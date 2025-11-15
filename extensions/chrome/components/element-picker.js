@@ -4,7 +4,6 @@
  */
 
 import { evalInPage } from '../utils/devtools.js';
-import { addPersistentOutline as addOutline, removePersistentOutline as removeOutline } from '../utils/element-outline.js';
 
 export class ElementPicker {
     constructor() {
@@ -167,8 +166,32 @@ export class ElementPicker {
                         this.isActive = false;
                         this.updateTileState('normal');
 
-                        // Add persistent outline to selected element
-                        this.addPersistentOutline();
+                        // Show highlightBox on selected element (instead of persistent outline)
+                        evalInPage(
+                            `(function() {
+                                if (typeof window.__INSPEKT_UPDATE_HIGHLIGHT__ === 'function') {
+                                    window.__INSPEKT_UPDATE_HIGHLIGHT__();
+                                    return { success: true };
+                                }
+                                return { success: false };
+                            })()`,
+                            (result, error) => {
+                                if (result && result.success) {
+                                    this.hasOutline = true;
+
+                                    // Get element tag for tile text
+                                    evalInPage(
+                                        `window.__INSPEKT_INSPECTED_ELEMENT__ ? window.__INSPEKT_INSPECTED_ELEMENT__.tagName.toLowerCase() : null`,
+                                        (tag, error) => {
+                                            if (tag) {
+                                                this.selectedElementTag = tag;
+                                                this.updateTileText(tag);
+                                            }
+                                        }
+                                    );
+                                }
+                            }
+                        );
 
                         console.log('[Element Picker] Picker completed successfully');
                     }
@@ -229,20 +252,26 @@ export class ElementPicker {
     }
 
     /**
-     * Remove persistent outline
+     * Remove highlight (hide highlightBox)
      */
     removeOutline() {
-        // Use shared utility to remove outline
-        removeOutline((result, error) => {
-            if (result && result.success) {
+        // Hide highlightBox by calling update with no element
+        evalInPage(
+            `(function() {
+                if (typeof window.__INSPEKT_UPDATE_HIGHLIGHT__ === 'function') {
+                    window.__INSPEKT_UPDATE_HIGHLIGHT__();
+                }
+                return { success: true };
+            })()`,
+            (result, error) => {
                 this.hasOutline = false;
                 this.selectedElementTag = null;
 
                 // Restore tile text to original
                 this.updateTileText(null);
 
-                console.log('[Inspekt Panel] Outline removed');
+                console.log('[Inspekt Panel] Highlight removed');
             }
-        });
+        );
     }
 }
