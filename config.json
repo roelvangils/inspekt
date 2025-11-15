@@ -1,5 +1,12 @@
 {
   "ai-language": "auto",
+  "ai": {
+    "endpoint": "https://thoth.elevenways.be/v1/chat/completions",
+    "text-model": "gpt-4o-mini",
+    "vision-model": "gpt-4o-mini",
+    "timeout": 30,
+    "max-tokens": 500
+  },
   "typing": {
     "human-like-typo-rate": 0.05
   },

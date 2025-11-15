@@ -67,4 +67,4 @@
     total: cleanedHeadings.length,
     url: window.location.href
   };
-})();
+})()

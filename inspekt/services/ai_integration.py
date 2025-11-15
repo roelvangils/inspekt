@@ -1,22 +1,25 @@
 """
-AI Integration Service - Language detection and AI tool orchestration.
+AI Integration Service - Language detection and Thoth API integration.
 
 This service handles:
 - Language detection from page content and configuration
 - Prompt file loading and formatting
-- Integration with external AI tools (mods, etc.)
-- Debug mode for prompt inspection
+- Direct integration with Thoth API for text and vision AI
+- Image processing for vision AI
 """
 
 from __future__ import annotations
 
+import base64
+import io
 import re
-import subprocess
 import sys
 from pathlib import Path
 from typing import Any
 
 import click
+import requests
+from PIL import Image
 
 from inspekt import config as inspekt_config
 
@@ -37,6 +40,9 @@ class AIIntegrationService:
             self.prompts_dir = current_file.parent.parent.parent / "prompts"
         else:
             self.prompts_dir = Path(prompts_dir)
+
+        # Load AI configuration
+        self.ai_config = inspekt_config.get_ai_config()
 
     def get_target_language(
         self,
@@ -104,36 +110,6 @@ class AIIntegrationService:
 
         return None
 
-    def check_mods_available(self) -> bool:
-        """
-        Check if the 'mods' AI tool is available.
-
-        Returns:
-            True if mods is installed and accessible
-        """
-        try:
-            subprocess.run(
-                ["mods", "--version"],
-                capture_output=True,
-                check=True,
-                timeout=5.0,
-            )
-            return True
-        except (subprocess.CalledProcessError, FileNotFoundError, subprocess.TimeoutExpired):
-            return False
-
-    def ensure_mods_available(self) -> None:
-        """
-        Ensure mods is available, exit with error if not.
-
-        Exits:
-            sys.exit(1) if mods is not installed
-        """
-        if not self.check_mods_available():
-            click.echo("Error: 'mods' command not found. Please install mods first.", err=True)
-            click.echo("Visit: https://github.com/charmbracelet/mods", err=True)
-            sys.exit(1)
-
     def load_prompt(self, prompt_name: str) -> str:
         """
         Load a prompt file from the prompts directory.
@@ -198,50 +174,258 @@ class AIIntegrationService:
 
         return "".join(prompt_parts)
 
-    def call_mods(
+    def call_thoth_text(
         self,
         prompt: str,
-        timeout: float = 60.0,
-        additional_args: list[str] | None = None,
+        model: str | None = None,
+        timeout: float | None = None,
+        max_tokens: int | None = None,
     ) -> str:
         """
-        Call the mods AI tool with the given prompt.
+        Call Thoth API for text completion.
 
         Args:
-            prompt: Complete prompt to send to mods
-            timeout: Maximum time to wait for response in seconds
-            additional_args: Additional CLI arguments for mods
+            prompt: Complete prompt to send to Thoth
+            model: Model name (default from config)
+            timeout: Request timeout in seconds (default from config)
+            max_tokens: Maximum tokens to generate (default from config)
 
         Returns:
             AI response text
 
         Raises:
-            SystemExit: If mods call fails
+            SystemExit: If API call fails
         """
-        cmd = ["mods"]
-        if additional_args:
-            cmd.extend(additional_args)
+        # Check for API key
+        api_key = self.ai_config.get("api-key", "")
+        if not api_key:
+            click.echo("Error: THOTH_API_KEY environment variable not set", err=True)
+            click.echo("Please set your Thoth API key to use AI features", err=True)
+            sys.exit(1)
+
+        # Use config defaults if not specified
+        model = model or self.ai_config.get("text-model", "gpt-4o-mini")
+        timeout = timeout or self.ai_config.get("timeout", 30)
+        max_tokens = max_tokens or self.ai_config.get("max-tokens", 500)
+        endpoint = self.ai_config.get("endpoint", "https://thoth.elevenways.be/v1/chat/completions")
 
         try:
-            result = subprocess.run(
-                cmd,
-                input=prompt,
-                text=True,
-                capture_output=True,
-                check=True,
+            response = requests.post(
+                endpoint,
+                headers={
+                    "Content-Type": "application/json",
+                    "Authorization": f"Bearer {api_key}",
+                },
+                json={
+                    "model": model,
+                    "messages": [{"role": "user", "content": prompt}],
+                    "max_tokens": max_tokens,
+                },
                 timeout=timeout,
             )
-            return result.stdout
 
-        except subprocess.TimeoutExpired:
-            click.echo(f"Error: mods timed out after {timeout} seconds", err=True)
+            if response.status_code == 200:
+                result = response.json()
+                if "choices" in result and len(result["choices"]) > 0:
+                    return result["choices"][0]["message"]["content"].strip()
+                else:
+                    click.echo(f"Error: Unexpected API response format: {result}", err=True)
+                    sys.exit(1)
+            else:
+                click.echo(f"Error: Thoth API returned status {response.status_code}", err=True)
+                try:
+                    error_body = response.json()
+                    click.echo(f"Error details: {error_body}", err=True)
+                except:
+                    click.echo(f"Response text: {response.text[:200]}", err=True)
+                sys.exit(1)
+
+        except requests.Timeout:
+            click.echo(f"Error: API request timed out after {timeout} seconds", err=True)
+            sys.exit(1)
+        except requests.RequestException as e:
+            click.echo(f"Error calling Thoth API: {e}", err=True)
             sys.exit(1)
 
-        except subprocess.CalledProcessError as e:
-            click.echo(f"Error calling mods: {e}", err=True)
-            if e.stderr:
-                click.echo(e.stderr, err=True)
-            sys.exit(1)
+    def call_thoth_vision(
+        self,
+        prompt: str,
+        image_data_url: str,
+        model: str | None = None,
+        timeout: float | None = None,
+        max_tokens: int | None = None,
+    ) -> str:
+        """
+        Call Thoth API for vision completion.
+
+        Args:
+            prompt: Text prompt for the vision request
+            image_data_url: Base64-encoded image data URL
+            model: Model name (default from config)
+            timeout: Request timeout in seconds (default from config)
+            max_tokens: Maximum tokens to generate (default from config)
+
+        Returns:
+            AI response text
+
+        Raises:
+            SystemExit: If API call fails
+        """
+        # Check for API key
+        api_key = self.ai_config.get("api-key", "")
+        if not api_key:
+            click.echo("Warning: THOTH_API_KEY not set, skipping vision analysis", err=True)
+            return ""
+
+        # Use config defaults if not specified
+        model = model or self.ai_config.get("vision-model", "gpt-4o-mini")
+        timeout = timeout or self.ai_config.get("timeout", 30)
+        max_tokens = max_tokens or self.ai_config.get("max-tokens", 150)
+        endpoint = self.ai_config.get("endpoint", "https://thoth.elevenways.be/v1/chat/completions")
+
+        try:
+            # Extract base64 data from data URL
+            if ';base64,' in image_data_url:
+                base64_data = image_data_url.split(';base64,')[1]
+            else:
+                click.echo("Error: Invalid image data URL format", err=True)
+                return ""
+
+            response = requests.post(
+                endpoint,
+                headers={
+                    "Content-Type": "application/json",
+                    "Authorization": f"Bearer {api_key}",
+                },
+                json={
+                    "model": model,
+                    "messages": [
+                        {
+                            "role": "user",
+                            "content": [
+                                {"type": "text", "text": prompt},
+                                {
+                                    "type": "image_url",
+                                    "image_url": {
+                                        "url": f"data:image/jpeg;base64,{base64_data}",
+                                        "detail": "low",
+                                    },
+                                },
+                            ],
+                        }
+                    ],
+                    "max_tokens": max_tokens,
+                },
+                timeout=timeout,
+            )
+
+            if response.status_code == 200:
+                result = response.json()
+                if "choices" in result and len(result["choices"]) > 0:
+                    description = result["choices"][0]["message"]["content"].strip()
+                    click.echo(f"✓ Got vision description ({len(description)} chars)", err=True)
+                    return description
+                else:
+                    click.echo(f"Warning: No choices in API response: {result}", err=True)
+                    return ""
+            else:
+                click.echo(f"Warning: Vision API returned status {response.status_code}", err=True)
+                try:
+                    error_body = response.json()
+                    click.echo(f"Error details: {error_body}", err=True)
+                except:
+                    click.echo(f"Response text: {response.text[:200]}", err=True)
+                return ""
+
+        except requests.Timeout:
+            click.echo(f"Warning: Vision API timed out after {timeout} seconds", err=True)
+            return ""
+        except requests.RequestException as e:
+            click.echo(f"Warning: Failed to call vision API: {e}", err=True)
+            return ""
+        except Exception as e:
+            click.echo(f"Warning: Unexpected error in vision API: {e}", err=True)
+            return ""
+
+    def download_and_convert_image(
+        self, image_url: str, max_size: int = 800, quality: int = 60
+    ) -> str:
+        """
+        Download an image from a URL and convert it to a base64 data URL.
+
+        Args:
+            image_url: URL of the image to download
+            max_size: Maximum width/height in pixels (image will be resized if larger)
+            quality: JPEG quality (1-100)
+
+        Returns:
+            Base64-encoded data URL (data:image/jpeg;base64,...)
+        """
+        try:
+            # Download the image
+            click.echo(f"Downloading image from {image_url[:80]}...", err=True)
+            response = requests.get(image_url, timeout=10)
+            response.raise_for_status()
+
+            # Open image with PIL
+            img = Image.open(io.BytesIO(response.content))
+
+            # Convert to RGB if necessary (e.g., RGBA or palette mode)
+            if img.mode not in ('RGB', 'L'):
+                img = img.convert('RGB')
+
+            # Resize if too large
+            width, height = img.size
+            if width > max_size or height > max_size:
+                # Calculate new size maintaining aspect ratio
+                if width > height:
+                    new_width = max_size
+                    new_height = int(height * (max_size / width))
+                else:
+                    new_height = max_size
+                    new_width = int(width * (max_size / height))
+
+                img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
+                click.echo(
+                    f"Resized image from {width}x{height} to {new_width}x{new_height}", err=True
+                )
+
+            # Convert to JPEG in memory
+            buffer = io.BytesIO()
+            img.save(buffer, format='JPEG', quality=quality, optimize=True)
+            buffer.seek(0)
+
+            # Encode to base64
+            img_base64 = base64.b64encode(buffer.read()).decode('utf-8')
+            data_url = f"data:image/jpeg;base64,{img_base64}"
+
+            click.echo(f"✓ Image converted to base64 ({len(img_base64)} bytes)", err=True)
+            return data_url
+
+        except requests.RequestException as e:
+            click.echo(f"Error downloading image: {e}", err=True)
+            return ""
+        except Exception as e:
+            click.echo(f"Error processing image: {e}", err=True)
+            return ""
+
+    def get_image_description(
+        self, image_data_url: str, prompt: str | None = None
+    ) -> str:
+        """
+        Get a vision AI description of an image.
+
+        Args:
+            image_data_url: Base64-encoded image data URL
+            prompt: Custom prompt for vision analysis (default: accessibility description)
+
+        Returns:
+            Description of the image
+        """
+        if not prompt:
+            prompt = "Describe this image for users who cannot see it in max. 100 words."
+
+        return self.call_thoth_vision(prompt, image_data_url, max_tokens=150)
 
     def show_debug_prompt(self, prompt: str) -> None:
         """
@@ -299,7 +483,7 @@ class AIIntegrationService:
 
         # Call AI
         click.echo("Generating description...", err=True)
-        return self.call_mods(full_prompt)
+        return self.call_thoth_text(full_prompt)
 
     def generate_summary(
         self,
@@ -343,7 +527,7 @@ class AIIntegrationService:
 
         # Call AI
         click.echo(f"Generating summary for: {title}", err=True)
-        return self.call_mods(full_prompt)
+        return self.call_thoth_text(full_prompt)
 
 
 # Global service instance (lazy-initialized)

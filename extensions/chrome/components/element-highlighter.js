@@ -32,7 +32,8 @@ export class ElementHighlighter {
         if (!currentElement) return;
 
         evalInPage(
-            `(function(forceNew) {
+            `(function() {
+                const forceNew = ${forceNew};
                 const el = window.__INSPEKT_INSPECTED_ELEMENT__;
                 if (!el) return false;
 
@@ -105,12 +106,7 @@ export class ElementHighlighter {
                     el.style.transform = 'scale(1)';
                     el.style.transformOrigin = 'center center';
                     el.style.transition = 'transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.4s ease-out';
-                    el.style.boxShadow = \`
-                        0 0 0 4px #0066ff,
-                        0 0 0 8px rgba(0, 102, 255, 0.3),
-                        0 20px 60px rgba(0, 102, 255, 0.5),
-                        0 0 100px rgba(0, 102, 255, 0.3)
-                    \`;
+                    el.style.boxShadow = '0 0 0 4px #0066ff, 0 0 0 8px rgba(0, 102, 255, 0.3), 0 20px 60px rgba(0, 102, 255, 0.5), 0 0 100px rgba(0, 102, 255, 0.3)';
                     el.style.backgroundColor = bgColor;
 
                     // Scale factor - larger than before
@@ -119,7 +115,7 @@ export class ElementHighlighter {
                     // Animate in
                     requestAnimationFrame(() => {
                         requestAnimationFrame(() => {
-                            el.style.transform = \`scale(\${scale})\`;
+                            el.style.transform = 'scale(' + scale + ')';
                         });
                     });
 
@@ -127,7 +123,7 @@ export class ElementHighlighter {
                     setTimeout(() => {
                         // Animate out
                         el.style.transition = 'transform 0.5s ease-out, box-shadow 0.5s ease-out';
-                        el.style.transform = \`scale(\${scale * 0.95})\`;
+                        el.style.transform = 'scale(' + (scale * 0.95) + ')';
                         el.style.boxShadow = 'none';
 
                         // Restore original styles after fade completes
@@ -144,7 +140,7 @@ export class ElementHighlighter {
                 }, isInViewport ? 0 : 500); // Wait for scroll if needed
 
                 return { created: true };
-            })(${forceNew})`,
+            })()`,
             (result, error) => {
                 if (result) {
                     this.btnHighlight.classList.add('success-flash');

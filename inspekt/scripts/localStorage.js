@@ -23,6 +23,79 @@
         };
     }
 
+    // Helper function to check if a string should be split into an array
+    function splitDelimitedString(value) {
+        // Check for pipe-separated values
+        if (value.includes('|')) {
+            return value.split('|').map(s => s.trim());
+        }
+
+        // Check for comma-separated values
+        // Only split if there are multiple items (has commas)
+        if (value.includes(',')) {
+            const parts = value.split(',').map(s => s.trim());
+            // Only treat as array if we have multiple non-empty parts
+            if (parts.length > 1 && parts.every(p => p.length > 0)) {
+                return parts;
+            }
+        }
+
+        return null; // Not a delimited string
+    }
+
+    // Helper function to recursively transform values (including nested objects)
+    function transformValueRecursive(obj) {
+        if (obj === null || obj === undefined) {
+            return obj;
+        }
+
+        // If it's an array, transform each element
+        if (Array.isArray(obj)) {
+            return obj.map(item => transformValueRecursive(item));
+        }
+
+        // If it's an object, transform each property
+        if (typeof obj === 'object') {
+            const result = {};
+            for (const key in obj) {
+                if (obj.hasOwnProperty(key)) {
+                    result[key] = transformValueRecursive(obj[key]);
+                }
+            }
+            return result;
+        }
+
+        // If it's a string, check if it's delimited
+        if (typeof obj === 'string') {
+            const delimited = splitDelimitedString(obj);
+            if (delimited) {
+                return delimited;
+            }
+        }
+
+        // Return as-is for other types (numbers, booleans, etc.)
+        return obj;
+    }
+
+    // Helper function to transform storage values
+    function transformValue(value) {
+        // Try to parse as JSON first
+        try {
+            const parsed = JSON.parse(value);
+            // Recursively transform to handle nested delimited strings
+            return transformValueRecursive(parsed);
+        } catch (e) {
+            // Not valid JSON, check for delimited values at top level
+            const delimited = splitDelimitedString(value);
+            if (delimited) {
+                return delimited;
+            }
+
+            // Return as plain string
+            return value;
+        }
+    }
+
     // Get all localStorage items
     function getAllItems() {
         const items = {};
@@ -31,7 +104,8 @@
         for (let i = 0; i < length; i++) {
             const itemKey = window.localStorage.key(i);
             if (itemKey !== null) {
-                items[itemKey] = window.localStorage.getItem(itemKey);
+                const rawValue = window.localStorage.getItem(itemKey);
+                items[itemKey] = transformValue(rawValue);
             }
         }
 
@@ -76,7 +150,9 @@
                     action: 'list',
                     count: Object.keys(allItems).length,
                     items: allItems,
-                    storageType: 'localStorage'
+                    storageType: 'localStorage',
+                    origin: window.location.origin,
+                    hostname: window.location.hostname
                 };
 
             case 'get':

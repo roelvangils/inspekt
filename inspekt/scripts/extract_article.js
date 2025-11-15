@@ -251,4 +251,4 @@
       url: window.location.href
     };
   }
-})();
+})()

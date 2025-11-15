@@ -52,11 +52,8 @@ def open(url, wait, timeout):
     """
     executor = get_executor()
 
-    # Basic navigation code
-    nav_code = f"""
-        window.location.href = {json.dumps(url)};
-        true;
-    """
+    # Basic navigation code (use comma operator, not semicolons, for AsyncFunction wrapping)
+    nav_code = f"""(window.location.href = {json.dumps(url)}, true)"""
 
     # If wait flag is set, wait for page load
     if wait:
@@ -116,7 +113,7 @@ def back():
     """
     executor = get_executor()
 
-    code = "window.history.back(); true;"
+    code = "(window.history.back(), true)"
 
     result = executor.execute(code, timeout=10.0)
     executor.check_result_ok(result)
@@ -141,7 +138,7 @@ def forward():
     """
     executor = get_executor()
 
-    code = "window.history.forward(); true;"
+    code = "(window.history.forward(), true)"
 
     result = executor.execute(code, timeout=10.0)
     executor.check_result_ok(result)
@@ -172,10 +169,10 @@ def reload(hard):
     executor = get_executor()
 
     if hard:
-        code = "window.location.reload(true); true;"
+        code = "(window.location.reload(true), true)"
         msg = "✓ Hard reload initiated"
     else:
-        code = "window.location.reload(); true;"
+        code = "(window.location.reload(), true)"
         msg = "✓ Reload initiated"
 
     result = executor.execute(code, timeout=10.0)
@@ -212,7 +209,7 @@ def pageup():
     """
     executor = get_executor()
 
-    code = "window.scrollBy(0, -window.innerHeight); true;"
+    code = "(window.scrollBy(0, -window.innerHeight), true)"
 
     result = executor.execute(code, timeout=10.0)
     executor.check_result_ok(result)
@@ -237,7 +234,7 @@ def pagedown():
     """
     executor = get_executor()
 
-    code = "window.scrollBy(0, window.innerHeight); true;"
+    code = "(window.scrollBy(0, window.innerHeight), true)"
 
     result = executor.execute(code, timeout=10.0)
     executor.check_result_ok(result)
@@ -262,7 +259,7 @@ def top():
     """
     executor = get_executor()
 
-    code = "window.scrollTo(0, 0); true;"
+    code = "(window.scrollTo(0, 0), true)"
 
     result = executor.execute(code, timeout=10.0)
     executor.check_result_ok(result)
@@ -287,7 +284,7 @@ def bottom():
     """
     executor = get_executor()
 
-    code = "window.scrollTo(0, document.body.scrollHeight); true;"
+    code = "(window.scrollTo(0, document.body.scrollHeight), true)"
 
     result = executor.execute(code, timeout=10.0)
     executor.check_result_ok(result)

@@ -1,12 +1,20 @@
 """Configuration management for Inspekt."""
 
 import json
+import os
 from pathlib import Path
 from typing import Any
 
 # Default configuration
 DEFAULT_CONFIG: dict[str, Any] = {
     "ai-language": "auto",
+    "ai": {
+        "endpoint": "https://thoth.elevenways.be/v1/chat/completions",
+        "text-model": "gpt-4o-mini",
+        "vision-model": "gpt-4o-mini",
+        "timeout": 30,
+        "max-tokens": 500,
+    },
     "typing": {
         "human-like-typo-rate": 0.05,
     },
@@ -88,6 +96,12 @@ def load_config() -> dict[str, Any]:
                     config["typing"].update(user_config["typing"])
                 else:
                     config["typing"] = user_config["typing"]
+            elif key == "ai" and isinstance(user_config["ai"], dict):
+                # Nested AI config - merge deeply
+                if isinstance(config.get("ai"), dict):
+                    config["ai"].update(user_config["ai"])
+                else:
+                    config["ai"] = user_config["ai"]
             else:
                 # Root-level properties like ai-language - overwrite
                 config[key] = user_config[key]
@@ -218,6 +232,63 @@ def get_config_path() -> str | None:
     """Get the path to the config file being used, if any."""
     config_file = find_config_file()
     return str(config_file) if config_file else None
+
+
+def validate_ai_config(config: dict[str, Any]) -> dict[str, Any]:
+    """
+    Validate and normalize AI configuration.
+
+    Args:
+        config: Configuration dictionary
+
+    Returns:
+        Validated AI configuration with normalized values
+    """
+    ai_config = config.get("ai", {})
+    validated = {}
+
+    # endpoint: URL string
+    validated["endpoint"] = str(
+        ai_config.get("endpoint", "https://thoth.elevenways.be/v1/chat/completions")
+    )
+
+    # text-model: model name string
+    validated["text-model"] = str(ai_config.get("text-model", "gpt-4o-mini"))
+
+    # vision-model: model name string
+    validated["vision-model"] = str(ai_config.get("vision-model", "gpt-4o-mini"))
+
+    # timeout: positive integer (seconds)
+    timeout = ai_config.get("timeout", 30)
+    try:
+        timeout = max(1, int(timeout))
+    except (ValueError, TypeError):
+        timeout = 30
+    validated["timeout"] = timeout
+
+    # max-tokens: positive integer
+    max_tokens = ai_config.get("max-tokens", 500)
+    try:
+        max_tokens = max(1, int(max_tokens))
+    except (ValueError, TypeError):
+        max_tokens = 500
+    validated["max-tokens"] = max_tokens
+
+    # api-key: from environment variable THOTH_API_KEY
+    validated["api-key"] = os.environ.get("THOTH_API_KEY", "")
+
+    return validated
+
+
+def get_ai_config() -> dict[str, Any]:
+    """
+    Get validated AI configuration.
+
+    Returns:
+        Validated AI configuration dictionary with API key from environment
+    """
+    config = load_config()
+    return validate_ai_config(config)
 
 
 def get_typing_config() -> dict[str, Any]:

@@ -24,4 +24,4 @@
     totalImages: allImages.length,
     images: imageInfo
   };
-})();
+})()

@@ -18,6 +18,10 @@ import { handleCopyClickCommand } from '../handlers/copy-click-command.js';
 import { handleShowInElements } from '../handlers/show-in-elements.js';
 import { handleHighlightElement } from '../handlers/highlight-element.js';
 import { handleTakeNodeScreenshot } from '../handlers/screenshot.js';
+import { handleNavigateParent } from '../handlers/navigate-parent.js';
+import { handleNavigateChild } from '../handlers/navigate-child.js';
+import { handleNavigatePrevSibling } from '../handlers/navigate-prev-sibling.js';
+import { handleNavigateNextSibling } from '../handlers/navigate-next-sibling.js';
 
 export class QuickActionsManager {
     constructor(dependencies) {
@@ -247,7 +251,11 @@ export class QuickActionsManager {
         copyClickCommand: handleCopyClickCommand,
         showInElementsPanel: handleShowInElements,
         highlightElement: handleHighlightElement,
-        takeNodeScreenshot: handleTakeNodeScreenshot
+        takeNodeScreenshot: handleTakeNodeScreenshot,
+        navigateToParent: handleNavigateParent,
+        navigateToChild: handleNavigateChild,
+        navigateToPrevSibling: handleNavigatePrevSibling,
+        navigateToNextSibling: handleNavigateNextSibling
     };
 
     /**

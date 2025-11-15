@@ -306,10 +306,13 @@ export function showScreenshotModal(dataUrl, selector, width, height, filesize) 
 
     document.addEventListener('keydown', function escHandler(e) {
         if (e.key === 'Escape') {
+            e.preventDefault();
+            e.stopPropagation();
+            e.stopImmediatePropagation();
             closeModal();
-            document.removeEventListener('keydown', escHandler);
+            document.removeEventListener('keydown', escHandler, true);
         }
-    });
+    }, true);
 
     // Fade in animation
     requestAnimationFrame(() => {

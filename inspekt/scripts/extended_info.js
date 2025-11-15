@@ -45,7 +45,7 @@
     }
 
     return result;
-  })();
+  })()
 
   // 2. More Accessibility Details
   extended.accessibility = (() => {
@@ -73,7 +73,7 @@
         return (text.includes('skip') || text.includes('jump')) &&
                (href === '#main' || href === '#content' || href.includes('main') || href.includes('content'));
       });
-    })();
+    })()
 
     const ariaCount = document.querySelectorAll('[aria-label], [aria-labelledby], [aria-describedby], [role], [aria-hidden], [aria-live], [aria-expanded], [aria-controls]').length;
 
@@ -84,7 +84,7 @@
       ariaAttributeCount: ariaCount,
       langAttribute: document.documentElement.hasAttribute('lang')
     };
-  })();
+  })()
 
   // 3. Structured Data (Schema.org)
   extended.structuredData = (() => {
@@ -107,7 +107,7 @@
       jsonLdTypes: jsonLd,
       microdataCount: microdata
     };
-  })();
+  })()
 
   // 4. Media Content
   extended.media = (() => {
@@ -116,14 +116,14 @@
       audio: document.querySelectorAll('audio').length,
       svgImages: document.querySelectorAll('svg, img[src$=".svg"]').length
     };
-  })();
+  })()
 
   // 5. More SEO
   extended.seoExtra = (() => {
     const sitemap = (() => {
       const sitemapLink = document.querySelector('link[rel="sitemap"]');
       return sitemapLink ? sitemapLink.href : null;
-    })();
+    })()
 
     const favicon = (() => {
       const icon = document.querySelector('link[rel="icon"], link[rel="shortcut icon"]');
@@ -135,7 +135,7 @@
         return 'Yes';
       }
       return null;
-    })();
+    })()
 
     const alternateLanguages = Array.from(document.querySelectorAll('link[rel="alternate"][hreflang]')).map(link => ({
       lang: link.getAttribute('hreflang'),
@@ -147,7 +147,7 @@
       favicon,
       alternateLanguages
     };
-  })();
+  })()
 
   // 6. Console Messages (capture new messages)
   extended.consoleStats = (() => {
@@ -156,7 +156,7 @@
       available: typeof console !== 'undefined',
       note: 'Real-time console monitoring would require persistent connection'
     };
-  })();
+  })()
 
   // 7. Third-party Resources
   extended.thirdParty = (() => {
@@ -204,7 +204,7 @@
       externalDomainCount: externalDomains.size,
       externalDomains: Array.from(externalDomains).slice(0, 10) // Top 10
     };
-  })();
+  })()
 
   // 8. Content Stats
   extended.content = (() => {
@@ -224,7 +224,7 @@
       paragraphs: mainElement.querySelectorAll('p').length,
       lists: mainElement.querySelectorAll('ul, ol').length
     };
-  })();
+  })()
 
   // 9. Network Summary (from Performance API)
   extended.network = (() => {
@@ -258,7 +258,7 @@
     } catch (e) {
       return null;
     }
-  })();
+  })()
 
   // 10. Font Details
   extended.fonts = (() => {
@@ -317,7 +317,7 @@
     }
 
     return fonts;
-  })();
+  })()
 
   // 11. Form Details
   extended.forms = (() => {
@@ -357,7 +357,7 @@
     });
 
     return forms;
-  })();
+  })()
 
   // 12. More Core Web Vitals
   extended.coreWebVitals = (() => {
@@ -399,7 +399,7 @@
     } catch (e) {}
 
     return Object.keys(vitals).length > 0 ? vitals : null;
-  })();
+  })()
 
   return extended;
-})();
+})()

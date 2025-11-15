@@ -221,4 +221,4 @@
     total: links.length,
     domain: currentDomain
   };
-})();
+})()

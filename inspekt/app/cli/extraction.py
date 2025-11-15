@@ -107,14 +107,6 @@ def describe(language, debug, force_refresh):
         click.echo("Error: Bridge server is not running. Start it with: inspekt server start", err=True)
         sys.exit(1)
 
-    # Check if mods is available
-    try:
-        subprocess.run(["/opt/homebrew/bin/mods", "--version"], capture_output=True, check=True)
-    except (subprocess.CalledProcessError, FileNotFoundError):
-        click.echo("Error: 'mods' command not found. Please install mods first.", err=True)
-        click.echo("Visit: https://github.com/charmbracelet/mods", err=True)
-        sys.exit(1)
-
     # Load and execute the extraction script
     script_path = Path(__file__).parent.parent.parent / "scripts" / "extract_page_structure.js"
 
@@ -182,61 +174,32 @@ def describe(language, debug, force_refresh):
                 click.echo(cached_result["output"])
                 return
 
-        # Read the prompt
-        prompt_path = Path(__file__).parent.parent.parent.parent / "prompts" / "describe.prompt"
-
-        if not prompt_path.exists():
-            click.echo(f"Error: Prompt file not found: {prompt_path}", err=True)
-            sys.exit(1)
-
-        with builtin_open(prompt_path) as f:
-            prompt = f.read().strip()
-
-        # Add language instruction if specified
-        if target_lang:
-            prompt = f"{prompt}\n\nIMPORTANT: Provide your response in {target_lang} language."
-
-        # Combine prompt with page structure (now in Markdown format)
-        full_input = f"{prompt}\n\n---\n\nPAGE STRUCTURE:\n\n{page_structure}"
-
-        # Debug mode: show the full prompt instead of calling AI
-        if debug:
-            click.echo("=" * 80)
-            click.echo("DEBUG: Full prompt that would be sent to AI")
-            click.echo("=" * 80)
-            click.echo()
-            click.echo(full_input)
-            click.echo()
-            click.echo("=" * 80)
-            return
+        # Use AI service for description generation
+        ai_service = get_ai_service()
 
         if force_refresh:
             click.echo("Generating fresh description... [AI - Force Refresh]", err=True)
         else:
             click.echo("Generating description... [AI]", err=True)
 
-        # Call mods
-        try:
-            result = subprocess.run(
-                ["/opt/homebrew/bin/mods"], input=full_input, text=True, capture_output=True, check=True
-            )
+        output = ai_service.generate_description(
+            page_structure=page_structure,
+            language_override=language,
+            debug=debug
+        )
 
-            output = result.stdout
+        # If debug mode, generate_description returns None after showing prompt
+        if debug:
+            return
 
-            # Store in cache for future use
-            if content_cache.is_enabled("describe") and current_url:
-                fingerprint = content_cache.create_describe_fingerprint(page_data)
-                content_cache.store_content(current_url, "describe", fingerprint, output, target_lang or "auto")
-                click.echo(click.style("✓ Description cached for future use", fg="green"), err=True)
-                click.echo()
+        # Store in cache for future use
+        if content_cache.is_enabled("describe") and current_url:
+            fingerprint = content_cache.create_describe_fingerprint(page_data)
+            content_cache.store_content(current_url, "describe", fingerprint, output, target_lang or "auto")
+            click.echo(click.style("✓ Description cached for future use", fg="green"), err=True)
+            click.echo()
 
-            click.echo(output)
-
-        except subprocess.CalledProcessError as e:
-            click.echo(f"Error calling mods: {e}", err=True)
-            if e.stderr:
-                click.echo(e.stderr, err=True)
-            sys.exit(1)
+        click.echo(output)
 
     except (ConnectionError, TimeoutError, RuntimeError) as e:
         click.echo(f"Error: {e}", err=True)
@@ -380,14 +343,6 @@ def do(instruction, debug, no_execute, force_ai):
 
     if not client.is_alive():
         click.echo("Error: Bridge server is not running. Start it with: inspekt server start", err=True)
-        sys.exit(1)
-
-    # Check if mods is available
-    try:
-        subprocess.run(["/opt/homebrew/bin/mods", "--version"], capture_output=True, check=True)
-    except (subprocess.CalledProcessError, FileNotFoundError):
-        click.echo("Error: 'mods' command not found. Please install mods first.", err=True)
-        click.echo("Visit: https://github.com/charmbracelet/mods", err=True)
         sys.exit(1)
 
     # Load and execute the extraction script
@@ -588,39 +543,37 @@ def do(instruction, debug, no_execute, force_ai):
 
         click.echo("Finding matching actions...", err=True)
 
-        # Call mods
+        # Call AI service
+        ai_service = get_ai_service()
+        raw_output = ai_service.call_thoth_text(full_input)
+
+        # Parse the JSON response
+        raw_output = raw_output.strip()
         try:
-            result = subprocess.run(
-                ["/opt/homebrew/bin/mods"], input=full_input, text=True, capture_output=True, check=True
-            )
+            response = json.loads(raw_output)
+        except json.JSONDecodeError:
+            # Try to strip markdown code blocks (```json ... ```)
+            if raw_output.startswith("```"):
+                # Remove opening ```json or ``` and closing ```
+                lines = raw_output.split("\n")
+                if lines[0].startswith("```"):
+                    lines = lines[1:]  # Remove first line
+                if lines and lines[-1].strip() == "```":
+                    lines = lines[:-1]  # Remove last line
+                raw_output = "\n".join(lines).strip()
 
-            # Parse the JSON response
-            raw_output = result.stdout.strip()
-            try:
-                response = json.loads(raw_output)
-            except json.JSONDecodeError:
-                # Try to strip markdown code blocks (```json ... ```)
-                if raw_output.startswith("```"):
-                    # Remove opening ```json or ``` and closing ```
-                    lines = raw_output.split("\n")
-                    if lines[0].startswith("```"):
-                        lines = lines[1:]  # Remove first line
-                    if lines and lines[-1].strip() == "```":
-                        lines = lines[:-1]  # Remove last line
-                    raw_output = "\n".join(lines).strip()
-
-                    try:
-                        response = json.loads(raw_output)
-                    except json.JSONDecodeError as e:
-                        click.echo(f"Error: AI returned invalid JSON even after stripping markdown: {e}", err=True)
-                        click.echo("Raw response:", err=True)
-                        click.echo(result.stdout, err=True)
-                        sys.exit(1)
-                else:
-                    click.echo(f"Error: AI returned invalid JSON", err=True)
+                try:
+                    response = json.loads(raw_output)
+                except json.JSONDecodeError as e:
+                    click.echo(f"Error: AI returned invalid JSON even after stripping markdown: {e}", err=True)
                     click.echo("Raw response:", err=True)
-                    click.echo(result.stdout, err=True)
+                    click.echo(raw_output, err=True)
                     sys.exit(1)
+            else:
+                click.echo(f"Error: AI returned invalid JSON", err=True)
+                click.echo("Raw response:", err=True)
+                click.echo(raw_output, err=True)
+                sys.exit(1)
 
             # Output the results
             click.echo()
@@ -1155,15 +1108,6 @@ def summarize(format, language, debug, force_refresh):
         click.echo("Error: Bridge server is not running. Start it with: inspekt server start", err=True)
         sys.exit(1)
 
-    # Check if mods is available
-    if format == "summary":
-        try:
-            subprocess.run(["/opt/homebrew/bin/mods", "--version"], capture_output=True, check=True)
-        except (subprocess.CalledProcessError, FileNotFoundError):
-            click.echo("Error: 'mods' command not found. Please install mods first.", err=True)
-            click.echo("Visit: https://github.com/charmbracelet/mods", err=True)
-            sys.exit(1)
-
     # Load and execute the extract_article script
     script_path = Path(__file__).parent.parent.parent / "scripts" / "extract_article.js"
 
@@ -1251,68 +1195,35 @@ def summarize(format, language, debug, force_refresh):
                 click.echo(cached_result["output"])
                 return
 
-        # Generate summary using mods
-        if force_refresh:
-            click.echo(f"Generating fresh summary for: {title} [AI - Force Refresh]", err=True)
-        else:
-            click.echo(f"Generating summary for: {title} [AI]", err=True)
+        # Use AI service for summary generation
+        ai_service = get_ai_service()
 
-        # Read the prompt file
-        prompt_path = Path(__file__).parent.parent.parent.parent / "prompts" / "summary.prompt"
+        # Show byline before AI call if in debug mode
+        if debug and byline:
+            click.echo(f"Article by: {byline}", err=True)
+            click.echo("", err=True)
 
-        if not prompt_path.exists():
-            click.echo(f"Error: Prompt file not found: {prompt_path}", err=True)
-            sys.exit(1)
+        output = ai_service.generate_summary(
+            article=article,
+            language_override=language,
+            debug=debug
+        )
 
-        with builtin_open(prompt_path) as f:
-            prompt = f.read().strip()
-
-        # Add language instruction if specified
-        if target_lang:
-            prompt = f"{prompt}\n\nIMPORTANT: Provide your response in {target_lang} language."
-
-        # Prepare the input for mods
-        full_input = f"{prompt}\n\nTitle: {title}\n\n{content}"
-
-        # Debug mode: show the full prompt instead of calling AI
+        # If debug mode, generate_summary returns None after showing prompt
         if debug:
-            click.echo("=" * 80)
-            click.echo("DEBUG: Full prompt that would be sent to AI")
-            click.echo("=" * 80)
-            click.echo()
-            if byline:
-                click.echo(f"Article by: {byline}")
-                click.echo()
-            click.echo(full_input)
-            click.echo()
-            click.echo("=" * 80)
             return
 
-        # Call mods
-        try:
-            result = subprocess.run(
-                ["/opt/homebrew/bin/mods"], input=full_input, text=True, capture_output=True, check=True
-            )
+        # Store in cache for future use
+        if content_cache.is_enabled("summarize") and current_url:
+            fingerprint = content_cache.create_summarize_fingerprint(article_data)
+            content_cache.store_content(current_url, "summarize", fingerprint, output, target_lang or "auto")
+            click.echo(click.style("✓ Summary cached for future use", fg="green"), err=True)
+            click.echo()
 
-            output = result.stdout
-
-            # Store in cache for future use
-            if content_cache.is_enabled("summarize") and current_url:
-                fingerprint = content_cache.create_summarize_fingerprint(article_data)
-                content_cache.store_content(current_url, "summarize", fingerprint, output, target_lang or "auto")
-                click.echo(click.style("✓ Summary cached for future use", fg="green"), err=True)
-                click.echo()
-
-            if byline:
-                click.echo(f"By: {byline}")
-                click.echo("")
-            click.echo(output)
-
-        except subprocess.CalledProcessError as e:
-            click.echo(f"Error calling mods: {e}", err=True)
-            if e.stderr:
-                click.echo(e.stderr, err=True)
-            sys.exit(1)
+        if byline:
+            click.echo(f"By: {byline}")
+            click.echo("")
+        click.echo(output)
 
     except (ConnectionError, TimeoutError, RuntimeError) as e:
         click.echo(f"Error: {e}", err=True)
@@ -1389,16 +1300,19 @@ def index(no_cache, output):
         # If there's a largest image, get vision AI description
         if largest_image:
             try:
+                # Get AI service
+                ai_service = get_ai_service()
+
                 # Get image data URL (either from browser or download server-side)
                 image_data_url = largest_image.get("dataUrl")
 
                 # If we have a URL but no dataUrl, download and convert it
                 if not image_data_url and largest_image.get("url"):
-                    image_data_url = download_and_convert_image(largest_image["url"])
+                    image_data_url = ai_service.download_and_convert_image(largest_image["url"])
 
                 if image_data_url:
                     click.echo("Analyzing largest image with vision AI...", err=True)
-                    vision_description = get_image_description(image_data_url)
+                    vision_description = ai_service.get_image_description(image_data_url)
                 else:
                     click.echo("Warning: No image data available for analysis", err=True)
                     vision_description = None
@@ -1520,14 +1434,6 @@ def ask(question, debug, no_cache):
 
     if not client.is_alive():
         click.echo("Error: Bridge server is not running. Start it with: inspekt server start", err=True)
-        sys.exit(1)
-
-    # Check if mods is available
-    try:
-        subprocess.run(["/opt/homebrew/bin/mods", "--version"], capture_output=True, check=True)
-    except (subprocess.CalledProcessError, FileNotFoundError):
-        click.echo("Error: 'mods' command not found. Please install mods first.", err=True)
-        click.echo("Visit: https://github.com/charmbracelet/mods", err=True)
         sys.exit(1)
 
     # Initialize content cache for AI response caching
@@ -1670,166 +1576,13 @@ PAGE INDEX:
     click.echo("Asking AI...", err=True)
     click.echo()
 
-    # Call mods
-    try:
-        result = subprocess.run(
-            ["/opt/homebrew/bin/mods"], input=full_input, text=True, capture_output=True, check=True
-        )
+    # Call AI service
+    ai_service = get_ai_service()
+    ai_response = ai_service.call_thoth_text(full_input)
+    click.echo(ai_response)
 
-        ai_response = result.stdout
-        click.echo(ai_response)
-
-        # Store response in cache (if we have a URL)
-        if current_url and not debug:
-            fingerprint = content_cache.create_ask_fingerprint(question)
-            question_hash = content_cache.get_question_hash(question)
-            content_cache.store_content(current_url, "ask", fingerprint, ai_response, question_hash)
-
-    except subprocess.CalledProcessError as e:
-        click.echo(f"Error calling mods: {e}", err=True)
-        if e.stderr:
-            click.echo(e.stderr, err=True)
-        sys.exit(1)
-
-
-def download_and_convert_image(image_url: str, max_size: int = 800, quality: int = 60) -> str:
-    """
-    Download an image from a URL and convert it to a base64 data URL.
-
-    Args:
-        image_url: URL of the image to download
-        max_size: Maximum width/height in pixels (image will be resized if larger)
-        quality: JPEG quality (1-100)
-
-    Returns:
-        Base64-encoded data URL (data:image/jpeg;base64,...)
-    """
-    try:
-        # Download the image
-        click.echo(f"Downloading image from {image_url[:80]}...", err=True)
-        response = requests.get(image_url, timeout=10)
-        response.raise_for_status()
-
-        # Open image with PIL
-        img = Image.open(io.BytesIO(response.content))
-
-        # Convert to RGB if necessary (e.g., RGBA or palette mode)
-        if img.mode not in ('RGB', 'L'):
-            img = img.convert('RGB')
-
-        # Resize if too large
-        width, height = img.size
-        if width > max_size or height > max_size:
-            # Calculate new size maintaining aspect ratio
-            if width > height:
-                new_width = max_size
-                new_height = int(height * (max_size / width))
-            else:
-                new_height = max_size
-                new_width = int(width * (max_size / height))
-
-            img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
-            click.echo(f"Resized image from {width}x{height} to {new_width}x{new_height}", err=True)
-
-        # Convert to JPEG in memory
-        buffer = io.BytesIO()
-        img.save(buffer, format='JPEG', quality=quality, optimize=True)
-        buffer.seek(0)
-
-        # Encode to base64
-        img_base64 = base64.b64encode(buffer.read()).decode('utf-8')
-        data_url = f"data:image/jpeg;base64,{img_base64}"
-
-        click.echo(f"✓ Image converted to base64 ({len(img_base64)} bytes)", err=True)
-        return data_url
-
-    except requests.RequestException as e:
-        click.echo(f"Error downloading image: {e}", err=True)
-        return ""
-    except Exception as e:
-        click.echo(f"Error processing image: {e}", err=True)
-        return ""
-
-
-def get_image_description(image_data_url: str) -> str:
-    """
-    Get a vision AI description of an image using the Thoth API.
-
-    Args:
-        image_data_url: Base64-encoded image data URL
-
-    Returns:
-        Description of the image
-    """
-    import os
-    import requests
-
-    try:
-        # Get API key from environment
-        api_key = os.environ.get("THOTH_API_KEY")
-        if not api_key:
-            click.echo("Warning: THOTH_API_KEY not set in environment, skipping image analysis", err=True)
-            return ""
-
-        # Extract base64 data from data URL
-        # Format: data:image/jpeg;base64,/9j/4AAQ...
-        if ';base64,' in image_data_url:
-            base64_data = image_data_url.split(';base64,')[1]
-        else:
-            return ""
-
-        # Call the Thoth vision API
-        response = requests.post(
-            "https://thoth.elevenways.be/v1/chat/completions",
-            headers={
-                "Content-Type": "application/json",
-                "Authorization": f"Bearer {api_key}"
-            },
-            json={
-                "model": "gpt-4o-mini",
-                "messages": [
-                    {
-                        "role": "user",
-                        "content": [
-                            {
-                                "type": "text",
-                                "text": "Describe this image for users who cannot see it in max. 100 words."
-                            },
-                            {
-                                "type": "image_url",
-                                "image_url": {
-                                    "url": f"data:image/jpeg;base64,{base64_data}",
-                                    "detail": "low"
-                                }
-                            }
-                        ]
-                    }
-                ],
-                "max_tokens": 150
-            },
-            timeout=30.0
-        )
-
-        if response.status_code == 200:
-            result = response.json()
-            if "choices" in result and len(result["choices"]) > 0:
-                description = result["choices"][0]["message"]["content"].strip()
-                click.echo(f"✓ Got vision description ({len(description)} chars)", err=True)
-                return description
-            else:
-                click.echo(f"Warning: No choices in API response: {result}", err=True)
-                return ""
-        else:
-            click.echo(f"Warning: Vision API returned status {response.status_code}", err=True)
-            try:
-                error_body = response.json()
-                click.echo(f"Error details: {error_body}", err=True)
-            except:
-                click.echo(f"Response text: {response.text[:200]}", err=True)
-            return ""
-
-    except Exception as e:
-        click.echo(f"Warning: Failed to get image description: {e}", err=True)
-        import traceback
-        click.echo(traceback.format_exc(), err=True)
-        return ""
+    # Store response in cache (if we have a URL)
+    if current_url and not debug:
+        fingerprint = content_cache.create_ask_fingerprint(question)
+        question_hash = content_cache.get_question_hash(question)
+        content_cache.store_content(current_url, "ask", fingerprint, ai_response, question_hash)

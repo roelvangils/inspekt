@@ -315,4 +315,4 @@
   }
 
   return output.join('\n');
-})();
+})()

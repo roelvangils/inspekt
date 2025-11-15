@@ -70,6 +70,42 @@ export const DEFAULT_ACTIONS = [
         handler: 'takeNodeScreenshot',
         shortcut: 'S',
         requiresElement: true
+    },
+    {
+        id: 'navigateParent',
+        icon: 'keyboard_arrow_up',
+        label: 'Navigate to Parent',
+        hint: 'Select parent element',
+        handler: 'navigateToParent',
+        shortcut: 'U',
+        requiresElement: true
+    },
+    {
+        id: 'navigateChild',
+        icon: 'keyboard_arrow_down',
+        label: 'Navigate to Child',
+        hint: 'Select first child',
+        handler: 'navigateToChild',
+        shortcut: 'D',
+        requiresElement: true
+    },
+    {
+        id: 'navigatePrevSibling',
+        icon: 'keyboard_arrow_left',
+        label: 'Navigate to Prev Sibling',
+        hint: 'Select previous sibling',
+        handler: 'navigateToPrevSibling',
+        shortcut: 'L',
+        requiresElement: true
+    },
+    {
+        id: 'navigateNextSibling',
+        icon: 'keyboard_arrow_right',
+        label: 'Navigate to Next Sibling',
+        hint: 'Select next sibling',
+        handler: 'navigateToNextSibling',
+        shortcut: 'R',
+        requiresElement: true
     }
 ];
 

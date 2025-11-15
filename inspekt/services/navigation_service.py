@@ -23,11 +23,8 @@ class NavigationService:
         Returns:
             Result dictionary with ok, result, error fields
         """
-        # Basic navigation code
-        nav_code = f"""
-            window.location.href = {json.dumps(url)};
-            true;
-        """
+        # Basic navigation code (use comma operator, not semicolons, for AsyncFunction wrapping)
+        nav_code = f"""(window.location.href = {json.dumps(url)}, true)"""
 
         # If wait flag is set, wait for page load
         if wait:
@@ -67,13 +64,13 @@ class NavigationService:
 
     def go_back(self) -> Dict[str, Any]:
         """Go back to the previous page in browser history."""
-        code = "window.history.back(); true;"
+        code = "window.history.back(), true)"
         result = self.executor.execute(code, timeout=10.0)
         return result
 
     def go_forward(self) -> Dict[str, Any]:
         """Go forward to the next page in browser history."""
-        code = "window.history.forward(); true;"
+        code = "window.history.forward(), true)"
         result = self.executor.execute(code, timeout=10.0)
         return result
 
@@ -88,33 +85,33 @@ class NavigationService:
             Result dictionary
         """
         if hard:
-            code = "window.location.reload(true); true;"
+            code = "window.location.reload(true), true)"
         else:
-            code = "window.location.reload(); true;"
+            code = "window.location.reload(), true)"
 
         result = self.executor.execute(code, timeout=10.0)
         return result
 
     def scroll_page_up(self) -> Dict[str, Any]:
         """Scroll up one page (one viewport height)."""
-        code = "window.scrollBy(0, -window.innerHeight); true;"
+        code = "window.scrollBy(0, -window.innerHeight), true)"
         result = self.executor.execute(code, timeout=10.0)
         return result
 
     def scroll_page_down(self) -> Dict[str, Any]:
         """Scroll down one page (one viewport height)."""
-        code = "window.scrollBy(0, window.innerHeight); true;"
+        code = "window.scrollBy(0, window.innerHeight), true)"
         result = self.executor.execute(code, timeout=10.0)
         return result
 
     def scroll_to_top(self) -> Dict[str, Any]:
         """Scroll to the top of the page."""
-        code = "window.scrollTo(0, 0); true;"
+        code = "window.scrollTo(0, 0), true)"
         result = self.executor.execute(code, timeout=10.0)
         return result
 
     def scroll_to_bottom(self) -> Dict[str, Any]:
         """Scroll to the bottom of the page."""
-        code = "window.scrollTo(0, document.body.scrollHeight); true;"
+        code = "window.scrollTo(0, document.body.scrollHeight), true)"
         result = self.executor.execute(code, timeout=10.0)
         return result

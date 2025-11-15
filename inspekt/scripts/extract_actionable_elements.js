@@ -265,4 +265,4 @@
     actionableElements: actionableElements,
     totalActions: actionCounter
   };
-})();
+})()

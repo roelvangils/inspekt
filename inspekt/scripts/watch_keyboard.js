@@ -59,4 +59,4 @@
         ok: true,
         message: 'Keyboard watcher started. Press keys to see output. Run zen.stopWatchingKeyboard() to stop.'
     };
-})();
+})()

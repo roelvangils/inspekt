@@ -460,4 +460,4 @@
   console.log('[Zen Index] Returning result with largestImage:', imageData ? 'YES' : 'NO');
 
   return result;
-})();
+})()
