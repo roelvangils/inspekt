@@ -6,6 +6,7 @@
  */
 
 import { evalInPage } from '../utils/devtools.js';
+import { addPersistentOutline } from '../utils/element-outline.js';
 
 export function handleNavigatePrevSibling(context) {
     console.log('[Navigate Prev Sibling] Executing navigation to previous sibling element');
@@ -50,8 +51,8 @@ export function handleNavigatePrevSibling(context) {
 
             console.log('[Navigate Prev Sibling] Successfully navigated to previous sibling:', result.siblingTag);
 
-            // Trigger spotlight highlight to draw attention to navigated element
-            context.elementHighlighter.highlight(true);
+            // Apply persistent outline to visually show the navigated element
+            addPersistentOutline();
         }
     );
 }

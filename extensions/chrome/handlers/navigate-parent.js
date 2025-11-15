@@ -6,6 +6,7 @@
  */
 
 import { evalInPage } from '../utils/devtools.js';
+import { addPersistentOutline } from '../utils/element-outline.js';
 
 export function handleNavigateParent(context) {
     console.log('[Navigate Parent] Executing navigation to parent element');
@@ -58,8 +59,8 @@ export function handleNavigateParent(context) {
 
             console.log('[Navigate Parent] Successfully navigated to parent:', result.parentTag);
 
-            // Trigger spotlight highlight to draw attention to navigated element
-            context.elementHighlighter.highlight(true);
+            // Apply persistent outline to visually show the navigated element
+            addPersistentOutline();
         }
     );
 }
