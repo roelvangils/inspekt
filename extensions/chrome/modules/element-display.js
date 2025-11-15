@@ -10,9 +10,10 @@ import { handleNavigatePrevSibling } from '../handlers/navigate-prev-sibling.js'
 import { handleNavigateNextSibling } from '../handlers/navigate-next-sibling.js';
 
 export class ElementDisplay {
-    constructor() {
+    constructor(elementHighlighter = null) {
         this.currentElement = null;
         this.inspectedElement = document.getElementById('inspectedElement');
+        this.elementHighlighter = elementHighlighter;
 
         // Note: Action buttons are now managed by QuickActionsManager
         // No longer need to reference them here
@@ -162,7 +163,10 @@ export class ElementDisplay {
      * @param {string} direction - Direction to navigate
      */
     handleNavigation(direction) {
-        const context = { elementDisplay: this };
+        const context = {
+            elementDisplay: this,
+            elementHighlighter: this.elementHighlighter
+        };
 
         switch (direction) {
             case 'parent':

@@ -55,7 +55,7 @@ function initializeManagers() {
 
     // Element handling
     console.log('[Panel] Creating element handlers...');
-    elementDisplay = new ElementDisplay();
+    elementDisplay = new ElementDisplay(); // elementHighlighter assigned below
     historyManager = new HistoryManager();
     elementMonitor = new ElementMonitor();
 
@@ -63,6 +63,9 @@ function initializeManagers() {
     console.log('[Panel] Creating components...');
     elementHighlighter = new ElementHighlighter(elementDisplay);
     elementPicker = new ElementPicker();
+
+    // Complete circular dependency: ElementDisplay needs ElementHighlighter
+    elementDisplay.elementHighlighter = elementHighlighter;
 
     // Initialize all managers (non-async)
     console.log('[Panel] Initializing managers...');
