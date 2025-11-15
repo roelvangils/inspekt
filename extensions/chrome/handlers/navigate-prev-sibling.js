@@ -50,8 +50,8 @@ export function handleNavigatePrevSibling(context) {
 
             console.log('[Navigate Prev Sibling] Successfully navigated to previous sibling:', result.siblingTag);
 
-            // Trigger element display update
-            context.elementDisplay.updateElement();
+            // Trigger spotlight highlight to draw attention to navigated element
+            context.elementHighlighter.highlight(true);
         }
     );
 }

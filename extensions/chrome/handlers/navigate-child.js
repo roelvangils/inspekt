@@ -50,8 +50,8 @@ export function handleNavigateChild(context) {
 
             console.log('[Navigate Child] Successfully navigated to child:', result.childTag);
 
-            // Trigger element display update
-            context.elementDisplay.updateElement();
+            // Trigger spotlight highlight to draw attention to navigated element
+            context.elementHighlighter.highlight(true);
         }
     );
 }
