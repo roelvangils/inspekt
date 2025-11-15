@@ -200,6 +200,18 @@
         }
     }
 
+    // Persistent scroll/resize handlers for highlightBox
+    function updatePersistentHighlight() {
+        const el = window.__INSPEKT_INSPECTED_ELEMENT__;
+        if (el && highlightBox && highlightBox.style.display !== 'none') {
+            const rect = el.getBoundingClientRect();
+            highlightBox.style.left = rect.left + 'px';
+            highlightBox.style.top = rect.top + 'px';
+            highlightBox.style.width = rect.width + 'px';
+            highlightBox.style.height = rect.height + 'px';
+        }
+    }
+
     // Global function to update highlight position (used for navigation)
     window.__INSPEKT_UPDATE_HIGHLIGHT__ = function() {
         const el = window.__INSPEKT_INSPECTED_ELEMENT__;
@@ -207,8 +219,29 @@
         if (!el) {
             if (highlightBox) {
                 highlightBox.style.display = 'none';
+                // Remove scroll/resize listeners when hiding
+                document.removeEventListener('scroll', updatePersistentHighlight, true);
+                window.removeEventListener('resize', updatePersistentHighlight);
             }
             return;
+        }
+
+        // Remove any persistent outline from previous element to prevent overlap
+        const existingOutline = document.querySelector('[data-inspekt-outline="true"]');
+        if (existingOutline) {
+            // Restore original styles
+            const originalOutline = existingOutline.getAttribute('data-inspekt-original-outline');
+            const originalBg = existingOutline.getAttribute('data-inspekt-original-background');
+            const originalTransition = existingOutline.getAttribute('data-inspekt-original-transition');
+
+            existingOutline.style.outline = originalOutline || '';
+            existingOutline.style.backgroundColor = originalBg || '';
+            existingOutline.style.transition = originalTransition || '';
+
+            existingOutline.removeAttribute('data-inspekt-outline');
+            existingOutline.removeAttribute('data-inspekt-original-outline');
+            existingOutline.removeAttribute('data-inspekt-original-background');
+            existingOutline.removeAttribute('data-inspekt-original-transition');
         }
 
         // Create highlightBox if it doesn't exist yet (navigation before picking)
@@ -237,6 +270,12 @@
         highlightBox.style.top = rect.top + 'px';
         highlightBox.style.width = rect.width + 'px';
         highlightBox.style.height = rect.height + 'px';
+
+        // Add persistent scroll/resize listeners to keep highlight anchored
+        document.removeEventListener('scroll', updatePersistentHighlight, true);
+        window.removeEventListener('resize', updatePersistentHighlight);
+        document.addEventListener('scroll', updatePersistentHighlight, true);
+        window.addEventListener('resize', updatePersistentHighlight);
     };
 
     // Initialize picker
