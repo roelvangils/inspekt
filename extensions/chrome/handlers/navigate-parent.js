@@ -6,7 +6,6 @@
  */
 
 import { evalInPage } from '../utils/devtools.js';
-import { addPersistentOutline } from '../utils/element-outline.js';
 
 export function handleNavigateParent(context) {
     console.log('[Navigate Parent] Executing navigation to parent element');
@@ -46,6 +45,11 @@ export function handleNavigateParent(context) {
             // Scroll into view
             parent.scrollIntoView({ behavior: 'smooth', block: 'center' });
 
+            // Update highlight to show new element with morph effect
+            if (typeof window.__INSPEKT_UPDATE_HIGHLIGHT__ === 'function') {
+                window.__INSPEKT_UPDATE_HIGHLIGHT__();
+            }
+
             return {
                 ok: true,
                 parentTag: parent.tagName.toLowerCase()
@@ -58,9 +62,6 @@ export function handleNavigateParent(context) {
             }
 
             console.log('[Navigate Parent] Successfully navigated to parent:', result.parentTag);
-
-            // Apply persistent outline to visually show the navigated element
-            addPersistentOutline();
         }
     );
 }

@@ -38,6 +38,11 @@ export function handleNavigatePrevSibling(context) {
             // Scroll into view
             prevSibling.scrollIntoView({ behavior: 'smooth', block: 'center' });
 
+            // Update highlight to show new element with morph effect
+            if (typeof window.__INSPEKT_UPDATE_HIGHLIGHT__ === 'function') {
+                window.__INSPEKT_UPDATE_HIGHLIGHT__();
+            }
+
             return {
                 ok: true,
                 siblingTag: prevSibling.tagName.toLowerCase()
@@ -50,9 +55,6 @@ export function handleNavigatePrevSibling(context) {
             }
 
             console.log('[Navigate Prev Sibling] Successfully navigated to previous sibling:', result.siblingTag);
-
-            // Apply persistent outline to visually show the navigated element
-            addPersistentOutline();
         }
     );
 }
