@@ -523,26 +523,26 @@ async def handle_http_health(request):
     cached = list(script_loader.get_cached_scripts())
 
     # Check if API server is running and get its stats
-    # Use requests library instead of aiohttp to avoid event loop conflicts
     api_server_info = None
     try:
-        import requests
-        resp = requests.get("http://127.0.0.1:8000/health", timeout=1)
-        if resp.status_code == 200:
-            api_data = resp.json()
-            api_server_info = {
-                "running": True,
-                "port": 8000,
-                "uptime_seconds": api_data.get("api_uptime_seconds", 0),
-                "total_requests": api_data.get("api_total_requests", 0),
-                "succeeded": api_data.get("api_succeeded", 0),
-                "failed": api_data.get("api_failed", 0),
-            }
-        else:
-            api_server_info = {
-                "running": False,
-                "port": 8000,
-            }
+        import aiohttp
+        async with aiohttp.ClientSession() as session:
+            async with session.get("http://127.0.0.1:8000/health", timeout=aiohttp.ClientTimeout(total=2)) as resp:
+                if resp.status == 200:
+                    api_data = await resp.json()
+                    api_server_info = {
+                        "running": True,
+                        "port": 8000,
+                        "uptime_seconds": api_data.get("api_uptime_seconds", 0),
+                        "total_requests": api_data.get("api_total_requests", 0),
+                        "succeeded": api_data.get("api_succeeded", 0),
+                        "failed": api_data.get("api_failed", 0),
+                    }
+                else:
+                    api_server_info = {
+                        "running": False,
+                        "port": 8000,
+                    }
     except Exception:
         # API server not running or not reachable
         api_server_info = {
