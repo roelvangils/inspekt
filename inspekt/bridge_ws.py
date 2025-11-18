@@ -522,6 +522,29 @@ async def handle_http_health(request):
     # Get cached scripts from script loader
     cached = list(script_loader.get_cached_scripts())
 
+    # Check if API server is running and get its stats
+    api_server_info = None
+    try:
+        import aiohttp
+        async with aiohttp.ClientSession() as session:
+            async with session.get("http://127.0.0.1:8000/health", timeout=aiohttp.ClientTimeout(total=1)) as resp:
+                if resp.status == 200:
+                    api_data = await resp.json()
+                    api_server_info = {
+                        "running": True,
+                        "port": 8000,
+                        "uptime_seconds": api_data.get("api_uptime_seconds", 0),
+                        "total_requests": api_data.get("api_total_requests", 0),
+                        "succeeded": api_data.get("api_succeeded", 0),
+                        "failed": api_data.get("api_failed", 0),
+                    }
+    except Exception:
+        # API server not running or not reachable
+        api_server_info = {
+            "running": False,
+            "port": 8000,
+        }
+
     return web.json_response(
         {
             "ok": True,
@@ -540,6 +563,7 @@ async def handle_http_health(request):
             "total_failed": total_requests_failed,
             "last_activity": last_activity_time,
             "cached_scripts": cached,
+            "api_server": api_server_info,
         }
     )
 

@@ -166,6 +166,31 @@ def status(output_json):
                 click.echo("\nPerformance:")
                 click.echo(f"  Cached Scripts:    {len(cached)} ({', '.join(cached)})")
 
+            # API Server
+            api_server = status.get('api_server', {})
+            click.echo("\nAPI Server:")
+            if api_server and api_server.get('running'):
+                click.echo(f"  Status:            Running")
+                click.echo(f"  Port:              {api_server.get('port', 8000)}")
+                api_uptime = api_server.get('uptime_seconds', 0)
+                click.echo(f"  Uptime:            {format_duration(api_uptime)}")
+                click.echo(f"  URL:               http://localhost:{api_server.get('port', 8000)}")
+                click.echo(f"  Documentation:     http://localhost:{api_server.get('port', 8000)}/docs")
+
+                # API Request Statistics
+                api_total = api_server.get('total_requests', 0)
+                api_succeeded = api_server.get('succeeded', 0)
+                api_failed = api_server.get('failed', 0)
+                if api_total > 0:
+                    click.echo(f"  Total Requests:    {api_total}")
+                    click.echo(f"  Succeeded:         {api_succeeded}")
+                    click.echo(f"  Failed:            {api_failed}")
+                    api_success_rate = (api_succeeded / api_total) * 100
+                    click.echo(f"  Success Rate:      {api_success_rate:.1f}%")
+            else:
+                click.echo(f"  Status:            Not Running")
+                click.echo(f"  Start with:        inspekt api start")
+
         else:
             click.echo("Inspekt Server Status (Running, status unavailable)")
     else:

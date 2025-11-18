@@ -10,11 +10,18 @@ Or use the CLI:
     inspekt api start
 """
 
-from fastapi import FastAPI, HTTPException
+import time
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from inspekt.services.bridge_executor import get_executor
 from inspekt import __version__
+
+# API Server tracking
+api_server_start_time = time.time()
+total_api_requests = 0
+total_api_succeeded = 0
+total_api_failed = 0
 
 # Create FastAPI app
 app = FastAPI(
@@ -34,6 +41,29 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# Request tracking middleware
+@app.middleware("http")
+async def track_requests(request: Request, call_next):
+    """Track API request statistics."""
+    global total_api_requests, total_api_succeeded, total_api_failed
+
+    total_api_requests += 1
+
+    try:
+        response = await call_next(request)
+
+        # Count as success if status code is 2xx or 3xx
+        if 200 <= response.status_code < 400:
+            total_api_succeeded += 1
+        else:
+            total_api_failed += 1
+
+        return response
+    except Exception as e:
+        total_api_failed += 1
+        raise
 
 
 # Exception handlers
@@ -71,9 +101,16 @@ async def health_check():
     executor = get_executor()
     bridge_running = executor.is_server_running()
 
+    # Calculate uptime
+    uptime_seconds = time.time() - api_server_start_time
+
     return {
         "api": "running",
         "api_version": __version__,
+        "api_uptime_seconds": uptime_seconds,
+        "api_total_requests": total_api_requests,
+        "api_succeeded": total_api_succeeded,
+        "api_failed": total_api_failed,
         "bridge_server": "running" if bridge_running else "stopped",
         "bridge_host": "127.0.0.1",
         "bridge_ports": {"http": 8765, "websocket": 8766},
