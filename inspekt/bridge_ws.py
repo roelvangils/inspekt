@@ -321,8 +321,13 @@ async def websocket_handler(request):
     return ws
 
 
-async def send_code_to_browser(code: str) -> str:
-    """Send code to browser for execution. Returns request_id."""
+async def send_code_to_browser(code: str, browser_index: int = None) -> str:
+    """Send code to browser for execution. Returns request_id.
+
+    Args:
+        code: JavaScript code to execute
+        browser_index: Optional index of specific browser to target (0-based)
+    """
     global most_recent_connection
     request_id = str(uuid.uuid4())
     pending_requests[request_id] = {"code": code, "timestamp": time.time()}
@@ -330,13 +335,25 @@ async def send_code_to_browser(code: str) -> str:
     # Send to most recent active browser only
     message = json.dumps({"type": "execute", "request_id": request_id, "code": code})
 
-    # Use most recent connection if available, otherwise use any active connection
-    target_ws = most_recent_connection if most_recent_connection in active_connections else None
+    # Select target browser
+    target_ws = None
 
-    if not target_ws and active_connections:
-        # Fallback to first available connection
-        target_ws = next(iter(active_connections))
-        most_recent_connection = target_ws
+    if browser_index is not None:
+        # Target specific browser by index
+        # Sort by connection time for consistent ordering (matches /health endpoint)
+        connections_list = sorted(active_connections, key=lambda ws: connection_times.get(ws, time.time()))
+        if 0 <= browser_index < len(connections_list):
+            target_ws = connections_list[browser_index]
+        else:
+            print(f"[Server] WARNING: Invalid browser_index {browser_index}, only {len(connections_list)} browsers connected")
+    else:
+        # Use most recent connection if available, otherwise use any active connection
+        target_ws = most_recent_connection if most_recent_connection in active_connections else None
+
+        if not target_ws and active_connections:
+            # Fallback to first available connection
+            target_ws = next(iter(active_connections))
+            most_recent_connection = target_ws
 
     if target_ws:
         try:
@@ -368,11 +385,12 @@ async def handle_http_run(request):
     try:
         data = await request.json()
         code = data.get("code", "")
+        browser_index = data.get("browser_index")  # Optional: target specific browser
 
         if not code or not isinstance(code, str):
             return web.json_response({"ok": False, "error": "missing code"}, status=400)
 
-        request_id = await send_code_to_browser(code)
+        request_id = await send_code_to_browser(code, browser_index=browser_index)
 
         return web.json_response({"ok": True, "request_id": request_id})
 
@@ -498,8 +516,11 @@ async def handle_http_health(request):
     uptime = current_time - server_start_time
 
     # Build browser connection list
+    # Sort connections by connection time for consistent ordering
+    sorted_connections = sorted(active_connections, key=lambda ws: connection_times.get(ws, current_time))
+
     browsers_list = []
-    for ws in active_connections:
+    for ws in sorted_connections:
         info = browser_info.get(ws, {})
         connection_time = connection_times.get(ws, current_time)
         duration = current_time - connection_time
@@ -569,8 +590,35 @@ async def handle_http_health(request):
             "last_activity": last_activity_time,
             "cached_scripts": cached,
             "api_server": api_server_info,
+        },
+        headers={
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "GET, OPTIONS",
+            "Access-Control-Allow-Headers": "Content-Type",
         }
     )
+
+
+@web.middleware
+async def cors_middleware(request, handler):
+    """CORS middleware to allow cross-origin requests from dashboard."""
+    # Handle preflight OPTIONS requests
+    if request.method == "OPTIONS":
+        response = web.Response()
+        response.headers["Access-Control-Allow-Origin"] = "*"
+        response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
+        response.headers["Access-Control-Allow-Headers"] = "Content-Type"
+        return response
+
+    # Process the request
+    response = await handler(request)
+
+    # Add CORS headers to response
+    response.headers["Access-Control-Allow-Origin"] = "*"
+    response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
+    response.headers["Access-Control-Allow-Headers"] = "Content-Type"
+
+    return response
 
 
 async def main():
@@ -590,8 +638,8 @@ async def main():
         print("  Auto-refocus will not work until file is available")
     print("")
 
-    # Setup aiohttp app
-    app = web.Application()
+    # Setup aiohttp app with CORS middleware
+    app = web.Application(middlewares=[cors_middleware])
 
     # HTTP endpoints for CLI
     app.router.add_post("/run", handle_http_run)

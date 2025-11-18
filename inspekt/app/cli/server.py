@@ -175,7 +175,8 @@ def status(output_json):
                 api_uptime = api_server.get('uptime_seconds', 0)
                 click.echo(f"  Uptime:            {format_duration(api_uptime)}")
                 click.echo(f"  URL:               http://localhost:{api_server.get('port', 8000)}")
-                click.echo(f"  Documentation:     http://localhost:{api_server.get('port', 8000)}/docs")
+                click.echo(f"  Swagger UI:        http://localhost:{api_server.get('port', 8000)}/docs")
+                click.echo(f"  ReDoc:             http://localhost:{api_server.get('port', 8000)}/redoc")
 
                 # API Request Statistics
                 api_total = api_server.get('total_requests', 0)

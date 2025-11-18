@@ -125,14 +125,23 @@
             };
 
             ws.onmessage = async (event) => {
-                if (!isFrontTab()) {
-                    return;
-                }
-
                 try {
                     const message = JSON.parse(event.data);
+                    console.log('[Inspekt Content] Received WebSocket message:', message.type, message);
+
+                    // Check if this is an identify command (should work even when tab is hidden)
+                    const isIdentifyCommand = message.code &&
+                        message.code.includes('orange') &&
+                        message.code.includes('overlay');
+
+                    // Skip visibility check for identify commands and pong responses
+                    if (!isFrontTab() && !isIdentifyCommand && message.type !== 'pong') {
+                        console.log('[Inspekt] Message dropped - tab not visible/active:', message.type);
+                        return;
+                    }
 
                     if (message.type === 'execute') {
+                        console.log('[Inspekt Content] Forwarding to background script:', message.code);
                         const requestId = message.request_id;
                         const code = message.code;
 
@@ -143,6 +152,8 @@
                                 code: code,
                                 requestId: requestId
                             });
+
+                            console.log('[Inspekt Content] Response from background:', response);
 
                             // Send result back via WebSocket
                             ws.send(JSON.stringify({

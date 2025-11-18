@@ -1,5 +1,6 @@
 """API server management commands."""
 
+import socket
 import subprocess
 import sys
 import time
@@ -87,7 +88,9 @@ def start(port, daemon, host):
             display_host = "localhost" if host == "127.0.0.1" else host
             click.echo(f"✓ API server started successfully")
             click.echo(f"\nAccess your API at:")
-            click.echo(f"  • Documentation: http://{display_host}:{port}/docs")
+            click.echo(f"  • Status:        http://{display_host}:{port}/status")
+            click.echo(f"  • Swagger UI:    http://{display_host}:{port}/docs")
+            click.echo(f"  • ReDoc:         http://{display_host}:{port}/redoc")
             click.echo(f"  • Health check:  http://{display_host}:{port}/health")
             click.echo(f"  • API root:      http://{display_host}:{port}/")
         else:
@@ -102,7 +105,9 @@ def start(port, daemon, host):
         click.echo(f"Starting API server on {host}:{port}...")
         display_host = "localhost" if host == "127.0.0.1" else host
         click.echo(f"\nAPI server running at:")
-        click.echo(f"  • Documentation: http://{display_host}:{port}/docs")
+        click.echo(f"  • Status:        http://{display_host}:{port}/status")
+        click.echo(f"  • Swagger UI:    http://{display_host}:{port}/docs")
+        click.echo(f"  • ReDoc:         http://{display_host}:{port}/redoc")
         click.echo(f"  • Health check:  http://{display_host}:{port}/health")
         click.echo(f"  • API root:      http://{display_host}:{port}/")
         click.echo("\nPress Ctrl+C to stop the server\n")
@@ -175,11 +180,150 @@ def status(output_json):
 
 
 @api.command()
-def stop():
-    """Stop the API server."""
-    click.echo("Stopping API server...")
-    click.echo("\nTo stop:")
-    click.echo("  • If running in foreground: Press Ctrl+C")
-    click.echo("  • If running in background: pkill -f 'uvicorn inspekt.app.api.server'")
-    click.echo("\nTo stop bridge server:")
-    click.echo("  • pkill -f 'inspekt.bridge_ws'")
+@click.option("--bridge", is_flag=True, help="Also stop the bridge server")
+def stop(bridge):
+    """Stop the API server (and optionally the bridge server).
+
+    By default, only stops the API server. Use --bridge to also stop the bridge server.
+
+    Examples:
+        inspekt api stop              # Stop only API server
+        inspekt api stop --bridge     # Stop both API and bridge servers
+    """
+    click.echo("Stopping Inspekt servers...\n")
+
+    api_stopped = False
+    bridge_stopped = False
+
+    # Stop API server
+    click.echo("• Stopping API server...")
+    result = subprocess.run(
+        ["pkill", "-f", "uvicorn inspekt.app.api.server"],
+        capture_output=True
+    )
+    if result.returncode == 0:
+        click.echo("  ✓ API server stopped")
+        api_stopped = True
+    else:
+        click.echo("  • API server was not running")
+
+    # Stop bridge server if requested
+    if bridge:
+        click.echo("• Stopping bridge server...")
+        result = subprocess.run(
+            ["pkill", "-f", "inspekt.bridge_ws"],
+            capture_output=True
+        )
+        if result.returncode == 0:
+            click.echo("  ✓ Bridge server stopped")
+            bridge_stopped = True
+        else:
+            click.echo("  • Bridge server was not running")
+
+    # Summary
+    if api_stopped or bridge_stopped:
+        click.echo("\n✓ Server(s) stopped successfully")
+    else:
+        click.echo("\n• No servers were running")
+
+    # Show foreground info
+    click.echo("\nNote: If servers are running in foreground, use Ctrl+C to stop them.")
+
+
+@api.command()
+@click.option("-p", "--port", type=int, default=8000, help="Port to run on (default: 8000)")
+@click.option("--host", default="127.0.0.1", help="Host to bind to (default: 127.0.0.1)")
+def restart(port, host):
+    """Restart both bridge and API servers.
+
+    This command stops any running bridge and API servers, then starts them fresh.
+    Useful for applying configuration changes or clearing server state.
+
+    Examples:
+        inspekt api restart                  # Restart on default port 8000
+        inspekt api restart -p 3000          # Restart API on custom port
+        inspekt api restart --host 0.0.0.0   # Restart listening on all interfaces
+    """
+    import signal
+    import os
+
+    click.echo("Restarting Inspekt servers...\n")
+
+    # Stop API server
+    click.echo("• Stopping API server...")
+    result = subprocess.run(
+        ["pkill", "-f", "uvicorn inspekt.app.api.server"],
+        capture_output=True
+    )
+    if result.returncode == 0:
+        click.echo("  ✓ API server stopped")
+    else:
+        click.echo("  • API server was not running")
+
+    # Stop bridge server
+    click.echo("• Stopping bridge server...")
+    result = subprocess.run(
+        ["pkill", "-f", "inspekt.bridge_ws"],
+        capture_output=True
+    )
+    if result.returncode == 0:
+        click.echo("  ✓ Bridge server stopped")
+    else:
+        click.echo("  • Bridge server was not running")
+
+    # Wait a moment for processes to fully stop
+    time.sleep(0.5)
+
+    click.echo("\n• Starting bridge server...")
+    # Start bridge server in background
+    subprocess.Popen(
+        [sys.executable, "-m", "inspekt.bridge_ws"],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        start_new_session=True,
+    )
+
+    # Wait for bridge to start
+    time.sleep(1)
+    bridge_client = BridgeClient()
+    if bridge_client.is_alive():
+        click.echo("  ✓ Bridge server started on ports 8765 (HTTP) and 8766 (WebSocket)")
+    else:
+        click.echo("  ✗ Failed to start bridge server", err=True)
+        sys.exit(1)
+
+    click.echo("• Starting API server...")
+    # Start API server in background
+    subprocess.Popen(
+        [
+            sys.executable, "-m", "uvicorn",
+            "inspekt.app.api.server:app",
+            "--host", host,
+            "--port", str(port)
+        ],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        start_new_session=True,
+    )
+
+    # Wait for API server to start
+    time.sleep(1.5)
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    if sock.connect_ex((host, port)) == 0:
+        sock.close()
+        display_host = "localhost" if host == "127.0.0.1" else host
+        click.echo(f"  ✓ API server started on port {port}")
+        click.echo(f"\n✓ All servers restarted successfully!")
+        click.echo(f"\nAccess your API at:")
+        click.echo(f"  • Status:        http://{display_host}:{port}/status")
+        click.echo(f"  • Swagger UI:    http://{display_host}:{port}/docs")
+        click.echo(f"  • ReDoc:         http://{display_host}:{port}/redoc")
+        click.echo(f"  • Health check:  http://{display_host}:{port}/health")
+        click.echo(f"  • API root:      http://{display_host}:{port}/")
+    else:
+        sock.close()
+        click.echo("  ✗ Failed to start API server", err=True)
+        click.echo("\nTroubleshooting:")
+        click.echo("  • Make sure uvicorn is installed: pip install uvicorn")
+        click.echo("  • Check if port is already in use")
+        sys.exit(1)

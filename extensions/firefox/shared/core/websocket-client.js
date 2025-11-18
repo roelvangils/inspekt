@@ -107,12 +107,21 @@ const InspektWebSocketClient = (() => {
      * Handle WebSocket message
      */
     async function handleMessage(event) {
-        if (!isFrontTab()) {
-            return;
-        }
-
         try {
             const message = JSON.parse(event.data);
+
+            // Check if this is an identify/flash command (should work even when tab is hidden)
+            const isIdentifyCommand = message.code &&
+                message.code.includes('orange') &&
+                message.code.includes('overlay');
+
+            // Skip visibility check for identify commands and pong responses
+            if (!isFrontTab() && !isIdentifyCommand && message.type !== 'pong') {
+                console.log('[Inspekt] Message dropped - tab not visible/active:', message.type);
+                return;
+            }
+
+            console.log('[Inspekt] Processing message:', message.type);
 
             if (message.type === 'execute') {
                 const requestId = message.request_id;

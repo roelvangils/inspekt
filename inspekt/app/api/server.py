@@ -11,11 +11,21 @@ Or use the CLI:
 """
 
 import time
+import logging
+from pathlib import Path
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, HTMLResponse
 from inspekt.services.bridge_executor import get_executor
 from inspekt import __version__
+
+# Configure logging to filter out /health endpoint requests
+class EndpointFilter(logging.Filter):
+    def filter(self, record: logging.LogRecord) -> bool:
+        return record.getMessage().find("/health") == -1
+
+# Apply filter to uvicorn access logger
+logging.getLogger("uvicorn.access").addFilter(EndpointFilter())
 
 # API Server tracking
 api_server_start_time = time.time()
@@ -48,6 +58,10 @@ app.add_middleware(
 async def track_requests(request: Request, call_next):
     """Track API request statistics."""
     global total_api_requests, total_api_succeeded, total_api_failed
+
+    # Don't track the health endpoint itself to avoid counting issues
+    if request.url.path == "/health":
+        return await call_next(request)
 
     total_api_requests += 1
 
@@ -97,10 +111,7 @@ async def runtime_error_handler(request, exc):
 # Health check endpoint
 @app.get("/health")
 async def health_check():
-    """Check if API and bridge server are running."""
-    executor = get_executor()
-    bridge_running = executor.is_server_running()
-
+    """Check API server health and return statistics."""
     # Calculate uptime
     uptime_seconds = time.time() - api_server_start_time
 
@@ -111,9 +122,6 @@ async def health_check():
         "api_total_requests": total_api_requests,
         "api_succeeded": total_api_succeeded,
         "api_failed": total_api_failed,
-        "bridge_server": "running" if bridge_running else "stopped",
-        "bridge_host": "127.0.0.1",
-        "bridge_ports": {"http": 8765, "websocket": 8766},
     }
 
 
@@ -126,6 +134,7 @@ async def root():
         "description": "HTTP API for browser automation commands",
         "docs": "/docs",
         "health": "/health",
+        "status": "/status",
         "endpoints": {
             "navigation": "/api/navigation/*",
             "extraction": "/api/extraction/*",
@@ -137,6 +146,21 @@ async def root():
             "storage": "/api/storage/*",
         },
     }
+
+
+@app.get("/status", response_class=HTMLResponse)
+async def status_dashboard():
+    """Live status dashboard showing bridge and API server health."""
+    # Read the dashboard HTML file
+    dashboard_path = Path(__file__).parent / "dashboard.html"
+    try:
+        with open(dashboard_path, "r", encoding="utf-8") as f:
+            return f.read()
+    except FileNotFoundError:
+        return HTMLResponse(
+            content="<h1>Dashboard not found</h1><p>dashboard.html file is missing</p>",
+            status_code=500
+        )
 
 
 # Import and register routers
