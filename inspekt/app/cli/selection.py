@@ -186,7 +186,7 @@ def text(raw, output_json):
 
     # Raw mode: just print the text, nothing else
     if raw:
-        click.echo(text_content, nl=False)
+        click.echo(text_content)
         return
 
     # Formatted display
@@ -222,7 +222,7 @@ def html(raw, output_json):
 
     # Raw mode: just print the HTML, nothing else
     if raw:
-        click.echo(html_content, nl=False)
+        click.echo(html_content)
         return
 
     # Formatted display
@@ -260,7 +260,7 @@ def markdown(raw, output_json):
 
     # Raw mode: just print the markdown, nothing else
     if raw:
-        click.echo(markdown_content, nl=False)
+        click.echo(markdown_content)
         return
 
     # Formatted display
