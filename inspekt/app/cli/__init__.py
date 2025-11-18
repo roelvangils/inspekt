@@ -110,6 +110,7 @@ cli.add_command(util_module.info, name="info")
 cli.add_command(util_module.repl, name="repl")
 cli.add_command(util_module.userscript, name="userscript")
 cli.add_command(util_module.download, name="download")
+cli.add_command(util_module.md_link, name="md-link")
 
 # Robots.txt inspection (from robots.py)
 cli.add_command(robots_module.robots, name="robots")

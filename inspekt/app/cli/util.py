@@ -1,5 +1,5 @@
 """
-Utility CLI commands for Zen Bridge.
+Utility CLI commands for Inspekt.
 
 This module contains utility commands:
 - info: Display page information
@@ -517,15 +517,40 @@ def info(extended, output_json):
                 click.echo("Error: No data returned from browser.", err=True)
                 sys.exit(1)
 
-            # Get userscript/extension version and type
-            version_code = "(window.__ZEN_BRIDGE_VERSION__ || 'unknown') + '|' + (window.__ZEN_BRIDGE_EXTENSION__ ? 'extension' : 'userscript')"
+            # Get userscript/extension version, type, and browser name
+            # Support both new (INSPEKT) and legacy (ZEN) variable names
+            version_code = """
+            (function() {
+                const version = window.__INSPEKT_BRIDGE_VERSION__ || window.__ZEN_BRIDGE_VERSION__ || 'unknown';
+                const type = (window.__INSPEKT_BRIDGE_EXTENSION__ || window.__ZEN_BRIDGE_EXTENSION__) ? 'extension' : 'userscript';
+
+                // Detect browser name from user agent
+                const ua = navigator.userAgent;
+                let browserName = 'Unknown';
+                if (ua.includes('Firefox')) {
+                    browserName = 'Firefox';
+                } else if (ua.includes('Edg')) {
+                    browserName = 'Edge';
+                } else if (ua.includes('Chrome')) {
+                    browserName = 'Chrome';
+                } else if (ua.includes('Safari')) {
+                    browserName = 'Safari';
+                }
+
+                return version + '|' + type + '|' + browserName;
+            })()
+            """
             version_result = client.execute(version_code, timeout=2.0)
             if version_result.get("ok"):
-                version_info = version_result.get("result", "unknown|userscript")
-                userscript_version, bridge_type = version_info.split("|") if "|" in version_info else (version_info, "userscript")
+                version_info = version_result.get("result", "unknown|userscript|Unknown")
+                parts = version_info.split("|") if "|" in version_info else [version_info, "userscript", "Unknown"]
+                userscript_version = parts[0]
+                bridge_type = parts[1] if len(parts) > 1 else "userscript"
+                browser_name = parts[2] if len(parts) > 2 else "Unknown"
             else:
                 userscript_version = "unknown"
                 bridge_type = "userscript"
+                browser_name = "Unknown"
 
             # If extended, also run the extended_info.js script
             if extended:
@@ -589,13 +614,15 @@ def info(extended, output_json):
                 click.echo(json.dumps(data, indent=2))
                 return
 
-            # Basic info
-            click.echo(f"URL:      {data.get('url', 'N/A')}")
-            click.echo(f"Title:    {data.get('title', 'N/A')}")
-            click.echo(f"Domain:   {data.get('domain', 'N/A')}")
-            click.echo(f"Protocol: {data.get('protocol', 'N/A')}")
-            click.echo(f"State:    {data.get('readyState', 'N/A')}")
-            click.echo(f"Size:     {data.get('width', 'N/A')}x{data.get('height', 'N/A')}")
+            # Basic info - Extension/browser info first
+            bridge_label = "Extension" if bridge_type == "extension" else "Userscript"
+            click.echo(f"Extension:    v{userscript_version} ({browser_name} {bridge_label})")
+            click.echo(f"URL:          {data.get('url', 'N/A')}")
+            click.echo(f"Title:        {data.get('title', 'N/A')}")
+            click.echo(f"State:        {data.get('readyState', 'N/A')}")
+            click.echo(f"Domain:       {data.get('domain', 'N/A')}")
+            click.echo(f"Protocol:     {data.get('protocol', 'N/A')}")
+            click.echo(f"Viewport:     {data.get('width', 'N/A')}x{data.get('height', 'N/A')}")
 
             if extended:
                 click.echo("")
@@ -1199,10 +1226,6 @@ def info(extended, output_json):
                             click.echo(f"  charset: {meta['charset']}")
                         elif "http-equiv" in meta:
                             click.echo(f"  {meta['http-equiv']}: {meta.get('content', '')}")
-
-            click.echo("")
-            bridge_label = "Extension" if bridge_type == "extension" else "Userscript"
-            click.echo(f"Zen Bridge: {bridge_label} v{userscript_version}")
         else:
             click.echo(f"Error: {result.get('error')}", err=True)
             sys.exit(1)
@@ -1553,6 +1576,86 @@ def download(output, list_only, output_json, timeout):
                 click.echo(f"    Error downloading {filename}: {e}", err=True)
 
         click.echo(f"\nDownloaded {success_count} of {len(files_to_download)} files successfully.")
+
+    except (ConnectionError, TimeoutError, RuntimeError) as e:
+        click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
+
+
+@click.command(name="md-link")
+@click.option("--json", "output_json", is_flag=True, help="Output as JSON")
+def md_link(output_json):
+    """
+    Get Markdown link for the current page.
+
+    Returns [title](url) format with cleaned page title.
+    Strips website name from title (splits on " |", " -", " –").
+
+    Examples:
+
+        inspekt md-link
+
+        inspekt md-link --json
+    """
+    client = BridgeClient()
+
+    if not client.is_alive():
+        click.echo("Error: Bridge server is not running. Start it with: inspekt server start", err=True)
+        sys.exit(1)
+
+    # Get current page URL and title
+    code = """
+    ({
+        url: location.href,
+        title: document.title
+    })
+    """
+
+    try:
+        result = client.execute(code)
+
+        if result.get("ok"):
+            data = result.get("result") or {}
+
+            if not data:
+                click.echo("Error: No data returned from browser.", err=True)
+                sys.exit(1)
+
+            url = data.get("url", "")
+            raw_title = data.get("title", "")
+
+            # Clean the title - strip website name
+            cleaned_title = raw_title
+            website_name = ""
+
+            # Try splitting on common separators
+            for separator in [" | ", " - ", " – ", " — "]:
+                if separator in raw_title:
+                    parts = raw_title.split(separator)
+                    # Use the first part as the clean title, last part as website name
+                    cleaned_title = parts[0].strip()
+                    website_name = parts[-1].strip()
+                    break
+
+            # Create markdown link
+            md_link_str = f"[{cleaned_title}]({url})"
+
+            if output_json:
+                import json
+                output_data = {
+                    "url": url,
+                    "title": cleaned_title,
+                    "raw_title": raw_title,
+                    "website_name": website_name,
+                    "markdown": md_link_str
+                }
+                click.echo(json.dumps(output_data, indent=2))
+            else:
+                click.echo(md_link_str)
+
+        else:
+            click.echo(f"Error: {result.get('error')}", err=True)
+            sys.exit(1)
 
     except (ConnectionError, TimeoutError, RuntimeError) as e:
         click.echo(f"Error: {e}", err=True)

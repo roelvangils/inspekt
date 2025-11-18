@@ -84,7 +84,8 @@ class BridgeClient:
             return self._cached_version
 
         try:
-            result = self.execute("window.__ZEN_BRIDGE_VERSION__ || 'unknown'", timeout=2.0)
+            # Support both new (INSPEKT) and legacy (ZEN) variable names
+            result = self.execute("window.__INSPEKT_BRIDGE_VERSION__ || window.__ZEN_BRIDGE_VERSION__ || 'unknown'", timeout=2.0)
             if result.get("ok"):
                 self._cached_version = result.get("result")
                 return self._cached_version
@@ -113,10 +114,11 @@ class BridgeClient:
                 return None  # Can't find userscript file, skip check
 
             # Get installed version and check if using extension
+            # Support both new (INSPEKT) and legacy (ZEN) variable names
             try:
                 response = requests.post(
                     f"{self.base_url}/run",
-                    json={"code": "(window.__ZEN_BRIDGE_VERSION__ || 'unknown') + '|' + (window.__ZEN_BRIDGE_EXTENSION__ ? 'ext' : 'user')"},
+                    json={"code": "(window.__INSPEKT_BRIDGE_VERSION__ || window.__ZEN_BRIDGE_VERSION__ || 'unknown') + '|' + ((window.__INSPEKT_BRIDGE_EXTENSION__ || window.__ZEN_BRIDGE_EXTENSION__) ? 'ext' : 'user')"},
                     timeout=self.timeout,
                 )
                 response.raise_for_status()

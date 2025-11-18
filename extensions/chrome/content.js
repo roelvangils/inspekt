@@ -118,7 +118,8 @@
                     userAgent: navigator.userAgent,
                     browserName: navigator.userAgentData?.brands?.[0]?.brand || 'Chrome',
                     url: window.location.href,
-                    title: document.title
+                    title: document.title,
+                    extensionVersion: window.__INSPEKT_BRIDGE_VERSION__ || window.__ZEN_BRIDGE_VERSION__ || null
                 };
                 ws.send(JSON.stringify(browserInfo));
             };

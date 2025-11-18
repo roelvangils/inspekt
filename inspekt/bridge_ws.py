@@ -59,6 +59,85 @@ MAX_REQUEST_AGE = 300
 # Script loader service (singleton)
 script_loader = ScriptLoader()
 
+# Server tracking
+server_start_time = time.time()  # Track server uptime
+connection_times: dict = {}  # Track when each connection was established
+total_requests_processed = 0  # Lifetime request counter
+total_requests_succeeded = 0  # Count of successful requests
+total_requests_failed = 0  # Count of failed requests
+last_activity_time = time.time()  # Track last request/result activity
+
+
+def parse_user_agent(user_agent: str) -> tuple[str, str]:
+    """
+    Parse User-Agent string to extract browser name and version.
+
+    Args:
+        user_agent: User-Agent header string
+
+    Returns:
+        Tuple of (browser_name, version)
+    """
+    if not user_agent:
+        return ("Unknown", "")
+
+    ua = user_agent
+
+    # Detect Zen Browser (based on Firefox)
+    if "Zen/" in ua:
+        import re
+        match = re.search(r'Zen/([\d.]+)', ua)
+        version = match.group(1) if match else ""
+        return ("Zen Browser", version)
+
+    # Detect Firefox
+    if "Firefox/" in ua and "Seamonkey" not in ua:
+        import re
+        match = re.search(r'Firefox/([\d.]+)', ua)
+        version = match.group(1) if match else ""
+        return ("Firefox", version)
+
+    # Detect Edge (Chromium-based)
+    if "Edg/" in ua:
+        import re
+        match = re.search(r'Edg/([\d.]+)', ua)
+        version = match.group(1) if match else ""
+        return ("Edge", version)
+
+    # Detect Chrome (but not Edge or other Chromium-based browsers)
+    if "Chrome/" in ua and "Edg/" not in ua:
+        import re
+        # Check if it's a Chromium-based browser with a different identity
+        if "OPR/" in ua or "Opera/" in ua:
+            match = re.search(r'(?:OPR|Opera)/([\d.]+)', ua)
+            version = match.group(1) if match else ""
+            return ("Opera", version)
+
+        # Generic Chromium detection
+        match = re.search(r'Chrome/([\d.]+)', ua)
+        version = match.group(1) if match else ""
+
+        # Check if it's actually Chrome or just Chromium
+        if "Google Chrome" in ua or ("Chrome/" in ua and "Chromium" not in ua):
+            return ("Chrome", version)
+        else:
+            return ("Chromium", version)
+
+    # Detect Safari (but not Chrome on iOS which also has Safari in UA)
+    if "Safari/" in ua and "Chrome" not in ua and "Chromium" not in ua:
+        import re
+        # Try to get version from Version/ token first
+        match = re.search(r'Version/([\d.]+)', ua)
+        if match:
+            version = match.group(1)
+        else:
+            # Fallback to Safari/ version
+            match = re.search(r'Safari/([\d.]+)', ua)
+            version = match.group(1) if match else ""
+        return ("Safari", version)
+
+    return ("Unknown", "")
+
 
 def cleanup_old_requests():
     """Remove requests older than MAX_REQUEST_AGE seconds."""
@@ -86,13 +165,16 @@ def cleanup_old_requests():
 
 async def websocket_handler(request):
     """Handle WebSocket connection from browser (userscript)."""
-    global most_recent_connection
+    global most_recent_connection, last_activity_time
     ws = web.WebSocketResponse()
     await ws.prepare(request)
 
     active_connections.add(ws)
     # Set this as the most recent connection
     most_recent_connection = ws
+    # Track connection time
+    connection_times[ws] = time.time()
+    last_activity_time = time.time()
     print("Browser tab connected via WebSocket")
     print(f"Active connections: {len(active_connections)}")
 
@@ -136,15 +218,24 @@ async def websocket_handler(request):
 
                         request_id = data.get("request_id")
                         if request_id and request_id in pending_requests:
+                            global total_requests_processed, total_requests_succeeded, total_requests_failed
                             del pending_requests[request_id]
+
+                            request_ok = data.get("ok", False)
                             completed_requests[request_id] = {
-                                "ok": data.get("ok", False),
+                                "ok": request_ok,
                                 "result": data.get("result"),
                                 "error": data.get("error"),
                                 "url": data.get("url"),
                                 "title": data.get("title"),
                                 "timestamp": time.time(),
                             }
+                            total_requests_processed += 1
+                            if request_ok:
+                                total_requests_succeeded += 1
+                            else:
+                                total_requests_failed += 1
+                            last_activity_time = time.time()
                             print(f"Received result for request {request_id}")
 
                             # Notify any waiting HTTP long-poll requests
@@ -202,11 +293,13 @@ async def websocket_handler(request):
                             "userAgent": data.get("userAgent", "Unknown"),
                             "browserName": data.get("browserName", "Unknown"),
                             "url": data.get("url", ""),
-                            "title": data.get("title", "")
+                            "title": data.get("title", ""),
+                            "extensionVersion": data.get("extensionVersion")
                         }
                         browser_name = data.get("browserName", "Unknown")
                         page_title = data.get("title", "")[:50]
-                        print(f"Browser info received: {browser_name} - {page_title}")
+                        ext_version = data.get("extensionVersion", "unknown")
+                        print(f"Browser info received: {browser_name} v{ext_version} - {page_title}")
 
                 except json.JSONDecodeError:
                     print(f"Invalid JSON from browser: {msg.data}")
@@ -219,6 +312,7 @@ async def websocket_handler(request):
     finally:
         active_connections.discard(ws)
         browser_info.pop(ws, None)
+        connection_times.pop(ws, None)  # Clean up connection time tracking
         if most_recent_connection == ws:
             most_recent_connection = None
         print("Browser tab disconnected")
@@ -395,14 +489,57 @@ async def handle_http_notifications(request):
 
 async def handle_http_health(request):
     """HTTP endpoint: Health check."""
+    from inspekt import __version__
+
     cleanup_old_requests()
+
+    # Calculate uptime
+    current_time = time.time()
+    uptime = current_time - server_start_time
+
+    # Build browser connection list
+    browsers_list = []
+    for ws in active_connections:
+        info = browser_info.get(ws, {})
+        connection_time = connection_times.get(ws, current_time)
+        duration = current_time - connection_time
+
+        # Parse User-Agent to get accurate browser name and version
+        user_agent = info.get("userAgent", "")
+        browser_name, browser_version = parse_user_agent(user_agent)
+
+        browsers_list.append({
+            "browser_name": browser_name,
+            "browser_version": browser_version,
+            "extension_version": info.get("extensionVersion"),
+            "url": info.get("url", ""),
+            "title": info.get("title", ""),
+            "user_agent": user_agent,
+            "is_most_recent": (ws == most_recent_connection),
+            "connected_duration": duration
+        })
+
+    # Get cached scripts from script loader
+    cached = list(script_loader.get_cached_scripts())
+
     return web.json_response(
         {
             "ok": True,
-            "timestamp": time.time(),
+            "timestamp": current_time,
+            "server_version": __version__,
+            "uptime_seconds": uptime,
+            "host": HOST,
+            "port": PORT,
+            "websocket_port": PORT + 1,
             "connected_browsers": len(active_connections),
+            "browsers": browsers_list,
             "pending": len(pending_requests),
             "completed": len(completed_requests),
+            "total_processed": total_requests_processed,
+            "total_succeeded": total_requests_succeeded,
+            "total_failed": total_requests_failed,
+            "last_activity": last_activity_time,
+            "cached_scripts": cached,
         }
     )
 

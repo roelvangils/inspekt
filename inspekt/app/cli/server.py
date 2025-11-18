@@ -3,6 +3,7 @@
 import json
 import subprocess
 import sys
+import time
 
 import click
 
@@ -64,20 +65,107 @@ def status(output_json):
     """Check bridge server status."""
     client = BridgeClient()
 
+    def format_duration(seconds):
+        """Format duration in human-readable format."""
+        if seconds < 60:
+            return f"{int(seconds)}s"
+        elif seconds < 3600:
+            mins = int(seconds / 60)
+            secs = int(seconds % 60)
+            return f"{mins}m {secs}s"
+        else:
+            hours = int(seconds / 3600)
+            mins = int((seconds % 3600) / 60)
+            secs = int(seconds % 60)
+            return f"{hours}h {mins}m {secs}s"
+
+    def format_time_ago(timestamp):
+        """Format timestamp as 'X time ago'."""
+        ago = time.time() - timestamp
+        if ago < 60:
+            return f"{int(ago)} seconds ago"
+        elif ago < 3600:
+            return f"{int(ago/60)} minutes ago"
+        else:
+            return f"{int(ago/3600)} hours ago"
+
     if client.is_alive():
         status = client.get_status()
         if output_json:
-            output_data = {
-                "running": True,
-                "pending": status.get('pending', 0) if status else None,
-                "completed": status.get('completed', 0) if status else None,
-                "status_available": status is not None
-            }
-            click.echo(json.dumps(output_data, indent=2))
+            # Full JSON output with all fields
+            click.echo(json.dumps(status, indent=2))
         elif status:
-            click.echo("Inspekt Server Status (Running)")
-            click.echo(f"  Pending requests:   {status.get('pending', 0)}")
-            click.echo(f"  Completed requests: {status.get('completed', 0)}")
+            # Enhanced human-readable output
+            click.echo("Inspekt Server Status\n")
+
+            # Server Information
+            click.echo("Server Information:")
+            click.echo(f"  Version:           {status.get('server_version', 'Unknown')}")
+            uptime = status.get('uptime_seconds', 0)
+            click.echo(f"  Uptime:            {format_duration(uptime)}")
+            host = status.get('host', '127.0.0.1')
+            port = status.get('port', 8765)
+            ws_port = status.get('websocket_port', 8766)
+            click.echo(f"  HTTP API:          http://{host}:{port}")
+            click.echo(f"  WebSocket:         ws://{host}:{ws_port}")
+
+            # Connected Browser Instances
+            click.echo("\nConnected Browser Instances:")
+            browser_count = status.get('connected_browsers', 0)
+            browsers = status.get('browsers', [])
+
+            if browser_count == 0:
+                click.echo("  No browsers connected")
+            else:
+                click.echo(f"  Total:             {browser_count} active connection{'s' if browser_count != 1 else ''}")
+
+                for i, browser in enumerate(browsers, 1):
+                    # Display browser name with version
+                    browser_name = browser['browser_name']
+                    browser_version = browser.get('browser_version', '')
+                    if browser_version:
+                        browser_display = f"{browser_name} {browser_version}"
+                    else:
+                        browser_display = browser_name
+
+                    click.echo(f"\n  [{i}] {browser_display}{' (last active)' if browser['is_most_recent'] else ''}")
+                    if browser.get('extension_version'):
+                        click.echo(f"      Extension:     v{browser['extension_version']}")
+                    url = browser.get('url', '')
+                    if url:
+                        # Truncate long URLs
+                        display_url = url if len(url) <= 60 else url[:57] + '...'
+                        click.echo(f"      Page:          {display_url}")
+                    title = browser.get('title', '')
+                    if title:
+                        # Truncate long titles
+                        display_title = title if len(title) <= 60 else title[:57] + '...'
+                        click.echo(f"      Title:         {display_title}")
+                    duration = browser.get('connected_duration', 0)
+                    click.echo(f"      Connected:     {format_duration(duration)}")
+
+            # Request Statistics
+            click.echo("\nRequest Statistics:")
+            click.echo(f"  Pending:           {status.get('pending', 0)}")
+            total = status.get('total_processed', 0)
+            succeeded = status.get('total_succeeded', 0)
+            failed = status.get('total_failed', 0)
+            click.echo(f"  Total Processed:   {total} (since startup)")
+            click.echo(f"  Succeeded:         {succeeded}")
+            click.echo(f"  Failed:            {failed}")
+            if total > 0:
+                success_rate = (succeeded / total) * 100
+                click.echo(f"  Success Rate:      {success_rate:.1f}%")
+            last_activity = status.get('last_activity')
+            if last_activity:
+                click.echo(f"  Last Activity:     {format_time_ago(last_activity)}")
+
+            # Performance
+            cached = status.get('cached_scripts', [])
+            if cached:
+                click.echo("\nPerformance:")
+                click.echo(f"  Cached Scripts:    {len(cached)} ({', '.join(cached)})")
+
         else:
             click.echo("Inspekt Server Status (Running, status unavailable)")
     else:
