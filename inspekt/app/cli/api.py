@@ -38,7 +38,7 @@ def start(port, daemon, host):
         click.echo("Bridge server not running, starting it first...")
         # Start bridge server in background
         subprocess.Popen(
-            [sys.executable, "-m", "zen.bridge_ws"],
+            [sys.executable, "-m", "inspekt.bridge_ws"],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
             start_new_session=True,
@@ -71,7 +71,7 @@ def start(port, daemon, host):
         subprocess.Popen(
             [
                 sys.executable, "-m", "uvicorn",
-                "zen.app.api.server:app",
+                "inspekt.app.api.server:app",
                 "--host", host,
                 "--port", str(port)
             ],
@@ -110,7 +110,7 @@ def start(port, daemon, host):
         try:
             subprocess.run([
                 sys.executable, "-m", "uvicorn",
-                "zen.app.api.server:app",
+                "inspekt.app.api.server:app",
                 "--host", host,
                 "--port", str(port)
             ])
@@ -180,6 +180,6 @@ def stop():
     click.echo("Stopping API server...")
     click.echo("\nTo stop:")
     click.echo("  • If running in foreground: Press Ctrl+C")
-    click.echo("  • If running in background: pkill -f 'uvicorn zen.app.api.server'")
+    click.echo("  • If running in background: pkill -f 'uvicorn inspekt.app.api.server'")
     click.echo("\nTo stop bridge server:")
-    click.echo("  • pkill -f 'zen.bridge_ws'")
+    click.echo("  • pkill -f 'inspekt.bridge_ws'")

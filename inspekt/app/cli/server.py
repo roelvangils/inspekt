@@ -31,7 +31,7 @@ def start(port, daemon):
         # Run in background
         click.echo(f"Starting WebSocket bridge server in background on port {port}...")
         subprocess.Popen(
-            [sys.executable, "-m", "zen.bridge_ws"],
+            [sys.executable, "-m", "inspekt.bridge_ws"],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
             start_new_session=True,
@@ -181,4 +181,4 @@ def status(output_json):
 def stop():
     """Stop the bridge server."""
     click.echo("Note: Use Ctrl+C to stop the server if running in foreground")
-    click.echo("For daemon mode, use: pkill -f 'zen.bridge_ws'")
+    click.echo("For daemon mode, use: pkill -f 'inspekt.bridge_ws'")
