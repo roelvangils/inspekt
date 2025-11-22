@@ -14,6 +14,7 @@
     "activeTab",
     "scripting",
     "storage",
+    "cookies",
     "clipboardWrite",
     "tabCapture",
     "offscreen"

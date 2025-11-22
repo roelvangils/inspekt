@@ -40,7 +40,7 @@
             position: fixed;
             pointer-events: none;
             z-index: 2147483646;
-            border: 3px solid #0066ff;
+            border: 2px solid #0066ff;
             border-radius: 2px;
             background: rgba(0, 102, 255, 0.1);
             transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
@@ -174,15 +174,17 @@
     function cleanup() {
         window.__INSPEKT_PICKER_ACTIVE__ = false;
 
-        // Remove overlay, highlight box, and tooltip
+        // Remove overlay and tooltip
         if (overlay && overlay.parentNode) {
             overlay.parentNode.removeChild(overlay);
         }
-        if (highlightBox && highlightBox.parentNode) {
-            highlightBox.parentNode.removeChild(highlightBox);
-        }
         if (tooltip && tooltip.parentNode) {
             tooltip.parentNode.removeChild(tooltip);
+        }
+
+        // Keep highlightBox for navigation - just hide it initially
+        if (highlightBox) {
+            highlightBox.style.display = 'none';
         }
 
         // Remove event listeners
@@ -191,7 +193,90 @@
         document.removeEventListener('keydown', handleKeyDown, true);
         document.removeEventListener('scroll', handleScroll, true);
         window.removeEventListener('resize', updateHighlightPosition);
+
+        // After picking, show highlight on selected element
+        if (window.__INSPEKT_INSPECTED_ELEMENT__ && typeof window.__INSPEKT_UPDATE_HIGHLIGHT__ === 'function') {
+            window.__INSPEKT_UPDATE_HIGHLIGHT__();
+        }
     }
+
+    // Persistent scroll/resize handlers for highlightBox
+    function updatePersistentHighlight() {
+        const el = window.__INSPEKT_INSPECTED_ELEMENT__;
+        if (el && highlightBox && highlightBox.style.display !== 'none') {
+            const rect = el.getBoundingClientRect();
+            highlightBox.style.left = rect.left + 'px';
+            highlightBox.style.top = rect.top + 'px';
+            highlightBox.style.width = rect.width + 'px';
+            highlightBox.style.height = rect.height + 'px';
+        }
+    }
+
+    // Global function to update highlight position (used for navigation)
+    window.__INSPEKT_UPDATE_HIGHLIGHT__ = function() {
+        const el = window.__INSPEKT_INSPECTED_ELEMENT__;
+
+        if (!el) {
+            if (highlightBox) {
+                highlightBox.style.display = 'none';
+                // Remove scroll/resize listeners when hiding
+                document.removeEventListener('scroll', updatePersistentHighlight, true);
+                window.removeEventListener('resize', updatePersistentHighlight);
+            }
+            return;
+        }
+
+        // Remove any persistent outline from previous element to prevent overlap
+        const existingOutline = document.querySelector('[data-inspekt-outline="true"]');
+        if (existingOutline) {
+            // Restore original styles
+            const originalOutline = existingOutline.getAttribute('data-inspekt-original-outline');
+            const originalBg = existingOutline.getAttribute('data-inspekt-original-background');
+            const originalTransition = existingOutline.getAttribute('data-inspekt-original-transition');
+
+            existingOutline.style.outline = originalOutline || '';
+            existingOutline.style.backgroundColor = originalBg || '';
+            existingOutline.style.transition = originalTransition || '';
+
+            existingOutline.removeAttribute('data-inspekt-outline');
+            existingOutline.removeAttribute('data-inspekt-original-outline');
+            existingOutline.removeAttribute('data-inspekt-original-background');
+            existingOutline.removeAttribute('data-inspekt-original-transition');
+        }
+
+        // Create highlightBox if it doesn't exist yet (navigation before picking)
+        if (!highlightBox) {
+            highlightBox = document.createElement('div');
+            highlightBox.style.cssText = `
+                position: fixed;
+                pointer-events: none;
+                z-index: 2147483646;
+                border: 2px solid #0066ff;
+                border-radius: 2px;
+                background: rgba(0, 102, 255, 0.1);
+                transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+                box-shadow: 0 0 0 1px rgba(0, 102, 255, 0.3),
+                            inset 0 0 0 1px rgba(255, 255, 255, 0.5);
+                display: none;
+            `;
+            document.body.appendChild(highlightBox);
+        }
+
+        const rect = el.getBoundingClientRect();
+
+        // Show and position the highlight (will morph smoothly due to CSS transition!)
+        highlightBox.style.display = 'block';
+        highlightBox.style.left = rect.left + 'px';
+        highlightBox.style.top = rect.top + 'px';
+        highlightBox.style.width = rect.width + 'px';
+        highlightBox.style.height = rect.height + 'px';
+
+        // Add persistent scroll/resize listeners to keep highlight anchored
+        document.removeEventListener('scroll', updatePersistentHighlight, true);
+        window.removeEventListener('resize', updatePersistentHighlight);
+        document.addEventListener('scroll', updatePersistentHighlight, true);
+        window.addEventListener('resize', updatePersistentHighlight);
+    };
 
     // Initialize picker
     createOverlay();

@@ -1,13 +1,56 @@
 /**
- * Inspekt - Popup Script (Firefox)
+ * Inspekt - Popup Script (Shared)
  *
  * Handles the settings panel UI and displays connection status
- * Uses browser API for Firefox compatibility
+ * Works with both Chrome and Firefox (via browser adapters)
  */
+
+// Browser API detection - works for both chrome and firefox
+const BrowserAPI = {
+    // Get tabs API
+    getTabs: async (query) => {
+        const api = typeof chrome !== 'undefined' ? chrome : browser;
+        return await api.tabs.query(query);
+    },
+
+    // Get manifest
+    getManifest: () => {
+        const api = typeof chrome !== 'undefined' ? chrome : browser;
+        return api.runtime.getManifest();
+    },
+
+    // Reload tab
+    reloadTab: async (tabId) => {
+        const api = typeof chrome !== 'undefined' ? chrome : browser;
+        return await api.tabs.reload(tabId);
+    },
+
+    // Execute script in tab (browser-specific)
+    executeScript: async (tabId, code) => {
+        const api = typeof chrome !== 'undefined' ? chrome : browser;
+
+        // Chrome (MV3) uses scripting.executeScript
+        if (typeof chrome !== 'undefined' && chrome.scripting) {
+            return await chrome.scripting.executeScript({
+                target: { tabId: tabId },
+                func: new Function(code)
+            });
+        }
+
+        // Firefox (MV2) uses tabs.executeScript with code string
+        if (typeof browser !== 'undefined' && browser.tabs) {
+            return await browser.tabs.executeScript(tabId, {
+                code: `(function() { ${code} })()`
+            });
+        }
+
+        throw new Error('Unable to execute script: no browser API available');
+    }
+};
 
 document.addEventListener('DOMContentLoaded', async () => {
     // Display version
-    const manifest = browser.runtime.getManifest();
+    const manifest = BrowserAPI.getManifest();
     document.getElementById('version').textContent = `v${manifest.version}`;
 
     // Load allowed domains
@@ -26,7 +69,7 @@ async function checkConnectionStatus() {
 
     try {
         // Get active tab
-        const tabs = await browser.tabs.query({ active: true, currentWindow: true });
+        const tabs = await BrowserAPI.getTabs({ active: true, currentWindow: true });
         if (!tabs[0]) {
             setStatus(statusDot, statusText, 'disconnected', 'No active tab');
             return;
@@ -35,33 +78,59 @@ async function checkConnectionStatus() {
         const tab = tabs[0];
 
         // Check if content script is loaded and WebSocket is connected
-        // Use browser.tabs.executeScript for Firefox MV2
         try {
-            const results = await browser.tabs.executeScript(tab.id, {
-                code: `(function() {
-                    return (window.__INSPEKT_WS_CONNECTED__ === true) ? 'connected' :
-                           (window.__INSPEKT_BRIDGE_EXTENSION__ ? 'loaded' : 'not-loaded');
-                })()`
-            });
+            const api = typeof chrome !== 'undefined' ? chrome : browser;
 
-            if (results && results[0]) {
-                const status = results[0];
+            // For Chrome: use scripting.executeScript
+            if (typeof chrome !== 'undefined' && chrome.scripting) {
+                const results = await chrome.scripting.executeScript({
+                    target: { tabId: tab.id },
+                    func: () => {
+                        return (window.__INSPEKT_WS_CONNECTED__ === true) ? 'connected' :
+                               (window.__INSPEKT_BRIDGE_EXTENSION__ ? 'loaded' : 'not-loaded');
+                    }
+                });
 
-                if (status === 'connected') {
-                    setStatus(statusDot, statusText, 'connected',
-                        '✅ Connected to localhost:8766');
-                } else if (status === 'loaded') {
-                    setStatus(statusDot, statusText, 'checking',
-                        '⏳ Extension loaded, connecting to server...');
-                } else {
-                    setStatus(statusDot, statusText, 'checking',
-                        '⏳ Extension loading...');
+                if (results && results[0]) {
+                    const status = results[0].result;
+
+                    if (status === 'connected') {
+                        setStatus(statusDot, statusText, 'connected',
+                            '✅ Connected to localhost:8766');
+                    } else if (status === 'loaded') {
+                        setStatus(statusDot, statusText, 'checking',
+                            '⏳ Extension loaded, connecting to server...');
+                    } else {
+                        setStatus(statusDot, statusText, 'checking',
+                            '⏳ Extension loading...');
+                    }
                 }
-            } else {
-                setStatus(statusDot, statusText, 'checking',
-                    '⏳ Initializing...');
             }
-        } catch (execError) {
+            // For Firefox: use tabs.executeScript
+            else if (typeof browser !== 'undefined' && browser.tabs) {
+                const results = await browser.tabs.executeScript(tab.id, {
+                    code: `(function() {
+                        return (window.__INSPEKT_WS_CONNECTED__ === true) ? 'connected' :
+                               (window.__INSPEKT_BRIDGE_EXTENSION__ ? 'loaded' : 'not-loaded');
+                    })()`
+                });
+
+                if (results && results[0]) {
+                    const status = results[0];
+
+                    if (status === 'connected') {
+                        setStatus(statusDot, statusText, 'connected',
+                            '✅ Connected to localhost:8766');
+                    } else if (status === 'loaded') {
+                        setStatus(statusDot, statusText, 'checking',
+                            '⏳ Extension loaded, connecting to server...');
+                    } else {
+                        setStatus(statusDot, statusText, 'checking',
+                            '⏳ Extension loading...');
+                    }
+                }
+            }
+        } catch (error) {
             // Script execution failed - likely the tab doesn't allow content scripts
             setStatus(statusDot, statusText, 'disconnected',
                 '❌ Extension not available on this page');
@@ -98,7 +167,7 @@ async function loadAllowedDomains() {
 
     try {
         // Get current tab
-        const tabs = await browser.tabs.query({ active: true, currentWindow: true });
+        const tabs = await BrowserAPI.getTabs({ active: true, currentWindow: true });
         if (!tabs[0]) return;
 
         const tab = tabs[0];
@@ -130,7 +199,7 @@ async function loadAllowedDomains() {
                 await InspektPermissions.allowDomain(currentDomain);
                 await loadAllowedDomains();
                 // Reload the tab to trigger connection
-                await browser.tabs.reload(tab.id);
+                await BrowserAPI.reloadTab(tab.id);
             });
         } else {
             document.getElementById('remove-current-btn').addEventListener('click', async () => {

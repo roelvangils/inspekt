@@ -9,7 +9,7 @@
 
 console.log('[Inspekt Extension] Background script loaded');
 
-// Track which tabs have Zen Bridge active
+// Track which tabs have Inspekt active
 const activeTabs = new Set();
 
 // Listen for tab updates to inject into new pages
@@ -69,16 +69,16 @@ async function executeWithCSPBypass(tabId, code, requestId) {
 (async function() {
     try {
         // Execute code - use eval to ensure proper scoping
-        const __zenEval = eval;
+        const __inspektEval = eval;
         // IMPORTANT: Escape backslashes FIRST to avoid double-escaping
-        let __zenResult = __zenEval(\`${code.replace(/\\/g, '\\\\').replace(/`/g, '\\`').replace(/\$/g, '\\$')}\`);
+        let __inspektResult = __inspektEval(\`${code.replace(/\\/g, '\\\\').replace(/`/g, '\\`').replace(/\$/g, '\\$')}\`);
 
         // If it's a promise, await it
-        if (__zenResult && typeof __zenResult.then === 'function') {
-            __zenResult = await __zenResult;
+        if (__inspektResult && typeof __inspektResult.then === 'function') {
+            __inspektResult = await __inspektResult;
         }
 
-        return { ok: true, result: __zenResult, error: null };
+        return { ok: true, result: __inspektResult, error: null };
     } catch (e) {
         return { ok: false, result: null, error: String(e.stack || e) };
     }

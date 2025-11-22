@@ -40,12 +40,14 @@ export class ManagePanel {
             });
         }
 
-        // Close on Escape key
+        // Close on Escape key (use capture phase to prevent DevTools console from opening)
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape' && this.isOpen) {
+                e.preventDefault();
+                e.stopPropagation();
                 this.close();
             }
-        });
+        }, true);
     }
 
     /**

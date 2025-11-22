@@ -330,6 +330,113 @@ body {
     margin-left: 4px;
 }
 
+/* Element Navigation Buttons */
+.element-navigation {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid light-dark(#e5e7eb, #404040);
+}
+
+.nav-row {
+    display: flex;
+    gap: 8px;
+}
+
+.nav-btn {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 10px 12px;
+    border: 2px solid light-dark(#e5e7eb, #404040);
+    border-radius: 6px;
+    background: light-dark(white, #2d2d2d);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: 11px;
+    font-weight: 500;
+    color: light-dark(#333, #e0e0e0);
+}
+
+.nav-btn .material-icons {
+    font-size: 18px;
+    color: light-dark(#0066ff, #66b3ff);
+    transition: transform 0.2s ease;
+}
+
+.nav-btn:hover:not(:disabled) {
+    border-color: light-dark(#0066ff, #66b3ff);
+    background: light-dark(#f8faff, #1a2332);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 6px light-dark(rgba(0, 102, 255, 0.15), rgba(0, 102, 255, 0.3));
+}
+
+.nav-btn:hover:not(:disabled) .material-icons {
+    transform: scale(1.1);
+}
+
+.nav-btn:active:not(:disabled) {
+    transform: translateY(0);
+    box-shadow: 0 1px 3px light-dark(rgba(0, 102, 255, 0.1), rgba(0, 102, 255, 0.2));
+}
+
+.nav-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    border-color: light-dark(#e5e7eb, #404040);
+    background: light-dark(#f5f5f5, #1a1a1a);
+}
+
+.nav-btn:disabled .material-icons {
+    color: light-dark(#999, #666);
+}
+
+.nav-label {
+    font-family: 'JetBrains Mono', 'SF Mono', 'Consolas', 'Liberation Mono', 'Courier New', monospace;
+    font-size: 11px;
+}
+
+/* Direction-specific button styling */
+.nav-btn-parent:hover:not(:disabled) .material-icons {
+    animation: bounceUp 0.6s ease infinite;
+}
+
+.nav-btn-child:hover:not(:disabled) .material-icons {
+    animation: bounceDown 0.6s ease infinite;
+}
+
+.nav-btn-prev:hover:not(:disabled) .material-icons {
+    animation: bounceLeft 0.6s ease infinite;
+}
+
+.nav-btn-next:hover:not(:disabled) .material-icons {
+    animation: bounceRight 0.6s ease infinite;
+}
+
+@keyframes bounceUp {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-3px); }
+}
+
+@keyframes bounceDown {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(3px); }
+}
+
+@keyframes bounceLeft {
+    0%, 100% { transform: translateX(0); }
+    50% { transform: translateX(-3px); }
+}
+
+@keyframes bounceRight {
+    0%, 100% { transform: translateX(0); }
+    50% { transform: translateX(3px); }
+}
+
 /* Quick Actions */
 .section-header {
     display: flex;

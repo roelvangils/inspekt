@@ -166,8 +166,32 @@ export class ElementPicker {
                         this.isActive = false;
                         this.updateTileState('normal');
 
-                        // Add persistent outline to selected element
-                        this.addPersistentOutline();
+                        // Show highlightBox on selected element (instead of persistent outline)
+                        evalInPage(
+                            `(function() {
+                                if (typeof window.__INSPEKT_UPDATE_HIGHLIGHT__ === 'function') {
+                                    window.__INSPEKT_UPDATE_HIGHLIGHT__();
+                                    return { success: true };
+                                }
+                                return { success: false };
+                            })()`,
+                            (result, error) => {
+                                if (result && result.success) {
+                                    this.hasOutline = true;
+
+                                    // Get element tag for tile text
+                                    evalInPage(
+                                        `window.__INSPEKT_INSPECTED_ELEMENT__ ? window.__INSPEKT_INSPECTED_ELEMENT__.tagName.toLowerCase() : null`,
+                                        (tag, error) => {
+                                            if (tag) {
+                                                this.selectedElementTag = tag;
+                                                this.updateTileText(tag);
+                                            }
+                                        }
+                                    );
+                                }
+                            }
+                        );
 
                         console.log('[Element Picker] Picker completed successfully');
                     }
@@ -213,80 +237,40 @@ export class ElementPicker {
      * Add persistent outline to selected element
      */
     addPersistentOutline() {
-        evalInPage(
-            `(function() {
-                const el = window.__INSPEKT_INSPECTED_ELEMENT__;
-                if (!el) return { success: false };
+        // Use shared utility with solid border and background
+        addOutline('2px solid #0066ff', 'rgba(0, 102, 255, 0.1)', (result, error) => {
+            if (result && result.success) {
+                this.hasOutline = true;
+                this.selectedElementTag = result.tag;
 
-                // Remove any existing outline
-                const existing = document.querySelector('[data-inspekt-outline="true"]');
-                if (existing) {
-                    existing.removeAttribute('data-inspekt-outline');
-                    existing.removeAttribute('data-inspekt-original-outline');
-                }
+                // Update tile text to show selected element
+                this.updateTileText(result.tag);
 
-                // Store original outline style
-                el.setAttribute('data-inspekt-original-outline', el.style.outline || '');
-                el.setAttribute('data-inspekt-outline', 'true');
-
-                // Add dashed outline
-                el.style.outline = '2px dashed #0066ff';
-                el.style.outlineOffset = '2px';
-
-                // Return element tag name
-                return {
-                    success: true,
-                    tag: el.tagName.toLowerCase()
-                };
-            })()`,
-            (result, error) => {
-                if (result && result.success) {
-                    this.hasOutline = true;
-                    this.selectedElementTag = result.tag;
-
-                    // Update tile text to show selected element
-                    this.updateTileText(result.tag);
-
-                    console.log('[Inspekt Panel] Persistent outline added for <' + result.tag + '>');
-                }
+                console.log('[Inspekt Panel] Persistent outline added for <' + result.tag + '>');
             }
-        );
+        });
     }
 
     /**
-     * Remove persistent outline
+     * Remove highlight (hide highlightBox)
      */
     removeOutline() {
+        // Hide highlightBox by calling update with no element
         evalInPage(
             `(function() {
-                const el = document.querySelector('[data-inspekt-outline="true"]');
-                if (!el) return false;
-
-                // Restore original outline
-                const originalOutline = el.getAttribute('data-inspekt-original-outline');
-                if (originalOutline) {
-                    el.style.outline = originalOutline;
-                } else {
-                    el.style.outline = '';
+                if (typeof window.__INSPEKT_UPDATE_HIGHLIGHT__ === 'function') {
+                    window.__INSPEKT_UPDATE_HIGHLIGHT__();
                 }
-                el.style.outlineOffset = '';
-
-                // Remove attributes
-                el.removeAttribute('data-inspekt-outline');
-                el.removeAttribute('data-inspekt-original-outline');
-
-                return true;
+                return { success: true };
             })()`,
             (result, error) => {
-                if (result) {
-                    this.hasOutline = false;
-                    this.selectedElementTag = null;
+                this.hasOutline = false;
+                this.selectedElementTag = null;
 
-                    // Restore tile text to original
-                    this.updateTileText(null);
+                // Restore tile text to original
+                this.updateTileText(null);
 
-                    console.log('[Inspekt Panel] Outline removed');
-                }
+                console.log('[Inspekt Panel] Highlight removed');
             }
         );
     }

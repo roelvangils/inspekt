@@ -52,21 +52,31 @@ export class ConnectionManager {
      * Check connection status once
      */
     checkStatus() {
-        evalInPage('window.__INSPEKT_WS_CONNECTED__', (result, error) => {
-            if (error) {
-                console.error('[Inspekt Panel] Error checking connection:', error);
-                this.updateStatus('disconnected');
-            } else {
-                // result can be: 'connecting', true (connected), or false (disconnected)
-                if (result === true) {
-                    this.updateStatus('connected');
-                } else if (result === 'connecting') {
-                    this.updateStatus('connecting');
-                } else {
+        try {
+            evalInPage('window.__INSPEKT_WS_CONNECTED__', (result, error) => {
+                console.log('[Connection Manager] Status check - Result:', result, 'Error:', error);
+
+                if (error) {
+                    console.error('[Connection Manager] Error checking connection:', error);
                     this.updateStatus('disconnected');
+                } else {
+                    // result can be: 'connecting', true (connected), or false (disconnected)
+                    if (result === true) {
+                        console.log('[Connection Manager] WebSocket is connected');
+                        this.updateStatus('connected');
+                    } else if (result === 'connecting') {
+                        console.log('[Connection Manager] WebSocket is connecting');
+                        this.updateStatus('connecting');
+                    } else {
+                        console.log('[Connection Manager] WebSocket is disconnected, result:', result);
+                        this.updateStatus('disconnected');
+                    }
                 }
-            }
-        });
+            });
+        } catch (err) {
+            console.error('[Connection Manager] Exception in checkStatus:', err);
+            this.updateStatus('disconnected');
+        }
 
         // Recheck every 2 seconds for faster updates
         this.checkInterval = setTimeout(() => this.checkStatus(), 2000);
@@ -77,6 +87,8 @@ export class ConnectionManager {
      * @param {string} status - 'connected', 'connecting', or 'disconnected'
      */
     updateStatus(status) {
+        console.log('[Connection Manager] Updating UI status to:', status);
+
         if (status === 'connected') {
             this.statusIndicator.className = 'status-indicator connected';
             this.statusText.textContent = 'Connected';

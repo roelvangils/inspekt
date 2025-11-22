@@ -25,6 +25,45 @@
         // Background script might not be ready yet, that's okay
     });
 
+    // Window Message Bridge
+    // Allows MAIN world scripts to communicate with extension APIs
+    // MAIN world → window.postMessage → content script → chrome.runtime → background script
+    window.addEventListener('message', async (event) => {
+        // Only accept messages from same origin (security)
+        if (event.source !== window) return;
+
+        const message = event.data;
+
+        // Handle GET_COOKIES_ENHANCED requests from MAIN world
+        if (message && message.type === 'INSPEKT_GET_COOKIES_ENHANCED' && message.source === 'inspekt-page') {
+            try {
+                // Forward to background script
+                const response = await chrome.runtime.sendMessage({
+                    type: 'GET_COOKIES_ENHANCED'
+                });
+
+                // Send response back to MAIN world
+                window.postMessage({
+                    type: 'INSPEKT_COOKIES_RESPONSE',
+                    source: 'inspekt-extension',
+                    requestId: message.requestId,
+                    response: response
+                }, '*');
+            } catch (error) {
+                // Send error back to MAIN world
+                window.postMessage({
+                    type: 'INSPEKT_COOKIES_RESPONSE',
+                    source: 'inspekt-extension',
+                    requestId: message.requestId,
+                    response: {
+                        ok: false,
+                        error: String(error)
+                    }
+                }, '*');
+            }
+        }
+    });
+
     const WS_URL = 'ws://127.0.0.1:8766/ws';
     let ws = null;
     let reconnectTimer = null;
@@ -79,20 +118,30 @@
                     userAgent: navigator.userAgent,
                     browserName: navigator.userAgentData?.brands?.[0]?.brand || 'Chrome',
                     url: window.location.href,
-                    title: document.title
+                    title: document.title,
+                    extensionVersion: window.__INSPEKT_BRIDGE_VERSION__ || window.__ZEN_BRIDGE_VERSION__ || null
                 };
                 ws.send(JSON.stringify(browserInfo));
             };
 
             ws.onmessage = async (event) => {
-                if (!isFrontTab()) {
-                    return;
-                }
-
                 try {
                     const message = JSON.parse(event.data);
+                    console.log('[Inspekt Content] Received WebSocket message:', message.type, message);
+
+                    // Check if this is an identify command (should work even when tab is hidden)
+                    const isIdentifyCommand = message.code &&
+                        message.code.includes('orange') &&
+                        message.code.includes('overlay');
+
+                    // Skip visibility check for identify commands and pong responses
+                    if (!isFrontTab() && !isIdentifyCommand && message.type !== 'pong') {
+                        console.log('[Inspekt] Message dropped - tab not visible/active:', message.type);
+                        return;
+                    }
 
                     if (message.type === 'execute') {
+                        console.log('[Inspekt Content] Forwarding to background script:', message.code);
                         const requestId = message.request_id;
                         const code = message.code;
 
@@ -103,6 +152,8 @@
                                 code: code,
                                 requestId: requestId
                             });
+
+                            console.log('[Inspekt Content] Response from background:', response);
 
                             // Send result back via WebSocket
                             ws.send(JSON.stringify({
@@ -292,8 +343,9 @@
             }
             return true;
         } else if (message.action === 'hideOutline') {
-            // Hide the element picker outline temporarily
+            // Hide both the persistent outline and the highlightBox
             try {
+                // Hide persistent outline (legacy system)
                 const element = document.querySelector('[data-inspekt-outline="true"]');
                 if (element) {
                     // Store current outline styles so we can restore them
@@ -304,12 +356,27 @@
                     element.style.outline = 'none';
                     element.style.outlineOffset = '';
 
-                    console.log('[Content Script] Outline hidden');
-                    sendResponse({ success: true });
-                } else {
-                    console.warn('[Content Script] No outlined element found to hide');
-                    sendResponse({ success: true }); // Not an error if outline doesn't exist
+                    console.log('[Content Script] Persistent outline hidden');
                 }
+
+                // Hide highlightBox (new system) by injecting code into page context
+                const script = document.createElement('script');
+                script.textContent = `
+                    (function() {
+                        // Store current highlightBox state
+                        const highlightBox = document.querySelector('[style*="z-index: 2147483646"]');
+                        if (highlightBox && highlightBox.style.display !== 'none') {
+                            highlightBox.setAttribute('data-inspekt-hidden-highlight', 'true');
+                            highlightBox.style.display = 'none';
+                            console.log('[Inspekt] HighlightBox hidden for screenshot');
+                        }
+                    })();
+                `;
+                document.documentElement.appendChild(script);
+                script.remove();
+
+                console.log('[Content Script] All highlights hidden');
+                sendResponse({ success: true });
             } catch (error) {
                 sendResponse({
                     success: false,
@@ -318,8 +385,9 @@
             }
             return true;
         } else if (message.action === 'showOutline') {
-            // Restore the element picker outline
+            // Restore both the persistent outline and the highlightBox
             try {
+                // Restore persistent outline (legacy system)
                 const element = document.querySelector('[data-inspekt-outline="true"]');
                 if (element) {
                     // Restore outline styles
@@ -335,12 +403,34 @@
                         element.removeAttribute('data-inspekt-hidden-outline-offset');
                     }
 
-                    console.log('[Content Script] Outline restored');
-                    sendResponse({ success: true });
-                } else {
-                    console.warn('[Content Script] No outlined element found to restore');
-                    sendResponse({ success: true }); // Not an error if outline doesn't exist
+                    console.log('[Content Script] Persistent outline restored');
                 }
+
+                // Restore highlightBox (new system) by injecting code into page context
+                const script = document.createElement('script');
+                script.textContent = `
+                    (function() {
+                        // Restore highlightBox if it was hidden
+                        const highlightBox = document.querySelector('[data-inspekt-hidden-highlight="true"]');
+                        if (highlightBox) {
+                            highlightBox.removeAttribute('data-inspekt-hidden-highlight');
+
+                            // Update highlight to restore position
+                            if (typeof window.__INSPEKT_UPDATE_HIGHLIGHT__ === 'function') {
+                                window.__INSPEKT_UPDATE_HIGHLIGHT__();
+                            } else {
+                                // Fallback: just show it
+                                highlightBox.style.display = 'block';
+                            }
+                            console.log('[Inspekt] HighlightBox restored after screenshot');
+                        }
+                    })();
+                `;
+                document.documentElement.appendChild(script);
+                script.remove();
+
+                console.log('[Content Script] All highlights restored');
+                sendResponse({ success: true });
             } catch (error) {
                 sendResponse({
                     success: false,

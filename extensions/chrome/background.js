@@ -89,6 +89,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             .catch(error => sendResponse({ ok: false, error: String(error) }));
         return true; // Keep channel open for async response
     }
+
+    if (message.type === 'GET_COOKIES_ENHANCED') {
+        // Retrieve detailed cookie information using chrome.cookies API
+        getCookiesEnhanced(sender.tab.url)
+            .then(sendResponse)
+            .catch(error => sendResponse({ ok: false, error: String(error) }));
+        return true; // Keep channel open for async response
+    }
 });
 
 /**
@@ -444,6 +452,206 @@ async function executeViaScriptTag(tabId, code, requestId) {
             error: String(error),
             requestId: requestId
         };
+    }
+}
+
+/**
+ * Helper function to check if a string should be split into an array
+ */
+function splitDelimitedString(value) {
+    // Check for pipe-separated values
+    if (value.includes('|')) {
+        return value.split('|').map(s => s.trim());
+    }
+
+    // Check for comma-separated values
+    // Only split if there are multiple items (has commas)
+    if (value.includes(',')) {
+        const parts = value.split(',').map(s => s.trim());
+        // Only treat as array if we have multiple non-empty parts
+        if (parts.length > 1 && parts.every(p => p.length > 0)) {
+            return parts;
+        }
+    }
+
+    return null; // Not a delimited string
+}
+
+/**
+ * Helper function to recursively transform values (including nested objects)
+ */
+function transformValueRecursive(obj) {
+    if (obj === null || obj === undefined) {
+        return obj;
+    }
+
+    // If it's an array, transform each element
+    if (Array.isArray(obj)) {
+        return obj.map(item => transformValueRecursive(item));
+    }
+
+    // If it's an object, transform each property
+    if (typeof obj === 'object') {
+        const result = {};
+        for (const key in obj) {
+            if (obj.hasOwnProperty(key)) {
+                result[key] = transformValueRecursive(obj[key]);
+            }
+        }
+        return result;
+    }
+
+    // If it's a string, check if it's delimited
+    if (typeof obj === 'string') {
+        const delimited = splitDelimitedString(obj);
+        if (delimited) {
+            return delimited;
+        }
+    }
+
+    // Return as-is for other types (numbers, booleans, etc.)
+    return obj;
+}
+
+/**
+ * Helper function to transform cookie values (parse JSON, split delimited strings)
+ */
+function transformValue(value) {
+    // Try to parse as JSON first
+    try {
+        const parsed = JSON.parse(value);
+        // Recursively transform to handle nested delimited strings
+        return transformValueRecursive(parsed);
+    } catch (e) {
+        // Not valid JSON, check for delimited values at top level
+        const delimited = splitDelimitedString(value);
+        if (delimited) {
+            return delimited;
+        }
+
+        // Return as plain string
+        return value;
+    }
+}
+
+/**
+ * Get detailed cookie information using chrome.cookies API
+ * This provides much more metadata than document.cookie
+ */
+async function getCookiesEnhanced(url) {
+    try {
+        // Get all cookies for the current URL
+        const cookies = await chrome.cookies.getAll({ url: url });
+
+        // Extract current domain from URL for party detection
+        const currentDomain = new URL(url).hostname;
+
+        // Enhance each cookie with calculated fields
+        const enhancedCookies = cookies.map(cookie => {
+            const currentTime = Date.now();
+
+            // Calculate cookie size
+            const size = cookie.name.length + cookie.value.length;
+
+            // Determine cookie type
+            const type = cookie.session ? 'session' : 'persistent';
+
+            // Convert expiration to ISO string (if persistent cookie)
+            const expires = cookie.expirationDate
+                ? new Date(cookie.expirationDate * 1000).toISOString()
+                : null;
+
+            // Determine first-party vs third-party
+            const cookieDomain = cookie.domain.startsWith('.')
+                ? cookie.domain.substring(1)
+                : cookie.domain;
+            const isFirstParty = currentDomain.includes(cookieDomain) ||
+                                 cookieDomain.includes(currentDomain);
+            const party = isFirstParty ? 'first-party' : 'third-party';
+
+            // Parse JSON value
+            const valueParsed = transformValue(cookie.value);
+
+            // Time-based properties
+            const expiresInMs = cookie.expirationDate ? (cookie.expirationDate * 1000 - currentTime) : null;
+            const expiresInMinutes = expiresInMs !== null ? Math.floor(expiresInMs / (1000 * 60)) : null;
+            const expiresInHours = expiresInMs !== null ? Math.floor(expiresInMs / (1000 * 60 * 60)) : null;
+            const expiresInDays = expiresInMs !== null ? Math.floor(expiresInMs / (1000 * 60 * 60 * 24)) : null;
+            const expiresAt = cookie.expirationDate ? new Date(cookie.expirationDate * 1000).toLocaleString() : null;
+
+            // Status flags
+            const isExpired = cookie.expirationDate ? (cookie.expirationDate * 1000 < currentTime) : false;
+            const isExpiringSoon = expiresInHours !== null && expiresInHours < 24 && expiresInHours > 0;
+            const isPersistent = !cookie.session;
+            const isLongLived = expiresInDays !== null && expiresInDays > 365;
+
+            // Size properties
+            const sizeBytes = new Blob([cookie.name + cookie.value]).size;
+            const isLarge = sizeBytes > 4096;
+
+            // Security properties
+            const securityFlags = [];
+            if (cookie.secure) securityFlags.push('secure');
+            if (cookie.httpOnly) securityFlags.push('httpOnly');
+            if (cookie.sameSite && cookie.sameSite !== 'no_restriction') securityFlags.push('sameSite');
+
+            let securityScore = 0;
+            if (cookie.secure) securityScore += 25;
+            if (cookie.httpOnly) securityScore += 25;
+            if (cookie.sameSite === 'strict') securityScore += 25;
+            else if (cookie.sameSite === 'lax') securityScore += 15;
+            if (party === 'first-party') securityScore += 10;
+
+            const isSecure = cookie.secure && cookie.httpOnly && cookie.sameSite !== 'no_restriction';
+
+            // Domain properties
+            const isWildcard = cookie.domain.startsWith('.');
+            const scope = isWildcard ? 'subdomain' : 'exact';
+
+            return {
+                ...cookie,
+                // Parsed value
+                valueParsed: valueParsed,
+                // Existing properties
+                size: size,
+                type: type,
+                expires: expires,
+                party: party,
+                // Time-based
+                expiresInMinutes: expiresInMinutes,
+                expiresInHours: expiresInHours,
+                expiresInDays: expiresInDays,
+                expiresAt: expiresAt,
+                // Status flags
+                isExpired: isExpired,
+                isExpiringSoon: isExpiringSoon,
+                isPersistent: isPersistent,
+                isLongLived: isLongLived,
+                // Size
+                sizeBytes: sizeBytes,
+                isLarge: isLarge,
+                // Security
+                securityScore: securityScore,
+                securityFlags: securityFlags,
+                isSecure: isSecure,
+                // Domain
+                isWildcard: isWildcard,
+                scope: scope
+            };
+        });
+
+        return {
+            ok: true,
+            action: 'list',
+            cookies: enhancedCookies,
+            count: enhancedCookies.length,
+            apiUsed: 'chrome.cookies',
+            origin: url,
+            hostname: new URL(url).hostname
+        };
+    } catch (error) {
+        console.error('[Inspekt] Cookie retrieval error:', error);
+        throw new Error(`Failed to retrieve cookies: ${error.message}`);
     }
 }
 
