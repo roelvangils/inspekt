@@ -19,9 +19,11 @@ Comprehensive guides, API reference, tutorials, and examples. Beautiful Material
 
 ## ✨ Features
 
+- **MCP Server** - Use with Claude Desktop and AI assistants via Model Context Protocol
 - **Execute JavaScript** - Run code in your active browser tab from the terminal
 - **Interactive REPL** - Live JavaScript experimentation with instant feedback
 - **AI Integration** - Article summarization and page descriptions powered by AI
+- **Accessibility Testing** - WCAG compliance audits with axe-core, rule-specific checks, auto-element selection
 - **Element Interaction** - Click, inspect, highlight, and wait for elements
 - **Keyboard Control** - Navigate pages entirely from your keyboard with auto-refocus
 - **Data Extraction** - Links, images, tables, metadata, and more
@@ -131,6 +133,11 @@ inspekt info
 # Extract all links
 inspekt links --only-external
 
+# Run accessibility audit
+inspekt axe
+inspekt axe --rule color-contrast
+inspekt axe --list-rules
+
 # Start interactive REPL
 inspekt repl
 
@@ -172,6 +179,46 @@ curl -X POST http://localhost:8767/api/navigation/open \
 # View API documentation
 open http://localhost:8767/docs
 ```
+
+### MCP Server for AI Assistants
+
+Use Inspekt with Claude Desktop and other AI assistants via the Model Context Protocol (MCP):
+
+```bash
+# Test MCP server connectivity
+inspekt mcp test
+
+# View available tools and resources
+inspekt mcp info
+
+# Start MCP server (for use with Claude Desktop)
+inspekt mcp start
+```
+
+**Configure Claude Desktop** (`~/Library/Application Support/Claude/claude_desktop_config.json`):
+
+```json
+{
+  "mcpServers": {
+    "inspekt": {
+      "command": "inspekt",
+      "args": ["mcp", "start"]
+    }
+  }
+}
+```
+
+Once configured, Claude can:
+- Navigate web pages and extract information
+- Automate browser interactions through natural language
+- Click elements, fill forms, and take screenshots
+- Access real-time page data during conversations
+
+**Available Tools:** 15 tools across 6 categories (navigation, execution, extraction, interaction, inspection, storage)
+
+**Available Resources:** 5 read-only resources (current URL, page title, metadata, browser info, connection status)
+
+📚 **[Complete MCP Integration Guide →](docs/MCP_INTEGRATION.md)**
 
 ## 📖 Usage Guide
 
@@ -383,6 +430,66 @@ Total: 7 headings
 - Verify heading hierarchy
 - SEO analysis
 - Quick page structure overview
+
+### Accessibility Testing
+
+Run WCAG compliance audits using the industry-standard axe-core library:
+
+```bash
+# Full WCAG 2.1 Level AA audit (default)
+inspekt axe
+
+# Test specific WCAG level
+inspekt axe --level 21aa
+inspekt axe --level 2aaa
+
+# Check a specific accessibility rule
+inspekt axe --rule color-contrast
+inspekt axe --rule link-name
+inspekt axe --rule aria-allowed-attr
+
+# List all available rules (~104 rules)
+inspekt axe --list-rules
+
+# Include passing checks
+inspekt axe --include-passes
+
+# Output as JSON
+inspekt axe --json > audit-results.json
+```
+
+**Features:**
+- **WCAG Standards**: Test against WCAG 2.0/2.1/2.2 (Level A, AA, AAA)
+- **104 Accessibility Rules**: Comprehensive coverage of accessibility issues
+- **Auto-Element Selection**: Single violations are automatically highlighted in browser
+- **Detailed Reports**: CSS selectors, HTML snippets, failure summaries, and help URLs
+- **Rule-Specific Checks**: Target specific issues like color contrast, ARIA attributes, etc.
+
+**Example Output:**
+```
+Running Accessibility Check (Rule: color-contrast)
+
+Rule: color-contrast
+Impact: serious
+Help: Elements must meet minimum color contrast ratio thresholds
+Documentation: https://dequeuniversity.com/rules/axe/4.11/color-contrast
+
+Found 1 violation:
+
+1. [serious]
+   Selector: .header__text
+   HTML: <span class="header__text">Welcome</span>
+   Issue: Element has insufficient color contrast of 3.2:1
+          Expected contrast ratio of 4.5:1
+
+✓ Element auto-selected and highlighted in browser
+  Run 'inspekt inspected' to view full element details
+```
+
+**Disable auto-selection:**
+```bash
+inspekt axe --rule color-contrast --no-select
+```
 
 ### AI-Powered Features
 
