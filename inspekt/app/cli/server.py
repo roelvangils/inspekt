@@ -8,6 +8,53 @@ import time
 import click
 
 from inspekt.client import BridgeClient
+from inspekt.services.axe_updater import get_axe_updater
+
+
+def _check_axe_updates():
+    """Check for axe-core updates and prompt user to update."""
+    updater = get_axe_updater()
+
+    try:
+        # Check for updates (quick, non-blocking)
+        click.echo("  • Checking for axe-core updates…", err=True)
+        update_available, current, latest = updater.is_update_available()
+
+        if not latest:
+            # Network error or timeout - silently continue
+            return
+
+        if not update_available:
+            # Already on latest version
+            click.echo(f"  ✓ axe-core is up-to-date ({current})", err=True)
+            return
+
+        # Update available - prompt user
+        click.echo(f"  ✓ axe-core {latest} is available (current: {current})", err=True)
+        click.echo("", err=True)
+
+        # Ask user if they want to update
+        if click.confirm(f"Update to axe-core {latest}?", default=True):
+            click.echo("", err=True)
+
+            # Progress callback
+            def show_progress(msg):
+                click.echo(f"{msg}", err=True)
+
+            # Perform update
+            success, message = updater.update_to_latest(progress_callback=show_progress)
+
+            if success:
+                click.echo(f"\n✓ {message}\n", err=True)
+            else:
+                click.echo(f"\n✗ Update failed: {message}", err=True)
+                click.echo("Continuing with current version.\n", err=True)
+        else:
+            click.echo("Skipping update.\n", err=True)
+
+    except Exception:
+        # Silently continue on any error - don't block server start
+        pass
 
 
 @click.group()
@@ -21,6 +68,9 @@ def server():
 @click.option("-d", "--daemon", is_flag=True, help="Run in background")
 def start(port, daemon):
     """Start the bridge server."""
+    # Check for axe-core updates before starting server
+    _check_axe_updates()
+
     client = BridgeClient(port=port)
 
     if client.is_alive():

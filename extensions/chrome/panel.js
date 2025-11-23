@@ -99,7 +99,53 @@ function initializeManagers() {
         if (settingsManager.getSettings().trackHistory) {
             historyManager.add(element);
         }
+
+        // Update pick element button state
+        updatePickElementButtonState(element);
     });
 
+    // Setup pick element button
+    setupPickElementButton();
+
     console.log('[Panel] All managers initialized');
+}
+
+/**
+ * Setup the permanent Pick Element button in Quick Actions heading
+ */
+function setupPickElementButton() {
+    const pickElementBtn = document.getElementById('pickElementBtn');
+    if (!pickElementBtn) {
+        console.error('[Panel] Pick Element button not found');
+        return;
+    }
+
+    // Add click handler
+    pickElementBtn.addEventListener('click', () => {
+        console.log('[Panel] Pick Element button clicked');
+        elementPicker.activate();
+    });
+
+    // Initialize state
+    const currentElement = elementDisplay.getCurrentElement();
+    updatePickElementButtonState(currentElement);
+
+    console.log('[Panel] Pick Element button initialized');
+}
+
+/**
+ * Update pick element button dimmed state based on element selection
+ * @param {Object|null} element - Current element or null
+ */
+function updatePickElementButtonState(element) {
+    const pickElementBtn = document.getElementById('pickElementBtn');
+    if (!pickElementBtn) return;
+
+    if (element) {
+        // Element is selected - dim the button
+        pickElementBtn.classList.add('dimmed');
+    } else {
+        // No element selected - normal state
+        pickElementBtn.classList.remove('dimmed');
+    }
 }

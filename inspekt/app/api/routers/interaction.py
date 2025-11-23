@@ -161,7 +161,7 @@ def _perform_click_api(selector: str, click_type: str) -> dict[str, Any]:
 
 # Endpoints
 @router.post("/click", response_model=CommandResponse)
-async def click_element(request: ClickRequest):
+def click_element(request: ClickRequest):
     """
     Click on an element.
 
@@ -185,7 +185,7 @@ async def click_element(request: ClickRequest):
 
 
 @router.post("/double-click", response_model=CommandResponse)
-async def double_click_element(request: ClickRequest):
+def double_click_element(request: ClickRequest):
     """
     Double-click on an element.
 
@@ -208,7 +208,7 @@ async def double_click_element(request: ClickRequest):
 
 
 @router.post("/right-click", response_model=CommandResponse)
-async def right_click_element(request: ClickRequest):
+def right_click_element(request: ClickRequest):
     """
     Right-click (context menu) on an element.
 
@@ -231,7 +231,7 @@ async def right_click_element(request: ClickRequest):
 
 
 @router.post("/type", response_model=CommandResponse)
-async def type_text(request: TypeRequest):
+def type_text(request: TypeRequest):
     """
     Type text character by character into the browser.
 
@@ -271,7 +271,7 @@ async def type_text(request: TypeRequest):
 
 
 @router.post("/paste", response_model=CommandResponse)
-async def paste_text(request: PasteRequest):
+def paste_text(request: PasteRequest):
     """
     Paste text instantly into the browser.
 
@@ -300,7 +300,7 @@ async def paste_text(request: PasteRequest):
 
 
 @router.post("/wait", response_model=CommandResponse)
-async def wait_for_element(request: WaitRequest):
+def wait_for_element(request: WaitRequest):
     """
     Wait for an element to appear, be visible, hidden, or contain text.
 

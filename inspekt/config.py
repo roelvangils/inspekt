@@ -18,6 +18,20 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "typing": {
         "human-like-typo-rate": 0.05,
     },
+    "screenshot": {
+        "optimize": True,
+        "format": "png",
+        "scale": 2,
+        "quality": 0.92,
+        "margin": 0,
+        "margin-color": "auto",
+    },
+    "html_selection": {
+        "compact": False,
+        "pretty": True,
+        "colors": True,
+        "theme": "monokai",  # Pygments theme: monokai, vim, github-dark, etc.
+    },
     "control": {
         "auto-refocus": "only-spa",
         "focus-outline": "custom",
@@ -38,6 +52,35 @@ DEFAULT_CONFIG: dict[str, Any] = {
         "verbose": True,
         "verbose-logging": False,
     },
+    "mcp": {
+        "enabled": True,
+        "bridge-port": 8765,
+        "resource-cache-ttl": 5,
+        "enabled-tools": [
+            "navigate_to_url",
+            "go_back",
+            "reload_page",
+            "execute_javascript",
+            "extract_links",
+            "extract_outline",
+            "extract_page_info",
+            "extract_article",
+            "click_element",
+            "type_text",
+            "get_page_info",
+            "take_screenshot",
+            "get_selected_text",
+            "get_cookies",
+            "set_cookie",
+        ],
+        "enabled-resources": [
+            "current-url",
+            "page-title",
+            "page-metadata",
+            "browser-info",
+            "connection-status",
+        ],
+    },
 }
 
 
@@ -47,7 +90,8 @@ def find_config_file() -> Path | None:
 
     Searches in order:
     1. Current directory (project root)
-    2. ~/.inspekt/config.json
+    2. ~/.config/inspekt.json (XDG Base Directory)
+    3. ~/.inspekt/config.json (legacy, backward compatibility)
 
     Returns:
         Path to config file if found, None otherwise
@@ -57,10 +101,15 @@ def find_config_file() -> Path | None:
     if local_config.exists():
         return local_config
 
-    # Check ~/.inspekt/
-    home_config = Path.home() / ".inspekt" / "config.json"
-    if home_config.exists():
-        return home_config
+    # Check ~/.config/inspekt.json (XDG Base Directory standard)
+    xdg_config = Path.home() / ".config" / "inspekt.json"
+    if xdg_config.exists():
+        return xdg_config
+
+    # Check ~/.inspekt/config.json (legacy path for backward compatibility)
+    legacy_config = Path.home() / ".inspekt" / "config.json"
+    if legacy_config.exists():
+        return legacy_config
 
     return None
 
@@ -96,12 +145,24 @@ def load_config() -> dict[str, Any]:
                     config["typing"].update(user_config["typing"])
                 else:
                     config["typing"] = user_config["typing"]
+            elif key == "screenshot" and isinstance(user_config["screenshot"], dict):
+                # Nested screenshot config - merge deeply
+                if isinstance(config.get("screenshot"), dict):
+                    config["screenshot"].update(user_config["screenshot"])
+                else:
+                    config["screenshot"] = user_config["screenshot"]
             elif key == "ai" and isinstance(user_config["ai"], dict):
                 # Nested AI config - merge deeply
                 if isinstance(config.get("ai"), dict):
                     config["ai"].update(user_config["ai"])
                 else:
                     config["ai"] = user_config["ai"]
+            elif key == "mcp" and isinstance(user_config["mcp"], dict):
+                # Nested MCP config - merge deeply
+                if isinstance(config.get("mcp"), dict):
+                    config["mcp"].update(user_config["mcp"])
+                else:
+                    config["mcp"] = user_config["mcp"]
             else:
                 # Root-level properties like ai-language - overwrite
                 config[key] = user_config[key]
@@ -312,4 +373,92 @@ def get_typing_config() -> dict[str, Any]:
 
     return {
         "human-like-typo-rate": typo_rate,
+    }
+
+
+def get_screenshot_config() -> dict[str, Any]:
+    """
+    Get screenshot configuration with validation.
+
+    Returns:
+        Screenshot configuration dictionary with validated values
+    """
+    config = load_config()
+    screenshot_config = config.get("screenshot", {})
+
+    # Validate optimize: boolean
+    optimize = screenshot_config.get("optimize", True)
+    optimize = bool(optimize)
+
+    # Validate format: must be png, jpg, or webp
+    format_val = screenshot_config.get("format", "png").lower()
+    if format_val not in ["png", "jpg", "webp"]:
+        format_val = "png"
+
+    # Validate scale: positive integer
+    scale = screenshot_config.get("scale", 2)
+    try:
+        scale = max(1, int(scale))
+    except (ValueError, TypeError):
+        scale = 2
+
+    # Validate quality: float between 0 and 1
+    quality = screenshot_config.get("quality", 0.92)
+    try:
+        quality = float(quality)
+        quality = max(0.0, min(1.0, quality))
+    except (ValueError, TypeError):
+        quality = 0.92
+
+    # Validate margin: non-negative integer
+    margin = screenshot_config.get("margin", 0)
+    try:
+        margin = max(0, int(margin))
+    except (ValueError, TypeError):
+        margin = 0
+
+    # Validate margin-color: string
+    margin_color = str(screenshot_config.get("margin-color", "auto"))
+
+    return {
+        "optimize": optimize,
+        "format": format_val,
+        "scale": scale,
+        "quality": quality,
+        "margin": margin,
+        "margin-color": margin_color,
+    }
+
+
+def get_html_selection_config() -> dict[str, Any]:
+    """
+    Get HTML selection configuration with validation.
+
+    Returns:
+        HTML selection configuration dictionary with validated boolean values
+    """
+    config = load_config()
+    html_selection_config = config.get("html_selection", {})
+
+    # Validate compact: boolean
+    compact = html_selection_config.get("compact", False)
+    compact = bool(compact)
+
+    # Validate pretty: boolean
+    pretty = html_selection_config.get("pretty", True)
+    pretty = bool(pretty)
+
+    # Validate colors: boolean
+    colors = html_selection_config.get("colors", True)
+    colors = bool(colors)
+
+    # Validate theme: string
+    theme = html_selection_config.get("theme", "monokai")
+    theme = str(theme) if theme else "monokai"
+
+    return {
+        "compact": compact,
+        "pretty": pretty,
+        "colors": colors,
+        "theme": theme,
     }

@@ -12,7 +12,7 @@
 
     // Expose version and status in BOTH isolated world (content script) AND main world (page)
     // Content script world (for content script use)
-    window.__INSPEKT_BRIDGE_VERSION__ = '4.2.1';
+    window.__INSPEKT_BRIDGE_VERSION__ = '4.3.1';
     window.__INSPEKT_BRIDGE_EXTENSION__ = true;
     window.__INSPEKT_BRIDGE_CSP_BLOCKED__ = false; // Extension bypasses CSP!
     window.__INSPEKT_WS_CONNECTED__ = false;
@@ -21,7 +21,7 @@
     // via browser.tabs.executeScript (which runs in main world, not isolated world)
     const script = document.createElement('script');
     script.textContent = `
-        window.__INSPEKT_BRIDGE_VERSION__ = '4.2.1';
+        window.__INSPEKT_BRIDGE_VERSION__ = '4.3.1';
         window.__INSPEKT_BRIDGE_EXTENSION__ = true;
         window.__INSPEKT_BRIDGE_CSP_BLOCKED__ = false;
         window.__INSPEKT_WS_CONNECTED__ = false;
@@ -67,6 +67,37 @@
                     }
                 }, '*');
             }
+        }
+    });
+
+    // Listen for WebSocket status updates from the WebSocket client
+    // and inject them into MAIN world so popup can read them
+    window.addEventListener('__inspekt_ws_status_change__', (event) => {
+        const status = event.detail;
+        const script = document.createElement('script');
+        script.textContent = `window.__INSPEKT_WS_CONNECTED__ = ${JSON.stringify(status)};`;
+        (document.head || document.documentElement).appendChild(script);
+        script.remove();
+    });
+
+    // Listen for messages from popup/background requesting connection status
+    browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
+        if (message.type === 'GET_WS_STATUS') {
+            // Return current WebSocket connection status
+            const wsConnected = window.__INSPEKT_WS_CONNECTED__;
+            const extensionLoaded = window.__INSPEKT_BRIDGE_EXTENSION__;
+
+            const status = (wsConnected === true) ? 'connected' :
+                          (extensionLoaded ? 'loaded' : 'not-loaded');
+
+            console.log('[Inspekt Content] GET_WS_STATUS request:', {
+                wsConnected,
+                extensionLoaded,
+                status
+            });
+
+            sendResponse({ status: status });
+            return true; // Keep channel open for async response
         }
     });
 

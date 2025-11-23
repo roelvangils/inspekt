@@ -113,9 +113,27 @@ class BrowserInfoMessage(BaseModel):
     model_config = {"extra": "forbid"}
 
 
+class DomainManagementResponse(BaseModel):
+    """Domain management response message.
+
+    Sent from browser to server in response to domain management commands.
+    """
+
+    type: Literal["response"] = "response"
+    requestId: str = Field(..., description="Request ID matching the original command")
+    response: dict[str, Any] = Field(..., description="Response data from background script")
+
+    model_config = {"extra": "forbid"}
+
+
 # Union type for all incoming WebSocket messages (browser → server)
 IncomingMessage = (
-    ExecuteResult | ReinitControlRequest | RefocusNotification | PingMessage | BrowserInfoMessage
+    ExecuteResult
+    | ReinitControlRequest
+    | RefocusNotification
+    | PingMessage
+    | BrowserInfoMessage
+    | DomainManagementResponse
 )
 
 # Union type for all outgoing WebSocket messages (server → browser)
@@ -415,6 +433,8 @@ def parse_incoming_message(data: dict[str, Any]) -> IncomingMessage:
         return PingMessage(**data)
     elif msg_type == "browser_info":
         return BrowserInfoMessage(**data)
+    elif msg_type == "response":
+        return DomainManagementResponse(**data)
     else:
         raise ValueError(f"Unknown message type: {msg_type}")
 

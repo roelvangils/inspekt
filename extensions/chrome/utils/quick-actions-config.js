@@ -6,17 +6,10 @@
 /**
  * Default Quick Actions definitions
  * Each action has metadata for rendering and execution
+ *
+ * Note: Pick Element action has been moved to a permanent button in the Quick Actions heading
  */
 export const DEFAULT_ACTIONS = [
-    {
-        id: 'pickElement',
-        icon: 'gps_fixed',
-        label: 'Pick Element',
-        hint: 'Select element on page',
-        handler: 'activatePicker',
-        shortcut: 'P'
-        // Note: requiresElement is NOT set, so this is always enabled
-    },
     {
         id: 'inspected',
         icon: 'search',
@@ -106,6 +99,24 @@ export const DEFAULT_ACTIONS = [
         handler: 'navigateToNextSibling',
         shortcut: 'R',
         requiresElement: true
+    },
+    {
+        id: 'hideElement',
+        icon: 'visibility_off',
+        label: 'Hide Element',
+        hint: 'Hide element permanently',
+        handler: 'hideElement',
+        shortcut: 'V',
+        requiresElement: true
+    },
+    {
+        id: 'unhideAll',
+        icon: 'visibility',
+        label: 'Unhide All',
+        hint: 'Restore all hidden elements',
+        handler: 'unhideAll',
+        shortcut: 'B',
+        requiresElement: false
     }
 ];
 

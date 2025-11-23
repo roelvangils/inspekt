@@ -22,6 +22,8 @@ import { handleNavigateParent } from '../handlers/navigate-parent.js';
 import { handleNavigateChild } from '../handlers/navigate-child.js';
 import { handleNavigatePrevSibling } from '../handlers/navigate-prev-sibling.js';
 import { handleNavigateNextSibling } from '../handlers/navigate-next-sibling.js';
+import { handleHideElement } from '../handlers/hide-element.js';
+import { handleUnhideAll } from '../handlers/unhide-all-elements.js';
 
 export class QuickActionsManager {
     constructor(dependencies) {
@@ -255,7 +257,9 @@ export class QuickActionsManager {
         navigateToParent: handleNavigateParent,
         navigateToChild: handleNavigateChild,
         navigateToPrevSibling: handleNavigatePrevSibling,
-        navigateToNextSibling: handleNavigateNextSibling
+        navigateToNextSibling: handleNavigateNextSibling,
+        hideElement: handleHideElement,
+        unhideAll: handleUnhideAll
     };
 
     /**

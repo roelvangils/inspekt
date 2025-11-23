@@ -1,12 +1,19 @@
 /**
  * Inspekt - Domain Permission Manager (Shared)
  *
- * Handles opt-in permission system for domains
+ * Handles user-initiated permission system for domains
  * Cross-browser compatible (works with chrome and browser APIs)
+ *
+ * New Features:
+ * - Parent domain grants subdomain access
+ * - Temporary "bypass all domains" mode
+ * - Timestamp tracking for domain additions
+ * - No intrusive modals - permission granted via popup button only
  */
 
 const InspektPermissions = {
     STORAGE_KEY: 'inspekt_allowed_domains',
+    TEMP_BYPASS_KEY: 'inspekt_temp_bypass',
 
     /**
      * Get the domain from a URL
@@ -21,32 +28,228 @@ const InspektPermissions = {
     },
 
     /**
+     * Check if a requested domain matches an allowed domain
+     * Supports parent domain → subdomain matching
+     *
+     * Examples:
+     *  - matchesDomain('github.com', 'github.com') → true
+     *  - matchesDomain('www.github.com', 'github.com') → true (subdomain)
+     *  - matchesDomain('api.github.com', 'github.com') → true (subdomain)
+     *  - matchesDomain('github.com', 'www.github.com') → false (parent doesn't match child)
+     *  - matchesDomain('example.com', 'github.com') → false (different domains)
+     */
+    matchesDomain(requestedDomain, allowedDomain) {
+        // Exact match
+        if (requestedDomain === allowedDomain) {
+            return true;
+        }
+
+        // Check if requestedDomain is a subdomain of allowedDomain
+        // e.g., 'www.github.com' should match 'github.com'
+        if (requestedDomain.endsWith('.' + allowedDomain)) {
+            return true;
+        }
+
+        // Special case for localhost with port
+        // 'localhost:3000' should match 'localhost'
+        if (allowedDomain === 'localhost' && requestedDomain.startsWith('localhost:')) {
+            return true;
+        }
+
+        // Also check if allowed domain has port but requested doesn't
+        // 'localhost' should match 'localhost:8080' if 'localhost:8080' is allowed
+        const requestedParts = requestedDomain.split(':');
+        const allowedParts = allowedDomain.split(':');
+        if (requestedParts[0] === allowedParts[0]) {
+            // Same base domain, different or missing ports
+            return true;
+        }
+
+        return false;
+    },
+
+    /**
+     * Check if temporary bypass is active
+     * Returns true if bypass enabled and not expired
+     */
+    async isTempBypassActive() {
+        const storage = typeof chrome !== 'undefined' ? chrome.storage : browser.storage;
+        const result = await storage.sync.get(this.TEMP_BYPASS_KEY);
+        const bypass = result[this.TEMP_BYPASS_KEY];
+
+        if (!bypass || !bypass.enabled) {
+            return false;
+        }
+
+        // Check if expired
+        if (bypass.expiresAt) {
+            const now = new Date().getTime();
+            const expiresAt = new Date(bypass.expiresAt).getTime();
+
+            if (now >= expiresAt) {
+                // Expired - clear it
+                await this.clearTempBypass();
+                return false;
+            }
+        }
+
+        return true;
+    },
+
+    /**
+     * Set temporary bypass for all domains
+     * @param {number} durationMinutes - Duration in minutes (0 to disable)
+     */
+    async setTempBypass(durationMinutes) {
+        const storage = typeof chrome !== 'undefined' ? chrome.storage : browser.storage;
+
+        if (durationMinutes === 0) {
+            // Disable bypass
+            await this.clearTempBypass();
+            return { ok: true, enabled: false };
+        }
+
+        const now = new Date();
+        const expiresAt = new Date(now.getTime() + durationMinutes * 60 * 1000);
+
+        const bypass = {
+            enabled: true,
+            expiresAt: expiresAt.toISOString(),
+            durationMinutes: durationMinutes
+        };
+
+        await storage.sync.set({ [this.TEMP_BYPASS_KEY]: bypass });
+
+        return {
+            ok: true,
+            enabled: true,
+            expiresAt: bypass.expiresAt,
+            durationMinutes: durationMinutes
+        };
+    },
+
+    /**
+     * Clear temporary bypass
+     */
+    async clearTempBypass() {
+        const storage = typeof chrome !== 'undefined' ? chrome.storage : browser.storage;
+        await storage.sync.remove(this.TEMP_BYPASS_KEY);
+    },
+
+    /**
+     * Get temporary bypass status
+     */
+    async getTempBypassStatus() {
+        const storage = typeof chrome !== 'undefined' ? chrome.storage : browser.storage;
+        const result = await storage.sync.get(this.TEMP_BYPASS_KEY);
+        const bypass = result[this.TEMP_BYPASS_KEY];
+
+        if (!bypass || !bypass.enabled) {
+            return { enabled: false };
+        }
+
+        // Check if expired
+        const now = new Date().getTime();
+        const expiresAt = new Date(bypass.expiresAt).getTime();
+
+        if (now >= expiresAt) {
+            await this.clearTempBypass();
+            return { enabled: false };
+        }
+
+        const remainingMs = expiresAt - now;
+        const remainingMinutes = Math.ceil(remainingMs / (60 * 1000));
+
+        return {
+            enabled: true,
+            expiresAt: bypass.expiresAt,
+            durationMinutes: bypass.durationMinutes,
+            remainingMinutes: remainingMinutes
+        };
+    },
+
+    /**
+     * Migrate legacy storage format (array) to new format (object with metadata)
+     * This runs automatically on first access
+     */
+    async migrateLegacyStorage() {
+        const storage = typeof chrome !== 'undefined' ? chrome.storage : browser.storage;
+        const result = await storage.sync.get(this.STORAGE_KEY);
+        const data = result[this.STORAGE_KEY];
+
+        // If no data or already migrated (is object), skip
+        if (!data || typeof data === 'object' && !Array.isArray(data)) {
+            return;
+        }
+
+        // If data is array (legacy format), migrate it
+        if (Array.isArray(data)) {
+            const migrated = {};
+            const now = new Date().toISOString();
+
+            data.forEach(domain => {
+                migrated[domain] = {
+                    addedAt: now,
+                    permanent: true
+                };
+            });
+
+            await storage.sync.set({ [this.STORAGE_KEY]: migrated });
+            console.log('[Inspekt] Migrated', data.length, 'domains to new format');
+        }
+    },
+
+    /**
      * Check if a domain is allowed
+     * Supports subdomain matching and temp bypass
      */
     async isAllowed(domain) {
         domain = domain || this.getDomain();
         if (!domain) return false;
 
+        // Check temp bypass first (bypasses all domain checks)
+        const bypassActive = await this.isTempBypassActive();
+        if (bypassActive) {
+            return true;
+        }
+
+        // Ensure migration has run
+        await this.migrateLegacyStorage();
+
         const storage = typeof chrome !== 'undefined' ? chrome.storage : browser.storage;
         const result = await storage.sync.get(this.STORAGE_KEY);
-        const allowedDomains = result[this.STORAGE_KEY] || [];
+        const allowedDomains = result[this.STORAGE_KEY] || {};
 
-        return allowedDomains.includes(domain);
+        // Check each allowed domain for match (including subdomains)
+        for (const allowedDomain of Object.keys(allowedDomains)) {
+            if (this.matchesDomain(domain, allowedDomain)) {
+                return true;
+            }
+        }
+
+        return false;
     },
 
     /**
-     * Add a domain to the allowed list
+     * Add a domain to the allowed list with timestamp
      */
     async allowDomain(domain) {
         domain = domain || this.getDomain();
         if (!domain) return false;
 
+        // Ensure migration has run
+        await this.migrateLegacyStorage();
+
         const storage = typeof chrome !== 'undefined' ? chrome.storage : browser.storage;
         const result = await storage.sync.get(this.STORAGE_KEY);
-        const allowedDomains = result[this.STORAGE_KEY] || [];
+        const allowedDomains = result[this.STORAGE_KEY] || {};
 
-        if (!allowedDomains.includes(domain)) {
-            allowedDomains.push(domain);
+        // Check if already exists
+        if (!allowedDomains[domain]) {
+            allowedDomains[domain] = {
+                addedAt: new Date().toISOString(),
+                permanent: true
+            };
             await storage.sync.set({ [this.STORAGE_KEY]: allowedDomains });
         }
 
@@ -57,219 +260,56 @@ const InspektPermissions = {
      * Remove a domain from the allowed list
      */
     async removeDomain(domain) {
+        // Ensure migration has run
+        await this.migrateLegacyStorage();
+
         const storage = typeof chrome !== 'undefined' ? chrome.storage : browser.storage;
         const result = await storage.sync.get(this.STORAGE_KEY);
-        const allowedDomains = result[this.STORAGE_KEY] || [];
+        const allowedDomains = result[this.STORAGE_KEY] || {};
 
-        const filtered = allowedDomains.filter(d => d !== domain);
-        await storage.sync.set({ [this.STORAGE_KEY]: filtered });
+        if (allowedDomains[domain]) {
+            delete allowedDomains[domain];
+            await storage.sync.set({ [this.STORAGE_KEY]: allowedDomains });
+        }
 
         return true;
     },
 
     /**
-     * Get all allowed domains
+     * Get all allowed domains with metadata
+     * Returns object: { "github.com": { addedAt: "...", permanent: true }, ... }
      */
     async getAllowedDomains() {
+        // Ensure migration has run
+        await this.migrateLegacyStorage();
+
         const storage = typeof chrome !== 'undefined' ? chrome.storage : browser.storage;
         const result = await storage.sync.get(this.STORAGE_KEY);
-        return result[this.STORAGE_KEY] || [];
+        return result[this.STORAGE_KEY] || {};
     },
 
     /**
-     * Show opt-in modal for the current domain
+     * Get all allowed domains as simple array (for backwards compatibility)
      */
-    async showOptInModal() {
-        const domain = this.getDomain();
-        if (!domain) return false;
-
-        return new Promise((resolve) => {
-            // Create modal overlay
-            const overlay = document.createElement('div');
-            overlay.id = 'inspekt-permission-modal';
-            overlay.style.cssText = `
-                position: fixed;
-                top: 0;
-                left: 0;
-                width: 100%;
-                height: 100%;
-                background: rgba(0, 0, 0, 0.7);
-                z-index: 2147483647;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            `;
-
-            // Create modal content
-            const modal = document.createElement('div');
-            modal.style.cssText = `
-                background: white;
-                border-radius: 12px;
-                padding: 32px;
-                max-width: 500px;
-                box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-                animation: inspekt-modal-appear 0.3s ease-out;
-            `;
-
-            // Add animation keyframes
-            const style = document.createElement('style');
-            style.textContent = `
-                @keyframes inspekt-modal-appear {
-                    from {
-                        opacity: 0;
-                        transform: translateY(-20px) scale(0.95);
-                    }
-                    to {
-                        opacity: 1;
-                        transform: translateY(0) scale(1);
-                    }
-                }
-            `;
-            document.head.appendChild(style);
-
-            modal.innerHTML = `
-                <div style="text-align: center; margin-bottom: 24px;">
-                    <div style="font-size: 48px; margin-bottom: 16px;">⚡</div>
-                    <h2 style="margin: 0 0 12px 0; color: #333; font-size: 24px; font-weight: 600;">
-                        Inspekt
-                    </h2>
-                    <p style="margin: 0; color: #666; font-size: 14px;">
-                        Allow CLI control of this website?
-                    </p>
-                </div>
-
-                <div style="background: #f5f5f5; padding: 16px; border-radius: 8px; margin-bottom: 24px;">
-                    <div style="display: flex; align-items: center; margin-bottom: 12px;">
-                        <div style="font-size: 24px; margin-right: 12px;">🌐</div>
-                        <div>
-                            <div style="font-weight: 600; color: #333; font-size: 16px;">${domain}</div>
-                            <div style="color: #666; font-size: 13px;">This domain</div>
-                        </div>
-                    </div>
-
-                    <div style="font-size: 13px; color: #666; line-height: 1.5;">
-                        Inspekt will be able to:
-                        <ul style="margin: 8px 0 0 0; padding-left: 20px;">
-                            <li>Execute commands from your CLI</li>
-                            <li>Read and modify page content</li>
-                            <li>Interact with page elements</li>
-                        </ul>
-                    </div>
-                </div>
-
-                <div style="background: #fff3cd; border: 1px solid #ffc107; padding: 12px; border-radius: 6px; margin-bottom: 24px;">
-                    <div style="display: flex; align-items: start;">
-                        <div style="margin-right: 8px; font-size: 16px;">⚠️</div>
-                        <div style="font-size: 13px; color: #856404; line-height: 1.5;">
-                            <strong>Important:</strong> Only allow Inspekt on websites you trust.
-                            This grants your local CLI full control over this domain.
-                        </div>
-                    </div>
-                </div>
-
-                <div style="display: flex; gap: 12px;">
-                    <button id="inspekt-deny-btn" style="
-                        flex: 1;
-                        padding: 12px 24px;
-                        border: 2px solid #e0e0e0;
-                        background: white;
-                        color: #666;
-                        border-radius: 8px;
-                        font-size: 14px;
-                        font-weight: 600;
-                        cursor: pointer;
-                        transition: all 0.2s;
-                    ">
-                        Deny
-                    </button>
-                    <button id="inspekt-allow-btn" style="
-                        flex: 1;
-                        padding: 12px 24px;
-                        border: none;
-                        background: linear-gradient(135deg, #0066ff 0%, #004db3 100%);
-                        color: white;
-                        border-radius: 8px;
-                        font-size: 14px;
-                        font-weight: 600;
-                        cursor: pointer;
-                        transition: all 0.2s;
-                    ">
-                        Allow ${domain}
-                    </button>
-                </div>
-
-                <div style="margin-top: 16px; text-align: center;">
-                    <a href="https://github.com/roelvangils/inspekt" target="_blank" style="
-                        color: #0066ff;
-                        text-decoration: none;
-                        font-size: 12px;
-                    ">Learn more about Inspekt</a>
-                </div>
-            `;
-
-            overlay.appendChild(modal);
-            document.body.appendChild(overlay);
-
-            // Add hover effects
-            const allowBtn = modal.querySelector('#inspekt-allow-btn');
-            const denyBtn = modal.querySelector('#inspekt-deny-btn');
-
-            allowBtn.addEventListener('mouseenter', () => {
-                allowBtn.style.transform = 'translateY(-2px)';
-                allowBtn.style.boxShadow = '0 4px 12px rgba(0, 102, 255, 0.3)';
-            });
-            allowBtn.addEventListener('mouseleave', () => {
-                allowBtn.style.transform = 'translateY(0)';
-                allowBtn.style.boxShadow = 'none';
-            });
-
-            denyBtn.addEventListener('mouseenter', () => {
-                denyBtn.style.background = '#f5f5f5';
-                denyBtn.style.borderColor = '#ccc';
-            });
-            denyBtn.addEventListener('mouseleave', () => {
-                denyBtn.style.background = 'white';
-                denyBtn.style.borderColor = '#e0e0e0';
-            });
-
-            // Handle button clicks
-            allowBtn.addEventListener('click', async () => {
-                await this.allowDomain(domain);
-                document.body.removeChild(overlay);
-                resolve(true);
-            });
-
-            denyBtn.addEventListener('click', () => {
-                document.body.removeChild(overlay);
-                resolve(false);
-            });
-
-            // Close on overlay click
-            overlay.addEventListener('click', (e) => {
-                if (e.target === overlay) {
-                    document.body.removeChild(overlay);
-                    resolve(false);
-                }
-            });
-        });
+    async getAllowedDomainsArray() {
+        const domains = await this.getAllowedDomains();
+        return Object.keys(domains);
     },
 
     /**
-     * Check permission and show modal if needed
+     * Check domain permission WITHOUT showing modal
+     * Returns true if:
+     * - Temp bypass is active, OR
+     * - Domain is explicitly allowed (including subdomain matching)
+     *
+     * Returns false otherwise (user must allow via popup button)
      */
     async checkAndRequest() {
         const domain = this.getDomain();
         if (!domain) return false;
 
         const allowed = await this.isAllowed(domain);
-        if (allowed) {
-            return true;
-        }
-
-        // Show opt-in modal
-        const result = await this.showOptInModal();
-        return result;
+        return allowed;
     }
 };
 

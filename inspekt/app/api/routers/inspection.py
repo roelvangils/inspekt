@@ -50,7 +50,7 @@ class ScreenshotResponse(BaseModel):
 
 # Endpoints
 @router.post("/inspect", response_model=CommandResponse)
-async def inspect_element(request: InspectRequest):
+def inspect_element(request: InspectRequest):
     """
     Select an element and show its details.
 
@@ -126,7 +126,7 @@ async def inspect_element(request: InspectRequest):
 
 
 @router.get("/inspected", response_model=CommandResponse)
-async def get_inspected_element():
+def get_inspected_element():
     """
     Get information about the currently inspected element.
 
@@ -177,7 +177,7 @@ async def get_inspected_element():
 
 
 @router.post("/screenshot", response_model=ScreenshotResponse)
-async def screenshot_element(request: ScreenshotRequest):
+def screenshot_element(request: ScreenshotRequest):
     """
     Take a screenshot of a specific element.
 

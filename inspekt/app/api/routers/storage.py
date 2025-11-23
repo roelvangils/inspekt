@@ -116,7 +116,7 @@ def _parse_types_param(types_str: str | None, default: list[str] | None = None) 
 # Endpoints
 @router.get("", response_model=StorageListResponse)
 @router.get("/", response_model=StorageListResponse)
-async def list_storage(
+def list_storage(
     types: str | None = Query(None, description="Comma-separated storage types: cookies,local,session or 'all' (default: all)"),
     type: Literal["local", "session", "cookies", "all"] | None = Query(None, description="[DEPRECATED] Single storage type - use 'types' instead")
 ):
@@ -195,7 +195,7 @@ async def list_storage(
 
 
 @router.get("/{key}", response_model=StorageGetResponse)
-async def get_storage(
+def get_storage(
     key: str,
     type: Literal["cookies", "local", "session"] = Query("local", description="Storage type")
 ):
@@ -256,7 +256,7 @@ async def get_storage(
 
 @router.post("", response_model=CommandResponse)
 @router.post("/", response_model=CommandResponse)
-async def set_storage(request: SetStorageRequest):
+def set_storage(request: SetStorageRequest):
     """
     Set a storage item (localStorage, sessionStorage, or cookie).
 
@@ -333,7 +333,7 @@ async def set_storage(request: SetStorageRequest):
 
 
 @router.delete("/{key}", response_model=CommandResponse)
-async def delete_storage(
+def delete_storage(
     key: str,
     type: Literal["cookies", "local", "session"] = Query("local", description="Storage type")
 ):
@@ -387,7 +387,7 @@ async def delete_storage(
 
 @router.delete("", response_model=CommandResponse)
 @router.delete("/", response_model=CommandResponse)
-async def clear_storage(
+def clear_storage(
     types: str | None = Query(None, description="Comma-separated storage types: cookies,local,session or 'all' (default: all)"),
     type: Literal["local", "session", "cookies", "all"] | None = Query(None, description="[DEPRECATED] Single storage type - use 'types' instead")
 ):

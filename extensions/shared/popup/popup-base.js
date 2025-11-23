@@ -56,11 +56,20 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Load allowed domains
     await loadAllowedDomains();
 
+    // Load temp bypass status
+    await loadTempBypassStatus();
+
+    // Setup temp bypass dropdown handler
+    setupTempBypassHandler();
+
     // Check connection status
     await checkConnectionStatus();
 
     // Refresh status every 5 seconds
     setInterval(checkConnectionStatus, 5000);
+
+    // Refresh temp bypass status every 10 seconds
+    setInterval(loadTempBypassStatus, 10000);
 });
 
 async function checkConnectionStatus() {
@@ -106,17 +115,16 @@ async function checkConnectionStatus() {
                     }
                 }
             }
-            // For Firefox: use tabs.executeScript
+            // For Firefox: use message passing to content script
             else if (typeof browser !== 'undefined' && browser.tabs) {
-                const results = await browser.tabs.executeScript(tab.id, {
-                    code: `(function() {
-                        return (window.__INSPEKT_WS_CONNECTED__ === true) ? 'connected' :
-                               (window.__INSPEKT_BRIDGE_EXTENSION__ ? 'loaded' : 'not-loaded');
-                    })()`
+                console.log('[Inspekt Popup] Sending GET_WS_STATUS to tab:', tab.id);
+                const response = await browser.tabs.sendMessage(tab.id, {
+                    type: 'GET_WS_STATUS'
                 });
+                console.log('[Inspekt Popup] Received status response:', response);
 
-                if (results && results[0]) {
-                    const status = results[0];
+                if (response && response.status) {
+                    const status = response.status;
 
                     if (status === 'connected') {
                         setStatus(statusDot, statusText, 'connected',
@@ -128,6 +136,8 @@ async function checkConnectionStatus() {
                         setStatus(statusDot, statusText, 'checking',
                             '⏳ Extension loading...');
                     }
+                } else {
+                    console.warn('[Inspekt Popup] No valid status in response:', response);
                 }
             }
         } catch (error) {
@@ -174,9 +184,12 @@ async function loadAllowedDomains() {
         const url = new URL(tab.url);
         const currentDomain = url.hostname;
 
-        // Get allowed domains
-        const allowedDomains = await InspektPermissions.getAllowedDomains();
-        const isCurrentAllowed = allowedDomains.includes(currentDomain);
+        // Get allowed domains (now returns object with metadata)
+        const allowedDomainsObj = await InspektPermissions.getAllowedDomains();
+        const allowedDomainsList = Object.keys(allowedDomainsObj);
+
+        // Check if current domain is allowed (using subdomain matching)
+        const isCurrentAllowed = await InspektPermissions.isAllowed(currentDomain);
 
         // Show current domain status
         currentDomainStatus.innerHTML = `
@@ -187,7 +200,7 @@ async function loadAllowedDomains() {
                 </span>
             </div>
             ${!isCurrentAllowed ? `
-                <button id="allow-current-btn">Allow This Domain</button>
+                <button id="allow-current-btn">⚡ Allow This Domain</button>
             ` : `
                 <button id="remove-current-btn" class="remove">Remove</button>
             `}
@@ -209,17 +222,27 @@ async function loadAllowedDomains() {
         }
 
         // Show all allowed domains (except current)
-        const otherDomains = allowedDomains.filter(d => d !== currentDomain);
+        const otherDomains = allowedDomainsList.filter(d => d !== currentDomain);
 
         if (otherDomains.length === 0) {
             domainsList.innerHTML = '<div class="no-domains">No other domains allowed</div>';
         } else {
-            domainsList.innerHTML = otherDomains.map(domain => `
-                <div class="domain-item">
-                    <span class="domain-name">${domain}</span>
-                    <button class="remove-domain-btn" data-domain="${domain}">Remove</button>
-                </div>
-            `).join('');
+            domainsList.innerHTML = otherDomains.map(domain => {
+                const metadata = allowedDomainsObj[domain];
+                const addedDate = metadata && metadata.addedAt
+                    ? new Date(metadata.addedAt).toLocaleDateString()
+                    : 'Unknown';
+
+                return `
+                    <div class="domain-item">
+                        <div class="domain-info">
+                            <span class="domain-name">${domain}</span>
+                            <span class="domain-date">Added: ${addedDate}</span>
+                        </div>
+                        <button class="remove-domain-btn" data-domain="${domain}">Remove</button>
+                    </div>
+                `;
+            }).join('');
 
             // Add remove listeners
             document.querySelectorAll('.remove-domain-btn').forEach(btn => {
@@ -235,4 +258,53 @@ async function loadAllowedDomains() {
         console.error('[Inspekt Popup] Error loading domains:', error);
         currentDomainStatus.innerHTML = '<div class="no-domains">Unable to load domain information</div>';
     }
+}
+
+async function loadTempBypassStatus() {
+    const bypassStatus = document.getElementById('temp-bypass-status');
+    const bypassRemaining = document.getElementById('bypass-remaining');
+    const bypassDropdown = document.getElementById('temp-bypass-duration');
+
+    try {
+        const status = await InspektPermissions.getTempBypassStatus();
+
+        if (status.enabled) {
+            // Show countdown
+            bypassStatus.classList.remove('hidden');
+            bypassRemaining.textContent = `${status.remainingMinutes} min`;
+
+            // Select the appropriate option (or closest match)
+            const closestOption = [60, 30, 15, 5].find(val => val >= status.remainingMinutes) || 5;
+            bypassDropdown.value = closestOption.toString();
+        } else {
+            // Hide countdown
+            bypassStatus.classList.add('hidden');
+            bypassDropdown.value = '0';
+        }
+    } catch (error) {
+        console.error('[Inspekt Popup] Error loading temp bypass status:', error);
+        bypassStatus.classList.add('hidden');
+    }
+}
+
+function setupTempBypassHandler() {
+    const bypassDropdown = document.getElementById('temp-bypass-duration');
+
+    bypassDropdown.addEventListener('change', async (e) => {
+        const minutes = parseInt(e.target.value);
+
+        try {
+            await InspektPermissions.setTempBypass(minutes);
+            await loadTempBypassStatus();
+
+            // Show visual feedback
+            if (minutes > 0) {
+                console.log(`[Inspekt] Temp bypass enabled for ${minutes} minutes`);
+            } else {
+                console.log('[Inspekt] Temp bypass disabled');
+            }
+        } catch (error) {
+            console.error('[Inspekt Popup] Error setting temp bypass:', error);
+        }
+    });
 }

@@ -224,7 +224,7 @@ footer {
 
 /* Permissions Section */
 .permissions {
-    max-height: 200px;
+    max-height: 300px;
     overflow-y: auto;
 }
 
@@ -289,6 +289,68 @@ footer {
     border-color: #dc3545;
 }
 
+/* Temp Bypass Section */
+.temp-bypass-section {
+    padding: 12px;
+    background: #fff8e1;
+    border-radius: 6px;
+    margin-bottom: 12px;
+}
+
+.temp-bypass-section label {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #333;
+    margin-bottom: 8px;
+}
+
+.temp-bypass-section select {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid #e0e0e0;
+    border-radius: 4px;
+    font-size: 13px;
+    background: white;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.temp-bypass-section select:hover {
+    border-color: #0066ff;
+}
+
+.temp-bypass-section select:focus {
+    outline: none;
+    border-color: #0066ff;
+    box-shadow: 0 0 0 3px rgba(0, 102, 255, 0.1);
+}
+
+.bypass-status {
+    margin-top: 8px;
+    padding: 8px 12px;
+    background: #ffc107;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #333;
+    text-align: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+}
+
+.bypass-status.hidden {
+    display: none;
+}
+
+.bypass-status span {
+    font-weight: 700;
+}
+
 .domains-list {
     display: flex;
     flex-direction: column;
@@ -304,10 +366,21 @@ footer {
     border-radius: 6px;
 }
 
+.domain-item .domain-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
 .domain-item .domain-name {
     font-size: 13px;
     color: #333;
     font-weight: 500;
+}
+
+.domain-item .domain-date {
+    font-size: 11px;
+    color: #666;
 }
 
 .domain-item button {
@@ -342,4 +415,190 @@ footer {
     text-align: center;
     color: #999;
     font-size: 13px;
+}
+
+/* Dark Mode */
+@media (prefers-color-scheme: dark) {
+    body {
+        color: #e0e0e0;
+        background: #1a1a1a;
+    }
+
+    .container {
+        background: #242424;
+    }
+
+    header {
+        background: linear-gradient(135deg, #0052cc 0%, #003d99 100%);
+    }
+
+    .status {
+        background: #1e1e1e;
+        border-bottom: 1px solid #3a3a3a;
+    }
+
+    .status-text {
+        color: #b0b0b0;
+    }
+
+    .status-text.connected {
+        color: #4caf50;
+    }
+
+    .status-text.disconnected {
+        color: #f44336;
+    }
+
+    section {
+        border-bottom: 1px solid #3a3a3a;
+    }
+
+    h2 {
+        color: #4a9eff;
+    }
+
+    h2 .material-icons {
+        color: #4a9eff;
+    }
+
+    code {
+        background: #1e1e1e;
+        color: #4a9eff;
+    }
+
+    .feature-list li,
+    .command-item span {
+        color: #b0b0b0;
+    }
+
+    .feature-list strong {
+        color: #e0e0e0;
+    }
+
+    .command-item {
+        background: #1e1e1e;
+    }
+
+    footer {
+        background: #1e1e1e;
+    }
+
+    .link-button {
+        background: #2a2a2a;
+        border: 1px solid #3a3a3a;
+        color: #4a9eff;
+    }
+
+    .link-button:hover {
+        background: #0066ff;
+        color: white;
+        border-color: #0066ff;
+    }
+
+    .copyright {
+        color: #666;
+    }
+
+    /* Permissions Section - Dark Mode */
+    .domain-status {
+        background: #1e1e1e;
+    }
+
+    .domain-status .domain-name {
+        color: #e0e0e0;
+    }
+
+    .domain-status .domain-badge.allowed {
+        background: #1b5e20;
+        color: #81c784;
+    }
+
+    .domain-status .domain-badge.denied {
+        background: #b71c1c;
+        color: #ef5350;
+    }
+
+    .domain-status button {
+        border: 1px solid #3a3a3a;
+        background: #2a2a2a;
+        color: #4a9eff;
+    }
+
+    .domain-status button:hover {
+        background: #0066ff;
+        color: white;
+        border-color: #0066ff;
+    }
+
+    .domain-status button.remove {
+        color: #f44336;
+    }
+
+    .domain-status button.remove:hover {
+        background: #d32f2f;
+        color: white;
+        border-color: #d32f2f;
+    }
+
+    /* Temp Bypass Section - Dark Mode */
+    .temp-bypass-section {
+        background: #2d2410;
+    }
+
+    .temp-bypass-section label {
+        color: #e0e0e0;
+    }
+
+    .temp-bypass-section select {
+        border: 1px solid #3a3a3a;
+        background: #2a2a2a;
+        color: #e0e0e0;
+    }
+
+    .temp-bypass-section select:hover {
+        border-color: #4a9eff;
+    }
+
+    .temp-bypass-section select:focus {
+        border-color: #4a9eff;
+        box-shadow: 0 0 0 3px rgba(74, 158, 255, 0.2);
+    }
+
+    .bypass-status {
+        background: #b8860b;
+        color: #fff;
+    }
+
+    .domain-item {
+        background: #1e1e1e;
+    }
+
+    .domain-item .domain-name {
+        color: #e0e0e0;
+    }
+
+    .domain-item .domain-date {
+        color: #999;
+    }
+
+    .domain-item button {
+        border: 1px solid #3a3a3a;
+        background: #2a2a2a;
+        color: #f44336;
+    }
+
+    .domain-item button:hover {
+        background: #d32f2f;
+        color: white;
+        border-color: #d32f2f;
+    }
+
+    .permissions-note {
+        background: #2d2410;
+        color: #d4a574;
+    }
+
+    .no-domains {
+        color: #666;
+    }
 }

@@ -9,7 +9,7 @@ router = APIRouter()
 
 
 @router.post("/open", response_model=CommandResponse)
-async def navigate_to_url(request: NavigateRequest):
+def navigate_to_url(request: NavigateRequest):
     """
     Navigate to a URL.
 
@@ -38,7 +38,7 @@ async def navigate_to_url(request: NavigateRequest):
 
 
 @router.post("/back", response_model=CommandResponse)
-async def go_back():
+def go_back():
     """
     Go back to the previous page in browser history.
 
@@ -62,7 +62,7 @@ async def go_back():
 
 
 @router.post("/forward", response_model=CommandResponse)
-async def go_forward():
+def go_forward():
     """
     Go forward to the next page in browser history.
 
@@ -86,7 +86,7 @@ async def go_forward():
 
 
 @router.post("/reload", response_model=CommandResponse)
-async def reload_page(hard: bool = False):
+def reload_page(hard: bool = False):
     """
     Reload the current page.
 
@@ -117,7 +117,7 @@ async def reload_page(hard: bool = False):
 
 
 @router.post("/pageup", response_model=CommandResponse)
-async def scroll_page_up():
+def scroll_page_up():
     """
     Scroll up one page (one viewport height).
 
@@ -141,7 +141,7 @@ async def scroll_page_up():
 
 
 @router.post("/pagedown", response_model=CommandResponse)
-async def scroll_page_down():
+def scroll_page_down():
     """
     Scroll down one page (one viewport height).
 
@@ -165,7 +165,7 @@ async def scroll_page_down():
 
 
 @router.post("/top", response_model=CommandResponse)
-async def scroll_to_top():
+def scroll_to_top():
     """
     Scroll to the top of the page.
 
@@ -189,7 +189,7 @@ async def scroll_to_top():
 
 
 @router.post("/bottom", response_model=CommandResponse)
-async def scroll_to_bottom():
+def scroll_to_bottom():
     """
     Scroll to the bottom of the page.
 

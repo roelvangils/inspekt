@@ -2,17 +2,208 @@
 
 This document contains architectural patterns, technical decisions, and development guidelines specifically for AI-assisted development on the Inspekt project.
 
-**Last Updated**: 2025-11-15
+**Last Updated**: 2025-11-19
 **Maintained for**: Claude Code and future AI development assistance
 
 ---
 
-## Table of Contents
+## Inspekt MCP Server - Browser Automation via MCP Tools
 
-1. [Window Message Bridge Pattern](#window-message-bridge-pattern)
-2. [Extension Architecture](#extension-architecture)
-3. [Common Patterns](#common-patterns)
-4. [Development Guidelines](#development-guidelines)
+### How MCP Tools Work in Claude Code
+
+The Inspekt MCP server exposes **15 browser automation tools** that appear in Claude's toolkit with the naming convention:
+
+```
+mcp__inspekt__<tool_name>
+```
+
+**Examples:**
+- `mcp__inspekt__navigate_to_url` - Navigate to URL in browser
+- `mcp__inspekt__type_text` - Type text into focused element
+- `mcp__inspekt__extract_links` - Extract all links from page
+- `mcp__inspekt__click_element` - Click element by selector
+
+### Tool Invocation Methods
+
+#### 1. **Autonomous (Recommended)**
+Claude automatically decides when to use Inspekt tools based on your request:
+
+```
+You: "Type 'hello' in the text field"
+Claude: Uses mcp__inspekt__type_text automatically
+```
+
+#### 2. **Explicit Reference**
+Reference resources using @ mentions:
+
+```
+You: "What's at @inspekt-mcp://current-url?"
+Claude: Reads the current-url resource
+```
+
+#### 3. **Slash Commands**
+Use slash commands for prompts (if configured):
+
+```
+/mcp__inspekt__navigate
+```
+
+### The Inspekt Advantage: Working with Your Current Browser Tab
+
+Inspekt's KILLER FEATURE is that it works with **your currently open browser tab**, maintaining:
+- Your login/authentication state
+- Your navigation history and current position
+- Your form inputs and session data
+- Your applied filters and preferences
+- All JavaScript-rendered dynamic content
+
+**This makes Inspekt SUPERIOR to Fetch for almost all real-world web tasks.**
+
+### When to Use Inspekt MCP Tools
+
+**ALWAYS use Inspekt MCP tools** for web pages and web content, unless:
+- Working with a public API that returns JSON/XML (not HTML)
+- Explicitly instructed to use Fetch
+
+### Why Inspekt Beats Fetch
+
+**Inspekt advantages:**
+1. ✅ Works with YOUR authenticated sessions (Twitter, GitHub, Gmail, etc.)
+2. ✅ Accesses content YOU can see (private repos, bookmarks, DMs)
+3. ✅ Continues from YOUR current browser state
+4. ✅ Executes JavaScript (sees what YOU see, not raw HTML)
+5. ✅ Can interact (click, type, submit forms)
+6. ✅ Collaborative workflow (you navigate, Claude extracts)
+
+**Fetch limitations:**
+1. ❌ No authentication (gets login walls)
+2. ❌ No browser state (starts fresh every time)
+3. ❌ No JavaScript execution (misses dynamic content)
+4. ❌ No interaction capability
+5. ❌ No context awareness
+
+### Human-AI Collaboration Pattern
+
+The most powerful Inspekt workflow:
+
+```
+1. You: Navigate to the page/state you want
+2. You: (Optional) Log in, apply filters, fill forms
+3. Claude: Works with YOUR current browser state
+4. Claude: Extracts, analyzes, or continues your task
+```
+
+**Examples:**
+
+```
+You: (Log into LinkedIn, search for jobs)
+You: "Extract these job postings and create a spreadsheet"
+Claude: Uses mcp__inspekt__extract_links on YOUR filtered results
+
+You: (Open Twitter, scroll to interesting thread)
+You: "Summarize this thread"
+Claude: Uses mcp__inspekt__extract_article on YOUR current page
+
+You: (Navigate through complex app to specific page)
+You: "Click the Export button and download as CSV"
+Claude: Uses mcp__inspekt__click_element from YOUR current position
+```
+
+### Available Inspekt MCP Tools (15 total)
+
+**Navigation (3):**
+- `mcp__inspekt__navigate_to_url` - Navigate to URL in real browser with JS execution
+- `mcp__inspekt__go_back` - Browser history backward
+- `mcp__inspekt__reload_page` - Refresh current page
+
+**Execution (1):**
+- `mcp__inspekt__execute_javascript` - Run arbitrary JS in browser context
+
+**Extraction (4):**
+- `mcp__inspekt__extract_links` - Get all links from page with metadata
+- `mcp__inspekt__extract_outline` - Get heading hierarchy (H1-H6)
+- `mcp__inspekt__extract_page_info` - Get comprehensive page metadata
+- `mcp__inspekt__extract_article` - Extract clean article content (Mozilla Readability)
+
+**Interaction (2):**
+- `mcp__inspekt__click_element` - Click elements by CSS selector
+- `mcp__inspekt__type_text` - Type into focused elements (forms, inputs)
+
+**Inspection (2):**
+- `mcp__inspekt__get_page_info` - Get current page URL, title, viewport, scroll position
+- `mcp__inspekt__take_screenshot` - Capture viewport, full page, or element screenshot
+
+**Storage (3):**
+- `mcp__inspekt__get_selected_text` - Get user-selected text (text/HTML/markdown)
+- `mcp__inspekt__get_cookies` - Get all cookies with full attributes
+- `mcp__inspekt__set_cookie` - Set cookies with security attributes
+
+### Available Inspekt Resources (5 total)
+
+Check these resources to understand current browser state:
+- `inspekt-mcp://current-url` - URL of currently open page
+- `inspekt-mcp://page-title` - Title of current page
+- `inspekt-mcp://page-metadata` - Extended metadata (JSON)
+- `inspekt-mcp://browser-info` - Browser details (JSON)
+- `inspekt-mcp://connection-status` - Bridge connection status (JSON)
+
+### Tool Selection Guidelines
+
+When working with web content:
+
+**For Navigation:**
+- "Go to [URL]" → `mcp__inspekt__navigate_to_url`
+- "Open [URL]" → `mcp__inspekt__navigate_to_url`
+
+**For Data Extraction:**
+- "Get links from [URL]" → `mcp__inspekt__navigate_to_url` + `mcp__inspekt__extract_links`
+- "Extract headings" → `mcp__inspekt__extract_outline`
+- "Get page info" → `mcp__inspekt__extract_page_info`
+- "Read the article" → `mcp__inspekt__extract_article`
+
+**For Browser Interaction:**
+- "Click [element]" → `mcp__inspekt__click_element`
+- "Type [text]" → `mcp__inspekt__type_text`
+
+**For Current Browser State:**
+- "Current page" → Check `inspekt-mcp://current-url` resource first
+- "Currently open page" → Use inspection/extraction tools on browser state
+
+### Important Notes
+
+1. **Browser must be running**: Ensure the Inspekt bridge server is connected
+2. **Better than static HTML**: Inspekt tools access the live, JavaScript-rendered DOM
+3. **Resource checking**: When user says "current page", first check `inspekt-mcp://current-url`
+4. **Multi-step workflows**: Chain navigation + extraction + interaction
+5. **Error handling**: If a tool fails, check bridge connection with `mcp__inspekt__get_page_info`
+6. **Permissions**: MCP tools are enabled via `"mcp__inspekt"` in permissions config
+
+### Debugging MCP Tools
+
+If Inspekt tools aren't available:
+
+1. **Check MCP server connection**:
+   ```
+   /mcp
+   ```
+   Should show "inspekt: ✓ Connected"
+
+2. **Check permissions** (`.claude/settings.local.json`):
+   ```json
+   {
+     "permissions": {
+       "allow": ["mcp__inspekt"]
+     }
+   }
+   ```
+
+3. **Restart Claude Code session** after configuration changes
+
+4. **Test with a simple request**:
+   ```
+   "What's the current page URL in my browser?"
+   ```
+   Should use `inspekt-mcp://current-url` resource
 
 ---
 
@@ -104,134 +295,6 @@ window.addEventListener('message', async (event) => {
 });
 ```
 
-#### 2. MAIN World Request (MAIN World → Content Script)
-
-**File**: `/Users/roelvangils/Repos/inspekt/inspekt/scripts/cookies.js` (lines 8-64)
-
-```javascript
-// Try to get enhanced cookie data via chrome.cookies API
-// Uses window message bridge to communicate with extension
-async function getCookiesEnhanced() {
-    // Check if we're in a browser context with window.postMessage
-    if (typeof window === 'undefined' || typeof window.postMessage !== 'function') {
-        return null;
-    }
-
-    try {
-        // Generate unique request ID
-        const requestId = 'cookie-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
-
-        // Create promise that waits for response via window message
-        const response = await new Promise((resolve, reject) => {
-            // Timeout after 1 second
-            const timeout = setTimeout(() => {
-                window.removeEventListener('message', messageHandler);
-                resolve(null); // Fallback to document.cookie
-            }, 1000);
-
-            // Listen for response from extension
-            const messageHandler = (event) => {
-                // Only accept messages from same origin
-                if (event.source !== window) return;
-
-                const message = event.data;
-                if (message &&
-                    message.type === 'INSPEKT_COOKIES_RESPONSE' &&
-                    message.source === 'inspekt-extension' &&
-                    message.requestId === requestId) {
-
-                    clearTimeout(timeout);
-                    window.removeEventListener('message', messageHandler);
-                    resolve(message.response);
-                }
-            };
-
-            window.addEventListener('message', messageHandler);
-
-            // Send request to extension via window.postMessage
-            window.postMessage({
-                type: 'INSPEKT_GET_COOKIES_ENHANCED',
-                source: 'inspekt-page',
-                requestId: requestId
-            }, '*');
-        });
-
-        if (response && response.ok) {
-            return response;
-        }
-    } catch (e) {
-        console.log('[Inspekt] Enhanced cookie API not available, falling back to document.cookie');
-    }
-
-    // Fallback: use document.cookie (limited data)
-    return null;
-}
-```
-
-#### 3. Background Script Handler (Background Script → Chrome APIs)
-
-**File**: `/Users/roelvangils/Repos/inspekt/extensions/chrome/background.js` (lines 93-99, 462-513)
-
-```javascript
-// Message handler in background.js
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-    if (message.type === 'GET_COOKIES_ENHANCED') {
-        // Retrieve detailed cookie information using chrome.cookies API
-        getCookiesEnhanced(sender.tab.url)
-            .then(sendResponse)
-            .catch(error => sendResponse({ ok: false, error: String(error) }));
-        return true; // Keep channel open for async response
-    }
-});
-
-async function getCookiesEnhanced(url) {
-    try {
-        // Get all cookies for the current URL using privileged API
-        const cookies = await chrome.cookies.getAll({ url: url });
-
-        // Extract current domain from URL for party detection
-        const currentDomain = new URL(url).hostname;
-
-        // Enhance each cookie with calculated fields
-        const enhancedCookies = cookies.map(cookie => {
-            const size = cookie.name.length + cookie.value.length;
-            const type = cookie.session ? 'session' : 'persistent';
-            const expires = cookie.expirationDate
-                ? new Date(cookie.expirationDate * 1000).toISOString()
-                : null;
-
-            const cookieDomain = cookie.domain.startsWith('.')
-                ? cookie.domain.substring(1)
-                : cookie.domain;
-            const isFirstParty = currentDomain.includes(cookieDomain) ||
-                                 cookieDomain.includes(currentDomain);
-            const party = isFirstParty ? 'first-party' : 'third-party';
-
-            return {
-                ...cookie,
-                size: size,
-                type: type,
-                expires: expires,
-                party: party
-            };
-        });
-
-        return {
-            ok: true,
-            action: 'list',
-            cookies: enhancedCookies,
-            count: enhancedCookies.length,
-            apiUsed: 'chrome.cookies',
-            origin: url,
-            hostname: new URL(url).hostname
-        };
-    } catch (error) {
-        console.error('[Inspekt] Cookie retrieval error:', error);
-        throw new Error(`Failed to retrieve cookies: ${error.message}`);
-    }
-}
-```
-
 ### Message Format Convention
 
 All window messages follow this naming convention:
@@ -276,407 +339,7 @@ Example:
 4. **Timeout Handling**: Always implement timeouts to prevent indefinite waiting
 5. **Error Handling**: Gracefully handle errors and provide fallback mechanisms
 
-### When to Use This Pattern
-
-Use the window message bridge when you need to:
-
-✅ Access Chrome extension APIs from MAIN world scripts
-✅ Retrieve data that's not available via standard DOM APIs
-✅ Bypass CSP restrictions while maintaining access to extension features
-✅ Implement enhanced functionality with graceful fallback
-
-Examples of good use cases:
-- `chrome.cookies` API for comprehensive cookie metadata
-- `chrome.storage` API for extension storage
-- `chrome.tabs` API for tab information
-- `chrome.history` API for browsing history
-
-### Extending the Bridge
-
-To add support for a new extension API:
-
-**Step 1**: Add handler in content script:
-
-```javascript
-// content.js
-window.addEventListener('message', async (event) => {
-    if (event.source !== window) return;
-    const message = event.data;
-
-    // Add new handler
-    if (message && message.type === 'INSPEKT_GET_STORAGE' && message.source === 'inspekt-page') {
-        try {
-            const response = await chrome.runtime.sendMessage({
-                type: 'GET_STORAGE',
-                keys: message.keys
-            });
-
-            window.postMessage({
-                type: 'INSPEKT_STORAGE_RESPONSE',
-                source: 'inspekt-extension',
-                requestId: message.requestId,
-                response: response
-            }, '*');
-        } catch (error) {
-            window.postMessage({
-                type: 'INSPEKT_STORAGE_RESPONSE',
-                source: 'inspekt-extension',
-                requestId: message.requestId,
-                response: { ok: false, error: String(error) }
-            }, '*');
-        }
-    }
-});
-```
-
-**Step 2**: Add handler in background script:
-
-```javascript
-// background.js
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-    if (message.type === 'GET_STORAGE') {
-        chrome.storage.local.get(message.keys)
-            .then(items => sendResponse({ ok: true, items: items }))
-            .catch(error => sendResponse({ ok: false, error: String(error) }));
-        return true;
-    }
-});
-```
-
-**Step 3**: Create MAIN world function:
-
-```javascript
-// scripts/storage.js
-async function getEnhancedStorage(keys) {
-    if (typeof window === 'undefined') return null;
-
-    try {
-        const requestId = 'storage-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
-
-        const response = await new Promise((resolve) => {
-            const timeout = setTimeout(() => {
-                window.removeEventListener('message', handler);
-                resolve(null);
-            }, 1000);
-
-            const handler = (event) => {
-                if (event.source !== window) return;
-                const msg = event.data;
-                if (msg && msg.type === 'INSPEKT_STORAGE_RESPONSE' &&
-                    msg.source === 'inspekt-extension' &&
-                    msg.requestId === requestId) {
-                    clearTimeout(timeout);
-                    window.removeEventListener('message', handler);
-                    resolve(msg.response);
-                }
-            };
-
-            window.addEventListener('message', handler);
-            window.postMessage({
-                type: 'INSPEKT_GET_STORAGE',
-                source: 'inspekt-page',
-                requestId: requestId,
-                keys: keys
-            }, '*');
-        });
-
-        return response;
-    } catch (e) {
-        console.log('[Inspekt] Enhanced storage not available');
-        return null;
-    }
-}
-```
-
 ---
 
-## Extension Architecture
-
-### Execution Contexts
-
-The Inspekt Chrome extension operates across multiple JavaScript execution contexts:
-
-#### 1. MAIN World (Page Context)
-- **Where**: Injected via `chrome.scripting.executeScript()` with `world: 'MAIN'`
-- **Purpose**: Execute code in page's JavaScript environment, bypass CSP
-- **Available APIs**: DOM, page globals, page JavaScript
-- **NOT Available**: Extension APIs (`chrome.*`)
-- **Files**: All scripts in `/inspekt/scripts/*.js`
-
-#### 2. Content Script (Isolated World)
-- **Where**: Injected via manifest `content_scripts`
-- **Purpose**: Bridge between page and extension, DOM access
-- **Available APIs**: Limited extension APIs, DOM
-- **NOT Available**: Page JavaScript variables, full extension APIs
-- **Files**: `/extensions/chrome/content.js`
-
-#### 3. Background Script (Service Worker)
-- **Where**: Runs as service worker defined in manifest
-- **Purpose**: Handle extension logic, access privileged APIs
-- **Available APIs**: Full extension APIs, no DOM access
-- **NOT Available**: DOM, page context
-- **Files**: `/extensions/chrome/background.js`
-
-### Communication Flow
-
-```
-CLI Command
-    ↓
-WebSocket Server (Python)
-    ↓
-WebSocket Client (content.js)
-    ↓
-chrome.runtime.sendMessage (content → background)
-    ↓
-chrome.scripting.executeScript (background → MAIN world)
-    ↓
-Execute JavaScript in MAIN world
-    ↓ (if extension API needed)
-window.postMessage (MAIN → content)
-    ↓
-chrome.runtime.sendMessage (content → background)
-    ↓
-Chrome API (background)
-    ↓
-chrome.runtime.sendMessage (background → content)
-    ↓
-window.postMessage (content → MAIN)
-    ↓
-Return result
-```
-
-### CSP Bypass Mechanism
-
-The extension uses a two-tier approach for CSP bypass:
-
-**Tier 1: Direct Execution (Fast Path)**
-- Uses `AsyncFunction` constructor
-- Works on most sites
-- Fails on strict CSP sites
-
-**Tier 2: Script Tag Injection (CSP Bypass)**
-- Creates `<script>` tag with embedded code
-- Extension privilege allows injection despite CSP
-- Works on all sites including strict CSP
-
-Implementation in `/extensions/chrome/background.js:253-456`.
-
----
-
-## Common Patterns
-
-### Pattern 1: Dual-Mode Retrieval with Fallback
-
-When accessing data that may have both a standard API and an enhanced extension API:
-
-```javascript
-async function getData() {
-    // Try enhanced API first (via extension)
-    const enhanced = await getEnhancedData();
-    if (enhanced && enhanced.ok) {
-        return enhanced;
-    }
-
-    // Fallback to standard API
-    const standard = getStandardData();
-    return {
-        ok: true,
-        data: standard,
-        apiUsed: 'standard'
-    };
-}
-```
-
-Example: `cookies.js` uses `chrome.cookies` API with fallback to `document.cookie`.
-
-### Pattern 2: Promise-Based Window Messaging
-
-For request-response patterns using window messages:
-
-```javascript
-async function requestFromExtension(type, data) {
-    const requestId = `${type}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-
-    return new Promise((resolve) => {
-        const timeout = setTimeout(() => {
-            window.removeEventListener('message', handler);
-            resolve(null); // Timeout fallback
-        }, 1000);
-
-        const handler = (event) => {
-            if (event.source !== window) return;
-            const msg = event.data;
-
-            if (msg &&
-                msg.type === `INSPEKT_${type}_RESPONSE` &&
-                msg.source === 'inspekt-extension' &&
-                msg.requestId === requestId) {
-
-                clearTimeout(timeout);
-                window.removeEventListener('message', handler);
-                resolve(msg.response);
-            }
-        };
-
-        window.addEventListener('message', handler);
-        window.postMessage({
-            type: `INSPEKT_${type}`,
-            source: 'inspekt-page',
-            requestId: requestId,
-            ...data
-        }, '*');
-    });
-}
-```
-
-### Pattern 3: Recursive Value Transformation
-
-For transforming nested data structures (used in storage):
-
-```javascript
-function transformValueRecursive(obj) {
-    if (obj === null || obj === undefined) {
-        return obj;
-    }
-
-    // If it's an array, transform each element
-    if (Array.isArray(obj)) {
-        return obj.map(item => transformValueRecursive(item));
-    }
-
-    // If it's an object, transform each property
-    if (typeof obj === 'object') {
-        const result = {};
-        for (const key in obj) {
-            if (obj.hasOwnProperty(key)) {
-                result[key] = transformValueRecursive(obj[key]);
-            }
-        }
-        return result;
-    }
-
-    // If it's a string, apply transformations
-    if (typeof obj === 'string') {
-        return applyStringTransformation(obj);
-    }
-
-    // Return as-is for other types
-    return obj;
-}
-```
-
----
-
-## Development Guidelines
-
-### Adding New Extension Features
-
-When adding functionality that requires Chrome extension APIs:
-
-1. **Check API Availability**: Ensure the Chrome API is available and has appropriate permissions in manifest.json
-2. **Add Permission**: Update `/extensions/chrome/manifest.json` if needed
-3. **Implement Background Handler**: Add handler in `background.js`
-4. **Add Content Script Bridge**: Extend window message listener in `content.js`
-5. **Create MAIN World Function**: Implement request function in appropriate script file
-6. **Implement Fallback**: Always provide graceful fallback for non-extension environments
-7. **Test Both Modes**: Test with extension active and with fallback mode
-
-### Testing Extension Features
-
-1. **Reload Extension**: After code changes, reload via `chrome://extensions/`
-2. **Check Console**: Monitor both page console and extension background console
-3. **Test Fallback**: Disable extension to verify fallback mode works
-4. **Verify Message Flow**: Use console.log to trace message flow through the bridge
-
-### Common Pitfalls to Avoid
-
-❌ **Don't**: Try to use `chrome.runtime` directly in MAIN world scripts
-✅ **Do**: Use window message bridge pattern
-
-❌ **Don't**: Forget timeout handling in promise-based messaging
-✅ **Do**: Always implement timeouts with fallback
-
-❌ **Don't**: Assume extension APIs are always available
-✅ **Do**: Implement dual-mode with fallback
-
-❌ **Don't**: Use synchronous operations in background script
-✅ **Do**: Use async/await for all extension API calls
-
-❌ **Don't**: Send sensitive data via window.postMessage without validation
-✅ **Do**: Validate event.source and use message type/source tags
-
-### File Organization
-
-- **Extension Files**: `/extensions/chrome/`
-  - `manifest.json` - Extension configuration
-  - `background.js` - Background service worker
-  - `content.js` - Content script (bridge + WebSocket)
-  - `permissions.js` - Permission management
-  - `devtools.html`, `panel.html` - DevTools integration
-  - `popup/` - Extension popup UI
-
-- **Script Files**: `/inspekt/scripts/`
-  - All scripts execute in MAIN world
-  - Should not directly access extension APIs
-  - Use window message bridge when extension features needed
-
-- **Python Backend**: `/inspekt/`
-  - CLI commands, services, WebSocket server
-  - Loads scripts and sends to browser for execution
-
----
-
-## Future Patterns to Consider
-
-### 1. Batch Message Handling
-
-For multiple related requests, consider batching:
-
-```javascript
-// Instead of multiple individual requests
-const cookies = await getCookies();
-const storage = await getStorage();
-const history = await getHistory();
-
-// Use single batch request
-const data = await getBatchData(['cookies', 'storage', 'history']);
-```
-
-### 2. Persistent Message Channel
-
-For long-lived connections, consider using `chrome.runtime.connect()` instead of `sendMessage()`:
-
-```javascript
-// In content script
-const port = chrome.runtime.connect({ name: 'inspekt-channel' });
-port.postMessage({ type: 'GET_DATA' });
-port.onMessage.addListener((msg) => {
-    // Handle response
-});
-```
-
-### 3. Event-Based Updates
-
-For real-time updates (e.g., cookie changes), use Chrome extension events:
-
-```javascript
-// In background script
-chrome.cookies.onChanged.addListener((changeInfo) => {
-    // Notify MAIN world of cookie change
-    sendToMainWorld('COOKIE_CHANGED', changeInfo);
-});
-```
-
----
-
-## Changelog
-
-**2025-11-15**: Initial creation with Window Message Bridge pattern documentation
-- Documented window message bridge architecture
-- Added extension context explanations
-- Included implementation examples
-- Added development guidelines
-
----
-
-**End of Document**
+**Last Updated**: 2025-11-19
+**MCP Integration**: Fully supported via Claude Code MCP protocol

@@ -148,7 +148,7 @@ def _execute_cookie_action(
 # Endpoints
 @router.get("", response_model=CookiesListResponse)
 @router.get("/", response_model=CookiesListResponse)
-async def list_cookies(response: Response):
+def list_cookies(response: Response):
     """
     List all cookies for the current page.
 
@@ -222,7 +222,7 @@ async def list_cookies(response: Response):
 
 
 @router.get("/{name}", response_model=CookieGetResponse)
-async def get_cookie(name: str, response: Response):
+def get_cookie(name: str, response: Response):
     """
     Get the value of a specific cookie.
 
@@ -267,7 +267,7 @@ async def get_cookie(name: str, response: Response):
 
 @router.post("", response_model=CommandResponse)
 @router.post("/", response_model=CommandResponse)
-async def set_cookie(request: SetCookieRequest, response: Response):
+def set_cookie(request: SetCookieRequest, response: Response):
     """
     Set a cookie with various options.
 
@@ -318,7 +318,7 @@ async def set_cookie(request: SetCookieRequest, response: Response):
 
 
 @router.delete("/{name}", response_model=CommandResponse)
-async def delete_cookie(name: str, response: Response):
+def delete_cookie(name: str, response: Response):
     """
     Delete a specific cookie.
 
@@ -350,7 +350,7 @@ async def delete_cookie(name: str, response: Response):
 
 @router.delete("", response_model=CommandResponse)
 @router.delete("/", response_model=CommandResponse)
-async def clear_cookies(response: Response):
+def clear_cookies(response: Response):
     """
     Clear all cookies for the current page.
 

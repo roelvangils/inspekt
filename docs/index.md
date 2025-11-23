@@ -114,6 +114,15 @@ inspektoutline                                   # Display page heading hierarch
 inspektinfo --extended                          # Extract comprehensive page info
 ```
 
+### :wheelchair: Accessibility Testing
+
+Run comprehensive WCAG audits using the industry-standard axe-core library.
+
+```bash
+inspektaxe --level 21aa                         # Test WCAG 2.1 Level AA compliance
+inspektaxe --tags best-practice --json          # Export detailed results
+```
+
 ### :floppy_disk: File Downloads
 
 Interactive file finder and downloader for images, documents, videos, audio, and archives.
@@ -393,9 +402,10 @@ See how Inspekt compares to traditional browser automation tools:
 
 - **Data Extraction** - Scrape data from authenticated sessions
 - **Testing & Debugging** - Experiment with live pages interactively
+- **Accessibility Testing** - Run WCAG compliance audits with axe-core
 - **Automation** - Automate repetitive browser tasks from scripts
 - **Development** - Inspect app state and debug without DevTools
-- **Accessibility** - Navigate pages with keyboard control mode
+- **Keyboard Navigation** - Navigate pages with keyboard control mode
 - **Research** - Analyze page structure, SEO, and performance
 
 ---

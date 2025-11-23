@@ -163,6 +163,7 @@ Inspekt is ideal for:
 
 ### Accessibility Testing
 
+- Run WCAG compliance audits (`inspekt axe`)
 - Check heading structure (`inspekt outline`)
 - Find images without alt text
 - Test keyboard navigation (`inspekt control`)
@@ -254,6 +255,15 @@ inspekt download
 inspekt info --extended
 ```
 
+### Accessibility Testing
+
+Run comprehensive WCAG audits:
+
+```bash
+inspekt axe --level 21aa
+inspekt axe --tags best-practice --json
+```
+
 ### AI-Powered Features
 
 Summarize and describe pages:
@@ -310,9 +320,10 @@ Ready to try Inspekt? Check out these guides:
 2. **[JavaScript Execution](javascript-execution.md)** - Master code execution
 3. **[Element Interaction](element-interaction.md)** - Click, inspect, and interact
 4. **[Data Extraction](data-extraction.md)** - Extract structured data
-5. **[AI Features](ai-features.md)** - AI-powered summarization and descriptions
-6. **[Control Mode](control-mode.md)** - Keyboard-only navigation
-7. **[Advanced Usage](advanced.md)** - Scripting and best practices
+5. **[Accessibility Testing](accessibility-testing.md)** - WCAG compliance audits with axe-core
+6. **[AI Features](ai-features.md)** - AI-powered summarization and descriptions
+7. **[Control Mode](control-mode.md)** - Keyboard-only navigation
+8. **[Advanced Usage](advanced.md)** - Scripting and best practices
 
 ## Next Steps
 

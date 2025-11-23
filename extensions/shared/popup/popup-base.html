@@ -53,6 +53,21 @@
         <section class="permissions">
             <h2>🔒 Allowed Domains</h2>
             <div id="current-domain-status" class="domain-status"></div>
+
+            <div class="temp-bypass-section">
+                <label for="temp-bypass-duration">⚡ Quick Access (All Domains):</label>
+                <select id="temp-bypass-duration">
+                    <option value="0">Disabled</option>
+                    <option value="5">5 minutes</option>
+                    <option value="15">15 minutes</option>
+                    <option value="30">30 minutes</option>
+                    <option value="60">60 minutes</option>
+                </select>
+                <div id="temp-bypass-status" class="bypass-status hidden">
+                    ⏱️ Active: <span id="bypass-remaining"></span> remaining
+                </div>
+            </div>
+
             <div id="allowed-domains-list" class="domains-list"></div>
             <div class="permissions-note">
                 You must explicitly allow each domain before Inspekt can control it.

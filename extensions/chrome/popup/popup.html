@@ -24,61 +24,27 @@
             </div>
         </section>
 
-        <section class="info">
-            <h2><span class="material-icons md-18">rocket_launch</span> Quick Start</h2>
-            <ol class="quick-start">
-                <li>Open a terminal</li>
-                <li>Start the server: <code>inspekt server start</code></li>
-                <li>Run commands: <code>inspekt eval "document.title"</code></li>
-            </ol>
-        </section>
-
-        <section class="features">
-            <h2><span class="material-icons md-18">auto_awesome</span> Extension Features</h2>
-            <ul class="feature-list">
-                <li>
-                    <strong>CSP Bypass:</strong>
-                    Works on all websites including GitHub, Gmail, banking sites
-                </li>
-                <li>
-                    <strong>Automatic Connection:</strong>
-                    Connects to localhost:8766 automatically
-                </li>
-                <li>
-                    <strong>DevTools Integration:</strong>
-                    Use DevTools panel or commands
-                </li>
-            </ul>
-        </section>
-
         <section class="permissions">
             <h2><span class="material-icons md-18">lock</span> Allowed Domains</h2>
             <div id="current-domain-status" class="domain-status"></div>
+
+            <div class="temp-bypass-section">
+                <label for="temp-bypass-duration"><span class="material-icons md-18">flash_on</span> Quick Access (All Domains):</label>
+                <select id="temp-bypass-duration">
+                    <option value="0">Disabled</option>
+                    <option value="5">5 minutes</option>
+                    <option value="15">15 minutes</option>
+                    <option value="30">30 minutes</option>
+                    <option value="60">60 minutes</option>
+                </select>
+                <div id="temp-bypass-status" class="bypass-status hidden">
+                    <span class="material-icons md-18">timer</span> Active: <span id="bypass-remaining"></span> remaining
+                </div>
+            </div>
+
             <div id="allowed-domains-list" class="domains-list"></div>
             <div class="permissions-note">
                 You must explicitly allow each domain before Inspekt can control it.
-            </div>
-        </section>
-
-        <section class="commands">
-            <h2><span class="material-icons md-18">description</span> Common Commands</h2>
-            <div class="command-list">
-                <div class="command-item">
-                    <code>inspekt info</code>
-                    <span>Show page information</span>
-                </div>
-                <div class="command-item">
-                    <code>inspekt describe</code>
-                    <span>AI-powered page description</span>
-                </div>
-                <div class="command-item">
-                    <code>inspekt do "login"</code>
-                    <span>Natural language actions</span>
-                </div>
-                <div class="command-item">
-                    <code>inspekt links</code>
-                    <span>Extract all links</span>
-                </div>
             </div>
         </section>
 

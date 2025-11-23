@@ -64,8 +64,51 @@ def html_to_markdown(html_content):
         return html_content
 
 
-def display_selection(response, content_type="text", show_tip=True):
+def apply_syntax_highlighting(html_content, theme=None):
+    """Apply syntax highlighting to HTML using Pygments.
+
+    Args:
+        html_content: HTML string to highlight
+        theme: Optional Pygments style name (e.g., 'monokai', 'vim', 'github-dark')
+
+    Returns:
+        Syntax-highlighted HTML string for terminal display
+    """
+    try:
+        from pygments import highlight
+        from pygments.lexers import HtmlLexer
+        from pygments.formatters import Terminal256Formatter
+        from pygments.styles import get_style_by_name
+
+        # Use Terminal256Formatter for better color support
+        formatter_kwargs = {}
+        if theme:
+            try:
+                # Validate theme exists
+                style = get_style_by_name(theme)
+                formatter_kwargs['style'] = style
+            except Exception:
+                # Invalid theme, use default
+                click.echo(f"Warning: Unknown theme '{theme}', using default", err=True)
+
+        # Apply syntax highlighting with terminal formatter
+        formatter = Terminal256Formatter(**formatter_kwargs)
+        highlighted = highlight(html_content, HtmlLexer(), formatter)
+        return highlighted
+    except ImportError:
+        # Pygments not available, return original content
+        click.echo("Warning: pygments not installed. Install with: pip install pygments", err=True)
+        return html_content
+    except Exception as e:
+        # Any other error, return original content
+        click.echo(f"Warning: syntax highlighting failed: {e}", err=True)
+        return html_content
+
+
+def display_selection(response, content_type="text", show_tip=True, pretty=None, compact=None, colors=None, theme=None):
     """Display selection in formatted output."""
+    from inspekt.config import get_html_selection_config
+
     text = response.get("text", "")
     length = response.get("length", 0)
 
@@ -76,6 +119,25 @@ def display_selection(response, content_type="text", show_tip=True):
     elif content_type == "html":
         content = response.get("html", "")
         display_name = "Selected HTML"
+
+        # Apply pretty, compact, and syntax highlighting for HTML display
+        from inspekt.services.html_processor import process_html
+        config = get_html_selection_config()
+
+        # Use provided flags or fall back to config/defaults
+        use_pretty = pretty if pretty is not None else config["pretty"]
+        use_compact = compact if compact is not None else config["compact"]
+        use_colors = colors if colors is not None else config["colors"]
+        use_theme = theme if theme is not None else config["theme"]
+
+        # Apply pretty and compact for display mode
+        if use_pretty or use_compact:
+            content = process_html(content, prettier=use_pretty, compact=use_compact)
+
+        # Apply syntax highlighting if outputting to terminal
+        if use_colors and sys.stdout.isatty():
+            content = apply_syntax_highlighting(content, theme=use_theme)
+
     elif content_type == "markdown":
         html = response.get("html", "")
         content = html_to_markdown(html) if html else text
@@ -84,13 +146,27 @@ def display_selection(response, content_type="text", show_tip=True):
         content = text
         display_name = "Selected Text"
 
-    # Show header with character count
-    if len(content) > 200:
-        click.echo(f"{display_name} (showing first 200 of {len(content)} characters):\n")
-        click.echo(f'"{content[:200]}…"\n')
+    # For HTML, show with separator lines
+    if content_type == "html":
+        # Dark gray color for separators (ANSI code: bright black)
+        dark_gray = "\033[90m"
+        reset = "\033[0m"
+        separator = f"{dark_gray}{'—' * 80}{reset}"
+        # Remove empty lines
+        content = '\n'.join(line for line in content.split('\n') if line.strip())
+        click.echo(f"{display_name} ({len(response.get('html', ''))} characters):\n")
+        click.echo(separator)
+        click.echo(content)
+        click.echo(separator)
+        click.echo("")
     else:
-        click.echo(f"{display_name} ({len(content)} characters):\n")
-        click.echo(f'"{content}"\n')
+        # Show header with character count for other types
+        if len(content) > 200:
+            click.echo(f"{display_name} (showing first 200 of {len(content)} characters):\n")
+            click.echo(f'"{content[:200]}…"\n')
+        else:
+            click.echo(f"{display_name} ({len(content)} characters):\n")
+            click.echo(f'"{content}"\n')
 
     # Position info
     pos = response.get("position", {})
@@ -110,9 +186,11 @@ def display_selection(response, content_type="text", show_tip=True):
             click.echo(f"  Class: {container['class']}")
         click.echo("")
 
-    # Show tip
+    # Show tips
     if show_tip:
-        click.echo(f"Tip: Use `zen selection {content_type} --raw` for raw output.")
+        click.echo("Tips:")
+        click.echo(f"  • Use `inspekt selection {content_type} --raw` for raw {content_type.upper()} output")
+        click.echo(f"  • Type `inspekt selection {content_type} --help` for advanced options")
 
 
 @click.group(invoke_without_command=True)
@@ -196,8 +274,27 @@ def text(raw, output_json):
 @selection.command()
 @click.option("--raw", is_flag=True, help="Output only the raw HTML without formatting")
 @click.option("--json", "output_json", is_flag=True, help="Output as JSON")
-def html(raw, output_json):
+@click.option("--pretty/--no-pretty", default=None, help="Format HTML using prettier (default: from config)")
+@click.option("--compact/--no-compact", default=None, help="Remove classes and truncate long text (default: from config)")
+@click.option("--colors/--no-colors", default=None, help="Apply syntax highlighting (default: from config)")
+@click.option("--theme", default=None, help="Syntax highlighting theme (e.g., monokai, vim, github-dark)")
+def html(raw, output_json, pretty, compact, colors, theme):
     """Get selected HTML."""
+    from inspekt.config import get_html_selection_config
+
+    # Load config defaults
+    config = get_html_selection_config()
+
+    # Use config values if flags not explicitly provided
+    if pretty is None:
+        pretty = config["pretty"]
+    if compact is None:
+        compact = config["compact"]
+    if colors is None:
+        colors = config["colors"]
+    if theme is None:
+        theme = config["theme"]
+
     response = get_selection_data()
 
     if response is None:
@@ -205,10 +302,20 @@ def html(raw, output_json):
             click.echo(json.dumps({"hasSelection": False, "html": "", "length": 0}, indent=2))
         elif not raw:
             click.echo("No text selected")
-            click.echo("Hint: Select some text in the browser first, then run: zen selection html")
+            click.echo("Hint: Select some text in the browser first, then run: `inspekt selection html`")
         sys.exit(0)
 
     html_content = response.get("html", "")
+
+    # Process HTML if pretty or compact flags are set
+    if pretty or compact:
+        from inspekt.services.html_processor import process_html
+        html_content = process_html(html_content, prettier=pretty, compact=compact)
+
+    # Apply syntax highlighting if requested (before JSON/raw output)
+    # Only apply if outputting to a terminal (not piped/redirected)
+    if colors and not output_json and sys.stdout.isatty():
+        html_content = apply_syntax_highlighting(html_content, theme=theme)
 
     # JSON mode: output only html data
     if output_json:
@@ -225,8 +332,8 @@ def html(raw, output_json):
         click.echo(html_content)
         return
 
-    # Formatted display
-    display_selection(response, content_type="html")
+    # Formatted display - pass flags to display function
+    display_selection(response, content_type="html", pretty=pretty, compact=compact, colors=colors, theme=theme)
 
 
 @selection.command()

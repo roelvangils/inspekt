@@ -86,7 +86,7 @@ def html_to_markdown(html_content: str) -> str:
 # Endpoints
 @router.get("", response_model=SelectionResponse)
 @router.get("/", response_model=SelectionResponse)
-async def get_selection():
+def get_selection():
     """
     Get the current text selection in all formats.
 
@@ -159,7 +159,7 @@ async def get_selection():
 
 
 @router.get("/text", response_model=SelectionResponse)
-async def get_selection_text():
+def get_selection_text():
     """
     Get selected text (plain text).
 
@@ -207,11 +207,11 @@ async def get_selection_text():
 
 
 @router.get("/html", response_model=SelectionResponse)
-async def get_selection_html():
+def get_selection_html():
     """
     Get selected HTML.
 
-    Mirrors 'zen selection html --json' CLI command.
+    Mirrors 'inspekt selection html --json' CLI command.
 
     Returns the HTML markup of the current selection.
 
@@ -255,7 +255,7 @@ async def get_selection_html():
 
 
 @router.get("/markdown", response_model=SelectionResponse)
-async def get_selection_markdown():
+def get_selection_markdown():
     """
     Get selected text as Markdown (converted from HTML).
 

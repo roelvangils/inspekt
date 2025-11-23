@@ -301,6 +301,24 @@ async def websocket_handler(request):
                         ext_version = data.get("extensionVersion", "unknown")
                         print(f"Browser info received: {browser_name} v{ext_version} - {page_title}")
 
+                    elif message_type == "response":
+                        # Extension sending back response for domain management commands
+                        request_id = data.get("requestId")
+
+                        if request_id and request_id in pending_requests:
+                            # Store the response
+                            completed_requests[request_id] = {
+                                "response": data.get("response"),
+                                "timestamp": time.time()
+                            }
+
+                            # Remove from pending
+                            del pending_requests[request_id]
+
+                            # Notify waiting HTTP request
+                            if request_id in pending_events:
+                                pending_events[request_id].set()
+
                 except json.JSONDecodeError:
                     print(f"Invalid JSON from browser: {msg.data}")
                 except Exception as e:
@@ -310,12 +328,27 @@ async def websocket_handler(request):
                 print(f"WebSocket connection closed with exception {ws.exception()}")
 
     finally:
+        # Cancel all pending requests for this connection
+        cancelled_count = 0
+        for req_id, req_data in list(pending_requests.items()):
+            if req_data.get('connection') == ws:
+                del pending_requests[req_id]
+                # Notify any waiting HTTP clients
+                if req_id in pending_events:
+                    pending_events[req_id].set()
+                    del pending_events[req_id]
+                cancelled_count += 1
+
         active_connections.discard(ws)
         browser_info.pop(ws, None)
         connection_times.pop(ws, None)  # Clean up connection time tracking
         if most_recent_connection == ws:
             most_recent_connection = None
-        print("Browser tab disconnected")
+
+        if cancelled_count > 0:
+            print(f"Browser tab disconnected - cancelled {cancelled_count} pending request(s)")
+        else:
+            print("Browser tab disconnected")
         print(f"Active connections: {len(active_connections)}")
 
     return ws
@@ -330,7 +363,11 @@ async def send_code_to_browser(code: str, browser_index: int = None) -> str:
     """
     global most_recent_connection
     request_id = str(uuid.uuid4())
-    pending_requests[request_id] = {"code": code, "timestamp": time.time()}
+    pending_requests[request_id] = {
+        "code": code,
+        "timestamp": time.time(),
+        "connection": None  # Will be set after selecting target
+    }
 
     # Send to most recent active browser only
     message = json.dumps({"type": "execute", "request_id": request_id, "code": code})
@@ -356,6 +393,9 @@ async def send_code_to_browser(code: str, browser_index: int = None) -> str:
             most_recent_connection = target_ws
 
     if target_ws:
+        # Track which connection owns this request
+        pending_requests[request_id]["connection"] = target_ws
+
         try:
             await target_ws.send_str(message)
             # Get browser info if available
@@ -427,7 +467,7 @@ async def handle_http_result(request):
             del pending_requests[request_id]
             pending_events.pop(request_id, None)
             return web.json_response(
-                {"ok": False, "error": "Request timeout: No browser connected"}
+                {"ok": False, "error": "Request timeout. Please ensure the extension is installed in Firefox and/or Chrome, and that the Inspekt Panel is visible."}
             )
 
         try:
@@ -459,6 +499,43 @@ async def handle_http_result(request):
 
     else:
         return web.json_response({"ok": False, "error": "unknown request_id"}, status=404)
+
+
+async def handle_http_cancel(request):
+    """HTTP endpoint: Cancel a pending request."""
+    request_id = request.query.get("request_id")
+
+    if not request_id:
+        return web.json_response({"ok": False, "error": "missing request_id"}, status=400)
+
+    # Check if request is pending
+    if request_id in pending_requests:
+        # Remove from pending
+        del pending_requests[request_id]
+
+        # Notify any waiting HTTP clients
+        if request_id in pending_events:
+            pending_events[request_id].set()
+            del pending_events[request_id]
+
+        print(f"[Server] Cancelled pending request {request_id[:8]}")
+        return web.json_response({"ok": True, "cancelled": True})
+
+    # Already completed
+    elif request_id in completed_requests:
+        return web.json_response({
+            "ok": False,
+            "error": "Request already completed",
+            "cancelled": False
+        }, status=400)
+
+    # Unknown request
+    else:
+        return web.json_response({
+            "ok": False,
+            "error": "Unknown request_id",
+            "cancelled": False
+        }, status=404)
 
 
 async def handle_http_reinit_control(request):
@@ -599,6 +676,311 @@ async def handle_http_health(request):
     )
 
 
+async def handle_http_domain_add(request):
+    """HTTP endpoint: Add a domain to allowed list."""
+    try:
+        data = await request.json()
+        domain = data.get("domain")
+
+        if not domain:
+            return web.json_response(
+                {"ok": False, "error": "Missing 'domain' parameter"},
+                status=400
+            )
+
+        # Send message to extension via WebSocket
+        if not most_recent_connection or most_recent_connection not in active_connections:
+            return web.json_response(
+                {"ok": False, "error": "No browser connected"},
+                status=503
+            )
+
+        request_id = str(uuid.uuid4())
+        message = {
+            "type": "DOMAIN_ADD",
+            "requestId": request_id,
+            "domain": domain
+        }
+
+        # Store pending request
+        pending_requests[request_id] = {
+            "timestamp": time.time(),
+            "type": "DOMAIN_ADD"
+        }
+
+        # Send to browser
+        await most_recent_connection.send_json(message)
+
+        # Wait for response (with timeout)
+        event = asyncio.Event()
+        pending_events[request_id] = event
+
+        try:
+            await asyncio.wait_for(event.wait(), timeout=10.0)
+            result = completed_requests.get(request_id, {})
+            return web.json_response(result.get("response", {"ok": False, "error": "No response"}))
+        except asyncio.TimeoutError:
+            return web.json_response(
+                {"ok": False, "error": "Request timed out"},
+                status=504
+            )
+        finally:
+            pending_events.pop(request_id, None)
+            completed_requests.pop(request_id, None)
+
+    except Exception as e:
+        return web.json_response(
+            {"ok": False, "error": str(e)},
+            status=500
+        )
+
+
+async def handle_http_domain_remove(request):
+    """HTTP endpoint: Remove a domain from allowed list."""
+    try:
+        data = await request.json()
+        domain = data.get("domain")
+
+        if not domain:
+            return web.json_response(
+                {"ok": False, "error": "Missing 'domain' parameter"},
+                status=400
+            )
+
+        # Send message to extension via WebSocket
+        if not most_recent_connection or most_recent_connection not in active_connections:
+            return web.json_response(
+                {"ok": False, "error": "No browser connected"},
+                status=503
+            )
+
+        request_id = str(uuid.uuid4())
+        message = {
+            "type": "DOMAIN_REMOVE",
+            "requestId": request_id,
+            "domain": domain
+        }
+
+        # Store pending request
+        pending_requests[request_id] = {
+            "timestamp": time.time(),
+            "type": "DOMAIN_REMOVE"
+        }
+
+        # Send to browser
+        await most_recent_connection.send_json(message)
+
+        # Wait for response (with timeout)
+        event = asyncio.Event()
+        pending_events[request_id] = event
+
+        try:
+            await asyncio.wait_for(event.wait(), timeout=10.0)
+            result = completed_requests.get(request_id, {})
+            return web.json_response(result.get("response", {"ok": False, "error": "No response"}))
+        except asyncio.TimeoutError:
+            return web.json_response(
+                {"ok": False, "error": "Request timed out"},
+                status=504
+            )
+        finally:
+            pending_events.pop(request_id, None)
+            completed_requests.pop(request_id, None)
+
+    except Exception as e:
+        return web.json_response(
+            {"ok": False, "error": str(e)},
+            status=500
+        )
+
+
+async def handle_http_domain_list(request):
+    """HTTP endpoint: List all allowed domains."""
+    try:
+        # Send message to extension via WebSocket
+        if not most_recent_connection or most_recent_connection not in active_connections:
+            return web.json_response(
+                {"ok": False, "error": "No browser connected"},
+                status=503
+            )
+
+        request_id = str(uuid.uuid4())
+        message = {
+            "type": "DOMAIN_LIST",
+            "requestId": request_id
+        }
+
+        # Store pending request
+        pending_requests[request_id] = {
+            "timestamp": time.time(),
+            "type": "DOMAIN_LIST"
+        }
+
+        # Send to browser
+        await most_recent_connection.send_json(message)
+
+        # Wait for response (with timeout)
+        event = asyncio.Event()
+        pending_events[request_id] = event
+
+        try:
+            await asyncio.wait_for(event.wait(), timeout=10.0)
+            result = completed_requests.get(request_id, {})
+            return web.json_response(result.get("response", {"ok": False, "error": "No response"}))
+        except asyncio.TimeoutError:
+            return web.json_response(
+                {"ok": False, "error": "Request timed out"},
+                status=504
+            )
+        finally:
+            pending_events.pop(request_id, None)
+            completed_requests.pop(request_id, None)
+
+    except Exception as e:
+        return web.json_response(
+            {"ok": False, "error": str(e)},
+            status=500
+        )
+
+
+async def handle_http_domain_bypass(request):
+    """HTTP endpoint: Set temporary bypass for all domains."""
+    try:
+        data = await request.json()
+        duration = data.get("duration")
+
+        if duration is None:
+            return web.json_response(
+                {"ok": False, "error": "Missing 'duration' parameter"},
+                status=400
+            )
+
+        # Send message to extension via WebSocket
+        if not most_recent_connection or most_recent_connection not in active_connections:
+            return web.json_response(
+                {"ok": False, "error": "No browser connected"},
+                status=503
+            )
+
+        request_id = str(uuid.uuid4())
+        message = {
+            "type": "DOMAIN_BYPASS",
+            "requestId": request_id,
+            "duration": duration
+        }
+
+        # Store pending request
+        pending_requests[request_id] = {
+            "timestamp": time.time(),
+            "type": "DOMAIN_BYPASS"
+        }
+
+        # Send to browser
+        await most_recent_connection.send_json(message)
+
+        # Wait for response (with timeout)
+        event = asyncio.Event()
+        pending_events[request_id] = event
+
+        try:
+            await asyncio.wait_for(event.wait(), timeout=10.0)
+            result = completed_requests.get(request_id, {})
+            return web.json_response(result.get("response", {"ok": False, "error": "No response"}))
+        except asyncio.TimeoutError:
+            return web.json_response(
+                {"ok": False, "error": "Request timed out"},
+                status=504
+            )
+        finally:
+            pending_events.pop(request_id, None)
+            completed_requests.pop(request_id, None)
+
+    except Exception as e:
+        return web.json_response(
+            {"ok": False, "error": str(e)},
+            status=500
+        )
+
+
+async def handle_http_domain_sync(request):
+    """HTTP endpoint: Sync domains from SQLite to browser extension storage."""
+    try:
+        from inspekt.services.domain_service import get_domain_service
+        from datetime import datetime, timezone
+
+        # Get domains from SQLite if not provided in request
+        data = await request.json() if request.can_read_body and request.content_length else {}
+        domains = data.get("domains")
+
+        if not domains:
+            # Fetch from SQLite
+            domain_service = get_domain_service()
+            domains_list = domain_service.get_all_domains()
+
+            # Convert to browser storage format
+            domains = {}
+            for item in domains_list:
+                dt = datetime.fromtimestamp(item["added_at"], tz=timezone.utc)
+                iso_timestamp = dt.isoformat().replace("+00:00", "Z")
+
+                domains[item["domain"]] = {
+                    "addedAt": iso_timestamp,
+                    "permanent": item["permanent"]
+                }
+
+        # Send message to extension via WebSocket
+        if not most_recent_connection or most_recent_connection not in active_connections:
+            return web.json_response(
+                {"ok": False, "error": "No browser connected"},
+                status=503
+            )
+
+        request_id = str(uuid.uuid4())
+        message = {
+            "type": "SYNC_ALLOWED_DOMAINS",
+            "requestId": request_id,
+            "domains": domains
+        }
+
+        # Store pending request
+        pending_requests[request_id] = {
+            "timestamp": time.time(),
+            "type": "SYNC_ALLOWED_DOMAINS"
+        }
+
+        # Send to browser
+        await most_recent_connection.send_json(message)
+
+        # Wait for response (with timeout)
+        event = asyncio.Event()
+        pending_events[request_id] = event
+
+        try:
+            await asyncio.wait_for(event.wait(), timeout=10.0)
+            result = completed_requests.get(request_id, {})
+            response_data = result.get("response", {"ok": False, "error": "No response"})
+
+            # Add synced count
+            if response_data.get("ok"):
+                response_data["synced"] = len(domains)
+
+            return web.json_response(response_data)
+        except asyncio.TimeoutError:
+            return web.json_response(
+                {"ok": False, "error": "Request timed out"},
+                status=504
+            )
+        finally:
+            pending_events.pop(request_id, None)
+            completed_requests.pop(request_id, None)
+
+    except Exception as e:
+        return web.json_response(
+            {"ok": False, "error": str(e)},
+            status=500
+        )
+
+
 @web.middleware
 async def cors_middleware(request, handler):
     """CORS middleware to allow cross-origin requests from dashboard."""
@@ -644,9 +1026,17 @@ async def main():
     # HTTP endpoints for CLI
     app.router.add_post("/run", handle_http_run)
     app.router.add_get("/result", handle_http_result)
+    app.router.add_delete("/cancel", handle_http_cancel)
     app.router.add_get("/notifications", handle_http_notifications)
     app.router.add_get("/health", handle_http_health)
     app.router.add_post("/reinit-control", handle_http_reinit_control)
+
+    # Domain management endpoints
+    app.router.add_post("/domains/add", handle_http_domain_add)
+    app.router.add_delete("/domains/remove", handle_http_domain_remove)
+    app.router.add_get("/domains/list", handle_http_domain_list)
+    app.router.add_post("/domains/bypass", handle_http_domain_bypass)
+    app.router.add_post("/domains/sync", handle_http_domain_sync)
 
     # WebSocket endpoint for browser
     app.router.add_get("/ws", websocket_handler)

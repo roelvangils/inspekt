@@ -8,7 +8,7 @@ router = APIRouter()
 
 
 @router.post("/eval", response_model=CommandResponse)
-async def execute_javascript(request: EvalRequest):
+def execute_javascript(request: EvalRequest):
     """
     Execute JavaScript code in the browser.
 

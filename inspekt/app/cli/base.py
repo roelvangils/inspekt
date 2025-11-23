@@ -92,7 +92,66 @@ class CustomGroup(click.Group):
 
     This extends Click's default Group class to provide more detailed help
     output, including options for each subcommand.
+
+    Also supports lazy loading of commands to minimize startup time.
+    Commands are only imported when they are actually invoked.
     """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._lazy_commands = {}
+
+    def add_lazy_command(self, name: str, module_path: str, attr: str):
+        """
+        Register a command for lazy loading.
+
+        Args:
+            name: Command name (e.g., "info", "links")
+            module_path: Module path relative to inspekt.app.cli (e.g., "util", "extraction")
+            attr: Attribute name to load from module (e.g., "info", "links")
+        """
+        self._lazy_commands[name] = (module_path, attr)
+
+    def get_command(self, ctx: click.Context, cmd_name: str):
+        """
+        Get a command, loading it lazily if needed.
+
+        This overrides Click's default get_command to support lazy loading.
+        Commands registered via add_lazy_command() are only imported when
+        they are actually invoked.
+        """
+        # Check if it's a lazy command
+        if cmd_name in self._lazy_commands:
+            module_path, attr = self._lazy_commands[cmd_name]
+
+            # Import the module and get the command
+            import importlib
+            module = importlib.import_module(f"inspekt.app.cli.{module_path}")
+            cmd = getattr(module, attr)
+
+            # Cache it in the commands dict for future access
+            self.commands[cmd_name] = cmd
+            return cmd
+
+        # Fall back to default behavior
+        return super().get_command(ctx, cmd_name)
+
+    def list_commands(self, ctx: click.Context):
+        """
+        List all available commands including lazy ones.
+
+        This ensures that lazy commands appear in help output
+        without being loaded.
+        """
+        # Get regular commands
+        regular_commands = list(self.commands.keys())
+
+        # Get lazy commands
+        lazy_commands = list(self._lazy_commands.keys())
+
+        # Combine and sort
+        all_commands = sorted(set(regular_commands + lazy_commands))
+        return all_commands
 
     def format_help(self, ctx: click.Context, formatter: click.HelpFormatter) -> None:
         """Format the complete help output."""

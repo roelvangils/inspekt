@@ -8,6 +8,53 @@ import time
 import click
 
 from inspekt.client import BridgeClient
+from inspekt.services.axe_updater import get_axe_updater
+
+
+def _check_axe_updates():
+    """Check for axe-core updates and prompt user to update."""
+    updater = get_axe_updater()
+
+    try:
+        # Check for updates (quick, non-blocking)
+        click.echo("  • Checking for axe-core updates…", err=True)
+        update_available, current, latest = updater.is_update_available()
+
+        if not latest:
+            # Network error or timeout - silently continue
+            return
+
+        if not update_available:
+            # Already on latest version
+            click.echo(f"  ✓ axe-core is up-to-date ({current})", err=True)
+            return
+
+        # Update available - prompt user
+        click.echo(f"  ✓ axe-core {latest} is available (current: {current})", err=True)
+        click.echo("", err=True)
+
+        # Ask user if they want to update
+        if click.confirm(f"Update to axe-core {latest}?", default=True):
+            click.echo("", err=True)
+
+            # Progress callback
+            def show_progress(msg):
+                click.echo(f"{msg}", err=True)
+
+            # Perform update
+            success, message = updater.update_to_latest(progress_callback=show_progress)
+
+            if success:
+                click.echo(f"\n✓ {message}\n", err=True)
+            else:
+                click.echo(f"\n✗ Update failed: {message}", err=True)
+                click.echo("Continuing with current version.\n", err=True)
+        else:
+            click.echo("Skipping update.\n", err=True)
+
+    except Exception:
+        # Silently continue on any error - don't block server start
+        pass
 
 
 @click.group()
@@ -87,7 +134,7 @@ def start(port, daemon, host):
             sock.close()
             display_host = "localhost" if host == "127.0.0.1" else host
             click.echo(f"✓ API server started successfully")
-            click.echo(f"\nAccess your API at:")
+            click.echo(f"\nAccess Inspekt API at:")
             click.echo(f"  • Status:        http://{display_host}:{port}/status")
             click.echo(f"  • Swagger UI:    http://{display_host}:{port}/docs")
             click.echo(f"  • ReDoc:         http://{display_host}:{port}/redoc")
@@ -247,10 +294,10 @@ def restart(port, host):
     import signal
     import os
 
-    click.echo("Restarting Inspekt servers...\n")
+    click.echo("Restarting Inspekt servers…\n")
 
     # Stop API server
-    click.echo("• Stopping API server...")
+    click.echo(" - Stopping API server…")
     result = subprocess.run(
         ["pkill", "-f", "uvicorn inspekt.app.api.server"],
         capture_output=True
@@ -261,7 +308,7 @@ def restart(port, host):
         click.echo("  • API server was not running")
 
     # Stop bridge server
-    click.echo("• Stopping bridge server...")
+    click.echo(" - Stopping bridge server…")
     result = subprocess.run(
         ["pkill", "-f", "inspekt.bridge_ws"],
         capture_output=True
@@ -274,7 +321,10 @@ def restart(port, host):
     # Wait a moment for processes to fully stop
     time.sleep(0.5)
 
-    click.echo("\n• Starting bridge server...")
+    # Check for axe-core updates before restarting servers
+    _check_axe_updates()
+
+    click.echo(" - Starting bridge server…")
     # Start bridge server in background
     subprocess.Popen(
         [sys.executable, "-m", "inspekt.bridge_ws"],
@@ -292,7 +342,7 @@ def restart(port, host):
         click.echo("  ✗ Failed to start bridge server", err=True)
         sys.exit(1)
 
-    click.echo("• Starting API server...")
+    click.echo(" - Starting API server…")
     # Start API server in background
     subprocess.Popen(
         [
@@ -313,8 +363,8 @@ def restart(port, host):
         sock.close()
         display_host = "localhost" if host == "127.0.0.1" else host
         click.echo(f"  ✓ API server started on port {port}")
-        click.echo(f"\n✓ All servers restarted successfully!")
-        click.echo(f"\nAccess your API at:")
+        click.echo(f"\nAll servers restarted successfully!")
+        click.echo(f"\nAccess Inspekt API at:")
         click.echo(f"  • Status:        http://{display_host}:{port}/status")
         click.echo(f"  • Swagger UI:    http://{display_host}:{port}/docs")
         click.echo(f"  • ReDoc:         http://{display_host}:{port}/redoc")

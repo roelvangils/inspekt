@@ -3,6 +3,9 @@ Inspekt CLI - Main entry point.
 
 This module assembles all CLI commands from individual command modules
 and creates the main CLI group with Click.
+
+Uses lazy imports to minimize startup time - modules are only imported
+when their commands are actually invoked.
 """
 
 from __future__ import annotations
@@ -11,21 +14,6 @@ import click
 
 from inspekt import __version__
 from inspekt.app.cli.base import CustomGroup
-
-# Import command modules
-from inspekt.app.cli import api as api_module
-from inspekt.app.cli import cookies as cookies_module
-from inspekt.app.cli import exec as exec_module
-from inspekt.app.cli import extraction as extraction_module
-from inspekt.app.cli import inspection as inspection_module
-from inspekt.app.cli import interaction as interaction_module
-from inspekt.app.cli import navigation as navigation_module
-from inspekt.app.cli import robots as robots_module
-from inspekt.app.cli import selection as selection_module
-from inspekt.app.cli import server as server_module
-from inspekt.app.cli import storage as storage_module
-from inspekt.app.cli import util as util_module
-from inspekt.app.cli import watch as watch_module
 
 
 @click.group(cls=CustomGroup)
@@ -36,84 +24,95 @@ def cli():
 
 
 # ============================================================================
-# Register Commands
+# Lazy Command Registration
 # ============================================================================
+# Commands are only imported when they are actually invoked, improving startup time
 
 # Execution commands (from exec.py)
-cli.add_command(exec_module.eval, name="eval")
-cli.add_command(exec_module.exec, name="exec")
+cli.add_lazy_command("eval", "exec", "eval")
+cli.add_lazy_command("exec", "exec", "exec")
 
 # Navigation commands (from navigation.py)
-cli.add_command(navigation_module.open, name="open")
-cli.add_command(navigation_module.back, name="back")
-cli.add_command(navigation_module.forward, name="forward")
-cli.add_command(navigation_module.reload, name="reload")
-cli.add_command(navigation_module.pageup, name="pageup")
-cli.add_command(navigation_module.pagedown, name="pagedown")
-cli.add_command(navigation_module.top, name="top")
-cli.add_command(navigation_module.bottom, name="bottom")
-cli.add_command(navigation_module.previous, name="previous")  # hidden alias for back
-cli.add_command(navigation_module.next, name="next")  # hidden alias for forward
-cli.add_command(navigation_module.refresh, name="refresh")  # hidden alias for reload
-cli.add_command(navigation_module.pgup, name="pgup")  # hidden alias for pageup
-cli.add_command(navigation_module.pgdown, name="pgdown")  # hidden alias for pagedown
-cli.add_command(navigation_module.home, name="home")  # hidden alias for top
-cli.add_command(navigation_module.end, name="end")  # hidden alias for bottom
+cli.add_lazy_command("open", "navigation", "open")
+cli.add_lazy_command("back", "navigation", "back")
+cli.add_lazy_command("forward", "navigation", "forward")
+cli.add_lazy_command("reload", "navigation", "reload")
+cli.add_lazy_command("pageup", "navigation", "pageup")
+cli.add_lazy_command("pagedown", "navigation", "pagedown")
+cli.add_lazy_command("top", "navigation", "top")
+cli.add_lazy_command("bottom", "navigation", "bottom")
+cli.add_lazy_command("previous", "navigation", "previous")
+cli.add_lazy_command("next", "navigation", "next")
+cli.add_lazy_command("refresh", "navigation", "refresh")
+cli.add_lazy_command("pgup", "navigation", "pgup")
+cli.add_lazy_command("pgdown", "navigation", "pgdown")
+cli.add_lazy_command("home", "navigation", "home")
+cli.add_lazy_command("end", "navigation", "end")
 
 # Cookie management commands (from cookies.py)
-cli.add_command(cookies_module.cookies, name="cookies")  # group
+cli.add_lazy_command("cookies", "cookies", "cookies")
 
 # Storage management commands (from storage.py)
-cli.add_command(storage_module.storage, name="storage")  # group
+cli.add_lazy_command("storage", "storage", "storage")
+
+# Domain management commands (from domain.py)
+cli.add_lazy_command("domain", "domain", "domain")
 
 # Interaction commands (from interaction.py)
-cli.add_command(interaction_module.type_text, name="type")
-cli.add_command(interaction_module.paste, name="paste")
-cli.add_command(interaction_module.send, name="send")  # deprecated, kept for backward compatibility
-cli.add_command(interaction_module.click_element, name="click")
-cli.add_command(interaction_module.double_click, name="double-click")
-cli.add_command(interaction_module.doubleclick_alias, name="doubleclick")  # hidden alias
-cli.add_command(interaction_module.right_click, name="right-click")
-cli.add_command(interaction_module.rightclick_alias, name="rightclick")  # hidden alias
-cli.add_command(interaction_module.wait, name="wait")
+cli.add_lazy_command("type", "interaction", "type_text")
+cli.add_lazy_command("paste", "interaction", "paste")
+cli.add_lazy_command("send", "interaction", "send")
+cli.add_lazy_command("click", "interaction", "click_element")
+cli.add_lazy_command("double-click", "interaction", "double_click")
+cli.add_lazy_command("doubleclick", "interaction", "doubleclick_alias")
+cli.add_lazy_command("right-click", "interaction", "right_click")
+cli.add_lazy_command("rightclick", "interaction", "rightclick_alias")
+cli.add_lazy_command("wait", "interaction", "wait")
 
 # Inspection commands (from inspection.py)
-cli.add_command(inspection_module.inspect, name="inspect")
-cli.add_command(inspection_module.inspected, name="inspected")
-cli.add_command(inspection_module.screenshot, name="screenshot")
+cli.add_lazy_command("inspect", "inspection", "inspect")
+cli.add_lazy_command("inspected", "inspection", "inspected")
+cli.add_lazy_command("screenshot", "inspection", "screenshot")
+
+# Accessibility commands (from accessibility.py)
+cli.add_lazy_command("axe", "accessibility", "axe")
+cli.add_lazy_command("autocomplete", "accessibility", "autocomplete")
 
 # Selection commands (from selection.py)
-cli.add_command(selection_module.selection, name="selection")  # group with text/html/markdown subcommands
-cli.add_command(selection_module.selected, name="selected")  # deprecated, kept for backward compatibility
+cli.add_lazy_command("selection", "selection", "selection")
+cli.add_lazy_command("selected", "selection", "selected")
 
 # Server management commands (from server.py)
-cli.add_command(server_module.server, name="server")  # group
+cli.add_lazy_command("server", "server", "server")
 
 # API server management commands (from api.py)
-cli.add_command(api_module.api, name="api")  # group
+cli.add_lazy_command("api", "api", "api")
+
+# MCP server management commands (from mcp.py)
+cli.add_lazy_command("mcp", "mcp", "mcp")
 
 # Content extraction commands (from extraction.py)
-cli.add_command(extraction_module.describe, name="describe")
-cli.add_command(extraction_module.do, name="do")
-cli.add_command(extraction_module.outline, name="outline")
-cli.add_command(extraction_module.links, name="links")
-cli.add_command(extraction_module.summarize, name="summarize")
-cli.add_command(extraction_module.index, name="index")
-cli.add_command(extraction_module.ask, name="ask")
+cli.add_lazy_command("describe", "extraction", "describe")
+cli.add_lazy_command("do", "extraction", "do")
+cli.add_lazy_command("outline", "extraction", "outline")
+cli.add_lazy_command("links", "extraction", "links")
+cli.add_lazy_command("summarize", "extraction", "summarize")
+cli.add_lazy_command("index", "extraction", "index")
+cli.add_lazy_command("ask", "extraction", "ask")
 
 # Watch commands (from watch.py)
-cli.add_command(watch_module.watch, name="watch")  # group
-cli.add_command(watch_module.control, name="control")
+cli.add_lazy_command("watch", "watch", "watch")
+cli.add_lazy_command("control", "watch", "control")
 
 # Utility commands (from util.py)
-cli.add_command(util_module.info, name="info")
-cli.add_command(util_module.repl, name="repl")
-cli.add_command(util_module.userscript, name="userscript")
-cli.add_command(util_module.download, name="download")
-cli.add_command(util_module.md_link, name="md-link")
+cli.add_lazy_command("info", "util", "info")
+cli.add_lazy_command("repl", "util", "repl")
+cli.add_lazy_command("userscript", "util", "userscript")
+cli.add_lazy_command("download", "util", "download")
+cli.add_lazy_command("md-link", "util", "md_link")
 
 # Robots.txt inspection (from robots.py)
-cli.add_command(robots_module.robots, name="robots")
+cli.add_lazy_command("robots", "robots", "robots")
 
 
 # ============================================================================

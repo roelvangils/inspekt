@@ -10,6 +10,7 @@ Examples:
     inspekt://eval?code=document.title
     inspekt://type?text=Hello&selector=input
     inspekt://screenshot?selector=h1
+    inspekt://md-link
 """
 
 import sys
@@ -284,6 +285,15 @@ def execute_command(command, params):
             f.write(f"ASK command - stderr: {result.stderr[:500]}\n")
         return {"ok": result.returncode == 0, "output": result.stdout, "error": result.stderr}
 
+    # Utility commands
+    elif command == "md-link":
+        cmd = ["/Users/roelvangils/.pyenv/shims/inspekt", "md-link"]
+        if params.get("json") == "true":
+            cmd.append("--json")
+
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+        return {"ok": result.returncode == 0, "output": result.stdout.strip(), "error": result.stderr}
+
     else:
         return {"error": f"Unknown command: {command}"}
 
@@ -393,7 +403,7 @@ def main():
     # Data commands: clipboard by default (content to use/paste)
     # Action commands: notification by default (just confirmation)
     ai_commands = ["summarize", "describe", "ask"]
-    data_commands = ["eval", "info", "selection", "inspected", "cookies", "screenshot", "outline"]
+    data_commands = ["eval", "info", "selection", "inspected", "cookies", "screenshot", "outline", "md-link"]
     action_commands = ["open", "back", "forward", "reload", "click", "double-click", "right-click",
                        "type", "paste", "inspect", "wait", "pageup", "pagedown", "top", "bottom"]
 

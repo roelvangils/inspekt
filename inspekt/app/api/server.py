@@ -144,6 +144,8 @@ async def root():
             "selection": "/api/selection/*",
             "cookies": "/api/cookies/*",
             "storage": "/api/storage/*",
+            "persistence": "/api/persistence/*",
+            "accessibility": "/api/accessibility/*",
         },
     }
 
@@ -173,6 +175,10 @@ from inspekt.app.api.routers import (
     selection,
     cookies,
     storage,
+    domains,
+    robots,
+    persistence,
+    accessibility,
 )
 
 app.include_router(navigation.router, prefix="/api/navigation", tags=["Navigation"])
@@ -183,3 +189,7 @@ app.include_router(inspection.router, prefix="/api/inspection", tags=["Inspectio
 app.include_router(selection.router, prefix="/api/selection", tags=["Selection"])
 app.include_router(cookies.router, prefix="/api/cookies", tags=["Cookies"])
 app.include_router(storage.router, prefix="/api/storage", tags=["Storage"])
+app.include_router(domains.router, prefix="/api/domains", tags=["Domains"])
+app.include_router(robots.router, prefix="/api/robots", tags=["Robots"])
+app.include_router(persistence.router, prefix="/api/persistence", tags=["Persistence"])
+app.include_router(accessibility.router, prefix="/api/accessibility", tags=["Accessibility"])

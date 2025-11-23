@@ -8,7 +8,7 @@ router = APIRouter()
 
 
 @router.get("/info", response_model=CommandResponse)
-async def get_page_info():
+def get_page_info():
     """
     Get information about the current browser tab.
 
@@ -72,7 +72,7 @@ async def get_page_info():
 
 
 @router.get("/links")
-async def get_page_links(include_text: bool = True):
+def get_page_links(include_text: bool = True):
     """
     Extract all links from the current page.
 

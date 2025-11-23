@@ -247,10 +247,6 @@
         };
 
         console.log('%c[Inspekt]%c DevTools integration ready', 'color: #0066ff; font-weight: bold', 'color: inherit');
-        console.log('[Inspekt] To capture inspected element:');
-        console.log('  1. Right-click element → Inspect');
-        console.log('  2. In DevTools Console: inspektStore($0)');
-        console.log('  3. In terminal: inspekt inspected');
     }
 
     // Initial connection

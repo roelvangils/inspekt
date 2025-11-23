@@ -76,6 +76,23 @@ class BridgeExecutor:
             )
             sys.exit(1)
 
+    def has_active_browser_connection(self) -> bool:
+        """
+        Check if there are any browser connections.
+
+        Note: This only checks if browsers are connected via WebSocket.
+        It cannot detect if the browser tab is inactive or unresponsive.
+
+        Returns:
+            True if at least one browser is connected, False otherwise
+        """
+        status = self.get_status()
+        if status is None:
+            return False
+
+        # Simply check if any browsers are connected
+        return status.get("connected_browsers", 0) > 0
+
     def execute(
         self,
         code: str,
@@ -105,12 +122,35 @@ class BridgeExecutor:
         """
         self.ensure_server_running()
 
+        # Check for active browser connections immediately
+        if not self.has_active_browser_connection():
+            click.echo(
+                "Error: Request timeout. Please ensure the extension is installed in Firefox and/or Chrome, and that the Inspekt Panel is visible.",
+                err=True,
+            )
+            sys.exit(1)
+
         retries = self.max_retries if retry_on_timeout else 1
         delay = self.retry_delay
 
         for attempt in range(retries):
             try:
                 result = self.client.execute(code, timeout=timeout)
+
+                # Check if this is a domain permission error
+                if not result.get("ok"):
+                    error_msg = result.get("error", "")
+                    if "Domain not authorized" in error_msg or "not authorized" in error_msg.lower():
+                        # Extract domain from URL
+                        url = result.get("url", "")
+                        domain = self._extract_domain_from_url(url)
+
+                        if domain and self._prompt_add_domain(domain):
+                            # User agreed to add domain, retry execution
+                            # Give browser a moment to sync
+                            time.sleep(1)
+                            result = self.client.execute(code, timeout=timeout)
+
                 return result
 
             except TimeoutError as e:
@@ -133,6 +173,76 @@ class BridgeExecutor:
         # Should not reach here
         click.echo("Error: Execution failed after retries", err=True)
         sys.exit(1)
+
+    def _extract_domain_from_url(self, url: str) -> str | None:
+        """Extract domain from URL."""
+        from urllib.parse import urlparse
+
+        try:
+            parsed = urlparse(url)
+            return parsed.netloc or parsed.hostname
+        except Exception:
+            return None
+
+    def _prompt_add_domain(self, domain: str) -> bool:
+        """
+        Prompt user to add domain to allowed list.
+
+        Returns:
+            True if domain was added, False otherwise
+        """
+        import requests
+        from inspekt.services.domain_service import get_domain_service
+
+        try:
+            # Show helpful message
+            click.echo(f"\nSorry, I'm not allowed to access this domain.", err=True)
+            click.echo(f"", err=True)
+
+            # Prompt user
+            response = click.prompt(
+                f'Would you like to add "{domain}" to the allowed list? [y/N]',
+                type=str,
+                default="N",
+                show_default=False
+            )
+
+            if response.lower() not in ('y', 'yes'):
+                click.echo(f"\nDomain not added. You can add it later with:", err=True)
+                click.echo(f"  inspekt domain add {domain}", err=True)
+                click.echo(f"", err=True)
+                click.echo(f"Or temporarily allow all domains with:", err=True)
+                click.echo(f"  inspekt domain bypass [DURATION IN MINUTES]", err=True)
+                return False
+
+            # Add to SQLite
+            domain_service = get_domain_service()
+            result = domain_service.add_domain(domain)
+
+            if not result.get("ok"):
+                click.echo(f"Error: Failed to add domain to database", err=True)
+                return False
+
+            click.echo(f"✓ Domain added: {domain}")
+
+            # Sync to browser extension
+            try:
+                sync_response = requests.post(
+                    f"http://{self.host}:{self.port}/domains/sync",
+                    timeout=5.0
+                )
+                if sync_response.status_code == 200:
+                    click.echo("✓ Synced to browser extension")
+                else:
+                    click.echo("Warning: Failed to sync to browser (domain saved to database)", err=True)
+            except Exception as e:
+                click.echo(f"Warning: Failed to sync to browser: {e}", err=True)
+
+            return True
+
+        except Exception as e:
+            click.echo(f"Error: Failed to add domain: {e}", err=True)
+            return False
 
     def execute_file(
         self,
