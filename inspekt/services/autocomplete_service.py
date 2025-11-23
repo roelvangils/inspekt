@@ -41,7 +41,17 @@ class AutocompleteService:
 
             # Load JavaScript source files
             with open(self.vendor_dir / "matchingclasses.js", "r", encoding="utf-8") as f:
-                self.matchingclasses_js = f.read()
+                matchingclasses_content = f.read()
+                # Remove duplicate variable declarations (they conflict with matching.js)
+                # Remove lines: let autocompleteDict = null; let matchingClassesInfluence = null; let getIdOfAcName = null;
+                lines_to_remove = [
+                    "let autocompleteDict = null;",
+                    "let matchingClassesInfluence = null;",
+                    "let getIdOfAcName = null;",
+                ]
+                for line in lines_to_remove:
+                    matchingclasses_content = matchingclasses_content.replace(line, "")
+                self.matchingclasses_js = matchingclasses_content
 
             with open(self.vendor_dir / "matching.js", "r", encoding="utf-8") as f:
                 self.matching_js = f.read()
@@ -90,19 +100,18 @@ class AutocompleteService:
             f"  const AUTOCOMPLETE_VALUES = {values_json};",
             f"  const MATCHING_INFLUENCE = {influence_json};",
             "",
+            "  // === Declare shared variables (used by both files) ===",
+            "  let autocompleteDict = AUTOCOMPLETE_DICT;",
+            "  let matchingClassesInfluence = MATCHING_INFLUENCE;",
+            "  let classesInfluence = MATCHING_INFLUENCE;",
+            "",
             "  // === Matching Classes (7 Strategies) ===",
-            "  // Inject matchingclasses.js code (declares autocompleteDict, matchingClassesInfluence, getIdOfAcName)",
+            "  // Inject matchingclasses.js code (variable declarations removed to avoid conflicts)",
             self.matchingclasses_js,
             "",
             "  // === Main Matching Logic ===",
-            "  // Inject matching.js code (defines getIdOfAcName)",
+            "  // Inject matching.js code (defines getIdOfAcName function)",
             self.matching_js,
-            "",
-            "  // === Initialize Dependencies ===",
-            "  // Set the variables that matching code needs",
-            "  autocompleteDict = AUTOCOMPLETE_DICT;",
-            "  matchingClassesInfluence = MATCHING_INFLUENCE;",
-            "  let classesInfluence = MATCHING_INFLUENCE;",
             "",
             "  // === Wrapper Script ===",
             "  // Replace injection placeholders",
