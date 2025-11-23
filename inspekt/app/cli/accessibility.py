@@ -839,7 +839,7 @@ def autocomplete(threshold, include_hidden, include_disabled, output_json, timeo
         else:
             click.echo(click.style(f"✗ Found {violations} WCAG 2.1 SC 1.3.5 violation(s)", fg="red", bold=True))
 
-        click.echo(click.style(f"Confidence threshold: {threshold} | Multi-language: EN, DE, NL", fg="bright_black"))
+        click.echo(click.style(f"Confidence threshold: {threshold} | Multi-language: EN, DE, NL, FR", fg="bright_black"))
         click.echo()
 
         # Exit with error code if violations found
