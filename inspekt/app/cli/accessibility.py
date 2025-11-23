@@ -3,6 +3,7 @@ Accessibility testing and audit commands.
 
 This module provides commands for testing web accessibility:
 - axe: Run axe-core accessibility audit on current page
+- autocomplete: Check autocomplete attributes per WCAG 2.1 SC 1.3.5
 
 These commands help identify WCAG violations and accessibility issues.
 """
@@ -652,6 +653,198 @@ def axe(level, rule, list_rules, tags, include_passes, include_incomplete, outpu
                 color = _get_impact_color(impact)
                 click.echo(f"  {click.style('•', fg=color)} {item.get('id')}: {item.get('description')} ({item.get('nodeCount', 0)} elements)")
             click.echo()
+
+    except (ConnectionError, TimeoutError, RuntimeError) as e:
+        click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
+
+
+@click.command()
+@click.option(
+    "--threshold",
+    type=float,
+    default=0.5,
+    help="Minimum confidence (0-1) to consider autocomplete required (default: 0.5)"
+)
+@click.option(
+    "--include-hidden",
+    is_flag=True,
+    help="Include hidden input fields in analysis"
+)
+@click.option(
+    "--include-disabled",
+    is_flag=True,
+    help="Include disabled input fields in analysis"
+)
+@click.option(
+    "--json",
+    "output_json",
+    is_flag=True,
+    help="Output results as JSON"
+)
+@click.option(
+    "--timeout",
+    type=float,
+    default=30.0,
+    help="Execution timeout in seconds (default: 30)"
+)
+def autocomplete(threshold, include_hidden, include_disabled, output_json, timeout):
+    """
+    Check autocomplete attributes on form fields per WCAG 2.1 SC 1.3.5.
+
+    Analyzes all form fields (input, textarea, select) on the current page and
+    predicts appropriate autocomplete attributes using multi-language heuristics.
+
+    The check uses 7 weighted matching strategies:
+    - Label text (weight: 5) - highest reliability
+    - Placeholder text (weight: 4)
+    - Name attribute (weight: 2)
+    - ID attribute (weight: 2)
+    - Field type (weight: 1)
+    - Input type (weight: 1)
+    - Form type (weight: 1) - login vs signup detection
+
+    Supports multi-language keyword matching (English, German, Dutch) with
+    fuzzy substring matching for robust field identification.
+
+    Examples:
+
+        # Basic check (default 0.5 threshold)
+        inspekt autocomplete
+
+        # Strict check (higher confidence threshold)
+        inspekt autocomplete --threshold 0.7
+
+        # Include hidden and disabled fields
+        inspekt autocomplete --include-hidden --include-disabled
+
+        # JSON output for programmatic use
+        inspekt autocomplete --json
+    """
+    try:
+        from inspekt.services.autocomplete_service import get_autocomplete_service
+        import asyncio
+
+        client = BridgeClient()
+        service = get_autocomplete_service()
+
+        # Run the autocomplete check
+        result = asyncio.run(service.check_autocomplete(
+            bridge_executor=client,
+            confidence_threshold=threshold,
+            include_hidden=include_hidden,
+            include_disabled=include_disabled
+        ))
+
+        if output_json:
+            # JSON output
+            click.echo(json.dumps(result, indent=2))
+            return
+
+        # Check for errors
+        if "error" in result and result.get("summary", {}).get("analyzed", 0) == 0:
+            click.echo(click.style(f"Error: {result.get('error')}", fg="red"), err=True)
+            sys.exit(1)
+
+        # Format terminal output
+        summary = result.get("summary", {})
+        fields = result.get("fields", [])
+
+        # Summary statistics (no header, cleaner alignment)
+        click.echo()
+        click.echo(click.style("Summary:", bold=True))
+        click.echo(f"  Total fields:         {summary.get('total', 0)}")
+        click.echo(f"  Analyzed:             {summary.get('analyzed', 0)}")
+        click.echo(f"  Needs autocomplete:   {summary.get('needsAutocomplete', 0)}")
+        click.echo(f"  Has autocomplete:     {summary.get('hasAutocomplete', 0)}")
+        click.echo(f"  Correct autocomplete: {summary.get('hasCorrectAutocomplete', 0)}")
+
+        violations = summary.get('violations', 0)
+        warnings = summary.get('warnings', 0)
+
+        # Format counts: use "None" for 0
+        violations_text = violations if violations > 0 else "None"
+        warnings_text = "None" if warnings == 0 else str(warnings)
+
+        if violations > 0:
+            click.echo(f"  {click.style('✗ Violations:', fg='red', bold=True)}         {violations_text}")
+        else:
+            click.echo(f"  {click.style('✓ Violations:', fg='green')}         {violations_text}")
+
+        if warnings > 0:
+            click.echo(f"  {click.style('⚠ Warnings:', fg='yellow', bold=True)}           {warnings_text}")
+        else:
+            click.echo(f"  {click.style('✓ Warnings:', fg='green')}           {warnings_text}")
+
+        click.echo()
+
+        # Group fields by status
+        violation_fields = [f for f in fields if f.get('level') == 'violation']
+        warning_fields = [f for f in fields if f.get('level') == 'warning']
+        pass_fields = [f for f in fields if f.get('level') == 'pass']
+
+        # Show violations
+        if violation_fields:
+            click.echo(click.style("❌ WCAG 2.1 SC 1.3.5 Violations:", bold=True, fg="red"))
+            click.echo()
+            for field in violation_fields:
+                selector = field.get('selector', 'unknown')
+                predicted = field.get('predictedAutocomplete', 'none')
+                confidence = field.get('confidence', 0)
+                label = field.get('label') or 'None'
+                message = field.get('message', '')
+
+                click.echo(f"  Field:     {selector}")
+                click.echo(f"  Label:     {label}")
+                click.echo(f"  Should be: {predicted} (confidence: {confidence:.0%})")
+                click.echo(f"  Issue:     {message}")
+                click.echo()
+
+        # Show warnings
+        if warning_fields:
+            click.echo(click.style("⚠️  Warnings:", bold=True, fg="yellow"))
+            click.echo()
+            for field in warning_fields:
+                selector = field.get('selector', 'unknown')
+                predicted = field.get('predictedAutocomplete', 'none')
+                confidence = field.get('confidence', 0)
+                message = field.get('message', '')
+
+                click.echo(f"  {click.style('Field:', fg='bright_black')} {selector}")
+                click.echo(f"  {click.style('Predicted:', fg='cyan')} {predicted} (confidence: {confidence:.0%})")
+                click.echo(f"  {click.style('Note:', fg='yellow')} {message}")
+                click.echo()
+
+        # Show passing fields with details
+        if pass_fields:
+            correct_fields = [f for f in pass_fields if f.get('status') == 'correct']
+            if correct_fields:
+                click.echo(click.style(f"✅ {len(correct_fields)} field(s) have correct autocomplete attributes:", fg="green"))
+                click.echo()
+                for field in correct_fields:
+                    selector = field.get('selector', 'unknown')
+                    current = field.get('currentAutocomplete', 'none')
+                    label = field.get('label') or 'None'
+                    confidence = field.get('confidence', 0)
+
+                    click.echo(f"  Field:        {selector}")
+                    click.echo(f"  Label:        {label}")
+                    click.echo(f"  Autocomplete: {current} (confidence: {confidence:.0%})")
+                    click.echo()
+
+        # Footer with WCAG info
+        click.echo(click.style("─" * 60, fg="bright_black"))
+        if violations == 0:
+            click.echo(click.style("✓ Page is compliant with WCAG 2.1 SC 1.3.5", fg="green", bold=True))
+        else:
+            click.echo(click.style(f"✗ Found {violations} WCAG 2.1 SC 1.3.5 violation(s)", fg="red", bold=True))
+
+        click.echo(click.style(f"Confidence threshold: {threshold} | Multi-language: EN, DE, NL", fg="bright_black"))
+        click.echo()
+
+        # Exit with error code if violations found
+        if violations > 0:
+            sys.exit(1)
 
     except (ConnectionError, TimeoutError, RuntimeError) as e:
         click.echo(f"Error: {e}", err=True)
