@@ -13,21 +13,44 @@ console.log('[Inspekt Extension] Background service worker loaded');
 const activeTabs = new Set();
 
 // Listen for tab updates to inject into new pages
-chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
-    if (changeInfo.status === 'complete' && tab.active) {
+chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
+    if (changeInfo.status === 'complete') {
         console.log('[Inspekt] Tab updated:', tab.url);
         activeTabs.add(tabId);
+
+        // Update icon when page finishes loading
+        await updateIconForTab(tabId, tab);
     }
 });
 
 // Listen for tab removal to clean up
 chrome.tabs.onRemoved.addListener((tabId) => {
     activeTabs.delete(tabId);
+    tabConnectionStatus.delete(tabId);
 });
 
 // Listen for tab activation
-chrome.tabs.onActivated.addListener((activeInfo) => {
+chrome.tabs.onActivated.addListener(async (activeInfo) => {
     activeTabs.add(activeInfo.tabId);
+
+    // Update icon when switching tabs
+    try {
+        const tab = await chrome.tabs.get(activeInfo.tabId);
+        await updateIconForTab(activeInfo.tabId, tab);
+    } catch (error) {
+        console.error('[Inspekt] Error updating icon on tab activation:', error);
+    }
+});
+
+// Listen for storage changes (permission updates)
+chrome.storage.onChanged.addListener(async (changes, areaName) => {
+    if (areaName === 'sync') {
+        // Update all tab icons when permissions or bypass status changes
+        if (changes.inspekt_allowed_domains || changes.inspekt_temp_bypass) {
+            console.log('[Inspekt] Permissions changed, updating all icons');
+            await updateAllTabIcons();
+        }
+    }
 });
 
 // Track WebSocket connection status per tab
@@ -94,6 +117,54 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         // Retrieve detailed cookie information using chrome.cookies API
         getCookiesEnhanced(sender.tab.url)
             .then(sendResponse)
+            .catch(error => sendResponse({ ok: false, error: String(error) }));
+        return true; // Keep channel open for async response
+    }
+
+    if (message.type === 'DOMAIN_ADD') {
+        // Add domain to allowed list
+        handleDomainAdd(message.domain)
+            .then(sendResponse)
+            .catch(error => sendResponse({ ok: false, error: String(error) }));
+        return true; // Keep channel open for async response
+    }
+
+    if (message.type === 'DOMAIN_REMOVE') {
+        // Remove domain from allowed list
+        handleDomainRemove(message.domain)
+            .then(sendResponse)
+            .catch(error => sendResponse({ ok: false, error: String(error) }));
+        return true; // Keep channel open for async response
+    }
+
+    if (message.type === 'DOMAIN_LIST') {
+        // List all allowed domains
+        handleDomainList()
+            .then(sendResponse)
+            .catch(error => sendResponse({ ok: false, error: String(error) }));
+        return true; // Keep channel open for async response
+    }
+
+    if (message.type === 'DOMAIN_BYPASS') {
+        // Set temporary bypass
+        handleDomainBypass(message.duration)
+            .then(sendResponse)
+            .catch(error => sendResponse({ ok: false, error: String(error) }));
+        return true; // Keep channel open for async response
+    }
+
+    if (message.type === 'SYNC_ALLOWED_DOMAINS') {
+        // Sync domains from SQLite to browser storage
+        handleDomainSync(message.domains)
+            .then(sendResponse)
+            .catch(error => sendResponse({ ok: false, error: String(error) }));
+        return true; // Keep channel open for async response
+    }
+
+    if (message.type === 'CAPTURE_VISIBLE_TAB') {
+        // Capture screenshot of visible tab (simple capture only, processing done in content script)
+        chrome.tabs.captureVisibleTab(null, { format: 'png' })
+            .then(dataUrl => sendResponse({ ok: true, dataUrl: dataUrl }))
             .catch(error => sendResponse({ ok: false, error: String(error) }));
         return true; // Keep channel open for async response
     }
@@ -227,11 +298,6 @@ async function injectMainWorldVars(tabId) {
 
                     console.log('%c[Inspekt]%c DevTools integration ready',
                         'color: #0066ff; font-weight: bold', 'color: inherit');
-                    console.log('[Inspekt] To capture inspected element:');
-                    console.log('  1. Right-click element → Inspect');
-                    console.log('  2. In DevTools Console: zenStore($0)');
-                    console.log('  3. In terminal: zen inspected');
-                    console.log('');
                     console.log('%c[Inspekt]%c Extension mode: CSP restrictions bypassed! ✓',
                         'color: #0066ff; font-weight: bold', 'color: #00aa00; font-weight: bold');
                 }
@@ -654,6 +720,407 @@ async function getCookiesEnhanced(url) {
         throw new Error(`Failed to retrieve cookies: ${error.message}`);
     }
 }
+
+/**
+ * Domain management functions
+ * These handle domain permission requests from the bridge server via WebSocket
+ */
+
+async function handleDomainAdd(domain) {
+    try {
+        const STORAGE_KEY = 'inspekt_allowed_domains';
+        const result = await chrome.storage.sync.get(STORAGE_KEY);
+        const allowedDomains = result[STORAGE_KEY] || {};
+
+        const alreadyExists = !!allowedDomains[domain];
+
+        // Add domain with metadata
+        allowedDomains[domain] = {
+            addedAt: new Date().toISOString(),
+            permanent: true
+        };
+
+        await chrome.storage.sync.set({ [STORAGE_KEY]: allowedDomains });
+
+        // Update icons for tabs with this domain
+        await updateAllTabIcons();
+
+        return {
+            ok: true,
+            domain: domain,
+            already_exists: alreadyExists
+        };
+    } catch (error) {
+        return {
+            ok: false,
+            error: String(error)
+        };
+    }
+}
+
+async function handleDomainRemove(domain) {
+    try {
+        const STORAGE_KEY = 'inspekt_allowed_domains';
+        const result = await chrome.storage.sync.get(STORAGE_KEY);
+        const allowedDomains = result[STORAGE_KEY] || {};
+
+        const existed = !!allowedDomains[domain];
+
+        if (allowedDomains[domain]) {
+            delete allowedDomains[domain];
+            await chrome.storage.sync.set({ [STORAGE_KEY]: allowedDomains });
+        }
+
+        // Update icons for tabs with this domain
+        await updateAllTabIcons();
+
+        return {
+            ok: true,
+            domain: domain,
+            not_found: !existed
+        };
+    } catch (error) {
+        return {
+            ok: false,
+            error: String(error)
+        };
+    }
+}
+
+async function handleDomainList() {
+    try {
+        const STORAGE_KEY = 'inspekt_allowed_domains';
+        const result = await chrome.storage.sync.get(STORAGE_KEY);
+        const allowedDomains = result[STORAGE_KEY] || {};
+
+        return {
+            ok: true,
+            domains: allowedDomains,
+            count: Object.keys(allowedDomains).length
+        };
+    } catch (error) {
+        return {
+            ok: false,
+            error: String(error)
+        };
+    }
+}
+
+async function handleDomainBypass(duration) {
+    try {
+        const TEMP_BYPASS_KEY = 'inspekt_temp_bypass';
+
+        // If duration is -1, just return current status without modifying
+        if (duration === -1) {
+            const result = await chrome.storage.sync.get(TEMP_BYPASS_KEY);
+            const bypass = result[TEMP_BYPASS_KEY];
+
+            if (!bypass || !bypass.enabled) {
+                return {
+                    ok: true,
+                    enabled: false
+                };
+            }
+
+            // Check if expired
+            const now = new Date();
+            const expiresAt = new Date(bypass.expiresAt);
+
+            if (now >= expiresAt) {
+                // Expired, remove it
+                await chrome.storage.sync.remove(TEMP_BYPASS_KEY);
+                await updateAllTabIcons();
+                return {
+                    ok: true,
+                    enabled: false
+                };
+            }
+
+            // Calculate remaining minutes
+            const remainingMs = expiresAt.getTime() - now.getTime();
+            const remainingMinutes = Math.ceil(remainingMs / (60 * 1000));
+
+            return {
+                ok: true,
+                enabled: true,
+                expiresAt: bypass.expiresAt,
+                remainingMinutes: remainingMinutes
+            };
+        }
+
+        if (duration === 0) {
+            // Disable bypass
+            await chrome.storage.sync.remove(TEMP_BYPASS_KEY);
+
+            // Update all tab icons
+            await updateAllTabIcons();
+
+            return {
+                ok: true,
+                enabled: false
+            };
+        }
+
+        const now = new Date();
+        const expiresAt = new Date(now.getTime() + duration * 60 * 1000);
+
+        const bypass = {
+            enabled: true,
+            expiresAt: expiresAt.toISOString(),
+            durationMinutes: duration
+        };
+
+        await chrome.storage.sync.set({ [TEMP_BYPASS_KEY]: bypass });
+
+        // Update all tab icons to show bypass state
+        await updateAllTabIcons();
+
+        return {
+            ok: true,
+            enabled: true,
+            expiresAt: bypass.expiresAt,
+            durationMinutes: duration,
+            remainingMinutes: duration
+        };
+    } catch (error) {
+        return {
+            ok: false,
+            error: String(error)
+        };
+    }
+}
+
+async function handleDomainSync(domains) {
+    try {
+        const STORAGE_KEY = 'inspekt_allowed_domains';
+
+        // Replace entire domain list with the one from SQLite
+        await chrome.storage.sync.set({ [STORAGE_KEY]: domains });
+
+        // Update icons for all tabs
+        await updateAllTabIcons();
+
+        return {
+            ok: true,
+            synced: Object.keys(domains).length
+        };
+    } catch (error) {
+        return {
+            ok: false,
+            error: String(error)
+        };
+    }
+}
+
+// ============================================================================
+// ICON STATE MANAGEMENT
+// ============================================================================
+
+/**
+ * Icon states for visual feedback
+ */
+const ICON_STATES = {
+    DEFAULT: 'default',
+    ALLOWED: 'allowed',
+    BYPASS: 'bypass',
+    CONNECTING: 'connecting'
+};
+
+/**
+ * Determine the appropriate icon state for a tab
+ */
+async function determineIconState(tabId, tab) {
+    try {
+        // Skip non-http(s) URLs
+        if (!tab.url || (!tab.url.startsWith('http://') && !tab.url.startsWith('https://'))) {
+            return { state: ICON_STATES.DEFAULT };
+        }
+
+        const domain = new URL(tab.url).hostname;
+
+        // 1. Check temp bypass first (highest priority)
+        const bypassStatus = await getTempBypassStatus();
+        if (bypassStatus.enabled) {
+            return {
+                state: ICON_STATES.BYPASS,
+                data: { minutes: bypassStatus.remainingMinutes }
+            };
+        }
+
+        // 2. Check if domain is allowed
+        const allowed = await checkDomainAllowed(domain);
+        if (allowed) {
+            return { state: ICON_STATES.ALLOWED };
+        }
+
+        // 3. Check connection status
+        const wsConnected = tabConnectionStatus.get(tabId);
+        if (wsConnected === 'connecting') {
+            return { state: ICON_STATES.CONNECTING };
+        }
+
+        // 4. Default state
+        return { state: ICON_STATES.DEFAULT };
+    } catch (error) {
+        console.error('[Inspekt] Error determining icon state:', error);
+        return { state: ICON_STATES.DEFAULT };
+    }
+}
+
+/**
+ * Helper to check if domain is allowed using the permission system
+ */
+async function checkDomainAllowed(domain) {
+    try {
+        const result = await chrome.storage.sync.get('inspekt_allowed_domains');
+        const allowedDomains = result['inspekt_allowed_domains'] || {};
+
+        // Check each allowed domain for match (including subdomains)
+        for (const allowedDomain of Object.keys(allowedDomains)) {
+            if (matchesDomain(domain, allowedDomain)) {
+                return true;
+            }
+        }
+
+        return false;
+    } catch (error) {
+        console.error('[Inspekt] Error checking domain:', error);
+        return false;
+    }
+}
+
+/**
+ * Helper for subdomain matching (same logic as permissions.js)
+ */
+function matchesDomain(requestedDomain, allowedDomain) {
+    if (requestedDomain === allowedDomain) {
+        return true;
+    }
+
+    if (requestedDomain.endsWith('.' + allowedDomain)) {
+        return true;
+    }
+
+    if (allowedDomain === 'localhost' && requestedDomain.startsWith('localhost:')) {
+        return true;
+    }
+
+    const requestedParts = requestedDomain.split(':');
+    const allowedParts = allowedDomain.split(':');
+    if (requestedParts[0] === allowedParts[0]) {
+        return true;
+    }
+
+    return false;
+}
+
+/**
+ * Helper to get temp bypass status
+ */
+async function getTempBypassStatus() {
+    try {
+        const result = await chrome.storage.sync.get('inspekt_temp_bypass');
+        const bypass = result['inspekt_temp_bypass'];
+
+        if (!bypass || !bypass.enabled) {
+            return { enabled: false };
+        }
+
+        const now = new Date().getTime();
+        const expiresAt = new Date(bypass.expiresAt).getTime();
+
+        if (now >= expiresAt) {
+            return { enabled: false };
+        }
+
+        const remainingMs = expiresAt - now;
+        const remainingMinutes = Math.ceil(remainingMs / (60 * 1000));
+
+        return {
+            enabled: true,
+            remainingMinutes: remainingMinutes
+        };
+    } catch (error) {
+        console.error('[Inspekt] Error getting bypass status:', error);
+        return { enabled: false };
+    }
+}
+
+/**
+ * Main function to update icon for a specific tab
+ */
+async function updateIconForTab(tabId, tab) {
+    try {
+        const { state, data } = await determineIconState(tabId, tab);
+
+        switch (state) {
+            case ICON_STATES.ALLOWED:
+                await setAllowedIcon(tabId);
+                break;
+            case ICON_STATES.BYPASS:
+                await setBypassIcon(tabId, data.minutes);
+                break;
+            case ICON_STATES.CONNECTING:
+                await setConnectingIcon(tabId);
+                break;
+            case ICON_STATES.DEFAULT:
+            default:
+                await setDefaultIcon(tabId);
+                break;
+        }
+    } catch (error) {
+        console.error('[Inspekt] Error updating icon:', error);
+    }
+}
+
+/**
+ * Update icons for all open tabs
+ */
+async function updateAllTabIcons() {
+    try {
+        const tabs = await chrome.tabs.query({});
+        for (const tab of tabs) {
+            await updateIconForTab(tab.id, tab);
+        }
+    } catch (error) {
+        console.error('[Inspekt] Error updating all icons:', error);
+    }
+}
+
+/**
+ * Set icon to "allowed" state (green checkmark)
+ */
+async function setAllowedIcon(tabId) {
+    await chrome.action.setBadgeText({ tabId, text: '✓' });
+    await chrome.action.setBadgeBackgroundColor({ tabId, color: '#00AA00' });
+}
+
+/**
+ * Set icon to "bypass" state (orange with minutes or unlock)
+ */
+async function setBypassIcon(tabId, minutes) {
+    const text = minutes > 99 ? '🔓' : String(minutes);
+    await chrome.action.setBadgeText({ tabId, text });
+    await chrome.action.setBadgeBackgroundColor({ tabId, color: '#FF9800' });
+}
+
+/**
+ * Set icon to "connecting" state (yellow with dots)
+ */
+async function setConnectingIcon(tabId) {
+    await chrome.action.setBadgeText({ tabId, text: '...' });
+    await chrome.action.setBadgeBackgroundColor({ tabId, color: '#FFEB3B' });
+}
+
+/**
+ * Set icon to default state (no badge)
+ */
+async function setDefaultIcon(tabId) {
+    await chrome.action.setBadgeText({ tabId, text: '' });
+}
+
+// Note: Screenshot processing is handled in content.js where DOM APIs are available
+// Background script only handles the raw capture via chrome.tabs.captureVisibleTab
 
 // Log extension initialization
 console.log('[Inspekt Extension] Version:', chrome.runtime.getManifest().version);

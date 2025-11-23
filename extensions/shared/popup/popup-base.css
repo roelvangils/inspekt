@@ -212,7 +212,7 @@ footer {
 
 /* Permissions Section */
 .permissions {
-    max-height: 200px;
+    max-height: 300px;
     overflow-y: auto;
 }
 
@@ -277,6 +277,62 @@ footer {
     border-color: #dc3545;
 }
 
+/* Temp Bypass Section */
+.temp-bypass-section {
+    padding: 12px;
+    background: #fff8e1;
+    border-radius: 6px;
+    margin-bottom: 12px;
+}
+
+.temp-bypass-section label {
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    color: #333;
+    margin-bottom: 8px;
+}
+
+.temp-bypass-section select {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid #e0e0e0;
+    border-radius: 4px;
+    font-size: 13px;
+    background: white;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.temp-bypass-section select:hover {
+    border-color: #0066ff;
+}
+
+.temp-bypass-section select:focus {
+    outline: none;
+    border-color: #0066ff;
+    box-shadow: 0 0 0 3px rgba(0, 102, 255, 0.1);
+}
+
+.bypass-status {
+    margin-top: 8px;
+    padding: 8px 12px;
+    background: #ffc107;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #333;
+    text-align: center;
+}
+
+.bypass-status.hidden {
+    display: none;
+}
+
+.bypass-status span {
+    font-weight: 700;
+}
+
 .domains-list {
     display: flex;
     flex-direction: column;
@@ -292,10 +348,21 @@ footer {
     border-radius: 6px;
 }
 
+.domain-item .domain-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
 .domain-item .domain-name {
     font-size: 13px;
     color: #333;
     font-weight: 500;
+}
+
+.domain-item .domain-date {
+    font-size: 11px;
+    color: #666;
 }
 
 .domain-item button {

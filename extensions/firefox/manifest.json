@@ -1,7 +1,7 @@
 {
   "manifest_version": 2,
   "name": "Inspekt",
-  "version": "4.2.1",
+  "version": "4.3.1",
   "description": "Execute JavaScript in your browser from the command line. Works on all websites, bypasses CSP restrictions.",
 
   "icons": {
@@ -29,6 +29,7 @@
         "shared/core/permissions.js",
         "shared/core/websocket-client.js",
         "shared/core/message-bridge.js",
+        "shared/modules/hidden-elements.js",
         "content.js"
       ],
       "run_at": "document_idle",
@@ -42,8 +43,13 @@
       "48": "icons/icon-48.png"
     },
     "default_title": "Inspekt",
-    "default_popup": "popup/popup.html"
+    "default_popup": "shared/popup/popup-base.html"
   },
+
+  "web_accessible_resources": [
+    "css/material-icons.css",
+    "fonts/material-icons.woff2"
+  ],
 
   "browser_specific_settings": {
     "gecko": {

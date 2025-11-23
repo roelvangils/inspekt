@@ -33,6 +33,12 @@ const InspektWebSocketClient = (() => {
         isConnected = connected;
         if (typeof window !== 'undefined') {
             window.__INSPEKT_WS_CONNECTED__ = connected;
+
+            // Dispatch custom event for content script to update MAIN world
+            // (Firefox needs this because tabs.executeScript reads from page context)
+            window.dispatchEvent(new CustomEvent('__inspekt_ws_status_change__', {
+                detail: connected
+            }));
         }
     }
 
@@ -118,6 +124,43 @@ const InspektWebSocketClient = (() => {
                 const requestId = message.request_id;
                 const code = message.code;
 
+                // Check domain authorization before executing code
+                const permModule = typeof ZenPermissions !== 'undefined' ? ZenPermissions :
+                                   (typeof InspektPermissions !== 'undefined' ? InspektPermissions : null);
+
+                if (!permModule) {
+                    ws.send(JSON.stringify({
+                        type: 'result',
+                        request_id: requestId,
+                        ok: false,
+                        result: null,
+                        error: 'Permission system not available',
+                        url: location.href,
+                        title: document.title || ''
+                    }));
+                    return;
+                }
+
+                const allowed = await permModule.isAllowed();
+                if (!allowed) {
+                    // Extract domain from current URL
+                    const currentDomain = location.hostname;
+
+                    // Create helpful error message with specific domain
+                    const errorMessage = `Sorry, I'm not allowed to access this domain. To add this domain permanently, use the following command:\n\ninspekt domain add ${currentDomain}\n\nAlternatively, you can temporarily allow all domains with this command:\n\ninspekt domain bypass [DURATION IN MINUTES]`;
+
+                    ws.send(JSON.stringify({
+                        type: 'result',
+                        request_id: requestId,
+                        ok: false,
+                        result: null,
+                        error: errorMessage,
+                        url: location.href,
+                        title: document.title || ''
+                    }));
+                    return;
+                }
+
                 try {
                     // Send to background script for CSP bypass execution
                     const runtimeAPI = typeof chrome !== 'undefined' ? chrome.runtime : browser.runtime;
@@ -152,6 +195,125 @@ const InspektWebSocketClient = (() => {
 
             } else if (message.type === 'pong') {
                 // Keepalive response
+
+            } else if (message.type === 'DOMAIN_ADD') {
+                // Forward domain add request to background script
+                const runtimeAPI = typeof chrome !== 'undefined' ? chrome.runtime : browser.runtime;
+                try {
+                    const response = await runtimeAPI.sendMessage({
+                        type: 'DOMAIN_ADD',
+                        domain: message.domain
+                    });
+
+                    // Send response back via WebSocket
+                    ws.send(JSON.stringify({
+                        type: 'response',
+                        requestId: message.requestId,
+                        response: response
+                    }));
+                } catch (err) {
+                    console.error('[Inspekt] Error handling DOMAIN_ADD:', err);
+                    ws.send(JSON.stringify({
+                        type: 'response',
+                        requestId: message.requestId,
+                        response: { ok: false, error: String(err) }
+                    }));
+                }
+
+            } else if (message.type === 'DOMAIN_REMOVE') {
+                // Forward domain remove request to background script
+                const runtimeAPI = typeof chrome !== 'undefined' ? chrome.runtime : browser.runtime;
+                try {
+                    const response = await runtimeAPI.sendMessage({
+                        type: 'DOMAIN_REMOVE',
+                        domain: message.domain
+                    });
+
+                    // Send response back via WebSocket
+                    ws.send(JSON.stringify({
+                        type: 'response',
+                        requestId: message.requestId,
+                        response: response
+                    }));
+                } catch (err) {
+                    console.error('[Inspekt] Error handling DOMAIN_REMOVE:', err);
+                    ws.send(JSON.stringify({
+                        type: 'response',
+                        requestId: message.requestId,
+                        response: { ok: false, error: String(err) }
+                    }));
+                }
+
+            } else if (message.type === 'DOMAIN_LIST') {
+                // Forward domain list request to background script
+                const runtimeAPI = typeof chrome !== 'undefined' ? chrome.runtime : browser.runtime;
+                try {
+                    const response = await runtimeAPI.sendMessage({
+                        type: 'DOMAIN_LIST'
+                    });
+
+                    // Send response back via WebSocket
+                    ws.send(JSON.stringify({
+                        type: 'response',
+                        requestId: message.requestId,
+                        response: response
+                    }));
+                } catch (err) {
+                    console.error('[Inspekt] Error handling DOMAIN_LIST:', err);
+                    ws.send(JSON.stringify({
+                        type: 'response',
+                        requestId: message.requestId,
+                        response: { ok: false, error: String(err) }
+                    }));
+                }
+
+            } else if (message.type === 'DOMAIN_BYPASS') {
+                // Forward domain bypass request to background script
+                const runtimeAPI = typeof chrome !== 'undefined' ? chrome.runtime : browser.runtime;
+                try {
+                    const response = await runtimeAPI.sendMessage({
+                        type: 'DOMAIN_BYPASS',
+                        duration: message.duration
+                    });
+
+                    // Send response back via WebSocket
+                    ws.send(JSON.stringify({
+                        type: 'response',
+                        requestId: message.requestId,
+                        response: response
+                    }));
+                } catch (err) {
+                    console.error('[Inspekt] Error handling DOMAIN_BYPASS:', err);
+                    ws.send(JSON.stringify({
+                        type: 'response',
+                        requestId: message.requestId,
+                        response: { ok: false, error: String(err) }
+                    }));
+                }
+
+            } else if (message.type === 'SYNC_ALLOWED_DOMAINS') {
+                // Forward domain sync request to background script
+                const runtimeAPI = typeof chrome !== 'undefined' ? chrome.runtime : browser.runtime;
+                try {
+                    const response = await runtimeAPI.sendMessage({
+                        type: 'SYNC_ALLOWED_DOMAINS',
+                        domains: message.domains
+                    });
+
+                    // Send response back via WebSocket
+                    ws.send(JSON.stringify({
+                        type: 'response',
+                        requestId: message.requestId,
+                        response: response
+                    }));
+                } catch (err) {
+                    console.error('[Inspekt] Error handling SYNC_ALLOWED_DOMAINS:', err);
+                    ws.send(JSON.stringify({
+                        type: 'response',
+                        requestId: message.requestId,
+                        response: { ok: false, error: String(err) }
+                    }));
+                }
             }
 
         } catch (err) {
@@ -223,21 +385,13 @@ const InspektWebSocketClient = (() => {
     }
 
     /**
-     * Initialize connection with domain check
+     * Initialize WebSocket connection
+     * Note: Connection is always established, but code execution requires domain authorization
      */
     async function initialize() {
         if (isFrontTab()) {
-            // Check if domain is allowed (will show opt-in modal if not)
-            const allowed = await (typeof ZenPermissions !== 'undefined' ?
-                ZenPermissions.checkAndRequest() :
-                (typeof InspektPermissions !== 'undefined' ? InspektPermissions.checkAndRequest() : false));
-
-            if (allowed) {
-                console.log('[Inspekt] Domain authorized, connecting...');
-                connect();
-            } else {
-                console.log('[Inspekt] Domain not authorized. Connection blocked.');
-            }
+            console.log('[Inspekt] Initializing WebSocket connection...');
+            connect();
         }
     }
 
@@ -246,16 +400,9 @@ const InspektWebSocketClient = (() => {
      */
     document.addEventListener('visibilitychange', async () => {
         if (document.visibilityState === 'visible' && window === window.top) {
-            // Tab became visible - connect if needed and domain is allowed
+            // Tab became visible - reconnect if needed
             if (!ws || ws.readyState !== WebSocket.OPEN) {
-                const permModule = typeof ZenPermissions !== 'undefined' ? ZenPermissions :
-                                   (typeof InspektPermissions !== 'undefined' ? InspektPermissions : null);
-                if (permModule) {
-                    const allowed = await permModule.isAllowed();
-                    if (allowed) {
-                        connect();
-                    }
-                }
+                connect();
             }
         } else if (document.visibilityState === 'hidden') {
             // Tab became hidden - disconnect to save resources

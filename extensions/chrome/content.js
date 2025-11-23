@@ -62,6 +62,52 @@
                 }, '*');
             }
         }
+
+        // Handle CAPTURE_SCREENSHOT requests from MAIN world
+        if (message && message.type === 'INSPEKT_CAPTURE_SCREENSHOT' && message.source === 'inspekt-page') {
+            try {
+                const mode = message.mode;
+                const options = message.options;
+
+                // Capture screenshot using background script
+                const captureResponse = await chrome.runtime.sendMessage({
+                    type: 'CAPTURE_VISIBLE_TAB'
+                });
+
+                if (!captureResponse || !captureResponse.ok) {
+                    throw new Error(captureResponse?.error || 'Failed to capture screenshot');
+                }
+
+                // Process the screenshot in content script (where DOM APIs are available)
+                let result;
+                if (mode === 'node') {
+                    result = await processNodeScreenshot(captureResponse.dataUrl, options);
+                } else if (mode === 'viewport') {
+                    result = await processViewportScreenshot(captureResponse.dataUrl, options);
+                } else {
+                    throw new Error(`Invalid mode: ${mode}`);
+                }
+
+                // Send response back to MAIN world
+                window.postMessage({
+                    type: 'INSPEKT_SCREENSHOT_RESPONSE',
+                    source: 'inspekt-extension',
+                    requestId: message.requestId,
+                    response: result
+                }, '*');
+            } catch (error) {
+                // Send error back to MAIN world
+                window.postMessage({
+                    type: 'INSPEKT_SCREENSHOT_RESPONSE',
+                    source: 'inspekt-extension',
+                    requestId: message.requestId,
+                    response: {
+                        ok: false,
+                        error: String(error)
+                    }
+                }, '*');
+            }
+        }
     });
 
     const WS_URL = 'ws://127.0.0.1:8766/ws';
@@ -134,8 +180,11 @@
                         message.code.includes('orange') &&
                         message.code.includes('overlay');
 
-                    // Skip visibility check for identify commands and pong responses
-                    if (!isFrontTab() && !isIdentifyCommand && message.type !== 'pong') {
+                    // Domain management should work regardless of tab visibility
+                    const isDomainManagement = ['DOMAIN_ADD', 'DOMAIN_REMOVE', 'DOMAIN_LIST', 'DOMAIN_BYPASS'].includes(message.type);
+
+                    // Skip visibility check for identify commands, pong responses, and domain management
+                    if (!isFrontTab() && !isIdentifyCommand && !isDomainManagement && message.type !== 'pong') {
                         console.log('[Inspekt] Message dropped - tab not visible/active:', message.type);
                         return;
                     }
@@ -181,6 +230,89 @@
 
                     } else if (message.type === 'pong') {
                         // Keepalive response
+
+                    } else if (message.type === 'DOMAIN_ADD') {
+                        try {
+                            const response = await chrome.runtime.sendMessage({
+                                type: 'DOMAIN_ADD',
+                                domain: message.domain
+                            });
+
+                            ws.send(JSON.stringify({
+                                type: 'response',
+                                requestId: message.requestId,
+                                response: response
+                            }));
+                        } catch (err) {
+                            console.error('[Inspekt] DOMAIN_ADD error:', err);
+                            ws.send(JSON.stringify({
+                                type: 'response',
+                                requestId: message.requestId,
+                                response: { ok: false, error: err.message }
+                            }));
+                        }
+
+                    } else if (message.type === 'DOMAIN_REMOVE') {
+                        try {
+                            const response = await chrome.runtime.sendMessage({
+                                type: 'DOMAIN_REMOVE',
+                                domain: message.domain
+                            });
+
+                            ws.send(JSON.stringify({
+                                type: 'response',
+                                requestId: message.requestId,
+                                response: response
+                            }));
+                        } catch (err) {
+                            console.error('[Inspekt] DOMAIN_REMOVE error:', err);
+                            ws.send(JSON.stringify({
+                                type: 'response',
+                                requestId: message.requestId,
+                                response: { ok: false, error: err.message }
+                            }));
+                        }
+
+                    } else if (message.type === 'DOMAIN_LIST') {
+                        try {
+                            const response = await chrome.runtime.sendMessage({
+                                type: 'DOMAIN_LIST'
+                            });
+
+                            ws.send(JSON.stringify({
+                                type: 'response',
+                                requestId: message.requestId,
+                                response: response
+                            }));
+                        } catch (err) {
+                            console.error('[Inspekt] DOMAIN_LIST error:', err);
+                            ws.send(JSON.stringify({
+                                type: 'response',
+                                requestId: message.requestId,
+                                response: { ok: false, error: err.message }
+                            }));
+                        }
+
+                    } else if (message.type === 'DOMAIN_BYPASS') {
+                        try {
+                            const response = await chrome.runtime.sendMessage({
+                                type: 'DOMAIN_BYPASS',
+                                duration: message.duration
+                            });
+
+                            ws.send(JSON.stringify({
+                                type: 'response',
+                                requestId: message.requestId,
+                                response: response
+                            }));
+                        } catch (err) {
+                            console.error('[Inspekt] DOMAIN_BYPASS error:', err);
+                            ws.send(JSON.stringify({
+                                type: 'response',
+                                requestId: message.requestId,
+                                response: { ok: false, error: err.message }
+                            }));
+                        }
                     }
 
                 } catch (err) {
@@ -440,5 +572,220 @@
             return true;
         }
     });
+
+    //=============================================================================
+    // Screenshot Processing Functions (DOM APIs available in content script)
+    //=============================================================================
+
+    /**
+     * Process node screenshot with cropping and options
+     */
+    async function processNodeScreenshot(dataUrl, options) {
+        const {
+            bounds,
+            selector,
+            tagName,
+            margin = 0,
+            marginColor = 'auto',
+            scale = 2,
+            quality = 0.92,
+            format = 'png'
+        } = options;
+
+        return cropImageWithOptions(dataUrl, bounds, {
+            margin,
+            marginColor,
+            scale,
+            quality,
+            format,
+            selector,
+            tagName
+        });
+    }
+
+    /**
+     * Process viewport screenshot with options
+     */
+    async function processViewportScreenshot(dataUrl, options) {
+        const {
+            margin = 0,
+            marginColor = 'auto',
+            scale = 2,
+            quality = 0.92,
+            format = 'png'
+        } = options;
+
+        return processImage(dataUrl, {
+            margin,
+            marginColor,
+            scale,
+            quality,
+            format
+        });
+    }
+
+    /**
+     * Crop image to element bounds with options
+     */
+    async function cropImageWithOptions(dataUrl, rect, options) {
+        const {
+            margin = 0,
+            marginColor = 'auto',
+            scale = 2,
+            quality = 0.92,
+            format = 'png',
+            selector = '',
+            tagName = ''
+        } = options;
+
+        return new Promise((resolve, reject) => {
+            const img = new Image();
+
+            img.onload = () => {
+                try {
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+
+                    const dpr = rect.devicePixelRatio || window.devicePixelRatio || 1;
+
+                    // Calculate source coordinates
+                    const sourceX = rect.x * dpr;
+                    const sourceY = rect.y * dpr;
+                    const sourceWidth = rect.width * dpr;
+                    const sourceHeight = rect.height * dpr;
+
+                    // Calculate canvas size with margin
+                    const marginScaled = margin * scale;
+                    canvas.width = (rect.width * scale) + (marginScaled * 2);
+                    canvas.height = (rect.height * scale) + (marginScaled * 2);
+
+                    // Determine background color
+                    let bgColor = '#ffffff';
+                    if (marginColor === 'auto') {
+                        const tempCanvas = document.createElement('canvas');
+                        const tempCtx = tempCanvas.getContext('2d');
+                        tempCanvas.width = 1;
+                        tempCanvas.height = 1;
+                        tempCtx.drawImage(img, sourceX, sourceY, 1, 1, 0, 0, 1, 1);
+                        const pixelData = tempCtx.getImageData(0, 0, 1, 1).data;
+                        if (pixelData[3] > 0) {
+                            bgColor = `rgb(${pixelData[0]}, ${pixelData[1]}, ${pixelData[2]})`;
+                        }
+                    } else {
+                        bgColor = marginColor;
+                    }
+
+                    // Fill with background
+                    ctx.fillStyle = bgColor;
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                    // Draw image
+                    ctx.drawImage(
+                        img,
+                        sourceX, sourceY, sourceWidth, sourceHeight,
+                        marginScaled, marginScaled,
+                        rect.width * scale, rect.height * scale
+                    );
+
+                    // Convert to format
+                    const mimeType = format === 'jpg' ? 'image/jpeg' :
+                                   format === 'webp' ? 'image/webp' : 'image/png';
+                    const outputDataUrl = canvas.toDataURL(mimeType, quality);
+
+                    // Calculate file size
+                    const base64Data = outputDataUrl.split(',')[1];
+                    const fileSize = Math.round((base64Data.length * 3) / 4);
+
+                    resolve({
+                        ok: true,
+                        dataUrl: outputDataUrl,
+                        width: canvas.width,
+                        height: canvas.height,
+                        fileSize: fileSize,
+                        selector: selector,
+                        tagName: tagName
+                    });
+                } catch (error) {
+                    reject(new Error(`Failed to crop image: ${error.message}`));
+                }
+            };
+
+            img.onerror = () => reject(new Error('Failed to load source image'));
+            img.src = dataUrl;
+        });
+    }
+
+    /**
+     * Process image with margin, scale, format
+     */
+    async function processImage(dataUrl, options) {
+        const {
+            margin = 0,
+            marginColor = 'auto',
+            scale = 1,
+            quality = 0.92,
+            format = 'png'
+        } = options;
+
+        return new Promise((resolve, reject) => {
+            const img = new Image();
+
+            img.onload = () => {
+                try {
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+
+                    const marginScaled = margin * scale;
+                    canvas.width = (img.width * scale) + (marginScaled * 2);
+                    canvas.height = (img.height * scale) + (marginScaled * 2);
+
+                    let bgColor = '#ffffff';
+                    if (marginColor === 'auto' && margin > 0) {
+                        const tempCanvas = document.createElement('canvas');
+                        const tempCtx = tempCanvas.getContext('2d');
+                        tempCanvas.width = 1;
+                        tempCanvas.height = 1;
+                        tempCtx.drawImage(img, 0, 0, 1, 1, 0, 0, 1, 1);
+                        const pixelData = tempCtx.getImageData(0, 0, 1, 1).data;
+                        if (pixelData[3] > 0) {
+                            bgColor = `rgb(${pixelData[0]}, ${pixelData[1]}, ${pixelData[2]})`;
+                        }
+                    } else if (marginColor !== 'auto') {
+                        bgColor = marginColor;
+                    }
+
+                    ctx.fillStyle = bgColor;
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                    ctx.drawImage(
+                        img,
+                        0, 0, img.width, img.height,
+                        marginScaled, marginScaled,
+                        img.width * scale, img.height * scale
+                    );
+
+                    const mimeType = format === 'jpg' ? 'image/jpeg' :
+                                   format === 'webp' ? 'image/webp' : 'image/png';
+                    const outputDataUrl = canvas.toDataURL(mimeType, quality);
+
+                    const base64Data = outputDataUrl.split(',')[1];
+                    const fileSize = Math.round((base64Data.length * 3) / 4);
+
+                    resolve({
+                        ok: true,
+                        dataUrl: outputDataUrl,
+                        width: canvas.width,
+                        height: canvas.height,
+                        fileSize: fileSize
+                    });
+                } catch (error) {
+                    reject(new Error(`Failed to process image: ${error.message}`));
+                }
+            };
+
+            img.onerror = () => reject(new Error('Failed to load source image'));
+            img.src = dataUrl;
+        });
+    }
 
 })();

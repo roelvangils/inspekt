@@ -447,6 +447,54 @@ body {
 
 .section-header h2 {
     margin-bottom: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* Pick Element Button */
+.pick-element-btn {
+    width: 32px;
+    height: 32px;
+    border: none;
+    background: light-dark(#0066ff, #4d94ff);
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    box-shadow: 0 2px 4px light-dark(rgba(0, 102, 255, 0.2), rgba(77, 148, 255, 0.3));
+}
+
+.pick-element-btn .material-icons {
+    font-size: 18px;
+    color: white;
+    transition: opacity 0.2s;
+}
+
+.pick-element-btn:hover {
+    background: light-dark(#0052cc, #66a3ff);
+    transform: scale(1.05);
+    box-shadow: 0 4px 8px light-dark(rgba(0, 102, 255, 0.3), rgba(77, 148, 255, 0.4));
+}
+
+.pick-element-btn:active {
+    transform: scale(0.95);
+}
+
+/* Dimmed state when element is selected */
+.pick-element-btn.dimmed {
+    background: light-dark(#cbd5e1, #475569);
+    box-shadow: 0 1px 2px light-dark(rgba(0, 0, 0, 0.1), rgba(0, 0, 0, 0.3));
+}
+
+.pick-element-btn.dimmed .material-icons {
+    opacity: 0.5;
+}
+
+.pick-element-btn.dimmed:hover {
+    background: light-dark(#94a3b8, #64748b);
 }
 
 .manage-btn {
