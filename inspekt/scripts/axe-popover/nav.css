@@ -1,0 +1,181 @@
+/**
+ * Navigation Bar - prev/next, counter, skip similar, detach, close
+ */
+
+.inspekt-axe-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  min-height: 40px;
+  padding: var(--space-md) var(--space-lg);
+  background: rgba(31, 41, 55, 0.9);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+}
+
+/* Button Groups */
+.inspekt-axe-nav__group {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  flex-shrink: 0;
+}
+
+/* Drag Handle */
+.inspekt-axe-nav__drag-handle {
+  display: none;
+}
+
+.inspekt-axe-popover--detached .inspekt-axe-nav__drag-handle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: 2px var(--space-sm);
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.05);
+  cursor: grab;
+}
+
+.inspekt-axe-nav__grip {
+  display: flex;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.inspekt-axe-nav__drag-label {
+  font-size: 9px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.5);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  user-select: none;
+}
+
+/* Counter */
+.inspekt-axe-nav__counter {
+  min-width: 36px;
+  padding: 0 2px;
+  text-align: center;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+/* Icon Buttons */
+.inspekt-axe-nav__prev,
+.inspekt-axe-nav__next,
+.inspekt-axe-nav__detach,
+.inspekt-axe-nav__close {
+  width: var(--nav-button-size);
+  height: var(--nav-button-size);
+  padding: 0;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--radius-md);
+  color: rgba(255, 255, 255, 0.85);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+
+  &:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.15);
+    border-color: rgba(255, 255, 255, 0.25);
+    color: white;
+  }
+
+  &:active:not(:disabled) {
+    transform: scale(0.95);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--blue-light);
+    outline-offset: 2px;
+  }
+
+  &:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+  }
+}
+
+/* Close Button - specific overrides */
+.inspekt-axe-nav__close {
+  border-radius: 50%;
+  background: rgba(239, 68, 68, 0.15);
+  border-color: rgba(239, 68, 68, 0.25);
+  color: #fca5a5;
+
+  &:hover {
+    background: rgba(239, 68, 68, 0.3);
+    border-color: rgba(239, 68, 68, 0.5);
+    color: #fef2f2;
+  }
+}
+
+/* Skip Similar Button */
+.inspekt-axe-nav__skip-similar {
+  height: var(--nav-button-size);
+  padding: 0 var(--space-md);
+  flex-shrink: 0;
+  white-space: nowrap;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--radius-md);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.85);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.15);
+    border-color: rgba(255, 255, 255, 0.25);
+    color: white;
+  }
+
+  &:active {
+    transform: scale(0.97);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--blue-light);
+    outline-offset: 2px;
+  }
+}
+
+.inspekt-axe-nav__skip-similar--active {
+  background: var(--blue);
+  border-color: var(--blue);
+  color: white;
+
+  &:hover {
+    background: #1d4ed8;
+    border-color: #1d4ed8;
+  }
+}
+
+/* Detach Active */
+.inspekt-axe-nav__detach--active {
+  background: var(--green);
+  border-color: var(--green);
+  color: white;
+
+  &:hover {
+    background: #059669;
+    border-color: #059669;
+  }
+}
+
+/* Cursor when detached */
+.inspekt-axe-popover--detached .inspekt-axe-nav {
+  cursor: grab;
+}
+
+.inspekt-axe-popover--dragging .inspekt-axe-nav {
+  cursor: grabbing !important;
+}

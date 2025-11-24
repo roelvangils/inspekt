@@ -1,0 +1,270 @@
+/**
+ * Animations - Entrance and exit keyframes
+ */
+
+/* Base Entrance */
+@keyframes popoverFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Exit Animations */
+@keyframes popoverExitUp {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(calc(-1 * var(--animation-distance)));
+  }
+}
+
+@keyframes popoverExitDown {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(var(--animation-distance));
+  }
+}
+
+@keyframes popoverExitLeft {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(calc(-1 * var(--animation-distance)));
+  }
+}
+
+@keyframes popoverExitRight {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(var(--animation-distance));
+  }
+}
+
+@keyframes popoverExitUpLeft {
+  from {
+    opacity: 1;
+    transform: translate(0, 0);
+  }
+  to {
+    opacity: 0;
+    transform: translate(
+      calc(-1 * var(--animation-distance)),
+      calc(-1 * var(--animation-distance))
+    );
+  }
+}
+
+@keyframes popoverExitUpRight {
+  from {
+    opacity: 1;
+    transform: translate(0, 0);
+  }
+  to {
+    opacity: 0;
+    transform: translate(
+      var(--animation-distance),
+      calc(-1 * var(--animation-distance))
+    );
+  }
+}
+
+@keyframes popoverExitDownLeft {
+  from {
+    opacity: 1;
+    transform: translate(0, 0);
+  }
+  to {
+    opacity: 0;
+    transform: translate(
+      calc(-1 * var(--animation-distance)),
+      var(--animation-distance)
+    );
+  }
+}
+
+@keyframes popoverExitDownRight {
+  from {
+    opacity: 1;
+    transform: translate(0, 0);
+  }
+  to {
+    opacity: 0;
+    transform: translate(var(--animation-distance), var(--animation-distance));
+  }
+}
+
+/* Entry Animations */
+@keyframes popoverEnterFromUp {
+  from {
+    opacity: 0;
+    transform: translateY(calc(-1 * var(--animation-distance)));
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes popoverEnterFromDown {
+  from {
+    opacity: 0;
+    transform: translateY(var(--animation-distance));
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes popoverEnterFromLeft {
+  from {
+    opacity: 0;
+    transform: translateX(calc(-1 * var(--animation-distance)));
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes popoverEnterFromRight {
+  from {
+    opacity: 0;
+    transform: translateX(var(--animation-distance));
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes popoverEnterFromUpLeft {
+  from {
+    opacity: 0;
+    transform: translate(
+      calc(-1 * var(--animation-distance)),
+      calc(-1 * var(--animation-distance))
+    );
+  }
+  to {
+    opacity: 1;
+    transform: translate(0, 0);
+  }
+}
+
+@keyframes popoverEnterFromUpRight {
+  from {
+    opacity: 0;
+    transform: translate(
+      var(--animation-distance),
+      calc(-1 * var(--animation-distance))
+    );
+  }
+  to {
+    opacity: 1;
+    transform: translate(0, 0);
+  }
+}
+
+@keyframes popoverEnterFromDownLeft {
+  from {
+    opacity: 0;
+    transform: translate(
+      calc(-1 * var(--animation-distance)),
+      var(--animation-distance)
+    );
+  }
+  to {
+    opacity: 1;
+    transform: translate(0, 0);
+  }
+}
+
+@keyframes popoverEnterFromDownRight {
+  from {
+    opacity: 0;
+    transform: translate(var(--animation-distance), var(--animation-distance));
+  }
+  to {
+    opacity: 1;
+    transform: translate(0, 0);
+  }
+}
+
+/* Animation Classes */
+[popover].inspekt-axe-popover {
+  /* Exit */
+  &.exit-up {
+    animation: popoverExitUp var(--animation-duration) ease-out forwards;
+  }
+  &.exit-down {
+    animation: popoverExitDown var(--animation-duration) ease-out forwards;
+  }
+  &.exit-left {
+    animation: popoverExitLeft var(--animation-duration) ease-out forwards;
+  }
+  &.exit-right {
+    animation: popoverExitRight var(--animation-duration) ease-out forwards;
+  }
+  &.exit-up-left {
+    animation: popoverExitUpLeft var(--animation-duration) ease-out forwards;
+  }
+  &.exit-up-right {
+    animation: popoverExitUpRight var(--animation-duration) ease-out forwards;
+  }
+  &.exit-down-left {
+    animation: popoverExitDownLeft var(--animation-duration) ease-out forwards;
+  }
+  &.exit-down-right {
+    animation: popoverExitDownRight var(--animation-duration) ease-out forwards;
+  }
+
+  /* Entry */
+  &.enter-from-up {
+    animation: popoverEnterFromUp var(--animation-duration) ease-out forwards;
+  }
+  &.enter-from-down {
+    animation: popoverEnterFromDown var(--animation-duration) ease-out forwards;
+  }
+  &.enter-from-left {
+    animation: popoverEnterFromLeft var(--animation-duration) ease-out forwards;
+  }
+  &.enter-from-right {
+    animation: popoverEnterFromRight var(--animation-duration) ease-out forwards;
+  }
+  &.enter-from-up-left {
+    animation: popoverEnterFromUpLeft var(--animation-duration) ease-out
+      forwards;
+  }
+  &.enter-from-up-right {
+    animation: popoverEnterFromUpRight var(--animation-duration) ease-out
+      forwards;
+  }
+  &.enter-from-down-left {
+    animation: popoverEnterFromDownLeft var(--animation-duration) ease-out
+      forwards;
+  }
+  &.enter-from-down-right {
+    animation: popoverEnterFromDownRight var(--animation-duration) ease-out
+      forwards;
+  }
+}

@@ -1,0 +1,27 @@
+/**
+ * Interactive Badges - Clickable violation markers on the page
+ */
+
+button.inspekt-axe-badge {
+  pointer-events: auto;
+  cursor: pointer;
+  border: 2px solid white;
+  background: inherit;
+  transition: transform var(--transition-fast),
+    box-shadow var(--transition-fast);
+
+  &:hover {
+    transform: scale(1.1);
+    box-shadow: var(--shadow-badge);
+  }
+
+  &:focus-visible {
+    outline: 3px solid var(--color-primary);
+    outline-offset: 2px;
+    transform: scale(1.1);
+  }
+
+  &:active {
+    transform: scale(0.95);
+  }
+}

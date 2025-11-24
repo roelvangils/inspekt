@@ -1,0 +1,101 @@
+/**
+ * Base - Popover container and anchor positioning
+ */
+
+[popover].inspekt-axe-popover {
+  /* Reset */
+  position: absolute;
+  margin: 0;
+  inset: unset;
+
+  /* Anchor Positioning */
+  position-area: block-end span-inline-end;
+  position-try-fallbacks: --bottom-left, --top-right, --top-left, flip-block, flip-inline;
+
+  /* Sizing */
+  max-width: var(--popover-max-width);
+  min-width: var(--popover-min-width);
+  max-height: var(--popover-max-height);
+  width: max-content;
+
+  /* Appearance */
+  background: var(--color-bg);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-popover);
+  backdrop-filter: var(--blur-popover);
+  -webkit-backdrop-filter: var(--blur-popover);
+
+  /* Typography */
+  font-family: var(--font-sans);
+  font-size: var(--text-lg);
+  line-height: 1.5;
+  color: var(--color-text);
+
+  /* Behavior */
+  padding: 0;
+  overflow: hidden;
+  overscroll-behavior: contain;
+  transition: opacity var(--transition-base), box-shadow var(--transition-base);
+
+  &:popover-open {
+    animation: popoverFadeIn var(--animation-duration) ease-out;
+  }
+}
+
+/* Position Fallbacks */
+@position-try --bottom-left {
+  position-area: block-end span-inline-start;
+}
+
+@position-try --top-right {
+  position-area: block-start span-inline-end;
+}
+
+@position-try --top-left {
+  position-area: block-start span-inline-start;
+}
+
+/* Detached State */
+[popover].inspekt-axe-popover--detached {
+  position: fixed;
+  position-anchor: unset;
+  position-area: unset;
+  position-try-fallbacks: unset;
+  inset: unset;
+  border-color: var(--green);
+  box-shadow: 0 25px 70px rgba(0, 0, 0, 0.15), 0 10px 25px rgba(0, 0, 0, 0.1);
+}
+
+/* Dragging State */
+[popover].inspekt-axe-popover--dragging {
+  cursor: grabbing !important;
+  user-select: none;
+  opacity: 0.5 !important;
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.2), 0 12px 30px rgba(0, 0, 0, 0.15) !important;
+
+  & * {
+    cursor: grabbing !important;
+    user-select: none;
+  }
+}
+
+/* Scrollbar */
+.inspekt-axe-popover__body {
+  &::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: var(--gray-50);
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: var(--gray-300);
+    border-radius: var(--radius-sm);
+
+    &:hover {
+      background: var(--gray-400);
+    }
+  }
+}

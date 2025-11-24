@@ -1,0 +1,14 @@
+/**
+ * Inspekt Axe Popover Styles
+ *
+ * Modular CSS for accessibility violation popovers.
+ * Edit tokens.css to customize colors, spacing, and typography.
+ */
+
+@import url("tokens.css");
+@import url("base.css");
+@import url("nav.css");
+@import url("content.css");
+@import url("badges.css");
+@import url("animations.css");
+@import url("themes.css");

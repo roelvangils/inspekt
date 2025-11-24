@@ -1,0 +1,185 @@
+/**
+ * Themes - Dark mode and high contrast overrides
+ */
+
+/* High Contrast Mode */
+@media (prefers-contrast: high) {
+  [popover].inspekt-axe-popover {
+    border: 2px solid currentColor;
+  }
+
+  .inspekt-axe-popover__impact-badge {
+    border: 1px solid white;
+  }
+}
+
+/* Dark Mode */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-text: var(--gray-50);
+    --color-text-muted: var(--gray-400);
+    --color-bg: rgba(31, 41, 55, 0.75);
+    --color-bg-subtle: var(--gray-900);
+    --color-border: var(--gray-700);
+
+    /* Status colors */
+    --green-bg: #14532d;
+    --red-bg: #7f1d1d;
+    --blue-bg: #1e3a5f;
+  }
+
+  .inspekt-axe-popover__header {
+    border-bottom-color: var(--gray-700);
+  }
+
+  /* Tabs */
+  .inspekt-axe-popover__tablist {
+    border-bottom-color: var(--gray-700);
+    background: rgba(17, 24, 39, 0.5);
+  }
+
+  .inspekt-axe-popover__tab {
+    color: var(--gray-400);
+
+    &:hover {
+      color: var(--gray-300);
+      background: rgba(255, 255, 255, 0.05);
+    }
+  }
+
+  .inspekt-axe-popover__tab--active {
+    color: var(--blue-light);
+    border-bottom-color: var(--blue-light);
+    background: rgba(31, 41, 55, 0.5);
+  }
+
+  .inspekt-axe-popover__markdown-textarea {
+    color: var(--gray-200);
+    background: var(--gray-800);
+  }
+
+  /* Details */
+  .inspekt-axe-popover__details {
+    & summary {
+      background: var(--gray-900);
+      color: var(--gray-200);
+
+      &::before {
+        color: var(--gray-400);
+      }
+
+      &:hover {
+        background: var(--gray-800);
+      }
+    }
+  }
+
+  .inspekt-axe-popover__details-content {
+    background: var(--gray-800);
+  }
+
+  /* Check items */
+  .inspekt-axe-popover__check-item {
+    background: var(--gray-900);
+    border-left-color: var(--gray-600);
+    color: var(--gray-300);
+  }
+
+  /* Failure summary */
+  .inspekt-axe-popover__failure-summary {
+    color: #fecaca;
+  }
+
+  /* Tags */
+  .inspekt-axe-popover__tag {
+    background: var(--gray-700);
+    border-color: var(--gray-600);
+    color: var(--gray-300);
+  }
+
+  .inspekt-axe-popover__tag--wcag {
+    background: var(--blue-bg);
+    border-color: var(--blue);
+    color: #93c5fd;
+  }
+
+  /* Selector */
+  .inspekt-axe-popover__selector {
+    background: var(--blue-bg);
+    border-color: var(--blue);
+    color: #93c5fd;
+  }
+
+  /* Footer */
+  .inspekt-axe-popover__footer {
+    border-top-color: var(--gray-700);
+    background: rgba(17, 24, 39, 0.5);
+  }
+
+  /* Scrollbar */
+  .inspekt-axe-popover__body {
+    &::-webkit-scrollbar-track {
+      background: var(--gray-900);
+    }
+
+    &::-webkit-scrollbar-thumb {
+      background: var(--gray-600);
+
+      &:hover {
+        background: var(--gray-500);
+      }
+    }
+  }
+
+  /* Navigation bar */
+  .inspekt-axe-nav {
+    background: rgba(17, 24, 39, 0.85);
+    border-bottom-color: rgba(17, 24, 39, 0.3);
+  }
+
+  .inspekt-axe-nav__prev,
+  .inspekt-axe-nav__next,
+  .inspekt-axe-nav__detach {
+    background: var(--gray-800);
+    border-color: var(--gray-600);
+    color: var(--gray-300);
+
+    &:hover:not(:disabled) {
+      background: var(--gray-700);
+      border-color: var(--gray-500);
+    }
+  }
+
+  .inspekt-axe-nav__skip-similar {
+    background: var(--gray-800);
+    border-color: var(--gray-600);
+    color: var(--gray-300);
+
+    &:hover {
+      background: var(--gray-700);
+      border-color: var(--gray-500);
+    }
+  }
+
+  .inspekt-axe-nav__skip-similar--active {
+    background: var(--blue);
+    border-color: var(--blue);
+    color: white;
+  }
+
+  .inspekt-axe-nav__close {
+    background: var(--gray-800);
+    border-color: var(--gray-600);
+    color: var(--gray-300);
+
+    &:hover {
+      background: #7f1d1d;
+      border-color: var(--red);
+      color: #fecaca;
+    }
+  }
+
+  .inspekt-axe-nav__counter {
+    color: var(--gray-400);
+  }
+}
