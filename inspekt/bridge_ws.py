@@ -163,10 +163,33 @@ def cleanup_old_requests():
         pending_events.pop(req_id, None)
 
 
+async def sync_domains_to_browser(ws):
+    """Send current domains from SQLite to browser on connection."""
+    try:
+        from inspekt.services.domain_service import get_domain_service
+
+        domain_service = get_domain_service()
+        domains = domain_service.get_domains_for_browser_sync()
+
+        if domains:
+            request_id = str(uuid.uuid4())
+            message = {
+                "type": "SYNC_ALLOWED_DOMAINS",
+                "requestId": request_id,
+                "domains": domains
+            }
+            await ws.send_json(message)
+            print(f"✓ Auto-synced {len(domains)} domain(s) to browser")
+    except Exception as e:
+        # Don't fail connection if sync fails
+        print(f"Domain auto-sync skipped: {e}")
+
+
 async def websocket_handler(request):
     """Handle WebSocket connection from browser (userscript)."""
     global most_recent_connection, last_activity_time
-    ws = web.WebSocketResponse()
+    # Increase max message size to 100MB for large page saves (default is 4MB)
+    ws = web.WebSocketResponse(max_msg_size=100 * 1024 * 1024)
     await ws.prepare(request)
 
     active_connections.add(ws)
@@ -177,6 +200,9 @@ async def websocket_handler(request):
     last_activity_time = time.time()
     print("Browser tab connected via WebSocket")
     print(f"Active connections: {len(active_connections)}")
+
+    # Auto-sync domains to newly connected browser
+    await sync_domains_to_browser(ws)
 
     # Resend any pending requests to the newly connected browser
     # This handles the case where a page navigation disconnected mid-request
@@ -457,9 +483,9 @@ async def handle_http_result(request):
 
         event = pending_events[request_id]
 
-        # Calculate timeout based on request age
+        # Calculate timeout based on request age (allow up to 180s for large operations like page save)
         req_age = time.time() - pending_requests[request_id]["timestamp"]
-        remaining_timeout = max(60.0 - req_age, 0.1)  # At least 100ms
+        remaining_timeout = max(180.0 - req_age, 0.1)  # At least 100ms
 
         # Check if no browser connected
         if len(active_connections) == 0:
@@ -903,7 +929,12 @@ async def handle_http_domain_bypass(request):
 
 
 async def handle_http_domain_sync(request):
-    """HTTP endpoint: Sync domains from SQLite to browser extension storage."""
+    """HTTP endpoint: Sync domains from SQLite to browser extension storage.
+
+    IMPORTANT: This broadcasts the sync to ALL connected browsers, not just the most recent.
+    This ensures that when the CLI retries a command after adding a domain, it works
+    regardless of which browser tab/window receives the retry request.
+    """
     try:
         from inspekt.services.domain_service import get_domain_service
         from datetime import datetime, timezone
@@ -928,51 +959,97 @@ async def handle_http_domain_sync(request):
                     "permanent": item["permanent"]
                 }
 
-        # Send message to extension via WebSocket
-        if not most_recent_connection or most_recent_connection not in active_connections:
+        # Check if any browsers are connected
+        if not active_connections:
             return web.json_response(
                 {"ok": False, "error": "No browser connected"},
                 status=503
             )
 
-        request_id = str(uuid.uuid4())
-        message = {
-            "type": "SYNC_ALLOWED_DOMAINS",
-            "requestId": request_id,
-            "domains": domains
-        }
+        # Broadcast sync to ALL connected browsers
+        # This ensures all browsers have the updated domain list
+        synced_count = 0
+        errors = []
+        events = []
 
-        # Store pending request
-        pending_requests[request_id] = {
-            "timestamp": time.time(),
-            "type": "SYNC_ALLOWED_DOMAINS"
-        }
+        for ws in list(active_connections):
+            request_id = str(uuid.uuid4())
+            message = {
+                "type": "SYNC_ALLOWED_DOMAINS",
+                "requestId": request_id,
+                "domains": domains
+            }
 
-        # Send to browser
-        await most_recent_connection.send_json(message)
+            # Store pending request
+            pending_requests[request_id] = {
+                "timestamp": time.time(),
+                "type": "SYNC_ALLOWED_DOMAINS"
+            }
 
-        # Wait for response (with timeout)
-        event = asyncio.Event()
-        pending_events[request_id] = event
+            try:
+                await ws.send_json(message)
 
+                # Create event for this request
+                event = asyncio.Event()
+                pending_events[request_id] = event
+                events.append((request_id, event, ws))
+            except Exception as e:
+                errors.append(f"Failed to send to browser: {e}")
+                pending_requests.pop(request_id, None)
+
+        if not events:
+            return web.json_response(
+                {"ok": False, "error": "Failed to send sync to any browser"},
+                status=500
+            )
+
+        # Wait for at least one response (with timeout)
+        # We don't need ALL browsers to respond, just confirmation from at least one
         try:
-            await asyncio.wait_for(event.wait(), timeout=10.0)
-            result = completed_requests.get(request_id, {})
-            response_data = result.get("response", {"ok": False, "error": "No response"})
+            # Wait for first response
+            done, pending_tasks = await asyncio.wait(
+                [asyncio.create_task(e.wait()) for _, e, _ in events],
+                timeout=10.0,
+                return_when=asyncio.FIRST_COMPLETED
+            )
 
-            # Add synced count
-            if response_data.get("ok"):
-                response_data["synced"] = len(domains)
+            # Cancel remaining waits
+            for task in pending_tasks:
+                task.cancel()
 
-            return web.json_response(response_data)
+            # Count successful syncs
+            for request_id, event, ws in events:
+                result = completed_requests.get(request_id, {})
+                response = result.get("response", {})
+                if response.get("ok"):
+                    synced_count += 1
+
+                # Clean up
+                pending_events.pop(request_id, None)
+                completed_requests.pop(request_id, None)
+
+            if synced_count > 0:
+                return web.json_response({
+                    "ok": True,
+                    "synced": len(domains),
+                    "browsers_synced": synced_count
+                })
+            else:
+                return web.json_response({
+                    "ok": False,
+                    "error": "No browser confirmed sync"
+                })
+
         except asyncio.TimeoutError:
+            # Clean up all pending
+            for request_id, _, _ in events:
+                pending_events.pop(request_id, None)
+                completed_requests.pop(request_id, None)
+
             return web.json_response(
                 {"ok": False, "error": "Request timed out"},
                 status=504
             )
-        finally:
-            pending_events.pop(request_id, None)
-            completed_requests.pop(request_id, None)
 
     except Exception as e:
         return web.json_response(
@@ -1001,6 +1078,113 @@ async def cors_middleware(request, handler):
     response.headers["Access-Control-Allow-Headers"] = "Content-Type"
 
     return response
+
+
+async def handle_http_get_har(request):
+    """HTTP endpoint: Get HAR (HTTP Archive) data from DevTools.
+
+    This requires the Chrome DevTools panel to be open for the active tab.
+    Returns full network request data including status codes, headers, and timing.
+
+    If DevTools is not open, returns an error with a hint to use `inspekt network`
+    for basic network data via the Performance API.
+    """
+    global most_recent_connection
+
+    if most_recent_connection is None:
+        return web.json_response(
+            {"ok": False, "error": "No browser connected"},
+            status=503
+        )
+
+    request_id = str(uuid.uuid4())
+    message = {
+        "type": "GET_HAR",
+        "requestId": request_id
+    }
+
+    # Store pending request
+    pending_requests[request_id] = {
+        "timestamp": time.time(),
+        "type": "GET_HAR"
+    }
+
+    # Send to browser
+    await most_recent_connection.send_json(message)
+
+    # Wait for response (with timeout)
+    event = asyncio.Event()
+    pending_events[request_id] = event
+
+    try:
+        await asyncio.wait_for(event.wait(), timeout=15.0)
+    except asyncio.TimeoutError:
+        pending_requests.pop(request_id, None)
+        pending_events.pop(request_id, None)
+        return web.json_response(
+            {
+                "ok": False,
+                "error": "HAR request timed out. Is Chrome DevTools open?",
+                "hint": "Open DevTools (F12) and refresh the page, then try again."
+            },
+            status=504
+        )
+
+    # Get result
+    result = completed_requests.pop(request_id, None)
+    pending_events.pop(request_id, None)
+
+    if result is None:
+        return web.json_response(
+            {"ok": False, "error": "No response received"},
+            status=500
+        )
+
+    return web.json_response(result.get("response", result))
+
+
+async def handle_static_singlefile(request):
+    """Serve the combined SingleFile library as a single JavaScript file."""
+    from pathlib import Path
+
+    vendor_dir = Path(__file__).parent / "scripts" / "vendor" / "singlefile"
+
+    # Files must be loaded in this order
+    library_files = [
+        "single-file-bootstrap.js",
+        "single-file-hooks-frames.js",
+        "single-file.js",
+    ]
+
+    try:
+        scripts = []
+        for filename in library_files:
+            filepath = vendor_dir / filename
+            if not filepath.exists():
+                return web.Response(
+                    text=f"// Error: {filename} not found",
+                    content_type="application/javascript",
+                    status=404
+                )
+            with open(filepath, encoding='utf-8') as f:
+                scripts.append(f"// === {filename} ===\n{f.read()}")
+
+        combined = "\n\n".join(scripts)
+
+        return web.Response(
+            text=combined,
+            content_type="application/javascript",
+            headers={
+                "Access-Control-Allow-Origin": "*",
+                "Cache-Control": "public, max-age=86400",  # Cache for 1 day
+            }
+        )
+    except Exception as e:
+        return web.Response(
+            text=f"// Error loading SingleFile: {e}",
+            content_type="application/javascript",
+            status=500
+        )
 
 
 async def main():
@@ -1037,6 +1221,12 @@ async def main():
     app.router.add_get("/domains/list", handle_http_domain_list)
     app.router.add_post("/domains/bypass", handle_http_domain_bypass)
     app.router.add_post("/domains/sync", handle_http_domain_sync)
+
+    # Network/HAR endpoint
+    app.router.add_get("/network/har", handle_http_get_har)
+
+    # Static file endpoint for SingleFile library
+    app.router.add_get("/static/singlefile.js", handle_static_singlefile)
 
     # WebSocket endpoint for browser
     app.router.add_get("/ws", websocket_handler)

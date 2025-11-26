@@ -18,9 +18,16 @@ from inspekt.app.cli.base import CustomGroup
 
 @click.group(cls=CustomGroup)
 @click.version_option(version=__version__)
-def cli():
+@click.option('--verbose', '-v', is_flag=True, help='Enable verbose output (timing, requests, state changes)')
+@click.pass_context
+def cli(ctx, verbose):
     """Inspekt - Browser automation and inspection from the command line."""
-    pass
+    ctx.ensure_object(dict)
+    ctx.obj['verbose'] = verbose
+
+    if verbose:
+        import os
+        os.environ['INSPEKT_VERBOSE'] = '1'
 
 
 # ============================================================================
@@ -82,11 +89,11 @@ cli.add_lazy_command("autocomplete", "accessibility", "autocomplete")
 cli.add_lazy_command("selection", "selection", "selection")
 cli.add_lazy_command("selected", "selection", "selected")
 
-# Server management commands (from server.py)
-cli.add_lazy_command("server", "server", "server")
-
-# API server management commands (from api.py)
-cli.add_lazy_command("api", "api", "api")
+# Unified server management commands (from control.py)
+cli.add_lazy_command("start", "control", "start")
+cli.add_lazy_command("stop", "control", "stop")
+cli.add_lazy_command("restart", "control", "restart")
+cli.add_lazy_command("status", "control", "status")
 
 # MCP server management commands (from mcp.py)
 cli.add_lazy_command("mcp", "mcp", "mcp")
@@ -113,6 +120,12 @@ cli.add_lazy_command("md-link", "util", "md_link")
 
 # Robots.txt inspection (from robots.py)
 cli.add_lazy_command("robots", "robots", "robots")
+
+# Network inspection commands (from network.py)
+cli.add_lazy_command("network", "network", "network")
+
+# Page saving commands (from save.py)
+cli.add_lazy_command("save", "save", "save")
 
 
 # ============================================================================
