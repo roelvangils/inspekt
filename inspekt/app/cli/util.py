@@ -16,7 +16,74 @@ from pathlib import Path
 import click
 
 from inspekt.app.cli.base import builtin_open, format_output
+from inspekt.app.cli.exec import _format_console_entry, _get_console_logs_since
+from inspekt.app.cli.table import Table
 from inspekt.client import BridgeClient
+
+
+def _print_info_table(title: str, rows: list[tuple[str, str, str | None]], key_width: int = 22, value_width: int = 55) -> None:
+    """
+    Print a key-value information table with consistent formatting.
+
+    Args:
+        title: Table section title (e.g., "Basic Information")
+        rows: List of (key, value, color) tuples. Color can be None.
+        key_width: Width for the key column
+        value_width: Width for the value column
+    """
+    if not rows:
+        return
+
+    click.echo()
+    click.echo(click.style(title, bold=True))
+    click.echo()
+
+    table = Table(["Property", "Value"], [key_width, value_width], ["left", "left"])
+    table.print_header()
+
+    for key, value, color in rows:
+        if color:
+            table.print_row([key, str(value)], [None, color])
+        else:
+            table.print_row([key, str(value)])
+
+    table.print_footer()
+
+
+def _print_list_table(title: str, headers: list[str], rows: list[list[str]], widths: list[int], colors: list[list[str | None]] | None = None) -> None:
+    """
+    Print a multi-column table for list-style data.
+
+    Args:
+        title: Table section title
+        headers: Column headers
+        rows: List of row data (each row is a list of column values)
+        widths: Column widths
+        colors: Optional list of color lists for each row
+    """
+    if not rows:
+        return
+
+    click.echo()
+    click.echo(click.style(title, bold=True))
+    click.echo()
+
+    alignments = ["left"] * len(headers)
+    table = Table(headers, widths, alignments)
+    table.print_header()
+
+    for i, row in enumerate(rows):
+        row_colors = colors[i] if colors and i < len(colors) else None
+        table.print_row(row, row_colors)
+
+    table.print_footer()
+
+
+def _truncate_value(value: str, max_len: int = 55) -> str:
+    """Truncate a value with ellipsis if too long."""
+    if len(value) <= max_len:
+        return value
+    return value[:max_len - 3] + "..."
 
 
 def _get_domain_metrics(domain):
@@ -616,22 +683,37 @@ def info(extended, output_json):
 
             # Basic info - Extension/browser info first
             bridge_label = "Extension" if bridge_type == "extension" else "Userscript"
-            click.echo(f"Extension:    v{userscript_version} ({browser_name} {bridge_label})")
-            click.echo(f"URL:          {data.get('url', 'N/A')}")
-            click.echo(f"Title:        {data.get('title', 'N/A')}")
-            click.echo(f"State:        {data.get('readyState', 'N/A')}")
-            click.echo(f"Domain:       {data.get('domain', 'N/A')}")
-            click.echo(f"Protocol:     {data.get('protocol', 'N/A')}")
-            click.echo(f"Viewport:     {data.get('width', 'N/A')}x{data.get('height', 'N/A')}")
+            protocol = data.get('protocol', 'N/A')
+            is_local_file = protocol == 'file:'
+
+            # Handle empty title
+            title = data.get('title', '')
+            if not title or title.strip() == '':
+                title = '-'
+            else:
+                title = _truncate_value(title)
+
+            # Handle domain for local files
+            domain = data.get('domain', 'N/A')
+            if is_local_file or not domain:
+                domain = '-'
+
+            basic_rows = [
+                ("Extension", f"v{userscript_version} ({browser_name} {bridge_label})", None),
+                ("URL", _truncate_value(data.get('url', 'N/A')), None),
+                ("Title", title, None),
+                ("State", data.get('readyState', 'N/A'), None),
+                ("Domain", domain, None),
+                ("Protocol", protocol, None),
+                ("Viewport", f"{data.get('width', 'N/A')}x{data.get('height', 'N/A')}", None),
+            ]
+            _print_info_table("Basic Information", basic_rows)
 
             if extended:
-                click.echo("")
-                click.echo("=== Extended Information ===")
-                click.echo("")
-
                 # Language and encoding (with natural language detection)
                 declared_lang = data.get("specifiedLanguage", "N/A")
-                click.echo(f"Language:           {declared_lang}")
+                detected_lang = None
+                lang_match = None
 
                 # Detect actual language using langdetect
                 try:
@@ -644,58 +726,96 @@ def info(extended, output_json):
                         para_text = para_result.get("result", "")
                         if para_text and len(para_text.strip()) > 50:
                             try:
-                                detected = detect(
-                                    para_text
-                                )  # Returns ISO 639-1 code (e.g., 'en', 'fr')
-                                if detected:
-                                    # Compare with declared language
-                                    if (
-                                        declared_lang != "N/A"
-                                        and declared_lang.lower() != detected.lower()
-                                    ):
-                                        click.echo(f"  Detected:         {detected}")
-                                        click.echo(
-                                            f'  ⚠️  Language mismatch! Content appears to be "{detected}" but lang="{declared_lang}"'
-                                        )
+                                detected_lang = detect(para_text)
+                                if detected_lang:
+                                    if declared_lang != "N/A" and declared_lang.lower() != detected_lang.lower():
+                                        lang_match = False
                                     else:
-                                        click.echo(f"  Detected:         {detected} ✓ matches")
+                                        lang_match = True
                             except LangDetectException:
-                                pass  # Could not detect language
+                                pass
                 except ImportError:
-                    pass  # langdetect not installed
+                    pass
                 except Exception:
-                    pass  # Language detection failed
+                    pass
 
-                click.echo(f"Character Set:      {data.get('charset', 'N/A')}")
+                # Build language rows
+                lang_rows = [
+                    ("Declared Language", declared_lang, None),
+                ]
+                if detected_lang:
+                    if lang_match:
+                        lang_rows.append(("Detected Language", f"{detected_lang} (matches)", "green"))
+                    else:
+                        lang_rows.append(("Detected Language", detected_lang, "yellow"))
+                        lang_rows.append(("Warning", f'Content appears to be "{detected_lang}" but lang="{declared_lang}"', "yellow"))
+                lang_rows.append(("Character Set", data.get('charset', 'N/A'), None))
+                _print_info_table("Language & Encoding", lang_rows)
 
-                # Resources
-                click.echo("")
-                click.echo("Resources:")
-                click.echo(f"  Scripts:          {data.get('scriptCount', 0)}")
-                click.echo(f"  Stylesheets:      {data.get('stylesheetCount', 0)}")
-                click.echo(f"  Images:           {data.get('imageCount', 0)}")
-                click.echo(f"  Links:            {data.get('linkCount', 0)}")
-                click.echo(f"  Forms:            {data.get('formCount', 0)}")
-                click.echo(f"  Iframes:          {data.get('iframeCount', 0)}")
+                # Resources - fetch single resource filenames if count is 1
+                def _get_single_resource_name(js_code: str) -> str:
+                    """Execute JS to get a single resource filename."""
+                    try:
+                        result = client.execute(js_code, timeout=2.0)
+                        if result.get("ok"):
+                            url = result.get("result", "")
+                            if url:
+                                # Extract filename from URL
+                                from urllib.parse import urlparse
+                                path = urlparse(url).path
+                                filename = path.split('/')[-1] if '/' in path else path
+                                return filename if filename else ""
+                    except Exception:
+                        pass
+                    return ""
+
+                def _format_resource_count(count: int, single_name: str = "") -> str:
+                    """Format resource count with optional filename for single resources."""
+                    if count == 0:
+                        return "0"
+                    elif count == 1 and single_name:
+                        # Use bright_black (dark gray) for the filename
+                        return f"1 {click.style(f'({single_name})', fg='bright_black')}"
+                    return str(count)
+
+                script_count = data.get('scriptCount', 0)
+                style_count = data.get('stylesheetCount', 0)
+                image_count = data.get('imageCount', 0)
+
+                # Get single filenames
+                script_name = _get_single_resource_name("document.querySelector('script[src]')?.src || ''") if script_count == 1 else ""
+                style_name = _get_single_resource_name("document.querySelector('link[rel=stylesheet]')?.href || ''") if style_count == 1 else ""
+                image_name = _get_single_resource_name("document.querySelector('img[src]')?.src || ''") if image_count == 1 else ""
+
+                resource_rows = [
+                    ("Scripts", _format_resource_count(script_count, script_name), None),
+                    ("Stylesheets", _format_resource_count(style_count, style_name), None),
+                    ("Images", _format_resource_count(image_count, image_name), None),
+                    ("Links", str(data.get('linkCount', 0)), None),
+                    ("Forms", str(data.get('formCount', 0)), None),
+                    ("Iframes", str(data.get('iframeCount', 0)), None),
+                ]
+                _print_info_table("Resources", resource_rows)
 
                 # Performance Metrics (from extended data)
                 extended_data = data.get("_extended", {})
                 perf = extended_data.get("performance", {})
                 if perf:
-                    click.echo("")
-                    click.echo("Performance:")
-                    if perf.get("pageLoadTime"):
-                        click.echo(f"  Page Load Time:    {perf['pageLoadTime']}s")
-                    if perf.get("domContentLoaded"):
-                        click.echo(f"  DOM Content Loaded: {perf['domContentLoaded']}s")
+                    perf_rows = []
                     if perf.get("timeToFirstByte"):
-                        click.echo(f"  Time to First Byte: {perf['timeToFirstByte']}ms")
+                        perf_rows.append(("Time to First Byte", f"{int(perf['timeToFirstByte'])}ms", None))
                     if perf.get("firstPaint"):
-                        click.echo(f"  First Paint:       {perf['firstPaint']}s")
+                        perf_rows.append(("First Paint", f"{int(float(perf['firstPaint']) * 1000)}ms", None))
                     if perf.get("firstContentfulPaint"):
-                        click.echo(f"  First Contentful Paint: {perf['firstContentfulPaint']}s")
+                        perf_rows.append(("First Contentful Paint", f"{int(float(perf['firstContentfulPaint']) * 1000)}ms", None))
+                    if perf.get("domContentLoaded"):
+                        perf_rows.append(("DOM Content Loaded", f"{int(float(perf['domContentLoaded']) * 1000)}ms", None))
                     if perf.get("largestContentfulPaint"):
-                        click.echo(f"  Largest Contentful Paint: {perf['largestContentfulPaint']}s")
+                        perf_rows.append(("Largest Contentful Paint", f"{int(float(perf['largestContentfulPaint']) * 1000)}ms", None))
+                    if perf.get("pageLoadTime"):
+                        perf_rows.append(("Page Load Time", f"{int(float(perf['pageLoadTime']) * 1000)}ms", None))
+                    if perf_rows:
+                        _print_info_table("Performance", perf_rows)
 
                 # Media Content (from extended data)
                 media = extended_data.get("media", {})
@@ -704,377 +824,404 @@ def info(extended, output_json):
                     or media.get("audio", 0) > 0
                     or media.get("svgImages", 0) > 0
                 ):
-                    click.echo("")
-                    click.echo("Media:")
-                    if media.get("videos", 0) > 0:
-                        click.echo(f"  Videos:            {media['videos']}")
-                    if media.get("audio", 0) > 0:
-                        click.echo(f"  Audio:             {media['audio']}")
-                    if media.get("svgImages", 0) > 0:
-                        click.echo(f"  SVG Images:        {media['svgImages']}")
+                    video_count = media.get("videos", 0)
+                    audio_count = media.get("audio", 0)
+                    svg_count = media.get("svgImages", 0)
+
+                    # Get single filenames for media
+                    video_name = _get_single_resource_name("document.querySelector('video source')?.src || document.querySelector('video')?.src || ''") if video_count == 1 else ""
+                    audio_name = _get_single_resource_name("document.querySelector('audio source')?.src || document.querySelector('audio')?.src || ''") if audio_count == 1 else ""
+
+                    media_rows = []
+                    if video_count > 0:
+                        media_rows.append(("Videos", _format_resource_count(video_count, video_name), None))
+                    if audio_count > 0:
+                        media_rows.append(("Audio", _format_resource_count(audio_count, audio_name), None))
+                    if svg_count > 0:
+                        media_rows.append(("SVG Images", str(svg_count), None))
+                    if media_rows:
+                        _print_info_table("Media", media_rows)
 
                 # Content Stats (from extended data)
                 content = extended_data.get("content", {})
+                content_rows = []
+                # Add page language at the start
+                page_lang = declared_lang if declared_lang != "N/A" else "-"
+                if detected_lang and lang_match:
+                    content_rows.append(("Language", page_lang, None))
+                elif detected_lang and not lang_match:
+                    content_rows.append(("Language", f"{page_lang} (detected: {detected_lang})", "yellow"))
+                else:
+                    content_rows.append(("Language", page_lang, None))
+
                 if content:
-                    click.echo("")
-                    click.echo("Content:")
                     if content.get("wordCount"):
-                        click.echo(f"  Word Count:        ~{content['wordCount']:,} words")
+                        content_rows.append(("Word Count", f"~{content['wordCount']:,} words", None))
                     if content.get("estimatedReadingTime"):
-                        click.echo(
-                            f"  Reading Time:      ~{content['estimatedReadingTime']} minutes"
-                        )
+                        content_rows.append(("Reading Time", f"~{content['estimatedReadingTime']} minutes", None))
                     if content.get("paragraphs"):
-                        click.echo(f"  Paragraphs:        {content['paragraphs']}")
+                        content_rows.append(("Paragraphs", str(content['paragraphs']), None))
                     if content.get("lists"):
-                        click.echo(f"  Lists:             {content['lists']}")
+                        content_rows.append(("Lists", str(content['lists']), None))
                     if content.get("languageSwitchers", 0) > 0:
-                        click.echo(f"  Language Switchers: {content['languageSwitchers']}")
+                        content_rows.append(("Language Switchers", str(content['languageSwitchers']), None))
+                if content_rows:
+                    _print_info_table("Content", content_rows)
 
-                # Document dimensions
-                click.echo("")
-                click.echo("Document Dimensions:")
-                click.echo(f"  Total Height:     {data.get('scrollHeight', 'N/A')}px")
-                click.echo(f"  Total Width:      {data.get('scrollWidth', 'N/A')}px")
+                # Dimensions
+                viewport_width = data.get('width', 0)
+                viewport_height = data.get('height', 0)
+                scroll_height = data.get('scrollHeight', 0)
+                scroll_width = data.get('scrollWidth', 0)
 
-                # Storage
-                click.echo("")
-                click.echo("Storage:")
+                # Calculate percentage visible
+                visible_pct = (viewport_height / scroll_height * 100) if scroll_height > 0 else 100
+                visible_pct = min(visible_pct, 100)  # Cap at 100%
+
+                dim_rows = [
+                    ("Viewport", f"{viewport_width}x{viewport_height}px", None),
+                    ("Document Size", f"{scroll_width}x{scroll_height}px", None),
+                    ("Visible", f"{visible_pct:.0f}% of page height", None),
+                ]
+                _print_info_table("Dimensions", dim_rows)
+
+                # Storage - collect data first
                 cookie_count = data.get("cookieCount", 0)
-                click.echo(f"  Cookies:          {cookie_count}")
+                local_kb = data.get("localStorageSize", 0) / 1024
+                session_kb = data.get("sessionStorageSize", 0) / 1024
 
-                # Get actual cookie names
+                # Get cookie names
+                cookie_names = []
                 if cookie_count > 0:
                     try:
                         cookie_code = "document.cookie.split(';').map(c => c.trim().split('=')[0]).filter(Boolean)"
                         cookie_result = client.execute(cookie_code, timeout=2.0)
                         if cookie_result.get("ok"):
                             cookie_names = cookie_result.get("result", [])
-                            if cookie_names:
-                                for i, name in enumerate(cookie_names[:8], 1):
-                                    click.echo(f"    {i}. {name}")
-                                if len(cookie_names) > 8:
-                                    click.echo(f"    ... and {len(cookie_names) - 8} more")
                     except Exception:
                         pass
 
-                local_kb = data.get("localStorageSize", 0) / 1024
-                click.echo(f"  LocalStorage:     {local_kb:.2f} KB")
-
                 # Get localStorage keys
+                ls_keys = []
                 if local_kb > 0:
                     try:
                         ls_code = "Object.keys(localStorage)"
                         ls_result = client.execute(ls_code, timeout=2.0)
                         if ls_result.get("ok"):
                             ls_keys = ls_result.get("result", [])
-                            if ls_keys:
-                                for i, key in enumerate(ls_keys[:8], 1):
-                                    click.echo(f"    {i}. {key}")
-                                if len(ls_keys) > 8:
-                                    click.echo(f"    ... and {len(ls_keys) - 8} more")
                     except Exception:
                         pass
 
-                session_kb = data.get("sessionStorageSize", 0) / 1024
-                click.echo(f"  SessionStorage:   {session_kb:.2f} KB")
-
                 # Get sessionStorage keys
+                ss_keys = []
                 if session_kb > 0:
                     try:
                         ss_code = "Object.keys(sessionStorage)"
                         ss_result = client.execute(ss_code, timeout=2.0)
                         if ss_result.get("ok"):
                             ss_keys = ss_result.get("result", [])
-                            if ss_keys:
-                                for i, key in enumerate(ss_keys[:8], 1):
-                                    click.echo(f"    {i}. {key}")
-                                if len(ss_keys) > 8:
-                                    click.echo(f"    ... and {len(ss_keys) - 8} more")
                     except Exception:
                         pass
 
-                click.echo(f"  Service Worker:   {'Yes' if data.get('hasServiceWorker') else 'No'}")
+                # Build storage table with better empty values
+                def _format_storage_count(count: int) -> str:
+                    return "None" if count == 0 else str(count)
+
+                def _format_storage_size(kb: float) -> str:
+                    if kb < 0.01:
+                        return "Empty"
+                    return f"{kb:.2f} KB"
+
+                storage_rows = [
+                    ("Cookies", _format_storage_count(cookie_count), None),
+                    ("LocalStorage", _format_storage_size(local_kb), None),
+                    ("SessionStorage", _format_storage_size(session_kb), None),
+                    ("Service Worker", 'Yes' if data.get('hasServiceWorker') else 'No', None),
+                ]
+                _print_info_table("Storage", storage_rows)
+
+                # Show cookie names if present
+                if cookie_names:
+                    cookie_list_rows = [[name] for name in cookie_names[:8]]
+                    if len(cookie_names) > 8:
+                        cookie_list_rows.append([f"... and {len(cookie_names) - 8} more"])
+                    _print_list_table("Cookie Names", ["Name"], cookie_list_rows, [55])
+
+                # Show localStorage keys if present
+                if ls_keys:
+                    ls_list_rows = [[key] for key in ls_keys[:8]]
+                    if len(ls_keys) > 8:
+                        ls_list_rows.append([f"... and {len(ls_keys) - 8} more"])
+                    _print_list_table("LocalStorage Keys", ["Key"], ls_list_rows, [55])
+
+                # Show sessionStorage keys if present
+                if ss_keys:
+                    ss_list_rows = [[key] for key in ss_keys[:8]]
+                    if len(ss_keys) > 8:
+                        ss_list_rows.append([f"... and {len(ss_keys) - 8} more"])
+                    _print_list_table("SessionStorage Keys", ["Key"], ss_list_rows, [55])
 
                 # Security Info
                 security = data.get("security", {})
                 if security:
-                    click.echo("")
-                    click.echo("Security:")
-                    click.echo(f"  HTTPS:            {'Yes' if security.get('isSecure') else 'No'}")
+                    sec_rows = []
+                    https_status = 'Yes' if security.get('isSecure') else 'No'
+                    https_color = 'green' if security.get('isSecure') else 'red'
+                    sec_rows.append(("HTTPS", https_status, https_color))
                     if security.get("isSecure") and security.get("hasMixedContent"):
-                        click.echo("  Mixed Content:    ⚠️  Warning - Insecure resources detected")
+                        sec_rows.append(("Mixed Content", "Warning - Insecure resources detected", "yellow"))
                     if security.get("cspMeta"):
-                        csp = security.get("cspMeta", "")
-                        if len(csp) > 50:
-                            csp = csp[:47] + "..."
-                        click.echo(f"  CSP Meta:         {csp}")
+                        csp = _truncate_value(security.get("cspMeta", ""), 50)
+                        sec_rows.append(("CSP Meta", csp, None))
                     if security.get("referrerPolicy"):
-                        click.echo(f"  Referrer Policy:  {security.get('referrerPolicy')}")
+                        sec_rows.append(("Referrer Policy", security.get('referrerPolicy'), None))
+                    if sec_rows:
+                        _print_info_table("Security", sec_rows)
 
                 # Accessibility
                 a11y = data.get("accessibility", {})
                 if a11y:
-                    click.echo("")
-                    click.echo("Accessibility:")
-                    click.echo(f"  Landmarks:        {a11y.get('landmarkCount', 0)} total")
+                    a11y_rows = []
+
+                    # Landmarks summary
                     landmarks = a11y.get("landmarks", {})
                     if landmarks:
-                        for role, count in landmarks.items():
-                            click.echo(f"    {role}: {count}")
+                        landmark_summary = ", ".join([f"{role}: {count}" for role, count in landmarks.items()])
+                        a11y_rows.append(("Landmarks", f"{a11y.get('landmarkCount', 0)} total ({landmark_summary})", None))
+                    else:
+                        a11y_rows.append(("Landmarks", f"{a11y.get('landmarkCount', 0)} total", None))
 
                     # Heading structure
                     heading_structure = a11y.get("headingStructure", {})
                     total_headings = sum(heading_structure.values())
                     if total_headings > 0:
-                        click.echo(f"  Headings:         {total_headings} total")
-                        for level in ["h1", "h2", "h3", "h4", "h5", "h6"]:
-                            count = heading_structure.get(level, 0)
-                            if count > 0:
-                                click.echo(f"    {level.upper()}: {count}")
+                        heading_parts = [f"{level.upper()}: {heading_structure.get(level, 0)}" for level in ["h1", "h2", "h3", "h4", "h5", "h6"] if heading_structure.get(level, 0) > 0]
+                        a11y_rows.append(("Headings", f"{total_headings} total ({', '.join(heading_parts)})", None))
 
-                    # A11y issues
+                    # A11y issues (without emoji)
                     img_no_alt = a11y.get("imagesWithoutAlt", 0)
                     if img_no_alt > 0:
-                        click.echo(f"  ⚠️  Images w/o alt: {img_no_alt}")
+                        a11y_rows.append(("Images w/o alt", str(img_no_alt), "yellow"))
 
                     form_issues = a11y.get("formLabelsIssues", {})
                     if form_issues.get("missingLabels", 0) > 0:
-                        click.echo(
-                            f"  ⚠️  Form inputs w/o labels: {form_issues['missingLabels']}/{form_issues['total']}"
-                        )
+                        a11y_rows.append(("Form inputs w/o labels", f"{form_issues['missingLabels']}/{form_issues['total']}", "yellow"))
 
                     # Extended accessibility info
                     a11y_ext = extended_data.get("accessibility", {})
                     if a11y_ext:
                         if a11y_ext.get("linksWithoutText", 0) > 0:
-                            click.echo(f"  ⚠️  Links w/o text: {a11y_ext['linksWithoutText']}")
+                            a11y_rows.append(("Links w/o text", str(a11y_ext['linksWithoutText']), "yellow"))
                         if a11y_ext.get("buttonsWithoutLabels", 0) > 0:
-                            click.echo(
-                                f"  ⚠️  Buttons w/o labels: {a11y_ext['buttonsWithoutLabels']}"
-                            )
+                            a11y_rows.append(("Buttons w/o labels", str(a11y_ext['buttonsWithoutLabels']), "yellow"))
                         if a11y_ext.get("hasSkipLink"):
-                            click.echo("  ✓  Page has skip link")
+                            a11y_rows.append(("Skip Link", "Present", "green"))
                         if not a11y_ext.get("langAttribute"):
-                            click.echo("  ⚠️  Missing lang attribute")
+                            a11y_rows.append(("Lang Attribute", "Missing", "yellow"))
                         if a11y_ext.get("ariaAttributeCount"):
-                            click.echo(
-                                f"  ARIA Usage:        {a11y_ext['ariaAttributeCount']} attributes"
-                            )
+                            a11y_rows.append(("ARIA Usage", f"{a11y_ext['ariaAttributeCount']} attributes", None))
+
+                    if a11y_rows:
+                        _print_info_table("Accessibility", a11y_rows)
+                        # Add hint about inspekt axe
+                        click.echo(click.style("  Hint: Run `inspekt axe` for detailed accessibility information.", fg="bright_black"))
 
                 # Structured Data (from extended data)
                 structured = extended_data.get("structuredData", {})
                 if structured and (
                     structured.get("jsonLdCount", 0) > 0 or structured.get("microdataCount", 0) > 0
                 ):
-                    click.echo("")
-                    click.echo("Structured Data:")
+                    struct_rows = []
                     if structured.get("jsonLdCount", 0) > 0:
-                        click.echo(f"  JSON-LD:           {structured['jsonLdCount']} blocks")
                         types = structured.get("jsonLdTypes", [])
-                        if types:
-                            click.echo(f"    Types: {', '.join(types[:5])}")
+                        type_info = f" ({', '.join(types[:5])})" if types else ""
+                        struct_rows.append(("JSON-LD", f"{structured['jsonLdCount']} blocks{type_info}", None))
                     if structured.get("microdataCount", 0) > 0:
-                        click.echo(f"  Microdata:         {structured['microdataCount']} items")
+                        struct_rows.append(("Microdata", f"{structured['microdataCount']} items", None))
+                    if struct_rows:
+                        _print_info_table("Structured Data", struct_rows)
 
                 # SEO Metrics
                 seo = data.get("seo", {})
                 if seo:
-                    click.echo("")
-                    click.echo("SEO:")
+                    seo_rows = []
                     if seo.get("canonical"):
-                        canonical = seo["canonical"]
-                        if len(canonical) > 60:
-                            canonical = canonical[:57] + "..."
-                        click.echo(f"  Canonical:        {canonical}")
+                        seo_rows.append(("Canonical", _truncate_value(seo["canonical"]), None))
                     if seo.get("description"):
-                        desc = seo["description"]
-                        if len(desc) > 60:
-                            desc = desc[:57] + "..."
-                        click.echo(f"  Description:      {desc}")
+                        seo_rows.append(("Description", _truncate_value(seo["description"]), None))
                     if seo.get("keywords"):
-                        kw = seo["keywords"]
-                        if len(kw) > 60:
-                            kw = kw[:57] + "..."
-                        click.echo(f"  Keywords:         {kw}")
+                        seo_rows.append(("Keywords", _truncate_value(seo["keywords"]), None))
                     if seo.get("robots"):
-                        click.echo(f"  Robots:           {seo['robots']}")
-
-                    # Open Graph
-                    og = seo.get("openGraph", {})
-                    if og:
-                        click.echo(f"  Open Graph:       {len(og)} tags")
-                        for key in ["title", "type", "image", "url"]:
-                            if key in og:
-                                value = og[key]
-                                if len(value) > 50:
-                                    value = value[:47] + "..."
-                                click.echo(f"    og:{key}: {value}")
-
-                    # Twitter Card
-                    twitter = seo.get("twitterCard", {})
-                    if twitter:
-                        click.echo(f"  Twitter Card:     {len(twitter)} tags")
-                        for key in ["card", "title", "description", "image"]:
-                            if key in twitter:
-                                value = twitter[key]
-                                if len(value) > 50:
-                                    value = value[:47] + "..."
-                                click.echo(f"    twitter:{key}: {value}")
+                        seo_rows.append(("Robots", seo['robots'], None))
 
                     # SEO Extras (from extended data)
                     seo_extra = extended_data.get("seoExtra", {})
                     if seo_extra:
                         if seo_extra.get("favicon"):
-                            click.echo(f"  Favicon:           {seo_extra['favicon']}")
+                            seo_rows.append(("Favicon", seo_extra['favicon'], None))
                         if seo_extra.get("sitemap"):
-                            sitemap = seo_extra["sitemap"]
-                            if len(sitemap) > 50:
-                                sitemap = sitemap[:47] + "..."
-                            click.echo(f"  Sitemap:           {sitemap}")
+                            seo_rows.append(("Sitemap", _truncate_value(seo_extra["sitemap"], 50), None))
                         alt_langs = seo_extra.get("alternateLanguages", [])
                         if alt_langs:
-                            click.echo(f"  Alternate Languages: {len(alt_langs)}")
-                            for lang in alt_langs[:3]:
-                                click.echo(f"    {lang['lang']}")
+                            lang_list = ", ".join([lang['lang'] for lang in alt_langs[:3]])
+                            if len(alt_langs) > 3:
+                                lang_list += f" (+{len(alt_langs) - 3} more)"
+                            seo_rows.append(("Alternate Languages", lang_list, None))
+
+                    if seo_rows:
+                        _print_info_table("SEO", seo_rows)
+
+                    # Open Graph as separate table
+                    og = seo.get("openGraph", {})
+                    if og:
+                        og_rows = []
+                        for key in ["title", "type", "image", "url", "description"]:
+                            if key in og:
+                                og_rows.append((f"og:{key}", _truncate_value(og[key], 50), None))
+                        if og_rows:
+                            _print_info_table(f"Open Graph ({len(og)} tags)", og_rows)
+
+                    # Twitter Card as separate table
+                    twitter = seo.get("twitterCard", {})
+                    if twitter:
+                        twitter_rows = []
+                        for key in ["card", "title", "description", "image"]:
+                            if key in twitter:
+                                twitter_rows.append((f"twitter:{key}", _truncate_value(twitter[key], 50), None))
+                        if twitter_rows:
+                            _print_info_table(f"Twitter Card ({len(twitter)} tags)", twitter_rows)
 
                 # Robots.txt
                 robots_data = _get_robots_txt(data.get("url"))
                 if robots_data and robots_data.get("exists"):
-                    click.echo("")
-                    click.echo("Robots.txt:")
-                    click.echo("  Status:            Found")
-                    click.echo(
-                        f"  Size:              {robots_data['size']:,} bytes ({robots_data['lines']} lines)"
-                    )
+                    robots_rows = [
+                        ("Status", "Found", "green"),
+                        ("Size", f"{robots_data['size']:,} bytes ({robots_data['lines']} lines)", None),
+                    ]
                     if robots_data.get("userAgents"):
                         agents = robots_data["userAgents"]
                         if len(agents) <= 3:
-                            click.echo(f"  User-agents:       {', '.join(agents)}")
+                            robots_rows.append(("User-agents", ', '.join(agents), None))
                         else:
-                            click.echo(f"  User-agents:       {len(agents)} defined")
+                            robots_rows.append(("User-agents", f"{len(agents)} defined", None))
                     if robots_data.get("disallowRules", 0) > 0:
-                        click.echo(f"  Disallow rules:    {robots_data['disallowRules']}")
+                        robots_rows.append(("Disallow rules", str(robots_data['disallowRules']), None))
                     if robots_data.get("allowRules", 0) > 0:
-                        click.echo(f"  Allow rules:       {robots_data['allowRules']}")
+                        robots_rows.append(("Allow rules", str(robots_data['allowRules']), None))
                     if robots_data.get("sitemaps"):
                         sitemaps = robots_data["sitemaps"]
-                        click.echo(f"  Sitemaps:          {len(sitemaps)} declared")
-                        for sitemap in sitemaps[:2]:
-                            if len(sitemap) > 50:
-                                sitemap = sitemap[:47] + "..."
-                            click.echo(f"    {sitemap}")
+                        sitemap_list = ", ".join([_truncate_value(s, 40) for s in sitemaps[:2]])
+                        if len(sitemaps) > 2:
+                            sitemap_list += f" (+{len(sitemaps) - 2} more)"
+                        robots_rows.append(("Sitemaps", f"{len(sitemaps)} declared", None))
+                    _print_info_table("Robots.txt", robots_rows)
 
                 # Third-Party Resources (from extended data)
                 third_party = extended_data.get("thirdParty", {})
                 if third_party and third_party.get("externalDomainCount", 0) > 0:
-                    click.echo("")
-                    click.echo("Third-Party:")
-                    click.echo(f"  External Domains:  {third_party['externalDomainCount']}")
                     domains = third_party.get("externalDomains", [])
+                    third_party_rows = [
+                        ("External Domains", str(third_party['externalDomainCount']), None),
+                    ]
                     if domains:
-                        for domain in domains[:8]:
-                            click.echo(f"    - {domain}")
+                        domain_list = ", ".join(domains[:5])
+                        if len(domains) > 5:
+                            domain_list += f" (+{len(domains) - 5} more)"
+                        third_party_rows.append(("Domains", domain_list, None))
+                    _print_info_table("Third-Party Resources", third_party_rows)
 
                 # Browser/Device Info
                 device = data.get("device", {})
                 if device:
-                    click.echo("")
-                    click.echo("Browser/Device:")
-                    click.echo(f"  Platform:         {device.get('platform', 'N/A')}")
-                    click.echo(f"  Language:         {device.get('language', 'N/A')}")
-                    click.echo(f"  Screen:           {device.get('screenResolution', 'N/A')}")
-                    click.echo(f"  Viewport:         {device.get('viewportSize', 'N/A')}")
-                    click.echo(f"  Pixel Ratio:      {device.get('devicePixelRatio', 'N/A')}")
-                    click.echo(
-                        f"  Touch Support:    {'Yes' if device.get('touchSupport') else 'No'}"
-                    )
-                    click.echo(
-                        f"  Cookies Enabled:  {'Yes' if device.get('cookiesEnabled') else 'No'}"
-                    )
-                    click.echo(
-                        f"  Online:           {'Yes' if device.get('onlineStatus') else 'No'}"
-                    )
+                    device_rows = [
+                        ("Platform", device.get('platform', 'N/A'), None),
+                        ("Language", device.get('language', 'N/A'), None),
+                        ("Screen", device.get('screenResolution', 'N/A'), None),
+                        ("Viewport", device.get('viewportSize', 'N/A'), None),
+                        ("Pixel Ratio", str(device.get('devicePixelRatio', 'N/A')), None),
+                        ("Touch Support", 'Yes' if device.get('touchSupport') else 'No', None),
+                        ("Cookies Enabled", 'Yes' if device.get('cookiesEnabled') else 'No', None),
+                        ("Online", 'Yes' if device.get('onlineStatus') else 'No', None),
+                    ]
 
                     ua = device.get("userAgent", "")
                     if ua:
-                        if len(ua) > 80:
-                            # Show first 80 chars on first line, rest on second line
-                            click.echo(f"  User Agent:       {ua[:80]}")
-                            remaining = ua[80:]
-                            if len(remaining) > 60:
-                                remaining = remaining[:57] + "..."
-                            click.echo(f"                    {remaining}")
-                        else:
-                            click.echo(f"  User Agent:       {ua}")
+                        device_rows.append(("User Agent", _truncate_value(ua), None))
+
+                    _print_info_table("Browser/Device", device_rows)
 
                 # Technologies Detected
                 technologies = data.get("technologies", {})
                 if technologies:
-                    click.echo("")
-                    click.echo("Technologies Detected:")
+                    tech_rows = []
                     for category, techs in sorted(technologies.items()):
                         if techs:
-                            click.echo(f"  {category}:")
-                            for tech in techs:
-                                click.echo(f"    - {tech}")
+                            tech_list = ", ".join(techs[:5])
+                            if len(techs) > 5:
+                                tech_list += f" (+{len(techs) - 5} more)"
+                            tech_rows.append((category, tech_list, None))
+                    if tech_rows:
+                        _print_info_table("Technologies Detected", tech_rows)
 
                 # Domain Metrics (fetched from server-side)
                 domain_metrics = _get_domain_metrics(data.get("domain"))
                 if domain_metrics:
-                    click.echo("")
-                    click.echo("Domain Metrics:")
+                    domain_rows = []
 
                     if domain_metrics.get("ip"):
-                        click.echo(f"  IP Address:       {domain_metrics['ip']}")
+                        domain_rows.append(("IP Address", domain_metrics['ip'], None))
 
                     geo = domain_metrics.get("geolocation", {})
                     if geo:
                         location_parts = [geo.get("city"), geo.get("region"), geo.get("country")]
                         location = ", ".join([p for p in location_parts if p])
                         if location:
-                            click.echo(f"  Location:         {location}")
+                            domain_rows.append(("Location", location, None))
                         if geo.get("isp"):
-                            click.echo(f"  ISP:              {geo['isp']}")
+                            domain_rows.append(("ISP", geo['isp'], None))
                         if geo.get("org"):
-                            click.echo(f"  Organization:     {geo['org']}")
+                            domain_rows.append(("Organization", geo['org'], None))
 
                     whois = domain_metrics.get("whois", {})
                     if whois:
                         if whois.get("creation_date"):
-                            click.echo(f"  Registered:       {whois['creation_date']}")
+                            domain_rows.append(("Registered", whois['creation_date'], None))
                         if whois.get("expiration_date"):
-                            click.echo(f"  Expires:          {whois['expiration_date']}")
+                            domain_rows.append(("Expires", whois['expiration_date'], None))
                         if whois.get("registrar"):
-                            click.echo(f"  Registrar:        {whois['registrar']}")
+                            domain_rows.append(("Registrar", whois['registrar'], None))
 
                     ssl_info = domain_metrics.get("ssl", {})
                     if ssl_info:
                         if ssl_info.get("issuer"):
-                            click.echo(f"  SSL Issuer:       {ssl_info['issuer']}")
+                            domain_rows.append(("SSL Issuer", ssl_info['issuer'], None))
                         if ssl_info.get("expiry"):
-                            click.echo(f"  SSL Expires:      {ssl_info['expiry']}")
+                            domain_rows.append(("SSL Expires", ssl_info['expiry'], None))
                         if ssl_info.get("days_remaining"):
                             days = ssl_info["days_remaining"]
                             if days < 30:
-                                click.echo(f"  SSL Status:       ⚠️  Expires in {days} days")
+                                domain_rows.append(("SSL Status", f"⚠️  Expires in {days} days", "yellow"))
                             else:
-                                click.echo(f"  SSL Status:       Valid ({days} days remaining)")
+                                domain_rows.append(("SSL Status", f"Valid ({days} days remaining)", "green"))
+
+                    if domain_rows:
+                        _print_info_table("Domain Metrics", domain_rows)
 
                 # Network Summary (from extended data)
                 network = extended_data.get("network", {})
                 if network:
-                    click.echo("")
-                    click.echo("Network:")
+                    network_rows = []
                     if network.get("totalRequests"):
-                        click.echo(f"  Total Requests:    {network['totalRequests']}")
+                        network_rows.append(("Total Requests", str(network['totalRequests']), None))
                     if network.get("totalSize"):
                         size_mb = network["totalSize"] / (1024 * 1024)
-                        click.echo(f"  Total Size:        {size_mb:.2f} MB")
+                        network_rows.append(("Total Size", f"{size_mb:.2f} MB", None))
                     largest = network.get("largestResource")
                     if largest:
                         size_kb = largest["size"] / 1024
-                        click.echo(f"  Largest Resource:  {largest['name']} ({size_kb:.2f} KB)")
+                        network_rows.append(("Largest Resource", f"{largest['name']} ({size_kb:.2f} KB)", None))
+                    if network_rows:
+                        _print_info_table("Network", network_rows)
 
                 # Fonts (from extended data)
                 fonts = extended_data.get("fonts", {})
@@ -1083,81 +1230,72 @@ def info(extended, output_json):
                     or fonts.get("customFonts")
                     or fonts.get("totalFontFiles", 0) > 0
                 ):
-                    click.echo("")
-                    click.echo("Fonts:")
+                    font_rows = []
                     google_fonts = fonts.get("googleFonts", [])
                     if google_fonts:
-                        click.echo(f"  Google Fonts:      {len(google_fonts)}")
-                        for font in google_fonts[:5]:
-                            click.echo(f"    - {font}")
+                        font_list = ", ".join(google_fonts[:5])
                         if len(google_fonts) > 5:
-                            click.echo(f"    ... and {len(google_fonts) - 5} more")
+                            font_list += f" (+{len(google_fonts) - 5} more)"
+                        font_rows.append(("Google Fonts", f"{len(google_fonts)}: {font_list}", None))
                     custom_fonts = fonts.get("customFonts", [])
                     if custom_fonts:
-                        click.echo(f"  Custom @font-face: {len(custom_fonts)}")
-                        for font in custom_fonts[:5]:
-                            click.echo(f"    - {font}")
+                        custom_list = ", ".join(custom_fonts[:5])
                         if len(custom_fonts) > 5:
-                            click.echo(f"    ... and {len(custom_fonts) - 5} more")
+                            custom_list += f" (+{len(custom_fonts) - 5} more)"
+                        font_rows.append(("Custom @font-face", f"{len(custom_fonts)}: {custom_list}", None))
                     if fonts.get("totalFontFiles", 0) > 0:
-                        click.echo(f"  Font Files:        {fonts['totalFontFiles']}")
+                        font_rows.append(("Font Files", str(fonts['totalFontFiles']), None))
+                    if font_rows:
+                        _print_info_table("Fonts", font_rows)
 
                 # Form Details (from extended data)
                 forms = extended_data.get("forms", [])
                 if forms:
-                    click.echo("")
-                    click.echo(f"Forms ({len(forms)}):")
+                    form_list_rows = []
+                    form_colors = []
                     for form in forms:
-                        click.echo(f"  {form['id']}:")
-                        click.echo(f"    Method:          {form['method']}")
-                        if form["action"] and form["action"] != "JavaScript":
-                            action = form["action"]
-                            if len(action) > 50:
-                                action = action[:47] + "..."
-                            click.echo(f"    Action:          {action}")
-                        click.echo(f"    Fields:          {len(form['fields'])}")
-                        if form["issues"]:
-                            click.echo(f"    ⚠️  Issues:       {len(form['issues'])}")
-                            for issue in form["issues"][:3]:
-                                click.echo(f"      - {issue}")
-                            if len(form["issues"]) > 3:
-                                click.echo(f"      ... and {len(form['issues']) - 3} more")
+                        method = form['method']
+                        fields = len(form['fields'])
+                        action = _truncate_value(form["action"], 30) if form["action"] and form["action"] != "JavaScript" else "-"
+                        issues = len(form.get("issues", []))
+                        issue_text = f"⚠️ {issues}" if issues > 0 else "0"
+                        form_list_rows.append([form['id'], method, action, str(fields), issue_text])
+                        form_colors.append([None, None, None, None, "yellow" if issues > 0 else None])
+                    _print_list_table(f"Forms ({len(forms)})", ["ID", "Method", "Action", "Fields", "Issues"], form_list_rows, [20, 8, 25, 8, 8], form_colors)
 
                 # Core Web Vitals (from extended data)
                 cwv = extended_data.get("coreWebVitals", {})
                 if cwv:
-                    click.echo("")
-                    click.echo("Core Web Vitals:")
+                    cwv_rows = []
                     if "cls" in cwv:
                         cls_val = float(cwv["cls"])
-                        cls_status = (
-                            "✓ Good"
-                            if cls_val < 0.1
-                            else "⚠️  Needs Improvement"
-                            if cls_val < 0.25
-                            else "❌ Poor"
-                        )
-                        click.echo(f"  CLS:               {cwv['cls']} ({cls_status})")
+                        if cls_val < 0.1:
+                            cls_status, cls_color = "✓ Good", "green"
+                        elif cls_val < 0.25:
+                            cls_status, cls_color = "⚠️ Needs Improvement", "yellow"
+                        else:
+                            cls_status, cls_color = "❌ Poor", "red"
+                        cwv_rows.append(("CLS", f"{cwv['cls']} ({cls_status})", cls_color))
                     if "fid" in cwv:
                         fid_val = int(cwv["fid"])
-                        fid_status = (
-                            "✓ Good"
-                            if fid_val < 100
-                            else "⚠️  Needs Improvement"
-                            if fid_val < 300
-                            else "❌ Poor"
-                        )
-                        click.echo(f"  FID:               {cwv['fid']}ms ({fid_status})")
+                        if fid_val < 100:
+                            fid_status, fid_color = "✓ Good", "green"
+                        elif fid_val < 300:
+                            fid_status, fid_color = "⚠️ Needs Improvement", "yellow"
+                        else:
+                            fid_status, fid_color = "❌ Poor", "red"
+                        cwv_rows.append(("FID", f"{cwv['fid']}ms ({fid_status})", fid_color))
                     if "inp" in cwv:
                         inp_val = int(cwv["inp"])
-                        inp_status = (
-                            "✓ Good"
-                            if inp_val < 200
-                            else "⚠️  Needs Improvement"
-                            if inp_val < 500
-                            else "❌ Poor"
-                        )
-                        click.echo(f"  INP:               {cwv['inp']}ms ({inp_status})")
+                        if inp_val < 200:
+                            inp_status, inp_color = "✓ Good", "green"
+                        elif inp_val < 500:
+                            inp_status, inp_color = "⚠️ Needs Improvement", "yellow"
+                        else:
+                            inp_status, inp_color = "❌ Poor", "red"
+                        cwv_rows.append(("INP", f"{cwv['inp']}ms ({inp_status})", inp_color))
+                    if cwv_rows:
+                        _print_info_table("Core Web Vitals", cwv_rows)
 
                 # Security Headers and Response Headers
                 headers = _get_response_headers(data.get("url"))
@@ -1173,16 +1311,13 @@ def info(extended, output_json):
                         "xXssProtection": "X-XSS-Protection",
                     }
 
-                    has_security_headers = any(headers.get(k) for k in security_headers)
-                    if has_security_headers:
-                        click.echo("")
-                        click.echo("Security Headers:")
-                        for key, label in security_headers.items():
-                            value = headers.get(key)
-                            if value:
-                                if len(value) > 60:
-                                    value = value[:57] + "..."
-                                click.echo(f"  {label}: {value}")
+                    sec_header_rows = []
+                    for key, label in security_headers.items():
+                        value = headers.get(key)
+                        if value:
+                            sec_header_rows.append((label, _truncate_value(value, 55), None))
+                    if sec_header_rows:
+                        _print_info_table("Security Headers", sec_header_rows)
 
                     # Response Headers
                     response_headers = {
@@ -1194,38 +1329,30 @@ def info(extended, output_json):
                         "contentType": "Content-Type",
                     }
 
-                    has_response_headers = any(headers.get(k) for k in response_headers)
-                    if has_response_headers:
-                        click.echo("")
-                        click.echo("Response Headers:")
-                        for key, label in response_headers.items():
-                            value = headers.get(key)
-                            if value:
-                                if len(value) > 60:
-                                    value = value[:57] + "..."
-                                click.echo(f"  {label}: {value}")
+                    resp_header_rows = []
+                    for key, label in response_headers.items():
+                        value = headers.get(key)
+                        if value:
+                            resp_header_rows.append((label, _truncate_value(value, 55), None))
+                    if resp_header_rows:
+                        _print_info_table("Response Headers", resp_header_rows)
 
                 # Meta tags
                 meta_tags = data.get("metaTags", [])
                 if meta_tags:
-                    click.echo("")
-                    click.echo(f"Meta Tags ({len(meta_tags)}):")
+                    meta_rows = []
                     for meta in meta_tags:
                         # Format meta tag nicely
                         if "name" in meta and "content" in meta:
-                            content = meta["content"]
-                            if len(content) > 60:
-                                content = content[:57] + "..."
-                            click.echo(f"  {meta['name']}: {content}")
+                            meta_rows.append((meta['name'], _truncate_value(meta["content"]), None))
                         elif "property" in meta and "content" in meta:
-                            content = meta["content"]
-                            if len(content) > 60:
-                                content = content[:57] + "..."
-                            click.echo(f"  {meta['property']}: {content}")
+                            meta_rows.append((meta['property'], _truncate_value(meta["content"]), None))
                         elif "charset" in meta:
-                            click.echo(f"  charset: {meta['charset']}")
+                            meta_rows.append(("charset", meta['charset'], None))
                         elif "http-equiv" in meta:
-                            click.echo(f"  {meta['http-equiv']}: {meta.get('content', '')}")
+                            meta_rows.append((meta['http-equiv'], meta.get('content', ''), None))
+                    if meta_rows:
+                        _print_info_table(f"Meta Tags ({len(meta_tags)})", meta_rows)
         else:
             click.echo(f"Error: {result.get('error')}", err=True)
             sys.exit(1)
@@ -1240,15 +1367,18 @@ def repl():
     """
     Start an interactive REPL session.
 
-    Execute JavaScript interactively. Type 'exit' or press Ctrl+D to quit.
+    Execute JavaScript interactively. Console output is shown automatically.
+    Type 'exit' or press Ctrl+D to quit.
     """
+    from datetime import datetime, timezone
+
     client = BridgeClient()
 
     if not client.is_alive():
-        click.echo("Error: Bridge server is not running. Start it with: inspekt server start", err=True)
+        click.echo("Error: Bridge server is not running. Start it with: inspekt start", err=True)
         sys.exit(1)
 
-    click.echo("Zen Browser REPL - Type JavaScript code, 'exit' to quit")
+    click.echo("Inspekt REPL - Type JavaScript code, 'exit' to quit")
     click.echo("")
 
     # Get initial page info
@@ -1260,12 +1390,12 @@ def repl():
                 f"Connected to: {data.get('title', 'Unknown')} ({data.get('url', 'Unknown')})"
             )
             click.echo("")
-    except:
+    except Exception:
         pass
 
     while True:
         try:
-            code = click.prompt("zen>", prompt_suffix=" ", default="", show_default=False)
+            code = click.prompt("inspekt>", prompt_suffix=" ", default="", show_default=False)
 
             if not code.strip():
                 continue
@@ -1274,10 +1404,22 @@ def repl():
                 break
 
             try:
+                # Get timestamp before execution
+                before_ts = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+
                 result = client.execute(code, timeout=10.0)
+
+                # Show console output
+                console_entries = _get_console_logs_since(before_ts)
+                if console_entries:
+                    for entry in console_entries:
+                        click.echo(_format_console_entry(entry))
+
+                # Show return value
                 output = format_output(result, "auto")
-                if output:
-                    click.echo(output)
+                if output and output.strip():
+                    click.echo(click.style("← ", dim=True) + output)
+
             except (ConnectionError, TimeoutError, RuntimeError) as e:
                 click.echo(f"Error: {e}", err=True)
 
@@ -1339,7 +1481,7 @@ def download(output, list_only, output_json, timeout):
     client = BridgeClient()
 
     if not client.is_alive():
-        click.echo("Error: Bridge server is not running. Start it with: inspekt server start", err=True)
+        click.echo("Error: Bridge server is not running. Start it with: inspekt start", err=True)
         sys.exit(1)
 
     # Execute the find_downloads script
@@ -1600,7 +1742,7 @@ def md_link(output_json):
     client = BridgeClient()
 
     if not client.is_alive():
-        click.echo("Error: Bridge server is not running. Start it with: inspekt server start", err=True)
+        click.echo("Error: Bridge server is not running. Start it with: inspekt start", err=True)
         sys.exit(1)
 
     # Get current page URL and title

@@ -127,6 +127,10 @@ cli.add_lazy_command("network", "network", "network")
 # Page saving commands (from save.py)
 cli.add_lazy_command("save", "save", "save")
 
+# Console message commands (from console.py)
+cli.add_lazy_command("console", "console", "console")
+cli.add_lazy_command("log", "console", "log_expression")  # Shorthand for `console log`
+
 
 # ============================================================================
 # Export main CLI
