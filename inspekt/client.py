@@ -135,8 +135,8 @@ class BridgeClient:
                 click.echo(f"\nDomain not added. You can add it later with:", err=True)
                 click.echo(f"  inspekt domain add {normalized}", err=True)
                 click.echo("", err=True)
-                click.echo("Or temporarily allow all domains with:", err=True)
-                click.echo("  inspekt domain bypass [DURATION IN MINUTES]", err=True)
+                click.echo("Or bypass all domain checks for 1 hour with:", err=True)
+                click.echo("  inspekt yolo", err=True)
                 return False
 
             # Add domain to SQLite
@@ -157,10 +157,7 @@ class BridgeClient:
 
             click.echo("")
 
-            # Give browser time to update its internal state
-            time.sleep(1.0)
-
-            # Retry execution
+            # Retry execution (no sleep needed - sync confirmation means browser has updated)
             self._last_retry_result = self.execute(code, timeout=timeout, _skip_domain_check=True)
             return self._last_retry_result.get("ok", False)
 
@@ -170,7 +167,12 @@ class BridgeClient:
             return False
 
     def _sync_domains_to_browser(self) -> bool:
-        """Sync domains from SQLite to browser extension. Returns True if successful."""
+        """
+        Sync domains from SQLite to browser extension.
+
+        Returns True only if at least one browser confirmed the sync.
+        This ensures the browser has actually updated its storage.
+        """
         _verbose_log("Syncing domains to browser extension")
         try:
             from inspekt.services.domain_service import get_domain_service
@@ -185,7 +187,10 @@ class BridgeClient:
             _verbose_log("Sync response", f"status={response.status_code}, time={time.time() - sync_start:.3f}s")
             if response.status_code == 200:
                 data = response.json()
-                return data.get("ok", False)
+                # Check browsers_synced > 0 for actual confirmation
+                browsers_synced = data.get("browsers_synced", 0)
+                _verbose_log("Browsers synced", browsers_synced)
+                return data.get("ok", False) and browsers_synced > 0
             return False
         except Exception as e:
             _verbose_log("Sync failed", str(e))

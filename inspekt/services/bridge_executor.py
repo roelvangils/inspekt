@@ -11,6 +11,7 @@ This service wraps the BridgeClient to provide:
 
 from __future__ import annotations
 
+import os
 import sys
 import time
 from pathlib import Path
@@ -19,6 +20,18 @@ from typing import Any
 import click
 
 from inspekt.client import BridgeClient
+
+
+def _verbose_log(message: str, data: Any = None) -> None:
+    """Log verbose output if INSPEKT_VERBOSE is set."""
+    if os.environ.get('INSPEKT_VERBOSE') != '1':
+        return
+
+    timestamp = time.strftime('%H:%M:%S')
+    if data is not None:
+        click.echo(f"[{timestamp}] {message}: {data}", err=True)
+    else:
+        click.echo(f"[{timestamp}] {message}", err=True)
 
 
 class BridgeExecutor:
@@ -71,7 +84,7 @@ class BridgeExecutor:
         """
         if not self.is_server_running():
             click.echo(
-                "Error: Bridge server is not running. Start it with: inspekt server start",
+                "Error: Bridge server is not running. Start it with: inspekt start",
                 err=True,
             )
             sys.exit(1)
@@ -98,6 +111,7 @@ class BridgeExecutor:
         code: str,
         timeout: float = 10.0,
         retry_on_timeout: bool = False,
+        skip_domain_check: bool = False,
     ) -> dict[str, Any]:
         """
         Execute JavaScript code in browser with error handling and optional retries.
@@ -106,6 +120,7 @@ class BridgeExecutor:
             code: JavaScript code to execute
             timeout: Maximum time to wait for result in seconds
             retry_on_timeout: If True, retry on TimeoutError
+            skip_domain_check: If True, skip the pre-execution domain check
 
         Returns:
             Dictionary with execution result:
@@ -120,7 +135,11 @@ class BridgeExecutor:
         Raises:
             SystemExit: If execution fails after retries
         """
+        _verbose_log("Starting execution", {"timeout": timeout, "retry_on_timeout": retry_on_timeout})
+        start_time = time.time()
+
         self.ensure_server_running()
+        _verbose_log("Server check passed", f"{time.time() - start_time:.3f}s")
 
         # Check for active browser connections immediately
         if not self.has_active_browser_connection():
@@ -129,28 +148,49 @@ class BridgeExecutor:
                 err=True,
             )
             sys.exit(1)
+        _verbose_log("Browser connection check passed", f"{time.time() - start_time:.3f}s")
+
+        # Fast domain pre-check (avoids long timeout on unauthorized domains)
+        if not skip_domain_check:
+            _verbose_log("Checking domain permission")
+            if not self._check_domain_and_prompt():
+                # User declined to add domain
+                sys.exit(1)
+            _verbose_log("Domain check passed", f"{time.time() - start_time:.3f}s")
 
         retries = self.max_retries if retry_on_timeout else 1
         delay = self.retry_delay
 
         for attempt in range(retries):
             try:
+                _verbose_log(f"Sending code to browser (attempt {attempt + 1}/{retries})")
+                exec_start = time.time()
                 result = self.client.execute(code, timeout=timeout)
+                _verbose_log(f"Execution completed", f"{time.time() - exec_start:.3f}s")
 
-                # Check if this is a domain permission error
+                # Check if this is a domain permission error (fallback for edge cases)
                 if not result.get("ok"):
-                    error_msg = result.get("error", "")
-                    if "Domain not authorized" in error_msg or "not authorized" in error_msg.lower():
+                    error_msg = result.get("error", "").lower()
+                    # Check for various forms of domain authorization errors
+                    is_domain_error = any(phrase in error_msg for phrase in [
+                        "domain not authorized",
+                        "not allowed to access this domain",
+                        "not authorized",
+                        "domain is not in the allowed list"
+                    ])
+
+                    if is_domain_error:
                         # Extract domain from URL
                         url = result.get("url", "")
                         domain = self._extract_domain_from_url(url)
 
                         if domain and self._prompt_add_domain(domain):
                             # User agreed to add domain, retry execution
-                            # Give browser a moment to sync
-                            time.sleep(1)
+                            # Sync confirmation already handled in _prompt_add_domain
                             result = self.client.execute(code, timeout=timeout)
 
+                _verbose_log("Total execution time", f"{time.time() - start_time:.3f}s")
+                _verbose_log("Result status", {"ok": result.get("ok"), "has_error": "error" in result})
                 return result
 
             except TimeoutError as e:
@@ -180,9 +220,74 @@ class BridgeExecutor:
 
         try:
             parsed = urlparse(url)
-            return parsed.netloc or parsed.hostname
+            hostname = parsed.netloc or parsed.hostname
+            # Remove port if present
+            if hostname and ':' in hostname:
+                hostname = hostname.split(':')[0]
+            return hostname
         except Exception:
             return None
+
+    def _is_domain_allowed(self, domain: str) -> bool:
+        """Check if domain is in the allowed list (SQLite) or yolo mode is active."""
+        from inspekt.services.domain_service import get_domain_service
+
+        try:
+            service = get_domain_service()
+            # is_allowed() already checks yolo mode first
+            return service.is_allowed(domain)
+        except Exception:
+            return True  # Assume allowed on error
+
+    def _quick_get_current_domain(self) -> str | None:
+        """
+        Quickly get the current page domain (2s timeout).
+
+        Returns domain string or None if unable to retrieve.
+        """
+        _verbose_log("Getting current domain (quick check)")
+        try:
+            result = self.client.execute("location.href", timeout=2.0)
+            if result.get("ok"):
+                # Successful execution - URL is in result
+                url = result.get("result", "")
+                domain = self._extract_domain_from_url(url)
+                _verbose_log("Current domain", domain)
+                return domain
+            else:
+                # Execution blocked (e.g., domain not authorized)
+                # URL is still returned in the response
+                url = result.get("url", "")
+                if url:
+                    domain = self._extract_domain_from_url(url)
+                    _verbose_log("Current domain (from blocked response)", domain)
+                    return domain
+        except Exception as e:
+            _verbose_log("Failed to get current domain", str(e))
+        return None
+
+    def _check_domain_and_prompt(self) -> bool:
+        """
+        Check if current domain is allowed, prompt to add if not.
+
+        Returns:
+            True if domain is allowed (or was added), False if user declined
+        """
+        domain = self._quick_get_current_domain()
+
+        if domain is None:
+            _verbose_log("Could not determine current domain, proceeding")
+            # Couldn't get domain, proceed with normal execution
+            return True
+
+        is_allowed = self._is_domain_allowed(domain)
+        _verbose_log(f"Domain '{domain}' allowed", is_allowed)
+
+        if is_allowed:
+            return True
+
+        # Domain not allowed - prompt user
+        return self._prompt_add_domain(domain)
 
     def _prompt_add_domain(self, domain: str) -> bool:
         """
@@ -192,52 +297,67 @@ class BridgeExecutor:
             True if domain was added, False otherwise
         """
         import requests
-        from inspekt.services.domain_service import get_domain_service
+        from inspekt.services.domain_service import get_domain_service, normalize_domain
 
         try:
+            # Normalize the domain (strip www. prefix)
+            normalized = normalize_domain(domain)
+
             # Show helpful message
-            click.echo(f"\nSorry, I'm not allowed to access this domain.", err=True)
+            click.echo(f"\nDomain '{normalized}' is not in the allowed list.", err=True)
             click.echo(f"", err=True)
 
             # Prompt user
             response = click.prompt(
-                f'Would you like to add "{domain}" to the allowed list? [y/N]',
+                f'Would you like to add it now? [Y/n]',
                 type=str,
-                default="N",
+                default="Y",
                 show_default=False
             )
 
-            if response.lower() not in ('y', 'yes'):
+            if response.lower() in ('n', 'no'):
                 click.echo(f"\nDomain not added. You can add it later with:", err=True)
-                click.echo(f"  inspekt domain add {domain}", err=True)
+                click.echo(f"  inspekt domain add {normalized}", err=True)
                 click.echo(f"", err=True)
-                click.echo(f"Or temporarily allow all domains with:", err=True)
-                click.echo(f"  inspekt domain bypass [DURATION IN MINUTES]", err=True)
+                click.echo(f"Or bypass all domain checks for 1 hour with:", err=True)
+                click.echo(f"  inspekt yolo", err=True)
                 return False
 
-            # Add to SQLite
+            # Add to SQLite (automatically normalized)
             domain_service = get_domain_service()
-            result = domain_service.add_domain(domain)
+            result = domain_service.add_domain(normalized)
 
             if not result.get("ok"):
                 click.echo(f"Error: Failed to add domain to database", err=True)
                 return False
 
-            click.echo(f"✓ Domain added: {domain}")
+            stored_domain = result.get("domain", normalized)
+            click.echo(f"✓ Domain added: {stored_domain}")
 
-            # Sync to browser extension
+            # Sync to browser extension with confirmation
             try:
+                _verbose_log("Syncing domains to browser extension")
+                sync_start = time.time()
+                domains = domain_service.get_domains_for_browser_sync()
                 sync_response = requests.post(
                     f"http://{self.host}:{self.port}/domains/sync",
-                    timeout=5.0
+                    json={"domains": domains},
+                    timeout=10.0  # Wait for browser confirmation
                 )
+                _verbose_log("Sync response", f"status={sync_response.status_code}, time={time.time() - sync_start:.3f}s")
                 if sync_response.status_code == 200:
-                    click.echo("✓ Synced to browser extension")
-                else:
-                    click.echo("Warning: Failed to sync to browser (domain saved to database)", err=True)
+                    data = sync_response.json()
+                    browsers_synced = data.get("browsers_synced", 0)
+                    _verbose_log("Browsers synced", browsers_synced)
+                    if data.get("ok") and browsers_synced > 0:
+                        click.echo("✓ Synced to browser extension")
+                    else:
+                        click.echo("⚠ Browser sync pending", err=True)
             except Exception as e:
-                click.echo(f"Warning: Failed to sync to browser: {e}", err=True)
+                _verbose_log("Sync failed (non-critical)", str(e))
+                click.echo("⚠ Browser sync pending", err=True)
 
+            click.echo("")  # Blank line before continuing
             return True
 
         except Exception as e:
@@ -249,6 +369,7 @@ class BridgeExecutor:
         filepath: str | Path,
         timeout: float = 10.0,
         retry_on_timeout: bool = False,
+        skip_domain_check: bool = False,
     ) -> dict[str, Any]:
         """
         Execute JavaScript from a file.
@@ -257,6 +378,7 @@ class BridgeExecutor:
             filepath: Path to JavaScript file
             timeout: Maximum time to wait for result in seconds
             retry_on_timeout: If True, retry on TimeoutError
+            skip_domain_check: If True, skip the pre-execution domain check
 
         Returns:
             Dictionary with execution result
@@ -271,7 +393,7 @@ class BridgeExecutor:
             click.echo(f"Error reading file {filepath}: {e}", err=True)
             sys.exit(1)
 
-        return self.execute(code, timeout=timeout, retry_on_timeout=retry_on_timeout)
+        return self.execute(code, timeout=timeout, retry_on_timeout=retry_on_timeout, skip_domain_check=skip_domain_check)
 
     def execute_with_script(
         self,
@@ -279,6 +401,7 @@ class BridgeExecutor:
         substitutions: dict[str, str] | None = None,
         timeout: float = 10.0,
         retry_on_timeout: bool = False,
+        skip_domain_check: bool = False,
     ) -> dict[str, Any]:
         """
         Execute a helper script with template substitutions.
@@ -288,6 +411,7 @@ class BridgeExecutor:
             substitutions: Dictionary of placeholder -> value substitutions
             timeout: Maximum time to wait for result in seconds
             retry_on_timeout: If True, retry on TimeoutError
+            skip_domain_check: If True, skip the pre-execution domain check
 
         Returns:
             Dictionary with execution result
@@ -305,7 +429,7 @@ class BridgeExecutor:
             click.echo(f"Error: {e}", err=True)
             sys.exit(1)
 
-        return self.execute(code, timeout=timeout, retry_on_timeout=retry_on_timeout)
+        return self.execute(code, timeout=timeout, retry_on_timeout=retry_on_timeout, skip_domain_check=skip_domain_check)
 
     def check_result_ok(self, result: dict[str, Any]) -> None:
         """

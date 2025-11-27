@@ -132,6 +132,9 @@ cli.add_lazy_command("save", "save", "save")
 cli.add_lazy_command("console", "console", "console")
 cli.add_lazy_command("log", "console", "log_expression")  # Shorthand for `console log`
 
+# Yolo mode (top-level command from domain.py)
+cli.add_lazy_command("yolo", "domain", "yolo")
+
 
 # ============================================================================
 # Export main CLI
