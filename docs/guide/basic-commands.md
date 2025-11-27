@@ -8,62 +8,177 @@ Before you can use any commands, the bridge server must be running.
 
 ### Starting the Server
 
-=== "Background Mode (Recommended)"
+=== "Start All Servers (Recommended)"
     ```bash
-    inspekt server start --daemon
+    inspekt start
     ```
 
-    Starts the server in the background. You can close your terminal and the server keeps running.
+    Starts both the bridge server and API server in daemon mode (background). Servers keep running even if you close your terminal.
+
+=== "Start Bridge Only"
+    ```bash
+    inspekt start --bridge-only
+    ```
+
+    Start only the bridge server. Useful if you don't need the HTTP API.
 
 === "Foreground Mode"
     ```bash
-    inspekt server start
+    inspekt start --bridge-only --foreground
     ```
 
     Starts the server in foreground mode. Useful for debugging. Press `Ctrl+C` to stop.
 
-=== "Custom Port"
+=== "Custom Ports"
     ```bash
-    inspekt server start --port 9000 --daemon
+    inspekt start --bridge-port 9000 --api-port 3000
     ```
 
-    Start on a different port (default is 8765).
+    Start on different ports (defaults: bridge=8765, API=8000).
 
 !!! tip "Auto-start on Login"
-    On macOS/Linux, you can create a launch agent or systemd service to start the server automatically when you log in.
+    On macOS/Linux, you can create a launch agent or systemd service to start the servers automatically when you log in.
 
 ### Checking Server Status
 
 ```bash
-inspekt server status
+inspekt status
 ```
 
 **Example output:**
 ```
-Bridge server is running
-  Pending requests:   0
-  Completed requests: 42
+Inspekt Server Status
+
+============================================================
+BRIDGE SERVER
+============================================================
+
+Server Information:
+  Version:           1.0.0
+  Uptime:            2h 15m 30s
+  HTTP API:          http://127.0.0.1:8765
+  WebSocket:         ws://127.0.0.1:8766
+
+Connected Browser Instances:
+  Total:             1 active connection
+
+Request Statistics:
+  Pending:           0
+  Total Processed:   42 (since startup)
+  Succeeded:         42
+  Failed:            0
+
+============================================================
+API SERVER
+============================================================
+
+✓ Running
+  Port:              8000
+  URL:               http://localhost:8000
 ```
 
-Shows:
-- Whether the server is running
-- Number of pending requests
-- Total completed requests since server started
+Shows comprehensive information including:
+- Server version and uptime
+- Connected browsers
+- Request statistics
+- API server status
 
 ### Stopping the Server
 
 ```bash
-inspekt server stop
+inspekt stop
 ```
 
-Only works if the server is running in foreground mode. For daemon mode, use:
+Stops both bridge and API servers running in daemon mode.
+
+=== "Stop All Servers"
+    ```bash
+    inspekt stop
+    ```
+
+=== "Stop Only API Server"
+    ```bash
+    inspekt stop --api-only
+    ```
+
+=== "Stop Only Bridge Server"
+    ```bash
+    inspekt stop --bridge-only
+    ```
+
+!!! tip "Foreground Mode"
+    If running servers in foreground mode, press `Ctrl+C` to stop them.
+
+### Restarting the Server
 
 ```bash
-pkill -f "inspekt server"
+inspekt restart
 ```
 
-!!! warning "Daemon Mode Limitation"
-    There's no built-in daemon stop command yet. Use `pkill` as shown above.
+Stops and restarts both servers. Useful after configuration changes or when applying updates.
+
+---
+
+## Request Queue Management
+
+The bridge server maintains a queue of pending requests. If requests get stuck (e.g., browser disconnects before responding), you can inspect and clear the queue.
+
+### Checking Queue Status
+
+```bash
+inspekt queue status
+```
+
+**Example output:**
+```
+Queue Status
+
+  Pending requests:   3
+  Completed (cached): 12
+
+Pending Requests:
+  ID         Age        Type
+  a1b2c3d4   45.2s      execute
+  e5f6g7h8   32.1s      execute
+  i9j0k1l2   12.8s      execute
+
+⚠️  3 request(s) pending for >10 seconds
+```
+
+Shows:
+- Number of pending and completed requests
+- Details of each pending request (ID, age, type)
+- Warning if requests are stuck for too long
+
+### Clearing Stuck Requests
+
+```bash
+# Clear all pending requests
+inspekt queue clear
+
+# Clear only requests older than 30 seconds
+inspekt queue clear --older-than 30
+
+# Skip confirmation prompt
+inspekt queue clear --force
+```
+
+**Example output:**
+```
+✓ Cleared 3 pending request(s)
+  Remaining: 0
+```
+
+### Automatic Cleanup
+
+The bridge server includes automatic cleanup:
+
+- **Background watchdog** - Runs every 30 seconds, removes stale requests
+- **Warning logs** - Alerts when requests are stuck for >60 seconds
+- **Auto-expiration** - Requests older than 2 minutes are automatically removed
+
+!!! tip "When to Clear the Queue"
+    Use `inspekt queue clear` if you see repeated timeouts or if `inspekt status` shows many pending requests. This is faster than restarting the server.
 
 ---
 
@@ -551,10 +666,10 @@ inspekt eval "document.querySelector('.modal')?.offsetParent !== null"
 **Server not running:**
 ```
 Error: Bridge server is not running
-Please start the server with: inspekt server start
+Please start the server with: inspekt start
 ```
 
-**Solution:** Start the server with `inspekt server start --daemon`
+**Solution:** Start the server with `inspekt start`
 
 **No browser connection:**
 ```
@@ -636,8 +751,12 @@ Check your browser console to see the log output.
 
 | Command | Purpose | Example |
 |---------|---------|---------|
-| `inspekt server start --daemon` | Start server in background | - |
-| `inspekt server status` | Check server status | - |
+| `inspekt start` | Start servers in background | `inspekt start --bridge-only` |
+| `inspekt stop` | Stop servers | `inspekt stop --api-only` |
+| `inspekt restart` | Restart servers | `inspekt restart` |
+| `inspekt status` | Check server status | - |
+| `inspekt queue status` | Check request queue | - |
+| `inspekt queue clear` | Clear stuck requests | `inspekt queue clear --older-than 30` |
 | `inspekt eval "code"` | Execute JavaScript | `inspekt eval "document.title"` |
 | `inspekt exec file.js` | Execute file | `inspekt exec script.js` |
 | `inspekt info` | Get page info | `inspekt info --extended` |

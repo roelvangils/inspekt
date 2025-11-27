@@ -104,7 +104,7 @@ def describe(language, debug, force_refresh):
     client = BridgeClient()
 
     if not client.is_alive():
-        click.echo("Error: Bridge server is not running. Start it with: inspekt server start", err=True)
+        click.echo("Error: Bridge server is not running. Start it with: inspekt start", err=True)
         sys.exit(1)
 
     # Load and execute the extraction script
@@ -342,7 +342,7 @@ def do(instruction, debug, no_execute, force_ai):
     client = BridgeClient()
 
     if not client.is_alive():
-        click.echo("Error: Bridge server is not running. Start it with: inspekt server start", err=True)
+        click.echo("Error: Bridge server is not running. Start it with: inspekt start", err=True)
         sys.exit(1)
 
     # Load and execute the extraction script
@@ -678,6 +678,53 @@ def do(instruction, debug, no_execute, force_ai):
         sys.exit(1)
 
 
+def _process_outline_headings(headings: list) -> list:
+    """
+    Process headings to:
+    1. Insert placeholders for missing heading levels
+    2. Mark duplicates (2nd+ occurrence)
+    3. Pass through ARIA type info
+    """
+    processed = []
+    seen_texts = {}  # text -> first occurrence (case-insensitive)
+    expected_level = 1  # Track expected next level
+
+    for heading in headings:
+        level = heading["level"]
+        text = heading["text"]
+        text_lower = text.lower().strip()
+
+        # Insert missing levels before this heading
+        while expected_level < level:
+            processed.append({
+                "level": expected_level,
+                "text": "",
+                "type": "missing",
+                "is_missing": True,
+                "is_duplicate": False
+            })
+            expected_level += 1
+
+        # Check for duplicates (2nd+ occurrence only, skip empty text)
+        is_duplicate = text_lower and text_lower in seen_texts
+        if text_lower and not is_duplicate:
+            seen_texts[text_lower] = True
+
+        processed.append({
+            "level": level,
+            "text": text,
+            "type": heading.get("type", "native"),
+            "is_missing": False,
+            "is_duplicate": is_duplicate
+        })
+
+        # Update expected level: after H2, expect H2 or H3 next
+        # But if next heading is H1 again, that resets context
+        expected_level = level + 1
+
+    return processed
+
+
 @click.command()
 @click.option("--json", "output_json", is_flag=True, help="Output as JSON")
 def outline(output_json):
@@ -685,7 +732,7 @@ def outline(output_json):
     Display the page's heading structure as a nested outline.
 
     Shows all headings (H1-H6 and ARIA headings) in a hierarchical view.
-    Heading levels are shown in gray, text in white.
+    Indicates missing levels (red), duplicates (yellow), and ARIA headings (gray).
 
     Examples:
         zen outline
@@ -694,7 +741,7 @@ def outline(output_json):
     client = BridgeClient()
 
     if not client.is_alive():
-        click.echo("Error: Bridge server is not running. Start it with: inspekt server start", err=True)
+        click.echo("Error: Bridge server is not running. Start it with: inspekt start", err=True)
         sys.exit(1)
 
     # Load and execute the extract_outline script
@@ -724,10 +771,20 @@ def outline(output_json):
                 click.echo("No headings found on this page.", err=True)
             sys.exit(0)
 
+        # Process headings to detect missing levels and duplicates
+        processed_headings = _process_outline_headings(headings)
+
+        # Calculate counts
+        total_real = len([h for h in processed_headings if not h.get("is_missing")])
+        missing_count = len([h for h in processed_headings if h.get("is_missing")])
+        duplicate_count = len([h for h in processed_headings if h.get("is_duplicate")])
+
         if output_json:
             output_data = {
-                "headings": headings,
-                "count": len(headings),
+                "headings": processed_headings,
+                "count": total_real,
+                "missing_count": missing_count,
+                "duplicate_count": duplicate_count,
                 "url": data.get("url", ""),
                 "title": data.get("title", "")
             }
@@ -735,26 +792,50 @@ def outline(output_json):
             return
 
         # Display the outline with proper indentation
-        for heading in headings:
+        for heading in processed_headings:
             level = heading["level"]
-            text = heading["text"]
+            is_missing = heading.get("is_missing", False)
+            is_duplicate = heading.get("is_duplicate", False)
+            is_aria = heading.get("type") == "aria"
 
-            # Calculate indentation (3 spaces per level, starting at level 1)
+            # Calculate indentation (3 spaces per level)
             indent = "   " * (level - 1)
 
-            # Format: H{level} in gray, text in white
-            level_label = click.style(f"H{level}", fg="bright_black")
-            heading_text = text
+            if is_missing:
+                # Missing level: red label and [Missing] text
+                level_label = click.style(f"H{level}", fg="red")
+                heading_text = click.style("[Missing]", fg="red")
+            else:
+                # Normal heading: gray label
+                level_label = click.style(f"H{level}", fg="bright_black")
+                text = heading["text"]
 
-            # Truncate very long headings
-            if len(heading_text) > 100:
-                heading_text = heading_text[:97] + "..."
+                # Truncate very long headings
+                if len(text) > 100:
+                    text = text[:97] + "..."
+
+                heading_text = text
+
+                # Add indicators
+                indicators = []
+                if is_duplicate:
+                    indicators.append(click.style("[Duplicate]", fg="yellow"))
+                if is_aria:
+                    indicators.append(click.style("[ARIA]", fg="bright_black"))
+
+                if indicators:
+                    heading_text = f"{heading_text} {' '.join(indicators)}"
 
             click.echo(f"{indent}{level_label} {heading_text}")
 
-        # Show summary
+        # Show summary with issue counts
         click.echo("", err=True)
-        click.echo(f"Total: {len(headings)} headings", err=True)
+        summary_parts = [f"Total: {total_real} headings"]
+        if missing_count:
+            summary_parts.append(click.style(f"{missing_count} missing", fg="red"))
+        if duplicate_count:
+            summary_parts.append(click.style(f"{duplicate_count} duplicates", fg="yellow"))
+        click.echo(" | ".join(summary_parts), err=True)
 
     except (ConnectionError, TimeoutError, RuntimeError) as e:
         click.echo(f"Error: {e}", err=True)
@@ -943,7 +1024,7 @@ def links(only_internal, only_external, alphabetically, only_urls, output_json, 
     client = BridgeClient()
 
     if not client.is_alive():
-        click.echo("Error: Bridge server is not running. Start it with: inspekt server start", err=True)
+        click.echo("Error: Bridge server is not running. Start it with: inspekt start", err=True)
         sys.exit(1)
 
     # Check for conflicting flags
@@ -1105,7 +1186,7 @@ def summarize(format, language, debug, force_refresh):
     client = BridgeClient()
 
     if not client.is_alive():
-        click.echo("Error: Bridge server is not running. Start it with: inspekt server start", err=True)
+        click.echo("Error: Bridge server is not running. Start it with: inspekt start", err=True)
         sys.exit(1)
 
     # Load and execute the extract_article script
@@ -1256,7 +1337,7 @@ def index(no_cache, output):
     client = BridgeClient()
 
     if not client.is_alive():
-        click.echo("Error: Bridge server is not running. Start it with: inspekt server start", err=True)
+        click.echo("Error: Bridge server is not running. Start it with: inspekt start", err=True)
         sys.exit(1)
 
     # Load and execute the index_page script
@@ -1433,7 +1514,7 @@ def ask(question, debug, no_cache):
     client = BridgeClient()
 
     if not client.is_alive():
-        click.echo("Error: Bridge server is not running. Start it with: inspekt server start", err=True)
+        click.echo("Error: Bridge server is not running. Start it with: inspekt start", err=True)
         sys.exit(1)
 
     # Initialize content cache for AI response caching

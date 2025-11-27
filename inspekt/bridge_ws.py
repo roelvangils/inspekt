@@ -53,8 +53,11 @@ pending_notifications: list = []
 # Events for long polling - notifies waiting HTTP requests when results arrive
 pending_events: dict[str, asyncio.Event] = {}
 
-# Cleanup old requests after 5 minutes
-MAX_REQUEST_AGE = 300
+# Cleanup old requests after 2 minutes (reduced from 5 to catch stuck requests faster)
+MAX_REQUEST_AGE = 120
+
+# Warn about requests stuck longer than this (seconds)
+STUCK_REQUEST_THRESHOLD = 60
 
 # Script loader service (singleton)
 script_loader = ScriptLoader()
@@ -161,6 +164,90 @@ def cleanup_old_requests():
         del completed_requests[req_id]
         # Clean up any associated events
         pending_events.pop(req_id, None)
+
+
+async def cleanup_watchdog():
+    """
+    Background task that proactively cleans up stale requests.
+    Runs every 30 seconds and logs warnings for stuck requests.
+    """
+    while True:
+        await asyncio.sleep(30)
+
+        now = time.time()
+        stuck_count = 0
+        oldest_age = 0
+        cleaned_count = 0
+
+        # Check and clean pending requests
+        for req_id, req in list(pending_requests.items()):
+            age = now - req["timestamp"]
+            if age > MAX_REQUEST_AGE:
+                # Auto-cleanup old requests
+                del pending_requests[req_id]
+                if req_id in pending_events:
+                    pending_events[req_id].set()  # Wake any waiters
+                    del pending_events[req_id]
+                cleaned_count += 1
+            elif age > STUCK_REQUEST_THRESHOLD:
+                stuck_count += 1
+                oldest_age = max(oldest_age, age)
+
+        # Log warning if requests are stuck
+        if stuck_count > 0:
+            print(f"[Warning] {stuck_count} request(s) pending for >{int(oldest_age)}s")
+
+        if cleaned_count > 0:
+            print(f"[Cleanup] Removed {cleaned_count} stale request(s)")
+
+
+def get_queue_stats() -> dict:
+    """Get current queue statistics."""
+    now = time.time()
+    pending_ages = [now - r["timestamp"] for r in pending_requests.values()]
+
+    return {
+        "pending_count": len(pending_requests),
+        "completed_count": len(completed_requests),
+        "oldest_pending_age": max(pending_ages) if pending_ages else 0,
+        "pending_requests": [
+            {
+                "request_id": rid,
+                "age_seconds": round(now - r["timestamp"], 1),
+                "type": r.get("type", "execute")
+            }
+            for rid, r in pending_requests.items()
+        ]
+    }
+
+
+def clear_queue(older_than: float = 0) -> dict:
+    """
+    Clear pending requests from the queue.
+
+    Args:
+        older_than: Only clear requests older than this many seconds (0 = all)
+
+    Returns:
+        Dict with cleared count and remaining count
+    """
+    now = time.time()
+    cleared = 0
+
+    for req_id, req in list(pending_requests.items()):
+        age = now - req["timestamp"]
+        if age >= older_than:
+            del pending_requests[req_id]
+            if req_id in pending_events:
+                pending_events[req_id].set()  # Wake any waiters
+                del pending_events[req_id]
+            cleared += 1
+
+    return {
+        "ok": True,
+        "cleared": cleared,
+        "remaining": len(pending_requests)
+    }
 
 
 async def sync_domains_to_browser(ws):
@@ -702,6 +789,31 @@ async def handle_http_health(request):
     )
 
 
+async def handle_http_queue_status(request):
+    """HTTP endpoint: Get queue statistics."""
+    stats = get_queue_stats()
+    return web.json_response(stats)
+
+
+async def handle_http_queue_clear(request):
+    """HTTP endpoint: Clear pending requests from the queue."""
+    try:
+        if request.body_exists:
+            data = await request.json()
+            older_than = data.get("older_than", 0)
+        else:
+            older_than = 0
+
+        result = clear_queue(older_than)
+        return web.json_response(result)
+
+    except Exception as e:
+        return web.json_response(
+            {"ok": False, "error": str(e)},
+            status=500
+        )
+
+
 async def handle_http_domain_add(request):
     """HTTP endpoint: Add a domain to allowed list."""
     try:
@@ -1143,6 +1255,114 @@ async def handle_http_get_har(request):
     return web.json_response(result.get("response", result))
 
 
+async def handle_http_get_console_logs(request):
+    """HTTP endpoint: Get captured console logs from browser.
+
+    Returns console.log/error/warn/info/debug messages that were captured
+    since the page loaded (or since last clear).
+    """
+    global most_recent_connection
+
+    if most_recent_connection is None:
+        return web.json_response(
+            {"ok": False, "error": "No browser connected"},
+            status=503
+        )
+
+    request_id = str(uuid.uuid4())
+    message = {
+        "type": "GET_CONSOLE_LOGS",
+        "requestId": request_id
+    }
+
+    # Store pending request
+    pending_requests[request_id] = {
+        "timestamp": time.time(),
+        "type": "GET_CONSOLE_LOGS"
+    }
+
+    # Send to browser
+    await most_recent_connection.send_json(message)
+
+    # Wait for response (with timeout)
+    event = asyncio.Event()
+    pending_events[request_id] = event
+
+    try:
+        await asyncio.wait_for(event.wait(), timeout=10.0)
+    except asyncio.TimeoutError:
+        pending_requests.pop(request_id, None)
+        pending_events.pop(request_id, None)
+        return web.json_response(
+            {"ok": False, "error": "Console logs request timed out"},
+            status=504
+        )
+
+    # Get result
+    result = completed_requests.pop(request_id, None)
+    pending_events.pop(request_id, None)
+
+    if result is None:
+        return web.json_response(
+            {"ok": False, "error": "No response received"},
+            status=500
+        )
+
+    return web.json_response(result.get("response", result))
+
+
+async def handle_http_clear_console_logs(request):
+    """HTTP endpoint: Clear the console logs buffer in browser."""
+    global most_recent_connection
+
+    if most_recent_connection is None:
+        return web.json_response(
+            {"ok": False, "error": "No browser connected"},
+            status=503
+        )
+
+    request_id = str(uuid.uuid4())
+    message = {
+        "type": "CLEAR_CONSOLE_LOGS",
+        "requestId": request_id
+    }
+
+    # Store pending request
+    pending_requests[request_id] = {
+        "timestamp": time.time(),
+        "type": "CLEAR_CONSOLE_LOGS"
+    }
+
+    # Send to browser
+    await most_recent_connection.send_json(message)
+
+    # Wait for response (with timeout)
+    event = asyncio.Event()
+    pending_events[request_id] = event
+
+    try:
+        await asyncio.wait_for(event.wait(), timeout=10.0)
+    except asyncio.TimeoutError:
+        pending_requests.pop(request_id, None)
+        pending_events.pop(request_id, None)
+        return web.json_response(
+            {"ok": False, "error": "Clear console logs request timed out"},
+            status=504
+        )
+
+    # Get result
+    result = completed_requests.pop(request_id, None)
+    pending_events.pop(request_id, None)
+
+    if result is None:
+        return web.json_response(
+            {"ok": False, "error": "No response received"},
+            status=500
+        )
+
+    return web.json_response(result.get("response", result))
+
+
 async def handle_static_singlefile(request):
     """Serve the combined SingleFile library as a single JavaScript file."""
     from pathlib import Path
@@ -1215,6 +1435,10 @@ async def main():
     app.router.add_get("/health", handle_http_health)
     app.router.add_post("/reinit-control", handle_http_reinit_control)
 
+    # Queue management endpoints
+    app.router.add_get("/queue/status", handle_http_queue_status)
+    app.router.add_post("/queue/clear", handle_http_queue_clear)
+
     # Domain management endpoints
     app.router.add_post("/domains/add", handle_http_domain_add)
     app.router.add_delete("/domains/remove", handle_http_domain_remove)
@@ -1224,6 +1448,10 @@ async def main():
 
     # Network/HAR endpoint
     app.router.add_get("/network/har", handle_http_get_har)
+
+    # Console logs endpoints
+    app.router.add_get("/console/logs", handle_http_get_console_logs)
+    app.router.add_post("/console/clear", handle_http_clear_console_logs)
 
     # Static file endpoint for SingleFile library
     app.router.add_get("/static/singlefile.js", handle_static_singlefile)
@@ -1245,6 +1473,9 @@ async def main():
     await ws_site.start()
     print(f"WebSocket server running on ws://{HOST}:{PORT + 1}/ws")
     print("Ready for connections!")
+
+    # Start background cleanup task
+    asyncio.create_task(cleanup_watchdog())
 
     # Keep running
     await asyncio.Event().wait()

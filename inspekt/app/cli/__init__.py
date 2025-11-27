@@ -94,6 +94,7 @@ cli.add_lazy_command("start", "control", "start")
 cli.add_lazy_command("stop", "control", "stop")
 cli.add_lazy_command("restart", "control", "restart")
 cli.add_lazy_command("status", "control", "status")
+cli.add_lazy_command("queue", "control", "queue")
 
 # MCP server management commands (from mcp.py)
 cli.add_lazy_command("mcp", "mcp", "mcp")

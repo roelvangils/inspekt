@@ -11,6 +11,7 @@ Inspekt provides specialized commands for data extraction:
 - `inspekt selected` - Get selected text
 - `inspekt download` - Find and download files
 - `inspekt info` - Get page metadata
+- `inspekt network` - Inspect network requests
 
 ## Extracting Links
 
@@ -204,9 +205,90 @@ Total: 7 headings
 ### Features
 
 - **Native HTML headings** - H1-H6 elements
-- **ARIA headings** - Elements with `role="heading"` and `aria-level`
+- **ARIA headings** - Elements with `role="heading"` and `aria-level`, marked with `[ARIA]`
+- **Missing level detection** - Gaps in heading hierarchy shown as `[Missing]` in red
+- **Duplicate detection** - Repeated heading text (2nd+ occurrence) marked with `[Duplicate]` in yellow
 - **Hierarchical indentation** - Visual tree structure
-- **Colored output** - Level labels in gray, text in white
+- **Colored output** - Level labels in gray, text in white, indicators in color
+
+### Accessibility Analysis
+
+The outline command automatically detects common heading issues:
+
+**Example with issues:**
+```bash
+inspekt outline
+```
+
+**Output:**
+```
+[Missing] H1
+H2 Citrus Fruits
+   H3 Oranges
+   H3 Lemons
+      H4 Varieties
+         [Missing] H5
+         H6 Growing Tips
+H2 Tropical Fruits
+   [ARIA] H3 Mangoes
+      H4 Varieties [Duplicate]
+   [ARIA] H3 Pineapples
+H1 Stone Fruits
+   [Missing] H2
+   H3 Peaches
+
+Total: 12 headings (4 ARIA) — 3 missing levels, 1 duplicate
+```
+
+**Indicators:**
+
+| Indicator | Color | Meaning |
+|-----------|-------|---------|
+| `[Missing]` | Red | A heading level was skipped (e.g., H2 → H4) |
+| `[Duplicate]` | Yellow | Same heading text appears multiple times |
+| `[ARIA]` | Gray | Heading uses `role="heading"` instead of native H1-H6 |
+
+### JSON Output
+
+```bash
+inspekt outline --json
+```
+
+Returns structured data including issue flags:
+
+```json
+{
+  "headings": [
+    {
+      "level": 1,
+      "text": "",
+      "type": "missing",
+      "is_missing": true,
+      "is_duplicate": false
+    },
+    {
+      "level": 2,
+      "text": "Citrus Fruits",
+      "type": "native",
+      "is_missing": false,
+      "is_duplicate": false
+    },
+    {
+      "level": 3,
+      "text": "Mangoes",
+      "type": "aria",
+      "is_missing": false,
+      "is_duplicate": false
+    }
+  ],
+  "summary": {
+    "total": 12,
+    "aria_count": 4,
+    "missing_count": 3,
+    "duplicate_count": 1
+  }
+}
+```
 
 ### Use Cases
 
@@ -214,21 +296,34 @@ Total: 7 headings
 ```bash
 inspekt outline
 # Check for:
-# - Single H1
-# - Proper nesting (no skipped levels)
-# - Logical hierarchy
+# - Single H1 at the top
+# - No missing levels (red [Missing] indicators)
+# - No unintentional duplicates (yellow [Duplicate] indicators)
+# - Proper use of native headings vs ARIA
+```
+
+**Find issues with jq:**
+```bash
+# Count missing levels
+inspekt outline --json | jq '.summary.missing_count'
+
+# Find all duplicate headings
+inspekt outline --json | jq '[.headings[] | select(.is_duplicate)] | length'
+
+# List ARIA headings
+inspekt outline --json | jq '.headings[] | select(.type == "aria") | .text'
 ```
 
 **SEO analysis:**
 ```bash
 inspekt outline | grep "H1"
-# Should find exactly one H1
+# Should find exactly one H1, and it shouldn't be [Missing]
 ```
 
 **Content structure:**
 ```bash
 inspekt outline > page-structure.txt
-# Document page organization
+# Document page organization with issue annotations
 ```
 
 **Compare pages:**
@@ -763,12 +858,400 @@ inspekt eval "
 
 ---
 
+## Network Requests
+
+Inspekt provides **two methods** for inspecting network requests, each with different capabilities:
+
+| Feature | `inspekt network` | `inspekt network har` |
+|---------|------------------|----------------------|
+| **API Used** | Performance API | DevTools Network API |
+| **Requires DevTools** | No | Yes (F12) |
+| **HTTP Status Codes** | No | Yes (200, 404, 500, etc.) |
+| **Request Headers** | No | Yes |
+| **Response Headers** | No | Yes |
+| **Timing Breakdown** | Yes | Yes (more detailed) |
+| **Transfer Size** | Yes | Yes |
+| **Cache Status** | Yes (heuristic) | Yes (accurate) |
+| **Buffer Limit** | ~150-250 entries | Unlimited |
+| **Initiator Info** | No | Yes |
+
+### Quick Start
+
+```bash
+# Basic network data (works always)
+inspekt network
+
+# Full data with status codes (requires DevTools open)
+inspekt network har
+```
+
+---
+
+### Method 1: Performance API (`inspekt network`)
+
+Works without DevTools. Great for quick performance analysis.
+
+#### Basic Usage
+
+```bash
+inspekt network
+```
+
+**Output:**
+```
+Name                                  Type         Size       Time      Proto
+-----------------------------------------------------------------------------------
+main.js                               script       125.3 KB   245 ms    h2
+styles.css                            stylesheet   45.2 KB    120 ms    h2
+logo.png                              image        12.1 KB    89 ms     h2
+api/data                              fetch        2.3 KB     340 ms    h2
+
+Summary:
+  Total requests: 42
+  Total transfer: 1.2 MB
+  Average time:   156 ms
+
+  By type:
+    script: 12
+    stylesheet: 5
+    image: 18
+    fetch: 7
+
+  Slowest: api/data (340 ms)
+  Largest: hero.jpg (450.0 KB)
+```
+
+#### Filter by Resource Type
+
+```bash
+inspekt network script      # JavaScript files
+inspekt network stylesheet  # CSS files (or use 'css')
+inspekt network fetch       # Fetch/XHR requests
+inspekt network xhr         # XHR requests
+inspekt network image       # Images
+inspekt network font        # Fonts
+inspekt network document    # HTML documents
+inspekt network svg         # SVG files
+inspekt network video       # Video files
+inspekt network audio       # Audio files
+```
+
+#### Sorting Options
+
+```bash
+inspekt network --sort=start  # Chronological order (default)
+inspekt network --sort=time   # Slowest first
+inspekt network --sort=size   # Largest first
+inspekt network --sort=name   # Alphabetical
+inspekt network --sort=type   # Grouped by type
+```
+
+#### Show Domain Information
+
+```bash
+inspekt network --domain      # Add domain column
+inspekt network --external    # Only third-party requests
+```
+
+#### Limit Results
+
+```bash
+inspekt network -n 10                  # Top 10
+inspekt network --sort=time -n 5       # 5 slowest
+inspekt network --sort=size -n 5       # 5 largest
+```
+
+#### JSON Output
+
+```bash
+inspekt network --json
+inspekt network --json | jq '.summary.byType'
+```
+
+---
+
+### Method 2: DevTools HAR (`inspekt network har`)
+
+Full network data with HTTP status codes. **Requires DevTools to be open (F12).**
+
+#### Why Use HAR Mode?
+
+- See **HTTP status codes** (200, 404, 500, etc.)
+- Access **request and response headers**
+- Get **accurate cache status**
+- See **initiator information** (what triggered the request)
+- **No buffer limit** - captures all requests
+- Export **raw HAR format** for import into other tools
+
+#### Basic Usage
+
+```bash
+# Open DevTools first (F12), then:
+inspekt network har
+```
+
+**Output:**
+```
+HAR Data (DevTools)
+Status codes and headers available!
+
+Name                                  Status   Type         Size       Time
+-----------------------------------------------------------------------------------
+                                         200   document     15.2 KB    234 ms
+main.js                                  200   script       125.3 KB   245 ms
+styles.css                               200   stylesheet   45.2 KB    120 ms
+api/users                                200   fetch        2.3 KB     340 ms
+missing-image.png                        404   image        -          89 ms
+api/broken                               500   fetch        512 B      1.2 s
+
+Summary:
+  Total requests: 42
+  Total transfer: 1.2 MB
+  Average time:   156 ms
+
+  By status:
+    2xx (Success): 38
+    4xx (Client Error): 3
+    5xx (Server Error): 1
+
+  Errors: 4
+  Cached: 12
+
+  By type:
+    script: 12
+    stylesheet: 5
+    image: 18
+    fetch: 7
+
+  Slowest: api/broken (500) (1.2 s)
+  Largest: hero.jpg (200) (450.0 KB)
+```
+
+#### Filter by Status
+
+```bash
+inspekt network har --errors           # Only 4xx and 5xx responses
+inspekt network har --sort=status      # Sort by HTTP status code
+```
+
+#### Filter by Type
+
+```bash
+inspekt network har --type=script      # Only scripts
+inspekt network har --type=fetch       # Only API calls
+inspekt network har --type=image       # Only images
+```
+
+#### Export Raw HAR
+
+Export in standard HAR format for import into Chrome DevTools, Charles Proxy, etc.:
+
+```bash
+inspekt network har --raw > page.har
+```
+
+#### JSON Output
+
+```bash
+inspekt network har --json
+inspekt network har --json | jq '.entries[] | select(.status >= 400)'
+```
+
+---
+
+### Practical Examples
+
+#### Performance Analysis
+
+```bash
+# Find slowest resources
+inspekt network --sort=time -n 10
+
+# Find largest resources
+inspekt network --sort=size -n 10
+
+# Check all third-party requests
+inspekt network --external --domain
+
+# Analyze script loading
+inspekt network script --sort=time
+```
+
+#### Error Detection (requires DevTools)
+
+```bash
+# Find all failed requests
+inspekt network har --errors
+
+# Find 404s
+inspekt network har --json | jq '.entries[] | select(.status == 404) | .url'
+
+# Find server errors (5xx)
+inspekt network har --json | jq '.entries[] | select(.status >= 500)'
+```
+
+#### API Analysis (requires DevTools)
+
+```bash
+# See all fetch/XHR requests with status codes
+inspekt network har --type=fetch
+
+# Find slow API calls
+inspekt network har --type=fetch --sort=time
+
+# Export API traffic for debugging
+inspekt network har --type=fetch --json > api-calls.json
+```
+
+#### Third-Party Audit
+
+```bash
+# List all external requests
+inspekt network --external --domain
+
+# Count requests by domain
+inspekt network --json | jq '.summary.byDomain'
+
+# Find slow third-party resources
+inspekt network --external --sort=time -n 10
+```
+
+#### Export & Integration
+
+```bash
+# Export for spreadsheet analysis
+inspekt network --json | jq -r '.entries[] | [.name, .type, .transferSize, .timing.total] | @csv' > network.csv
+
+# Export HAR for Chrome DevTools import
+inspekt network har --raw > page.har
+
+# Export for performance monitoring
+inspekt network --json | jq '{
+  url: .url,
+  totalRequests: .summary.totalRequests,
+  totalSize: .summary.totalTransferSize,
+  avgTime: .summary.averageDuration,
+  slowest: .summary.slowestRequest,
+  largest: .summary.largestRequest
+}' > metrics.json
+```
+
+---
+
+### Timing Breakdown
+
+Both methods provide timing information:
+
+| Timing | Description |
+|--------|-------------|
+| `dns` | DNS lookup time |
+| `tcp` / `connect` | TCP connection time |
+| `ssl` | SSL/TLS handshake time |
+| `ttfb` / `wait` | Time to first byte (server response time) |
+| `download` / `receive` | Content download time |
+| `total` | Total request duration |
+
+**Example timing analysis:**
+```bash
+# Find requests with slow DNS
+inspekt network --json | jq '.entries[] | select(.timing.dns > 50) | {name, dns: .timing.dns}'
+
+# Find requests with slow server response
+inspekt network --json | jq '.entries[] | select(.timing.ttfb > 500) | {name, ttfb: .timing.ttfb}'
+```
+
+---
+
+### API & MCP Access
+
+#### REST API
+
+```bash
+# Performance API data
+curl http://localhost:8767/api/network/
+
+# HAR data (requires DevTools)
+curl http://localhost:8767/api/network/har
+
+# Filter by type
+curl "http://localhost:8767/api/network/?type=script"
+curl "http://localhost:8767/api/network/har?errors_only=true"
+```
+
+#### MCP Tools
+
+The network commands are available as MCP tools for AI assistants:
+
+- `get_network_requests` - Performance API data (always works)
+- `get_har` - DevTools HAR data (requires DevTools open)
+
+---
+
+### Benefits & Use Cases
+
+#### Performance Optimization
+- Identify slow resources blocking page load
+- Find oversized images and scripts
+- Detect excessive third-party requests
+- Measure TTFB and download times
+
+#### Debugging
+- Find failed requests (404s, 500s) with HAR mode
+- Inspect API responses
+- Debug caching issues
+- Trace request initiators
+
+#### Security Auditing
+- Audit third-party requests
+- Check for mixed content
+- Review external dependencies
+- Monitor data exfiltration
+
+#### SEO & Core Web Vitals
+- Analyze Largest Contentful Paint (LCP) resources
+- Find render-blocking resources
+- Optimize Time to First Byte (TTFB)
+- Reduce total page weight
+
+---
+
+### Caveats & Limitations
+
+#### Performance API (`inspekt network`)
+
+| Limitation | Impact | Workaround |
+|------------|--------|------------|
+| No HTTP status codes | Can't see 404s, 500s | Use `inspekt network har` |
+| No headers | Can't inspect request/response headers | Use `inspekt network har` |
+| Buffer limit (~150-250) | May miss requests on heavy pages | Capture early, or use HAR |
+| Cross-origin restrictions | Some sizes show as 0 | N/A (browser security) |
+| Cached resources | Size may be 0 | Check `cached` field |
+
+#### DevTools HAR (`inspekt network har`)
+
+| Limitation | Impact | Workaround |
+|------------|--------|------------|
+| Requires DevTools open | Won't work headlessly | Use Performance API |
+| Only captures after DevTools opened | Misses early requests | Open DevTools before navigating |
+| Large HAR files | Slow on heavy pages | Use filters and limits |
+
+#### Best Practice
+
+1. **Quick analysis**: Use `inspekt network`
+2. **Need status codes**: Open DevTools (F12), then use `inspekt network har`
+3. **CI/CD pipelines**: Use `inspekt network` (no DevTools needed)
+4. **Debugging errors**: Use `inspekt network har --errors`
+
+---
+
 ## Quick Reference
 
 | Command | Purpose | Example |
 |---------|---------|---------|
 | `inspekt links` | Extract links | `inspekt links --only-external` |
-| `inspekt outline` | Page heading structure | `inspekt outline` |
+| `inspekt outline` | Page heading structure with issues | `inspekt outline --json` |
 | `inspekt selected` | Get selected text | `inspekt selected --raw` |
 | `inspekt download` | Download files | `inspekt download --output ~/Downloads` |
 | `inspekt info` | Page metadata | `inspekt info --extended` |
+| `inspekt network` | Network requests (Performance API) | `inspekt network --sort=time` |
+| `inspekt network har` | Full network data (DevTools) | `inspekt network har --errors` |
