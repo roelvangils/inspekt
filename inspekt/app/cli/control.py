@@ -274,7 +274,8 @@ def start(bridge_only, api_only, foreground, no_update_check, api_port, bridge_p
             click.echo(f"  • ReDoc:         http://{display_host}:{api_port}/redoc")
             click.echo(f"  • Health:        http://{display_host}:{api_port}/health")
 
-        click.echo(f"\nView status: inspekt status")
+        click.echo(f"\nWeb-based status: http://localhost:{api_port}/status")
+        click.echo(f"View status: inspekt status")
         click.echo(f"Stop servers: inspekt stop")
     else:
         click.echo("\n✗ Failed to start one or more servers", err=True)
@@ -401,10 +402,13 @@ def restart(no_update_check, api_port, bridge_port, host):
     click.echo(f"  • ReDoc:         http://{display_host}:{api_port}/redoc")
     click.echo(f"  • Health:        http://{display_host}:{api_port}/health")
 
+    click.echo(f"\nWeb-based status: http://localhost:{api_port}/status")
 
-@click.command()
+
+@click.group(invoke_without_command=True)
 @click.option("--json", "output_json", is_flag=True, help="Output as JSON")
-def status(output_json):
+@click.pass_context
+def status(ctx, output_json):
     """Check status of all Inspekt servers.
 
     Shows comprehensive status information for both bridge and API servers,
@@ -413,7 +417,12 @@ def status(output_json):
     Examples:
         inspekt status        # Human-readable status
         inspekt status --json # JSON output
+        inspekt status web    # Open web dashboard
     """
+    # If a subcommand is invoked, don't run the default behavior
+    if ctx.invoked_subcommand is not None:
+        return
+
     bridge_client = BridgeClient()
 
     def format_duration(seconds):
@@ -561,9 +570,38 @@ def status(output_json):
 
         click.echo("\n" + "=" * 60)
 
+        if api_running:
+            click.echo(f"\nWeb-based status: http://localhost:8000/status")
+
     # Exit with error if either server is not running
     if not (bridge_running and api_running):
         sys.exit(1)
+
+
+@status.command("web")
+@click.option("--port", type=int, default=8000, help="API server port (default: 8000)")
+def status_web(port):
+    """Open the web-based dashboard in your browser.
+
+    Opens the Inspekt status dashboard in your default web browser.
+    The API server must be running.
+
+    Examples:
+        inspekt status web           # Open dashboard
+        inspekt status web --port 3000  # Custom port
+    """
+    import webbrowser
+
+    url = f"http://localhost:{port}/status"
+
+    # Check if API server is running
+    if not _is_port_open("127.0.0.1", port):
+        click.echo(f"Error: API server is not running on port {port}", err=True)
+        click.echo("\nStart it with: inspekt start", err=True)
+        sys.exit(1)
+
+    click.echo(f"Opening {url} in your browser...")
+    webbrowser.open(url)
 
 
 # Queue management command group
