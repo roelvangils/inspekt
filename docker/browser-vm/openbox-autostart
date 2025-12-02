@@ -1,0 +1,28 @@
+#!/bin/bash
+# Openbox autostart script - launches Chromium when window manager starts
+
+# Wait a moment for everything to initialize
+sleep 1
+
+# Launch Chromium in kiosk-like mode
+# Security flags needed for running in container
+exec /usr/bin/chromium \
+    --no-sandbox \
+    --disable-gpu \
+    --disable-software-rasterizer \
+    --disable-dev-shm-usage \
+    --disable-background-networking \
+    --disable-default-apps \
+    --disable-extensions \
+    --disable-sync \
+    --disable-translate \
+    --disable-background-timer-throttling \
+    --disable-backgrounding-occluded-windows \
+    --disable-breakpad \
+    --disable-component-extensions-with-background-pages \
+    --disable-features=TranslateUI \
+    --metrics-recording-only \
+    --no-first-run \
+    --start-maximized \
+    --window-position=0,0 \
+    "${HOME_URL}"
