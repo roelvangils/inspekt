@@ -183,6 +183,125 @@ def domain_list(output_json):
         sys.exit(1)
 
 
+@domain.command(name="csp")
+@click.argument("domain_name", required=False)
+@click.option("--enable", "-e", is_flag=True, help="Enable CSP bypass for domain")
+@click.option("--disable", "-d", is_flag=True, help="Disable CSP bypass for domain")
+@click.option("--status", "-s", is_flag=True, help="Check CSP bypass status")
+@click.option("--list", "-l", "list_all", is_flag=True, help="List all CSP bypass domains")
+def domain_csp(domain_name, enable, disable, status, list_all):
+    """
+    Manage CSP (Content Security Policy) bypass for strict sites.
+
+    Some websites have strict CSP that blocks Inspekt from executing JavaScript.
+    This command enables bypassing CSP headers for specific domains.
+
+    IMPORTANT: After enabling CSP bypass, you must refresh the page for changes to take effect.
+
+    Examples:
+        inspekt domain csp www.dnsbelgium.be --enable    # Enable bypass
+        inspekt domain csp www.dnsbelgium.be --disable   # Disable bypass
+        inspekt domain csp www.dnsbelgium.be --status    # Check status
+        inspekt domain csp --list                        # List all bypassed domains
+    """
+    try:
+        if list_all:
+            # List all CSP bypass domains from browser storage
+            response = requests.get(
+                f"http://{BRIDGE_HTTP_HOST}:{BRIDGE_HTTP_PORT}/csp/status",
+                params={"domain": "__list_all__"},
+                timeout=10.0
+            )
+            # For now, just show a message since listing requires storage access
+            click.echo("CSP bypass domains are stored in browser extension storage.")
+            click.echo("Use the extension popup to view all bypassed domains.")
+            return
+
+        if not domain_name:
+            click.echo("Error: Domain name required (or use --list)", err=True)
+            sys.exit(1)
+
+        # Normalize domain
+        domain_name = normalize_domain(domain_name)
+
+        if enable and disable:
+            click.echo("Error: Cannot use both --enable and --disable", err=True)
+            sys.exit(1)
+
+        if enable:
+            response = requests.post(
+                f"http://{BRIDGE_HTTP_HOST}:{BRIDGE_HTTP_PORT}/csp/enable",
+                json={"domain": domain_name},
+                timeout=10.0
+            )
+
+            if response.status_code == 200:
+                result = response.json()
+                if result.get("ok"):
+                    click.echo(f"✓ CSP bypass enabled for {domain_name}")
+                    click.echo("  Refresh the page for changes to take effect")
+                else:
+                    click.echo(f"Error: {result.get('error', 'Unknown error')}", err=True)
+                    sys.exit(1)
+            else:
+                click.echo(f"Error: HTTP {response.status_code}", err=True)
+                sys.exit(1)
+
+        elif disable:
+            response = requests.post(
+                f"http://{BRIDGE_HTTP_HOST}:{BRIDGE_HTTP_PORT}/csp/disable",
+                json={"domain": domain_name},
+                timeout=10.0
+            )
+
+            if response.status_code == 200:
+                result = response.json()
+                if result.get("ok"):
+                    click.echo(f"✓ CSP bypass disabled for {domain_name}")
+                    click.echo("  Refresh the page for changes to take effect")
+                else:
+                    click.echo(f"Error: {result.get('error', 'Unknown error')}", err=True)
+                    sys.exit(1)
+            else:
+                click.echo(f"Error: HTTP {response.status_code}", err=True)
+                sys.exit(1)
+
+        else:
+            # Default: check status
+            response = requests.post(
+                f"http://{BRIDGE_HTTP_HOST}:{BRIDGE_HTTP_PORT}/csp/status",
+                json={"domain": domain_name},
+                timeout=10.0
+            )
+
+            if response.status_code == 200:
+                result = response.json()
+                if result.get("ok"):
+                    if result.get("enabled"):
+                        click.echo(f"CSP bypass is ENABLED for {domain_name}")
+                        if result.get("enabledAt"):
+                            click.echo(f"  Enabled at: {_format_human_datetime(result['enabledAt'])}")
+                    else:
+                        click.echo(f"CSP bypass is DISABLED for {domain_name}")
+                else:
+                    click.echo(f"Error: {result.get('error', 'Unknown error')}", err=True)
+                    sys.exit(1)
+            else:
+                click.echo(f"Error: HTTP {response.status_code}", err=True)
+                sys.exit(1)
+
+    except requests.exceptions.ConnectionError:
+        click.echo("Error: Could not connect to bridge server", err=True)
+        click.echo("Make sure the server is running: inspekt start", err=True)
+        sys.exit(1)
+    except requests.exceptions.Timeout:
+        click.echo("Error: Request timed out", err=True)
+        sys.exit(1)
+    except Exception as e:
+        click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
+
+
 @domain.command(name="bypass")
 @click.argument("duration", type=int)
 def domain_bypass(duration):
@@ -394,11 +513,12 @@ def _display_domains(domains, bypass_status=None):
 @click.option("--status", "-s", is_flag=True, help="Check yolo mode status")
 def yolo(disable, status):
     """
-    YOLO mode - bypass ALL domain checks for 1 hour.
+    YOLO mode - bypass ALL restrictions for 1 hour.
 
     When yolo mode is active:
     - CLI skips domain permission prompts
     - Browser extension skips domain checks
+    - CSP bypass enabled for current domain (strict sites work)
     - All domains are allowed without confirmation
 
     This is useful for development or when working across many domains.
@@ -439,9 +559,15 @@ def yolo(disable, status):
             # Also enable browser bypass and reload page
             browser_ok = _enable_browser_bypass(duration_minutes=60)
             if browser_ok:
-                click.echo("  Browser bypass synced")
-                # Auto-reload to apply bypass immediately
-                _reload_browser_page()
+                click.echo("  Browser domain bypass synced")
+
+            # Enable CSP bypass for current domain
+            csp_ok = _enable_csp_bypass_for_current_domain()
+            if csp_ok:
+                click.echo("  CSP bypass enabled for current domain")
+
+            # Auto-reload to apply all bypasses immediately
+            _reload_browser_page()
         else:
             click.echo(f"Error: Failed to enable yolo mode", err=True)
             sys.exit(1)
@@ -449,3 +575,40 @@ def yolo(disable, status):
     except Exception as e:
         click.echo(f"Error: {e}", err=True)
         sys.exit(1)
+
+
+def _enable_csp_bypass_for_current_domain() -> bool:
+    """Enable CSP bypass for the currently open browser domain."""
+    try:
+        # First get the current page info to find the domain
+        response = requests.post(
+            f"http://{BRIDGE_HTTP_HOST}:{BRIDGE_HTTP_PORT}/execute",
+            json={"code": "location.hostname"},
+            timeout=5.0
+        )
+
+        if response.status_code != 200:
+            return False
+
+        result = response.json()
+        if not result.get("ok"):
+            return False
+
+        domain = result.get("result")
+        if not domain:
+            return False
+
+        # Now enable CSP bypass for this domain
+        csp_response = requests.post(
+            f"http://{BRIDGE_HTTP_HOST}:{BRIDGE_HTTP_PORT}/csp/enable",
+            json={"domain": domain},
+            timeout=10.0
+        )
+
+        if csp_response.status_code == 200:
+            csp_result = csp_response.json()
+            return csp_result.get("ok", False)
+
+        return False
+    except Exception:
+        return False

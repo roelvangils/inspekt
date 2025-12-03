@@ -10,6 +10,7 @@ This module provides common functionality used across all CLI command modules:
 
 from __future__ import annotations
 
+import difflib
 import json
 from typing import Any
 
@@ -135,6 +136,32 @@ class CustomGroup(click.Group):
 
         # Fall back to default behavior
         return super().get_command(ctx, cmd_name)
+
+    def resolve_command(self, ctx: click.Context, args: list[str]):
+        """
+        Resolve command with fuzzy matching suggestions.
+
+        If command is not found, suggest similar commands using difflib.
+        """
+        try:
+            return super().resolve_command(ctx, args)
+        except click.UsageError as e:
+            # Check if it's a "No such command" error
+            if "No such command" in str(e) and args:
+                cmd_name = args[0]
+                all_commands = self.list_commands(ctx)
+
+                # Find close matches (cutoff 0.4 = 40% similarity)
+                suggestions = difflib.get_close_matches(
+                    cmd_name, all_commands, n=3, cutoff=0.4
+                )
+
+                if suggestions:
+                    suggestion_text = ", ".join(f"'{s}'" for s in suggestions)
+                    raise click.UsageError(
+                        f"No such command '{cmd_name}'. Did you mean: {suggestion_text}?"
+                    )
+            raise
 
     def list_commands(self, ctx: click.Context):
         """

@@ -683,7 +683,8 @@ def _process_outline_headings(headings: list) -> list:
     Process headings to:
     1. Insert placeholders for missing heading levels
     2. Mark duplicates (2nd+ occurrence)
-    3. Pass through ARIA type info
+    3. Mark empty headings
+    4. Pass through ARIA type info
     """
     processed = []
     seen_texts = {}  # text -> first occurrence (case-insensitive)
@@ -701,6 +702,7 @@ def _process_outline_headings(headings: list) -> list:
                 "text": "",
                 "type": "missing",
                 "is_missing": True,
+                "is_empty": False,
                 "is_duplicate": False
             })
             expected_level += 1
@@ -710,11 +712,15 @@ def _process_outline_headings(headings: list) -> list:
         if text_lower and not is_duplicate:
             seen_texts[text_lower] = True
 
+        # Check for empty headings (real heading but no text content)
+        is_empty = not text.strip()
+
         processed.append({
             "level": level,
             "text": text,
             "type": heading.get("type", "native"),
             "is_missing": False,
+            "is_empty": is_empty,
             "is_duplicate": is_duplicate
         })
 
@@ -727,7 +733,8 @@ def _process_outline_headings(headings: list) -> list:
 
 @click.command()
 @click.option("--json", "output_json", is_flag=True, help="Output as JSON")
-def outline(output_json):
+@click.option("--truncate", type=int, default=None, help="Truncate headings to specified number of characters")
+def outline(output_json, truncate):
     """
     Display the page's heading structure as a nested outline.
 
@@ -737,6 +744,7 @@ def outline(output_json):
     Examples:
         zen outline
         zen outline --json
+        zen outline --truncate 80
     """
     client = BridgeClient()
 
@@ -771,13 +779,14 @@ def outline(output_json):
                 click.echo("No headings found on this page.", err=True)
             sys.exit(0)
 
-        # Process headings to detect missing levels and duplicates
+        # Process headings to detect missing levels, duplicates, and empty headings
         processed_headings = _process_outline_headings(headings)
 
         # Calculate counts
         total_real = len([h for h in processed_headings if not h.get("is_missing")])
         missing_count = len([h for h in processed_headings if h.get("is_missing")])
         duplicate_count = len([h for h in processed_headings if h.get("is_duplicate")])
+        empty_count = len([h for h in processed_headings if h.get("is_empty")])
 
         if output_json:
             output_data = {
@@ -785,6 +794,7 @@ def outline(output_json):
                 "count": total_real,
                 "missing_count": missing_count,
                 "duplicate_count": duplicate_count,
+                "empty_count": empty_count,
                 "url": data.get("url", ""),
                 "title": data.get("title", "")
             }
@@ -795,6 +805,7 @@ def outline(output_json):
         for heading in processed_headings:
             level = heading["level"]
             is_missing = heading.get("is_missing", False)
+            is_empty = heading.get("is_empty", False)
             is_duplicate = heading.get("is_duplicate", False)
             is_aria = heading.get("type") == "aria"
 
@@ -805,14 +816,18 @@ def outline(output_json):
                 # Missing level: red label and [Missing] text
                 level_label = click.style(f"H{level}", fg="red")
                 heading_text = click.style("[Missing]", fg="red")
+            elif is_empty:
+                # Empty heading: magenta label and [Empty] text
+                level_label = click.style(f"H{level}", fg="magenta")
+                heading_text = click.style("[Empty]", fg="magenta")
             else:
                 # Normal heading: gray label
                 level_label = click.style(f"H{level}", fg="bright_black")
                 text = heading["text"]
 
-                # Truncate very long headings
-                if len(text) > 100:
-                    text = text[:97] + "..."
+                # Truncate headings only if --truncate is specified
+                if truncate and len(text) > truncate:
+                    text = text[:truncate - 1] + "…"
 
                 heading_text = text
 
@@ -833,6 +848,8 @@ def outline(output_json):
         summary_parts = [f"Total: {total_real} headings"]
         if missing_count:
             summary_parts.append(click.style(f"{missing_count} missing", fg="red"))
+        if empty_count:
+            summary_parts.append(click.style(f"{empty_count} empty", fg="magenta"))
         if duplicate_count:
             summary_parts.append(click.style(f"{duplicate_count} duplicates", fg="yellow"))
         click.echo(" | ".join(summary_parts), err=True)

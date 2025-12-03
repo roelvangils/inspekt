@@ -161,6 +161,24 @@ def inspected(output_json):
                 text = text[:60] + "..."
             click.echo(f"Text:     {text}")
 
+        # Selection source
+        selection_source = response.get("selectionSource", "unknown")
+        if selection_source != "unknown":
+            source_labels = {
+                "panel": "Inspekt panel picker",
+                "devtools": "Chrome DevTools inspector"
+            }
+            source_label = source_labels.get(selection_source, selection_source)
+            click.echo(f"\nSelected via: {click.style(source_label, fg='cyan')}")
+
+            # Show timestamp if available
+            selection_time = response.get("selectionTimestamp")
+            if selection_time:
+                from datetime import datetime
+                dt = datetime.fromtimestamp(selection_time / 1000)
+                time_str = dt.strftime("%Y-%m-%d %H:%M:%S")
+                click.echo(f"Selected at:  {time_str}")
+
         # Dimensions
         dim = response["dimensions"]
         click.echo("\nDimensions:")
@@ -624,16 +642,148 @@ def screenshot_viewport(output, margin, margin_color, optimize, scale, format, q
 
 @screenshot.command(name="page")
 @click.option("--output", "-o", type=click.Path(), required=True, help="Output file path")
-def screenshot_page(output):
+@click.option(
+    "--margin",
+    "-m",
+    type=int,
+    default=0,
+    help="Margin in pixels around screenshot (default: 0)",
+)
+@click.option(
+    "--margin-color",
+    "-c",
+    default="auto",
+    help="Margin color: 'auto' (sample first pixel), hex code, or color name (default: auto)",
+)
+@click.option(
+    "--optimize",
+    is_flag=True,
+    help="Optimize PNG with oxipng to reduce file size",
+)
+@click.option(
+    "--scale",
+    type=int,
+    default=1,
+    help="Scale factor (1 or 2, default: 1)",
+)
+@click.option(
+    "--format",
+    type=click.Choice(["png", "jpg", "webp"], case_sensitive=False),
+    default="png",
+    help="Output format (default: png)",
+)
+@click.option(
+    "--quality",
+    type=float,
+    default=0.92,
+    help="Quality for lossy formats (0.0-1.0, default: 0.92)",
+)
+@click.option(
+    "--max-height",
+    type=int,
+    default=16384,
+    help="Maximum capture height in pixels (default: 16384, Chrome limit)",
+)
+def screenshot_page(output, margin, margin_color, optimize, scale, format, quality, max_height):
     """
     Capture a screenshot of the entire page (full height).
 
-    NOTE: This feature is not yet implemented.
-    Use 'screenshot viewport' for now.
+    Uses Chrome DevTools Protocol for single-shot full page capture.
+    Note: Chrome has a maximum height limit of 16384 pixels.
+
+    WARNING: A debugger notification banner will appear briefly during capture.
+    This is a Chrome security feature and cannot be disabled.
 
     Examples:
         inspekt screenshot page -o fullpage.png
+        inspekt screenshot page -o page.png --scale 2
+        inspekt screenshot page -o page.jpg --format jpg --quality 0.85
     """
-    click.echo("Error: Full page screenshots are not yet implemented.", err=True)
-    click.echo("Use 'inspekt screenshot viewport' to capture the visible viewport.", err=True)
-    sys.exit(1)
+    executor = get_executor()
+    loader = ScriptLoader()
+
+    executor.ensure_server_running()
+
+    try:
+        script = loader.load_script_sync("screenshot_unified.js")
+    except FileNotFoundError as e:
+        click.echo(f"Error: Screenshot script not found: {e}", err=True)
+        sys.exit(1)
+
+    options = {
+        "margin": margin,
+        "marginColor": margin_color,
+        "scale": scale,
+        "format": format,
+        "quality": quality,
+        "maxHeight": max_height,
+    }
+
+    code = script.replace("'MODE_PLACEHOLDER'", json.dumps("page"))
+    code = code.replace("OPTIONS_PLACEHOLDER", json.dumps(options))
+
+    try:
+        click.echo("Capturing full page (debugger will attach briefly)...")
+
+        result = executor.execute(code, timeout=120.0)  # Longer timeout for full page
+
+        if not result.get("ok"):
+            click.echo(f"Error: {result.get('error')}", err=True)
+            sys.exit(1)
+
+        response = result.get("result", {})
+        if not response.get("ok"):
+            click.echo(f"Error: {response.get('error')}", err=True)
+            sys.exit(1)
+
+        # Check for truncation warning
+        if response.get("truncated"):
+            click.echo(
+                f"Warning: Page was truncated from {response.get('fullHeight')}px to {response.get('height')}px",
+                err=True,
+            )
+
+        # Get data URL and decode
+        data_url = response.get("dataUrl")
+        if not data_url:
+            click.echo("Error: No image data received", err=True)
+            sys.exit(1)
+
+        # Extract and decode base64 data
+        base64_data = data_url.split(",", 1)[1] if "," in data_url else data_url
+
+        try:
+            image_data = base64.b64decode(base64_data)
+        except Exception as e:
+            click.echo(f"Error decoding image data: {e}", err=True)
+            sys.exit(1)
+
+        # Save image
+        output_path = Path(output)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        with _builtin_open(output_path, "wb") as f:
+            f.write(image_data)
+
+        file_size_kb = len(image_data) / 1024
+        click.echo(f"Screenshot saved: {output_path}")
+        click.echo(f"Size: {response.get('width')}x{response.get('height')}px ({file_size_kb:.1f} KB)")
+
+        # Optimize if requested
+        if optimize and format == "png":
+            from inspekt.services.image_optimizer import optimize_png
+
+            try:
+                original_size = len(image_data)
+                optimized_size = optimize_png(output_path)
+
+                if optimized_size:
+                    reduction = ((original_size - optimized_size) / original_size) * 100
+                    click.echo(
+                        f"Optimized: {original_size/1024:.1f} KB → {optimized_size/1024:.1f} KB ({reduction:.1f}% reduction)"
+                    )
+            except Exception as e:
+                click.echo(f"Optimization failed: {e}", err=True)
+
+    except (ConnectionError, TimeoutError, RuntimeError) as e:
+        click.echo(f"Error: {e}", err=True)
+        sys.exit(1)

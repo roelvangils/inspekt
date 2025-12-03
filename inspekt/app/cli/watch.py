@@ -35,7 +35,7 @@ def input():
     client = BridgeClient()
 
     if not client.is_alive():
-        click.echo("Error: Bridge server is not running. Start it with: inspekt server start", err=True)
+        click.echo("Error: Bridge server is not running. Start it with: inspekt start", err=True)
         sys.exit(1)
 
     # Start watching keyboard
@@ -122,7 +122,7 @@ def all():
     client = BridgeClient()
 
     if not client.is_alive():
-        click.echo("Error: Bridge server is not running. Start it with: inspekt server start", err=True)
+        click.echo("Error: Bridge server is not running. Start it with: inspekt start", err=True)
         sys.exit(1)
 
     # Load watch_all script
@@ -226,7 +226,7 @@ def control():
     client = BridgeClient()
 
     if not client.is_alive():
-        click.echo("Error: Bridge server is not running. Start it with: inspekt server start", err=True)
+        click.echo("Error: Bridge server is not running. Start it with: inspekt start", err=True)
         sys.exit(1)
 
     # Load configuration

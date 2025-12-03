@@ -19,6 +19,7 @@ from urllib.parse import urlparse
 import click
 import requests
 
+from inspekt.app.cli.table import Table
 from inspekt.services.bridge_executor import get_executor
 
 
@@ -459,33 +460,81 @@ def _display_robots_txt(data: dict[str, Any], show_validation: bool = False):
 
     click.echo()
 
-    # User-agent groups
+    # User-agent groups as table
     groups = data.get("groups", [])
     if groups:
-        click.echo("User-agent Groups:")
-        for i, group in enumerate(groups, 1):
+        click.echo(click.style("User-agent Groups:", bold=True))
+        click.echo()
+
+        # Create table for rules
+        headers = ["User-agent", "Directive", "Path"]
+        widths = [20, 12, 50]
+        alignments = ["left", "left", "left"]
+
+        table = Table(headers, widths, alignments)
+        table.print_header()
+
+        for i, group in enumerate(groups):
             agents = ", ".join(group["userAgents"])
-            click.echo(f"  {i}. User-agent: {agents}")
+            rules = group.get("rules", [])
 
-            for rule in group.get("rules", []):
-                directive = rule["directive"]
-                path = rule["path"]
-                click.echo(f"     • {directive}: {path}")
+            # First rule includes user-agent
+            if rules:
+                first_rule = rules[0]
+                directive = first_rule["directive"]
+                path = first_rule["path"] or "/"
 
+                # Color code directives
+                directive_color = "green" if directive == "Allow" else "red"
+                table.print_row(
+                    [agents, directive, path],
+                    [None, directive_color, None]
+                )
+
+                # Subsequent rules show empty user-agent cell
+                for rule in rules[1:]:
+                    directive = rule["directive"]
+                    path = rule["path"] or "/"
+                    directive_color = "green" if directive == "Allow" else "red"
+                    table.print_row(
+                        ["", directive, path],
+                        [None, directive_color, None]
+                    )
+
+            # Show crawl-delay and request-rate as special rows
             if crawl_delay := group.get("crawlDelay"):
-                click.echo(f"     • Crawl-delay: {crawl_delay}")
+                table.print_row(
+                    ["", "Crawl-delay", str(crawl_delay)],
+                    [None, "cyan", None]
+                )
 
             if request_rate := group.get("requestRate"):
-                click.echo(f"     • Request-rate: {request_rate}")
+                table.print_row(
+                    ["", "Request-rate", request_rate],
+                    [None, "cyan", None]
+                )
 
-            click.echo()
+            # Add separator between groups (except for last group)
+            if i < len(groups) - 1:
+                table.print_separator()
 
-    # Sitemaps
+        table.print_footer()
+        click.echo()
+
+    # Sitemaps as table
     sitemaps = data.get("sitemaps", [])
     if sitemaps:
-        click.echo("Sitemaps:")
+        click.echo(click.style("Sitemaps:", bold=True))
+        click.echo()
+
+        # Single column table for sitemaps
+        sitemap_table = Table(["URL"], [80], ["left"])
+        sitemap_table.print_header()
+
         for sitemap in sitemaps:
-            click.echo(f"  • {sitemap}")
+            sitemap_table.print_row([sitemap])
+
+        sitemap_table.print_footer()
         click.echo()
 
     # Validation
@@ -494,13 +543,21 @@ def _display_robots_txt(data: dict[str, Any], show_validation: bool = False):
         errors = validation.get("errors", [])
         warnings = validation.get("warnings", [])
 
+        click.echo(click.style("Validation:", bold=True))
+        click.echo()
+
         if errors or warnings:
-            click.echo("Validation:")
+            # Create validation table
+            val_table = Table(["Type", "Message"], [10, 70], ["left", "left"])
+            val_table.print_header()
+
             for error in errors:
-                click.echo(f"  ✗ Error: {error}")
+                val_table.print_row(["Error", error], ["red", None])
+
             for warning in warnings:
-                click.echo(f"  ⚠ Warning: {warning}")
+                val_table.print_row(["Warning", warning], ["yellow", None])
+
+            val_table.print_footer()
         else:
-            click.echo("Validation:")
-            click.echo("  ✓ No errors or warnings")
+            click.echo("  No errors or warnings")
         click.echo()

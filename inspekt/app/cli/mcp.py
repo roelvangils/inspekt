@@ -39,7 +39,7 @@ def start(bridge_port, cache_ttl):
     and other MCP clients that use standard input/output for communication.
 
     Make sure the bridge server is running first:
-        inspekt server start --daemon
+        inspekt start --bridge-only
 
     Then configure your Claude Desktop config to use this server:
         {
@@ -58,7 +58,7 @@ def start(bridge_port, cache_ttl):
             "Warning: Bridge server is not running on port {}.".format(bridge_port),
             err=True,
         )
-        click.echo("Start it with: inspekt server start --daemon", err=True)
+        click.echo("Start it with: inspekt start --bridge-only", err=True)
         click.echo("MCP server will start but tools will fail until bridge is running.\n", err=True)
 
     # Import and run MCP server
@@ -100,147 +100,219 @@ def info(output_json):
     Show information about available MCP tools and resources.
 
     Lists all tools (actions) and resources (read-only data) that
-    the MCP server exposes to AI assistants.
+    the MCP server exposes to AI assistants. Dynamically fetches
+    tool definitions including any MCP-enabled plugins.
     """
-    # Define tools info (must match server.py descriptions)
-    tools = [
-        {
-            "name": "navigate_to_url",
-            "description": "Navigate to a URL in a real browser with JavaScript execution",
-            "category": "Navigation",
-        },
-        {
-            "name": "go_back",
-            "description": "Navigate back in browser history",
-            "category": "Navigation",
-        },
-        {
-            "name": "reload_page",
-            "description": "Reload the current page in the browser",
-            "category": "Navigation",
-        },
-        {
-            "name": "execute_javascript",
-            "description": "Execute arbitrary JavaScript code in the browser context",
-            "category": "Execution",
-        },
-        {
-            "name": "extract_links",
-            "description": "Extract all links from a webpage currently open in the browser",
-            "category": "Extraction",
-        },
-        {
-            "name": "extract_outline",
-            "description": "Extract the heading hierarchy (H1-H6) from a webpage",
-            "category": "Extraction",
-        },
-        {
-            "name": "extract_page_info",
-            "description": "Extract comprehensive metadata from a webpage",
-            "category": "Extraction",
-        },
-        {
-            "name": "extract_article",
-            "description": "Extract main article content using Mozilla Readability",
-            "category": "Extraction",
-        },
-        {
-            "name": "click_element",
-            "description": "Click an element on the webpage by CSS selector",
-            "category": "Interaction",
-        },
-        {
-            "name": "type_text",
-            "description": "Type text into the currently focused element",
-            "category": "Interaction",
-        },
-        {
-            "name": "get_page_info",
-            "description": "Get current page information from the browser",
-            "category": "Inspection",
-        },
-        {
-            "name": "take_screenshot",
-            "description": "Capture a screenshot of the browser viewport, full page, or element",
-            "category": "Inspection",
-        },
-        {
-            "name": "get_selected_text",
-            "description": "Get currently selected text from the browser",
-            "category": "Selection",
-        },
-        {
-            "name": "get_cookies",
-            "description": "Get all cookies for the current page from the browser",
-            "category": "Storage",
-        },
-        {
-            "name": "set_cookie",
-            "description": "Set a cookie in the browser with optional attributes",
-            "category": "Storage",
-        },
-    ]
+    from inspekt.app.mcp.registry import (
+        format_params_summary,
+        get_builtin_tools,
+        get_plugin_tools,
+        get_resources,
+        get_tools_by_category,
+    )
 
-    resources = [
-        {
-            "uri": "inspekt-mcp://current-url",
-            "name": "Current Page URL",
-            "description": "The URL of the currently active browser tab",
-        },
-        {
-            "uri": "inspekt-mcp://page-title",
-            "name": "Page Title",
-            "description": "The title of the currently active browser tab",
-        },
-        {
-            "uri": "inspekt-mcp://page-metadata",
-            "name": "Page Metadata",
-            "description": "Extended metadata about the current page (JSON)",
-        },
-        {
-            "uri": "inspekt-mcp://browser-info",
-            "name": "Browser Information",
-            "description": "Information about the connected browser (JSON)",
-        },
-        {
-            "uri": "inspekt-mcp://connection-status",
-            "name": "Connection Status",
-            "description": "Bridge server connection status and health (JSON)",
-        },
-    ]
+    builtin_tools = get_builtin_tools()
+    plugin_tools = get_plugin_tools()
+    resources = get_resources()
 
     if output_json:
-        # JSON output
-        click.echo(json.dumps({"tools": tools, "resources": resources}, indent=2))
+        # JSON output with full details
+        tools_json = []
+        for tool in builtin_tools + plugin_tools:
+            tools_json.append({
+                "name": tool.name,
+                "description": tool.description,
+                "category": tool.category,
+                "parameters": format_params_summary(tool.input_schema),
+                "input_schema": tool.input_schema,
+                "is_plugin": tool.is_plugin,
+            })
+
+        resources_json = []
+        for resource in resources:
+            resources_json.append({
+                "uri": resource.uri,
+                "name": resource.name,
+                "description": resource.description,
+                "mime_type": resource.mime_type,
+            })
+
+        click.echo(json.dumps({
+            "tools": tools_json,
+            "resources": resources_json,
+            "summary": {
+                "builtin_tools": len(builtin_tools),
+                "plugin_tools": len(plugin_tools),
+                "resources": len(resources),
+            }
+        }, indent=2))
     else:
         # Human-readable output
         click.echo("Inspekt MCP Server - Available Tools and Resources\n")
 
-        # Group tools by category
-        click.echo("TOOLS (Actions)")
-        click.echo("=" * 70)
-        categories = {}
-        for tool in tools:
-            cat = tool["category"]
-            if cat not in categories:
-                categories[cat] = []
-            categories[cat].append(tool)
+        # Count totals
+        builtin_count = len(builtin_tools)
+        plugin_count = len(plugin_tools)
 
-        for category in sorted(categories.keys()):
-            click.echo(f"\n{category}:")
-            for tool in categories[category]:
-                click.echo(f"  • {tool['name']}")
-                click.echo(f"    {tool['description']}")
+        if plugin_count > 0:
+            click.echo(f"TOOLS ({builtin_count} built-in + {plugin_count} plugins)")
+        else:
+            click.echo(f"TOOLS ({builtin_count} built-in)")
+        click.echo("=" * 70)
+
+        # Group tools by category
+        tools_by_category = get_tools_by_category()
+
+        for category, tools in tools_by_category.items():
+            count = len(tools)
+            click.echo(f"\n{category} ({count}):")
+
+            for tool in tools:
+                params = format_params_summary(tool.input_schema)
+                # Truncate description to first sentence for cleaner output
+                desc = tool.description.split(". ")[0]
+                if len(desc) > 60:
+                    desc = desc[:57] + "..."
+
+                click.echo(f"  • {tool.name}")
+                click.echo(f"    {desc}")
+                click.echo(f"    Parameters: {params}")
 
         # Resources
-        click.echo("\n\nRESOURCES (Read-only data)")
+        click.echo(f"\n\nRESOURCES ({len(resources)})")
         click.echo("=" * 70)
         for resource in resources:
-            click.echo(f"\n  • {resource['name']}")
-            click.echo(f"    URI: {resource['uri']}")
-            click.echo(f"    {resource['description']}")
+            click.echo(f"\n  • {resource.name}")
+            click.echo(f"    URI: {resource.uri}")
+            click.echo(f"    {resource.description}")
 
-        click.echo(f"\n\nTotal: {len(tools)} tools, {len(resources)} resources")
+        # Summary
+        total_tools = builtin_count + plugin_count
+        click.echo(f"\n\nTotal: {total_tools} tools, {len(resources)} resources")
+        click.echo("\nUse 'inspekt mcp describe <tool>' for detailed documentation.")
+
+
+@mcp.command()
+@click.argument("tool_name")
+@click.option("--json", "output_json", is_flag=True, help="Output as JSON")
+def describe(tool_name, output_json):
+    """
+    Show detailed documentation for a specific MCP tool.
+
+    Displays full parameter schemas, descriptions, return types,
+    and usage examples for the specified tool.
+    """
+    from inspekt.app.mcp.registry import (
+        format_params_detailed,
+        get_response_schema,
+        get_tool,
+    )
+
+    tool = get_tool(tool_name)
+
+    if not tool:
+        # Try with plugin_ prefix
+        if not tool_name.startswith("plugin_"):
+            tool = get_tool(f"plugin_{tool_name}")
+
+        if not tool:
+            click.echo(f"Error: Tool '{tool_name}' not found.", err=True)
+            click.echo("\nUse 'inspekt mcp info' to see available tools.", err=True)
+            sys.exit(1)
+
+    params = format_params_detailed(tool.input_schema)
+    response_schema = get_response_schema(tool)
+
+    if output_json:
+        # JSON output
+        output = {
+            "name": tool.name,
+            "category": tool.category,
+            "description": tool.description,
+            "is_plugin": tool.is_plugin,
+            "input_schema": tool.input_schema,
+            "response_schema": response_schema,
+            "parameters": params,
+        }
+        click.echo(json.dumps(output, indent=2))
+    else:
+        # Human-readable output
+        click.echo(f"Tool: {tool.name}")
+        click.echo(f"Category: {tool.category}")
+        if tool.is_plugin:
+            click.echo(f"Type: Plugin (ID: {tool.plugin_id})")
+        click.echo()
+
+        click.echo("Description:")
+        # Word wrap the description
+        desc_words = tool.description.split()
+        lines = []
+        current_line = "  "
+        for word in desc_words:
+            if len(current_line) + len(word) + 1 > 72:
+                lines.append(current_line)
+                current_line = "  " + word
+            else:
+                current_line += " " + word if current_line != "  " else word
+        if current_line.strip():
+            lines.append(current_line)
+        click.echo("\n".join(lines))
+        click.echo()
+
+        # Parameters
+        click.echo("Parameters:")
+        if not params:
+            click.echo("  none")
+        else:
+            for param in params:
+                req_str = "[REQUIRED]" if param["required"] else "[optional]"
+                type_str = param["type"]
+                click.echo(f"  {param['name']} ({type_str}) {req_str}")
+                if param["description"]:
+                    click.echo(f"    {param['description']}")
+                if param.get("allowed_values"):
+                    click.echo(f"    Allowed: {', '.join(repr(v) for v in param['allowed_values'])}")
+                if param.get("default") is not None:
+                    click.echo(f"    Default: {param['default']}")
+        click.echo()
+
+        # Response schema
+        if response_schema:
+            click.echo("Returns:")
+            response_props = response_schema.get("properties", {})
+            response_required = set(response_schema.get("required", []))
+            for name, prop in response_props.items():
+                opt = "" if name in response_required else ", optional"
+                prop_type = prop.get("type", "any")
+                desc = prop.get("description", "")
+                click.echo(f"  • {name} ({prop_type}{opt})")
+                if desc:
+                    click.echo(f"    {desc}")
+            click.echo()
+
+        # Example invocation
+        click.echo("MCP Invocation Example:")
+        example_args = {}
+        for param in params:
+            if param["required"]:
+                # Add placeholder for required params
+                if param["type"] == "string":
+                    if param.get("allowed_values"):
+                        example_args[param["name"]] = param["allowed_values"][0]
+                    else:
+                        example_args[param["name"]] = f"<{param['name']}>"
+                elif param["type"] == "integer":
+                    example_args[param["name"]] = 30
+                elif param["type"] == "boolean":
+                    example_args[param["name"]] = True
+                else:
+                    example_args[param["name"]] = f"<{param['name']}>"
+
+        example = {
+            "name": tool.name,
+            "arguments": example_args if example_args else {},
+        }
+        click.echo(json.dumps(example, indent=2))
 
 
 @mcp.command()
@@ -259,7 +331,7 @@ def test():
     click.echo("1. Checking bridge server...")
     if not client.is_alive():
         click.echo("   ✗ Bridge server is NOT running", err=True)
-        click.echo("   Start it with: inspekt server start --daemon", err=True)
+        click.echo("   Start it with: inspekt start --bridge-only", err=True)
         sys.exit(1)
     else:
         click.echo("   ✓ Bridge server is running")

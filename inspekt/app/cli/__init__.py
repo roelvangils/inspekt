@@ -30,6 +30,145 @@ def cli(ctx, verbose):
         os.environ['INSPEKT_VERBOSE'] = '1'
 
 
+@cli.command()
+@click.argument('shell', type=click.Choice(['bash', 'zsh', 'fish']))
+def completion(shell: str):
+    """Generate shell completion script.
+
+    Install with:
+
+    \b
+      # Bash
+      inspekt completion bash >> ~/.bashrc
+
+    \b
+      # Zsh
+      inspekt completion zsh >> ~/.zshrc
+
+    \b
+      # Fish
+      inspekt completion fish > ~/.config/fish/completions/inspekt.fish
+
+    Then restart your shell or source the file.
+    """
+    from click.shell_completion import get_completion_class
+
+    # Get the completion class for the requested shell
+    completion_class = get_completion_class(shell)
+
+    # Create a completer instance and generate the source script
+    completer = completion_class(cli, {}, "inspekt", "_INSPEKT_COMPLETE")
+    click.echo(completer.source())
+
+
+@cli.command()
+@click.option('--install-completion', is_flag=True, help='Automatically install shell completion')
+def setup(install_completion: bool):
+    """Interactive setup wizard for new users.
+
+    Detects your shell and helps configure:
+    - Tab completion for commands
+    - Useful tips for getting started
+
+    Run with --install-completion to automatically add completion to your shell config.
+    """
+    import os
+    import subprocess
+    from pathlib import Path
+    from click.shell_completion import get_completion_class
+
+    # Detect current shell
+    shell_path = os.environ.get('SHELL', '')
+    if 'zsh' in shell_path:
+        shell = 'zsh'
+        rc_file = Path.home() / '.zshrc'
+    elif 'fish' in shell_path:
+        shell = 'fish'
+        rc_file = Path.home() / '.config' / 'fish' / 'completions' / 'inspekt.fish'
+    else:
+        shell = 'bash'
+        rc_file = Path.home() / '.bashrc'
+
+    click.echo()
+    click.secho("  Inspekt Setup Wizard", fg="cyan", bold=True)
+    click.secho("  " + "=" * 20, fg="cyan")
+    click.echo()
+
+    # Show version
+    click.echo(f"  Version: {__version__}")
+    click.echo(f"  Shell:   {shell}")
+    click.echo()
+
+    # Shell completion
+    click.secho("  Shell Completion", fg="yellow", bold=True)
+    click.echo("  ----------------")
+
+    # Check if completion is already installed
+    completion_marker = "# inspekt shell completion" if shell != 'fish' else "_inspekt_completion"
+    already_installed = False
+
+    if rc_file.exists():
+        content = rc_file.read_text()
+        if completion_marker in content or "_inspekt_completion" in content:
+            already_installed = True
+
+    if already_installed:
+        click.secho("  Tab completion is already installed.", fg="green")
+    elif install_completion:
+        # Auto-install completion
+        completion_class = get_completion_class(shell)
+        completer = completion_class(cli, {}, "inspekt", "_INSPEKT_COMPLETE")
+        script = completer.source()
+
+        if shell == 'fish':
+            # Fish uses a separate file
+            rc_file.parent.mkdir(parents=True, exist_ok=True)
+            rc_file.write_text(script)
+            click.secho(f"  Completion installed to {rc_file}", fg="green")
+        else:
+            # Bash/zsh append to rc file
+            with open(rc_file, 'a') as f:
+                f.write(f"\n# inspekt shell completion\n{script}\n")
+            click.secho(f"  Completion added to {rc_file}", fg="green")
+
+        click.echo()
+        click.secho("  Reload your shell or run:", fg="yellow")
+        if shell == 'fish':
+            click.echo(f"    source {rc_file}")
+        else:
+            click.echo(f"    source {rc_file}")
+    else:
+        click.echo("  Tab completion is not installed.")
+        click.echo()
+        click.echo("  To enable, run one of:")
+        click.echo()
+        click.secho(f"    inspekt setup --install-completion", fg="green")
+        click.echo("    # or manually:")
+        if shell == 'fish':
+            click.echo(f"    inspekt completion {shell} > {rc_file}")
+        else:
+            click.echo(f"    inspekt completion {shell} >> {rc_file}")
+
+    click.echo()
+
+    # Quick tips
+    click.secho("  Quick Tips", fg="yellow", bold=True)
+    click.echo("  ----------")
+    click.echo("  - Mistype a command? Inspekt suggests corrections:")
+    click.secho("      $ inspekt screenshit", fg="white", dim=True)
+    click.secho("      Error: Did you mean: 'screenshot'?", fg="white", dim=True)
+    click.echo()
+    click.echo("  - Start the bridge server:")
+    click.echo("      inspekt start")
+    click.echo()
+    click.echo("  - Check connection status:")
+    click.echo("      inspekt status")
+    click.echo()
+    click.echo("  - Get help on any command:")
+    click.echo("      inspekt <command> --help")
+    click.echo()
+
+
 # ============================================================================
 # Lazy Command Registration
 # ============================================================================
@@ -112,8 +251,16 @@ cli.add_lazy_command("ask", "extraction", "ask")
 cli.add_lazy_command("watch", "watch", "watch")
 cli.add_lazy_command("control", "watch", "control")
 
+# Recording commands (from record.py)
+cli.add_lazy_command("record", "record", "record")
+
+# Replay commands (from replay.py)
+cli.add_lazy_command("replay", "replay", "replay")
+
+# Info command group (from info.py)
+cli.add_lazy_command("info", "info", "info")
+
 # Utility commands (from util.py)
-cli.add_lazy_command("info", "util", "info")
 cli.add_lazy_command("repl", "util", "repl")
 cli.add_lazy_command("userscript", "util", "userscript")
 cli.add_lazy_command("download", "util", "download")
@@ -134,6 +281,9 @@ cli.add_lazy_command("log", "console", "log_expression")  # Shorthand for `conso
 
 # Yolo mode (top-level command from domain.py)
 cli.add_lazy_command("yolo", "domain", "yolo")
+
+# Plugin management commands (from plugin.py)
+cli.add_lazy_command("plugin", "plugin", "plugin")
 
 
 # ============================================================================

@@ -17,6 +17,7 @@ from pathlib import Path
 import click
 
 from inspekt.app.cli.base import builtin_open
+from inspekt.app.cli.table import Table
 from inspekt.client import BridgeClient
 
 
@@ -69,40 +70,268 @@ def _build_axe_config(level: str, tags: str | None, include_passes: bool, includ
     return config
 
 
-def _format_table_row(columns: list[str], widths: list[int], colors: list[str | None] = None) -> str:
-    """Format a table row with fixed column widths and optional colors."""
-    if colors is None:
-        colors = [None] * len(columns)
+def _separator_line(fg: str = "bright_black") -> str:
+    """
+    Create a separator line that spans the terminal width.
 
-    parts = []
-    for i, col in enumerate(columns):
-        # Truncate if too long
-        if len(col) > widths[i]:
-            col = col[:widths[i] - 3] + "..."
-        # Pad to width
-        padded = col.ljust(widths[i])
-        # Apply color if specified
-        if colors[i]:
-            padded = click.style(padded, fg=colors[i])
-        parts.append(padded)
+    Args:
+        fg: Foreground color for the line (default: bright_black)
 
-    # Use dark gray for borders
-    border = click.style("│", fg="bright_black")
-    return border + " " + (" " + border + " ").join(parts) + " " + border
+    Returns:
+        Styled separator line
+    """
+    try:
+        terminal_width = click.get_terminal_size()[0]
+    except Exception:
+        # Fallback to 80 if terminal size cannot be determined
+        terminal_width = 80
+
+    return click.style("─" * terminal_width, fg=fg)
 
 
-def _format_table_separator(widths: list[int], top: bool = False, bottom: bool = False) -> str:
-    """Format a table separator line with dark gray color."""
-    if top:
-        left, mid, right = "┌", "┬", "┐"
-    elif bottom:
-        left, mid, right = "└", "┴", "┘"
+def _parse_selectors(selector_list: tuple[str, ...]) -> list[str]:
+    """
+    Parse selectors from multiple --exclude flags and comma-separated values.
+
+    Args:
+        selector_list: Tuple of selector strings (from multiple --exclude flags)
+
+    Returns:
+        Flat list of individual selectors
+    """
+    selectors = []
+    for item in selector_list:
+        # Split on commas and strip whitespace
+        parts = [s.strip() for s in item.split(',') if s.strip()]
+        selectors.extend(parts)
+    return selectors
+
+
+def _validate_selectors(client: BridgeClient, selectors: list[str], timeout: float) -> dict[str, dict]:
+    """
+    Validate CSS selectors by testing them in the browser.
+
+    Args:
+        client: Bridge client for executing JavaScript
+        selectors: List of CSS selectors to validate
+        timeout: Timeout for JavaScript execution
+
+    Returns:
+        Dictionary mapping selector to validation result
+    """
+    if not selectors:
+        return {}
+
+    validation_script = f"""
+    (function() {{
+        const selectors = {json.dumps(selectors)};
+        const results = {{}};
+
+        for (const sel of selectors) {{
+            try {{
+                const elements = document.querySelectorAll(sel);
+                results[sel] = {{ valid: true, count: elements.length }};
+            }} catch (e) {{
+                results[sel] = {{ valid: false, error: e.message }};
+            }}
+        }}
+
+        return results;
+    }})()
+    """
+
+    result = client.execute(validation_script, timeout=timeout)
+
+    if not result.get("ok"):
+        raise RuntimeError(f"Failed to validate selectors: {result.get('error')}")
+
+    return result.get("result", {})
+
+
+def _build_axe_context(client: BridgeClient, scoped: str | None, exclude_selectors: list[str], timeout: float, require_panel_selection: bool = False) -> tuple[str, str | None]:
+    """
+    Build the axe context parameter based on scoped and exclude options.
+
+    Args:
+        client: Bridge client for executing JavaScript
+        scoped: Scoped value ("inspected" or CSS selectors)
+        exclude_selectors: List of selectors to exclude
+        timeout: Timeout for JavaScript execution
+
+    Returns:
+        Tuple of (context_expression, warning_message)
+        - context_expression: JavaScript expression for axe.run() context
+        - warning_message: Optional warning message to display to user
+    """
+    warning = None
+
+    # Handle scoped=inspected
+    if scoped and scoped.lower() == "inspected":
+        # Check if element is inspected
+        check_script = """
+        (function() {
+            const el = window.__INSPEKT_INSPECTED_ELEMENT__;
+            if (!el || el.nodeType !== 1) {
+                return { ok: false, error: 'No element inspected' };
+            }
+
+            // Get a CSS selector for the element
+            function getCSSPath(el) {
+                if (el.id) return '#' + el.id;
+                if (el === document.body) return 'body';
+
+                let path = [];
+                while (el && el.nodeType === 1) {
+                    let selector = el.nodeName.toLowerCase();
+                    if (el.id) {
+                        selector = '#' + el.id;
+                        path.unshift(selector);
+                        break;
+                    } else if (el.className && typeof el.className === 'string') {
+                        selector += '.' + el.className.trim().split(/\\s+/).join('.');
+                    }
+                    path.unshift(selector);
+                    el = el.parentElement;
+                }
+                return path.join(' > ');
+            }
+
+            return {
+                ok: true,
+                selector: getCSSPath(el),
+                nodeName: el.nodeName.toLowerCase(),
+                selectionSource: window.__INSPEKT_SELECTION_SOURCE__ || 'unknown'
+            };
+        })()
+        """
+
+        result = client.execute(check_script, timeout=timeout)
+
+        if not result.get("ok"):
+            raise RuntimeError(f"Failed to check inspected element: {result.get('error')}")
+
+        data = result.get("result", {})
+        if not data.get("ok"):
+            click.echo("Error: No element inspected. Use the Chrome DevTools inspector or Inspekt panel to select an element first.", err=True)
+            sys.exit(1)
+
+        selector = data.get("selector", "unknown")
+        node_name = data.get("nodeName", "unknown")
+        selection_source = data.get("selectionSource", "unknown")
+
+        # Check if panel selection is required
+        if require_panel_selection and selection_source != "panel":
+            source_label = {
+                "devtools": "Chrome DevTools inspector",
+                "unknown": "unknown method"
+            }.get(selection_source, selection_source)
+
+            click.echo(f"Error: Element must be selected using Inspekt panel picker.", err=True)
+            click.echo(f"Current selection source: {source_label}", err=True)
+            click.echo("", err=True)
+            click.echo("To select via Inspekt panel:", err=True)
+            click.echo("  1. Open Chrome DevTools (F12)", err=True)
+            click.echo("  2. Click on the 'Inspekt' panel tab", err=True)
+            click.echo("  3. Click the 'Pick Element' button", err=True)
+            click.echo("  4. Click the element you want to test", err=True)
+            sys.exit(1)
+
+        # Show selection source confirmation if panel selection was required
+        if require_panel_selection:
+            click.echo(click.style("✓", fg="green") + " Element selected via Inspekt panel picker", err=True)
+
+        # Display scoped element with separator lines
+        click.echo(f"Scoping to inspected element:", err=True)
+        click.echo(_separator_line(), err=True)
+        click.echo(f"{click.style(node_name, fg='cyan')} ({selector})", err=True)
+        click.echo(_separator_line(), err=True)
+        click.echo("", err=True)
+
+        # Build context with inspected element
+        if exclude_selectors:
+            context_expr = json.dumps({
+                "include": "window.__INSPEKT_INSPECTED_ELEMENT__",
+                "exclude": exclude_selectors
+            })
+            # Replace the quoted window reference with actual reference
+            context_expr = context_expr.replace('"window.__INSPEKT_INSPECTED_ELEMENT__"', 'window.__INSPEKT_INSPECTED_ELEMENT__')
+        else:
+            context_expr = "window.__INSPEKT_INSPECTED_ELEMENT__"
+
+        warning = "Some rules may show incomplete results when scoped to a single element (e.g., duplicate-id, heading-order, landmark rules)."
+
+    # Handle scoped with CSS selectors
+    elif scoped:
+        # Parse comma-separated selectors
+        scoped_selectors = [s.strip() for s in scoped.split(',') if s.strip()]
+
+        # Validate scoped selectors
+        validation = _validate_selectors(client, scoped_selectors, timeout)
+
+        # Check for invalid selectors
+        invalid = [sel for sel, info in validation.items() if not info.get("valid")]
+        if invalid:
+            click.echo("Error: Invalid CSS selectors in --scoped:", err=True)
+            for sel in invalid:
+                error = validation[sel].get("error", "Unknown error")
+                click.echo(f"  - '{sel}': {error}", err=True)
+            sys.exit(1)
+
+        # Warn about selectors that match no elements
+        empty = [sel for sel, info in validation.items() if info.get("count") == 0]
+        if empty:
+            click.echo(click.style("Warning:", fg="yellow") + " Some --scoped selectors match no elements:", err=True)
+            for sel in empty:
+                click.echo(f"  - '{sel}'", err=True)
+            click.echo("", err=True)
+
+        # Build context
+        if exclude_selectors:
+            context_expr = json.dumps({
+                "include": scoped_selectors,
+                "exclude": exclude_selectors
+            })
+        else:
+            # Single selector can be a string, multiple must be array
+            if len(scoped_selectors) == 1:
+                context_expr = json.dumps(scoped_selectors[0])
+            else:
+                context_expr = json.dumps(scoped_selectors)
+
+        # Display scoped selectors with separator lines
+        selector_preview = ', '.join(scoped_selectors[:3])
+        if len(scoped_selectors) > 3:
+            selector_preview += f' (+{len(scoped_selectors) - 3} more)'
+
+        click.echo(f"Scoping to:", err=True)
+        click.echo(_separator_line(), err=True)
+        click.echo(click.style(selector_preview, fg='cyan'), err=True)
+        click.echo(_separator_line(), err=True)
+        click.echo("", err=True)
+
+    # Handle exclude-only (no scoped)
+    elif exclude_selectors:
+        context_expr = json.dumps({"exclude": exclude_selectors})
+
+        # Display excluded selectors with separator lines
+        selector_preview = ', '.join(exclude_selectors[:3])
+        if len(exclude_selectors) > 3:
+            selector_preview += f' (+{len(exclude_selectors) - 3} more)'
+
+        click.echo(f"Excluding:", err=True)
+        click.echo(_separator_line(), err=True)
+        click.echo(click.style(selector_preview, fg='cyan'), err=True)
+        click.echo(_separator_line(), err=True)
+        click.echo("", err=True)
+
+    # No scoped or exclude
     else:
-        left, mid, right = "├", "┼", "┤"
+        context_expr = "document"
 
-    parts = [("─" * (w + 2)) for w in widths]
-    line = left + mid.join(parts) + right
-    return click.style(line, fg="bright_black")
+    return context_expr, warning
+
+
+# Table formatting functions moved to inspekt.app.cli.table module
 
 
 def _get_impact_color(impact: str) -> str:
@@ -371,28 +600,36 @@ def _format_detailed_violation_output(violations: list[dict], url: str, rule_id:
     click.echo(f"Tested: {url}")
 
 
-def _format_table_output(violations: list[dict], url: str, summary: dict) -> None:
-    """Format violations as a table."""
+def _format_table_output(violations: list[dict], url: str, summary: dict, compact: bool = False) -> None:
+    """Format violations as a table.
+
+    Args:
+        violations: List of violation dicts
+        url: The URL that was tested
+        summary: Summary dict with counts
+        compact: If True, only show table without summary (for persistent mode)
+    """
     if not violations:
         click.echo()
         click.echo(click.style("✓ No accessibility violations found!", fg="green", bold=True))
-        click.echo(f"Tested: {url}")
-        click.echo(f"Passes: {summary.get('passCount', 0)}")
+        if not compact:
+            click.echo(f"Tested: {url}")
+            click.echo(f"Passes: {summary.get('passCount', 0)}")
         return
 
     # Sort violations by impact (critical -> serious -> moderate -> minor)
     impact_order = {"critical": 0, "serious": 1, "moderate": 2, "minor": 3}
     violations = sorted(violations, key=lambda v: impact_order.get(v.get("impact", "minor"), 4))
 
-    # Table column widths
+    # Create table
+    headers = ["Rule", "Impact", "Count", "Description"]
     widths = [25, 10, 7, 50]
+    alignments = ["left", "left", "right", "left"]
 
-    # Table header
-    click.echo()
-    click.echo(_format_table_separator(widths, top=True))
-    header = _format_table_row(["Rule", "Impact", "Count", "Description"], widths)
-    click.echo(click.style(header, bold=True))
-    click.echo(_format_table_separator(widths))
+    table = Table(headers, widths, alignments)
+
+    # Print header
+    table.print_header()
 
     # Table rows
     for violation in violations:
@@ -404,12 +641,14 @@ def _format_table_output(violations: list[dict], url: str, summary: dict) -> Non
         # Format row with impact color on the impact column
         row_data = [rule_id, impact, str(count), description]
         row_colors = [None, _get_impact_color(impact), None, None]
-        row = _format_table_row(row_data, widths, row_colors)
-        click.echo(row)
+        table.print_row(row_data, row_colors)
 
-    click.echo(_format_table_separator(widths, bottom=True))
+    table.print_footer()
 
-    # Summary
+    # Summary (skip in compact mode)
+    if compact:
+        return
+
     click.echo()
     violation_count = summary.get('violationCount', 0)
     violation_word = "violation" if violation_count == 1 else "violations"
@@ -479,7 +718,46 @@ def _format_table_output(violations: list[dict], url: str, summary: dict) -> Non
     is_flag=True,
     help="Disable auto-selection of element when single violation is found (only applies to --rule checks)"
 )
-def axe(level, rule, list_rules, tags, include_passes, include_incomplete, output_json, timeout, no_select):
+@click.option(
+    "--scoped",
+    type=str,
+    help="Scope tests to specific elements. Use 'inspected' for the currently inspected element, or provide CSS selectors (comma-separated)"
+)
+@click.option(
+    "--exclude",
+    type=str,
+    multiple=True,
+    help="Exclude elements from testing. Can be comma-separated selectors or multiple --exclude flags"
+)
+@click.option(
+    "--require-panel-selection",
+    is_flag=True,
+    help="Require element to be selected via Inspekt panel (not DevTools). Only valid with --scoped inspected"
+)
+@click.option(
+    "--show-badges/--no-show-badges",
+    default=None,
+    help="Show numbered severity badges on violating elements (default: from config)"
+)
+@click.option(
+    "--interactive",
+    is_flag=True,
+    default=False,
+    help="Make badges clickable with detailed popover information (requires --show-badges)"
+)
+@click.option(
+    "--dev-css",
+    is_flag=True,
+    default=False,
+    help="Load CSS from local server (http://localhost:5500) for live editing. Use with VS Code Live Server."
+)
+@click.option(
+    "--persistent",
+    is_flag=True,
+    default=False,
+    help="Monitor and re-run audit on each page navigation (press Ctrl+C to stop). CLI only."
+)
+def axe(level, rule, list_rules, tags, include_passes, include_incomplete, output_json, timeout, no_select, scoped, exclude, require_panel_selection, show_badges, interactive, dev_css, persistent):
     """
     Run axe-core accessibility audit on the current page.
 
@@ -489,18 +767,43 @@ def axe(level, rule, list_rules, tags, include_passes, include_incomplete, outpu
     The audit runs in your current browser tab, testing the actual rendered page
     state including any JavaScript-generated content and your authentication state.
 
+    Violations are marked with numbered badges on the page by default. Use
+    --interactive to make badges clickable, revealing detailed violation information
+    in accessible popovers with fix suggestions, code snippets, and documentation.
+
     When checking a single rule (--rule) with exactly one violation, the element
     is automatically selected and highlighted in the browser. Use --no-select to
     disable this behavior.
 
     Examples:
+        # Basic WCAG audits
         inspekt axe                                    # WCAG 2.1 Level AA audit
         inspekt axe --level 21aa                       # WCAG 2.1 Level AA audit
-        inspekt axe --rule color-contrast              # Check single rule (auto-selects if 1 violation)
-        inspekt axe --rule color-contrast --no-select  # Disable auto-selection
+        inspekt axe --rule color-contrast              # Check single rule
+
+        # Interactive badges
+        inspekt axe --interactive                      # Clickable badges with popovers
+        inspekt axe --no-show-badges                   # Disable badges
+
+        # Scoped testing
+        inspekt axe --scoped inspected                 # Test only inspected element
+        inspekt axe --scoped "main"                    # Test only main element
+        inspekt axe --scoped "main,nav,footer"         # Test multiple regions
+        inspekt axe --scoped inspected --require-panel-selection  # Require Inspekt panel
+
+        # Excluding elements
+        inspekt axe --exclude "header,footer"          # Exclude header and footer
+        inspekt axe --exclude header --exclude footer  # Multiple --exclude flags
+        inspekt axe --scoped "main" --exclude ".ad"    # Combined scoping and exclusion
+
+        # Other options
         inspekt axe --list-rules                       # List all available rules
-        inspekt axe --tags best-practice --include-incomplete
-        inspekt axe --json > audit-results.json
+        inspekt axe --json > audit-results.json        # JSON output
+        inspekt axe --rule color-contrast --no-select  # Disable auto-selection
+
+        # Persistent monitoring
+        inspekt axe --persistent                       # Monitor across page navigations
+        inspekt axe --persistent --interactive         # With clickable badges
     """
     # Validation: --rule and --level are mutually exclusive
     if rule and level != "2aa":  # "2aa" is the default, so it's okay
@@ -510,7 +813,7 @@ def axe(level, rule, list_rules, tags, include_passes, include_incomplete, outpu
     client = BridgeClient()
 
     if not client.is_alive():
-        click.echo("Error: Bridge server is not running. Start it with: inspekt server start", err=True)
+        click.echo("Error: Bridge server is not running. Start it with: inspekt start", err=True)
         sys.exit(1)
 
     # Handle --list-rules flag
@@ -537,6 +840,57 @@ def axe(level, rule, list_rules, tags, include_passes, include_incomplete, outpu
         # WCAG level-based check (existing behavior)
         config = _build_axe_config(level, tags, include_passes, include_incomplete)
 
+    # Parse and validate exclude selectors
+    exclude_selectors = _parse_selectors(exclude)
+
+    # Validate exclude selectors if provided
+    if exclude_selectors:
+        validation = _validate_selectors(client, exclude_selectors, timeout)
+
+        # Check for invalid selectors
+        invalid = [sel for sel, info in validation.items() if not info.get("valid")]
+        if invalid:
+            click.echo("Error: Invalid CSS selectors in --exclude:", err=True)
+            for sel in invalid:
+                error = validation[sel].get("error", "Unknown error")
+                click.echo(f"  - '{sel}': {error}", err=True)
+            sys.exit(1)
+
+        # Warn about selectors that match no elements
+        empty = [sel for sel, info in validation.items() if info.get("count") == 0]
+        if empty:
+            click.echo(click.style("Warning:", fg="yellow") + " Some --exclude selectors match no elements:", err=True)
+            for sel in empty:
+                click.echo(f"  - '{sel}'", err=True)
+            click.echo("", err=True)
+
+    # Validate --require-panel-selection usage
+    if require_panel_selection and (not scoped or scoped.lower() != "inspected"):
+        click.echo("Error: --require-panel-selection can only be used with --scoped inspected", err=True)
+        sys.exit(1)
+
+    # Build axe context
+    context_expr, context_warning = _build_axe_context(client, scoped, exclude_selectors, timeout, require_panel_selection)
+
+    # Determine if badges should be shown
+    if show_badges is None:
+        # Load config default if not specified via CLI
+        from inspekt.config import load_config
+        config_data = load_config()
+        show_badges = config_data.get("axe", {}).get("show-badges", True)
+
+    # Validate interactive flag
+    if interactive and not show_badges:
+        click.echo("Error: --interactive requires --show-badges to be enabled", err=True)
+        sys.exit(1)
+
+    # Add badge flags to config (will be consumed by run_axe.js)
+    # JSON output mode disables badges
+    config["__showBadges"] = show_badges and not output_json
+    config["__interactiveBadges"] = interactive and show_badges and not output_json
+    config["__devCss"] = dev_css and interactive  # Dev CSS only works with interactive mode
+    config["__persistent"] = persistent  # Enable persistent monitoring mode
+
     # Load axe-core library (bundled locally)
     axe_lib_path = Path(__file__).parent.parent.parent / "scripts" / "vendor" / "axe-core.min.js"
     if not axe_lib_path.exists():
@@ -561,20 +915,42 @@ def axe(level, rule, list_rules, tags, include_passes, include_incomplete, outpu
         # Replace config placeholder
         audit_script = audit_script.replace("__AXE_CONFIG__", json.dumps(config))
 
-        # Combine: axe-core library + audit script in a single async IIFE
-        # This avoids semicolon issues with AsyncFunction wrapper
-        script = f"""(async function() {{
-    // Load axe-core library
-    {axe_lib}
+        # Replace context placeholder (document is default in run_axe.js)
+        audit_script = audit_script.replace("document", context_expr, 1)
 
-    // Run audit
-    const auditResult = await {audit_script};
-    return auditResult;
-}})()"""
+        # First, inject axe-core library
+        # Wrap in IIFE to make it a valid expression (background.js wraps code in "return (code)")
+        # The library ends with a semicolon which would create "return (...;)" - invalid syntax
+        try:
+            axe_lib_wrapped = f"(function() {{ {axe_lib} return typeof axe !== 'undefined'; }})()"
+            result = client.execute(axe_lib_wrapped, timeout=10.0)
+            if not result.get("ok"):
+                click.echo(f"Error loading axe-core: {result.get('error')}", err=True)
+                sys.exit(1)
+            if not result.get("result"):
+                click.echo("Error: axe-core library failed to load (axe is undefined)", err=True)
+                sys.exit(1)
+        except Exception as e:
+            click.echo(f"Error loading axe-core: {e}", err=True)
+            sys.exit(1)
 
-        # Show warning about automated testing limitations
-        click.echo(click.style("WARNING:", fg="yellow", bold=True) + " Automated accessibility testing tools like Axe can detect only 20 to 30% of (potential) WCAG failures. To achieve complete WCAG compliance, it is essential to combine automated scans with manual checks.", err=True)
-        click.echo("", err=True)
+        # Now execute the audit script
+        script = audit_script
+
+        # Collect all warnings
+        warnings = []
+        warnings.append("Automated accessibility testing tools like Axe can detect only 20 to 30% of (potential) WCAG failures. To achieve complete WCAG compliance, it is essential to combine automated scans with manual checks.")
+
+        if context_warning:
+            warnings.append(context_warning)
+
+        # Display warnings grouped together with bullets
+        if warnings:
+            click.echo(click.style("WARNINGS:", fg="yellow", bold=True), err=True)
+            click.echo("", err=True)
+            for warning in warnings:
+                click.echo(f"• {warning}", err=True)
+            click.echo("", err=True)
 
         # Show progress
         if rule:
@@ -617,6 +993,19 @@ def axe(level, rule, list_rules, tags, include_passes, include_incomplete, outpu
         summary = data.get("summary", {})
         url = data.get("url", "")
 
+        # Display badge statistics if badges were injected
+        badge_stats = data.get("badgeStats", {})
+        if badge_stats.get("ok") and badge_stats.get("badgesCreated", 0) > 0:
+            click.echo(f"\n✓ {badge_stats['badgesCreated']} violation badge(s) displayed on page", err=True)
+            if badge_stats.get("badgesSkipped", 0) > 0:
+                click.echo(
+                    click.style(
+                        f"  ⚠ {badge_stats['badgesSkipped']} badge(s) skipped (limit: {badge_stats['maxBadges']})",
+                        fg="yellow"
+                    ),
+                    err=True
+                )
+
         if output_json:
             # Output full JSON
             output_data = {
@@ -653,6 +1042,133 @@ def axe(level, rule, list_rules, tags, include_passes, include_incomplete, outpu
                 color = _get_impact_color(impact)
                 click.echo(f"  {click.style('•', fg=color)} {item.get('id')}: {item.get('description')} ({item.get('nodeCount', 0)} elements)")
             click.echo()
+
+        # Persistent monitoring mode
+        if persistent:
+            import time
+            from urllib.parse import urlparse
+
+            def get_root_domain(hostname: str) -> str:
+                """Extract root domain (e.g., 'example.com' from 'www.example.com')."""
+                parts = hostname.split('.')
+                return '.'.join(parts[-2:]) if len(parts) > 2 else hostname
+
+            # Get initial URL info
+            initial_url = url
+            initial_parsed = urlparse(initial_url)
+            initial_root_domain = get_root_domain(initial_parsed.netloc)
+            last_url = initial_url
+
+            click.echo()
+            click.echo(click.style("Persistent monitoring mode", fg="cyan", bold=True) + " • Press Ctrl+C to stop", err=True)
+            click.echo(f"Monitoring domain: {initial_root_domain}…", err=True)
+
+            poll_interval = 1.0  # Check every second
+
+            try:
+                while True:
+                    time.sleep(poll_interval)
+
+                    # Check for dirty flag (click-triggered) OR URL change
+                    check_result = client.execute("""
+                        (function() {
+                            const dirty = window.__inspektDirty__ || false;
+                            const url = window.location.href;
+                            if (dirty) window.__inspektDirty__ = false;
+                            return { dirty: dirty, url: url };
+                        })()
+                    """, timeout=5.0)
+
+                    if not check_result.get("ok"):
+                        continue  # Might be during navigation, try again
+
+                    state = check_result.get("result", {})
+                    current_url = state.get("url", "")
+                    is_dirty = state.get("dirty", False)
+                    url_changed = current_url and current_url != last_url
+
+                    # Nothing changed - continue polling
+                    if not url_changed and not is_dirty:
+                        continue
+
+                    # Check same root domain (only for URL changes)
+                    if url_changed:
+                        current_parsed = urlparse(current_url)
+                        current_root_domain = get_root_domain(current_parsed.netloc)
+
+                        if current_root_domain != initial_root_domain:
+                            click.echo(f"\n{click.style('⚠', fg='yellow')} Different domain ({current_root_domain}), skipping...", err=True)
+                            last_url = current_url
+                            continue
+
+                        last_url = current_url
+
+                    # Show what triggered the re-scan
+                    click.echo()
+                    if url_changed:
+                        click.echo(current_url, err=True)
+                    else:
+                        click.echo(click.style("Page state changed", fg="cyan"), err=True)
+
+                    # Check if axe-core exists and re-inject if needed
+                    # (URL changes lose JS context, but some SPA navigations might too)
+                    try:
+                        axe_check = client.execute("typeof axe !== 'undefined'", timeout=5.0)
+                        axe_exists = axe_check.get("ok") and axe_check.get("result") is True
+
+                        if not axe_exists:
+                            axe_lib_wrapped = f"(function() {{ {axe_lib} return typeof axe !== 'undefined'; }})()"
+                            lib_result = client.execute(axe_lib_wrapped, timeout=10.0)
+                            if not lib_result.get("ok") or not lib_result.get("result"):
+                                click.echo(click.style("  ⚠ Failed to load axe-core", fg="yellow"), err=True)
+                                continue
+                    except Exception as e:
+                        click.echo(click.style(f"  ⚠ Error loading axe-core: {e}", fg="yellow"), err=True)
+                        continue
+
+                    # Execute audit script
+                    try:
+                        result = client.execute(script, timeout=timeout)
+
+                        if not result.get("ok"):
+                            click.echo(click.style(f"  ⚠ Audit error: {result.get('error')}", fg="yellow"), err=True)
+                            continue
+
+                        data = result.get("result", {})
+                        if not data.get("ok"):
+                            click.echo(click.style(f"  ⚠ Audit error: {data.get('error')}", fg="yellow"), err=True)
+                            continue
+
+                        # Extract results
+                        new_badge_stats = data.get("badgeStats", {})
+                        badges_created = new_badge_stats.get("badgesCreated", 0)
+                        total_badges = new_badge_stats.get("totalBadgesOnPage", 0)
+
+                        # Display results based on whether new violations were found
+                        if badges_created == 0:
+                            # No new violations found
+                            click.echo(click.style("✓ No new accessibility violations found", fg="green", bold=True) + " • Press Ctrl+C to stop", err=True)
+                        else:
+                            # New violations found - show table with only new violations
+                            new_violations = data.get("violations", [])
+                            new_summary = data.get("summary", {})
+                            new_url = data.get("url", current_url)
+
+                            _format_table_output(new_violations, new_url, new_summary, compact=True)
+
+                            # Show badge stats with total count
+                            if total_badges > badges_created:
+                                click.echo(f"✓ {badges_created} new badge(s) added ({total_badges} total) • Press Ctrl+C to stop", err=True)
+                            else:
+                                click.echo(f"✓ {badges_created} violation badge(s) displayed • Press Ctrl+C to stop", err=True)
+
+                    except Exception as e:
+                        click.echo(click.style(f"  ⚠ Audit error: {e}", fg="yellow"), err=True)
+                        continue
+
+            except KeyboardInterrupt:
+                click.echo()
+                click.echo(click.style("Monitoring stopped.", fg="cyan"), err=True)
 
     except (ConnectionError, TimeoutError, RuntimeError) as e:
         click.echo(f"Error: {e}", err=True)
