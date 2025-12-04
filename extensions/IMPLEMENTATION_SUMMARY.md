@@ -191,7 +191,7 @@ Then simplify `content.js` and `popup.js` by removing duplicated code.
 **Time Estimate**: 1-2 hours
 
 ### 3. Documentation Updates (Optional)
-- Update [CLAUDE.md](../CLAUDE.md) with new shared architecture patterns
+- Update [CLAUDE.md](https://github.com/roelvangils/inspekt/blob/main/CLAUDE.md) with new shared architecture patterns
 - Add extension development guide for future contributors
 - Document browser API differences clearly
 

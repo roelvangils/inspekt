@@ -21,6 +21,11 @@ browser.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
         console.log('[Inspekt] Tab updated:', tab.url);
         activeTabs.add(tabId);
 
+        // Inject console hooks when page loads (for console capture feature)
+        if (tab.url?.startsWith('http')) {
+            injectConsoleHooks(tabId);
+        }
+
         // Update icon when page finishes loading
         await updateIconForTab(tabId, tab);
     }
@@ -52,6 +57,19 @@ browser.storage.onChanged.addListener(async (changes, areaName) => {
         if (changes.inspekt_allowed_domains || changes.inspekt_temp_bypass) {
             console.log('[Inspekt] Permissions changed, updating all icons');
             await updateAllTabIcons();
+
+            // Notify all tabs to re-check permissions and reconnect if needed
+            // This enables commands to work immediately after adding a domain (no page refresh)
+            const tabs = await browser.tabs.query({});
+            for (const tab of tabs) {
+                try {
+                    await browser.tabs.sendMessage(tab.id, {
+                        type: 'PERMISSIONS_CHANGED'
+                    });
+                } catch (e) {
+                    // Tab may not have content script loaded (e.g., about: pages)
+                }
+            }
         }
     }
 });
@@ -108,6 +126,14 @@ browser.runtime.onMessage.addListener((message, sender) => {
 
     if (message.type === 'SYNC_ALLOWED_DOMAINS') {
         return handleDomainSync(message.domains);
+    }
+
+    if (message.type === 'GET_CONSOLE_LOGS') {
+        return getConsoleLogs(sender.tab.id);
+    }
+
+    if (message.type === 'CLEAR_CONSOLE_LOGS') {
+        return clearConsoleLogs(sender.tab.id);
     }
 });
 
@@ -588,6 +614,129 @@ async function handleDomainSync(domains) {
         return {
             ok: true,
             synced: Object.keys(domains).length
+        };
+    } catch (error) {
+        return {
+            ok: false,
+            error: String(error)
+        };
+    }
+}
+
+// ============================================================================
+// CONSOLE HOOKS INJECTION (for console capture feature)
+// ============================================================================
+
+/**
+ * Inject console hooks into page to capture console.log/error/warn/info/debug
+ */
+async function injectConsoleHooks(tabId) {
+    try {
+        await browser.tabs.executeScript(tabId, {
+            code: `
+                (function() {
+                    // Don't re-inject if already hooked
+                    if (window.__INSPEKT_CONSOLE_HOOKED__) return;
+                    window.__INSPEKT_CONSOLE_HOOKED__ = true;
+
+                    const buffer = [];
+                    const MAX_MESSAGES = 1000;
+
+                    ['log', 'error', 'warn', 'info', 'debug'].forEach(level => {
+                        const original = console[level];
+                        console[level] = function(...args) {
+                            buffer.push({
+                                level,
+                                timestamp: new Date().toISOString(),
+                                message: args.map(a => {
+                                    try {
+                                        return typeof a === 'string' ? a : JSON.stringify(a);
+                                    } catch {
+                                        return String(a);
+                                    }
+                                }).join(' ')
+                            });
+                            // Keep buffer size limited
+                            if (buffer.length > MAX_MESSAGES) buffer.shift();
+                            // Call original console method
+                            return original.apply(console, args);
+                        };
+                    });
+
+                    // Store buffer reference for retrieval
+                    window.__INSPEKT_CONSOLE_LOGS__ = buffer;
+                })();
+            `,
+            runAt: 'document_idle'
+        });
+        console.log('[Inspekt] Console hooks injected for tab:', tabId);
+    } catch (error) {
+        // Silently fail for restricted pages (about:, moz-extension:, etc.)
+        console.log('[Inspekt] Could not inject console hooks:', error.message);
+    }
+}
+
+/**
+ * Get console logs from page
+ */
+async function getConsoleLogs(tabId) {
+    try {
+        const results = await browser.tabs.executeScript(tabId, {
+            code: `
+                (function() {
+                    const logs = window.__INSPEKT_CONSOLE_LOGS__ || [];
+                    return {
+                        ok: true,
+                        entries: logs,
+                        count: logs.length,
+                        hooked: !!window.__INSPEKT_CONSOLE_HOOKED__
+                    };
+                })();
+            `,
+            runAt: 'document_idle'
+        });
+
+        if (results && results[0]) {
+            return results[0];
+        }
+
+        return {
+            ok: false,
+            error: 'No result returned from tab'
+        };
+    } catch (error) {
+        return {
+            ok: false,
+            error: String(error)
+        };
+    }
+}
+
+/**
+ * Clear console logs buffer in page
+ */
+async function clearConsoleLogs(tabId) {
+    try {
+        const results = await browser.tabs.executeScript(tabId, {
+            code: `
+                (function() {
+                    if (window.__INSPEKT_CONSOLE_LOGS__) {
+                        window.__INSPEKT_CONSOLE_LOGS__.length = 0;
+                        return { ok: true, message: 'Console buffer cleared' };
+                    }
+                    return { ok: true, message: 'No console buffer to clear' };
+                })();
+            `,
+            runAt: 'document_idle'
+        });
+
+        if (results && results[0]) {
+            return results[0];
+        }
+
+        return {
+            ok: false,
+            error: 'No result returned from tab'
         };
     } catch (error) {
         return {

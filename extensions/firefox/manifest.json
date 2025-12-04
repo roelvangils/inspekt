@@ -24,6 +24,12 @@
 
   "content_scripts": [
     {
+      "matches": ["http://*/*", "https://*/*"],
+      "js": ["console-hooks.js"],
+      "run_at": "document_start",
+      "all_frames": false
+    },
+    {
       "matches": ["<all_urls>"],
       "js": [
         "shared/core/permissions.js",
@@ -48,7 +54,8 @@
 
   "web_accessible_resources": [
     "css/material-icons.css",
-    "fonts/material-icons.woff2"
+    "fonts/material-icons.woff2",
+    "scripts/console-hooks-inject.js"
   ],
 
   "browser_specific_settings": {

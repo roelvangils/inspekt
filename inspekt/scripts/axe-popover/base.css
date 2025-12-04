@@ -2,6 +2,18 @@
  * Base - Popover container and anchor positioning
  */
 
+/* Visually hidden utility - accessible to screen readers but invisible */
+.visually-hidden {
+  opacity: 0 !important;
+  clip-path: inset(100%);
+  clip: rect(1px, 1px, 1px, 1px);
+  height: 1px;
+  overflow: hidden;
+  position: absolute;
+  white-space: nowrap;
+  width: 1px;
+}
+
 [popover].inspekt-axe-popover {
   /* Reset */
   position: absolute;
@@ -10,7 +22,8 @@
 
   /* Anchor Positioning */
   position-area: block-end span-inline-end;
-  position-try-fallbacks: --bottom-left, --top-right, --top-left, flip-block, flip-inline;
+  position-try-fallbacks: --bottom-left, --top-right, --top-left, flip-block,
+    flip-inline;
 
   /* Sizing */
   max-width: var(--popover-max-width);

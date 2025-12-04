@@ -54,7 +54,7 @@ For easier distribution and installation:
 
 ### Method 3: Chrome Web Store (Coming Soon)
 
-Once published to the Chrome Web Store, you'll be able to install with one click. See [CHROME_WEB_STORE.md](CHROME_WEB_STORE.md) for our publication roadmap.
+Once published to the Chrome Web Store, you'll be able to install with one click. See [CHROME_WEB_STORE.md](../chrome/CHROME_WEB_STORE.md) for our publication roadmap.
 
 ## Usage
 
@@ -334,11 +334,11 @@ A: Yes! This extension should work on any Chromium-based browser (Edge, Brave, O
 A: It's recommended to use only one at a time to avoid conflicts. The extension is the better choice for compatibility.
 
 **Q: When will it be on Chrome Web Store?**
-A: We're preparing for submission! See [CHROME_WEB_STORE.md](CHROME_WEB_STORE.md) for our publication roadmap and how you can help.
+A: We're preparing for submission! See [CHROME_WEB_STORE.md](../chrome/CHROME_WEB_STORE.md) for our publication roadmap and how you can help.
 
 ## Publishing to Chrome Web Store
 
-See [CHROME_WEB_STORE.md](CHROME_WEB_STORE.md) for detailed instructions on how to publish this extension to the Chrome Web Store.
+See [CHROME_WEB_STORE.md](../chrome/CHROME_WEB_STORE.md) for detailed instructions on how to publish this extension to the Chrome Web Store.
 
 ## License
 
@@ -349,4 +349,4 @@ Part of Inspekt - see main repository for license.
 - 📖 [Documentation](https://roelvangils.github.io/inspekt/)
 - 💻 [GitHub](https://github.com/roelvangils/inspekt)
 - 🐛 [Report Issue](https://github.com/roelvangils/inspekt/issues)
-- 🌐 [Chrome Web Store](CHROME_WEB_STORE.md) (Coming Soon)
+- 🌐 [Chrome Web Store](../chrome/CHROME_WEB_STORE.md) (Coming Soon)

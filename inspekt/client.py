@@ -401,14 +401,44 @@ class BridgeClient:
                     # Check if result contains CSP error
                     if data.get("status") == "completed" and not data.get("ok"):
                         error = data.get("error", "")
+
+                        # Check if CSP bypass was auto-enabled (yolo mode)
+                        if "CSP_AUTO_ENABLED" in error:
+                            _verbose_log("CSP bypass auto-enabled, refreshing page and retrying...")
+                            # Reload the page to apply CSP bypass
+                            try:
+                                reload_response = self._session.post(
+                                    f"{self.base_url}/execute",
+                                    json={"code": "location.reload()"},
+                                    timeout=5.0,
+                                )
+                                # Wait for page to reload
+                                time.sleep(2.0)
+                                # Retry the original request
+                                return self.run(code, timeout=timeout)
+                            except Exception as reload_error:
+                                _verbose_log(f"Auto-reload failed: {reload_error}")
+                                # Fall through to regular CSP error
+
+                        # Check for CSP_BLOCKED error (user needs to enable bypass manually)
+                        if "CSP_BLOCKED" in error:
+                            raise RuntimeError(
+                                "Content Security Policy (CSP) blocks JavaScript execution on this page.\n\n"
+                                "Solutions:\n"
+                                "  • Run `inspekt yolo` to bypass all restrictions (recommended)\n"
+                                "  • Run `inspekt domain csp <domain> --enable` then refresh the page\n"
+                                "  • Enable CSP Bypass in the extension popup, then refresh\n\n"
+                                f"Technical details: {error[:200]}"
+                            )
+
+                        # Legacy CSP error handling
                         if "EvalError" in error or "Content Security Policy" in error:
                             raise RuntimeError(
                                 "Content Security Policy (CSP) blocks JavaScript execution on this page.\n\n"
                                 "This website has security restrictions that prevent eval() and dynamic code execution.\n\n"
-                                "Common affected sites: GitHub, Gmail, banking sites, government portals, extension pages.\n\n"
                                 "Solutions:\n"
-                                "  • Navigate to a different website without strict CSP\n"
-                                "  • Test on simple sites like example.com or wikipedia.org\n"
+                                "  • Run `inspekt yolo` to bypass all restrictions\n"
+                                "  • Run `inspekt domain csp <domain> --enable` then refresh the page\n"
                                 "  • Check browser console (F12) for Inspekt CSP warnings\n\n"
                                 f"Current site: {data.get('url', 'unknown')}\n\n"
                                 f"Technical details: {error[:200]}"

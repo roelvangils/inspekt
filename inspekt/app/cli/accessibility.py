@@ -17,7 +17,7 @@ from pathlib import Path
 import click
 
 from inspekt.app.cli.base import builtin_open
-from inspekt.app.cli.table import Table
+from inspekt.app.cli.table import Table, print_wrapped
 from inspekt.client import BridgeClient
 
 
@@ -621,27 +621,37 @@ def _format_table_output(violations: list[dict], url: str, summary: dict, compac
     impact_order = {"critical": 0, "serious": 1, "moderate": 2, "minor": 3}
     violations = sorted(violations, key=lambda v: impact_order.get(v.get("impact", "minor"), 4))
 
-    # Create table
+    # Build all rows first for auto-width calculation
     headers = ["Rule", "Impact", "Count", "Description"]
-    widths = [25, 10, 7, 50]
     alignments = ["left", "left", "right", "left"]
 
-    table = Table(headers, widths, alignments)
+    rows = []
+    row_colors = []
+    total_count = 0
 
-    # Print header
-    table.print_header()
-
-    # Table rows
     for violation in violations:
         rule_id = violation.get("id", "unknown")
         impact = violation.get("impact", "unknown")
         count = violation.get("nodeCount", 0)
         description = violation.get("description", "")
 
-        # Format row with impact color on the impact column
-        row_data = [rule_id, impact, str(count), description]
-        row_colors = [None, _get_impact_color(impact), None, None]
-        table.print_row(row_data, row_colors)
+        total_count += count
+        rows.append([rule_id, impact, str(count), description])
+        row_colors.append([None, _get_impact_color(impact), None, None])
+
+    # Create table with auto-width and title
+    violation_count = summary.get('violationCount', len(violations))
+    title = f"Accessibility Violations ({violation_count})"
+    table = Table(headers, alignments=alignments, title=title)
+    table.set_data(rows)
+    table.print_header()
+
+    for row_data, colors in zip(rows, row_colors):
+        table.print_row(row_data, colors)
+
+    # Summary row
+    summary_row = [f"{len(violations)} rules", "", str(total_count), ""]
+    table.print_summary(summary_row)
 
     table.print_footer()
 
@@ -650,23 +660,22 @@ def _format_table_output(violations: list[dict], url: str, summary: dict, compac
         return
 
     click.echo()
-    violation_count = summary.get('violationCount', 0)
     violation_word = "violation" if violation_count == 1 else "violations"
-    click.echo(click.style(f"Summary: Found {violation_count} {violation_word}", bold=True))
+    click.echo(click.style(f"Summary: Found {violation_count} {violation_word} on {url}", bold=True))
 
-    # Format counts: use "None" for 0, otherwise show number
+    # Format counts: use "—" (em dash, dark gray) for 0, otherwise show number
     def format_count(count):
-        return "None" if count == 0 else str(count)
+        if count == 0:
+            return click.style("\u2014", fg="bright_black")
+        return str(count)
 
-    click.echo(f"  Critical: {format_count(summary.get('criticalCount', 0))}")
-    click.echo(f"  Serious:  {format_count(summary.get('seriousCount', 0))}")
-    click.echo(f"  Moderate: {format_count(summary.get('moderateCount', 0))}")
-    click.echo(f"  Minor:    {format_count(summary.get('minorCount', 0))}")
-    click.echo()
-    click.echo(f"Passes:     {summary.get('passCount', 0)}")
+    click.echo(f"  Critical:   {format_count(summary.get('criticalCount', 0))}")
+    click.echo(f"  Serious:    {format_count(summary.get('seriousCount', 0))}")
+    click.echo(f"  Moderate:   {format_count(summary.get('moderateCount', 0))}")
+    click.echo(f"  Minor:      {format_count(summary.get('minorCount', 0))}")
+    click.echo(f"  Passes:     {summary.get('passCount', 0)}")
     if summary.get('incompleteCount', 0) > 0:
-        click.echo(f"Incomplete: {summary.get('incompleteCount', 0)} (use --include-incomplete to see details)")
-    click.echo(f"Tested:     {url}")
+        click.echo(f"  Incomplete: {summary.get('incompleteCount', 0)} (use --include-incomplete to see details)")
 
 
 @click.command()
@@ -939,23 +948,26 @@ def axe(level, rule, list_rules, tags, include_passes, include_incomplete, outpu
 
         # Collect all warnings
         warnings = []
-        warnings.append("Automated accessibility testing tools like Axe can detect only 20 to 30% of (potential) WCAG failures. To achieve complete WCAG compliance, it is essential to combine automated scans with manual checks.")
+        warnings.append("Automated accessibility checkers, such as Axe, typically identify only a small percentage (about 20–30%) of WCAG issues, depending on your content and page complexity. Treat these results as a first pass only. Next, conduct end-to-end testing, use assistive technology, and have a human accessibility expert review the results before considering your site compliant.")
 
         if context_warning:
             warnings.append(context_warning)
 
-        # Display warnings grouped together with bullets
+        # Display warnings grouped together (with bullets if more than one)
         if warnings:
-            click.echo(click.style("WARNINGS:", fg="yellow", bold=True), err=True)
-            click.echo("", err=True)
-            for warning in warnings:
-                click.echo(f"• {warning}", err=True)
+            warning_heading = "WARNING" if len(warnings) == 1 else "WARNINGS"
+            click.echo(click.style(f"{warning_heading}", fg="yellow", bold=True), err=True)
+            if len(warnings) == 1:
+                print_wrapped(warnings[0], err=True)
+            else:
+                for warning in warnings:
+                    print_wrapped(warning, indent="\u2022 ", subsequent_indent="  ", err=True)
             click.echo("", err=True)
 
         # Show progress
         if rule:
             # Rule-specific check
-            click.echo(f"Running Accessibility Check (Rule: {rule})", err=True)
+            click.echo(f"Running Accessibility Check (Rule: {rule})\u2026", err=True)
         else:
             # WCAG level-based check
             # Map level codes to full standard names
@@ -970,7 +982,7 @@ def axe(level, rule, list_rules, tags, include_passes, include_incomplete, outpu
             level_label = level_names.get(level.lower(), f"WCAG {level.upper()}")
             if tags:
                 level_label += f" + {tags}"
-            click.echo(f"Running Accessibility Audit ({level_label})", err=True)
+            click.echo(f"Running Accessibility Audit ({level_label})\u2026", err=True)
 
         # Execute the script
         result = client.execute(script, timeout=timeout)
@@ -996,11 +1008,15 @@ def axe(level, rule, list_rules, tags, include_passes, include_incomplete, outpu
         # Display badge statistics if badges were injected
         badge_stats = data.get("badgeStats", {})
         if badge_stats.get("ok") and badge_stats.get("badgesCreated", 0) > 0:
-            click.echo(f"\n✓ {badge_stats['badgesCreated']} violation badge(s) displayed on page", err=True)
+            badge_count = badge_stats['badgesCreated']
+            badge_word = "badge" if badge_count == 1 else "badges"
+            click.echo(f"\n\u2713 {badge_count} violation {badge_word} displayed on page", err=True)
             if badge_stats.get("badgesSkipped", 0) > 0:
+                skipped_count = badge_stats['badgesSkipped']
+                skipped_word = "badge" if skipped_count == 1 else "badges"
                 click.echo(
                     click.style(
-                        f"  ⚠ {badge_stats['badgesSkipped']} badge(s) skipped (limit: {badge_stats['maxBadges']})",
+                        f"  \u26a0 {skipped_count} {skipped_word} skipped (limit: {badge_stats['maxBadges']})",
                         fg="yellow"
                     ),
                     err=True
@@ -1157,10 +1173,11 @@ def axe(level, rule, list_rules, tags, include_passes, include_incomplete, outpu
                             _format_table_output(new_violations, new_url, new_summary, compact=True)
 
                             # Show badge stats with total count
+                            new_badge_word = "badge" if badges_created == 1 else "badges"
                             if total_badges > badges_created:
-                                click.echo(f"✓ {badges_created} new badge(s) added ({total_badges} total) • Press Ctrl+C to stop", err=True)
+                                click.echo(f"\u2713 {badges_created} new {new_badge_word} added ({total_badges} total) \u2022 Press Ctrl+C to stop", err=True)
                             else:
-                                click.echo(f"✓ {badges_created} violation badge(s) displayed • Press Ctrl+C to stop", err=True)
+                                click.echo(f"\u2713 {badges_created} violation {new_badge_word} displayed \u2022 Press Ctrl+C to stop", err=True)
 
                     except Exception as e:
                         click.echo(click.style(f"  ⚠ Audit error: {e}", fg="yellow"), err=True)

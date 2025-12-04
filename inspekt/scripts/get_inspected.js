@@ -265,6 +265,8 @@
         accessibility: a11y,
         semantic: semantic,
         childCount: element.children.length,
-        parentTag: element.parentElement ? element.parentElement.tagName.toLowerCase() : null
+        parentTag: element.parentElement ? element.parentElement.tagName.toLowerCase() : null,
+        selectionSource: window.__INSPEKT_SELECTION_SOURCE__ || 'unknown',
+        selectionTimestamp: window.__INSPEKT_SELECTION_TIME__ || null
     };
 })()

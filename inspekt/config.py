@@ -5,6 +5,27 @@ import os
 from pathlib import Path
 from typing import Any
 
+# Environment variable for isolated mode
+ISOLATED_ENV_VAR = "INSPEKT_ISOLATED"
+
+
+def is_isolated_mode() -> bool:
+    """
+    Check if isolated mode is enabled.
+
+    Isolated mode bypasses all privacy protections and is intended
+    for use in Docker VM environments where the browser is sandboxed.
+
+    Enabled via:
+    - Environment variable: INSPEKT_ISOLATED=1
+    - CLI flag: --isolated (when starting bridge server)
+
+    Returns:
+        True if isolated mode is enabled, False otherwise
+    """
+    return os.environ.get(ISOLATED_ENV_VAR, "").lower() in ("1", "true", "yes")
+
+
 # Default configuration
 DEFAULT_CONFIG: dict[str, Any] = {
     "ai-language": "auto",
@@ -51,6 +72,12 @@ DEFAULT_CONFIG: dict[str, Any] = {
         "refocus-timeout": 2000,
         "verbose": True,
         "verbose-logging": False,
+    },
+    "axe": {
+        "show-badges": True,
+    },
+    "permissions": {
+        "allow-local-files": True,  # Allow file:// URLs without adding to domain list
     },
     "mcp": {
         "enabled": True,
@@ -163,6 +190,12 @@ def load_config() -> dict[str, Any]:
                     config["mcp"].update(user_config["mcp"])
                 else:
                     config["mcp"] = user_config["mcp"]
+            elif key == "permissions" and isinstance(user_config["permissions"], dict):
+                # Nested permissions config - merge deeply
+                if isinstance(config.get("permissions"), dict):
+                    config["permissions"].update(user_config["permissions"])
+                else:
+                    config["permissions"] = user_config["permissions"]
             else:
                 # Root-level properties like ai-language - overwrite
                 config[key] = user_config[key]
@@ -461,4 +494,23 @@ def get_html_selection_config() -> dict[str, Any]:
         "pretty": pretty,
         "colors": colors,
         "theme": theme,
+    }
+
+
+def get_permissions_config() -> dict[str, Any]:
+    """
+    Get permissions configuration with validation.
+
+    Returns:
+        Permissions configuration dictionary with validated values
+    """
+    config = load_config()
+    permissions_config = config.get("permissions", {})
+
+    # Validate allow-local-files: boolean (default True)
+    allow_local_files = permissions_config.get("allow-local-files", True)
+    allow_local_files = bool(allow_local_files)
+
+    return {
+        "allow-local-files": allow_local_files,
     }

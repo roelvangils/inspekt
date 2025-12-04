@@ -33,6 +33,48 @@
         return args.map(stringify).join(' ');
     }
 
+    // Sensitive data patterns to redact from console output
+    // This helps prevent accidental exposure of credentials, tokens, and API keys
+    const SENSITIVE_PATTERNS = [
+        // Passwords in various formats
+        { regex: /(password|passwd|pwd)\s*[=:]\s*['"][^'"]+['"]/gi,
+          replacement: '$1=***REDACTED***' },
+        { regex: /(password|passwd|pwd)\s*[=:]\s*[^\s,;'"}\]]+/gi,
+          replacement: '$1=***REDACTED***' },
+        // API keys and secrets
+        { regex: /(api[_-]?key|secret[_-]?key|api[_-]?secret)\s*[=:]\s*['"][^'"]+['"]/gi,
+          replacement: '$1=***REDACTED***' },
+        { regex: /(api[_-]?key|secret[_-]?key|api[_-]?secret)\s*[=:]\s*[^\s,;'"}\]]+/gi,
+          replacement: '$1=***REDACTED***' },
+        // Bearer tokens
+        { regex: /Bearer\s+[A-Za-z0-9\-_=]+\.[A-Za-z0-9\-_=]+\.[A-Za-z0-9\-_=]*/gi,
+          replacement: 'Bearer ***REDACTED***' },
+        { regex: /Bearer\s+[A-Za-z0-9\-_=]{20,}/gi,
+          replacement: 'Bearer ***REDACTED***' },
+        // JWT tokens (eyJ... format)
+        { regex: /eyJ[A-Za-z0-9\-_=]+\.[A-Za-z0-9\-_=]+\.[A-Za-z0-9\-_=]*/g,
+          replacement: '***JWT_REDACTED***' },
+        // AWS keys
+        { regex: /AKIA[0-9A-Z]{16}/g,
+          replacement: '***AWS_KEY_REDACTED***' },
+        // Generic tokens and secrets in JSON
+        { regex: /"(token|access_token|refresh_token|auth_token|secret)"\s*:\s*"[^"]+"/gi,
+          replacement: '"$1":"***REDACTED***"' },
+        // Authorization headers
+        { regex: /(Authorization|X-Api-Key|X-Auth-Token)\s*[=:]\s*['"][^'"]+['"]/gi,
+          replacement: '$1=***REDACTED***' }
+    ];
+
+    // Filter sensitive data from console messages
+    function filterSensitive(message) {
+        if (typeof message !== 'string') return message;
+        let filtered = message;
+        for (const pattern of SENSITIVE_PATTERNS) {
+            filtered = filtered.replace(pattern.regex, pattern.replacement);
+        }
+        return filtered;
+    }
+
     // Helper to stringify values
     function stringify(a) {
         // Handle special values that JSON.stringify mangles
@@ -55,10 +97,12 @@
     // Helper to add to buffer
     function addToBuffer(level, message) {
         const trimmed = message.trim();
+        // Filter sensitive data before storing
+        const filtered = filterSensitive(trimmed === '' ? '(empty)' : trimmed);
         buffer.push({
             level,
             timestamp: new Date().toISOString(),
-            message: trimmed === '' ? '(empty)' : trimmed
+            message: filtered
         });
         if (buffer.length > MAX_MESSAGES) buffer.shift();
     }

@@ -60,8 +60,8 @@ def _truncate(s: str, max_len: int) -> str:
     return s[: max_len - 3] + "..."
 
 
-def _display_table(entries: list, show_domain: bool = False):
-    """Display network entries in a formatted ASCII table."""
+def _display_table(entries: list, show_domain: bool = False, summary: dict = None):
+    """Display network entries in a formatted ASCII table with auto-width columns."""
     if not entries:
         click.echo("No network requests found.", err=True)
         return
@@ -69,22 +69,28 @@ def _display_table(entries: list, show_domain: bool = False):
     # Define columns based on options
     if show_domain:
         headers = ["Domain", "Name", "Type", "Size", "Time", "Proto"]
-        widths = [20, 35, 12, 10, 10, 8]
         alignments = ["left", "left", "left", "right", "right", "left"]
     else:
         headers = ["Name", "Type", "Size", "Time", "Proto"]
-        widths = [40, 12, 10, 10, 8]
         alignments = ["left", "left", "right", "right", "left"]
 
-    table = Table(headers, widths, alignments)
-    table.print_header()
+    # Build all rows first for auto-width calculation
+    rows = []
+    row_colors = []
+    total_size = 0
+    total_time = 0
 
     for entry in entries:
         name = entry["name"]
         type_str = entry["type"]
-        size = format_size(entry["transferSize"])
-        time_val = format_time(entry["timing"]["total"])
+        size_bytes = entry["transferSize"]
+        time_ms = entry["timing"]["total"]
+        size = format_size(size_bytes)
+        time_val = format_time(time_ms)
         protocol = entry["protocol"]
+
+        total_size += size_bytes
+        total_time += time_ms
 
         # Add cached marker to name
         if entry.get("cached"):
@@ -97,13 +103,27 @@ def _display_table(entries: list, show_domain: bool = False):
             domain = entry["domain"]
             if entry.get("external"):
                 domain = domain + " ↗"
-            values = [domain, name, type_str, size, time_val, protocol]
-            colors = [None, None, type_color, None, None, None]
+            rows.append([domain, name, type_str, size, time_val, protocol])
+            row_colors.append([None, None, type_color, None, None, None])
         else:
-            values = [name, type_str, size, time_val, protocol]
-            colors = [None, type_color, None, None, None]
+            rows.append([name, type_str, size, time_val, protocol])
+            row_colors.append([None, type_color, None, None, None])
 
+    # Create table with auto-width and title
+    title = f"Network Requests ({len(entries)})"
+    table = Table(headers, alignments=alignments, title=title)
+    table.set_data(rows)
+    table.print_header()
+
+    for values, colors in zip(rows, row_colors):
         table.print_row(values, colors)
+
+    # Print summary row with totals
+    if show_domain:
+        summary_row = ["Total", f"{len(entries)} requests", "", format_size(total_size), format_time(total_time // len(entries) if entries else 0), ""]
+    else:
+        summary_row = [f"{len(entries)} requests", "", format_size(total_size), format_time(total_time // len(entries) if entries else 0), ""]
+    table.print_summary(summary_row)
 
     table.print_footer()
 
@@ -556,7 +576,7 @@ def _get_har_data(executor: BridgeExecutor) -> dict:
 
 
 def _display_har_table(entries: list, show_domain: bool = False, show_status: bool = True):
-    """Display HAR entries in a formatted ASCII table (with status codes)."""
+    """Display HAR entries in a formatted ASCII table with auto-width columns."""
     if not entries:
         click.echo("No network requests found.", err=True)
         return
@@ -564,31 +584,35 @@ def _display_har_table(entries: list, show_domain: bool = False, show_status: bo
     # Define columns based on options
     if show_domain and show_status:
         headers = ["Domain", "Name", "Status", "Type", "Size", "Time"]
-        widths = [18, 30, 6, 12, 10, 10]
         alignments = ["left", "left", "right", "left", "right", "right"]
     elif show_domain:
         headers = ["Domain", "Name", "Type", "Size", "Time"]
-        widths = [18, 35, 12, 10, 10]
         alignments = ["left", "left", "left", "right", "right"]
     elif show_status:
         headers = ["Name", "Status", "Type", "Size", "Time"]
-        widths = [35, 6, 12, 10, 10]
         alignments = ["left", "right", "left", "right", "right"]
     else:
         headers = ["Name", "Type", "Size", "Time"]
-        widths = [40, 12, 10, 10]
         alignments = ["left", "left", "right", "right"]
 
-    table = Table(headers, widths, alignments)
-    table.print_header()
+    # Build all rows first for auto-width calculation
+    rows = []
+    row_colors = []
+    total_size = 0
+    total_time = 0
 
     for entry in entries:
         name = entry.get("name", "")
         status = entry.get("status", 0)
         type_str = entry.get("type", "other")
-        size = format_size(entry.get("transferSize", 0))
+        size_bytes = entry.get("transferSize", 0)
         timing = entry.get("timing", {})
-        time_val = format_time(timing.get("total", 0) if isinstance(timing, dict) else 0)
+        time_ms = timing.get("total", 0) if isinstance(timing, dict) else 0
+        size = format_size(size_bytes)
+        time_val = format_time(time_ms)
+
+        total_size += size_bytes
+        total_time += time_ms
 
         # Add cached marker to name
         if entry.get("fromCache"):
@@ -611,12 +635,12 @@ def _display_har_table(entries: list, show_domain: bool = False, show_status: bo
             elif status >= 200:
                 status_color = "green"
 
-            values = [domain, name, str(status) if status else "-", type_str, size, time_val]
-            colors = [None, None, status_color, type_color, None, None]
+            rows.append([domain, name, str(status) if status else "-", type_str, size, time_val])
+            row_colors.append([None, None, status_color, type_color, None, None])
         elif show_domain:
             domain = entry.get("domain", "")
-            values = [domain, name, type_str, size, time_val]
-            colors = [None, None, type_color, None, None]
+            rows.append([domain, name, type_str, size, time_val])
+            row_colors.append([None, None, type_color, None, None])
         elif show_status:
             status_color = None
             if status >= 500:
@@ -628,13 +652,32 @@ def _display_har_table(entries: list, show_domain: bool = False, show_status: bo
             elif status >= 200:
                 status_color = "green"
 
-            values = [name, str(status) if status else "-", type_str, size, time_val]
-            colors = [None, status_color, type_color, None, None]
+            rows.append([name, str(status) if status else "-", type_str, size, time_val])
+            row_colors.append([None, status_color, type_color, None, None])
         else:
-            values = [name, type_str, size, time_val]
-            colors = [None, type_color, None, None]
+            rows.append([name, type_str, size, time_val])
+            row_colors.append([None, type_color, None, None])
 
+    # Create table with auto-width and title
+    title = f"Network Requests ({len(entries)})"
+    table = Table(headers, alignments=alignments, title=title)
+    table.set_data(rows)
+    table.print_header()
+
+    for values, colors in zip(rows, row_colors):
         table.print_row(values, colors)
+
+    # Print summary row with totals
+    avg_time = total_time // len(entries) if entries else 0
+    if show_domain and show_status:
+        summary_row = ["Total", f"{len(entries)} requests", "", "", format_size(total_size), format_time(avg_time)]
+    elif show_domain:
+        summary_row = ["Total", f"{len(entries)} requests", "", format_size(total_size), format_time(avg_time)]
+    elif show_status:
+        summary_row = [f"{len(entries)} requests", "", "", format_size(total_size), format_time(avg_time)]
+    else:
+        summary_row = [f"{len(entries)} requests", "", format_size(total_size), format_time(avg_time)]
+    table.print_summary(summary_row)
 
     table.print_footer()
 

@@ -333,3 +333,272 @@ class CheckAutocompleteResponse(BaseModel):
         default=None, description="Detailed analysis for each field with predictions and status"
     )
     message: Optional[str] = Field(default=None, description="Success or error message")
+
+
+# ============================================================================
+# Network Tool Schemas
+# ============================================================================
+
+
+class GetNetworkRequestsParams(BaseModel):
+    """Parameters for get_network_requests tool."""
+
+    resource_type: Optional[str] = Field(
+        default=None,
+        description="Filter by resource type: script, stylesheet, fetch, xhr, image, font, document, svg, video, audio",
+    )
+    external_only: Optional[bool] = Field(
+        default=False, description="Only return requests to external domains"
+    )
+    sort_by: Optional[Literal["start", "time", "size", "name", "type"]] = Field(
+        default="start", description="Sort field: start (chronological), time (slowest first), size (largest first), name, type"
+    )
+    limit: Optional[int] = Field(
+        default=None, description="Maximum number of entries to return"
+    )
+
+
+class NetworkTimingInfo(BaseModel):
+    """Timing information for a network request."""
+
+    total: int = Field(..., description="Total request duration in milliseconds")
+    dns: int = Field(..., description="DNS lookup time in milliseconds")
+    tcp: int = Field(..., description="TCP connection time in milliseconds")
+    ssl: int = Field(..., description="SSL handshake time in milliseconds")
+    ttfb: int = Field(..., description="Time to first byte in milliseconds")
+    download: int = Field(..., description="Download time in milliseconds")
+
+
+class NetworkEntry(BaseModel):
+    """Information about a single network request."""
+
+    index: int = Field(..., description="Request index (order loaded)")
+    url: str = Field(..., description="Full request URL")
+    name: str = Field(..., description="Resource filename")
+    domain: str = Field(..., description="Domain the resource was loaded from")
+    path: str = Field(..., description="URL path")
+    type: str = Field(..., description="Resource type (script, stylesheet, fetch, image, font, etc.)")
+    initiatorType: str = Field(..., description="Original initiator type from Performance API")
+    external: bool = Field(..., description="Whether the resource is from an external domain")
+    transferSize: int = Field(..., description="Transfer size in bytes")
+    encodedSize: int = Field(..., description="Encoded body size in bytes")
+    decodedSize: int = Field(..., description="Decoded body size in bytes")
+    timing: NetworkTimingInfo = Field(..., description="Timing breakdown")
+    startTime: int = Field(..., description="Start time relative to navigation (ms)")
+    protocol: str = Field(..., description="Protocol used (h1, h2, h3, etc.)")
+    cached: bool = Field(..., description="Whether the resource was served from cache")
+
+
+class NetworkSummary(BaseModel):
+    """Summary statistics for network requests."""
+
+    totalRequests: int = Field(..., description="Total number of requests")
+    totalTransferSize: int = Field(..., description="Total transfer size in bytes")
+    totalDecodedSize: int = Field(..., description="Total decoded size in bytes")
+    byType: dict[str, int] = Field(..., description="Request count by resource type")
+    byDomain: dict[str, int] = Field(..., description="Request count by domain")
+    averageDuration: int = Field(..., description="Average request duration in milliseconds")
+    slowestRequest: Optional[dict[str, Any]] = Field(default=None, description="Slowest request info")
+    largestRequest: Optional[dict[str, Any]] = Field(default=None, description="Largest request info")
+    cachedRequests: int = Field(..., description="Number of cached requests")
+    externalRequests: int = Field(..., description="Number of external requests")
+
+
+class GetNetworkRequestsResponse(BaseModel):
+    """Response from get_network_requests tool."""
+
+    success: bool = Field(..., description="Whether the operation succeeded")
+    url: str = Field(..., description="Page URL")
+    timestamp: str = Field(..., description="Timestamp of the capture (ISO 8601)")
+    entries: list[dict[str, Any]] = Field(..., description="List of network request entries")
+    summary: dict[str, Any] = Field(..., description="Summary statistics")
+    message: Optional[str] = Field(default=None, description="Success or error message")
+
+
+class GetHARParams(BaseModel):
+    """Parameters for get_har tool."""
+
+    resource_type: Optional[str] = Field(
+        default=None,
+        description="Filter by resource type: script, stylesheet, fetch, image, font, document",
+    )
+    errors_only: Optional[bool] = Field(
+        default=False, description="Only return failed requests (4xx/5xx status codes)"
+    )
+    sort_by: Optional[Literal["start", "time", "size", "name", "type", "status"]] = Field(
+        default="start", description="Sort field"
+    )
+    limit: Optional[int] = Field(
+        default=None, description="Maximum number of entries to return"
+    )
+
+
+class GetHARResponse(BaseModel):
+    """Response from get_har tool."""
+
+    success: bool = Field(..., description="Whether the operation succeeded")
+    source: str = Field(default="devtools", description="Data source (devtools)")
+    url: str = Field(..., description="Page URL")
+    timestamp: str = Field(..., description="Timestamp of the capture (ISO 8601)")
+    entries: list[dict[str, Any]] = Field(..., description="List of HAR entries with status codes and headers")
+    summary: dict[str, Any] = Field(..., description="Summary statistics including status breakdown")
+    message: Optional[str] = Field(default=None, description="Success or error message")
+
+
+# ============================================================================
+# Console Tool Schemas
+# ============================================================================
+
+
+class GetConsoleLogsParams(BaseModel):
+    """Parameters for get_console_logs tool."""
+
+    level: Optional[Literal["all", "error", "warn", "log", "info", "debug"]] = Field(
+        default="all",
+        description="Filter by log level: all (default), error, warn, log, info, or debug",
+    )
+    limit: Optional[int] = Field(
+        default=100, description="Maximum number of messages to return (default: 100)"
+    )
+
+
+class ConsoleEntry(BaseModel):
+    """A single console log entry."""
+
+    level: str = Field(..., description="Log level: error, warn, log, info, or debug")
+    timestamp: str = Field(..., description="Timestamp when the message was logged (ISO 8601)")
+    message: str = Field(..., description="The logged message content")
+
+
+class GetConsoleLogsResponse(BaseModel):
+    """Response from get_console_logs tool."""
+
+    success: bool = Field(..., description="Whether the operation succeeded")
+    entries: list[ConsoleEntry] = Field(default=[], description="List of console log entries")
+    count: int = Field(default=0, description="Number of entries returned")
+    hooked: bool = Field(default=False, description="Whether console hooks are active on the page")
+    message: Optional[str] = Field(default=None, description="Success or error message")
+
+
+class ClearConsoleLogsResponse(BaseModel):
+    """Response from clear_console_logs tool."""
+
+    success: bool = Field(..., description="Whether the operation succeeded")
+    message: Optional[str] = Field(default=None, description="Success or error message")
+
+
+# ============================================================================
+# Axe-core Accessibility Schemas
+# ============================================================================
+
+
+class RunAxeParams(BaseModel):
+    """Parameters for run_axe accessibility tool."""
+
+    level: Optional[Literal["2a", "2aa", "2aaa", "21a", "21aa", "22aa"]] = Field(
+        default="21aa",
+        description="WCAG conformance level: 2a, 2aa (WCAG 2.0), 21a, 21aa (WCAG 2.1), 22aa (WCAG 2.2)"
+    )
+    rule: Optional[str] = Field(
+        default=None,
+        description="Check specific rule by ID (e.g., 'color-contrast', 'link-name'). Mutually exclusive with level."
+    )
+    selector: Optional[str] = Field(
+        default=None,
+        description="CSS selector to scope tests to specific element(s)"
+    )
+    exclude: Optional[list[str]] = Field(
+        default=None,
+        description="CSS selectors to exclude from testing"
+    )
+    include_passes: bool = Field(
+        default=False,
+        description="Include passing checks in results"
+    )
+    include_incomplete: bool = Field(
+        default=False,
+        description="Include incomplete checks requiring manual review"
+    )
+
+
+class AxeNode(BaseModel):
+    """Information about a single failing element."""
+
+    target: list[str] = Field(..., description="CSS selector path to element")
+    html: str = Field(..., description="HTML snippet of the element")
+    impact: str = Field(..., description="Impact level: critical, serious, moderate, minor")
+    failure_summary: Optional[str] = Field(default=None, description="Description of the failure")
+
+
+class AxeViolation(BaseModel):
+    """A single accessibility violation."""
+
+    id: str = Field(..., description="Rule ID (e.g., 'color-contrast')")
+    impact: str = Field(..., description="Impact level: critical, serious, moderate, minor")
+    description: str = Field(..., description="What the rule checks")
+    help: str = Field(..., description="Short description of how to fix")
+    help_url: str = Field(..., description="URL to detailed documentation")
+    nodes: list[AxeNode] = Field(..., description="List of failing elements")
+    node_count: int = Field(..., description="Number of failing elements")
+
+
+class AxeSummary(BaseModel):
+    """Summary statistics from axe audit."""
+
+    violation_count: int = Field(..., description="Total violations")
+    pass_count: int = Field(..., description="Total passes")
+    incomplete_count: int = Field(..., description="Checks needing manual review")
+    critical_count: int = Field(default=0, description="Critical impact violations")
+    serious_count: int = Field(default=0, description="Serious impact violations")
+    moderate_count: int = Field(default=0, description="Moderate impact violations")
+    minor_count: int = Field(default=0, description="Minor impact violations")
+
+
+class RunAxeResponse(BaseModel):
+    """Response from run_axe accessibility tool."""
+
+    success: bool = Field(..., description="Whether the audit completed successfully")
+    url: str = Field(default="", description="Page URL that was tested")
+    violations: list[AxeViolation] = Field(default=[], description="List of accessibility violations")
+    passes: list[dict[str, Any]] = Field(default=[], description="Passing checks (if include_passes=True)")
+    incomplete: list[dict[str, Any]] = Field(default=[], description="Incomplete checks (if include_incomplete=True)")
+    summary: Optional[AxeSummary] = Field(default=None, description="Summary statistics")
+    axe_version: Optional[str] = Field(default=None, description="Axe-core version used")
+    message: Optional[str] = Field(default=None, description="Success or error message")
+
+
+# ============================================================================
+# Plugin Execution Schemas
+# ============================================================================
+
+
+class PluginExecuteParams(BaseModel):
+    """Parameters for plugin execution tools."""
+
+    capture_console: bool = Field(
+        default=True,
+        description="Capture console.log/error/warn output during execution"
+    )
+
+
+class ConsoleEntry(BaseModel):
+    """A captured console message."""
+
+    level: str = Field(..., description="Log level: log, error, warn, info, debug")
+    timestamp: str = Field(..., description="ISO 8601 timestamp")
+    message: str = Field(..., description="The logged message")
+
+
+class PluginExecuteResponse(BaseModel):
+    """Response from plugin execution."""
+
+    success: bool = Field(..., description="Whether execution succeeded")
+    plugin_name: str = Field(..., description="Name of the executed plugin")
+    plugin_id: str = Field(..., description="ID of the executed plugin")
+    result: Any = Field(default=None, description="Return value from the plugin (if returns_data=True)")
+    console_output: list[ConsoleEntry] = Field(
+        default=[],
+        description="Captured console messages during execution"
+    )
+    execution_time_ms: int = Field(..., description="Execution time in milliseconds")
+    message: Optional[str] = Field(default=None, description="Success or error message")

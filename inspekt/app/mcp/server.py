@@ -3,6 +3,9 @@ Inspekt MCP Server
 
 Main MCP server implementation that exposes Inspekt's browser automation
 capabilities as tools and resources for AI assistants.
+
+Uses the Unified Command Registry for migrated commands, with fallback
+to legacy handlers for unmigrated commands.
 """
 
 import asyncio
@@ -17,6 +20,8 @@ from mcp.server.models import InitializationOptions
 from inspekt.app.mcp import schemas
 from inspekt.app.mcp.resources import ResourceProvider
 from inspekt.app.mcp.tools import ToolProvider
+from inspekt.core import get_registry, register_all_commands
+from inspekt.core.generators.mcp import MCPToolRouter
 from inspekt.services.bridge_executor import BridgeExecutor
 from inspekt.services.script_loader import ScriptLoader
 
@@ -44,15 +49,256 @@ class InspektMCPServer:
         self.executor = BridgeExecutor(host=bridge_host, port=bridge_port)
         self.script_loader = ScriptLoader()
 
-        # Initialize providers
+        # Initialize legacy providers (for unmigrated tools)
         self.tool_provider = ToolProvider(self.executor, self.script_loader)
         self.resource_provider = ResourceProvider(self.executor, resource_cache_ttl)
+
+        # Initialize unified command registry
+        register_all_commands()
+        self.registry = get_registry()
+        self.unified_router = MCPToolRouter(self.registry)
 
         # Create MCP server
         self.server = Server("inspekt")
 
         # Register handlers
         self._register_handlers()
+
+    async def _execute_plugin(
+        self, plugin_id: str, params: schemas.PluginExecuteParams
+    ) -> schemas.PluginExecuteResponse:
+        """
+        Execute a plugin by ID.
+
+        Args:
+            plugin_id: Plugin slug ID
+            params: Execution parameters
+
+        Returns:
+            PluginExecuteResponse with execution results
+        """
+        import time
+        import requests as http_requests
+
+        from inspekt.services.plugin_service import get_plugin_service
+
+        start_time = time.time()
+        plugin_service = get_plugin_service()
+
+        # Get plugin
+        plugin = plugin_service.get_plugin(plugin_id)
+        if not plugin:
+            return schemas.PluginExecuteResponse(
+                success=False,
+                plugin_name="",
+                plugin_id=plugin_id,
+                execution_time_ms=0,
+                message=f"Plugin '{plugin_id}' not found",
+            )
+
+        # Clear console before execution if capturing
+        if params.capture_console:
+            try:
+                http_requests.post(
+                    f"http://{self.executor.host}:{self.executor.port}/console/clear",
+                    timeout=5.0,
+                )
+            except Exception:
+                pass
+
+        # Execute the plugin code
+        try:
+            result = await asyncio.to_thread(
+                self.executor.execute,
+                plugin["code"],
+                plugin.get("timeout", 30.0),
+            )
+        except Exception as e:
+            return schemas.PluginExecuteResponse(
+                success=False,
+                plugin_name=plugin["name"],
+                plugin_id=plugin_id,
+                execution_time_ms=int((time.time() - start_time) * 1000),
+                message=f"Execution error: {str(e)}",
+            )
+
+        execution_time_ms = int((time.time() - start_time) * 1000)
+
+        # Capture console output
+        console_output = []
+        if params.capture_console:
+            try:
+                console_response = http_requests.get(
+                    f"http://{self.executor.host}:{self.executor.port}/console/logs",
+                    timeout=5.0,
+                )
+                if console_response.status_code == 200:
+                    console_data = console_response.json()
+                    for entry in console_data.get("entries", []):
+                        console_output.append(schemas.ConsoleEntry(
+                            level=entry.get("level", "log"),
+                            timestamp=entry.get("timestamp", ""),
+                            message=entry.get("message", ""),
+                        ))
+            except Exception:
+                pass
+
+        # Update run count
+        plugin_service.increment_run_count(plugin_id)
+
+        if not result.get("ok"):
+            return schemas.PluginExecuteResponse(
+                success=False,
+                plugin_name=plugin["name"],
+                plugin_id=plugin_id,
+                console_output=console_output,
+                execution_time_ms=execution_time_ms,
+                message=result.get("error", "Execution failed"),
+            )
+
+        return schemas.PluginExecuteResponse(
+            success=True,
+            plugin_name=plugin["name"],
+            plugin_id=plugin_id,
+            result=result.get("result") if plugin.get("returns_data") else None,
+            console_output=console_output,
+            execution_time_ms=execution_time_ms,
+            message=f"Plugin '{plugin['name']}' executed successfully",
+        )
+
+    async def _unload_plugin(
+        self, plugin_id: str, params: schemas.PluginExecuteParams
+    ) -> schemas.PluginExecuteResponse:
+        """
+        Unload/reverse a plugin by ID.
+
+        Args:
+            plugin_id: Plugin slug ID
+            params: Execution parameters
+
+        Returns:
+            PluginExecuteResponse with execution results
+        """
+        import time
+        import requests as http_requests
+
+        from inspekt.services.plugin_service import get_plugin_service
+
+        start_time = time.time()
+        plugin_service = get_plugin_service()
+
+        # Get plugin
+        plugin = plugin_service.get_plugin(plugin_id)
+        if not plugin:
+            return schemas.PluginExecuteResponse(
+                success=False,
+                plugin_name="",
+                plugin_id=plugin_id,
+                execution_time_ms=0,
+                message=f"Plugin '{plugin_id}' not found",
+            )
+
+        unload_mode = plugin.get("unload_mode", "none")
+
+        if unload_mode == "none":
+            return schemas.PluginExecuteResponse(
+                success=False,
+                plugin_name=plugin["name"],
+                plugin_id=plugin_id,
+                execution_time_ms=0,
+                message=f"Plugin '{plugin['name']}' does not support unloading",
+            )
+
+        # Determine which code to run
+        if unload_mode == "toggle":
+            code_to_run = plugin["code"]
+            action = "toggled"
+        elif unload_mode == "custom":
+            code_to_run = plugin.get("unload_code")
+            if not code_to_run:
+                return schemas.PluginExecuteResponse(
+                    success=False,
+                    plugin_name=plugin["name"],
+                    plugin_id=plugin_id,
+                    execution_time_ms=0,
+                    message=f"Plugin has custom unload mode but no unload code",
+                )
+            action = "unloaded"
+        else:
+            return schemas.PluginExecuteResponse(
+                success=False,
+                plugin_name=plugin["name"],
+                plugin_id=plugin_id,
+                execution_time_ms=0,
+                message=f"Unknown unload mode: {unload_mode}",
+            )
+
+        # Clear console before execution if capturing
+        if params.capture_console:
+            try:
+                http_requests.post(
+                    f"http://{self.executor.host}:{self.executor.port}/console/clear",
+                    timeout=5.0,
+                )
+            except Exception:
+                pass
+
+        # Execute the unload code
+        try:
+            result = await asyncio.to_thread(
+                self.executor.execute,
+                code_to_run,
+                plugin.get("timeout", 30.0),
+            )
+        except Exception as e:
+            return schemas.PluginExecuteResponse(
+                success=False,
+                plugin_name=plugin["name"],
+                plugin_id=plugin_id,
+                execution_time_ms=int((time.time() - start_time) * 1000),
+                message=f"Execution error: {str(e)}",
+            )
+
+        execution_time_ms = int((time.time() - start_time) * 1000)
+
+        # Capture console output
+        console_output = []
+        if params.capture_console:
+            try:
+                console_response = http_requests.get(
+                    f"http://{self.executor.host}:{self.executor.port}/console/logs",
+                    timeout=5.0,
+                )
+                if console_response.status_code == 200:
+                    console_data = console_response.json()
+                    for entry in console_data.get("entries", []):
+                        console_output.append(schemas.ConsoleEntry(
+                            level=entry.get("level", "log"),
+                            timestamp=entry.get("timestamp", ""),
+                            message=entry.get("message", ""),
+                        ))
+            except Exception:
+                pass
+
+        if not result.get("ok"):
+            return schemas.PluginExecuteResponse(
+                success=False,
+                plugin_name=plugin["name"],
+                plugin_id=plugin_id,
+                console_output=console_output,
+                execution_time_ms=execution_time_ms,
+                message=result.get("error", "Execution failed"),
+            )
+
+        return schemas.PluginExecuteResponse(
+            success=True,
+            plugin_name=plugin["name"],
+            plugin_id=plugin_id,
+            result=result.get("result") if plugin.get("returns_data") else None,
+            console_output=console_output,
+            execution_time_ms=execution_time_ms,
+            message=f"Plugin '{plugin['name']}' {action} successfully",
+        )
 
     def _register_handlers(self) -> None:
         """Register all MCP protocol handlers."""
@@ -62,105 +308,27 @@ class InspektMCPServer:
         # ====================================================================
         @self.server.list_tools()
         async def handle_list_tools() -> list[types.Tool]:
-            """List all available tools."""
-            return [
-                # Navigation tools
-                types.Tool(
-                    name="navigate_to_url",
-                    description="Navigate to a URL in a real browser with JavaScript execution. Use this instead of simple HTTP fetch when you need to access dynamic content, execute JavaScript, or interact with the page. Supports wait conditions for page load.",
-                    inputSchema=schemas.NavigateToUrlParams.model_json_schema(),
-                ),
-                types.Tool(
-                    name="go_back",
-                    description="Navigate back in browser history",
-                    inputSchema={},
-                ),
-                types.Tool(
-                    name="reload_page",
-                    description="Reload the current page in the browser",
-                    inputSchema={
-                        "type": "object",
-                        "properties": {
-                            "hard": {
-                                "type": "boolean",
-                                "description": "Hard reload (bypass cache)",
-                                "default": False,
-                            }
-                        },
-                    },
-                ),
-                # JavaScript execution
-                types.Tool(
-                    name="execute_javascript",
-                    description="Execute arbitrary JavaScript code in the browser context. Use this to interact with the page DOM, extract data dynamically, or manipulate page content.",
-                    inputSchema=schemas.ExecuteJavaScriptParams.model_json_schema(),
-                ),
-                # Data extraction tools
-                types.Tool(
-                    name="extract_links",
-                    description="Extract all links from a webpage currently open in the browser. Returns structured data including link text, URLs, and link types (internal/external/anchor). Better than parsing HTML as it uses the live DOM.",
-                    inputSchema=schemas.ExtractLinksParams.model_json_schema(),
-                ),
-                types.Tool(
-                    name="extract_outline",
-                    description="Extract the heading hierarchy (H1-H6) from a webpage currently open in the browser. Creates a structured outline of the page content. Use this when asked about page structure, headings, or outline.",
-                    inputSchema={},
-                ),
-                types.Tool(
-                    name="extract_page_info",
-                    description="Extract comprehensive metadata from a webpage including title, description, Open Graph tags, meta tags, language, author, and viewport info. Use this for getting detailed page information.",
-                    inputSchema={},
-                ),
-                types.Tool(
-                    name="extract_article",
-                    description="Extract the main article content from a webpage using Mozilla Readability algorithm. Removes navigation, ads, and clutter to return clean article text. Use this for reading news articles, blog posts, or any long-form content.",
-                    inputSchema={},
-                ),
-                # Element interaction tools
-                types.Tool(
-                    name="click_element",
-                    description="Click an element on the webpage by CSS selector or DevTools reference ($0). Use this to interact with buttons, links, or any clickable elements in the browser.",
-                    inputSchema=schemas.ClickElementParams.model_json_schema(),
-                ),
-                types.Tool(
-                    name="type_text",
-                    description="Type text into the currently focused element in the browser. Use this to fill out forms, search boxes, or any text input fields. Supports typing speed simulation and form submission.",
-                    inputSchema=schemas.TypeTextParams.model_json_schema(),
-                ),
-                # Inspection tools
-                types.Tool(
-                    name="get_page_info",
-                    description="Get current page information from the browser including URL, title, viewport dimensions, and scroll position. Use this to check what page is currently open in the browser.",
-                    inputSchema={},
-                ),
-                types.Tool(
-                    name="take_screenshot",
-                    description="Capture a screenshot of the browser viewport, full page, or specific element. Returns base64-encoded image data. Use this to visually document or analyze webpage content.",
-                    inputSchema=schemas.TakeScreenshotParams.model_json_schema(),
-                ),
-                # Selection and storage tools
-                types.Tool(
-                    name="get_selected_text",
-                    description="Get the currently selected text from the browser in text, HTML, or markdown format. Use this to extract user-highlighted content from the page.",
-                    inputSchema=schemas.GetSelectedTextParams.model_json_schema(),
-                ),
-                types.Tool(
-                    name="get_cookies",
-                    description="Get all cookies for the current page from the browser, including httpOnly, secure, and sameSite attributes. Use this to inspect authentication state or session data.",
-                    inputSchema={},
-                ),
-                types.Tool(
-                    name="set_cookie",
-                    description="Set a cookie in the browser with optional attributes (secure, httpOnly, sameSite, expiration). Use this to modify authentication state or session data.",
-                    inputSchema=schemas.SetCookieParams.model_json_schema(),
-                ),
-                # Accessibility tools
-                types.Tool(
-                    name="check_autocomplete",
-                    description="Check autocomplete attributes on form fields per WCAG 2.1 SC 1.3.5 (Identify Input Purpose). Analyzes all form fields using multi-language heuristics to predict appropriate autocomplete attributes. Returns violations, warnings, and recommendations with confidence scores. Supports English, German, and Dutch field identification.",
-                    inputSchema=schemas.CheckAutocompleteParams.model_json_schema(),
-                ),
-            ]
+            """List all available tools from both unified and legacy registries."""
+            from inspekt.app.mcp.registry import get_all_tools
+
+            # Get tools from unified registry (migrated commands)
+            unified_tools = self.unified_router.get_tools()
+            unified_names = {t.name for t in unified_tools}
+
+            # Get tools from legacy registry (excluding migrated ones)
+            legacy_tools = []
+            for tool_def in get_all_tools():
+                if tool_def.name not in unified_names:
+                    legacy_tools.append(
+                        types.Tool(
+                            name=tool_def.name,
+                            description=tool_def.description,
+                            inputSchema=tool_def.input_schema,
+                        )
+                    )
+
+            # Combine: unified tools first, then legacy
+            return unified_tools + legacy_tools
 
         # ====================================================================
         # Call a tool
@@ -177,29 +345,22 @@ class InspektMCPServer:
                 return [
                     types.TextContent(
                         type="text",
-                        text="Error: Bridge server is not running. Start it with: inspekt server start",
+                        text="Error: Bridge server is not running. Start it with: inspekt start",
                     )
                 ]
 
             arguments = arguments or {}
 
             try:
-                # Route to appropriate tool handler
-                if name == "navigate_to_url":
-                    params = schemas.NavigateToUrlParams(**arguments)
-                    result = await self.tool_provider.navigate_to_url(params)
-                    return [types.TextContent(type="text", text=result.model_dump_json(indent=2))]
+                # First, try unified registry (for migrated commands)
+                if self.unified_router.has_tool(name):
+                    logger.debug(f"Routing {name} to unified registry")
+                    return await self.unified_router.call_tool(name, arguments)
 
-                elif name == "go_back":
-                    result = await self.tool_provider.go_back()
-                    return [types.TextContent(type="text", text=result.model_dump_json(indent=2))]
+                # Legacy handlers below (for unmigrated commands)
+                # TODO: Remove these as commands are migrated
 
-                elif name == "reload_page":
-                    hard = arguments.get("hard", False)
-                    result = await self.tool_provider.reload_page(hard)
-                    return [types.TextContent(type="text", text=result.model_dump_json(indent=2))]
-
-                elif name == "execute_javascript":
+                if name == "execute_javascript":
                     params = schemas.ExecuteJavaScriptParams(**arguments)
                     result = await self.tool_provider.execute_javascript(params)
                     return [types.TextContent(type="text", text=result.model_dump_json(indent=2))]
@@ -264,6 +425,43 @@ class InspektMCPServer:
                     result = await self.tool_provider.check_autocomplete(params)
                     return [types.TextContent(type="text", text=result.model_dump_json(indent=2))]
 
+                elif name == "run_axe":
+                    params = schemas.RunAxeParams(**arguments)
+                    result = await self.tool_provider.run_axe(params)
+                    return [types.TextContent(type="text", text=result.model_dump_json(indent=2))]
+
+                elif name == "get_network_requests":
+                    params = schemas.GetNetworkRequestsParams(**arguments)
+                    result = await self.tool_provider.get_network_requests(params)
+                    return [types.TextContent(type="text", text=result.model_dump_json(indent=2))]
+
+                elif name == "get_har":
+                    params = schemas.GetHARParams(**arguments)
+                    result = await self.tool_provider.get_har(params)
+                    return [types.TextContent(type="text", text=result.model_dump_json(indent=2))]
+
+                elif name == "get_console_logs":
+                    params = schemas.GetConsoleLogsParams(**arguments)
+                    result = await self.tool_provider.get_console_logs(params)
+                    return [types.TextContent(type="text", text=result.model_dump_json(indent=2))]
+
+                elif name == "clear_console_logs":
+                    result = await self.tool_provider.clear_console_logs()
+                    return [types.TextContent(type="text", text=result.model_dump_json(indent=2))]
+
+                # Handle dynamic plugin tools
+                elif name.startswith("unload_plugin_"):
+                    plugin_id = name[14:]  # Remove "unload_plugin_" prefix
+                    params = schemas.PluginExecuteParams(**arguments)
+                    result = await self._unload_plugin(plugin_id, params)
+                    return [types.TextContent(type="text", text=result.model_dump_json(indent=2))]
+
+                elif name.startswith("plugin_"):
+                    plugin_id = name[7:]  # Remove "plugin_" prefix
+                    params = schemas.PluginExecuteParams(**arguments)
+                    result = await self._execute_plugin(plugin_id, params)
+                    return [types.TextContent(type="text", text=result.model_dump_json(indent=2))]
+
                 else:
                     return [
                         types.TextContent(
@@ -297,7 +495,7 @@ class InspektMCPServer:
 
             # Ensure bridge server is running
             if not self.executor.is_server_running():
-                return "Error: Bridge server is not running. Start it with: inspekt server start"
+                return "Error: Bridge server is not running. Start it with: inspekt start"
 
             try:
                 content = await self.resource_provider.read_resource(uri)
@@ -318,7 +516,7 @@ class InspektMCPServer:
             logger.warning(
                 "Bridge server is not running. Tools will fail until server is started."
             )
-            logger.warning("Start bridge server with: inspekt server start")
+            logger.warning("Start bridge server with: inspekt start")
 
         # Run server
         async with mcp.server.stdio.stdio_server() as (read_stream, write_stream):

@@ -17,7 +17,13 @@
     "cookies",
     "clipboardWrite",
     "tabCapture",
-    "offscreen"
+    "offscreen",
+    "debugger",
+    "declarativeNetRequest",
+    "downloads",
+    "tabs",
+    "notifications",
+    "webRequest"
   ],
 
   "host_permissions": [
@@ -29,6 +35,12 @@
   },
 
   "content_scripts": [
+    {
+      "matches": ["http://*/*", "https://*/*"],
+      "js": ["console-hooks.js"],
+      "run_at": "document_start",
+      "all_frames": false
+    },
     {
       "matches": ["<all_urls>"],
       "js": ["permissions.js", "content.js", "modules/hidden-elements.js"],
@@ -49,7 +61,7 @@
   "devtools_page": "devtools.html",
 
   "web_accessible_resources": [{
-    "resources": ["fonts/*", "css/*"],
+    "resources": ["fonts/*", "css/*", "scripts/console-hooks-inject.js"],
     "matches": ["<all_urls>"]
   }]
 }

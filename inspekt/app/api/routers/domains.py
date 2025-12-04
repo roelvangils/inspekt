@@ -90,6 +90,26 @@ class DomainBypassResponse(BaseModel):
     error: str | None = None
 
 
+class CspGlobalRequest(BaseModel):
+    """Request model for global CSP bypass."""
+    enabled: bool = Field(..., description="Enable or disable global CSP bypass")
+
+    model_config = {"json_schema_extra": {
+        "examples": [
+            {"enabled": True},
+            {"enabled": False}
+        ]
+    }}
+
+
+class CspGlobalResponse(BaseModel):
+    """Response model for global CSP bypass operation."""
+    ok: bool
+    enabled: bool | None = None
+    enabledAt: str | None = None
+    error: str | None = None
+
+
 # ============================================================================
 # API Endpoints
 # ============================================================================
@@ -346,7 +366,7 @@ def set_bypass(request: DomainBypassRequest):
     except requests.exceptions.ConnectionError:
         raise HTTPException(
             status_code=503,
-            detail="Could not connect to bridge server. Ensure server is running: inspekt server start"
+            detail="Could not connect to bridge server. Ensure server is running: inspekt start"
         )
     except requests.exceptions.Timeout:
         raise HTTPException(status_code=504, detail="Request to bridge server timed out")
@@ -387,6 +407,120 @@ def sync_domains():
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Sync failed: {str(e)}")
+
+
+@router.post("/csp-global", response_model=CspGlobalResponse)
+def toggle_global_csp(request: CspGlobalRequest):
+    """
+    Enable or disable global CSP bypass for all domains.
+
+    When enabled, Content Security Policy headers are stripped from all responses,
+    allowing scripts to run on sites with strict CSP policies.
+
+    Args:
+        request: CSP global request with enabled flag
+
+    Returns:
+        Success status with current enabled state
+
+    Raises:
+        HTTPException: If bridge server is unreachable or request fails
+
+    Examples:
+        ```bash
+        # Enable global CSP bypass
+        curl -X POST http://localhost:8000/api/domains/csp-global \\
+          -H "Content-Type: application/json" \\
+          -d '{"enabled": true}'
+
+        # Disable global CSP bypass
+        curl -X POST http://localhost:8000/api/domains/csp-global \\
+          -H "Content-Type: application/json" \\
+          -d '{"enabled": false}'
+        ```
+
+        Response:
+        ```json
+        {
+          "ok": true,
+          "enabled": true
+        }
+        ```
+    """
+    try:
+        response = requests.post(
+            f"http://{BRIDGE_HTTP_HOST}:{BRIDGE_HTTP_PORT}/csp/global",
+            json={"enabled": request.enabled},
+            timeout=10.0
+        )
+
+        if response.status_code == 200:
+            return response.json()
+        else:
+            raise HTTPException(
+                status_code=response.status_code,
+                detail=f"Bridge server returned HTTP {response.status_code}"
+            )
+
+    except requests.exceptions.ConnectionError:
+        raise HTTPException(
+            status_code=503,
+            detail="Could not connect to bridge server. Ensure server is running: inspekt start"
+        )
+    except requests.exceptions.Timeout:
+        raise HTTPException(status_code=504, detail="Request to bridge server timed out")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
+
+
+@router.get("/csp-global", response_model=CspGlobalResponse)
+def get_global_csp_status():
+    """
+    Get the current global CSP bypass status.
+
+    Returns:
+        Current enabled state of global CSP bypass
+
+    Raises:
+        HTTPException: If bridge server is unreachable or request fails
+
+    Examples:
+        ```bash
+        curl http://localhost:8000/api/domains/csp-global
+        ```
+
+        Response:
+        ```json
+        {
+          "ok": true,
+          "enabled": true,
+          "enabledAt": "2024-01-15T10:30:00Z"
+        }
+        ```
+    """
+    try:
+        response = requests.get(
+            f"http://{BRIDGE_HTTP_HOST}:{BRIDGE_HTTP_PORT}/csp/global",
+            timeout=10.0
+        )
+
+        if response.status_code == 200:
+            return response.json()
+        else:
+            raise HTTPException(
+                status_code=response.status_code,
+                detail=f"Bridge server returned HTTP {response.status_code}"
+            )
+
+    except requests.exceptions.ConnectionError:
+        raise HTTPException(
+            status_code=503,
+            detail="Could not connect to bridge server. Ensure server is running: inspekt start"
+        )
+    except requests.exceptions.Timeout:
+        raise HTTPException(status_code=504, detail="Request to bridge server timed out")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
 
 
 # ============================================================================

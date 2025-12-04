@@ -35,18 +35,18 @@ from inspekt.client import BridgeClient
 # =============================================================================
 
 
-def _print_info_table(
-    title: str, rows: list[tuple[str, str, str | None]], key_width: int = 22, value_width: int = 55
-) -> None:
-    """Print a key-value information table with consistent formatting."""
+def _print_info_table(title: str, rows: list[tuple[str, str, str | None]]) -> None:
+    """Print a key-value information table with auto-width columns and title bar."""
     if not rows:
         return
 
     click.echo()
-    click.echo(click.style(title, bold=True))
-    click.echo()
 
-    table = Table(["Property", "Value"], [key_width, value_width], ["left", "left"])
+    # Convert rows to list format for width calculation
+    row_data = [[key, str(value)] for key, value, _ in rows]
+
+    table = Table(["Property", "Value"], alignments=["left", "left"], title=title)
+    table.set_data(row_data)
     table.print_header()
 
     for key, value, color in rows:
@@ -62,19 +62,22 @@ def _print_list_table(
     title: str,
     headers: list[str],
     rows: list[list[str]],
-    widths: list[int],
+    widths: list[int] | None = None,
     colors: list[list[str | None]] | None = None,
 ) -> None:
-    """Print a multi-column table for list-style data."""
+    """Print a multi-column table for list-style data with auto-width columns and title bar."""
     if not rows:
         return
 
     click.echo()
-    click.echo(click.style(title, bold=True))
-    click.echo()
 
     alignments = ["left"] * len(headers)
-    table = Table(headers, widths, alignments)
+    table = Table(headers, widths=widths, alignments=alignments, title=title)
+
+    # If no widths provided, calculate automatically
+    if widths is None:
+        table.set_data(rows)
+
     table.print_header()
 
     for i, row in enumerate(rows):
@@ -954,17 +957,21 @@ def _print_summary(data: dict, version: str, bridge_type: str, browser: str) -> 
         ("Title", title, None),
         ("Domain", domain, None),
         ("Protocol", protocol, "green" if data.get("isSecure") else None),
-        ("Viewport", f"{data.get('width', 'N/A')}x{data.get('height', 'N/A')}", None),
+        ("Viewport", f"{data.get('width', 'N/A')}\u00d7{data.get('height', 'N/A')}", None),
     ]
     _print_info_table("Summary", basic_rows)
 
     # Device info
     device = data.get("device", {})
     if device:
+        # Replace 'x' with '×' in screen resolution
+        screen_res = device.get("screenResolution", "N/A")
+        if isinstance(screen_res, str) and "x" in screen_res:
+            screen_res = screen_res.replace("x", "\u00d7")
         device_rows = [
             ("Platform", device.get("platform", "N/A"), None),
             ("Language", device.get("language", "N/A"), None),
-            ("Screen", device.get("screenResolution", "N/A"), None),
+            ("Screen", screen_res, None),
             ("Pixel Ratio", str(device.get("devicePixelRatio", "N/A")), None),
             ("Touch Support", "Yes" if device.get("touchSupport") else "No", None),
             ("Cookies", str(data.get("cookieCount", 0)), None),
@@ -1272,21 +1279,38 @@ def _print_accessibility(data: dict) -> None:
             form_list_rows.append([form["id"], form["method"], action, str(form["fieldCount"]), issue_text])
             form_colors.append([None, None, None, None, "yellow" if issues > 0 else None])
         _print_list_table(
-            f"Forms ({len(forms)})", ["ID", "Method", "Action", "Fields", "Issues"], form_list_rows, [20, 8, 25, 8, 8], form_colors
+            f"Forms ({len(forms)})", ["ID", "Method", "Action", "Fields", "Issues"], form_list_rows, colors=form_colors
         )
 
 
 def _print_resources(data: dict) -> None:
     """Print resources output."""
+    # Calculate total for summary
+    script_count = data.get("scriptCount", 0)
+    stylesheet_count = data.get("stylesheetCount", 0)
+    image_count = data.get("imageCount", 0)
+    link_count = data.get("linkCount", 0)
+    form_count = data.get("formCount", 0)
+    iframe_count = data.get("iframeCount", 0)
+    total_count = script_count + stylesheet_count + image_count + link_count + form_count + iframe_count
+
     resource_rows = [
-        ("Scripts", str(data.get("scriptCount", 0)), None),
-        ("Stylesheets", str(data.get("stylesheetCount", 0)), None),
-        ("Images", str(data.get("imageCount", 0)), None),
-        ("Links", str(data.get("linkCount", 0)), None),
-        ("Forms", str(data.get("formCount", 0)), None),
-        ("Iframes", str(data.get("iframeCount", 0)), None),
+        ["Scripts", str(script_count)],
+        ["Stylesheets", str(stylesheet_count)],
+        ["Images", str(image_count)],
+        ["Links", str(link_count)],
+        ["Forms", str(form_count)],
+        ["Iframes", str(iframe_count)],
     ]
-    _print_info_table("Resources", resource_rows)
+
+    click.echo()
+    table = Table(["Resource", "Count"], alignments=["left", "right"], title="Resources")
+    table.set_data(resource_rows)
+    table.print_header()
+    for row in resource_rows:
+        table.print_row(row)
+    table.print_summary(["Total", str(total_count)])
+    table.print_footer()
 
     # Media
     media_rows = []
@@ -1371,7 +1395,7 @@ def _print_storage(data: dict) -> None:
         cookie_list_rows = [[name] for name in cookie_names[:8]]
         if len(cookie_names) > 8:
             cookie_list_rows.append([f"... and {len(cookie_names) - 8} more"])
-        _print_list_table("Cookie Names", ["Name"], cookie_list_rows, [55])
+        _print_list_table("Cookie Names", ["Name"], cookie_list_rows)
 
     # LocalStorage keys
     ls_keys = data.get("localStorageKeys", [])
@@ -1379,7 +1403,7 @@ def _print_storage(data: dict) -> None:
         ls_list_rows = [[key] for key in ls_keys[:8]]
         if len(ls_keys) > 8:
             ls_list_rows.append([f"... and {len(ls_keys) - 8} more"])
-        _print_list_table("LocalStorage Keys", ["Key"], ls_list_rows, [55])
+        _print_list_table("LocalStorage Keys", ["Key"], ls_list_rows)
 
     # SessionStorage keys
     ss_keys = data.get("sessionStorageKeys", [])
@@ -1387,7 +1411,7 @@ def _print_storage(data: dict) -> None:
         ss_list_rows = [[key] for key in ss_keys[:8]]
         if len(ss_keys) > 8:
             ss_list_rows.append([f"... and {len(ss_keys) - 8} more"])
-        _print_list_table("SessionStorage Keys", ["Key"], ss_list_rows, [55])
+        _print_list_table("SessionStorage Keys", ["Key"], ss_list_rows)
 
 
 def _print_tech(data: dict) -> None:
@@ -1463,8 +1487,8 @@ def _print_domain(metrics: dict | None) -> None:
 def _print_layout(data: dict) -> None:
     """Print layout output."""
     layout_rows = [
-        ("Viewport", f"{data.get('viewportWidth', 'N/A')}x{data.get('viewportHeight', 'N/A')}px", None),
-        ("Document Size", f"{data.get('documentWidth', 'N/A')}x{data.get('documentHeight', 'N/A')}px", None),
+        ("Viewport", f"{data.get('viewportWidth', 'N/A')}\u00d7{data.get('viewportHeight', 'N/A')}px", None),
+        ("Document Size", f"{data.get('documentWidth', 'N/A')}\u00d7{data.get('documentHeight', 'N/A')}px", None),
         ("Scroll Position", f"X: {data.get('scrollX', 0)}, Y: {data.get('scrollY', 0)}", None),
         ("Visible", f"{data.get('visiblePercentage', 100):.0f}% of page height", None),
     ]

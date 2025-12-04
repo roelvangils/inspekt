@@ -360,20 +360,16 @@
             };
 
         } else if (mode === 'page') {
-            // Full page screenshot: capture entire page with scrolling/stitching
+            // Full page screenshot: uses CDP (Chrome DevTools Protocol) for single-shot capture
 
-            // Request screenshot from extension
+            // Request screenshot from extension (uses chrome.debugger API)
             const screenshot = await requestScreenshotFromExtension('page', {
                 margin: options.margin || 0,
                 marginColor: options.marginColor || 'auto',
-                scale: options.scale || 2,
+                scale: options.scale || 1,
                 quality: options.quality || 0.92,
                 format: options.format || 'png',
-                excludeFixed: options.excludeFixed || false,
-                stitchDelay: options.stitchDelay || 100,
-                stitchOverlap: options.stitchOverlap || 0,
-                maxHeight: options.maxHeight || null,
-                lazyLoadWait: options.lazyLoadWait || 500
+                maxHeight: options.maxHeight || 16384
             });
 
             if (!screenshot.ok) {
@@ -390,11 +386,12 @@
                 dataUrl: screenshot.dataUrl,
                 width: screenshot.width,
                 height: screenshot.height,
+                fullHeight: screenshot.fullHeight,
+                truncated: screenshot.truncated || false,
                 fileSize: screenshot.fileSize || null,
-                apiUsed: 'chrome.tabs.captureVisibleTab (stitched)',
+                apiUsed: screenshot.apiUsed || 'chrome.debugger (CDP)',
                 origin: window.location.origin,
-                url: window.location.href,
-                stitchCount: screenshot.stitchCount || 1
+                url: window.location.href
             };
 
         } else {

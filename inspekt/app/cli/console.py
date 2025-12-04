@@ -26,7 +26,7 @@ from inspekt.client import BridgeClient
 
 
 def render_console_table(table_json: str) -> None:
-    """Render a console.table() as a formatted table."""
+    """Render a console.table() as a formatted table with auto-width columns."""
     try:
         data = json.loads(table_json)
         rows = data.get("data", [])
@@ -52,24 +52,19 @@ def render_console_table(table_json: str) -> None:
             columns = ["#"] + columns
             rows = [{"#": i, **row} for i, row in enumerate(rows)]
 
-        # Calculate column widths (min 3, max 25)
-        widths = []
-        for col in columns:
-            if col == "#":
-                widths.append(max(3, len(str(len(rows) - 1))))
-            else:
-                max_val = max(
-                    (len(str(row.get(col, ""))) for row in rows if isinstance(row, dict)),
-                    default=0
-                )
-                widths.append(min(25, max(len(col), max_val, 3)))
-
-        # Create and render table
-        table = Table(columns, widths)
-        table.print_header()
+        # Build row data for auto-width calculation
+        table_rows = []
         for row in rows:
-            values = [str(row.get(col, ""))[:25] for col in columns]
-            table.print_row(values)
+            values = [str(row.get(col, "")) for col in columns]
+            table_rows.append(values)
+
+        # Create table with auto-width (terminal-aware)
+        table = Table(columns)
+        table.set_data(table_rows)
+        table.print_header()
+
+        for row_values in table_rows:
+            table.print_row(row_values)
         table.print_footer()
 
     except Exception as e:

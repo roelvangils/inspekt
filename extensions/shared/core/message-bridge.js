@@ -49,12 +49,13 @@ const InspektMessageBridge = (() => {
                 });
 
                 // Send response back to MAIN world
+                // Security: use location.origin instead of '*' to prevent cross-origin iframes from intercepting
                 window.postMessage({
                     type: `INSPEKT_${messageType}_RESPONSE`,
                     source: 'inspekt-extension',
                     requestId: message.requestId,
                     response: response
-                }, '*');
+                }, location.origin);
             } catch (error) {
                 // Send error back to MAIN world
                 window.postMessage({
@@ -65,7 +66,7 @@ const InspektMessageBridge = (() => {
                         ok: false,
                         error: String(error)
                     }
-                }, '*');
+                }, location.origin);
             }
         });
     }

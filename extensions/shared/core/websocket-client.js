@@ -20,10 +20,11 @@ const InspektWebSocketClient = (() => {
     let isConnected = false;
 
     /**
-     * Check if this is the front tab (visible and top-level window)
+     * Check if this is the front tab (top-level window, not an iframe)
+     * We no longer require visibility - connections are kept alive for hidden tabs too
      */
     function isFrontTab() {
-        return document.visibilityState === 'visible' && window === window.top;
+        return window === window.top;
     }
 
     /**
@@ -71,13 +72,34 @@ const InspektWebSocketClient = (() => {
     function sendBrowserInfo() {
         if (!ws || ws.readyState !== WebSocket.OPEN) return;
 
+        // Detect browser name from userAgentData (prefer known browsers over generic entries)
+        let detectedBrowser = 'Unknown';
+        if (navigator.userAgentData?.brands) {
+            const knownBrowsers = ['Google Chrome', 'Chrome', 'Microsoft Edge', 'Brave', 'Opera', 'Vivaldi', 'Firefox'];
+            for (const brand of navigator.userAgentData.brands) {
+                if (knownBrowsers.some(known => brand.brand.includes(known))) {
+                    detectedBrowser = brand.brand;
+                    break;
+                }
+            }
+        }
+        // Fallback: try to detect from userAgent string
+        if (detectedBrowser === 'Unknown') {
+            const ua = navigator.userAgent;
+            if (ua.includes('Firefox/')) detectedBrowser = 'Firefox';
+            else if (ua.includes('Edg/')) detectedBrowser = 'Edge';
+            else if (ua.includes('Chrome/')) detectedBrowser = 'Chrome';
+            else if (ua.includes('Safari/')) detectedBrowser = 'Safari';
+        }
+
         const browserInfo = {
             type: 'browser_info',
             userAgent: navigator.userAgent,
-            browserName: navigator.userAgentData?.brands?.[0]?.brand || 'Unknown',
+            browserName: detectedBrowser,
             url: window.location.href,
             title: document.title,
-            extensionVersion: window.__INSPEKT_BRIDGE_VERSION__ || window.__ZEN_BRIDGE_VERSION__ || null
+            extensionVersion: window.__INSPEKT_BRIDGE_VERSION__ || window.__ZEN_BRIDGE_VERSION__ || null,
+            visible: document.visibilityState === 'visible'
         };
         ws.send(JSON.stringify(browserInfo));
     }
@@ -113,12 +135,16 @@ const InspektWebSocketClient = (() => {
      * Handle WebSocket message
      */
     async function handleMessage(event) {
-        if (!isFrontTab()) {
-            return;
-        }
-
         try {
             const message = JSON.parse(event.data);
+
+            // Console management should work regardless of tab visibility
+            const isConsoleManagement = ['GET_CONSOLE_LOGS', 'CLEAR_CONSOLE_LOGS'].includes(message.type);
+
+            // Skip visibility check for console management and pong responses
+            if (!isFrontTab() && !isConsoleManagement && message.type !== 'pong') {
+                return;
+            }
 
             if (message.type === 'execute') {
                 const requestId = message.request_id;
@@ -314,6 +340,84 @@ const InspektWebSocketClient = (() => {
                         response: { ok: false, error: String(err) }
                     }));
                 }
+
+            } else if (message.type === 'GET_CONSOLE_LOGS') {
+                // Forward console logs request to background script
+                const runtimeAPI = typeof chrome !== 'undefined' ? chrome.runtime : browser.runtime;
+                try {
+                    const response = await runtimeAPI.sendMessage({
+                        type: 'GET_CONSOLE_LOGS'
+                    });
+
+                    // Send response back via WebSocket
+                    ws.send(JSON.stringify({
+                        type: 'response',
+                        requestId: message.requestId,
+                        response: response
+                    }));
+                } catch (err) {
+                    console.error('[Inspekt] Error handling GET_CONSOLE_LOGS:', err);
+                    ws.send(JSON.stringify({
+                        type: 'response',
+                        requestId: message.requestId,
+                        response: { ok: false, error: String(err) }
+                    }));
+                }
+
+            } else if (message.type === 'CLEAR_CONSOLE_LOGS') {
+                // Forward clear console logs request to background script
+                const runtimeAPI = typeof chrome !== 'undefined' ? chrome.runtime : browser.runtime;
+                try {
+                    const response = await runtimeAPI.sendMessage({
+                        type: 'CLEAR_CONSOLE_LOGS'
+                    });
+
+                    // Send response back via WebSocket
+                    ws.send(JSON.stringify({
+                        type: 'response',
+                        requestId: message.requestId,
+                        response: response
+                    }));
+                } catch (err) {
+                    console.error('[Inspekt] Error handling CLEAR_CONSOLE_LOGS:', err);
+                    ws.send(JSON.stringify({
+                        type: 'response',
+                        requestId: message.requestId,
+                        response: { ok: false, error: String(err) }
+                    }));
+                }
+
+            } else if (message.type === 'PERMANENT_BYPASS') {
+                // Enable/disable permanent bypass (for isolated/VM environments)
+                const permModule = typeof ZenPermissions !== 'undefined' ? ZenPermissions :
+                                   (typeof InspektPermissions !== 'undefined' ? InspektPermissions : null);
+                try {
+                    if (!permModule || !permModule.setPermanentBypass) {
+                        throw new Error('Permission system not available');
+                    }
+
+                    const enabled = message.enabled !== false;
+                    await permModule.setPermanentBypass(enabled);
+
+                    ws.send(JSON.stringify({
+                        type: 'response',
+                        requestId: message.requestId,
+                        response: {
+                            ok: true,
+                            enabled: enabled,
+                            message: enabled ?
+                                'Permanent bypass enabled (isolated mode)' :
+                                'Permanent bypass disabled'
+                        }
+                    }));
+                } catch (err) {
+                    console.error('[Inspekt] Error handling PERMANENT_BYPASS:', err);
+                    ws.send(JSON.stringify({
+                        type: 'response',
+                        requestId: message.requestId,
+                        response: { ok: false, error: String(err) }
+                    }));
+                }
             }
 
         } catch (err) {
@@ -396,25 +500,46 @@ const InspektWebSocketClient = (() => {
     }
 
     /**
-     * Handle visibility changes
+     * Handle visibility changes - send visibility updates instead of disconnecting
      */
     document.addEventListener('visibilitychange', async () => {
-        if (document.visibilityState === 'visible' && window === window.top) {
+        const isVisible = document.visibilityState === 'visible';
+
+        if (isVisible && window === window.top) {
             // Tab became visible - reconnect if needed
             if (!ws || ws.readyState !== WebSocket.OPEN) {
                 connect();
+            } else {
+                // Already connected - send visibility update
+                ws.send(JSON.stringify({
+                    type: 'visibility_change',
+                    visible: true
+                }));
             }
-        } else if (document.visibilityState === 'hidden') {
-            // Tab became hidden - disconnect to save resources
-            if (ws && ws.readyState === WebSocket.OPEN) {
-                console.log('[Inspekt] Tab hidden, closing connection');
-                ws.close();
-                ws = null;
-                updateMainWorldStatus(false);
-                clearKeepaliveTimer();
-            }
+        } else if (!isVisible && ws && ws.readyState === WebSocket.OPEN) {
+            // Tab became hidden - send visibility update but keep connection alive
+            console.log('[Inspekt] Tab hidden, sending visibility update (connection stays alive)');
+            ws.send(JSON.stringify({
+                type: 'visibility_change',
+                visible: false
+            }));
         }
     });
+
+    /**
+     * Handle permission changes (called when domains are added/removed via CLI)
+     * This enables commands to work immediately after adding a domain - no page refresh needed
+     */
+    async function handlePermissionChange() {
+        if (isFrontTab()) {
+            // Always try to connect/reconnect when permissions change
+            // The permission check happens per-request in ws.onmessage
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                console.log('[Inspekt] Permissions changed, reconnecting...');
+                connect();
+            }
+        }
+    }
 
     // Public API
     return {
@@ -429,6 +554,7 @@ const InspektWebSocketClient = (() => {
             }
         },
         isConnected: () => isConnected,
-        getWebSocket: () => ws
+        getWebSocket: () => ws,
+        handlePermissionChange
     };
 })();

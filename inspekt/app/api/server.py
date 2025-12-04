@@ -16,8 +16,13 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, HTMLResponse
+from fastapi.templating import Jinja2Templates
 from inspekt.services.bridge_executor import get_executor
 from inspekt import __version__
+
+# Set up Jinja2 templates
+templates_dir = Path(__file__).parent
+templates = Jinja2Templates(directory=str(templates_dir))
 
 # Configure logging to filter out /health endpoint requests
 class EndpointFilter(logging.Filter):
@@ -89,7 +94,7 @@ async def connection_error_handler(request, exc):
         content={
             "ok": False,
             "error": f"Bridge server connection error: {str(exc)}",
-            "detail": "Is the bridge server running? Start it with: inspekt server start",
+            "detail": "Is the bridge server running? Start it with: inspekt start",
         },
     )
 
@@ -146,21 +151,27 @@ async def root():
             "storage": "/api/storage/*",
             "persistence": "/api/persistence/*",
             "accessibility": "/api/accessibility/*",
+            "network": "/api/network/*",
+            "plugins": "/api/plugins/*",
+        },
+        "ui": {
+            "status": "/status",
+            "plugins": "/plugins",
         },
     }
 
 
 @app.get("/status", response_class=HTMLResponse)
-async def status_dashboard():
+async def status_dashboard(request: Request):
     """Live status dashboard showing bridge and API server health."""
-    # Read the dashboard HTML file
-    dashboard_path = Path(__file__).parent / "dashboard.html"
     try:
-        with open(dashboard_path, "r", encoding="utf-8") as f:
-            return f.read()
-    except FileNotFoundError:
+        return templates.TemplateResponse(
+            "dashboard.html",
+            {"request": request, "active_page": "dashboard"}
+        )
+    except Exception as e:
         return HTMLResponse(
-            content="<h1>Dashboard not found</h1><p>dashboard.html file is missing</p>",
+            content=f"<h1>Dashboard not found</h1><p>Error: {e}</p>",
             status_code=500
         )
 
@@ -179,6 +190,10 @@ from inspekt.app.api.routers import (
     robots,
     persistence,
     accessibility,
+    network,
+    plugins,
+    browser,
+    commands,
 )
 
 app.include_router(navigation.router, prefix="/api/navigation", tags=["Navigation"])
@@ -193,3 +208,37 @@ app.include_router(domains.router, prefix="/api/domains", tags=["Domains"])
 app.include_router(robots.router, prefix="/api/robots", tags=["Robots"])
 app.include_router(persistence.router, prefix="/api/persistence", tags=["Persistence"])
 app.include_router(accessibility.router, prefix="/api/accessibility", tags=["Accessibility"])
+app.include_router(network.router, prefix="/api/network", tags=["Network"])
+app.include_router(plugins.router, prefix="/api/plugins", tags=["Plugins"])
+app.include_router(browser.router, prefix="/api/browser", tags=["Browser"])
+app.include_router(commands.router, prefix="/api/commands", tags=["Commands"])
+
+
+@app.get("/plugins", response_class=HTMLResponse)
+async def plugins_ui(request: Request):
+    """Plugin management UI."""
+    try:
+        return templates.TemplateResponse(
+            "plugins.html",
+            {"request": request, "active_page": "plugins"}
+        )
+    except Exception as e:
+        return HTMLResponse(
+            content=f"<h1>Plugins UI not found</h1><p>Error: {e}</p>",
+            status_code=500
+        )
+
+
+@app.get("/commands", response_class=HTMLResponse)
+async def commands_ui(request: Request):
+    """Commands dashboard UI - view and manage all Inspekt commands."""
+    try:
+        return templates.TemplateResponse(
+            "commands.html",
+            {"request": request, "active_page": "commands"}
+        )
+    except Exception as e:
+        return HTMLResponse(
+            content=f"<h1>Commands UI not found</h1><p>Error: {e}</p>",
+            status_code=500
+        )

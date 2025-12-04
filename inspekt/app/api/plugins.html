@@ -79,6 +79,8 @@
             --shadow-hover: light-dark(0 4px 16px rgba(0,0,0,0.12), 0 4px 16px rgba(0,0,0,0.4));
         }
 
+        {% include 'partials/_nav.css' %}
+
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
             background: var(--bg-secondary);
@@ -204,6 +206,15 @@
             font-size: 16px;
             font-weight: 600;
             color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .card-title .material-icons {
+            font-size: 20px;
+            color: var(--accent);
+            opacity: 0.9;
         }
 
         /* Plugin List */
@@ -465,6 +476,75 @@
             gap: 12px;
         }
 
+        /* Browser Target Display */
+        .browser-target {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px 14px;
+            margin-top: 16px;
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            font-size: 13px;
+        }
+
+        .browser-target-label {
+            color: var(--text-secondary);
+            font-weight: 500;
+            flex-shrink: 0;
+        }
+
+        .browser-target .browser-icon-wrapper {
+            display: flex;
+            align-items: center;
+            flex-shrink: 0;
+        }
+
+        .browser-target .browser-icon {
+            width: 20px;
+            height: 20px;
+            color: var(--text-secondary);
+        }
+
+        .browser-target .page-favicon {
+            width: 16px;
+            height: 16px;
+            flex-shrink: 0;
+            border-radius: 2px;
+        }
+
+        .browser-target .target-info {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            min-width: 0;
+            flex: 1;
+        }
+
+        .browser-target .target-title {
+            font-weight: 500;
+            color: var(--text-primary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .browser-target .target-url {
+            color: var(--text-secondary);
+            font-size: 12px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .browser-target.disconnected {
+            opacity: 0.7;
+        }
+
+        .browser-target.disconnected .target-title {
+            color: var(--text-secondary);
+        }
+
         /* Modal */
         .modal-overlay {
             position: fixed;
@@ -531,6 +611,10 @@
 
         .modal-body {
             padding: 24px;
+        }
+
+        .modal-body .form-group + .form-group {
+            margin-top: 20px;
         }
 
         .modal-tabs {
@@ -610,23 +694,18 @@
             margin-bottom: 16px;
         }
 
-        .search-input {
+        input[type="text"].search-input {
             width: 100%;
-            padding: 10px 14px;
-            padding-left: 36px;
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
-            font-size: 14px;
-            background: var(--bg-input);
-            color: var(--text-primary);
+            padding: 10px 14px 10px 44px;
         }
 
         .search-icon {
             position: absolute;
-            left: 12px;
+            left: 14px;
             top: 50%;
             transform: translateY(-50%);
             color: var(--text-secondary);
+            pointer-events: none;
         }
 
         /* Filters */
@@ -655,13 +734,12 @@
     </style>
 </head>
 <body>
+    {% include 'partials/_nav.html' %}
+
     <div class="container">
         <header>
             <div>
-                <h1>Inspekt Plugins</h1>
-                <a href="/status" class="back-link">
-                    <span class="material-icons md-18">arrow_back</span> Dashboard
-                </a>
+                <h1><span class="material-icons md-24" style="vertical-align: middle; margin-right: 8px; color: var(--accent);">extension</span>Inspekt Plugins</h1>
             </div>
             <div class="header-actions">
                 <a href="#" class="header-link" onclick="exportPlugins(); return false;">
@@ -680,7 +758,7 @@
             <!-- Plugin List Panel -->
             <div class="card sidebar">
                 <div class="card-header">
-                    <span class="card-title">Plugins (<span id="plugin-count">0</span>)</span>
+                    <span class="card-title"><span class="material-icons">extension</span>Plugins (<span id="plugin-count">0</span>)</span>
                 </div>
 
                 <div class="search-box">
@@ -710,7 +788,7 @@
             <!-- Editor Panel -->
             <div class="card editor-panel" id="editor-panel" style="display: none;">
                 <div class="card-header">
-                    <span class="card-title" id="editor-title">Edit Plugin</span>
+                    <span class="card-title" id="editor-title"><span class="material-icons">edit</span>Edit Plugin</span>
                 </div>
 
                 <div class="form-row">
@@ -799,7 +877,7 @@
 
                 <div class="console-panel" id="console-panel" style="display: none;">
                     <div class="console-header">
-                        <span class="console-title">Console Output</span>
+                        <span class="console-title"><span class="material-icons md-18" style="vertical-align: middle; margin-right: 6px;">terminal</span>Console Output</span>
                         <button class="btn btn-small btn-secondary" onclick="clearConsole()">Clear</button>
                     </div>
                     <div id="console-output">
@@ -823,6 +901,16 @@
                         Delete
                     </button>
                 </div>
+
+                <div class="browser-target" id="browser-target">
+                    <span class="browser-target-label"><span class="material-icons md-18" style="vertical-align: middle; margin-right: 4px;">ads_click</span>Target:</span>
+                    <span class="browser-icon-wrapper" id="browser-icon"></span>
+                    <img class="page-favicon" id="page-favicon" src="" alt="" onerror="this.style.display='none'">
+                    <div class="target-info">
+                        <span class="target-title" id="target-title">Connecting...</span>
+                        <span class="target-url" id="target-url"></span>
+                    </div>
+                </div>
             </div>
 
             <!-- Empty Editor State -->
@@ -831,6 +919,9 @@
                     <div class="empty-state-icon"><span class="material-icons md-36">code</span></div>
                     <p>Select a plugin to edit</p>
                     <p style="margin-top: 8px; font-size: 13px;">Or add a new one to get started</p>
+                    <button class="btn btn-primary" style="margin-top: 16px;" onclick="showAddModal()">
+                        <span class="material-icons md-18">add</span> Add plugin
+                    </button>
                 </div>
             </div>
         </div>
@@ -840,7 +931,7 @@
     <div class="modal-overlay" id="add-modal">
         <div class="modal">
             <div class="modal-header">
-                <span class="modal-title">Add Plugin</span>
+                <span class="modal-title"><span class="material-icons md-24" style="vertical-align: middle; margin-right: 8px; color: var(--accent);">add_box</span>Add Plugin</span>
                 <button class="modal-close" onclick="closeAddModal()">&times;</button>
             </div>
             <div class="modal-body">
@@ -867,7 +958,7 @@
                         <input type="text" id="add-name-code" placeholder="e.g., Custom Script">
                     </div>
                     <div class="form-group">
-                        <label for="add-code">JavaScript Code</label>
+                        <label for="add-code">JavaScript Code (or Edit later)</label>
                         <textarea id="add-code" rows="8" placeholder="(function() { ... })();" style="font-family: monospace;"></textarea>
                     </div>
                 </div>
@@ -885,7 +976,7 @@
     <div class="modal-overlay" id="import-modal">
         <div class="modal">
             <div class="modal-header">
-                <span class="modal-title">Import Plugins</span>
+                <span class="modal-title"><span class="material-icons md-24" style="vertical-align: middle; margin-right: 8px; color: var(--accent);">upload_file</span>Import Plugins</span>
                 <button class="modal-close" onclick="closeImportModal()">&times;</button>
             </div>
             <div class="modal-body">
@@ -1399,8 +1490,17 @@
                     renderPluginList();
                     updateCategoryFilter();
 
-                    // Select first plugin by default if none selected
-                    if (!selectedPluginId && plugins.length > 0) {
+                    // Check for ?id= query parameter (from dashboard link)
+                    const urlParams = new URLSearchParams(window.location.search);
+                    const pluginIdFromUrl = urlParams.get('id');
+
+                    if (pluginIdFromUrl && plugins.find(p => p.id === pluginIdFromUrl)) {
+                        // Select the plugin from URL
+                        selectPlugin(pluginIdFromUrl);
+                        // Clean up URL without reloading
+                        window.history.replaceState({}, '', '/plugins');
+                    } else if (!selectedPluginId && plugins.length > 0) {
+                        // Select first plugin by default if none selected
                         selectPlugin(plugins[0].id);
                     }
                 }
@@ -1575,7 +1675,8 @@
                     body: JSON.stringify({
                         code: window.getEditorValue(window.editor),
                         timeout: 30,
-                        capture_console: true
+                        capture_console: true,
+                        browser_index: currentBrowserIndex
                     })
                 });
 
@@ -1726,10 +1827,7 @@
                     alert('Please enter a plugin name');
                     return;
                 }
-                if (!code) {
-                    alert('Please enter JavaScript code');
-                    return;
-                }
+                // Code is optional - can be edited later
             }
 
             try {
@@ -1770,7 +1868,21 @@
                         alert('Plugin added. Notes:\n' + data.warnings.join('\n'));
                     }
                 } else {
-                    alert('Error: ' + (data.error || data.detail || 'Failed to add plugin'));
+                    // Handle different error formats from FastAPI
+                    let errorMsg = 'Failed to add plugin';
+                    if (data.error) {
+                        errorMsg = data.error;
+                    } else if (data.detail) {
+                        if (typeof data.detail === 'string') {
+                            errorMsg = data.detail;
+                        } else if (Array.isArray(data.detail)) {
+                            // Validation errors come as array
+                            errorMsg = data.detail.map(e => e.msg || e.message || JSON.stringify(e)).join(', ');
+                        } else {
+                            errorMsg = JSON.stringify(data.detail);
+                        }
+                    }
+                    alert('Error: ' + errorMsg);
                 }
             } catch (error) {
                 alert('Error: ' + error.message);
@@ -1899,6 +2011,118 @@
             const date = new Date(timestamp * 1000);
             return date.toLocaleDateString();
         }
+
+        // Browser target display
+        const BRIDGE_URL = 'http://localhost:8765';
+        let browserTargetInterval = null;
+        let currentBrowserIndex = null;  // Track which browser to target for execution
+
+        async function fetchBrowserTarget() {
+            const container = document.getElementById('browser-target');
+            const browserIconEl = document.getElementById('browser-icon');
+            const pageFavicon = document.getElementById('page-favicon');
+            const targetTitle = document.getElementById('target-title');
+            const targetUrl = document.getElementById('target-url');
+
+            try {
+                const response = await fetch(`${BRIDGE_URL}/health`, { timeout: 3000 });
+                if (!response.ok) throw new Error('Bridge not responding');
+
+                const data = await response.json();
+                const browsers = data.browsers || [];
+
+                if (browsers.length === 0) {
+                    container.classList.add('disconnected');
+                    browserIconEl.innerHTML = '';
+                    pageFavicon.style.display = 'none';
+                    targetTitle.textContent = 'No browser connected';
+                    targetUrl.textContent = 'Open a page with the Inspekt extension';
+                    currentBrowserIndex = null;
+                    return;
+                }
+
+                // Find the most recently used browser (by last_command_time)
+                // or the one marked as most_recent, or fall back to first
+                let browser = browsers.find(b => b.is_most_recent);
+                let browserIdx = browser ? browsers.indexOf(browser) : -1;
+
+                if (!browser) {
+                    // Sort by last_command_time (most recent first)
+                    const sorted = [...browsers].sort((a, b) => {
+                        const aTime = a.last_command_time || 0;
+                        const bTime = b.last_command_time || 0;
+                        return bTime - aTime;
+                    });
+                    browser = sorted[0];
+                    browserIdx = browsers.indexOf(browser);
+                }
+
+                // Store the index for targeting execution
+                currentBrowserIndex = browserIdx;
+                container.classList.remove('disconnected');
+
+                // Browser icon (inline SVG)
+                const browserName = (browser.browser_name || 'chrome').toLowerCase();
+                browserIconEl.innerHTML = getBrowserIcon(browserName);
+
+                // Page favicon
+                if (browser.url && browser.url !== '-') {
+                    pageFavicon.src = getFaviconUrl(browser.url);
+                    pageFavicon.style.display = 'block';
+                } else {
+                    pageFavicon.style.display = 'none';
+                }
+
+                // Title and URL
+                targetTitle.textContent = browser.title || 'Untitled';
+                targetUrl.textContent = browser.url || '-';
+
+            } catch (error) {
+                container.classList.add('disconnected');
+                browserIconEl.innerHTML = '';
+                pageFavicon.style.display = 'none';
+                targetTitle.textContent = 'Bridge not connected';
+                targetUrl.textContent = 'Run: inspekt start';
+                currentBrowserIndex = null;
+            }
+        }
+
+        function getBrowserIcon(browserName) {
+            const icons = {
+                'chrome': `<svg class="browser-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="currentColor"><path d="M12 0C8.21 0 4.831 1.757 2.632 4.501l3.953 6.848A5.454 5.454 0 0 1 12 6.545h10.691A12 12 0 0 0 12 0zM1.931 5.47A11.943 11.943 0 0 0 0 12c0 6.012 4.42 10.991 10.189 11.864l3.953-6.847a5.45 5.45 0 0 1-6.865-2.29zm13.342 2.166a5.446 5.446 0 0 1 1.45 7.09l.002.001h-.002l-5.344 9.257c.206.01.413.016.621.016 6.627 0 12-5.373 12-12 0-1.54-.29-3.011-.818-4.364zM12 16.364a4.364 4.364 0 1 1 0-8.728 4.364 4.364 0 0 1 0 8.728Z"/></svg>`,
+                'firefox': `<svg class="browser-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="currentColor"><path d="M8.824 7.287c.008 0 .004 0 0 0zm-2.8-1.4c.006 0 .003 0 0 0zm16.754 2.161c-.505-1.215-1.53-2.528-2.333-2.943.654 1.283 1.033 2.57 1.177 3.53l.002.02c-1.314-3.278-3.544-4.6-5.366-7.477-.091-.147-.184-.292-.273-.446a3.545 3.545 0 01-.13-.24 2.118 2.118 0 01-.172-.46.03.03 0 00-.027-.03.038.038 0 00-.021 0l-.006.001a.037.037 0 00-.01.005L15.624 0c-2.585 1.515-3.657 4.168-3.932 5.856a6.197 6.197 0 00-2.305.587.297.297 0 00-.147.37c.057.162.24.24.396.17a5.622 5.622 0 012.008-.523l.067-.005a5.847 5.847 0 011.957.222l.095.03a5.816 5.816 0 01.616.228c.08.036.16.073.238.112l.107.055a5.835 5.835 0 01.368.211 5.953 5.953 0 012.034 2.104c-.62-.437-1.733-.868-2.803-.681 4.183 2.09 3.06 9.292-2.737 9.02a5.164 5.164 0 01-1.513-.292 4.42 4.42 0 01-.538-.232c-1.42-.735-2.593-2.121-2.74-3.806 0 0 .537-2 3.845-2 .357 0 1.38-.998 1.398-1.287-.005-.095-2.029-.9-2.817-1.677-.422-.416-.622-.616-.8-.767a3.47 3.47 0 00-.301-.227 5.388 5.388 0 01-.032-2.842c-1.195.544-2.124 1.403-2.8 2.163h-.006c-.46-.584-.428-2.51-.402-2.913-.006-.025-.343.176-.389.206-.406.29-.787.616-1.136.974-.397.403-.76.839-1.085 1.303a9.816 9.816 0 00-1.562 3.52c-.003.013-.11.487-.19 1.073-.013.09-.026.181-.037.272a7.8 7.8 0 00-.069.667l-.002.034-.023.387-.001.06C.386 18.795 5.593 24 12.016 24c5.752 0 10.527-4.176 11.463-9.661.02-.149.035-.298.052-.448.232-1.994-.025-4.09-.753-5.844z"/></svg>`,
+                'safari': `<svg class="browser-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="currentColor"><path d="M12 24C5.373 24 0 18.627 0 12S5.373 0 12 0s12 5.373 12 12-5.373 12-12 12zm0-.75c6.213 0 11.25-5.037 11.25-11.25S18.213.75 12 .75.75 5.787.75 12 5.787 23.25 12 23.25zM12 2a.25.25 0 01.25.25v1a.25.25 0 11-.5 0v-1A.25.25 0 0112 2zm-8.25 10a.25.25 0 01.25-.25h1a.25.25 0 110 .5H4a.25.25 0 01-.25-.25zM12 19.5a.25.25 0 01.25.25v1a.25.25 0 11-.5 0v-1a.25.25 0 01.25-.25zm7.75-7.75a.25.25 0 01.25.25v.5a.25.25 0 11-.5 0V12a.25.25 0 01.25-.25zm-8.944-6.47l-4.47 7.989 7.99-4.47-7.99 4.47 4.47-7.99z"/></svg>`,
+                'edge': `<svg class="browser-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="currentColor"><path d="M21.86 17.86q.14 0 .25.12.1.13.1.25t-.11.33l-.32.46-.43.53-.44.5q-.21.25-.38.42l-.22.23q-.58.53-1.34 1.04-.76.51-1.6.91-.86.4-1.74.64t-1.67.24q-.9 0-1.69-.28-.8-.28-1.48-.78-.68-.5-1.22-1.17-.53-.66-.92-1.44-.38-.77-.58-1.6-.2-.83-.2-1.67 0-1 .32-1.96.33-.97.87-1.8.14.95.55 1.77.41.82 1.02 1.5.6.68 1.38 1.21.78.54 1.64.9.86.36 1.77.56.92.2 1.8.2 1.12 0 2.18-.24 1.06-.23 2.06-.72l.2-.1.2-.05zm-15.5-1.27q0 1.1.27 2.15.27 1.06.78 2.03.51.96 1.24 1.77.74.82 1.66 1.4-1.47-.2-2.8-.74-1.33-.55-2.48-1.37-1.15-.83-2.08-1.9-.92-1.07-1.58-2.33T.36 14.94Q0 13.54 0 12.06q0-.81.32-1.49.31-.68.83-1.23.53-.55 1.2-.96.66-.4 1.35-.66.74-.27 1.5-.39.78-.12 1.55-.12.7 0 1.42.1.72.12 1.4.35.68.23 1.32.57.63.35 1.16.83-.35 0-.7.07-.33.07-.65.23v-.02q-.63.28-1.2.74-.57.46-1.05 1.04-.48.58-.87 1.26-.38.67-.65 1.39-.27.71-.42 1.44-.15.72-.15 1.38zM11.96.06q1.7 0 3.33.39 1.63.38 3.07 1.15 1.43.77 2.62 1.93 1.18 1.16 1.98 2.7.49.94.76 1.96.28 1 .28 2.08 0 .89-.23 1.7-.24.8-.69 1.48-.45.68-1.1 1.22-.64.53-1.45.88-.54.24-1.11.36-.58.13-1.16.13-.42 0-.97-.03-.54-.03-1.1-.12-.55-.1-1.05-.28-.5-.19-.84-.5-.12-.09-.23-.24-.1-.16-.1-.33 0-.15.16-.35.16-.2.35-.5.2-.28.36-.68.16-.4.16-.95 0-1.06-.4-1.96-.4-.91-1.06-1.64-.66-.74-1.52-1.28-.86-.55-1.79-.89-.84-.3-1.72-.44-.87-.14-1.76-.14-1.55 0-3.06.45T.94 7.55q.71-1.74 1.81-3.13 1.1-1.38 2.52-2.35Q6.68 1.1 8.37.58q1.7-.52 3.58-.52Z"/></svg>`
+            };
+            return icons[browserName] || icons['chrome'];
+        }
+
+        function getFaviconUrl(pageUrl) {
+            if (!pageUrl || pageUrl === '-') return '';
+            try {
+                const url = new URL(pageUrl);
+                return `https://www.google.com/s2/favicons?domain=${url.hostname}&sz=32`;
+            } catch (e) {
+                return '';
+            }
+        }
+
+        function startBrowserTargetPolling() {
+            // Initial fetch
+            fetchBrowserTarget();
+            // Poll every 5 seconds
+            browserTargetInterval = setInterval(fetchBrowserTarget, 5000);
+        }
+
+        function stopBrowserTargetPolling() {
+            if (browserTargetInterval) {
+                clearInterval(browserTargetInterval);
+                browserTargetInterval = null;
+            }
+        }
+
+        // Start polling when page loads
+        document.addEventListener('DOMContentLoaded', startBrowserTargetPolling);
 
         // Escape HTML
         function escapeHtml(text) {

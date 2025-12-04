@@ -109,6 +109,19 @@ class BrowserInfoMessage(BaseModel):
     url: str = Field(..., description="Current page URL")
     title: str = Field(..., description="Page title")
     extensionVersion: Optional[str] = Field(None, description="Extension version")
+    visible: bool = Field(True, description="Whether the tab is currently visible")
+
+    model_config = {"extra": "forbid"}
+
+
+class VisibilityChangeMessage(BaseModel):
+    """Tab visibility change message.
+
+    Sent from browser to server when tab visibility changes.
+    """
+
+    type: Literal["visibility_change"] = "visibility_change"
+    visible: bool = Field(..., description="Whether the tab is now visible")
 
     model_config = {"extra": "forbid"}
 
@@ -133,6 +146,7 @@ IncomingMessage = (
     | RefocusNotification
     | PingMessage
     | BrowserInfoMessage
+    | VisibilityChangeMessage
     | DomainManagementResponse
 )
 
@@ -433,6 +447,8 @@ def parse_incoming_message(data: dict[str, Any]) -> IncomingMessage:
         return PingMessage(**data)
     elif msg_type == "browser_info":
         return BrowserInfoMessage(**data)
+    elif msg_type == "visibility_change":
+        return VisibilityChangeMessage(**data)
     elif msg_type == "response":
         return DomainManagementResponse(**data)
     else:

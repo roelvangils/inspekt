@@ -59,6 +59,15 @@ MAX_REQUEST_AGE = 120
 # Warn about requests stuck longer than this (seconds)
 STUCK_REQUEST_THRESHOLD = 60
 
+# Time window for browser_info message before connection is considered a ghost
+BROWSER_INFO_TTL = 5
+
+# Stale connection threshold (no activity for 90 seconds = 3 missed pings)
+STALE_CONNECTION_THRESHOLD = 90
+
+# Long idle connection threshold (1 hour) - for connections that are alive but unused
+IDLE_CONNECTION_THRESHOLD = 3600
+
 # Script loader service (singleton)
 script_loader = ScriptLoader()
 
@@ -69,6 +78,34 @@ total_requests_processed = 0  # Lifetime request counter
 total_requests_succeeded = 0  # Count of successful requests
 total_requests_failed = 0  # Count of failed requests
 last_activity_time = time.time()  # Track last request/result activity
+last_activity_per_connection: dict = {}  # Track last activity time per connection
+last_command_per_connection: dict = {}  # Track last command execution time per connection
+
+
+def is_valid_browser_info(info: dict) -> bool:
+    """
+    Check if browser_info contains enough data to be considered valid.
+
+    A valid browser connection MUST have:
+    - A non-empty userAgent string (not empty, not just "Unknown", at least 10 chars), AND
+    - A valid extensionVersion
+
+    Connections without both are considered orphaned and will be filtered out.
+    """
+    if not info:
+        return False
+
+    user_agent = info.get("userAgent", "")
+    extension_version = info.get("extensionVersion")
+
+    # Must have a real user agent (not empty, not just "Unknown")
+    has_valid_ua = bool(user_agent and user_agent != "Unknown" and len(user_agent) > 10)
+
+    # Must have an extension version
+    has_extension = bool(extension_version)
+
+    # Require BOTH for a valid connection
+    return has_valid_ua and has_extension
 
 
 def parse_user_agent(user_agent: str) -> tuple[str, str]:
@@ -168,9 +205,11 @@ def cleanup_old_requests():
 
 async def cleanup_watchdog():
     """
-    Background task that proactively cleans up stale requests.
+    Background task that proactively cleans up stale requests and ghost connections.
     Runs every 30 seconds and logs warnings for stuck requests.
     """
+    global most_recent_connection
+
     while True:
         await asyncio.sleep(30)
 
@@ -199,6 +238,99 @@ async def cleanup_watchdog():
 
         if cleaned_count > 0:
             print(f"[Cleanup] Removed {cleaned_count} stale request(s)")
+
+        # Clean up ghost connections (no browser_info received within TTL)
+        ghost_count = 0
+        for ws in list(active_connections):
+            connection_time = connection_times.get(ws, now)
+            age = now - connection_time
+            if ws not in browser_info and age > BROWSER_INFO_TTL:
+                ghost_count += 1
+                print(f"[Cleanup] Closing ghost connection (no browser_info after {age:.1f}s)")
+                try:
+                    await ws.close()
+                except Exception:
+                    pass
+                active_connections.discard(ws)
+                connection_times.pop(ws, None)
+                last_activity_per_connection.pop(ws, None)
+                last_command_per_connection.pop(ws, None)
+                if most_recent_connection == ws:
+                    most_recent_connection = None
+
+        if ghost_count > 0:
+            print(f"[Cleanup] Removed {ghost_count} ghost connection(s)")
+
+        # Clean up connections with incomplete/invalid browser_info
+        incomplete_count = 0
+        for ws in list(active_connections):
+            info = browser_info.get(ws)
+            connection_time = connection_times.get(ws, now)
+            age = now - connection_time
+            # Give connections 10 seconds to send complete info, then close if invalid
+            if info is not None and age > 10 and not is_valid_browser_info(info):
+                incomplete_count += 1
+                print(f"[Cleanup] Closing connection with incomplete browser_info after {age:.1f}s")
+                try:
+                    await ws.close()
+                except Exception:
+                    pass
+                active_connections.discard(ws)
+                browser_info.pop(ws, None)
+                connection_times.pop(ws, None)
+                last_activity_per_connection.pop(ws, None)
+                last_command_per_connection.pop(ws, None)
+                if most_recent_connection == ws:
+                    most_recent_connection = None
+
+        if incomplete_count > 0:
+            print(f"[Cleanup] Removed {incomplete_count} connection(s) with incomplete info")
+
+        # Clean up stale connections (no activity for STALE_CONNECTION_THRESHOLD seconds)
+        stale_count = 0
+        for ws in list(active_connections):
+            last_activity = last_activity_per_connection.get(ws, connection_times.get(ws, now))
+            if now - last_activity > STALE_CONNECTION_THRESHOLD:
+                stale_count += 1
+                print(f"[Cleanup] Closing stale connection (no activity for {now - last_activity:.0f}s)")
+                try:
+                    await ws.close()
+                except Exception:
+                    pass
+                active_connections.discard(ws)
+                browser_info.pop(ws, None)
+                connection_times.pop(ws, None)
+                last_activity_per_connection.pop(ws, None)
+                last_command_per_connection.pop(ws, None)
+                if most_recent_connection == ws:
+                    most_recent_connection = None
+
+        if stale_count > 0:
+            print(f"[Cleanup] Removed {stale_count} stale connection(s)")
+
+        # Clean up long-idle connections (connected for over 1 hour with no recent activity)
+        idle_count = 0
+        for ws in list(active_connections):
+            last_activity = last_activity_per_connection.get(ws, connection_times.get(ws, now))
+            idle_time = now - last_activity
+            if idle_time > IDLE_CONNECTION_THRESHOLD:
+                idle_count += 1
+                hours = idle_time / 3600
+                print(f"[Cleanup] Closing idle connection (no activity for {hours:.1f} hours)")
+                try:
+                    await ws.close()
+                except Exception:
+                    pass
+                active_connections.discard(ws)
+                browser_info.pop(ws, None)
+                connection_times.pop(ws, None)
+                last_activity_per_connection.pop(ws, None)
+                last_command_per_connection.pop(ws, None)
+                if most_recent_connection == ws:
+                    most_recent_connection = None
+
+        if idle_count > 0:
+            print(f"[Cleanup] Removed {idle_count} idle connection(s)")
 
 
 def get_queue_stats() -> dict:
@@ -272,6 +404,38 @@ async def sync_domains_to_browser(ws):
         print(f"Domain auto-sync skipped: {e}")
 
 
+async def enable_permanent_bypass_if_isolated(ws):
+    """Enable permanent bypass and global CSP bypass in browser if running in isolated mode."""
+    from inspekt.config import is_isolated_mode
+
+    if is_isolated_mode():
+        # Enable permanent domain bypass
+        try:
+            request_id = str(uuid.uuid4())
+            message = {
+                "type": "PERMANENT_BYPASS",
+                "requestId": request_id,
+                "enabled": True
+            }
+            await ws.send_json(message)
+            print("✓ Enabled permanent bypass in browser (isolated mode)")
+        except Exception as e:
+            print(f"Failed to enable permanent bypass: {e}")
+
+        # Enable global CSP bypass
+        try:
+            request_id = str(uuid.uuid4())
+            message = {
+                "type": "CSP_BYPASS_GLOBAL",
+                "requestId": request_id,
+                "enabled": True
+            }
+            await ws.send_json(message)
+            print("✓ Enabled global CSP bypass in browser (isolated mode)")
+        except Exception as e:
+            print(f"Failed to enable global CSP bypass: {e}")
+
+
 async def websocket_handler(request):
     """Handle WebSocket connection from browser (userscript)."""
     global most_recent_connection, last_activity_time
@@ -290,6 +454,9 @@ async def websocket_handler(request):
 
     # Auto-sync domains to newly connected browser
     await sync_domains_to_browser(ws)
+
+    # Enable permanent bypass if running in isolated mode (Docker VM)
+    await enable_permanent_bypass_if_isolated(ws)
 
     # Resend any pending requests to the newly connected browser
     # This handles the case where a page navigation disconnected mid-request
@@ -320,6 +487,9 @@ async def websocket_handler(request):
 
                     message_type = validated_msg.type
 
+                    # Track activity for this connection (for stale detection)
+                    last_activity_per_connection[ws] = time.time()
+
                     # Mark this connection as most recent when it sends any message (except ping)
                     if message_type != "ping":
                         most_recent_connection = ws
@@ -349,6 +519,7 @@ async def websocket_handler(request):
                             else:
                                 total_requests_failed += 1
                             last_activity_time = time.time()
+                            last_command_per_connection[ws] = time.time()  # Track last command for this connection
                             print(f"Received result for request {request_id}")
 
                             # Notify any waiting HTTP long-poll requests
@@ -407,12 +578,22 @@ async def websocket_handler(request):
                             "browserName": data.get("browserName", "Unknown"),
                             "url": data.get("url", ""),
                             "title": data.get("title", ""),
-                            "extensionVersion": data.get("extensionVersion")
+                            "extensionVersion": data.get("extensionVersion"),
+                            "visible": data.get("visible", True)
                         }
                         browser_name = data.get("browserName", "Unknown")
                         page_title = data.get("title", "")[:50]
                         ext_version = data.get("extensionVersion", "unknown")
-                        print(f"Browser info received: {browser_name} v{ext_version} - {page_title}")
+                        visible_status = "visible" if data.get("visible", True) else "hidden"
+                        print(f"Browser info received: {browser_name} v{ext_version} ({visible_status}) - {page_title}")
+
+                    elif message_type == "visibility_change":
+                        # Update visibility state for this browser
+                        if ws in browser_info:
+                            browser_info[ws]["visible"] = data.get("visible", True)
+                            visible_status = "visible" if data.get("visible", True) else "hidden"
+                            browser_name = browser_info[ws].get("browserName", "Unknown")
+                            print(f"Visibility changed: {browser_name} is now {visible_status}")
 
                     elif message_type == "response":
                         # Extension sending back response for domain management commands
@@ -455,6 +636,8 @@ async def websocket_handler(request):
         active_connections.discard(ws)
         browser_info.pop(ws, None)
         connection_times.pop(ws, None)  # Clean up connection time tracking
+        last_activity_per_connection.pop(ws, None)  # Clean up activity tracking
+        last_command_per_connection.pop(ws, None)  # Clean up command tracking
         if most_recent_connection == ws:
             most_recent_connection = None
 
@@ -706,8 +889,13 @@ async def handle_http_health(request):
     uptime = current_time - server_start_time
 
     # Build browser connection list
+    # Filter out ghost connections (those without browser_info or with incomplete info)
+    valid_connections = [
+        ws for ws in active_connections
+        if ws in browser_info and is_valid_browser_info(browser_info.get(ws))
+    ]
     # Sort connections by connection time for consistent ordering
-    sorted_connections = sorted(active_connections, key=lambda ws: connection_times.get(ws, current_time))
+    sorted_connections = sorted(valid_connections, key=lambda ws: connection_times.get(ws, current_time))
 
     browsers_list = []
     for ws in sorted_connections:
@@ -719,6 +907,17 @@ async def handle_http_health(request):
         user_agent = info.get("userAgent", "")
         browser_name, browser_version = parse_user_agent(user_agent)
 
+        # Fallback to extension-provided browserName if parsing failed
+        if browser_name == "Unknown":
+            extension_browser_name = info.get("browserName", "")
+            if extension_browser_name and extension_browser_name != "Unknown":
+                # Normalize common names
+                name_map = {
+                    "Google Chrome": "Chrome",
+                    "Microsoft Edge": "Edge",
+                }
+                browser_name = name_map.get(extension_browser_name, extension_browser_name)
+
         browsers_list.append({
             "browser_name": browser_name,
             "browser_version": browser_version,
@@ -727,7 +926,9 @@ async def handle_http_health(request):
             "title": info.get("title", ""),
             "user_agent": user_agent,
             "is_most_recent": (ws == most_recent_connection),
-            "connected_duration": duration
+            "connected_duration": duration,
+            "visible": info.get("visible", True),
+            "last_command_time": last_command_per_connection.get(ws),  # None if never commanded
         })
 
     # Get cached scripts from script loader
@@ -770,7 +971,7 @@ async def handle_http_health(request):
             "host": HOST,
             "port": PORT,
             "websocket_port": PORT + 1,
-            "connected_browsers": len(active_connections),
+            "connected_browsers": len(valid_connections),
             "browsers": browsers_list,
             "pending": len(pending_requests),
             "completed": len(completed_requests),
@@ -1170,6 +1371,302 @@ async def handle_http_domain_sync(request):
         )
 
 
+# ============================================================================
+# CSP Bypass Endpoints
+# ============================================================================
+
+async def handle_http_csp_bypass_enable(request):
+    """HTTP endpoint: Enable CSP bypass for a domain."""
+    try:
+        data = await request.json()
+        domain = data.get("domain")
+
+        if not domain:
+            return web.json_response(
+                {"ok": False, "error": "Missing 'domain' parameter"},
+                status=400
+            )
+
+        # Send message to extension via WebSocket
+        if not most_recent_connection or most_recent_connection not in active_connections:
+            return web.json_response(
+                {"ok": False, "error": "No browser connected"},
+                status=503
+            )
+
+        request_id = str(uuid.uuid4())
+        message = {
+            "type": "CSP_BYPASS_ENABLE",
+            "requestId": request_id,
+            "domain": domain
+        }
+
+        # Store pending request
+        pending_requests[request_id] = {
+            "timestamp": time.time(),
+            "type": "CSP_BYPASS_ENABLE"
+        }
+
+        # Send to browser
+        await most_recent_connection.send_json(message)
+
+        # Wait for response (with timeout)
+        event = asyncio.Event()
+        pending_events[request_id] = event
+
+        try:
+            await asyncio.wait_for(event.wait(), timeout=10.0)
+            result = completed_requests.get(request_id, {})
+            return web.json_response(result.get("response", {"ok": False, "error": "No response"}))
+        except asyncio.TimeoutError:
+            return web.json_response(
+                {"ok": False, "error": "Request timed out"},
+                status=504
+            )
+        finally:
+            pending_events.pop(request_id, None)
+            completed_requests.pop(request_id, None)
+
+    except Exception as e:
+        return web.json_response(
+            {"ok": False, "error": str(e)},
+            status=500
+        )
+
+
+async def handle_http_csp_bypass_disable(request):
+    """HTTP endpoint: Disable CSP bypass for a domain."""
+    try:
+        data = await request.json()
+        domain = data.get("domain")
+
+        if not domain:
+            return web.json_response(
+                {"ok": False, "error": "Missing 'domain' parameter"},
+                status=400
+            )
+
+        # Send message to extension via WebSocket
+        if not most_recent_connection or most_recent_connection not in active_connections:
+            return web.json_response(
+                {"ok": False, "error": "No browser connected"},
+                status=503
+            )
+
+        request_id = str(uuid.uuid4())
+        message = {
+            "type": "CSP_BYPASS_DISABLE",
+            "requestId": request_id,
+            "domain": domain
+        }
+
+        # Store pending request
+        pending_requests[request_id] = {
+            "timestamp": time.time(),
+            "type": "CSP_BYPASS_DISABLE"
+        }
+
+        # Send to browser
+        await most_recent_connection.send_json(message)
+
+        # Wait for response (with timeout)
+        event = asyncio.Event()
+        pending_events[request_id] = event
+
+        try:
+            await asyncio.wait_for(event.wait(), timeout=10.0)
+            result = completed_requests.get(request_id, {})
+            return web.json_response(result.get("response", {"ok": False, "error": "No response"}))
+        except asyncio.TimeoutError:
+            return web.json_response(
+                {"ok": False, "error": "Request timed out"},
+                status=504
+            )
+        finally:
+            pending_events.pop(request_id, None)
+            completed_requests.pop(request_id, None)
+
+    except Exception as e:
+        return web.json_response(
+            {"ok": False, "error": str(e)},
+            status=500
+        )
+
+
+async def handle_http_csp_bypass_status(request):
+    """HTTP endpoint: Get CSP bypass status for a domain."""
+    try:
+        # Get domain from query string or JSON body
+        domain = request.query.get("domain")
+
+        if not domain:
+            try:
+                data = await request.json()
+                domain = data.get("domain")
+            except Exception:
+                pass
+
+        if not domain:
+            return web.json_response(
+                {"ok": False, "error": "Missing 'domain' parameter"},
+                status=400
+            )
+
+        # Send message to extension via WebSocket
+        if not most_recent_connection or most_recent_connection not in active_connections:
+            return web.json_response(
+                {"ok": False, "error": "No browser connected"},
+                status=503
+            )
+
+        request_id = str(uuid.uuid4())
+        message = {
+            "type": "CSP_BYPASS_STATUS",
+            "requestId": request_id,
+            "domain": domain
+        }
+
+        # Store pending request
+        pending_requests[request_id] = {
+            "timestamp": time.time(),
+            "type": "CSP_BYPASS_STATUS"
+        }
+
+        # Send to browser
+        await most_recent_connection.send_json(message)
+
+        # Wait for response (with timeout)
+        event = asyncio.Event()
+        pending_events[request_id] = event
+
+        try:
+            await asyncio.wait_for(event.wait(), timeout=10.0)
+            result = completed_requests.get(request_id, {})
+            return web.json_response(result.get("response", {"ok": False, "error": "No response"}))
+        except asyncio.TimeoutError:
+            return web.json_response(
+                {"ok": False, "error": "Request timed out"},
+                status=504
+            )
+        finally:
+            pending_events.pop(request_id, None)
+            completed_requests.pop(request_id, None)
+
+    except Exception as e:
+        return web.json_response(
+            {"ok": False, "error": str(e)},
+            status=500
+        )
+
+
+async def handle_http_csp_bypass_global(request):
+    """HTTP endpoint: Enable/disable CSP bypass for ALL domains globally."""
+    try:
+        data = await request.json()
+        enabled = data.get("enabled")
+
+        if enabled is None:
+            return web.json_response(
+                {"ok": False, "error": "Missing 'enabled' parameter (true/false)"},
+                status=400
+            )
+
+        # Send message to extension via WebSocket
+        if not most_recent_connection or most_recent_connection not in active_connections:
+            return web.json_response(
+                {"ok": False, "error": "No browser connected"},
+                status=503
+            )
+
+        request_id = str(uuid.uuid4())
+        message = {
+            "type": "CSP_BYPASS_GLOBAL",
+            "requestId": request_id,
+            "enabled": bool(enabled)
+        }
+
+        # Store pending request
+        pending_requests[request_id] = {
+            "timestamp": time.time(),
+            "type": "CSP_BYPASS_GLOBAL"
+        }
+
+        # Send to browser
+        await most_recent_connection.send_json(message)
+
+        # Wait for response (with timeout)
+        event = asyncio.Event()
+        pending_events[request_id] = event
+
+        try:
+            await asyncio.wait_for(event.wait(), timeout=10.0)
+            result = completed_requests.get(request_id, {})
+            return web.json_response(result.get("response", {"ok": False, "error": "No response"}))
+        except asyncio.TimeoutError:
+            return web.json_response(
+                {"ok": False, "error": "Request timed out"},
+                status=504
+            )
+        finally:
+            pending_events.pop(request_id, None)
+            completed_requests.pop(request_id, None)
+
+    except Exception as e:
+        return web.json_response(
+            {"ok": False, "error": str(e)},
+            status=500
+        )
+
+
+async def handle_http_csp_bypass_global_status(request):
+    """HTTP endpoint: Get global CSP bypass status."""
+    try:
+        # Send message to extension via WebSocket
+        if not most_recent_connection or most_recent_connection not in active_connections:
+            return web.json_response(
+                {"ok": False, "error": "No browser connected"},
+                status=503
+            )
+
+        request_id = str(uuid.uuid4())
+        message = {
+            "type": "CSP_BYPASS_GLOBAL_STATUS",
+            "requestId": request_id
+        }
+
+        # Store pending request
+        pending_requests[request_id] = {
+            "timestamp": time.time(),
+            "type": "CSP_BYPASS_GLOBAL_STATUS"
+        }
+
+        # Send to browser
+        await most_recent_connection.send_json(message)
+
+        # Wait for response (with timeout)
+        event = asyncio.Event()
+        pending_events[request_id] = event
+
+        try:
+            await asyncio.wait_for(event.wait(), timeout=10.0)
+            result = completed_requests.get(request_id, {})
+            return web.json_response(result.get("response", {"ok": False, "error": "No response"}))
+        except asyncio.TimeoutError:
+            return web.json_response(
+                {"ok": False, "error": "Request timed out"},
+                status=504
+            )
+        finally:
+            pending_events.pop(request_id, None)
+            completed_requests.pop(request_id, None)
+
+    except Exception as e:
+        return web.json_response(
+            {"ok": False, "error": str(e)},
+            status=500
+        )
+
+
 @web.middleware
 async def cors_middleware(request, handler):
     """CORS middleware to allow cross-origin requests from dashboard."""
@@ -1446,6 +1943,14 @@ async def main():
     app.router.add_post("/domains/bypass", handle_http_domain_bypass)
     app.router.add_post("/domains/sync", handle_http_domain_sync)
 
+    # CSP bypass endpoints
+    app.router.add_post("/csp/enable", handle_http_csp_bypass_enable)
+    app.router.add_post("/csp/disable", handle_http_csp_bypass_disable)
+    app.router.add_get("/csp/status", handle_http_csp_bypass_status)
+    app.router.add_post("/csp/status", handle_http_csp_bypass_status)  # Also support POST
+    app.router.add_post("/csp/global", handle_http_csp_bypass_global)
+    app.router.add_get("/csp/global", handle_http_csp_bypass_global_status)
+
     # Network/HAR endpoint
     app.router.add_get("/network/har", handle_http_get_har)
 
@@ -1482,6 +1987,51 @@ async def main():
 
 
 if __name__ == "__main__":
+    import argparse
+    import os
+
+    parser = argparse.ArgumentParser(
+        description="Inspekt WebSocket Bridge Server",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  python bridge_ws.py                    # Start with defaults
+  python bridge_ws.py --isolated         # Docker VM mode (bypass all protections)
+  python bridge_ws.py --host 0.0.0.0     # Allow external connections
+  python bridge_ws.py --port 9000        # Use custom port
+        """
+    )
+    parser.add_argument(
+        "--isolated",
+        action="store_true",
+        help="Enable isolated mode (bypass all privacy protections). For Docker VM use only."
+    )
+    parser.add_argument(
+        "--host",
+        default="127.0.0.1",
+        help="Host to bind to (default: 127.0.0.1)"
+    )
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=8765,
+        help="Port to bind to (default: 8765)"
+    )
+
+    args = parser.parse_args()
+
+    # Set environment variable for isolated mode
+    if args.isolated:
+        os.environ["INSPEKT_ISOLATED"] = "1"
+        print("=" * 50)
+        print("ISOLATED MODE ENABLED")
+        print("All privacy protections bypassed (Docker VM mode)")
+        print("=" * 50)
+
+    # Update global HOST/PORT
+    HOST = args.host
+    PORT = args.port
+
     try:
         asyncio.run(main())
     except KeyboardInterrupt:

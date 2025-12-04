@@ -17,10 +17,17 @@ const InspektPermissions = {
 
     /**
      * Get the domain from a URL
+     * For file:// URLs, returns 'local-file' as a special domain
      */
     getDomain(url) {
         try {
             const urlObj = new URL(url || window.location.href);
+
+            // Handle file:// URLs - hostname is empty for these
+            if (urlObj.protocol === 'file:') {
+                return 'local-file';
+            }
+
             return urlObj.hostname;
         } catch (e) {
             return null;
@@ -196,10 +203,17 @@ const InspektPermissions = {
     /**
      * Check if a domain is allowed
      * Supports subdomain matching and temp bypass
+     * Local files (file://) are allowed by default
      */
     async isAllowed(domain) {
         domain = domain || this.getDomain();
         if (!domain) return false;
+
+        // Local files are always allowed by default
+        // (user already opted in by enabling "Allow access to file URLs" in Chrome)
+        if (domain === 'local-file') {
+            return true;
+        }
 
         // Check temp bypass first (bypasses all domain checks)
         const bypassActive = await this.isTempBypassActive();

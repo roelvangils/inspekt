@@ -18,18 +18,71 @@
         const showBadges = config.__showBadges !== false;  // Default true
         const interactiveBadges = config.__interactiveBadges === true;  // Default false
         const devCss = config.__devCss === true;  // Dev mode: load CSS from external server
+        const isPersistent = config.__persistent === true;  // Persistent monitoring mode
 
         // Debug logging for dev mode
         console.log('[Inspekt] Config flags:', {
             showBadges,
             interactiveBadges,
             devCss,
+            isPersistent,
             raw__devCss: config.__devCss
         });
 
         delete config.__showBadges;  // Don't pass this to axe
         delete config.__interactiveBadges;  // Don't pass this to axe
         delete config.__devCss;  // Don't pass this to axe
+        delete config.__persistent;  // Don't pass this to axe
+
+        // ============================================================
+        // PERSISTENT MODE SETUP
+        // ============================================================
+        // Set up click listener and URL change detection for re-scanning
+        if (isPersistent) {
+            // Initialize persistent state (preserved across re-runs on same page)
+            window.__inspektSeenViolations__ = window.__inspektSeenViolations__ || new Set();
+            window.__inspektDirty__ = window.__inspektDirty__ || false;
+            window.__inspektLastBadgeNumber__ = window.__inspektLastBadgeNumber__ || 0;
+
+            // Only set up listeners once (check if already installed)
+            if (!window.__inspektPersistentListenersInstalled__) {
+                window.__inspektPersistentListenersInstalled__ = true;
+
+                // Click listener with 1s debounce
+                // Ignores clicks on Inspekt UI elements (badges and popovers)
+                let clickDebounceTimer;
+                document.addEventListener('click', (event) => {
+                    // Ignore clicks on Inspekt UI elements
+                    if (event.target.closest('[data-inspekt-axe-badge], [data-inspekt-axe-popover], .inspekt-axe-popover')) {
+                        return;
+                    }
+
+                    clearTimeout(clickDebounceTimer);
+                    clickDebounceTimer = setTimeout(() => {
+                        window.__inspektDirty__ = true;
+                    }, 1000);
+                }, true); // Capture phase to catch all clicks
+
+                // Also watch for SPA URL changes (pushState/replaceState)
+                const originalPushState = history.pushState;
+                history.pushState = function(...args) {
+                    originalPushState.apply(this, args);
+                    window.__inspektDirty__ = true;
+                };
+
+                const originalReplaceState = history.replaceState;
+                history.replaceState = function(...args) {
+                    originalReplaceState.apply(this, args);
+                    window.__inspektDirty__ = true;
+                };
+
+                window.addEventListener('popstate', () => {
+                    window.__inspektDirty__ = true;
+                });
+
+                console.log('[Inspekt] Persistent mode listeners installed');
+            }
+        }
 
         // Global state for popover navigation and management (must be declared early)
         const popoverState = {
@@ -265,6 +318,15 @@
             const targetViolation = popoverState.violations[targetIndex];
             if (!targetViolation) return;
 
+            // Update active badge styling (pulsing animation)
+            document.querySelectorAll('.inspekt-axe-badge--active').forEach(b =>
+                b.classList.remove('inspekt-axe-badge--active')
+            );
+            const activeBadge = document.getElementById(targetViolation.badgeId);
+            if (activeBadge) {
+                activeBadge.classList.add('inspekt-axe-badge--active');
+            }
+
             const currentIndex = popoverState.currentIndex;
             const targetPopover = document.getElementById(targetViolation.popoverId);
 
@@ -401,7 +463,7 @@
             const prevBtn = popover.querySelector('.inspekt-axe-nav__prev');
             const nextBtn = popover.querySelector('.inspekt-axe-nav__next');
             const counter = popover.querySelector('.inspekt-axe-nav__counter');
-            const skipBtn = popover.querySelector('.inspekt-axe-nav__skip-similar');
+            const skipInput = popover.querySelector('.inspekt-axe-nav__skip-input');
 
             const total = popoverState.violations.length;
             const current = popoverState.currentIndex + 1; // 1-based for display
@@ -424,17 +486,11 @@
                 nextBtn.disabled = !canGoNext;
             }
 
-            // Update skip similar button state
-            if (skipBtn) {
+            // Update skip similar switch state
+            if (skipInput) {
                 const currentViolation = popoverState.violations[popoverState.currentIndex];
                 const isSkipped = popoverState.skippedRuleIds.has(currentViolation.ruleId);
-                if (isSkipped) {
-                    skipBtn.classList.add('inspekt-axe-nav__skip-similar--active');
-                    skipBtn.setAttribute('aria-pressed', 'true');
-                } else {
-                    skipBtn.classList.remove('inspekt-axe-nav__skip-similar--active');
-                    skipBtn.setAttribute('aria-pressed', 'false');
-                }
+                skipInput.checked = isSkipped;
             }
         }
 
@@ -766,7 +822,7 @@
          * @returns {string} CSS content
          */
         function getPopoverCSS() {
-            return `@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");:root{--gray-50:#f9fafb;--gray-100:#f3f4f6;--gray-200:#e5e7eb;--gray-300:#d1d5db;--gray-400:#9ca3af;--gray-500:#6b7280;--gray-600:#4b5563;--gray-700:#374151;--gray-800:#1f2937;--gray-900:#111827;--blue:#2563eb;--blue-light:#60a5fa;--blue-bg:#eff6ff;--green:#10b981;--green-bg:#f0fdf4;--red:#dc2626;--red-bg:#fef2f2;--orange:#ea580c;--color-text:var(--gray-800);--color-text-muted:var(--gray-500);--color-text-inverse:#ffffff;--color-bg:rgba(255,255,255,0.75);--color-bg-subtle:var(--gray-50);--color-border:var(--gray-200);--color-primary:var(--blue);--impact-critical:var(--red);--impact-serious:var(--orange);--impact-moderate:var(--blue);--impact-minor:var(--gray-500);--font-sans:"Inter",-apple-system,BlinkMacSystemFont,system-ui,sans-serif;--font-mono:ui-monospace,SFMono-Regular,monospace;--text-xs:11px;--text-sm:13px;--text-base:14px;--text-lg:16px;--space-sm:4px;--space-md:8px;--space-lg:16px;--radius-sm:4px;--radius-md:8px;--radius-lg:12px;--shadow-popover:0 20px 60px rgba(0,0,0,0.12),0 8px 20px rgba(0,0,0,0.08);--shadow-badge:0 3px 6px rgba(0,0,0,0.5);--popover-max-width:480px;--popover-min-width:380px;--popover-max-height:80vh;--nav-button-size:28px;--transition-fast:0.15s ease;--transition-base:0.2s ease;--animation-duration:0.15s;--animation-distance:20px;--blur-popover:blur(20px)saturate(180%)}[popover].inspekt-axe-popover{position:absolute;margin:0;inset:unset;position-area:block-end span-inline-end;position-try-fallbacks:--bottom-left,--top-right,--top-left,flip-block,flip-inline;max-width:var(--popover-max-width);min-width:var(--popover-min-width);max-height:var(--popover-max-height);width:max-content;background:var(--color-bg);border:2px solid var(--color-border);border-radius:var(--radius-lg);box-shadow:var(--shadow-popover);backdrop-filter:var(--blur-popover);-webkit-backdrop-filter:var(--blur-popover);font-family:var(--font-sans);font-size:var(--text-lg);line-height:1.5;color:var(--color-text);padding:0;overflow:hidden;overscroll-behavior:contain;transition:opacity var(--transition-base),box-shadow var(--transition-base);&:popover-open{animation:popoverFadeIn var(--animation-duration)ease-out}}@position-try --bottom-left{position-area:block-end span-inline-start}@position-try --top-right{position-area:block-start span-inline-end}@position-try --top-left{position-area:block-start span-inline-start}[popover].inspekt-axe-popover--detached{position:fixed;position-anchor:unset;position-area:unset;position-try-fallbacks:unset;inset:unset;border-color:var(--green);box-shadow:0 25px 70px rgba(0,0,0,0.15),0 10px 25px rgba(0,0,0,0.1)}[popover].inspekt-axe-popover--dragging{cursor:grabbing !important;user-select:none;opacity:0.5 !important;box-shadow:0 30px 80px rgba(0,0,0,0.2),0 12px 30px rgba(0,0,0,0.15)!important;& *{cursor:grabbing !important;user-select:none}}.inspekt-axe-popover__body{&::-webkit-scrollbar{width:8px}&::-webkit-scrollbar-track{background:var(--gray-50)}&::-webkit-scrollbar-thumb{background:var(--gray-300);border-radius:var(--radius-sm);&:hover{background:var(--gray-400)}}}.inspekt-axe-nav{display:flex;align-items:center;justify-content:space-between;gap:var(--space-sm);min-height:40px;padding:var(--space-md)var(--space-lg);background:rgba(31,41,55,0.9);backdrop-filter:blur(10px);border-bottom:1px solid rgba(255,255,255,0.1);border-radius:var(--radius-lg)var(--radius-lg)0 0}.inspekt-axe-nav__group{display:flex;align-items:center;gap:var(--space-sm);flex-shrink:0}.inspekt-axe-nav__drag-handle{display:none}.inspekt-axe-popover--detached .inspekt-axe-nav__drag-handle{display:flex;align-items:center;gap:var(--space-sm);padding:2px var(--space-sm);border-radius:var(--radius-sm);background:rgba(255,255,255,0.05);cursor:grab}.inspekt-axe-nav__grip{display:flex;color:rgba(255,255,255,0.4)}.inspekt-axe-nav__drag-label{font-size:9px;font-weight:600;color:rgba(255,255,255,0.5);text-transform:uppercase;letter-spacing:0.5px;user-select:none}.inspekt-axe-nav__counter{min-width:36px;padding:0 2px;text-align:center;font-size:var(--text-sm);font-weight:600;font-variant-numeric:tabular-nums;color:rgba(255,255,255,0.7)}.inspekt-axe-nav__prev,.inspekt-axe-nav__next,.inspekt-axe-nav__detach,.inspekt-axe-nav__close{width:var(--nav-button-size);height:var(--nav-button-size);padding:0;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.12);border-radius:var(--radius-md);color:rgba(255,255,255,0.85);cursor:pointer;transition:all var(--transition-fast);&:hover:not(:disabled){background:rgba(255,255,255,0.15);border-color:rgba(255,255,255,0.25);color:white}&:active:not(:disabled){transform:scale(0.95)}&:focus-visible{outline:2px solid var(--blue-light);outline-offset:2px}&:disabled{opacity:0.3;cursor:not-allowed}}.inspekt-axe-nav__close{border-radius:50%;background:rgba(239,68,68,0.15);border-color:rgba(239,68,68,0.25);color:#fca5a5;&:hover{background:rgba(239,68,68,0.3);border-color:rgba(239,68,68,0.5);color:#fef2f2}}.inspekt-axe-nav__skip-similar{height:var(--nav-button-size);padding:0 var(--space-md);flex-shrink:0;white-space:nowrap;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.12);border-radius:var(--radius-md);font-size:var(--text-xs);font-weight:500;color:rgba(255,255,255,0.85);cursor:pointer;transition:all var(--transition-fast);&:hover{background:rgba(255,255,255,0.15);border-color:rgba(255,255,255,0.25);color:white}&:active{transform:scale(0.97)}&:focus-visible{outline:2px solid var(--blue-light);outline-offset:2px}}.inspekt-axe-nav__skip-similar--active{background:var(--blue);border-color:var(--blue);color:white;&:hover{background:#1d4ed8;border-color:#1d4ed8}}.inspekt-axe-nav__detach--active{background:var(--green);border-color:var(--green);color:white;&:hover{background:#059669;border-color:#059669}}.inspekt-axe-popover--detached .inspekt-axe-nav{cursor:grab}.inspekt-axe-popover--dragging .inspekt-axe-nav{cursor:grabbing !important}.inspekt-axe-popover__header{display:flex;align-items:flex-start;gap:var(--space-lg);padding:var(--space-lg);border-bottom:1px solid var(--color-border)}.inspekt-axe-popover__title{flex:1;margin:0;font-size:var(--text-base);font-weight:600;line-height:1.4;color:var(--color-text)}.inspekt-axe-popover__impact-badge{flex-shrink:0;padding:5px 11px;border-radius:var(--radius-md);font-size:var(--text-xs);font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--color-text-inverse)}.inspekt-axe-popover__impact-badge--critical{background:var(--impact-critical)}.inspekt-axe-popover__impact-badge--serious{background:var(--impact-serious)}.inspekt-axe-popover__impact-badge--moderate{background:var(--impact-moderate)}.inspekt-axe-popover__impact-badge--minor{background:var(--impact-minor)}.inspekt-axe-popover__tablist{display:flex;gap:0;padding:0 var(--space-lg);background:var(--gray-50);border-bottom:1px solid var(--color-border)}.inspekt-axe-popover__tab{position:relative;top:1px;padding:var(--space-md)var(--space-lg);background:transparent;border:none;border-bottom:2px solid transparent;font-size:var(--text-base);font-weight:500;color:var(--color-text-muted);cursor:pointer;transition:all var(--transition-base);&:hover{color:var(--gray-600);background:rgba(0,0,0,0.02)}&:focus-visible{outline:2px solid var(--color-primary);outline-offset:-2px}}.inspekt-axe-popover__tab--active{color:var(--color-primary);border-bottom-color:var(--color-primary);background:white}.inspekt-axe-popover__tabpanel[hidden]{display:none}.inspekt-axe-popover__markdown-panel{padding:0;overflow:hidden}.inspekt-axe-popover__markdown-textarea{width:100%;height:400px;max-height:calc(80vh - 200px);padding:var(--space-lg);background:white;border:none;outline:none;resize:vertical;overflow-y:auto;font-family:var(--font-mono);font-size:var(--text-sm);line-height:1.6;color:var(--color-text);&::selection{background:#bfdbfe}}.inspekt-axe-popover__body{padding:var(--space-lg);max-height:calc(80vh - 150px);overflow-y:auto}.inspekt-axe-popover__section{margin-bottom:var(--space-lg);&:last-child{margin-bottom:0}}.inspekt-axe-popover__section-label{display:block;margin-bottom:var(--space-sm);font-size:var(--text-xs);font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--color-text-muted)}.inspekt-axe-popover__section-content{font-size:var(--text-sm);line-height:1.6;color:var(--gray-600)}.inspekt-axe-popover__failure-summary{padding:var(--space-md);background:var(--red-bg);border-radius:var(--radius-md);font-size:var(--text-sm);line-height:1.6;color:#991b1b}.inspekt-axe-popover__code{padding:var(--space-md);background:var(--gray-50);border:1px solid var(--color-border);border-radius:var(--radius-md);overflow-x:auto;font-family:var(--font-mono);font-size:var(--text-sm);line-height:1.5;color:var(--color-text);white-space:pre-wrap;word-wrap:break-word}.inspekt-axe-popover__selector{padding:var(--space-sm)var(--space-md);background:var(--blue-bg);border:1px solid #bfdbfe;border-radius:var(--radius-md);overflow-x:auto;font-family:var(--font-mono);font-size:var(--text-sm);color:#1e40af;word-wrap:break-word}.inspekt-axe-popover__details{border:1px solid var(--color-border);border-radius:var(--radius-md);overflow:hidden;& summary{display:flex;align-items:center;gap:var(--space-md);padding:var(--space-md);background:var(--gray-50);list-style:none;user-select:none;cursor:pointer;font-size:var(--text-sm);font-weight:500;color:var(--gray-600);&::-webkit-details-marker{display:none}&::before{content:"\\25B6";font-size:10px;color:var(--color-text-muted);transition:transform var(--transition-base)}&:hover{background:var(--gray-100)}&:focus-visible{outline:2px solid var(--color-primary);outline-offset:-2px}}&[open] summary::before{transform:rotate(90deg)}}.inspekt-axe-popover__details-content{padding:var(--space-md);background:white}.inspekt-axe-popover__checks{margin-top:var(--space-md)}.inspekt-axe-popover__check-group{margin-bottom:var(--space-md);&:last-child{margin-bottom:0}}.inspekt-axe-popover__check-title{margin-bottom:var(--space-sm);font-size:var(--text-sm);font-weight:600;color:var(--gray-600)}.inspekt-axe-popover__check-list{list-style:none;padding:0;margin:0}.inspekt-axe-popover__check-item{margin-bottom:var(--space-sm);padding:var(--space-md);background:var(--gray-50);border-radius:var(--radius-sm);font-size:var(--text-sm)}.inspekt-axe-popover__check-item--pass{background:var(--green-bg);border-left-color:var(--green);color:#166534}.inspekt-axe-popover__check-item--fail{background:var(--red-bg);border-left-color:var(--red);color:#991b1b}.inspekt-axe-popover__check-message{display:block;margin-bottom:var(--space-sm);font-weight:500}.inspekt-axe-popover__check-data{display:block;font-size:var(--text-xs);color:var(--color-text-muted)}.inspekt-axe-popover__tags{display:flex;flex-wrap:wrap;gap:var(--space-sm);margin-top:var(--space-md)}.inspekt-axe-popover__tag{display:inline-block;padding:3px var(--space-md);background:var(--gray-100);border:1px solid var(--gray-300);border-radius:9999px;font-size:var(--text-xs);font-weight:500;color:var(--gray-600)}.inspekt-axe-popover__tag--wcag{background:var(--blue-bg);border-color:#bfdbfe;color:#1e40af}.inspekt-axe-popover__footer{padding:var(--space-lg);background:var(--gray-50);border-top:1px solid var(--color-border)}.inspekt-axe-popover__learn-more{display:inline-flex;align-items:center;gap:var(--space-sm);padding:var(--space-md)var(--space-lg);background:var(--color-primary);border-radius:var(--radius-md);text-decoration:none;font-size:var(--text-base);font-weight:500;color:var(--color-text-inverse);transition:background var(--transition-base);&:hover{background:#1d4ed8}&:focus-visible{outline:2px solid var(--color-primary);outline-offset:2px}&::after{content:"\\2192"}}button.inspekt-axe-badge{pointer-events:auto;cursor:pointer;border:2px solid white;background:inherit;transition:transform var(--transition-fast),box-shadow var(--transition-fast);&:hover{transform:scale(1.1);box-shadow:var(--shadow-badge)}&:focus-visible{outline:3px solid var(--color-primary);outline-offset:2px;transform:scale(1.1)}&:active{transform:scale(0.95)}}@keyframes popoverFadeIn{from{opacity:0;transform:scale(0.95)}to{opacity:1;transform:scale(1)}}@keyframes popoverExitUp{from{opacity:1;transform:translateY(0)}to{opacity:0;transform:translateY(calc(-1 * var(--animation-distance)))}}@keyframes popoverExitDown{from{opacity:1;transform:translateY(0)}to{opacity:0;transform:translateY(var(--animation-distance))}}@keyframes popoverExitLeft{from{opacity:1;transform:translateX(0)}to{opacity:0;transform:translateX(calc(-1 * var(--animation-distance)))}}@keyframes popoverExitRight{from{opacity:1;transform:translateX(0)}to{opacity:0;transform:translateX(var(--animation-distance))}}@keyframes popoverExitUpLeft{from{opacity:1;transform:translate(0,0)}to{opacity:0;transform:translate(calc(-1 * var(--animation-distance)),calc(-1 * var(--animation-distance)))}}@keyframes popoverExitUpRight{from{opacity:1;transform:translate(0,0)}to{opacity:0;transform:translate(var(--animation-distance),calc(-1 * var(--animation-distance)))}}@keyframes popoverExitDownLeft{from{opacity:1;transform:translate(0,0)}to{opacity:0;transform:translate(calc(-1 * var(--animation-distance)),var(--animation-distance))}}@keyframes popoverExitDownRight{from{opacity:1;transform:translate(0,0)}to{opacity:0;transform:translate(var(--animation-distance),var(--animation-distance))}}@keyframes popoverEnterFromUp{from{opacity:0;transform:translateY(calc(-1 * var(--animation-distance)))}to{opacity:1;transform:translateY(0)}}@keyframes popoverEnterFromDown{from{opacity:0;transform:translateY(var(--animation-distance))}to{opacity:1;transform:translateY(0)}}@keyframes popoverEnterFromLeft{from{opacity:0;transform:translateX(calc(-1 * var(--animation-distance)))}to{opacity:1;transform:translateX(0)}}@keyframes popoverEnterFromRight{from{opacity:0;transform:translateX(var(--animation-distance))}to{opacity:1;transform:translateX(0)}}@keyframes popoverEnterFromUpLeft{from{opacity:0;transform:translate(calc(-1 * var(--animation-distance)),calc(-1 * var(--animation-distance)))}to{opacity:1;transform:translate(0,0)}}@keyframes popoverEnterFromUpRight{from{opacity:0;transform:translate(var(--animation-distance),calc(-1 * var(--animation-distance)))}to{opacity:1;transform:translate(0,0)}}@keyframes popoverEnterFromDownLeft{from{opacity:0;transform:translate(calc(-1 * var(--animation-distance)),var(--animation-distance))}to{opacity:1;transform:translate(0,0)}}@keyframes popoverEnterFromDownRight{from{opacity:0;transform:translate(var(--animation-distance),var(--animation-distance))}to{opacity:1;transform:translate(0,0)}}[popover].inspekt-axe-popover{&.exit-up{animation:popoverExitUp var(--animation-duration)ease-out forwards}&.exit-down{animation:popoverExitDown var(--animation-duration)ease-out forwards}&.exit-left{animation:popoverExitLeft var(--animation-duration)ease-out forwards}&.exit-right{animation:popoverExitRight var(--animation-duration)ease-out forwards}&.exit-up-left{animation:popoverExitUpLeft var(--animation-duration)ease-out forwards}&.exit-up-right{animation:popoverExitUpRight var(--animation-duration)ease-out forwards}&.exit-down-left{animation:popoverExitDownLeft var(--animation-duration)ease-out forwards}&.exit-down-right{animation:popoverExitDownRight var(--animation-duration)ease-out forwards}&.enter-from-up{animation:popoverEnterFromUp var(--animation-duration)ease-out forwards}&.enter-from-down{animation:popoverEnterFromDown var(--animation-duration)ease-out forwards}&.enter-from-left{animation:popoverEnterFromLeft var(--animation-duration)ease-out forwards}&.enter-from-right{animation:popoverEnterFromRight var(--animation-duration)ease-out forwards}&.enter-from-up-left{animation:popoverEnterFromUpLeft var(--animation-duration)ease-out forwards}&.enter-from-up-right{animation:popoverEnterFromUpRight var(--animation-duration)ease-out forwards}&.enter-from-down-left{animation:popoverEnterFromDownLeft var(--animation-duration)ease-out forwards}&.enter-from-down-right{animation:popoverEnterFromDownRight var(--animation-duration)ease-out forwards}}@media(prefers-contrast:high){[popover].inspekt-axe-popover{border:2px solid currentColor}.inspekt-axe-popover__impact-badge{border:1px solid white}}@media(prefers-color-scheme:dark){:root{--color-text:var(--gray-50);--color-text-muted:var(--gray-400);--color-bg:rgba(31,41,55,0.75);--color-bg-subtle:var(--gray-900);--color-border:var(--gray-700);--green-bg:#14532d;--red-bg:#7f1d1d;--blue-bg:#1e3a5f}.inspekt-axe-popover__header{border-bottom-color:var(--gray-700)}.inspekt-axe-popover__tablist{border-bottom-color:var(--gray-700);background:rgba(17,24,39,0.5)}.inspekt-axe-popover__tab{color:var(--gray-400);&:hover{color:var(--gray-300);background:rgba(255,255,255,0.05)}}.inspekt-axe-popover__tab--active{color:var(--blue-light);border-bottom-color:var(--blue-light);background:rgba(31,41,55,0.5)}.inspekt-axe-popover__markdown-textarea{color:var(--gray-200);background:var(--gray-800)}.inspekt-axe-popover__details{& summary{background:var(--gray-900);color:var(--gray-200);&::before{color:var(--gray-400)}&:hover{background:var(--gray-800)}}}.inspekt-axe-popover__details-content{background:var(--gray-800)}.inspekt-axe-popover__check-item{background:var(--gray-900);border-left-color:var(--gray-600);color:var(--gray-300)}.inspekt-axe-popover__failure-summary{color:#fecaca}.inspekt-axe-popover__tag{background:var(--gray-700);border-color:var(--gray-600);color:var(--gray-300)}.inspekt-axe-popover__tag--wcag{background:var(--blue-bg);border-color:var(--blue);color:#93c5fd}.inspekt-axe-popover__selector{background:var(--blue-bg);border-color:var(--blue);color:#93c5fd}.inspekt-axe-popover__footer{border-top-color:var(--gray-700);background:rgba(17,24,39,0.5)}.inspekt-axe-popover__body{&::-webkit-scrollbar-track{background:var(--gray-900)}&::-webkit-scrollbar-thumb{background:var(--gray-600);&:hover{background:var(--gray-500)}}}.inspekt-axe-nav{background:rgba(17,24,39,0.85);border-bottom-color:rgba(17,24,39,0.3)}.inspekt-axe-nav__prev,.inspekt-axe-nav__next,.inspekt-axe-nav__detach{background:var(--gray-800);border-color:var(--gray-600);color:var(--gray-300);&:hover:not(:disabled){background:var(--gray-700);border-color:var(--gray-500)}}.inspekt-axe-nav__skip-similar{background:var(--gray-800);border-color:var(--gray-600);color:var(--gray-300);&:hover{background:var(--gray-700);border-color:var(--gray-500)}}.inspekt-axe-nav__skip-similar--active{background:var(--blue);border-color:var(--blue);color:white}.inspekt-axe-nav__close{background:var(--gray-800);border-color:var(--gray-600);color:var(--gray-300);&:hover{background:#7f1d1d;border-color:var(--red);color:#fecaca}}.inspekt-axe-nav__counter{color:var(--gray-400)}}`;
+            return `@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");:root{--gray-50:#f9fafb;--gray-100:#f3f4f6;--gray-200:#e5e7eb;--gray-300:#d1d5db;--gray-400:#9ca3af;--gray-500:#6b7280;--gray-600:#4b5563;--gray-700:#374151;--gray-800:#1f2937;--gray-900:#111827;--blue:#2563eb;--blue-light:#60a5fa;--blue-bg:#eff6ff;--green:#10b981;--green-bg:#f0fdf4;--red:#dc2626;--red-bg:#fef2f2;--orange:#ea580c;--color-text:var(--gray-800);--color-text-muted:var(--gray-500);--color-text-inverse:#ffffff;--color-bg:rgba(255,255,255,0.75);--color-bg-subtle:var(--gray-50);--color-border:var(--gray-200);--color-primary:var(--blue);--impact-critical:var(--red);--impact-serious:var(--orange);--impact-moderate:var(--blue);--impact-minor:var(--gray-500);--font-sans:"Inter",-apple-system,BlinkMacSystemFont,system-ui,sans-serif;--font-mono:ui-monospace,SFMono-Regular,monospace;--text-xs:11px;--text-sm:13px;--text-base:14px;--text-lg:16px;--space-sm:4px;--space-md:8px;--space-lg:16px;--radius-sm:4px;--radius-md:8px;--radius-lg:12px;--shadow-popover:0 20px 60px rgba(0,0,0,0.12),0 8px 20px rgba(0,0,0,0.08);--shadow-badge:0 3px 6px rgba(0,0,0,0.5);--popover-max-width:480px;--popover-min-width:380px;--popover-max-height:80vh;--nav-button-size:28px;--transition-fast:0.15s ease;--transition-base:0.2s ease;--animation-duration:0.15s;--animation-distance:20px;--blur-popover:blur(20px)saturate(180%)}.visually-hidden{opacity:0 !important;clip-path:inset(100%);clip:rect(1px,1px,1px,1px);height:1px;overflow:hidden;position:absolute;white-space:nowrap;width:1px}[popover].inspekt-axe-popover{position:absolute;margin:0;inset:unset;position-area:block-end span-inline-end;position-try-fallbacks:--bottom-left,--top-right,--top-left,flip-block,flip-inline;max-width:var(--popover-max-width);min-width:var(--popover-min-width);max-height:var(--popover-max-height);width:max-content;background:var(--color-bg);border:2px solid var(--color-border);border-radius:var(--radius-lg);box-shadow:var(--shadow-popover);backdrop-filter:var(--blur-popover);-webkit-backdrop-filter:var(--blur-popover);font-family:var(--font-sans);font-size:var(--text-lg);line-height:1.5;color:var(--color-text);padding:0;overflow:hidden;overscroll-behavior:contain;transition:opacity var(--transition-base),box-shadow var(--transition-base);&:popover-open{animation:popoverFadeIn var(--animation-duration)ease-out}}@position-try --bottom-left{position-area:block-end span-inline-start}@position-try --top-right{position-area:block-start span-inline-end}@position-try --top-left{position-area:block-start span-inline-start}[popover].inspekt-axe-popover--detached{position:fixed;position-anchor:unset;position-area:unset;position-try-fallbacks:unset;inset:unset;border-color:var(--green);box-shadow:0 25px 70px rgba(0,0,0,0.15),0 10px 25px rgba(0,0,0,0.1)}[popover].inspekt-axe-popover--dragging{cursor:grabbing !important;user-select:none;opacity:0.5 !important;box-shadow:0 30px 80px rgba(0,0,0,0.2),0 12px 30px rgba(0,0,0,0.15)!important;& *{cursor:grabbing !important;user-select:none}}.inspekt-axe-popover__body{&::-webkit-scrollbar{width:8px}&::-webkit-scrollbar-track{background:var(--gray-50)}&::-webkit-scrollbar-thumb{background:var(--gray-300);border-radius:var(--radius-sm);&:hover{background:var(--gray-400)}}}.inspekt-axe-nav{display:flex;align-items:center;justify-content:space-between;gap:var(--space-sm);min-height:40px;padding:var(--space-md)var(--space-lg);background:rgba(31,41,55,0.9);backdrop-filter:blur(10px);border-bottom:1px solid rgba(255,255,255,0.1);border-radius:var(--radius-lg)var(--radius-lg)0 0}.inspekt-axe-nav__group{display:flex;align-items:center;gap:var(--space-sm);flex-shrink:0}.inspekt-axe-nav__drag-handle{display:none}.inspekt-axe-popover--detached .inspekt-axe-nav__drag-handle{display:flex;align-items:center;gap:var(--space-sm);padding:2px var(--space-sm);border-radius:var(--radius-sm);background:rgba(255,255,255,0.05);cursor:grab}.inspekt-axe-nav__grip{display:flex;color:rgba(255,255,255,0.4)}.inspekt-axe-nav__drag-label{font-size:9px;font-weight:600;color:rgba(255,255,255,0.5);text-transform:uppercase;letter-spacing:0.5px;user-select:none}.inspekt-axe-nav__counter{min-width:36px;padding:0 2px;text-align:center;font-size:var(--text-sm);font-weight:600;font-variant-numeric:tabular-nums;color:rgba(255,255,255,0.7)}.inspekt-axe-nav__prev,.inspekt-axe-nav__next,.inspekt-axe-nav__detach,.inspekt-axe-nav__close{width:var(--nav-button-size);height:var(--nav-button-size);padding:0;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.12);border-radius:var(--radius-md);color:rgba(255,255,255,0.85);cursor:pointer;transition:all var(--transition-fast);&:hover:not(:disabled){background:rgba(255,255,255,0.15);border-color:rgba(255,255,255,0.25);color:white}&:active:not(:disabled){transform:scale(0.95)}&:focus-visible{outline:2px solid var(--blue-light);outline-offset:2px}&:disabled{opacity:0.3;cursor:not-allowed}}.inspekt-axe-nav__close{border-radius:50%;background:rgba(239,68,68,0.15);border-color:rgba(239,68,68,0.25);color:#fca5a5;&:hover{background:rgba(239,68,68,0.3);border-color:rgba(239,68,68,0.5);color:#fef2f2}}.inspekt-axe-nav__skip-similar{height:var(--nav-button-size);padding:0 var(--space-md);flex-shrink:0;white-space:nowrap;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.12);border-radius:var(--radius-md);font-size:var(--text-xs);font-weight:500;color:rgba(255,255,255,0.85);cursor:pointer;transition:all var(--transition-fast);&:hover{background:rgba(255,255,255,0.15);border-color:rgba(255,255,255,0.25);color:white}&:active{transform:scale(0.97)}&:focus-visible{outline:2px solid var(--blue-light);outline-offset:2px}}.inspekt-axe-nav__skip-similar--active{background:var(--blue);border-color:var(--blue);color:white;&:hover{background:#1d4ed8;border-color:#1d4ed8}}.inspekt-axe-nav__detach--active{background:var(--green);border-color:var(--green);color:white;&:hover{background:#059669;border-color:#059669}}.inspekt-axe-popover--detached .inspekt-axe-nav{cursor:grab}.inspekt-axe-popover--dragging .inspekt-axe-nav{cursor:grabbing !important}.inspekt-axe-popover__header{display:flex;align-items:flex-start;gap:var(--space-lg);padding:var(--space-lg);border-bottom:1px solid var(--color-border)}.inspekt-axe-popover__title{flex:1;margin:0;font-size:var(--text-base);font-weight:600;line-height:1.4;color:var(--color-text)}.inspekt-axe-popover__impact-badge{flex-shrink:0;padding:5px 11px;border-radius:var(--radius-md);font-size:var(--text-xs);font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--color-text-inverse)}.inspekt-axe-popover__impact-badge--critical{background:var(--impact-critical)}.inspekt-axe-popover__impact-badge--serious{background:var(--impact-serious)}.inspekt-axe-popover__impact-badge--moderate{background:var(--impact-moderate)}.inspekt-axe-popover__impact-badge--minor{background:var(--impact-minor)}.inspekt-axe-popover__tablist{display:flex;gap:0;padding:0 var(--space-lg);background:var(--gray-50);border-bottom:1px solid var(--color-border)}.inspekt-axe-popover__tab{position:relative;top:1px;padding:var(--space-md)var(--space-lg);background:transparent;border:none;border-bottom:2px solid transparent;font-size:var(--text-base);font-weight:500;color:var(--color-text-muted);cursor:pointer;transition:all var(--transition-base);&:hover{color:var(--gray-600);background:rgba(0,0,0,0.02)}&:focus-visible{outline:2px solid var(--color-primary);outline-offset:-2px}}.inspekt-axe-popover__tab--active{color:var(--color-primary);border-bottom-color:var(--color-primary);background:white}.inspekt-axe-popover__tabpanel[hidden]{display:none}.inspekt-axe-popover__markdown-panel{padding:0;overflow:hidden}.inspekt-axe-popover__markdown-textarea{width:100%;height:400px;max-height:calc(80vh - 200px);padding:var(--space-lg);background:white;border:none;outline:none;resize:vertical;overflow-y:auto;font-family:var(--font-mono);font-size:var(--text-sm);line-height:1.6;color:var(--color-text);&::selection{background:#bfdbfe}}.inspekt-axe-popover__body{padding:var(--space-lg);max-height:calc(80vh - 150px);overflow-y:auto}.inspekt-axe-popover__section{margin-bottom:var(--space-lg);&:last-child{margin-bottom:0}}.inspekt-axe-popover__section-label{display:block;margin-bottom:var(--space-sm);font-size:var(--text-xs);font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--color-text-muted)}.inspekt-axe-popover__section-content{font-size:var(--text-sm);line-height:1.6;color:var(--gray-600)}.inspekt-axe-popover__failure-summary{padding:var(--space-md);background:var(--red-bg);border-radius:var(--radius-md);font-size:var(--text-sm);line-height:1.6;color:#991b1b}.inspekt-axe-popover__code{padding:var(--space-md);background:var(--gray-50);border:1px solid var(--color-border);border-radius:var(--radius-md);overflow-x:auto;font-family:var(--font-mono);font-size:var(--text-sm);line-height:1.5;color:var(--color-text);white-space:pre-wrap;word-wrap:break-word}.inspekt-axe-popover__selector{padding:var(--space-sm)var(--space-md);background:var(--blue-bg);border:1px solid #bfdbfe;border-radius:var(--radius-md);overflow-x:auto;font-family:var(--font-mono);font-size:var(--text-sm);color:#1e40af;word-wrap:break-word}.inspekt-axe-popover__details{border:1px solid var(--color-border);border-radius:var(--radius-md);overflow:hidden;& summary{display:flex;align-items:center;gap:var(--space-md);padding:var(--space-md);background:var(--gray-50);list-style:none;user-select:none;cursor:pointer;font-size:var(--text-sm);font-weight:500;color:var(--gray-600);&::-webkit-details-marker{display:none}&::before{content:"\\25B6";font-size:10px;color:var(--color-text-muted);transition:transform var(--transition-base)}&:hover{background:var(--gray-100)}&:focus-visible{outline:2px solid var(--color-primary);outline-offset:-2px}}&[open] summary::before{transform:rotate(90deg)}}.inspekt-axe-popover__details-content{padding:var(--space-md);background:white}.inspekt-axe-popover__checks{margin-top:var(--space-md)}.inspekt-axe-popover__check-group{margin-bottom:var(--space-md);&:last-child{margin-bottom:0}}.inspekt-axe-popover__check-title{margin-bottom:var(--space-sm);font-size:var(--text-sm);font-weight:600;color:var(--gray-600)}.inspekt-axe-popover__check-list{list-style:none;padding:0;margin:0}.inspekt-axe-popover__check-item{margin-bottom:var(--space-sm);padding:var(--space-md);background:var(--gray-50);border-radius:var(--radius-sm);font-size:var(--text-sm)}.inspekt-axe-popover__check-item--pass{background:var(--green-bg);border-left-color:var(--green);color:#166534}.inspekt-axe-popover__check-item--fail{background:var(--red-bg);border-left-color:var(--red);color:#991b1b}.inspekt-axe-popover__check-message{display:block;margin-bottom:var(--space-sm);font-weight:500}.inspekt-axe-popover__check-data{display:block;font-size:var(--text-xs);color:var(--color-text-muted)}.inspekt-axe-popover__tags{display:flex;flex-wrap:wrap;gap:var(--space-sm);margin-top:var(--space-md)}.inspekt-axe-popover__tag{display:inline-block;padding:3px var(--space-md);background:var(--gray-100);border:1px solid var(--gray-300);border-radius:9999px;font-size:var(--text-xs);font-weight:500;color:var(--gray-600)}.inspekt-axe-popover__tag--wcag{background:var(--blue-bg);border-color:#bfdbfe;color:#1e40af}.inspekt-axe-popover__footer{padding:var(--space-lg);background:var(--gray-50);border-top:1px solid var(--color-border)}.inspekt-axe-popover__learn-more{display:inline-flex;align-items:center;gap:var(--space-sm);padding:var(--space-md)var(--space-lg);background:var(--color-primary);border-radius:var(--radius-md);text-decoration:none;font-size:var(--text-base);font-weight:500;color:var(--color-text-inverse);transition:background var(--transition-base);&:hover{background:#1d4ed8}&:focus-visible{outline:2px solid var(--color-primary);outline-offset:2px}&::after{content:"\\2192"}}button.inspekt-axe-badge{pointer-events:auto;cursor:pointer;border:2px solid white;background:inherit;transition:transform var(--transition-fast),box-shadow var(--transition-fast);&:hover{transform:scale(1.1);box-shadow:var(--shadow-badge)}&:focus-visible{outline:3px solid var(--color-primary);outline-offset:2px;transform:scale(1.1)}&:active{transform:scale(0.95)}}@keyframes popoverFadeIn{from{opacity:0;transform:scale(0.95)}to{opacity:1;transform:scale(1)}}@keyframes popoverExitUp{from{opacity:1;transform:translateY(0)}to{opacity:0;transform:translateY(calc(-1 * var(--animation-distance)))}}@keyframes popoverExitDown{from{opacity:1;transform:translateY(0)}to{opacity:0;transform:translateY(var(--animation-distance))}}@keyframes popoverExitLeft{from{opacity:1;transform:translateX(0)}to{opacity:0;transform:translateX(calc(-1 * var(--animation-distance)))}}@keyframes popoverExitRight{from{opacity:1;transform:translateX(0)}to{opacity:0;transform:translateX(var(--animation-distance))}}@keyframes popoverExitUpLeft{from{opacity:1;transform:translate(0,0)}to{opacity:0;transform:translate(calc(-1 * var(--animation-distance)),calc(-1 * var(--animation-distance)))}}@keyframes popoverExitUpRight{from{opacity:1;transform:translate(0,0)}to{opacity:0;transform:translate(var(--animation-distance),calc(-1 * var(--animation-distance)))}}@keyframes popoverExitDownLeft{from{opacity:1;transform:translate(0,0)}to{opacity:0;transform:translate(calc(-1 * var(--animation-distance)),var(--animation-distance))}}@keyframes popoverExitDownRight{from{opacity:1;transform:translate(0,0)}to{opacity:0;transform:translate(var(--animation-distance),var(--animation-distance))}}@keyframes popoverEnterFromUp{from{opacity:0;transform:translateY(calc(-1 * var(--animation-distance)))}to{opacity:1;transform:translateY(0)}}@keyframes popoverEnterFromDown{from{opacity:0;transform:translateY(var(--animation-distance))}to{opacity:1;transform:translateY(0)}}@keyframes popoverEnterFromLeft{from{opacity:0;transform:translateX(calc(-1 * var(--animation-distance)))}to{opacity:1;transform:translateX(0)}}@keyframes popoverEnterFromRight{from{opacity:0;transform:translateX(var(--animation-distance))}to{opacity:1;transform:translateX(0)}}@keyframes popoverEnterFromUpLeft{from{opacity:0;transform:translate(calc(-1 * var(--animation-distance)),calc(-1 * var(--animation-distance)))}to{opacity:1;transform:translate(0,0)}}@keyframes popoverEnterFromUpRight{from{opacity:0;transform:translate(var(--animation-distance),calc(-1 * var(--animation-distance)))}to{opacity:1;transform:translate(0,0)}}@keyframes popoverEnterFromDownLeft{from{opacity:0;transform:translate(calc(-1 * var(--animation-distance)),var(--animation-distance))}to{opacity:1;transform:translate(0,0)}}@keyframes popoverEnterFromDownRight{from{opacity:0;transform:translate(var(--animation-distance),var(--animation-distance))}to{opacity:1;transform:translate(0,0)}}[popover].inspekt-axe-popover{&.exit-up{animation:popoverExitUp var(--animation-duration)ease-out forwards}&.exit-down{animation:popoverExitDown var(--animation-duration)ease-out forwards}&.exit-left{animation:popoverExitLeft var(--animation-duration)ease-out forwards}&.exit-right{animation:popoverExitRight var(--animation-duration)ease-out forwards}&.exit-up-left{animation:popoverExitUpLeft var(--animation-duration)ease-out forwards}&.exit-up-right{animation:popoverExitUpRight var(--animation-duration)ease-out forwards}&.exit-down-left{animation:popoverExitDownLeft var(--animation-duration)ease-out forwards}&.exit-down-right{animation:popoverExitDownRight var(--animation-duration)ease-out forwards}&.enter-from-up{animation:popoverEnterFromUp var(--animation-duration)ease-out forwards}&.enter-from-down{animation:popoverEnterFromDown var(--animation-duration)ease-out forwards}&.enter-from-left{animation:popoverEnterFromLeft var(--animation-duration)ease-out forwards}&.enter-from-right{animation:popoverEnterFromRight var(--animation-duration)ease-out forwards}&.enter-from-up-left{animation:popoverEnterFromUpLeft var(--animation-duration)ease-out forwards}&.enter-from-up-right{animation:popoverEnterFromUpRight var(--animation-duration)ease-out forwards}&.enter-from-down-left{animation:popoverEnterFromDownLeft var(--animation-duration)ease-out forwards}&.enter-from-down-right{animation:popoverEnterFromDownRight var(--animation-duration)ease-out forwards}}@media(prefers-contrast:high){[popover].inspekt-axe-popover{border:2px solid currentColor}.inspekt-axe-popover__impact-badge{border:1px solid white}}@media(prefers-color-scheme:dark){:root{--color-text:var(--gray-50);--color-text-muted:var(--gray-400);--color-bg:rgba(31,41,55,0.75);--color-bg-subtle:var(--gray-900);--color-border:var(--gray-700);--green-bg:#14532d;--red-bg:#7f1d1d;--blue-bg:#1e3a5f}.inspekt-axe-popover__header{border-bottom-color:var(--gray-700)}.inspekt-axe-popover__tablist{border-bottom-color:var(--gray-700);background:rgba(17,24,39,0.5)}.inspekt-axe-popover__tab{color:var(--gray-400);&:hover{color:var(--gray-300);background:rgba(255,255,255,0.05)}}.inspekt-axe-popover__tab--active{color:var(--blue-light);border-bottom-color:var(--blue-light);background:rgba(31,41,55,0.5)}.inspekt-axe-popover__markdown-textarea{color:var(--gray-200);background:var(--gray-800)}.inspekt-axe-popover__details{& summary{background:var(--gray-900);color:var(--gray-200);&::before{color:var(--gray-400)}&:hover{background:var(--gray-800)}}}.inspekt-axe-popover__details-content{background:var(--gray-800)}.inspekt-axe-popover__check-item{background:var(--gray-900);border-left-color:var(--gray-600);color:var(--gray-300)}.inspekt-axe-popover__failure-summary{color:#fecaca}.inspekt-axe-popover__tag{background:var(--gray-700);border-color:var(--gray-600);color:var(--gray-300)}.inspekt-axe-popover__tag--wcag{background:var(--blue-bg);border-color:var(--blue);color:#93c5fd}.inspekt-axe-popover__selector{background:var(--blue-bg);border-color:var(--blue);color:#93c5fd}.inspekt-axe-popover__footer{border-top-color:var(--gray-700);background:rgba(17,24,39,0.5)}.inspekt-axe-popover__body{&::-webkit-scrollbar-track{background:var(--gray-900)}&::-webkit-scrollbar-thumb{background:var(--gray-600);&:hover{background:var(--gray-500)}}}.inspekt-axe-nav{background:rgba(17,24,39,0.85);border-bottom-color:rgba(17,24,39,0.3)}.inspekt-axe-nav__prev,.inspekt-axe-nav__next,.inspekt-axe-nav__detach{background:var(--gray-800);border-color:var(--gray-600);color:var(--gray-300);&:hover:not(:disabled){background:var(--gray-700);border-color:var(--gray-500)}}.inspekt-axe-nav__skip-similar{background:var(--gray-800);border-color:var(--gray-600);color:var(--gray-300);&:hover{background:var(--gray-700);border-color:var(--gray-500)}}.inspekt-axe-nav__skip-similar--active{background:var(--blue);border-color:var(--blue);color:white}.inspekt-axe-nav__close{background:var(--gray-800);border-color:var(--gray-600);color:var(--gray-300);&:hover{background:#7f1d1d;border-color:var(--red);color:#fecaca}}.inspekt-axe-nav__counter{color:var(--gray-400)}}`;
         }
 
         /**
@@ -819,9 +875,11 @@
                         </button>
                     </div>
                     <div class="inspekt-axe-nav__group inspekt-axe-nav__group--right">
-                        <button class="inspekt-axe-nav__skip-similar" type="button" aria-pressed="false" title="Skip similar violations">
-                            Skip similar
-                        </button>
+                        <label class="inspekt-axe-nav__skip-switch">
+                            <input type="checkbox" class="inspekt-axe-nav__skip-input" title="Skip similar violations">
+                            <span class="inspekt-axe-nav__skip-slider"></span>
+                            <span class="inspekt-axe-nav__skip-label">Skip similar</span>
+                        </label>
                         <button class="inspekt-axe-nav__detach" type="button" aria-pressed="false" title="Detach popover">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                                 <path d="M19 19H5V5h7V3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"/>
@@ -841,12 +899,12 @@
                 <div role="tablist" aria-label="Violation details" class="inspekt-axe-popover__tablist">
                     <button role="tab"
                             aria-selected="true"
-                            aria-controls="panel-default-${badgeNumber}"
-                            id="tab-default-${badgeNumber}"
+                            aria-controls="panel-details-${badgeNumber}"
+                            id="tab-details-${badgeNumber}"
                             class="inspekt-axe-popover__tab inspekt-axe-popover__tab--active"
                             tabindex="0"
                             type="button">
-                        Default
+                        Details
                     </button>
                     <button role="tab"
                             aria-selected="false"
@@ -859,8 +917,8 @@
                     </button>
                 </div>
                 <div role="tabpanel"
-                     id="panel-default-${badgeNumber}"
-                     aria-labelledby="tab-default-${badgeNumber}"
+                     id="panel-details-${badgeNumber}"
+                     aria-labelledby="tab-details-${badgeNumber}"
                      class="inspekt-axe-popover__tabpanel inspekt-axe-popover__body">
             `;
 
@@ -976,22 +1034,45 @@
                      aria-labelledby="tab-markdown-${badgeNumber}"
                      class="inspekt-axe-popover__tabpanel inspekt-axe-popover__markdown-panel"
                      hidden>
+                    <div class="inspekt-axe-popover__markdown-header">
+                        <button class="inspekt-axe-popover__copy-btn" type="button" title="Copy markdown to clipboard">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                            </svg>
+                            Copy
+                        </button>
+                    </div>
                     <textarea class="inspekt-axe-popover__markdown-textarea"
                               aria-label="Markdown formatted violation details (editable)"
                               spellcheck="false">${escapeHtml(markdownContent)}</textarea>
                 </div>
             `;
 
-            // Footer with Learn More link
+            // Footer with Reveal in DevTools and Learn More buttons
+            content += `
+                <div class="inspekt-axe-popover__footer">
+                    <button class="inspekt-axe-popover__reveal-btn" type="button" title="Reveal element in DevTools Elements panel">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                            <rect x="3" y="3" width="18" height="18" rx="2"/>
+                            <path d="M9 9l6 6M15 9l-6 6"/>
+                        </svg>
+                        Reveal in DevTools
+                    </button>
+            `;
             if (violation.helpUrl) {
                 content += `
-                    <div class="inspekt-axe-popover__footer">
-                        <a href="${escapeHtml(violation.helpUrl)}" target="_blank" rel="noopener noreferrer" class="inspekt-axe-popover__learn-more">
-                            Learn more at Deque University
-                        </a>
-                    </div>
+                    <a href="${escapeHtml(violation.helpUrl)}" target="_blank" rel="noopener noreferrer" class="inspekt-axe-popover__learn-more">
+                        Learn more at Deque University
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+                            <polyline points="15 3 21 3 21 9"/>
+                            <line x1="10" y1="14" x2="21" y2="3"/>
+                        </svg>
+                    </a>
                 `;
             }
+            content += `</div>`;
 
             popover.innerHTML = content;
 
@@ -999,7 +1080,7 @@
             const prevBtn = popover.querySelector('.inspekt-axe-nav__prev');
             const nextBtn = popover.querySelector('.inspekt-axe-nav__next');
             const closeBtn = popover.querySelector('.inspekt-axe-nav__close');
-            const skipBtn = popover.querySelector('.inspekt-axe-nav__skip-similar');
+            const skipInput = popover.querySelector('.inspekt-axe-nav__skip-input');
             const detachBtn = popover.querySelector('.inspekt-axe-nav__detach');
 
             if (prevBtn) {
@@ -1026,9 +1107,9 @@
                 });
             }
 
-            if (skipBtn) {
-                skipBtn.addEventListener('click', () => {
-                    const isNowSkipped = toggleSkipSimilar();
+            if (skipInput) {
+                skipInput.addEventListener('change', () => {
+                    toggleSkipSimilar();
                     updateBadgeDimming();
                     updateNavigationControls(popover);
                 });
@@ -1037,6 +1118,23 @@
             if (detachBtn) {
                 detachBtn.addEventListener('click', () => {
                     toggleDetach(popover);
+                });
+            }
+
+            // Reveal in DevTools button
+            const revealBtn = popover.querySelector('.inspekt-axe-popover__reveal-btn');
+            if (revealBtn) {
+                revealBtn.addEventListener('click', () => {
+                    // Get the element reference from popoverState
+                    const violation = popoverState.violations[popoverState.currentIndex];
+                    if (violation && violation.element) {
+                        // Chrome DevTools inspect() function - reveals element in Elements panel
+                        if (typeof inspect === 'function') {
+                            inspect(violation.element);
+                        } else {
+                            console.log('[Inspekt] inspect() not available - open DevTools first');
+                        }
+                    }
                 });
             }
 
@@ -1099,6 +1197,34 @@
                 });
             });
 
+            // Copy button functionality
+            const copyBtn = popover.querySelector('.inspekt-axe-popover__copy-btn');
+            if (copyBtn) {
+                copyBtn.addEventListener('click', async () => {
+                    const textarea = popover.querySelector('.inspekt-axe-popover__markdown-textarea');
+                    if (textarea) {
+                        try {
+                            await navigator.clipboard.writeText(textarea.value);
+                            // Visual feedback
+                            copyBtn.classList.add('inspekt-axe-popover__copy-btn--copied');
+                            const originalHTML = copyBtn.innerHTML;
+                            copyBtn.innerHTML = `
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                    <polyline points="20 6 9 17 4 12"/>
+                                </svg>
+                                Copied!
+                            `;
+                            setTimeout(() => {
+                                copyBtn.classList.remove('inspekt-axe-popover__copy-btn--copied');
+                                copyBtn.innerHTML = originalHTML;
+                            }, 2000);
+                        } catch (err) {
+                            console.error('[Inspekt] Failed to copy:', err);
+                        }
+                    }
+                });
+            }
+
             // Handle popover toggle event to update state
             popover.addEventListener('toggle', (e) => {
                 if (e.newState === 'open') {
@@ -1143,6 +1269,15 @@
         }
 
         /**
+         * Generate unique key for a violation (ruleId + selector)
+         * Used to track seen violations in persistent mode
+         */
+        function getViolationKey(ruleId, target) {
+            const selector = Array.isArray(target) ? target.join(' > ') : target;
+            return `${ruleId}::${selector}`;
+        }
+
+        /**
          * Inject numbered badges on page elements with violations.
          * Uses direct DOM element references from axe-core results.
          *
@@ -1151,24 +1286,35 @@
          * @returns {Object} Badge injection statistics
          */
         async function injectBadgesWithElementRefs(violations, interactive = false) {
-            // Remove existing badges, popovers, and styles from previous runs
-            document.querySelectorAll('[data-inspekt-axe-badge]').forEach(el => el.remove());
-            document.querySelectorAll('[data-inspekt-axe-popover]').forEach(el => el.remove());
-            const oldStyles = document.getElementById('inspekt-axe-badge-styles');
-            if (oldStyles) oldStyles.remove();
-            const oldPopoverStyles = document.getElementById('inspekt-axe-popover-styles');
-            if (oldPopoverStyles) oldPopoverStyles.remove();
+            // In persistent mode, keep existing badges and only add new ones
+            // In non-persistent mode, remove everything from previous runs
+            if (!isPersistent) {
+                document.querySelectorAll('[data-inspekt-axe-badge]').forEach(el => el.remove());
+                document.querySelectorAll('[data-inspekt-axe-popover]').forEach(el => el.remove());
+                const oldStyles = document.getElementById('inspekt-axe-badge-styles');
+                if (oldStyles) oldStyles.remove();
+                const oldPopoverStyles = document.getElementById('inspekt-axe-popover-styles');
+                if (oldPopoverStyles) oldPopoverStyles.remove();
+                const oldAdditionalStyles = document.getElementById('inspekt-axe-popover-additional-styles');
+                if (oldAdditionalStyles) oldAdditionalStyles.remove();
 
-            // Stop CSS hot-reload if running from previous session
-            if (window.__inspektCSSHotReloader) {
-                window.__inspektCSSHotReloader.stop();
-                delete window.__inspektCSSHotReloader;
+                // Stop CSS hot-reload if running from previous session
+                if (window.__inspektCSSHotReloader) {
+                    window.__inspektCSSHotReloader.stop();
+                    delete window.__inspektCSSHotReloader;
+                }
             }
 
-            // Inject CSS for badges
-            const styleEl = document.createElement('style');
-            styleEl.id = 'inspekt-axe-badge-styles';
-            styleEl.textContent = `
+            // Inject CSS for badges (skip if already exists in persistent mode)
+            const existingBadgeStyles = document.getElementById('inspekt-axe-badge-styles');
+            const shouldInjectBadgeStyles = !(existingBadgeStyles && isPersistent);
+
+            if (shouldInjectBadgeStyles) {
+                if (existingBadgeStyles) existingBadgeStyles.remove();
+
+                const styleEl = document.createElement('style');
+                styleEl.id = 'inspekt-axe-badge-styles';
+                styleEl.textContent = `
                 .inspekt-axe-badge {
                     /* Reset all inherited styles first */
                     all: initial;
@@ -1280,61 +1426,262 @@
                     transform: none;
                     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
                 }
-            `;
-            document.head.appendChild(styleEl);
 
-            // Inject popover CSS if in interactive mode
-            if (interactive) {
-                if (devCss) {
-                    // Dev mode: load CSS from local server for live editing
-                    // Start server with: npm run dev:axe-css
-                    const cssUrl = 'http://localhost:8000/axe-popover/index.css';
-                    const linkEl = document.createElement('link');
-                    linkEl.id = 'inspekt-axe-popover-styles';
-                    linkEl.rel = 'stylesheet';
-                    linkEl.href = cssUrl;
-                    document.head.appendChild(linkEl);
-
-                    // Start CSS hot-reload polling
-                    const hotReloader = new CSSHotReloader(cssUrl);
-                    hotReloader.start(linkEl);
-
-                    // Store reference for cleanup
-                    window.__inspektCSSHotReloader = hotReloader;
-
-                    console.log('%c[Inspekt Dev Mode]%c CSS loaded from ' + cssUrl,
-                        'color: #10b981; font-weight: bold', 'color: inherit');
-                    console.log('%c[Inspekt Dev Mode]%c Start server: npm run dev:axe-css',
-                        'color: #10b981; font-weight: bold', 'color: inherit');
-                    console.log('%c[Inspekt Dev Mode]%c Hot-reload enabled - save CSS to see changes automatically',
-                        'color: #10b981; font-weight: bold', 'color: inherit');
-                } else {
-                    // Production mode: embed CSS inline
-                    const popoverStyleEl = document.createElement('style');
-                    popoverStyleEl.id = 'inspekt-axe-popover-styles';
-                    popoverStyleEl.textContent = getPopoverCSS();
-                    document.head.appendChild(popoverStyleEl);
+                /* Pulsing animation for active badge */
+                @keyframes inspekt-pulse {
+                    0% { box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.7), 0 2px 4px rgba(0, 0, 0, 0.4); }
+                    70% { box-shadow: 0 0 0 12px rgba(37, 99, 235, 0), 0 2px 4px rgba(0, 0, 0, 0.4); }
+                    100% { box-shadow: 0 0 0 0 rgba(37, 99, 235, 0), 0 2px 4px rgba(0, 0, 0, 0.4); }
                 }
+
+                button.inspekt-axe-badge--active {
+                    animation: inspekt-pulse 1.5s infinite !important;
+                }
+            `;
+                document.head.appendChild(styleEl);
+            } // End of shouldInjectBadgeStyles
+
+            // Inject popover CSS if in interactive mode (skip if already exists in persistent mode)
+            if (interactive) {
+                const existingPopoverStyles = document.getElementById('inspekt-axe-popover-styles');
+                const shouldInjectPopoverStyles = !(existingPopoverStyles && isPersistent);
+
+                if (shouldInjectPopoverStyles) {
+                    if (devCss) {
+                        // Dev mode: load CSS from local server for live editing
+                        // Start server with: npm run dev:axe-css
+                        const cssUrl = 'http://localhost:8000/axe-popover/index.css';
+                        const linkEl = document.createElement('link');
+                        linkEl.id = 'inspekt-axe-popover-styles';
+                        linkEl.rel = 'stylesheet';
+                        linkEl.href = cssUrl;
+                        document.head.appendChild(linkEl);
+
+                        // Start CSS hot-reload polling
+                        const hotReloader = new CSSHotReloader(cssUrl);
+                        hotReloader.start(linkEl);
+
+                        // Store reference for cleanup
+                        window.__inspektCSSHotReloader = hotReloader;
+
+                        console.log('%c[Inspekt Dev Mode]%c CSS loaded from ' + cssUrl,
+                            'color: #10b981; font-weight: bold', 'color: inherit');
+                        console.log('%c[Inspekt Dev Mode]%c Start server: npm run dev:axe-css',
+                            'color: #10b981; font-weight: bold', 'color: inherit');
+                        console.log('%c[Inspekt Dev Mode]%c Hot-reload enabled - save CSS to see changes automatically',
+                            'color: #10b981; font-weight: bold', 'color: inherit');
+                    } else {
+                        // Production mode: embed CSS inline
+                        const popoverStyleEl = document.createElement('style');
+                        popoverStyleEl.id = 'inspekt-axe-popover-styles';
+                        popoverStyleEl.textContent = getPopoverCSS();
+                        document.head.appendChild(popoverStyleEl);
+                    }
+                }
+
+                // Additional styles for new UI elements (skip if already exists in persistent mode)
+                const existingAdditionalStyles = document.getElementById('inspekt-axe-popover-additional-styles');
+                if (!(existingAdditionalStyles && isPersistent)) {
+                    if (existingAdditionalStyles) existingAdditionalStyles.remove();
+
+                    const additionalStyles = document.createElement('style');
+                    additionalStyles.id = 'inspekt-axe-popover-additional-styles';
+                    additionalStyles.textContent = `
+                    /* Reveal in DevTools button */
+                    .inspekt-axe-popover__reveal-btn {
+                        display: inline-flex;
+                        align-items: center;
+                        gap: 6px;
+                        padding: 8px 14px;
+                        background: transparent;
+                        border: 1px solid #d1d5db;
+                        border-radius: 6px;
+                        font-size: 13px;
+                        font-weight: 500;
+                        color: #374151;
+                        cursor: pointer;
+                        transition: background-color 0.15s ease;
+                    }
+
+                    .inspekt-axe-popover__reveal-btn:hover {
+                        background: #f3f4f6;
+                    }
+
+                    .inspekt-axe-popover__reveal-btn:focus-visible {
+                        outline: 2px solid #2563eb;
+                        outline-offset: 2px;
+                    }
+
+                    /* Learn More button - white with blue text */
+                    .inspekt-axe-popover__learn-more {
+                        display: inline-flex;
+                        align-items: center;
+                        gap: 6px;
+                        padding: 8px 14px;
+                        background: white;
+                        border: 1px solid #2563eb;
+                        border-radius: 6px;
+                        font-size: 13px;
+                        font-weight: 500;
+                        color: #2563eb;
+                        text-decoration: none;
+                        cursor: pointer;
+                        transition: background-color 0.15s ease;
+                    }
+
+                    .inspekt-axe-popover__learn-more:hover {
+                        background: #eff6ff;
+                    }
+
+                    .inspekt-axe-popover__learn-more:focus-visible {
+                        outline: 2px solid #2563eb;
+                        outline-offset: 2px;
+                    }
+
+                    /* Footer layout */
+                    .inspekt-axe-popover__footer {
+                        display: flex;
+                        gap: 10px;
+                        padding: 12px 16px;
+                        border-top: 1px solid #e5e7eb;
+                    }
+
+                    /* Switch toggle for Skip Similar */
+                    .inspekt-axe-nav__skip-switch {
+                        display: inline-flex;
+                        align-items: center;
+                        gap: 8px;
+                        cursor: pointer;
+                        user-select: none;
+                    }
+
+                    .inspekt-axe-nav__skip-input {
+                        position: absolute;
+                        opacity: 0;
+                        width: 0;
+                        height: 0;
+                    }
+
+                    .inspekt-axe-nav__skip-slider {
+                        position: relative;
+                        width: 36px;
+                        height: 20px;
+                        background: #d1d5db;
+                        border-radius: 10px;
+                        transition: background-color 0.2s ease;
+                        flex-shrink: 0;
+                    }
+
+                    .inspekt-axe-nav__skip-slider::before {
+                        content: '';
+                        position: absolute;
+                        width: 16px;
+                        height: 16px;
+                        left: 2px;
+                        top: 2px;
+                        background: white;
+                        border-radius: 50%;
+                        transition: transform 0.2s ease;
+                        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+                    }
+
+                    .inspekt-axe-nav__skip-input:checked + .inspekt-axe-nav__skip-slider {
+                        background: #2563eb;
+                    }
+
+                    .inspekt-axe-nav__skip-input:checked + .inspekt-axe-nav__skip-slider::before {
+                        transform: translateX(16px);
+                    }
+
+                    .inspekt-axe-nav__skip-input:focus-visible + .inspekt-axe-nav__skip-slider {
+                        outline: 2px solid #2563eb;
+                        outline-offset: 2px;
+                    }
+
+                    .inspekt-axe-nav__skip-label {
+                        font-size: 13px;
+                        color: #374151;
+                        white-space: nowrap;
+                    }
+
+                    /* Markdown panel header and copy button */
+                    .inspekt-axe-popover__markdown-header {
+                        display: flex;
+                        justify-content: flex-end;
+                        padding: 8px 12px;
+                        border-bottom: 1px solid #e5e7eb;
+                    }
+
+                    .inspekt-axe-popover__copy-btn {
+                        display: inline-flex;
+                        align-items: center;
+                        gap: 4px;
+                        padding: 4px 10px;
+                        background: #f3f4f6;
+                        border: 1px solid #d1d5db;
+                        border-radius: 4px;
+                        font-size: 12px;
+                        font-weight: 500;
+                        color: #374151;
+                        cursor: pointer;
+                        transition: all 0.15s ease;
+                    }
+
+                    .inspekt-axe-popover__copy-btn:hover {
+                        background: #e5e7eb;
+                    }
+
+                    .inspekt-axe-popover__copy-btn:focus-visible {
+                        outline: 2px solid #2563eb;
+                        outline-offset: 2px;
+                    }
+
+                    .inspekt-axe-popover__copy-btn--copied {
+                        background: #dcfce7;
+                        border-color: #22c55e;
+                        color: #15803d;
+                    }
+                `;
+                    document.head.appendChild(additionalStyles);
+                } // End of existingAdditionalStyles check
             }
 
             const MAX_BADGES = 50;
-            let badgeNumber = 1;
+            // In persistent mode, continue numbering from last badge number
+            let badgeNumber = isPersistent ? (window.__inspektLastBadgeNumber__ || 0) + 1 : 1;
             let badgesCreated = 0;
             let badgesFailed = 0;
             let badgesSkipped = 0;
+            let violationsAlreadySeen = 0;
 
-            // Reset global state for new badge injection
-            popoverState.violations = [];
-            popoverState.currentIndex = -1;
-            popoverState.skippedRuleIds.clear();
+            // In persistent mode, preserve existing popover state; otherwise reset
+            if (!isPersistent) {
+                popoverState.violations = [];
+                popoverState.currentIndex = -1;
+                popoverState.skippedRuleIds.clear();
+            }
 
             // Track badges per element to handle multiple violations on same element
             const elementBadges = new Map(); // DOM element -> badge count
+
+            // Track new violations for return value (persistent mode)
+            const newViolationsForCli = [];
 
             for (const violation of violations) {
                 const impact = violation.impact || 'minor';
 
                 for (const node of violation.nodes) {
+                    // In persistent mode, skip violations we've already seen
+                    if (isPersistent) {
+                        const violationKey = getViolationKey(violation.id, node.target);
+                        if (window.__inspektSeenViolations__.has(violationKey)) {
+                            violationsAlreadySeen++;
+                            continue;  // Skip this violation, don't increment badge number
+                        }
+                        // Mark this violation as seen
+                        window.__inspektSeenViolations__.add(violationKey);
+                    }
+
                     // Check badge limit
                     if (badgesCreated >= MAX_BADGES) {
                         badgesSkipped++;
@@ -1387,18 +1734,26 @@
                         // Create badge text with accessibility attributes
                         const textContent = document.createElement('span');
                         textContent.className = 'inspekt-axe-badge__text';
-                        textContent.textContent = badgeNumber;
 
                         // Capitalize impact for display
                         const impactLabel = impact.charAt(0).toUpperCase() + impact.slice(1);
 
-                        // Add accessibility attributes
-                        const ariaLabel = interactive
+                        // Add visually-hidden text for screen readers
+                        const srText = interactive
                             ? `Show details for Accessibility Violation ${badgeNumber} (${impactLabel})`
                             : `Accessibility Violation ${badgeNumber} (${impactLabel})`;
-                        textContent.setAttribute('aria-label', ariaLabel);
+                        const visuallyHidden = document.createElement('span');
+                        visuallyHidden.className = 'visually-hidden';
+                        visuallyHidden.textContent = srText;
+                        textContent.appendChild(visuallyHidden);
+
+                        // Add visible badge number (hidden from screen readers)
+                        const visibleText = document.createElement('span');
+                        visibleText.setAttribute('aria-hidden', 'true');
+                        visibleText.textContent = badgeNumber;
+                        textContent.appendChild(visibleText);
+
                         textContent.setAttribute('title', impactLabel);
-                        textContent.setAttribute('role', 'text');
 
                         badge.appendChild(textContent);
 
@@ -1421,13 +1776,22 @@
                                 popoverId: popoverId,
                                 ruleId: violation.id,
                                 violation: violation,
-                                node: node
+                                node: node,
+                                element: element // Store DOM element for "Reveal in DevTools"
                             });
                         }
 
                         // Track this element
                         elementBadges.set(element, existingCount + 1);
                         badgesCreated++;
+
+                        // In persistent mode, track new violations for CLI display
+                        if (isPersistent) {
+                            newViolationsForCli.push({
+                                violation: violation,
+                                node: node
+                            });
+                        }
 
                     } catch (error) {
                         badgesFailed++;
@@ -1437,13 +1801,23 @@
                 }
             }
 
+            // Update last badge number in persistent mode
+            if (isPersistent && badgesCreated > 0) {
+                window.__inspektLastBadgeNumber__ = badgeNumber - 1;
+            }
+
             return {
                 ok: true,
                 badgesCreated: badgesCreated,
                 badgesFailed: badgesFailed,
                 badgesSkipped: badgesSkipped,
                 totalViolations: badgeNumber - 1,
-                maxBadges: MAX_BADGES
+                maxBadges: MAX_BADGES,
+                // Persistent mode stats
+                violationsAlreadySeen: violationsAlreadySeen,
+                totalBadgesOnPage: isPersistent ? (window.__inspektLastBadgeNumber__ || 0) : badgesCreated,
+                isPersistent: isPersistent,
+                newViolationsForCli: newViolationsForCli
             };
         }
 
@@ -1536,37 +1910,85 @@
         }
 
         // Calculate summary statistics
-        const summary = {
-            violationCount: results.violations.length,
-            passCount: results.passes.length,
-            incompleteCount: results.incomplete.length,
-            inapplicableCount: results.inapplicable.length,
-            criticalCount: results.violations.filter(v => v.impact === 'critical').length,
-            seriousCount: results.violations.filter(v => v.impact === 'serious').length,
-            moderateCount: results.violations.filter(v => v.impact === 'moderate').length,
-            minorCount: results.violations.filter(v => v.impact === 'minor').length
-        };
+        // In persistent mode, use new violations only for counts
+        let summary;
+        if (isPersistent && badgeStats.newViolationsForCli) {
+            const newViolations = badgeStats.newViolationsForCli;
+            summary = {
+                violationCount: newViolations.length,
+                passCount: results.passes.length,
+                incompleteCount: results.incomplete.length,
+                inapplicableCount: results.inapplicable.length,
+                criticalCount: newViolations.filter(v => v.violation.impact === 'critical').length,
+                seriousCount: newViolations.filter(v => v.violation.impact === 'serious').length,
+                moderateCount: newViolations.filter(v => v.violation.impact === 'moderate').length,
+                minorCount: newViolations.filter(v => v.violation.impact === 'minor').length
+            };
+        } else {
+            summary = {
+                violationCount: results.violations.length,
+                passCount: results.passes.length,
+                incompleteCount: results.incomplete.length,
+                inapplicableCount: results.inapplicable.length,
+                criticalCount: results.violations.filter(v => v.impact === 'critical').length,
+                seriousCount: results.violations.filter(v => v.impact === 'serious').length,
+                moderateCount: results.violations.filter(v => v.impact === 'moderate').length,
+                minorCount: results.violations.filter(v => v.impact === 'minor').length
+            };
+        }
 
         // Process violations - exclude element refs (can't serialize DOM nodes)
-        const violations = results.violations.map(violation => ({
-            id: violation.id,
-            impact: violation.impact,
-            description: violation.description,
-            help: violation.help,
-            helpUrl: violation.helpUrl,
-            tags: violation.tags,
-            nodes: violation.nodes.map(node => {
-                // Destructure to remove element property
+        // In persistent mode, use the filtered new violations from badge injection
+        let violations;
+        if (isPersistent && badgeStats.newViolationsForCli && badgeStats.newViolationsForCli.length > 0) {
+            // Group new violations by rule ID for CLI display
+            const violationsByRule = new Map();
+            for (const { violation, node } of badgeStats.newViolationsForCli) {
+                if (!violationsByRule.has(violation.id)) {
+                    violationsByRule.set(violation.id, {
+                        id: violation.id,
+                        impact: violation.impact,
+                        description: violation.description,
+                        help: violation.help,
+                        helpUrl: violation.helpUrl,
+                        tags: violation.tags,
+                        nodes: [],
+                        nodeCount: 0
+                    });
+                }
+                const v = violationsByRule.get(violation.id);
                 const { element, ...serializable } = node;
-                return {
+                v.nodes.push({
                     html: serializable.html,
                     target: serializable.target,
                     failureSummary: serializable.failureSummary,
                     impact: serializable.impact
-                };
-            }),
-            nodeCount: violation.nodes.length
-        }));
+                });
+                v.nodeCount++;
+            }
+            violations = Array.from(violationsByRule.values());
+        } else {
+            // Non-persistent mode: return all violations
+            violations = results.violations.map(violation => ({
+                id: violation.id,
+                impact: violation.impact,
+                description: violation.description,
+                help: violation.help,
+                helpUrl: violation.helpUrl,
+                tags: violation.tags,
+                nodes: violation.nodes.map(node => {
+                    // Destructure to remove element property
+                    const { element, ...serializable } = node;
+                    return {
+                        html: serializable.html,
+                        target: serializable.target,
+                        failureSummary: serializable.failureSummary,
+                        impact: serializable.impact
+                    };
+                }),
+                nodeCount: violation.nodes.length
+            }));
+        }
 
         // Process passes (simplified)
         const passes = results.passes.map(pass => ({

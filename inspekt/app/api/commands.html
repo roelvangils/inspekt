@@ -1,0 +1,2364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inspekt Commands</title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.6/dist/purify.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            color-scheme: light dark;
+            --bg-primary: light-dark(#ffffff, #1a1a1a);
+            --bg-secondary: light-dark(#f5f7fa, #0d0d0d);
+            --bg-card: light-dark(#ffffff, #242424);
+            --bg-sidebar: light-dark(#fafbfc, #1e1e1e);
+            --text-primary: light-dark(#2c3e50, #e8e8e8);
+            --text-secondary: light-dark(#7f8c8d, #a0a0a0);
+            --text-tertiary: light-dark(#95a5a6, #888);
+            --border-color: light-dark(#e1e4e8, #3a3a3a);
+            --success: #27ae60;
+            --error: #e74c3c;
+            --warning: #f39c12;
+            --accent: #3498db;
+            --accent-light: light-dark(#e8f4fd, #1a3a4a);
+            --mcp-color: #e91e63;
+            --shadow: light-dark(0 2px 8px rgba(0,0,0,0.08), 0 2px 8px rgba(0,0,0,0.3));
+            --shadow-hover: light-dark(0 4px 16px rgba(0,0,0,0.12), 0 4px 16px rgba(0,0,0,0.4));
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+
+        /* Material Icons styling */
+        .material-icons {
+            font-size: 20px;
+            vertical-align: middle;
+        }
+
+        /* MCP Icon SVG */
+        .mcp-icon {
+            width: 16px;
+            height: 16px;
+            display: inline-block;
+            vertical-align: middle;
+        }
+
+        .mcp-icon svg {
+            width: 100%;
+            height: 100%;
+        }
+
+        .mcp-icon.large {
+            width: 20px;
+            height: 20px;
+        }
+
+        {% include 'partials/_nav.css' %}
+
+        /* Layout */
+        .page-layout {
+            display: grid;
+            grid-template-columns: 260px 1fr;
+            min-height: calc(100vh - 56px);
+        }
+
+        /* Sidebar */
+        .sidebar {
+            background: var(--bg-sidebar);
+            border-right: 1px solid var(--border-color);
+            padding: 20px 0;
+            position: sticky;
+            top: 56px;
+            height: calc(100vh - 56px);
+            overflow-y: auto;
+        }
+
+        .sidebar-header {
+            padding: 0 20px 20px;
+            border-bottom: 1px solid var(--border-color);
+            margin-bottom: 16px;
+        }
+
+        .sidebar-title {
+            font-size: 20px;
+            font-weight: 600;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .sidebar-subtitle {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-top: 4px;
+        }
+
+        .sidebar-back {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 13px;
+            margin-top: 12px;
+        }
+
+        .sidebar-back:hover {
+            color: var(--accent);
+        }
+
+        .sidebar-nav {
+            padding: 0 12px;
+        }
+
+        .nav-section-title {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            padding: 12px 8px 8px;
+        }
+
+        .nav-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 12px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.15s;
+            color: var(--text-primary);
+            text-decoration: none;
+        }
+
+        .nav-item:hover {
+            background: var(--bg-secondary);
+        }
+
+        .nav-item.active {
+            background: var(--accent-light);
+            color: var(--accent);
+        }
+
+        .nav-item .material-icons {
+            font-size: 20px;
+            opacity: 0.8;
+        }
+
+        .nav-item.active .material-icons {
+            opacity: 1;
+        }
+
+        .nav-item-text {
+            flex: 1;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .nav-item-count {
+            font-size: 12px;
+            color: var(--text-secondary);
+            background: var(--bg-secondary);
+            padding: 2px 8px;
+            border-radius: 10px;
+        }
+
+        .nav-item.active .nav-item-count {
+            background: var(--accent);
+            color: white;
+        }
+
+        /* Category icons */
+        .nav-item[data-category="navigation"] .material-icons { color: #3498db; }
+        .nav-item[data-category="execution"] .material-icons { color: #e74c3c; }
+        .nav-item[data-category="extraction"] .material-icons { color: #9b59b6; }
+        .nav-item[data-category="interaction"] .material-icons { color: #f39c12; }
+        .nav-item[data-category="inspection"] .material-icons { color: #1abc9c; }
+        .nav-item[data-category="selection"] .material-icons { color: #e91e63; }
+        .nav-item[data-category="storage"] .material-icons { color: #00bcd4; }
+        .nav-item[data-category="debugging"] .material-icons { color: #ff5722; }
+        .nav-item[data-category="accessibility"] .material-icons { color: #8bc34a; }
+
+        .nav-item.active[data-category="navigation"] { background: #e3f2fd; color: #3498db; }
+        .nav-item.active[data-category="execution"] { background: #ffebee; color: #e74c3c; }
+        .nav-item.active[data-category="extraction"] { background: #f3e5f5; color: #9b59b6; }
+        .nav-item.active[data-category="interaction"] { background: #fff8e1; color: #f39c12; }
+        .nav-item.active[data-category="inspection"] { background: #e0f2f1; color: #1abc9c; }
+        .nav-item.active[data-category="selection"] { background: #fce4ec; color: #e91e63; }
+        .nav-item.active[data-category="storage"] { background: #e0f7fa; color: #00bcd4; }
+        .nav-item.active[data-category="debugging"] { background: #fbe9e7; color: #ff5722; }
+        .nav-item.active[data-category="accessibility"] { background: #f1f8e9; color: #8bc34a; }
+
+        /* Stats in sidebar */
+        .sidebar-stats {
+            padding: 16px 20px;
+            border-top: 1px solid var(--border-color);
+            margin-top: 16px;
+        }
+
+        .sidebar-stat {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 6px 0;
+            font-size: 13px;
+        }
+
+        .sidebar-stat-label {
+            color: var(--text-secondary);
+        }
+
+        .sidebar-stat-value {
+            font-weight: 600;
+            color: var(--accent);
+        }
+
+        /* Main content */
+        .main-content {
+            padding: 24px 32px;
+            overflow-y: auto;
+        }
+
+        .content-header {
+            margin-bottom: 24px;
+        }
+
+        .content-title {
+            font-size: 24px;
+            font-weight: 600;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .content-title .material-icons {
+            font-size: 28px;
+        }
+
+        .content-description {
+            color: var(--text-secondary);
+            margin-top: 4px;
+            font-size: 14px;
+        }
+
+        /* Commands list */
+        .commands-card {
+            background: var(--bg-card);
+            border-radius: 12px;
+            box-shadow: var(--shadow);
+            overflow: hidden;
+        }
+
+        .command-item {
+            padding: 16px 24px;
+            border-bottom: 1px solid var(--border-color);
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 16px;
+            align-items: center;
+            transition: background 0.2s;
+        }
+
+        .command-item:last-child {
+            border-bottom: none;
+        }
+
+        .command-item:hover {
+            background: var(--accent-light);
+        }
+
+        .command-info {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .command-name {
+            font-weight: 600;
+            font-size: 15px;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .command-id {
+            font-family: 'JetBrains Mono', 'SF Mono', monospace;
+            font-size: 11px;
+            color: var(--text-tertiary);
+            background: var(--bg-secondary);
+            padding: 2px 8px;
+            border-radius: 4px;
+        }
+
+        .command-description {
+            font-size: 13px;
+            color: var(--text-secondary);
+            line-height: 1.5;
+        }
+
+        .command-paths {
+            display: flex;
+            gap: 10px;
+            margin-top: 6px;
+            flex-wrap: wrap;
+        }
+
+        .path-badge {
+            font-family: 'JetBrains Mono', 'SF Mono', monospace;
+            font-size: 11px;
+            padding: 4px 10px;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .path-badge.cli {
+            background: light-dark(#e8f5e9, #1a3a1a);
+            color: var(--success);
+        }
+
+        .path-badge.api {
+            background: light-dark(#e3f2fd, #1a2a3a);
+            color: var(--accent);
+        }
+
+        .path-badge.mcp {
+            background: light-dark(#fce4ec, #3a1a2a);
+            color: var(--mcp-color);
+        }
+
+        .command-actions {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        /* MCP Toggle with label */
+        .mcp-toggle-wrapper {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .mcp-toggle-label {
+            font-size: 10px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        /* Toggle switch */
+        .toggle {
+            position: relative;
+            width: 44px;
+            height: 24px;
+        }
+
+        .toggle input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: light-dark(#ccc, #444);
+            transition: 0.3s;
+            border-radius: 24px;
+        }
+
+        .toggle-slider:before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: 0.3s;
+            border-radius: 50%;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+        }
+
+        .toggle input:checked + .toggle-slider {
+            background-color: var(--mcp-color);
+        }
+
+        .toggle input:checked + .toggle-slider:before {
+            transform: translateX(20px);
+        }
+
+        .toggle input:focus + .toggle-slider {
+            box-shadow: 0 0 0 2px var(--accent-light);
+        }
+
+        .detail-btn {
+            padding: 8px 16px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            color: var(--text-primary);
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 500;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .detail-btn:hover {
+            background: var(--accent);
+            color: white;
+            border-color: var(--accent);
+        }
+
+        /* Modal */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.6);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+            backdrop-filter: blur(2px);
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .modal {
+            background: var(--bg-card);
+            border-radius: 16px;
+            max-width: 800px;
+            width: 95%;
+            max-height: 90vh;
+            overflow: hidden;
+            box-shadow: var(--shadow-hover);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .modal-header {
+            padding: 20px 24px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: var(--bg-card);
+            flex-shrink: 0;
+        }
+
+        .modal-title {
+            font-size: 20px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .modal-close {
+            background: var(--bg-secondary);
+            border: none;
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            cursor: pointer;
+            color: var(--text-secondary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+
+        .modal-close:hover {
+            background: var(--error);
+            color: white;
+        }
+
+        .modal-body {
+            padding: 24px;
+            overflow-y: auto;
+            flex: 1;
+        }
+
+        .detail-section {
+            margin-bottom: 24px;
+        }
+
+        .detail-section:last-child {
+            margin-bottom: 0;
+        }
+
+        .detail-label {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .detail-value {
+            font-size: 14px;
+            color: var(--text-primary);
+            line-height: 1.6;
+        }
+
+        /* Code blocks with copy button */
+        .code-block {
+            position: relative;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .code-block-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 12px;
+            background: light-dark(#f0f0f0, #1a1a1a);
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .code-block-title {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+        }
+
+        .copy-btn {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 10px;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-size: 11px;
+            font-weight: 500;
+            transition: all 0.15s;
+        }
+
+        .copy-btn:hover {
+            background: var(--accent);
+            color: white;
+            border-color: var(--accent);
+        }
+
+        .copy-btn.copied {
+            background: var(--success);
+            color: white;
+            border-color: var(--success);
+        }
+
+        .copy-btn .material-icons {
+            font-size: 14px;
+        }
+
+        .code-block pre {
+            margin: 0;
+            padding: 12px 16px;
+            font-family: 'JetBrains Mono', 'SF Mono', monospace;
+            font-size: 12px;
+            line-height: 1.5;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        /* Inline code */
+        .inline-code {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: var(--bg-secondary);
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-family: 'JetBrains Mono', 'SF Mono', monospace;
+            font-size: 13px;
+        }
+
+        .inline-code-value {
+            flex: 1;
+        }
+
+        .inline-code .copy-btn {
+            padding: 4px 8px;
+        }
+
+        /* Examples list */
+        .examples-list {
+            list-style: none;
+            padding: 0;
+        }
+
+        .example-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: var(--bg-secondary);
+            padding: 10px 14px;
+            border-radius: 8px;
+            margin-bottom: 8px;
+            font-family: 'JetBrains Mono', 'SF Mono', monospace;
+            font-size: 12px;
+        }
+
+        .example-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .example-item-text {
+            flex: 1;
+            word-break: break-all;
+        }
+
+        /* Two column layout in modal */
+        .detail-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+
+        @media (max-width: 600px) {
+            .detail-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Modal Tabs */
+        .modal-tabs {
+            display: flex;
+            border-bottom: 2px solid var(--border-color);
+            background: var(--bg-card);
+            flex-shrink: 0;
+        }
+
+        .modal-tab {
+            padding: 14px 24px;
+            cursor: pointer;
+            border: none;
+            background: none;
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--text-secondary);
+            border-bottom: 2px solid transparent;
+            margin-bottom: -2px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s;
+        }
+
+        .modal-tab:hover {
+            color: var(--text-primary);
+            background: var(--bg-secondary);
+        }
+
+        .modal-tab.active {
+            color: var(--accent);
+            border-bottom-color: var(--accent);
+        }
+
+        .modal-tab .material-icons {
+            font-size: 18px;
+        }
+
+        .modal-tab-panel {
+            display: none;
+        }
+
+        .modal-tab-panel.active {
+            display: block;
+        }
+
+        /* Customization badge */
+        .customized-badge {
+            font-size: 10px;
+            padding: 2px 8px;
+            background: var(--warning);
+            color: white;
+            border-radius: 10px;
+            margin-left: 8px;
+            font-weight: 600;
+        }
+
+        /* Reset button */
+        .reset-btn {
+            font-size: 11px;
+            padding: 4px 10px;
+            border: 1px dashed var(--border-color);
+            background: none;
+            border-radius: 4px;
+            color: var(--text-secondary);
+            cursor: pointer;
+            margin-left: 8px;
+            transition: all 0.15s;
+        }
+
+        .reset-btn:hover {
+            color: var(--error);
+            border-color: var(--error);
+            background: light-dark(#ffebee, #3a1a1a);
+        }
+
+        /* Split-pane editor */
+        .editor-split {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            min-height: 300px;
+        }
+
+        @media (max-width: 800px) {
+            .editor-split {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .editor-pane {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .editor-pane-header {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+            text-transform: uppercase;
+        }
+
+        .editor-container {
+            flex: 1;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            overflow: hidden;
+            min-height: 250px;
+        }
+
+        .preview-container {
+            flex: 1;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 16px;
+            background: var(--bg-secondary);
+            overflow-y: auto;
+            min-height: 250px;
+        }
+
+        .preview-container h1, .preview-container h2, .preview-container h3 {
+            margin-top: 0;
+        }
+
+        .preview-container p {
+            margin: 0 0 1em 0;
+        }
+
+        .preview-container ul, .preview-container ol {
+            margin: 0 0 1em 0;
+            padding-left: 1.5em;
+        }
+
+        .preview-container code {
+            background: var(--bg-card);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+        }
+
+        /* MCP Preview card */
+        .mcp-preview-card {
+            background: var(--bg-secondary);
+            border: 2px solid var(--mcp-color);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .mcp-preview-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 16px;
+        }
+
+        .mcp-preview-title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 600;
+            color: var(--mcp-color);
+        }
+
+        .mcp-tips {
+            background: light-dark(#fff8e1, #3a3520);
+            border-left: 4px solid var(--warning);
+            padding: 16px 20px;
+            border-radius: 0 8px 8px 0;
+        }
+
+        .mcp-tips-title {
+            font-weight: 600;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .mcp-tips ul {
+            margin: 0;
+            padding-left: 20px;
+        }
+
+        .mcp-tips li {
+            margin-bottom: 6px;
+            color: var(--text-secondary);
+            font-size: 13px;
+        }
+
+        /* Examples manager */
+        .examples-manager {
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .example-edit-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 12px;
+            border-bottom: 1px solid var(--border-color);
+            background: var(--bg-card);
+        }
+
+        .example-edit-item:last-child {
+            border-bottom: none;
+        }
+
+        .example-edit-input {
+            flex: 1;
+            padding: 8px 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+        }
+
+        .example-edit-btn {
+            width: 28px;
+            height: 28px;
+            padding: 0;
+            border: none;
+            background: var(--bg-secondary);
+            border-radius: 4px;
+            cursor: pointer;
+            color: var(--text-secondary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.15s;
+        }
+
+        .example-edit-btn:hover {
+            background: var(--accent);
+            color: white;
+        }
+
+        .example-edit-btn.delete:hover {
+            background: var(--error);
+        }
+
+        .add-example-btn {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 10px 16px;
+            background: var(--bg-secondary);
+            border: 1px dashed var(--border-color);
+            border-radius: 8px;
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-size: 13px;
+            margin-top: 12px;
+            transition: all 0.15s;
+        }
+
+        .add-example-btn:hover {
+            border-color: var(--accent);
+            color: var(--accent);
+            background: var(--accent-light);
+        }
+
+        /* Save bar */
+        .modal-save-bar {
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+            padding: 16px 24px;
+            border-top: 1px solid var(--border-color);
+            background: var(--bg-card);
+            flex-shrink: 0;
+        }
+
+        .save-btn {
+            padding: 10px 24px;
+            background: var(--success);
+            border: none;
+            border-radius: 8px;
+            color: white;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.15s;
+        }
+
+        .save-btn:hover {
+            filter: brightness(1.1);
+        }
+
+        .save-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .cancel-btn {
+            padding: 10px 24px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .cancel-btn:hover {
+            background: var(--bg-card);
+        }
+
+        /* Collapsible sections */
+        .collapsible-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            cursor: pointer;
+            padding: 10px 0;
+        }
+
+        .collapsible-header:hover {
+            color: var(--accent);
+        }
+
+        .collapsible-header .material-icons {
+            transition: transform 0.2s;
+        }
+
+        .collapsible-header.collapsed .material-icons {
+            transform: rotate(-90deg);
+        }
+
+        .collapsible-content {
+            overflow: hidden;
+            transition: max-height 0.3s ease-out;
+        }
+
+        .collapsible-content.collapsed {
+            max-height: 0 !important;
+        }
+
+        /* MCP name input */
+        .mcp-name-input {
+            width: 100%;
+            padding: 10px 14px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+        }
+
+        .mcp-name-input:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px var(--accent-light);
+        }
+
+        /* Schema Annotations Editor */
+        .schema-annotations {
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .schema-field {
+            padding: 16px;
+            border-bottom: 1px solid var(--border-color);
+            background: var(--bg-card);
+        }
+
+        .schema-field:last-child {
+            border-bottom: none;
+        }
+
+        .schema-field-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+
+        .schema-field-name {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--accent);
+        }
+
+        .schema-field-type {
+            font-size: 11px;
+            color: var(--text-secondary);
+            background: var(--bg-secondary);
+            padding: 2px 8px;
+            border-radius: 4px;
+        }
+
+        .schema-field-required {
+            font-size: 10px;
+            color: var(--error);
+            background: light-dark(#ffebee, #3a1a1a);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-weight: 600;
+        }
+
+        .schema-field-row {
+            margin-bottom: 12px;
+        }
+
+        .schema-field-row:last-child {
+            margin-bottom: 0;
+        }
+
+        .schema-field-label {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-bottom: 6px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .schema-field-input {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            font-size: 13px;
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+        }
+
+        .schema-field-input:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        .schema-field-input::placeholder {
+            color: var(--text-tertiary);
+        }
+
+        .schema-field-default {
+            font-size: 12px;
+            color: var(--text-tertiary);
+            margin-top: 4px;
+            font-style: italic;
+        }
+
+        /* Loading */
+        .loading {
+            text-align: center;
+            padding: 60px;
+            color: var(--text-secondary);
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid var(--border-color);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 16px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Empty state */
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text-secondary);
+        }
+
+        .empty-state .material-icons {
+            font-size: 48px;
+            margin-bottom: 16px;
+            opacity: 0.5;
+        }
+
+        /* Responsive */
+        @media (max-width: 900px) {
+            .page-layout {
+                grid-template-columns: 1fr;
+            }
+
+            .sidebar {
+                position: relative;
+                height: auto;
+                border-right: none;
+                border-bottom: 1px solid var(--border-color);
+            }
+
+            .sidebar-nav {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 8px;
+            }
+
+            .nav-item {
+                flex: 0 0 auto;
+            }
+        }
+    </style>
+</head>
+<body>
+    {% include 'partials/_nav.html' %}
+
+    <div class="page-layout">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="sidebar-title">
+                    <span class="material-icons" style="color: var(--accent);">terminal</span>
+                    Commands
+                </div>
+                <div class="sidebar-subtitle">Unified Command Registry</div>
+            </div>
+
+            <nav class="sidebar-nav">
+                <div class="nav-section-title">Categories</div>
+                <a href="#all" class="nav-item active" data-category="all" onclick="filterCategory('all', this)">
+                    <span class="material-icons">apps</span>
+                    <span class="nav-item-text">All Commands</span>
+                    <span class="nav-item-count" id="count-all">0</span>
+                </a>
+                <a href="#navigation" class="nav-item" data-category="navigation" onclick="filterCategory('navigation', this)">
+                    <span class="material-icons">explore</span>
+                    <span class="nav-item-text">Navigation</span>
+                    <span class="nav-item-count" id="count-navigation">0</span>
+                </a>
+                <a href="#execution" class="nav-item" data-category="execution" onclick="filterCategory('execution', this)">
+                    <span class="material-icons">play_circle</span>
+                    <span class="nav-item-text">Execution</span>
+                    <span class="nav-item-count" id="count-execution">0</span>
+                </a>
+                <a href="#extraction" class="nav-item" data-category="extraction" onclick="filterCategory('extraction', this)">
+                    <span class="material-icons">content_copy</span>
+                    <span class="nav-item-text">Extraction</span>
+                    <span class="nav-item-count" id="count-extraction">0</span>
+                </a>
+                <a href="#interaction" class="nav-item" data-category="interaction" onclick="filterCategory('interaction', this)">
+                    <span class="material-icons">touch_app</span>
+                    <span class="nav-item-text">Interaction</span>
+                    <span class="nav-item-count" id="count-interaction">0</span>
+                </a>
+                <a href="#inspection" class="nav-item" data-category="inspection" onclick="filterCategory('inspection', this)">
+                    <span class="material-icons">search</span>
+                    <span class="nav-item-text">Inspection</span>
+                    <span class="nav-item-count" id="count-inspection">0</span>
+                </a>
+                <a href="#selection" class="nav-item" data-category="selection" onclick="filterCategory('selection', this)">
+                    <span class="material-icons">select_all</span>
+                    <span class="nav-item-text">Selection</span>
+                    <span class="nav-item-count" id="count-selection">0</span>
+                </a>
+                <a href="#storage" class="nav-item" data-category="storage" onclick="filterCategory('storage', this)">
+                    <span class="material-icons">storage</span>
+                    <span class="nav-item-text">Storage</span>
+                    <span class="nav-item-count" id="count-storage">0</span>
+                </a>
+                <a href="#debugging" class="nav-item" data-category="debugging" onclick="filterCategory('debugging', this)">
+                    <span class="material-icons">bug_report</span>
+                    <span class="nav-item-text">Debugging</span>
+                    <span class="nav-item-count" id="count-debugging">0</span>
+                </a>
+                <a href="#accessibility" class="nav-item" data-category="accessibility" onclick="filterCategory('accessibility', this)">
+                    <span class="material-icons">accessibility</span>
+                    <span class="nav-item-text">Accessibility</span>
+                    <span class="nav-item-count" id="count-accessibility">0</span>
+                </a>
+            </nav>
+
+            <div class="sidebar-stats">
+                <div class="sidebar-stat">
+                    <span class="sidebar-stat-label">Total Commands</span>
+                    <span class="sidebar-stat-value" id="total-count">0</span>
+                </div>
+                <div class="sidebar-stat">
+                    <span class="sidebar-stat-label">
+                        <span class="mcp-icon" id="mcp-stat-icon"></span>
+                        MCP Enabled
+                    </span>
+                    <span class="sidebar-stat-value" id="mcp-count">0</span>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main content -->
+        <main class="main-content">
+            <div class="content-header">
+                <h1 class="content-title" id="content-title">
+                    <span class="material-icons">apps</span>
+                    All Commands
+                </h1>
+                <p class="content-description" id="content-description">Browse and manage all available commands across CLI, API, and MCP interfaces.</p>
+            </div>
+
+            <div id="commands-container">
+                <div class="loading">
+                    <div class="spinner"></div>
+                    Loading commands...
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Detail Modal -->
+    <div class="modal-overlay" id="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+        <div class="modal">
+            <div class="modal-header">
+                <span class="modal-title" id="modal-title">Command Details</span>
+                <button class="modal-close" onclick="closeModal()" aria-label="Close modal">
+                    <span class="material-icons">close</span>
+                </button>
+            </div>
+
+            <!-- Modal Tabs -->
+            <div class="modal-tabs" role="tablist">
+                <button class="modal-tab active" role="tab" aria-selected="true" aria-controls="tab-overview" id="tab-btn-overview" onclick="switchTab('overview')">
+                    <span class="material-icons">visibility</span>
+                    Overview
+                </button>
+                <button class="modal-tab" role="tab" aria-selected="false" aria-controls="tab-edit" id="tab-btn-edit" onclick="switchTab('edit')">
+                    <span class="material-icons">edit</span>
+                    Edit
+                </button>
+                <button class="modal-tab" role="tab" aria-selected="false" aria-controls="tab-mcp" id="tab-btn-mcp" onclick="switchTab('mcp')">
+                    <span class="mcp-icon" id="mcp-tab-icon"></span>
+                    MCP Preview
+                </button>
+            </div>
+
+            <!-- Tab Panels -->
+            <div class="modal-body" id="modal-body">
+                <!-- Overview Tab -->
+                <div class="modal-tab-panel active" id="tab-overview" role="tabpanel" aria-labelledby="tab-btn-overview">
+                    <!-- Content injected by showDetails() -->
+                </div>
+
+                <!-- Edit Tab -->
+                <div class="modal-tab-panel" id="tab-edit" role="tabpanel" aria-labelledby="tab-btn-edit">
+                    <!-- Content injected by showDetails() -->
+                </div>
+
+                <!-- MCP Preview Tab -->
+                <div class="modal-tab-panel" id="tab-mcp" role="tabpanel" aria-labelledby="tab-btn-mcp">
+                    <!-- Content injected by showDetails() -->
+                </div>
+            </div>
+
+            <!-- Save Bar (only visible on Edit tab) -->
+            <div class="modal-save-bar" id="modal-save-bar" style="display: none;">
+                <button class="cancel-btn" onclick="cancelEdits()">Cancel</button>
+                <button class="save-btn" onclick="saveChanges()" id="save-btn" disabled>
+                    <span class="material-icons">save</span>
+                    Save Changes
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = '/api/commands';
+        let commandsData = {};
+        let currentCategory = 'all';
+        let focusableElements = [];
+        let firstFocusable = null;
+        let lastFocusable = null;
+
+        // Edit state
+        let currentCommand = null;
+        let editState = {
+            description: '',
+            mcpName: '',
+            examples: [],
+            schemaAnnotations: {},
+            isDirty: false
+        };
+        let originalState = {};
+
+        // MCP Icon SVG
+        function getMcpIconSvg(color = 'currentColor') {
+            return `<svg viewBox="0 0 180 180" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <g clip-path="url(#clip0)">
+                    <path d="M18 84.8528L85.8822 16.9706C95.2548 7.59798 110.451 7.59798 119.823 16.9706V16.9706C129.196 26.3431 129.196 41.5391 119.823 50.9117L68.5581 102.177" stroke="${color}" stroke-width="12" stroke-linecap="round"/>
+                    <path d="M69.2652 101.47L119.823 50.9117C129.196 41.5391 144.392 41.5391 153.765 50.9117L154.118 51.2652C163.491 60.6378 163.491 75.8338 154.118 85.2063L92.7248 146.6C89.6006 149.724 89.6006 154.789 92.7248 157.913L105.331 170.52" stroke="${color}" stroke-width="12" stroke-linecap="round"/>
+                    <path d="M102.853 33.9411L52.6482 84.1457C43.2756 93.5183 43.2756 108.714 52.6482 118.087V118.087C62.0208 127.459 77.2167 127.459 86.5893 118.087L136.794 67.8822" stroke="${color}" stroke-width="12" stroke-linecap="round"/>
+                </g>
+                <defs>
+                    <clipPath id="clip0">
+                        <rect width="180" height="180" fill="white"/>
+                    </clipPath>
+                </defs>
+            </svg>`;
+        }
+
+        // Category metadata
+        const categoryMeta = {
+            all: { icon: 'apps', title: 'All Commands', description: 'Browse and manage all available commands across CLI, API, and MCP interfaces.' },
+            navigation: { icon: 'explore', title: 'Navigation', description: 'Commands for navigating between pages, going back, forward, and reloading.' },
+            execution: { icon: 'play_circle', title: 'Execution', description: 'Commands for executing JavaScript code in the browser context.' },
+            extraction: { icon: 'content_copy', title: 'Extraction', description: 'Commands for extracting content, links, headings, and structured data from pages.' },
+            interaction: { icon: 'touch_app', title: 'Interaction', description: 'Commands for interacting with page elements - clicking, typing, scrolling.' },
+            inspection: { icon: 'search', title: 'Inspection', description: 'Commands for inspecting page state, taking screenshots, and getting page info.' },
+            selection: { icon: 'select_all', title: 'Selection', description: 'Commands for working with selected text and elements.' },
+            storage: { icon: 'storage', title: 'Storage', description: 'Commands for managing cookies, local storage, and session data.' },
+            debugging: { icon: 'bug_report', title: 'Debugging', description: 'Commands for debugging - console logs, network monitoring, errors.' },
+            accessibility: { icon: 'accessibility', title: 'Accessibility', description: 'Commands for accessibility testing and ARIA inspection.' }
+        };
+
+        // Tab switching
+        function switchTab(tabId) {
+            // Update tab buttons
+            document.querySelectorAll('.modal-tab').forEach(tab => {
+                tab.classList.remove('active');
+                tab.setAttribute('aria-selected', 'false');
+            });
+            document.getElementById(`tab-btn-${tabId}`).classList.add('active');
+            document.getElementById(`tab-btn-${tabId}`).setAttribute('aria-selected', 'true');
+
+            // Update tab panels
+            document.querySelectorAll('.modal-tab-panel').forEach(panel => {
+                panel.classList.remove('active');
+            });
+            document.getElementById(`tab-${tabId}`).classList.add('active');
+
+            // Show/hide save bar based on tab
+            const saveBar = document.getElementById('modal-save-bar');
+            if (tabId === 'edit') {
+                saveBar.style.display = 'flex';
+            } else {
+                saveBar.style.display = 'none';
+            }
+
+            // Re-setup focus trap
+            setupFocusTrap();
+        }
+
+        // Mark edit state as dirty
+        function markDirty() {
+            editState.isDirty = true;
+            document.getElementById('save-btn').disabled = false;
+        }
+
+        // Render markdown preview
+        function renderPreview() {
+            const previewEl = document.getElementById('description-preview');
+            if (previewEl && typeof marked !== 'undefined') {
+                const rawHtml = marked.parse(editState.description);
+                previewEl.innerHTML = typeof DOMPurify !== 'undefined' ?
+                    DOMPurify.sanitize(rawHtml) : rawHtml;
+            }
+        }
+
+        async function loadCommands() {
+            try {
+                const response = await fetch(`${API_BASE}/by-category`);
+                const data = await response.json();
+                commandsData = data.categories;
+                updateCounts();
+                renderCommands();
+            } catch (error) {
+                document.getElementById('commands-container').innerHTML = `
+                    <div class="loading" style="color: var(--error);">
+                        Failed to load commands: ${error.message}
+                    </div>
+                `;
+            }
+        }
+
+        function updateCounts() {
+            let total = 0;
+            let mcpEnabled = 0;
+
+            // Update individual category counts
+            for (const [category, commands] of Object.entries(commandsData)) {
+                const countEl = document.getElementById(`count-${category.toLowerCase()}`);
+                if (countEl) {
+                    countEl.textContent = commands.length;
+                }
+                total += commands.length;
+                mcpEnabled += commands.filter(c => c.mcp_enabled).length;
+            }
+
+            document.getElementById('count-all').textContent = total;
+            document.getElementById('total-count').textContent = total;
+            document.getElementById('mcp-count').textContent = mcpEnabled;
+        }
+
+        function filterCategory(category, element) {
+            currentCategory = category;
+
+            // Update active state
+            document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+            element.classList.add('active');
+
+            // Update header
+            const meta = categoryMeta[category] || categoryMeta.all;
+            document.getElementById('content-title').innerHTML = `
+                <span class="material-icons">${meta.icon}</span>
+                ${meta.title}
+            `;
+            document.getElementById('content-description').textContent = meta.description;
+
+            renderCommands();
+        }
+
+        function renderCommands() {
+            const container = document.getElementById('commands-container');
+
+            // Get commands to display
+            let commandsToShow = [];
+            if (currentCategory === 'all') {
+                // Show all, grouped by category
+                const categoryOrder = ['Navigation', 'Execution', 'Extraction', 'Interaction',
+                                       'Inspection', 'Selection', 'Storage', 'Debugging', 'Accessibility'];
+                const sortedCategories = Object.entries(commandsData).sort((a, b) => {
+                    const aIndex = categoryOrder.indexOf(a[0]);
+                    const bIndex = categoryOrder.indexOf(b[0]);
+                    if (aIndex === -1) return 1;
+                    if (bIndex === -1) return -1;
+                    return aIndex - bIndex;
+                });
+
+                container.innerHTML = sortedCategories.map(([category, commands]) => `
+                    <div style="margin-bottom: 24px;">
+                        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
+                            <span class="material-icons" style="color: ${getCategoryColor(category)}; font-size: 24px;">${categoryMeta[category.toLowerCase()]?.icon || 'folder'}</span>
+                            <span style="font-size: 18px; font-weight: 600;">${category}</span>
+                            <span style="font-size: 13px; color: var(--text-secondary); background: var(--bg-secondary); padding: 2px 10px; border-radius: 10px;">${commands.length}</span>
+                        </div>
+                        <div class="commands-card">
+                            ${commands.map(cmd => renderCommand(cmd)).join('')}
+                        </div>
+                    </div>
+                `).join('');
+            } else {
+                // Show single category
+                const categoryKey = Object.keys(commandsData).find(k => k.toLowerCase() === currentCategory);
+                const commands = categoryKey ? commandsData[categoryKey] : [];
+
+                if (commands.length === 0) {
+                    container.innerHTML = `
+                        <div class="empty-state">
+                            <span class="material-icons">inbox</span>
+                            <p>No commands in this category</p>
+                        </div>
+                    `;
+                } else {
+                    container.innerHTML = `
+                        <div class="commands-card">
+                            ${commands.map(cmd => renderCommand(cmd)).join('')}
+                        </div>
+                    `;
+                }
+            }
+        }
+
+        function getCategoryColor(category) {
+            const colors = {
+                'Navigation': '#3498db',
+                'Execution': '#e74c3c',
+                'Extraction': '#9b59b6',
+                'Interaction': '#f39c12',
+                'Inspection': '#1abc9c',
+                'Selection': '#e91e63',
+                'Storage': '#00bcd4',
+                'Debugging': '#ff5722',
+                'Accessibility': '#8bc34a'
+            };
+            return colors[category] || '#666';
+        }
+
+        function renderCommand(cmd) {
+            return `
+                <div class="command-item">
+                    <div class="command-info">
+                        <div class="command-name">
+                            ${escapeHtml(cmd.name)}
+                            <span class="command-id">${escapeHtml(cmd.id)}</span>
+                        </div>
+                        <div class="command-description">${escapeHtml(cmd.description)}</div>
+                        <div class="command-paths">
+                            <span class="path-badge cli">
+                                <span class="material-icons" style="font-size: 12px;">terminal</span>
+                                ${escapeHtml(cmd.cli_name)}
+                            </span>
+                            <span class="path-badge api">
+                                <span class="material-icons" style="font-size: 12px;">api</span>
+                                ${escapeHtml(cmd.api_path)}
+                            </span>
+                            <span class="path-badge mcp">
+                                <span class="mcp-icon" style="width: 12px; height: 12px;">${getMcpIconSvg('#e91e63')}</span>
+                                ${escapeHtml(cmd.mcp_name)}
+                            </span>
+                        </div>
+                    </div>
+                    <div class="command-actions">
+                        <div class="mcp-toggle-wrapper">
+                            <div class="mcp-toggle-label">
+                                <span class="mcp-icon" style="width: 12px; height: 12px;">${getMcpIconSvg()}</span>
+                                MCP
+                            </div>
+                            <label class="toggle">
+                                <input type="checkbox"
+                                       ${cmd.mcp_enabled ? 'checked' : ''}
+                                       onchange="toggleMCP('${cmd.id}', this.checked)"
+                                       aria-label="Toggle MCP for ${escapeHtml(cmd.name)}">
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                        <button class="detail-btn" onclick="showDetails('${cmd.id}')">
+                            <span class="material-icons" style="font-size: 16px;">info</span>
+                            Details
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+
+        async function toggleMCP(commandId, enabled) {
+            try {
+                const response = await fetch(`${API_BASE}/${commandId}/mcp`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ enabled })
+                });
+                const result = await response.json();
+
+                // Update local data
+                for (const commands of Object.values(commandsData)) {
+                    const cmd = commands.find(c => c.id === commandId);
+                    if (cmd) {
+                        cmd.mcp_enabled = enabled;
+                        break;
+                    }
+                }
+                updateCounts();
+            } catch (error) {
+                console.error('Failed to toggle MCP:', error);
+                loadCommands();
+            }
+        }
+
+        async function showDetails(commandId) {
+            try {
+                const response = await fetch(`${API_BASE}/${commandId}`);
+                const cmd = await response.json();
+                currentCommand = cmd;
+
+                // Initialize edit state
+                editState = {
+                    description: cmd.description,
+                    mcpName: cmd.mcp_name,
+                    examples: [...(cmd.examples || [])],
+                    schemaAnnotations: JSON.parse(JSON.stringify(cmd.schema_annotations || {})),
+                    isDirty: false
+                };
+                originalState = {
+                    description: cmd.description,
+                    mcpName: cmd.mcp_name,
+                    examples: [...(cmd.examples || [])],
+                    schemaAnnotations: JSON.parse(JSON.stringify(cmd.schema_annotations || {}))
+                };
+
+                document.getElementById('modal-title').innerHTML = `
+                    <span class="material-icons" style="color: var(--accent);">info</span>
+                    ${escapeHtml(cmd.name)}
+                `;
+
+                // Populate Overview Tab
+                document.getElementById('tab-overview').innerHTML = renderOverviewTab(cmd);
+
+                // Populate Edit Tab
+                document.getElementById('tab-edit').innerHTML = renderEditTab(cmd);
+
+                // Populate MCP Preview Tab
+                document.getElementById('tab-mcp').innerHTML = renderMcpPreviewTab(cmd);
+
+                // Reset to Overview tab
+                switchTab('overview');
+                document.getElementById('save-btn').disabled = true;
+
+                // Set up edit tab event listeners after DOM is ready
+                setTimeout(() => {
+                    setupEditListeners();
+                    renderPreview();
+                }, 50);
+
+                openModal();
+            } catch (error) {
+                console.error('Failed to load command details:', error);
+            }
+        }
+
+        function renderOverviewTab(cmd) {
+            // Render description as markdown
+            const renderedDescription = typeof marked !== 'undefined' ?
+                (typeof DOMPurify !== 'undefined' ?
+                    DOMPurify.sanitize(marked.parse(cmd.description || '')) :
+                    marked.parse(cmd.description || '')) :
+                escapeHtml(cmd.description).replace(/\n/g, '<br>');
+
+            return `
+                <div class="detail-section">
+                    <div class="detail-label">
+                        <span class="material-icons" style="font-size: 16px;">description</span>
+                        Description
+                        ${cmd.has_custom_description ? '<span class="customized-badge">customized</span>' : ''}
+                    </div>
+                    <div class="detail-value preview-container" style="padding: 0; border: none; background: transparent;">${renderedDescription}</div>
+                </div>
+
+                <div class="detail-grid">
+                    <div class="detail-section">
+                        <div class="detail-label">
+                            <span class="material-icons" style="font-size: 16px;">terminal</span>
+                            CLI Command
+                        </div>
+                        <div class="inline-code">
+                            <span class="inline-code-value">inspekt ${escapeHtml(cmd.cli_name)}</span>
+                            <button class="copy-btn" onclick="copyToClipboard('inspekt ${escapeHtml(cmd.cli_name)}', this)">
+                                <span class="material-icons">content_copy</span>
+                                Copy
+                            </button>
+                        </div>
+                    </div>
+                    <div class="detail-section">
+                        <div class="detail-label">
+                            <span class="material-icons" style="font-size: 16px;">api</span>
+                            API Endpoint
+                        </div>
+                        <div class="inline-code">
+                            <span class="inline-code-value">${escapeHtml(cmd.api_method)} ${escapeHtml(cmd.api_path)}</span>
+                            <button class="copy-btn" onclick="copyToClipboard('${escapeHtml(cmd.api_method)} ${escapeHtml(cmd.api_path)}', this)">
+                                <span class="material-icons">content_copy</span>
+                                Copy
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="detail-section">
+                    <div class="detail-label collapsible-header" onclick="toggleCollapsible(this)">
+                        <span>
+                            <span class="material-icons" style="font-size: 16px;">input</span>
+                            Input Schema
+                        </span>
+                        <span class="material-icons">expand_more</span>
+                    </div>
+                    <div class="collapsible-content">
+                        <div class="code-block">
+                            <div class="code-block-header">
+                                <span class="code-block-title">JSON Schema</span>
+                                <button class="copy-btn" onclick="copyToClipboard(\`${escapeForJs(JSON.stringify(cmd.input_schema, null, 2))}\`, this)">
+                                    <span class="material-icons">content_copy</span>
+                                    Copy
+                                </button>
+                            </div>
+                            <pre>${escapeHtml(JSON.stringify(cmd.input_schema, null, 2))}</pre>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="detail-section">
+                    <div class="detail-label collapsible-header collapsed" onclick="toggleCollapsible(this)">
+                        <span>
+                            <span class="material-icons" style="font-size: 16px;">output</span>
+                            Output Schema
+                        </span>
+                        <span class="material-icons">expand_more</span>
+                    </div>
+                    <div class="collapsible-content collapsed">
+                        <div class="code-block">
+                            <div class="code-block-header">
+                                <span class="code-block-title">JSON Schema</span>
+                                <button class="copy-btn" onclick="copyToClipboard(\`${escapeForJs(JSON.stringify(cmd.output_schema, null, 2))}\`, this)">
+                                    <span class="material-icons">content_copy</span>
+                                    Copy
+                                </button>
+                            </div>
+                            <pre>${escapeHtml(JSON.stringify(cmd.output_schema, null, 2))}</pre>
+                        </div>
+                    </div>
+                </div>
+
+                ${cmd.examples && cmd.examples.length > 0 ? `
+                <div class="detail-section">
+                    <div class="detail-label">
+                        <span class="material-icons" style="font-size: 16px;">lightbulb</span>
+                        Examples
+                        ${cmd.has_custom_examples ? '<span class="customized-badge">customized</span>' : ''}
+                    </div>
+                    <ul class="examples-list">
+                        ${cmd.examples.map(ex => `
+                            <li class="example-item">
+                                <span class="example-item-text">${escapeHtml(ex)}</span>
+                                <button class="copy-btn" onclick="copyToClipboard('${escapeForJs(ex)}', this)">
+                                    <span class="material-icons">content_copy</span>
+                                </button>
+                            </li>
+                        `).join('')}
+                    </ul>
+                </div>
+                ` : ''}
+            `;
+        }
+
+        function renderEditTab(cmd) {
+            return `
+                <div class="detail-section">
+                    <div class="detail-label">
+                        <span class="material-icons" style="font-size: 16px;">description</span>
+                        Description (Markdown)
+                        ${cmd.has_custom_description ? '<span class="customized-badge">customized</span>' : ''}
+                        ${cmd.has_custom_description ? `<button class="reset-btn" onclick="resetField('description')">Reset</button>` : ''}
+                    </div>
+                    <div class="editor-split">
+                        <div class="editor-pane">
+                            <div class="editor-pane-header">Edit</div>
+                            <div class="editor-container">
+                                <textarea id="description-editor" style="width: 100%; height: 100%; min-height: 230px; padding: 12px; border: none; resize: none; font-family: 'JetBrains Mono', monospace; font-size: 13px; background: var(--bg-secondary); color: var(--text-primary);">${escapeHtml(cmd.description)}</textarea>
+                            </div>
+                        </div>
+                        <div class="editor-pane">
+                            <div class="editor-pane-header">Preview</div>
+                            <div class="preview-container" id="description-preview">
+                                <!-- Rendered markdown will appear here -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="detail-section">
+                    <div class="detail-label">
+                        <span class="mcp-icon" style="width: 16px; height: 16px;">${getMcpIconSvg()}</span>
+                        MCP Tool Name
+                        ${cmd.has_custom_mcp_name ? '<span class="customized-badge">customized</span>' : ''}
+                        ${cmd.has_custom_mcp_name ? `<button class="reset-btn" onclick="resetField('mcp_name')">Reset</button>` : ''}
+                    </div>
+                    <input type="text" class="mcp-name-input" id="mcp-name-input" value="${escapeHtml(cmd.mcp_name)}" placeholder="e.g., navigate_to_url">
+                    <p style="font-size: 12px; color: var(--text-secondary); margin-top: 6px;">
+                        Default: <code style="background: var(--bg-secondary); padding: 2px 6px; border-radius: 4px;">${escapeHtml(cmd.default_mcp_name || cmd.mcp_name)}</code>
+                    </p>
+                </div>
+
+                <div class="detail-section">
+                    <div class="detail-label">
+                        <span class="material-icons" style="font-size: 16px;">lightbulb</span>
+                        Examples
+                        ${cmd.has_custom_examples ? '<span class="customized-badge">customized</span>' : ''}
+                        ${cmd.has_custom_examples ? `<button class="reset-btn" onclick="resetField('examples')">Reset</button>` : ''}
+                    </div>
+                    <div class="examples-manager" id="examples-manager">
+                        ${(cmd.examples || []).map((ex, i) => `
+                            <div class="example-edit-item" data-index="${i}">
+                                <input type="text" class="example-edit-input" value="${escapeHtml(ex)}" onchange="updateExample(${i}, this.value)">
+                                <button class="example-edit-btn" onclick="moveExample(${i}, -1)" title="Move up" ${i === 0 ? 'disabled style="opacity: 0.3"' : ''}>
+                                    <span class="material-icons" style="font-size: 16px;">arrow_upward</span>
+                                </button>
+                                <button class="example-edit-btn" onclick="moveExample(${i}, 1)" title="Move down" ${i === (cmd.examples || []).length - 1 ? 'disabled style="opacity: 0.3"' : ''}>
+                                    <span class="material-icons" style="font-size: 16px;">arrow_downward</span>
+                                </button>
+                                <button class="example-edit-btn delete" onclick="deleteExample(${i})" title="Delete">
+                                    <span class="material-icons" style="font-size: 16px;">close</span>
+                                </button>
+                            </div>
+                        `).join('')}
+                    </div>
+                    <button class="add-example-btn" onclick="addExample()">
+                        <span class="material-icons">add</span>
+                        Add Example
+                    </button>
+                </div>
+
+                ${renderSchemaAnnotationsEditor(cmd)}
+            `;
+        }
+
+        function renderSchemaAnnotationsEditor(cmd) {
+            const schema = cmd.input_schema;
+            if (!schema || !schema.properties || Object.keys(schema.properties).length === 0) {
+                return '';
+            }
+
+            const required = schema.required || [];
+            const annotations = cmd.schema_annotations || {};
+
+            return `
+                <div class="detail-section">
+                    <div class="detail-label">
+                        <span class="material-icons" style="font-size: 16px;">tune</span>
+                        Schema Field Annotations
+                        ${cmd.has_custom_schema_annotations ? '<span class="customized-badge">customized</span>' : ''}
+                        ${cmd.has_custom_schema_annotations ? `<button class="reset-btn" onclick="resetField('schema_annotations')">Reset All</button>` : ''}
+                    </div>
+                    <p style="font-size: 12px; color: var(--text-secondary); margin-bottom: 12px;">
+                        Customize field descriptions and add examples to help AI understand parameters better.
+                    </p>
+                    <div class="schema-annotations" id="schema-annotations">
+                        ${Object.entries(schema.properties).map(([fieldName, fieldSchema]) => {
+                            const fieldAnnotation = annotations[fieldName] || {};
+                            const isRequired = required.includes(fieldName);
+                            const fieldType = fieldSchema.type || (fieldSchema.anyOf ? fieldSchema.anyOf.map(t => t.type).filter(Boolean).join(' | ') : 'any');
+
+                            return `
+                                <div class="schema-field" data-field="${escapeHtml(fieldName)}">
+                                    <div class="schema-field-header">
+                                        <span class="schema-field-name">${escapeHtml(fieldName)}</span>
+                                        <span class="schema-field-type">${escapeHtml(fieldType)}</span>
+                                        ${isRequired ? '<span class="schema-field-required">required</span>' : ''}
+                                    </div>
+                                    <div class="schema-field-row">
+                                        <div class="schema-field-label">Description</div>
+                                        <input type="text"
+                                               class="schema-field-input"
+                                               placeholder="${escapeHtml(fieldSchema.description || 'No default description')}"
+                                               value="${escapeHtml(fieldAnnotation.description || '')}"
+                                               onchange="updateSchemaAnnotation('${escapeHtml(fieldName)}', 'description', this.value)">
+                                        ${fieldSchema.description ? `<div class="schema-field-default">Default: ${escapeHtml(fieldSchema.description)}</div>` : ''}
+                                    </div>
+                                    <div class="schema-field-row">
+                                        <div class="schema-field-label">Examples (comma-separated)</div>
+                                        <input type="text"
+                                               class="schema-field-input"
+                                               placeholder="e.g., value1, value2, value3"
+                                               value="${escapeHtml((fieldAnnotation.examples || []).join(', '))}"
+                                               onchange="updateSchemaAnnotationExamples('${escapeHtml(fieldName)}', this.value)">
+                                    </div>
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+                </div>
+            `;
+        }
+
+        function updateSchemaAnnotation(fieldName, key, value) {
+            if (!editState.schemaAnnotations[fieldName]) {
+                editState.schemaAnnotations[fieldName] = {};
+            }
+            if (value.trim()) {
+                editState.schemaAnnotations[fieldName][key] = value.trim();
+            } else {
+                delete editState.schemaAnnotations[fieldName][key];
+                // Clean up empty objects
+                if (Object.keys(editState.schemaAnnotations[fieldName]).length === 0) {
+                    delete editState.schemaAnnotations[fieldName];
+                }
+            }
+            markDirty();
+        }
+
+        function updateSchemaAnnotationExamples(fieldName, value) {
+            if (!editState.schemaAnnotations[fieldName]) {
+                editState.schemaAnnotations[fieldName] = {};
+            }
+            if (value.trim()) {
+                editState.schemaAnnotations[fieldName].examples = value.split(',').map(s => s.trim()).filter(Boolean);
+            } else {
+                delete editState.schemaAnnotations[fieldName].examples;
+                // Clean up empty objects
+                if (Object.keys(editState.schemaAnnotations[fieldName]).length === 0) {
+                    delete editState.schemaAnnotations[fieldName];
+                }
+            }
+            markDirty();
+        }
+
+        // Merge schema annotations into the base schema
+        function mergeSchemaAnnotations(baseSchema, annotations) {
+            if (!annotations || Object.keys(annotations).length === 0) {
+                return baseSchema;
+            }
+
+            // Deep copy to avoid modifying original
+            const schema = JSON.parse(JSON.stringify(baseSchema));
+
+            if (schema.properties) {
+                for (const [fieldName, fieldAnnotations] of Object.entries(annotations)) {
+                    if (schema.properties[fieldName]) {
+                        if (fieldAnnotations.description) {
+                            schema.properties[fieldName].description = fieldAnnotations.description;
+                        }
+                        if (fieldAnnotations.examples && fieldAnnotations.examples.length > 0) {
+                            schema.properties[fieldName].examples = fieldAnnotations.examples;
+                        }
+                    }
+                }
+            }
+
+            return schema;
+        }
+
+        function renderMcpPreviewTab(cmd) {
+            // Merge schema annotations into the schema for preview
+            const effectiveSchema = mergeSchemaAnnotations(cmd.input_schema, cmd.schema_annotations);
+
+            const toolDef = {
+                name: cmd.mcp_name,
+                description: cmd.description,
+                inputSchema: effectiveSchema
+            };
+
+            return `
+                <div class="mcp-preview-card">
+                    <div class="mcp-preview-header">
+                        <div class="mcp-preview-title">
+                            <span class="mcp-icon large">${getMcpIconSvg('#e91e63')}</span>
+                            What AI Models See
+                        </div>
+                        <button class="copy-btn" onclick="copyToClipboard(\`${escapeForJs(JSON.stringify(toolDef, null, 2))}\`, this)">
+                            <span class="material-icons">content_copy</span>
+                            Copy
+                        </button>
+                    </div>
+                    <div class="code-block" style="margin: 0;">
+                        <pre id="mcp-tool-json">${escapeHtml(JSON.stringify(toolDef, null, 2))}</pre>
+                    </div>
+                </div>
+
+                <div class="mcp-tips">
+                    <div class="mcp-tips-title">
+                        <span class="material-icons" style="color: var(--warning);">tips_and_updates</span>
+                        Tips for Writing Good AI Instructions
+                    </div>
+                    <ul>
+                        <li>Be specific about <strong>when</strong> to use this tool vs alternatives</li>
+                        <li>Describe the <strong>expected output</strong> format clearly</li>
+                        <li>List common <strong>use cases</strong> and patterns</li>
+                        <li>Mention any <strong>prerequisites</strong> (e.g., "page must be loaded first")</li>
+                        <li>Include <strong>error scenarios</strong> the AI should watch for</li>
+                    </ul>
+                </div>
+
+                <div class="detail-section" style="margin-top: 20px;">
+                    <div class="detail-label">
+                        <span class="material-icons" style="font-size: 16px;">info</span>
+                        MCP Protocol Details
+                    </div>
+                    <div style="font-size: 13px; color: var(--text-secondary); line-height: 1.6;">
+                        <p>The MCP (Model Context Protocol) exposes exactly <strong>three fields</strong> to AI models:</p>
+                        <ul style="margin: 10px 0; padding-left: 20px;">
+                            <li><code>name</code> - Tool identifier (snake_case)</li>
+                            <li><code>description</code> - The ONLY text AI models see for instructions</li>
+                            <li><code>inputSchema</code> - JSON Schema for parameters</li>
+                        </ul>
+                        <p>Note: Examples are stored but NOT sent to AI via MCP. They're for documentation/CLI help only.</p>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Collapsible toggle
+        function toggleCollapsible(header) {
+            header.classList.toggle('collapsed');
+            const content = header.nextElementSibling;
+            content.classList.toggle('collapsed');
+        }
+
+        // Edit tab listeners
+        function setupEditListeners() {
+            const descEditor = document.getElementById('description-editor');
+            const mcpNameInput = document.getElementById('mcp-name-input');
+
+            if (descEditor) {
+                descEditor.addEventListener('input', (e) => {
+                    editState.description = e.target.value;
+                    markDirty();
+                    renderPreview();
+                });
+            }
+
+            if (mcpNameInput) {
+                mcpNameInput.addEventListener('input', (e) => {
+                    editState.mcpName = e.target.value;
+                    markDirty();
+                });
+            }
+        }
+
+        // Examples management
+        function updateExample(index, value) {
+            editState.examples[index] = value;
+            markDirty();
+        }
+
+        function moveExample(index, direction) {
+            const newIndex = index + direction;
+            if (newIndex < 0 || newIndex >= editState.examples.length) return;
+
+            const temp = editState.examples[index];
+            editState.examples[index] = editState.examples[newIndex];
+            editState.examples[newIndex] = temp;
+
+            markDirty();
+            refreshExamplesManager();
+        }
+
+        function deleteExample(index) {
+            editState.examples.splice(index, 1);
+            markDirty();
+            refreshExamplesManager();
+        }
+
+        function addExample() {
+            editState.examples.push('inspekt ' + (currentCommand?.cli_name || 'command'));
+            markDirty();
+            refreshExamplesManager();
+        }
+
+        function refreshExamplesManager() {
+            const manager = document.getElementById('examples-manager');
+            if (!manager) return;
+
+            manager.innerHTML = editState.examples.map((ex, i) => `
+                <div class="example-edit-item" data-index="${i}">
+                    <input type="text" class="example-edit-input" value="${escapeHtml(ex)}" onchange="updateExample(${i}, this.value)">
+                    <button class="example-edit-btn" onclick="moveExample(${i}, -1)" title="Move up" ${i === 0 ? 'disabled style="opacity: 0.3"' : ''}>
+                        <span class="material-icons" style="font-size: 16px;">arrow_upward</span>
+                    </button>
+                    <button class="example-edit-btn" onclick="moveExample(${i}, 1)" title="Move down" ${i === editState.examples.length - 1 ? 'disabled style="opacity: 0.3"' : ''}>
+                        <span class="material-icons" style="font-size: 16px;">arrow_downward</span>
+                    </button>
+                    <button class="example-edit-btn delete" onclick="deleteExample(${i})" title="Delete">
+                        <span class="material-icons" style="font-size: 16px;">close</span>
+                    </button>
+                </div>
+            `).join('');
+        }
+
+        // Reset field to default
+        async function resetField(field) {
+            if (!currentCommand) return;
+
+            try {
+                const response = await fetch(`${API_BASE}/${currentCommand.id}/reset`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ fields: [field] })
+                });
+
+                if (response.ok) {
+                    // Reload command details
+                    await showDetails(currentCommand.id);
+                }
+            } catch (error) {
+                console.error('Failed to reset field:', error);
+            }
+        }
+
+        // Save changes
+        async function saveChanges() {
+            console.log('saveChanges called', { currentCommand, editState });
+
+            if (!currentCommand) {
+                console.error('No current command');
+                return;
+            }
+
+            const saveBtn = document.getElementById('save-btn');
+            const originalBtnHtml = saveBtn.innerHTML;
+
+            try {
+                // Show loading state
+                saveBtn.disabled = true;
+                saveBtn.innerHTML = '<span class="material-icons">hourglass_empty</span> Saving...';
+
+                const body = {};
+
+                // Always include current values (not just changed ones)
+                body.description = editState.description;
+                body.mcp_name = editState.mcpName;
+                body.examples = editState.examples;
+                // Include schema annotations (empty object means reset)
+                body.schema_annotations = Object.keys(editState.schemaAnnotations).length > 0 ?
+                    editState.schemaAnnotations : null;
+
+                console.log('Sending to API:', body);
+
+                const response = await fetch(`${API_BASE}/${currentCommand.id}/config`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+
+                console.log('Response status:', response.status);
+
+                if (response.ok) {
+                    const result = await response.json();
+                    console.log('Save result:', result);
+
+                    // Show success briefly
+                    saveBtn.innerHTML = '<span class="material-icons">check</span> Saved!';
+                    saveBtn.style.background = 'var(--success)';
+
+                    setTimeout(async () => {
+                        // Reload to get updated data
+                        await showDetails(currentCommand.id);
+                        // Also refresh the command list
+                        await loadCommands();
+                    }, 500);
+                } else {
+                    const errorText = await response.text();
+                    console.error('Save failed:', response.status, errorText);
+                    alert(`Failed to save: ${response.status} ${errorText}`);
+                    saveBtn.innerHTML = originalBtnHtml;
+                    saveBtn.disabled = false;
+                }
+            } catch (error) {
+                console.error('Failed to save changes:', error);
+                alert(`Error saving: ${error.message}`);
+                saveBtn.innerHTML = originalBtnHtml;
+                saveBtn.disabled = false;
+            }
+        }
+
+        // Cancel edits
+        function cancelEdits() {
+            if (editState.isDirty) {
+                if (!confirm('You have unsaved changes. Are you sure you want to discard them?')) {
+                    return;
+                }
+            }
+
+            // Reset edit state (deep copy for nested objects)
+            editState = {
+                ...originalState,
+                schemaAnnotations: JSON.parse(JSON.stringify(originalState.schemaAnnotations || {})),
+                isDirty: false
+            };
+            document.getElementById('save-btn').disabled = true;
+
+            // Switch back to overview
+            switchTab('overview');
+        }
+
+        function openModal() {
+            const overlay = document.getElementById('modal-overlay');
+            overlay.classList.add('active');
+
+            // Make rest of page inert
+            document.querySelector('.page-layout').inert = true;
+
+            // Set up focus trap
+            setupFocusTrap();
+
+            // Focus first focusable element
+            setTimeout(() => {
+                if (firstFocusable) firstFocusable.focus();
+            }, 50);
+        }
+
+        function closeModal() {
+            // Warn about unsaved changes
+            if (editState.isDirty) {
+                if (!confirm('You have unsaved changes. Are you sure you want to close?')) {
+                    return;
+                }
+            }
+
+            const overlay = document.getElementById('modal-overlay');
+            overlay.classList.remove('active');
+
+            // Reset edit state
+            editState.isDirty = false;
+            currentCommand = null;
+
+            // Remove inert from page
+            document.querySelector('.page-layout').inert = false;
+        }
+
+        function setupFocusTrap() {
+            const modal = document.querySelector('.modal');
+            focusableElements = modal.querySelectorAll(
+                'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+            );
+            firstFocusable = focusableElements[0];
+            lastFocusable = focusableElements[focusableElements.length - 1];
+        }
+
+        // Handle keyboard navigation in modal
+        document.addEventListener('keydown', (e) => {
+            const overlay = document.getElementById('modal-overlay');
+            if (!overlay.classList.contains('active')) return;
+
+            if (e.key === 'Escape') {
+                closeModal();
+                return;
+            }
+
+            if (e.key === 'Tab') {
+                if (e.shiftKey) {
+                    if (document.activeElement === firstFocusable) {
+                        e.preventDefault();
+                        lastFocusable.focus();
+                    }
+                } else {
+                    if (document.activeElement === lastFocusable) {
+                        e.preventDefault();
+                        firstFocusable.focus();
+                    }
+                }
+            }
+        });
+
+        // Close modal on overlay click
+        document.getElementById('modal-overlay').addEventListener('click', (e) => {
+            if (e.target === e.currentTarget) closeModal();
+        });
+
+        // Copy to clipboard
+        async function copyToClipboard(text, button) {
+            try {
+                await navigator.clipboard.writeText(text);
+                const originalHtml = button.innerHTML;
+                button.innerHTML = '<span class="material-icons">check</span> Copied';
+                button.classList.add('copied');
+                setTimeout(() => {
+                    button.innerHTML = originalHtml;
+                    button.classList.remove('copied');
+                }, 2000);
+            } catch (error) {
+                console.error('Failed to copy:', error);
+            }
+        }
+
+        // Escape HTML
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text || '';
+            return div.innerHTML;
+        }
+
+        // Escape for JS string
+        function escapeForJs(text) {
+            return (text || '').replace(/\\/g, '\\\\').replace(/`/g, '\\`').replace(/\$/g, '\\$');
+        }
+
+        // Initialize MCP icons
+        document.addEventListener('DOMContentLoaded', () => {
+            const mcpStatIcon = document.getElementById('mcp-stat-icon');
+            if (mcpStatIcon) {
+                mcpStatIcon.innerHTML = getMcpIconSvg();
+            }
+            const mcpTabIcon = document.getElementById('mcp-tab-icon');
+            if (mcpTabIcon) {
+                mcpTabIcon.innerHTML = getMcpIconSvg();
+            }
+        });
+
+        // Keyboard navigation for modal tabs
+        document.addEventListener('keydown', (e) => {
+            const overlay = document.getElementById('modal-overlay');
+            if (!overlay.classList.contains('active')) return;
+
+            // Arrow keys for tab navigation when focused on a tab
+            if (document.activeElement?.classList.contains('modal-tab')) {
+                const tabs = ['overview', 'edit', 'mcp'];
+                const currentTab = document.activeElement.id.replace('tab-btn-', '');
+                const currentIndex = tabs.indexOf(currentTab);
+
+                if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    const nextIndex = (currentIndex + 1) % tabs.length;
+                    switchTab(tabs[nextIndex]);
+                    document.getElementById(`tab-btn-${tabs[nextIndex]}`).focus();
+                } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    const prevIndex = (currentIndex - 1 + tabs.length) % tabs.length;
+                    switchTab(tabs[prevIndex]);
+                    document.getElementById(`tab-btn-${tabs[prevIndex]}`).focus();
+                }
+            }
+        });
+
+        // Load on page load
+        loadCommands();
+    </script>
+</body>
+</html>

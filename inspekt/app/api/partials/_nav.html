@@ -1,0 +1,30 @@
+<!-- Top Navigation Bar -->
+<nav class="top-nav">
+    <a href="/status" class="top-nav-brand">
+        <span class="material-icons">visibility</span>
+        Inspekt
+    </a>
+    <div class="top-nav-links">
+        <a href="/status" class="top-nav-link{% if active_page == 'dashboard' %} active{% endif %}">
+            <span class="material-icons">dashboard</span>
+            Dashboard
+        </a>
+        <a href="/commands" class="top-nav-link{% if active_page == 'commands' %} active{% endif %}">
+            <span class="material-icons">terminal</span>
+            Commands
+        </a>
+        <a href="/plugins" class="top-nav-link{% if active_page == 'plugins' %} active{% endif %}">
+            <span class="material-icons">extension</span>
+            Plugins
+        </a>
+        <div class="top-nav-divider"></div>
+        <a href="/docs" class="top-nav-link external" target="_blank">
+            <span class="material-icons">description</span>
+            API Docs
+        </a>
+        <a href="https://github.com/roelvangils/inspekt" class="top-nav-link external" target="_blank">
+            <span class="material-icons">code</span>
+            GitHub
+        </a>
+    </div>
+</nav>

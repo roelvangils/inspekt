@@ -324,4 +324,4 @@ When adding browser-specific features:
 
 - [Chrome Extension MV3 Docs](https://developer.chrome.com/docs/extensions/mv3/)
 - [Firefox WebExtensions Docs](https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/)
-- [Window Message Bridge Pattern](../CLAUDE.md#window-message-bridge-pattern)
+- [Window Message Bridge Pattern](https://github.com/roelvangils/inspekt/blob/main/CLAUDE.md#window-message-bridge-pattern)

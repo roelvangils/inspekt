@@ -19,7 +19,7 @@ from urllib.parse import urlparse
 import click
 import requests
 
-from inspekt.app.cli.table import Table
+from inspekt.app.cli.table import Table, format_status_icon
 from inspekt.services.bridge_executor import get_executor
 
 
@@ -463,16 +463,15 @@ def _display_robots_txt(data: dict[str, Any], show_validation: bool = False):
     # User-agent groups as table
     groups = data.get("groups", [])
     if groups:
-        click.echo(click.style("User-agent Groups:", bold=True))
-        click.echo()
-
-        # Create table for rules
+        # Create table for rules with auto-width and title bar
         headers = ["User-agent", "Directive", "Path"]
-        widths = [20, 12, 50]
         alignments = ["left", "left", "left"]
+        title = f"User-agent Groups ({len(groups)})"
 
-        table = Table(headers, widths, alignments)
-        table.print_header()
+        # Build all rows first for auto-width calculation
+        rows = []
+        row_colors = []
+        separator_indices = []  # Track where to add separators
 
         for i, group in enumerate(groups):
             agents = ", ".join(group["userAgents"])
@@ -483,39 +482,39 @@ def _display_robots_txt(data: dict[str, Any], show_validation: bool = False):
                 first_rule = rules[0]
                 directive = first_rule["directive"]
                 path = first_rule["path"] or "/"
-
-                # Color code directives
                 directive_color = "green" if directive == "Allow" else "red"
-                table.print_row(
-                    [agents, directive, path],
-                    [None, directive_color, None]
-                )
+                rows.append([agents, directive, path])
+                row_colors.append([None, directive_color, None])
 
                 # Subsequent rules show empty user-agent cell
                 for rule in rules[1:]:
                     directive = rule["directive"]
                     path = rule["path"] or "/"
                     directive_color = "green" if directive == "Allow" else "red"
-                    table.print_row(
-                        ["", directive, path],
-                        [None, directive_color, None]
-                    )
+                    rows.append(["", directive, path])
+                    row_colors.append([None, directive_color, None])
 
             # Show crawl-delay and request-rate as special rows
             if crawl_delay := group.get("crawlDelay"):
-                table.print_row(
-                    ["", "Crawl-delay", str(crawl_delay)],
-                    [None, "cyan", None]
-                )
+                rows.append(["", "Crawl-delay", str(crawl_delay)])
+                row_colors.append([None, "cyan", None])
 
             if request_rate := group.get("requestRate"):
-                table.print_row(
-                    ["", "Request-rate", request_rate],
-                    [None, "cyan", None]
-                )
+                rows.append(["", "Request-rate", request_rate])
+                row_colors.append([None, "cyan", None])
 
-            # Add separator between groups (except for last group)
+            # Track separator position (except for last group)
             if i < len(groups) - 1:
+                separator_indices.append(len(rows))
+
+        # Create table with auto-width and title
+        table = Table(headers, alignments=alignments, title=title)
+        table.set_data(rows)
+        table.print_header()
+
+        for idx, (row, colors) in enumerate(zip(rows, row_colors)):
+            table.print_row(row, colors)
+            if idx + 1 in separator_indices:
                 table.print_separator()
 
         table.print_footer()
@@ -524,15 +523,14 @@ def _display_robots_txt(data: dict[str, Any], show_validation: bool = False):
     # Sitemaps as table
     sitemaps = data.get("sitemaps", [])
     if sitemaps:
-        click.echo(click.style("Sitemaps:", bold=True))
-        click.echo()
-
-        # Single column table for sitemaps
-        sitemap_table = Table(["URL"], [80], ["left"])
+        # Single column table for sitemaps with auto-width and title bar
+        sitemap_rows = [[sitemap] for sitemap in sitemaps]
+        sitemap_table = Table(["URL"], alignments=["left"], title=f"Sitemaps ({len(sitemaps)})")
+        sitemap_table.set_data(sitemap_rows)
         sitemap_table.print_header()
 
-        for sitemap in sitemaps:
-            sitemap_table.print_row([sitemap])
+        for row in sitemap_rows:
+            sitemap_table.print_row(row)
 
         sitemap_table.print_footer()
         click.echo()
@@ -543,21 +541,28 @@ def _display_robots_txt(data: dict[str, Any], show_validation: bool = False):
         errors = validation.get("errors", [])
         warnings = validation.get("warnings", [])
 
-        click.echo(click.style("Validation:", bold=True))
-        click.echo()
+        total_issues = len(errors) + len(warnings)
 
         if errors or warnings:
-            # Create validation table
-            val_table = Table(["Type", "Message"], [10, 70], ["left", "left"])
+            # Build validation rows for auto-width with status icons
+            val_rows = []
+            val_colors = []
+            for error in errors:
+                val_rows.append([format_status_icon("error"), "Error", error])
+                val_colors.append([None, "red", None])
+            for warning in warnings:
+                val_rows.append([format_status_icon(None), "Warning", warning])
+                val_colors.append([None, "yellow", None])
+
+            # Create validation table with auto-width and title bar
+            val_table = Table(["", "Type", "Message"], alignments=["left", "left", "left"], title=f"Validation ({total_issues} issues)")
+            val_table.set_data(val_rows)
             val_table.print_header()
 
-            for error in errors:
-                val_table.print_row(["Error", error], ["red", None])
-
-            for warning in warnings:
-                val_table.print_row(["Warning", warning], ["yellow", None])
+            for row, colors in zip(val_rows, val_colors):
+                val_table.print_row(row, colors)
 
             val_table.print_footer()
         else:
-            click.echo("  No errors or warnings")
+            click.echo(click.style(f"{format_status_icon('pass')} Validation: No errors or warnings", fg="green"))
         click.echo()

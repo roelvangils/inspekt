@@ -1,0 +1,78 @@
+/* Top Navigation Bar */
+.top-nav {
+    background: var(--bg-card);
+    border-bottom: 1px solid var(--border-color);
+    padding: 0 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 56px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    margin: -20px -20px 20px -20px;
+    width: calc(100% + 40px);
+}
+
+.top-nav-brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text-primary);
+    text-decoration: none;
+}
+
+.top-nav-brand .material-icons {
+    font-size: 24px;
+    color: var(--accent);
+}
+
+.top-nav-links {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.top-nav-link {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    border-radius: 8px;
+    text-decoration: none;
+    color: var(--text-secondary);
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.15s;
+}
+
+.top-nav-link:hover {
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+}
+
+.top-nav-link.active {
+    background: var(--accent);
+    color: white;
+}
+
+.top-nav-link .material-icons {
+    font-size: 18px;
+}
+
+.top-nav-divider {
+    width: 1px;
+    height: 24px;
+    background: var(--border-color);
+    margin: 0 8px;
+}
+
+.top-nav-link.external {
+    color: var(--text-tertiary);
+}
+
+.top-nav-link.external:hover {
+    color: var(--text-primary);
+}

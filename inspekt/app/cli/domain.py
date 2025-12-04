@@ -464,8 +464,11 @@ def _format_human_datetime(iso_string):
 
 
 def _display_domains(domains, bypass_status=None):
-    """Display domains in table format."""
+    """Display domains in table format with auto-width columns and title bar."""
     from inspekt.app.cli.table import Table
+
+    headers = ["Domain", "Added"]
+    alignments = ["left", "left"]
 
     # Show bypass status if active
     if bypass_status and bypass_status.get("enabled"):
@@ -474,32 +477,32 @@ def _display_domains(domains, bypass_status=None):
             click.echo(click.style(f"⚡ Bypass active ({remaining_minutes} min remaining)", fg="yellow"))
             click.echo()
 
+    count = len(domains) if domains else 0
+    title = f"Allowed Domains ({count})"
+
     if not domains:
-        table = Table(["Domain", "Added"], [40, 20])
+        table = Table(headers, alignments=alignments, title=title)
+        table.set_data([])  # Empty data, widths based on headers
         table.print_empty_message("No allowed domains")
         return
 
-    count = len(domains)
-    click.echo(f"Allowed domains ({count}):")
     click.echo()
 
-    # Create table with domain and date columns
-    table = Table(
-        headers=["Domain", "Added"],
-        widths=[40, 20],
-        alignments=["left", "left"]
-    )
-
-    table.print_header()
-
-    # Sort domains alphabetically
+    # Sort domains alphabetically and build rows
     sorted_domains = sorted(domains.items())
-
+    rows = []
     for domain, metadata in sorted_domains:
         added_at = metadata.get("addedAt", "Unknown")
         formatted_date = _format_human_datetime(added_at)
+        rows.append([domain, formatted_date])
 
-        table.print_row([domain, formatted_date])
+    # Create table with auto-width and title
+    table = Table(headers, alignments=alignments, title=title)
+    table.set_data(rows)
+    table.print_header()
+
+    for row in rows:
+        table.print_row(row)
 
     table.print_footer()
 

@@ -559,10 +559,10 @@ class ToolProvider:
                     success=True,
                     url=data.get("url", ""),
                     title=data.get("title", ""),
-                    viewport_width=data.get("viewport_width", 0),
-                    viewport_height=data.get("viewport_height", 0),
-                    scroll_x=data.get("scroll_x", 0),
-                    scroll_y=data.get("scroll_y", 0),
+                    viewport_width=int(data.get("viewport_width", 0)),
+                    viewport_height=int(data.get("viewport_height", 0)),
+                    scroll_x=int(data.get("scroll_x", 0)),
+                    scroll_y=int(data.get("scroll_y", 0)),
                 )
             else:
                 return schemas.GetPageInfoResponse(
@@ -831,4 +831,552 @@ class ToolProvider:
             logger.error(f"Autocomplete check error: {e}")
             return schemas.CheckAutocompleteResponse(
                 success=False, message=f"Error: {str(e)}"
+            )
+
+    async def run_axe(
+        self, params: schemas.RunAxeParams
+    ) -> schemas.RunAxeResponse:
+        """
+        Run axe-core accessibility tests on current page.
+
+        Performs WCAG conformance testing using the industry-standard axe-core
+        library. Returns violations with impact levels, affected elements,
+        and remediation guidance.
+
+        Args:
+            params: Axe configuration including WCAG level, rule, and scope
+
+        Returns:
+            Audit results with violations, summary, and optional passes/incomplete
+        """
+        try:
+            # Build axe configuration
+            if params.rule:
+                # Single rule check
+                config = {
+                    "runOnly": {"type": "rule", "values": [params.rule]},
+                    "resultTypes": ["violations"]
+                }
+            else:
+                # WCAG level-based check
+                level_mapping = {
+                    "2a": ["wcag2a"],
+                    "2aa": ["wcag2a", "wcag2aa"],
+                    "2aaa": ["wcag2a", "wcag2aa", "wcag2aaa"],
+                    "21a": ["wcag2a", "wcag21a"],
+                    "21aa": ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"],
+                    "22aa": ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"],
+                }
+                axe_tags = level_mapping.get(
+                    params.level or "21aa",
+                    ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]
+                )
+                config = {
+                    "runOnly": {"type": "tag", "values": axe_tags},
+                    "resultTypes": ["violations"]
+                }
+
+            if params.include_passes:
+                config["resultTypes"].append("passes")
+            if params.include_incomplete:
+                config["resultTypes"].append("incomplete")
+
+            # Disable badges for MCP (no visual output needed)
+            config["__showBadges"] = False
+            config["__interactiveBadges"] = False
+
+            # Build context expression
+            context_expr = "document"
+            if params.selector:
+                if params.exclude:
+                    context_expr = json.dumps({
+                        "include": params.selector,
+                        "exclude": params.exclude
+                    })
+                else:
+                    context_expr = json.dumps(params.selector)
+            elif params.exclude:
+                context_expr = json.dumps({"exclude": params.exclude})
+
+            # Load axe-core library
+            axe_lib = await self.script_loader.load_script_async(
+                "vendor/axe-core.min.js"
+            )
+
+            # Load run_axe script
+            run_axe_script = await self.script_loader.load_script_async("run_axe.js")
+
+            # Substitute config placeholder
+            run_axe_script = run_axe_script.replace(
+                "__AXE_CONFIG__", json.dumps(config)
+            )
+            # Substitute context (first occurrence only)
+            run_axe_script = run_axe_script.replace("document", context_expr, 1)
+
+            # First inject axe-core library
+            axe_lib_wrapped = (
+                f"(function() {{ {axe_lib} return typeof axe !== 'undefined'; }})()"
+            )
+            inject_result = await asyncio.to_thread(
+                self.executor.execute, axe_lib_wrapped, 10.0
+            )
+
+            if not inject_result.get("ok") or not inject_result.get("result"):
+                return schemas.RunAxeResponse(
+                    success=False,
+                    message=f"Failed to load axe-core: {inject_result.get('error', 'axe undefined')}"
+                )
+
+            # Execute audit script
+            result = await asyncio.to_thread(
+                self.executor.execute, run_axe_script, 60.0
+            )
+
+            if not result.get("ok"):
+                return schemas.RunAxeResponse(
+                    success=False,
+                    message=f"Axe execution failed: {result.get('error')}"
+                )
+
+            data = result.get("result", {})
+
+            if not data.get("ok"):
+                return schemas.RunAxeResponse(
+                    success=False,
+                    message=f"Axe audit error: {data.get('error')}"
+                )
+
+            # Parse violations into structured format
+            violations = []
+            for v in data.get("violations", []):
+                nodes = [
+                    schemas.AxeNode(
+                        target=n.get("target", []),
+                        html=n.get("html", ""),
+                        impact=n.get("impact", "unknown"),
+                        failure_summary=n.get("failureSummary")
+                    )
+                    for n in v.get("nodes", [])
+                ]
+                violations.append(schemas.AxeViolation(
+                    id=v.get("id", ""),
+                    impact=v.get("impact", "unknown"),
+                    description=v.get("description", ""),
+                    help=v.get("help", ""),
+                    help_url=v.get("helpUrl", ""),
+                    nodes=nodes,
+                    node_count=len(nodes)
+                ))
+
+            # Parse summary
+            summary_data = data.get("summary", {})
+            summary = schemas.AxeSummary(
+                violation_count=summary_data.get("violationCount", 0),
+                pass_count=summary_data.get("passCount", 0),
+                incomplete_count=summary_data.get("incompleteCount", 0),
+                critical_count=summary_data.get("criticalCount", 0),
+                serious_count=summary_data.get("seriousCount", 0),
+                moderate_count=summary_data.get("moderateCount", 0),
+                minor_count=summary_data.get("minorCount", 0)
+            )
+
+            return schemas.RunAxeResponse(
+                success=True,
+                url=data.get("url", ""),
+                violations=violations,
+                passes=data.get("passes", []) if params.include_passes else [],
+                incomplete=data.get("incomplete", []) if params.include_incomplete else [],
+                summary=summary,
+                axe_version=data.get("axeVersion"),
+                message=f"Found {len(violations)} accessibility violation(s)"
+            )
+
+        except Exception as e:
+            logger.error(f"Run axe error: {e}")
+            return schemas.RunAxeResponse(
+                success=False,
+                message=f"Error: {str(e)}"
+            )
+
+    # ========================================================================
+    # Network Tools
+    # ========================================================================
+
+    async def get_network_requests(
+        self, params: schemas.GetNetworkRequestsParams
+    ) -> schemas.GetNetworkRequestsResponse:
+        """
+        Get network requests from the current page using Performance API.
+
+        Returns detailed information about all resources loaded by the page,
+        including timing, size, and type information.
+
+        Note: Uses Performance API which has limitations:
+        - No HTTP status codes
+        - No request/response headers
+        - Buffer limit of ~150-250 entries
+
+        Args:
+            params: Filter and sort options
+
+        Returns:
+            Network request entries with summary statistics
+        """
+        try:
+            # Load the get_network.js script
+            script = await self.script_loader.load_script_async("get_network.js")
+
+            result = await asyncio.to_thread(
+                self.executor.execute, script, 30.0
+            )
+
+            if result.get("ok"):
+                data = result.get("result", {})
+
+                if data.get("error"):
+                    return schemas.GetNetworkRequestsResponse(
+                        success=False,
+                        url="",
+                        timestamp="",
+                        entries=[],
+                        summary={},
+                        message=data["error"],
+                    )
+
+                entries = data.get("entries", [])
+                summary = data.get("summary", {})
+
+                # Filter by type if specified
+                if params.resource_type:
+                    entries = [e for e in entries if e.get("type") == params.resource_type]
+                    # Update summary counts
+                    summary["totalRequests"] = len(entries)
+                    summary["totalTransferSize"] = sum(e.get("transferSize", 0) for e in entries)
+
+                # Filter external only
+                if params.external_only:
+                    entries = [e for e in entries if e.get("external")]
+
+                # Sort entries
+                sort_keys = {
+                    "start": lambda e: e.get("startTime", 0),
+                    "time": lambda e: -e.get("timing", {}).get("total", 0),
+                    "size": lambda e: -e.get("transferSize", 0),
+                    "name": lambda e: e.get("name", "").lower(),
+                    "type": lambda e: e.get("type", ""),
+                }
+
+                sort_by = params.sort_by or "start"
+                if sort_by in sort_keys:
+                    entries = sorted(entries, key=sort_keys[sort_by])
+
+                # Apply limit
+                if params.limit:
+                    entries = entries[:params.limit]
+
+                return schemas.GetNetworkRequestsResponse(
+                    success=True,
+                    url=data.get("url", ""),
+                    timestamp=data.get("timestamp", ""),
+                    entries=entries,
+                    summary=summary,
+                    message=f"Found {len(entries)} network requests",
+                )
+            else:
+                return schemas.GetNetworkRequestsResponse(
+                    success=False,
+                    url="",
+                    timestamp="",
+                    entries=[],
+                    summary={},
+                    message=result.get("error", "Failed to get network data"),
+                )
+
+        except Exception as e:
+            logger.error(f"Get network requests error: {e}")
+            return schemas.GetNetworkRequestsResponse(
+                success=False,
+                url="",
+                timestamp="",
+                entries=[],
+                summary={},
+                message=f"Error: {str(e)}",
+            )
+
+    async def get_har(
+        self, params: schemas.GetHARParams
+    ) -> schemas.GetHARResponse:
+        """
+        Get full network data from DevTools (HAR format).
+
+        This tool requires Chrome DevTools to be open (F12) for the active tab.
+        It provides complete network data including:
+        - HTTP status codes (200, 404, 500, etc.)
+        - Request and response headers
+        - Full timing breakdown
+        - Initiator information
+
+        If DevTools is not open, returns an error with a hint to use
+        get_network_requests instead.
+
+        Args:
+            params: Filter and sort options
+
+        Returns:
+            HAR entries with status codes, headers, and summary statistics
+        """
+        import requests as http_requests
+
+        try:
+            # Get HAR data from bridge server (which gets it from DevTools)
+            response = http_requests.get(
+                "http://127.0.0.1:8765/network/har",
+                timeout=20.0
+            )
+            data = response.json()
+
+            if not data.get("ok", False):
+                return schemas.GetHARResponse(
+                    success=False,
+                    source="devtools",
+                    url="",
+                    timestamp="",
+                    entries=[],
+                    summary={},
+                    message=data.get("error", "Failed to get HAR data. Is DevTools open (F12)?"),
+                )
+
+            entries = data.get("entries", [])
+            summary = data.get("summary", {})
+
+            # Filter by type if specified
+            if params.resource_type:
+                entries = [e for e in entries if e.get("type") == params.resource_type]
+
+            # Filter errors only
+            if params.errors_only:
+                entries = [e for e in entries if e.get("status", 0) >= 400]
+
+            # Sort entries
+            sort_keys = {
+                "start": lambda e: e.get("startedDateTime", ""),
+                "time": lambda e: -(e.get("timing", {}).get("total", 0) if isinstance(e.get("timing"), dict) else 0),
+                "size": lambda e: -e.get("transferSize", 0),
+                "name": lambda e: e.get("name", "").lower(),
+                "type": lambda e: e.get("type", ""),
+                "status": lambda e: e.get("status", 0),
+            }
+
+            sort_by = params.sort_by or "start"
+            if sort_by in sort_keys:
+                entries = sorted(entries, key=sort_keys[sort_by])
+
+            # Apply limit
+            if params.limit:
+                entries = entries[:params.limit]
+
+            # Update summary for filtered results
+            if params.resource_type or params.errors_only:
+                summary["totalRequests"] = len(entries)
+                summary["totalTransferSize"] = sum(e.get("transferSize", 0) for e in entries)
+
+            return schemas.GetHARResponse(
+                success=True,
+                source="devtools",
+                url=data.get("url", ""),
+                timestamp=data.get("timestamp", ""),
+                entries=entries,
+                summary=summary,
+                message=f"Found {len(entries)} requests with status codes and headers",
+            )
+
+        except http_requests.exceptions.ConnectionError:
+            return schemas.GetHARResponse(
+                success=False,
+                source="devtools",
+                url="",
+                timestamp="",
+                entries=[],
+                summary={},
+                message="Bridge server not running. Start it with: inspekt start",
+            )
+        except http_requests.exceptions.Timeout:
+            return schemas.GetHARResponse(
+                success=False,
+                source="devtools",
+                url="",
+                timestamp="",
+                entries=[],
+                summary={},
+                message="HAR request timed out. Is Chrome DevTools open (F12)?",
+            )
+        except Exception as e:
+            logger.error(f"Get HAR error: {e}")
+            return schemas.GetHARResponse(
+                success=False,
+                source="devtools",
+                url="",
+                timestamp="",
+                entries=[],
+                summary={},
+                message=f"Error: {str(e)}",
+            )
+
+    # ========================================================================
+    # Console Tools
+    # ========================================================================
+
+    async def get_console_logs(
+        self, params: schemas.GetConsoleLogsParams
+    ) -> schemas.GetConsoleLogsResponse:
+        """
+        Get captured browser console messages.
+
+        Returns console.log, console.error, console.warn, console.info, and
+        console.debug messages that were captured since the page loaded.
+        Console messages are automatically captured when pages load via
+        hooks injected by the browser extension.
+
+        Useful for:
+        - Debugging JavaScript errors after user interactions
+        - Monitoring application logging output
+        - Checking for deprecation warnings
+        - Verifying no errors occurred during automated testing
+
+        Note: Only captures messages logged AFTER the page loads and console
+        hooks are injected. Buffer is limited to 1000 messages.
+
+        Args:
+            params: Filter options (level, limit)
+
+        Returns:
+            List of console log entries with timestamps
+        """
+        import requests as http_requests
+
+        try:
+            # Get console logs from bridge server
+            response = http_requests.get(
+                "http://127.0.0.1:8765/console/logs",
+                timeout=15.0
+            )
+            data = response.json()
+
+            if not data.get("ok", False):
+                return schemas.GetConsoleLogsResponse(
+                    success=False,
+                    entries=[],
+                    count=0,
+                    hooked=False,
+                    message=data.get("error", "Failed to get console logs"),
+                )
+
+            entries = data.get("entries", [])
+            hooked = data.get("hooked", False)
+
+            # Filter by level if specified
+            if params.level and params.level != "all":
+                entries = [e for e in entries if e.get("level") == params.level]
+
+            # Apply limit
+            if params.limit and params.limit > 0:
+                entries = entries[-params.limit:]  # Get most recent
+
+            # Convert to Pydantic models
+            console_entries = [
+                schemas.ConsoleEntry(
+                    level=e.get("level", "log"),
+                    timestamp=e.get("timestamp", ""),
+                    message=e.get("message", ""),
+                )
+                for e in entries
+            ]
+
+            return schemas.GetConsoleLogsResponse(
+                success=True,
+                entries=console_entries,
+                count=len(console_entries),
+                hooked=hooked,
+                message=f"Found {len(console_entries)} console message(s)" + (
+                    f" (filtered: {params.level})" if params.level != "all" else ""
+                ),
+            )
+
+        except http_requests.exceptions.ConnectionError:
+            return schemas.GetConsoleLogsResponse(
+                success=False,
+                entries=[],
+                count=0,
+                hooked=False,
+                message="Bridge server not running. Start it with: inspekt start",
+            )
+        except http_requests.exceptions.Timeout:
+            return schemas.GetConsoleLogsResponse(
+                success=False,
+                entries=[],
+                count=0,
+                hooked=False,
+                message="Console logs request timed out",
+            )
+        except Exception as e:
+            logger.error(f"Get console logs error: {e}")
+            return schemas.GetConsoleLogsResponse(
+                success=False,
+                entries=[],
+                count=0,
+                hooked=False,
+                message=f"Error: {str(e)}",
+            )
+
+    async def clear_console_logs(self) -> schemas.ClearConsoleLogsResponse:
+        """
+        Clear the browser console message buffer.
+
+        Removes all captured console messages from the browser's buffer.
+        New messages will continue to be captured after clearing.
+
+        Useful for:
+        - Resetting before a specific test or interaction
+        - Clearing old messages to focus on new activity
+        - Starting fresh monitoring of console output
+
+        Returns:
+            Success status and message
+        """
+        import requests as http_requests
+
+        try:
+            # Clear console logs via bridge server
+            response = http_requests.post(
+                "http://127.0.0.1:8765/console/clear",
+                timeout=15.0
+            )
+            data = response.json()
+
+            if not data.get("ok", False):
+                return schemas.ClearConsoleLogsResponse(
+                    success=False,
+                    message=data.get("error", "Failed to clear console logs"),
+                )
+
+            return schemas.ClearConsoleLogsResponse(
+                success=True,
+                message="Console buffer cleared",
+            )
+
+        except http_requests.exceptions.ConnectionError:
+            return schemas.ClearConsoleLogsResponse(
+                success=False,
+                message="Bridge server not running. Start it with: inspekt start",
+            )
+        except http_requests.exceptions.Timeout:
+            return schemas.ClearConsoleLogsResponse(
+                success=False,
+                message="Clear console logs request timed out",
+            )
+        except Exception as e:
+            logger.error(f"Clear console logs error: {e}")
+            return schemas.ClearConsoleLogsResponse(
+                success=False,
+                message=f"Error: {str(e)}",
             )

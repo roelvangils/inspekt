@@ -285,6 +285,9 @@ cli.add_lazy_command("yolo", "domain", "yolo")
 # Plugin management commands (from plugin.py)
 cli.add_lazy_command("plugin", "plugin", "plugin")
 
+# VM management commands (from vm.py)
+cli.add_lazy_command("vm", "vm", "vm")
+
 
 # ============================================================================
 # Export main CLI

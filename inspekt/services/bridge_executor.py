@@ -270,9 +270,17 @@ class BridgeExecutor:
         """
         Check if current domain is allowed, prompt to add if not.
 
+        In isolated mode (Docker VM), always returns True without prompting.
+
         Returns:
             True if domain is allowed (or was added), False if user declined
         """
+        # In isolated mode, skip all domain checks and prompts
+        from inspekt.config import is_isolated_mode
+        if is_isolated_mode():
+            _verbose_log("Isolated mode active, skipping domain check")
+            return True
+
         domain = self._quick_get_current_domain()
 
         if domain is None:

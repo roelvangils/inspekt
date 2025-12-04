@@ -553,33 +553,39 @@ def _execute_plugin(
 
 
 def _display_plugins(plugins: list[dict]) -> None:
-    """Display plugins in table format."""
+    """Display plugins in table format with auto-width columns and title bar."""
     from inspekt.app.cli.table import Table
 
+    headers = ["Name", "Category", "MCP", "Runs"]
+    alignments = ["left", "left", "center", "right"]
+    title = f"Plugins ({len(plugins)})"
+
     if not plugins:
-        table = Table(["Name", "Category", "MCP", "Runs"], [30, 15, 5, 8])
+        # For empty tables, use minimum widths based on headers
+        table = Table(headers, alignments=alignments, title=title)
+        table.set_data([])  # Empty data, widths based on headers
         table.print_empty_message("No plugins found")
         return
 
-    click.echo(f"Plugins ({len(plugins)}):")
     click.echo()
 
-    table = Table(
-        headers=["Name", "Category", "MCP", "Runs"],
-        widths=[30, 15, 5, 8],
-        alignments=["left", "left", "center", "right"],
-    )
-
-    table.print_header()
-
+    # Build all rows first for auto-width calculation
+    rows = []
     for p in plugins:
         mcp_indicator = "*" if p.get("mcp_exposed") else ""
-        table.print_row([
-            p["name"][:30],
-            (p.get("category") or "-")[:15],
+        rows.append([
+            p["name"],
+            p.get("category") or "-",
             mcp_indicator,
             str(p.get("run_count", 0)),
         ])
+
+    table = Table(headers, alignments=alignments, title=title)
+    table.set_data(rows)
+    table.print_header()
+
+    for row in rows:
+        table.print_row(row)
 
     table.print_footer()
 

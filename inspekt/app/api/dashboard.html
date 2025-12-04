@@ -4,7 +4,18 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Inspekt Status Dashboard</title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
     <style>
+        /* Material Icons styling */
+        .material-icons {
+            font-size: 20px;
+            vertical-align: middle;
+            margin-right: 8px;
+            opacity: 0.8;
+        }
+        .card-title .material-icons {
+            color: var(--primary);
+        }
         * {
             margin: 0;
             padding: 0;
@@ -41,18 +52,15 @@
         }
 
         header {
-            background: var(--bg-card);
-            padding: 24px 32px;
-            border-radius: 12px;
-            box-shadow: var(--shadow);
-            margin-bottom: 24px;
+            padding: 16px 0;
+            margin-bottom: 16px;
             display: flex;
             justify-content: space-between;
             align-items: center;
         }
 
         h1 {
-            font-size: 28px;
+            font-size: 22px;
             font-weight: 600;
             color: var(--text-primary);
         }
@@ -117,6 +125,26 @@
             border-radius: 50%;
             background: var(--success);
             animation: pulse 2s ease-in-out infinite;
+        }
+
+        .poll-select {
+            padding: 4px 8px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            background: var(--bg-card);
+            color: var(--text-primary);
+            font-size: 12px;
+            cursor: pointer;
+            margin-left: 8px;
+        }
+
+        .poll-select:hover {
+            border-color: var(--accent);
+        }
+
+        .poll-select:focus {
+            outline: none;
+            border-color: var(--accent);
         }
 
         @keyframes pulse {
@@ -202,9 +230,17 @@
 
         .grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            grid-template-columns: repeat(3, 1fr);
             gap: 24px;
             margin-bottom: 24px;
+        }
+
+        .card.full-width {
+            grid-column: 1 / -1;
+        }
+
+        .card.span-2 {
+            grid-column: span 2;
         }
 
         .card {
@@ -340,6 +376,109 @@
             cursor: not-allowed;
         }
 
+        .activate-btn {
+            appearance: none;
+            -webkit-appearance: none;
+            position: relative;
+            padding: 4px 12px;
+            background: #27ae60;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s, opacity 0.2s, color 0.2s;
+            margin-right: 8px;
+            min-width: 60px;
+            text-align: center;
+            line-height: 1.4;
+        }
+
+        .activate-btn:hover {
+            background: #219a52;
+        }
+
+        .activate-btn:focus {
+            outline: none;
+            box-shadow: 0 0 0 2px rgba(39, 174, 96, 0.4);
+        }
+
+        .activate-btn:focus:not(:focus-visible) {
+            box-shadow: none;
+        }
+
+        .activate-btn:active {
+            background: #1e8449;
+        }
+
+        .activate-btn:disabled {
+            background: var(--text-secondary);
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+
+        .activate-btn.loading {
+            visibility: hidden;
+        }
+
+        .activate-btn.success {
+            background: #27ae60;
+            color: transparent;
+        }
+
+        .activate-btn.success::after {
+            content: '✓';
+            color: white;
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+
+        .activate-btn.error {
+            background: #e74c3c;
+            color: transparent;
+        }
+
+        .activate-btn.error::after {
+            content: '✗';
+            color: white;
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+
+        .visibility-icon {
+            width: 14px;
+            height: 14px;
+            margin-left: 6px;
+            vertical-align: middle;
+            opacity: 0.7;
+        }
+
+        .visibility-icon.visible {
+            color: var(--success);
+            opacity: 1;
+        }
+
+        .visibility-icon.hidden {
+            color: var(--text-secondary);
+            opacity: 0.5;
+        }
+
+        .favicon {
+            width: 16px;
+            height: 16px;
+            margin-right: 8px;
+            vertical-align: middle;
+            border-radius: 2px;
+        }
+
+        .browser-detail-value-with-icon {
+            display: flex;
+            align-items: center;
+        }
+
         .browser-table tr:last-child td {
             border-bottom: none;
         }
@@ -391,15 +530,829 @@
             margin-top: 16px;
         }
 
+        /* Domain Management Styles */
+        .domain-list {
+            margin-top: 8px;
+        }
+
+        .domain-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid var(--border-color);
+            font-size: 13px;
+        }
+
+        .domain-item:last-child {
+            border-bottom: none;
+        }
+
+        .domain-name {
+            font-family: 'JetBrains Mono', 'SF Mono', 'Consolas', 'Liberation Mono', 'Courier New', monospace;
+            color: var(--text-primary);
+        }
+
+        .domain-meta {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .domain-date {
+            font-size: 11px;
+            color: var(--text-secondary);
+        }
+
+        /* Plugin List */
+        .plugin-list {
+            margin-top: 8px;
+        }
+
+        .plugin-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 12px;
+            margin-bottom: 6px;
+            border-radius: 8px;
+            background: var(--bg-secondary);
+            cursor: pointer;
+            transition: all 0.15s ease;
+            text-decoration: none;
+            color: inherit;
+        }
+
+        .plugin-item:hover {
+            background: light-dark(#e3f2fd, #1a3a5c);
+            transform: translateX(4px);
+        }
+
+        .plugin-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .plugin-item-info {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            min-width: 0;
+            flex: 1;
+        }
+
+        .plugin-item-name {
+            font-weight: 600;
+            font-size: 13px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .plugin-item-meta {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 11px;
+            color: var(--text-secondary);
+        }
+
+        .plugin-category-badge {
+            padding: 2px 6px;
+            background: var(--bg-card);
+            border-radius: 4px;
+            font-size: 10px;
+            font-weight: 500;
+        }
+
+        .plugin-mcp-badge {
+            padding: 2px 6px;
+            background: var(--primary);
+            color: white;
+            border-radius: 4px;
+            font-size: 10px;
+            font-weight: 600;
+        }
+
+        .plugin-item-arrow {
+            color: var(--text-secondary);
+            opacity: 0;
+            transition: opacity 0.15s;
+        }
+
+        .plugin-item:hover .plugin-item-arrow {
+            opacity: 1;
+        }
+
+        .plugins-footer {
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid var(--border-color);
+            text-align: center;
+        }
+
+        .plugins-footer a {
+            color: var(--primary);
+            text-decoration: none;
+            font-size: 13px;
+            font-weight: 500;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .plugins-footer a:hover {
+            text-decoration: underline;
+        }
+
+        /* Links Card */
+        .links-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+            margin-top: 8px;
+        }
+
+        .links-section {
+            margin-bottom: 12px;
+        }
+
+        .links-section:last-child {
+            margin-bottom: 0;
+        }
+
+        .links-section-title {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+            padding-bottom: 4px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .link-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 10px;
+            border-radius: 6px;
+            background: var(--bg-secondary);
+            text-decoration: none;
+            color: var(--text-primary);
+            font-size: 13px;
+            font-weight: 500;
+            transition: all 0.15s ease;
+        }
+
+        .link-item:hover {
+            background: light-dark(#e3f2fd, #1a3a5c);
+            transform: translateY(-1px);
+        }
+
+        .link-item .material-icons {
+            font-size: 18px;
+            color: var(--primary);
+            opacity: 0.8;
+        }
+
+        .link-item.external .material-icons {
+            color: var(--text-secondary);
+        }
+
+        .link-item-text {
+            flex: 1;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .link-item .external-icon {
+            font-size: 14px;
+            color: var(--text-secondary);
+            opacity: 0;
+            transition: opacity 0.15s;
+        }
+
+        .link-item:hover .external-icon {
+            opacity: 1;
+        }
+
+        {% include 'partials/_nav.css' %}
+
+        /* Bypass Controls */
+        .bypass-controls {
+            margin-bottom: 16px;
+            padding: 12px;
+            background: var(--bg-secondary);
+            border-radius: 8px;
+        }
+
+        .bypass-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 8px 0;
+        }
+
+        .bypass-row:not(:last-child) {
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .bypass-row label {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 13px;
+            color: var(--text-primary);
+        }
+
+        .bypass-icon, .bypass-timer-icon {
+            font-size: 16px;
+        }
+
+        .bypass-select {
+            padding: 6px 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            background: var(--bg-card);
+            color: var(--text-primary);
+            font-size: 13px;
+            cursor: pointer;
+        }
+
+        .bypass-select:hover {
+            border-color: var(--accent);
+        }
+
+        .bypass-select:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 2px rgba(0, 122, 255, 0.2);
+        }
+
+        /* Timer Display */
+        .bypass-timer-row {
+            background: light-dark(#fff3cd, #3a3520);
+            margin: 0 -12px;
+            padding: 8px 12px !important;
+            border-radius: 0;
+            color: var(--warning);
+        }
+
+        .bypass-timer-row:not(:last-child) {
+            border-bottom: none !important;
+        }
+
+        .bypass-bar-inline {
+            flex: 1;
+            height: 4px;
+            background: var(--border-color);
+            border-radius: 2px;
+            overflow: hidden;
+        }
+
+        .bypass-bar-fill {
+            height: 100%;
+            background: var(--warning);
+            transition: width 1s linear;
+        }
+
+        /* Checkbox Toggle */
+        .checkbox-label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            font-size: 13px;
+            color: var(--text-primary);
+        }
+
+        .checkbox-label input[type="checkbox"] {
+            display: none;
+        }
+
+        .checkbox-custom {
+            width: 18px;
+            height: 18px;
+            border: 2px solid var(--border-color);
+            border-radius: 4px;
+            position: relative;
+            transition: all 0.2s;
+            flex-shrink: 0;
+        }
+
+        .checkbox-label:hover .checkbox-custom {
+            border-color: var(--warning);
+        }
+
+        .checkbox-label input:checked + .checkbox-custom {
+            background: var(--warning);
+            border-color: var(--warning);
+        }
+
+        .checkbox-label input:checked + .checkbox-custom::after {
+            content: '✓';
+            position: absolute;
+            color: white;
+            font-size: 12px;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        /* Domain Remove Button */
+        .domain-remove-btn {
+            width: 20px;
+            height: 20px;
+            padding: 0;
+            border: none;
+            background: transparent;
+            color: var(--text-secondary);
+            font-size: 16px;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .domain-remove-btn:hover {
+            background: var(--error);
+            color: white;
+        }
+
+        /* Console Logs Styles */
+        .console-summary {
+            display: flex;
+            gap: 16px;
+            padding: 12px 0;
+            border-bottom: 1px solid var(--border-color);
+            margin-bottom: 12px;
+        }
+
+        .console-count {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 13px;
+        }
+
+        .console-count .count-label {
+            color: var(--text-secondary);
+        }
+
+        .console-count .count-value {
+            font-weight: 600;
+            font-family: 'JetBrains Mono', 'SF Mono', 'Consolas', 'Liberation Mono', 'Courier New', monospace;
+        }
+
+        .console-count.error .count-value {
+            color: var(--error);
+        }
+
+        .console-count.warn .count-value {
+            color: var(--warning);
+        }
+
+        .console-count.info .count-value {
+            color: var(--accent);
+        }
+
+        .console-count.debug .count-value {
+            color: var(--text-secondary);
+        }
+
+        .console-messages {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .console-message {
+            display: flex;
+            gap: 8px;
+            padding: 6px 0;
+            border-bottom: 1px solid var(--border-color);
+            font-size: 12px;
+        }
+
+        .console-message:last-child {
+            border-bottom: none;
+        }
+
+        .console-time {
+            color: var(--text-secondary);
+            font-family: 'JetBrains Mono', 'SF Mono', 'Consolas', 'Liberation Mono', 'Courier New', monospace;
+            flex-shrink: 0;
+        }
+
+        .console-level {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            flex-shrink: 0;
+            margin-top: 4px;
+        }
+
+        .console-level.error {
+            background: var(--error);
+        }
+
+        .console-level.warn {
+            background: var(--warning);
+        }
+
+        .console-level.info {
+            background: var(--accent);
+        }
+
+        .console-level.debug {
+            background: var(--text-secondary);
+        }
+
+        .console-level.log {
+            background: var(--text-primary);
+        }
+
+        .console-text {
+            color: var(--text-primary);
+            font-family: 'JetBrains Mono', 'SF Mono', 'Consolas', 'Liberation Mono', 'Courier New', monospace;
+            word-break: break-word;
+            flex: 1;
+        }
+
+        .console-empty {
+            text-align: center;
+            padding: 20px;
+            color: var(--text-secondary);
+            font-size: 13px;
+        }
+
+        /* Collapsible Browser Instance Styles */
+        .browser-instance {
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            margin-bottom: 12px;
+            overflow: hidden;
+        }
+
+        .browser-instance:last-child {
+            margin-bottom: 0;
+        }
+
+        .browser-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 16px;
+            background: var(--bg-secondary);
+            cursor: pointer;
+            user-select: none;
+            transition: background 0.2s;
+            border-radius: 7px; /* Match parent's 8px minus 1px border */
+        }
+
+        .browser-instance.expanded .browser-header {
+            border-radius: 7px 7px 0 0; /* Only top corners when expanded */
+        }
+
+        .browser-header:hover {
+            background: var(--border-color);
+        }
+
+        .browser-header:focus {
+            outline: none;
+            box-shadow: inset 0 0 0 2px var(--accent);
+            background: var(--border-color);
+        }
+
+        .browser-header:focus-visible {
+            outline: none;
+            box-shadow: inset 0 0 0 2px var(--accent);
+        }
+
+        .browser-header-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex: 1;
+            min-width: 0;
+        }
+
+        .browser-header-right {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-shrink: 0;
+        }
+
+        .browser-chevron {
+            width: 16px;
+            height: 16px;
+            color: var(--text-secondary);
+            transition: transform 0.2s;
+            flex-shrink: 0;
+        }
+
+        .browser-instance.expanded .browser-chevron {
+            transform: rotate(90deg);
+        }
+
+        .browser-info {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            min-width: 0;
+            flex: 1;
+        }
+
+        .browser-title {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        .browser-url-preview {
+            font-size: 12px;
+            color: var(--text-secondary);
+            font-family: 'JetBrains Mono', 'SF Mono', 'Consolas', monospace;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 400px;
+        }
+
+        .browser-stats {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .browser-stat {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .browser-stat.errors {
+            color: var(--error);
+        }
+
+        .browser-stat.warnings {
+            color: var(--warning);
+        }
+
+        .browser-body {
+            display: none;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .browser-instance.expanded .browser-body {
+            display: block;
+        }
+
+        .browser-details {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 12px;
+            padding: 16px;
+            background: var(--bg-card);
+        }
+
+        .browser-detail {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .browser-detail-label {
+            font-size: 11px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .browser-detail-value {
+            font-size: 13px;
+            font-family: 'JetBrains Mono', 'SF Mono', 'Consolas', monospace;
+        }
+
+        .browser-console {
+            border-top: 1px solid var(--border-color);
+            padding: 12px 16px;
+            background: var(--bg-card);
+        }
+
+        .browser-console-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 12px;
+        }
+
+        .browser-console-title {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .browser-console-messages {
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
         .loading {
             text-align: center;
             padding: 40px;
             color: var(--text-secondary);
         }
 
+        /* Browser List Controls - Search and Sort */
+        .browser-controls {
+            display: flex;
+            gap: 16px;
+            align-items: center;
+            margin-bottom: 16px;
+            padding: 12px 16px;
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            flex-wrap: wrap;
+        }
+
+        .browser-search {
+            flex: 1;
+            min-width: 200px;
+            position: relative;
+        }
+
+        .browser-search-input {
+            width: 100%;
+            padding: 8px 12px 8px 36px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            background: var(--bg-card);
+            color: var(--text-primary);
+            font-size: 13px;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+
+        .browser-search-input:hover {
+            border-color: var(--accent);
+        }
+
+        .browser-search-input:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.15);
+        }
+
+        .browser-search-input::placeholder {
+            color: var(--text-secondary);
+        }
+
+        .browser-search-icon {
+            position: absolute;
+            left: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 14px;
+            height: 14px;
+            color: var(--text-secondary);
+            pointer-events: none;
+        }
+
+        .browser-search-clear {
+            position: absolute;
+            right: 8px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 18px;
+            height: 18px;
+            border: none;
+            background: var(--border-color);
+            color: var(--text-secondary);
+            border-radius: 50%;
+            cursor: pointer;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            line-height: 1;
+            padding: 0;
+        }
+
+        .browser-search-clear:hover {
+            background: var(--text-secondary);
+            color: var(--bg-card);
+        }
+
+        .browser-search.has-value .browser-search-clear {
+            display: flex;
+        }
+
+        .browser-sort {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .browser-sort-label {
+            font-size: 12px;
+            color: var(--text-secondary);
+            white-space: nowrap;
+        }
+
+        .browser-sort-select {
+            padding: 6px 10px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            background: var(--bg-card);
+            color: var(--text-primary);
+            font-size: 12px;
+            cursor: pointer;
+        }
+
+        .browser-sort-select:hover {
+            border-color: var(--accent);
+        }
+
+        .browser-sort-select:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        .browser-sort-direction {
+            padding: 6px 8px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            background: var(--bg-card);
+            color: var(--text-secondary);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.2s, color 0.2s, border-color 0.2s;
+        }
+
+        .browser-sort-direction:hover {
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+
+        .browser-sort-direction svg {
+            width: 14px;
+            height: 14px;
+            transition: transform 0.2s;
+        }
+
+        .browser-sort-direction.desc svg {
+            transform: rotate(180deg);
+        }
+
+        .browser-no-results {
+            text-align: center;
+            padding: 40px 20px;
+            color: var(--text-secondary);
+        }
+
+        .browser-no-results-icon {
+            width: 48px;
+            height: 48px;
+            margin-bottom: 12px;
+            opacity: 0.5;
+        }
+
+        .browser-no-results-text {
+            font-size: 14px;
+            margin-bottom: 8px;
+        }
+
+        .browser-no-results-hint {
+            font-size: 12px;
+            opacity: 0.7;
+        }
+
+        .browser-result-count {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-left: auto;
+        }
+
         @media (max-width: 768px) {
             .grid {
                 grid-template-columns: 1fr;
+            }
+
+            .card.full-width,
+            .card.span-2 {
+                grid-column: 1;
             }
 
             header {
@@ -415,14 +1368,35 @@
             .url-cell {
                 max-width: 150px;
             }
+
+            .browser-controls {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .browser-search {
+                min-width: 100%;
+            }
+
+            .browser-sort {
+                justify-content: space-between;
+            }
+
+            .browser-result-count {
+                margin-left: 0;
+                margin-top: 8px;
+                text-align: center;
+            }
         }
     </style>
 </head>
 <body>
+    {% include 'partials/_nav.html' %}
+
     <div class="container">
         <header>
             <div>
-                <h1>Inspekt Status Dashboard</h1>
+                <h1><span class="material-icons" style="vertical-align: middle; margin-right: 8px; color: var(--primary);">dashboard</span>Inspekt Status Dashboard</h1>
                 <div class="version" id="version">Loading...</div>
             </div>
             <div class="header-indicators">
@@ -433,15 +1407,66 @@
                 <div class="refresh-indicator">
                     <span class="refresh-dot"></span>
                     <span id="last-update">Updating...</span>
+                    <select id="poll-interval" class="poll-select" title="Refresh interval">
+                        <option value="1000">1s</option>
+                        <option value="2000">2s</option>
+                        <option value="5000">5s</option>
+                        <option value="30000">30s</option>
+                    </select>
                 </div>
             </div>
         </header>
 
         <div class="grid">
+            <!-- Connected Browser Instances -->
+            <div class="card full-width">
+                <div class="card-header">
+                    <div class="card-title"><span class="material-icons">devices</span>Connected Browser Instances</div>
+                    <div class="big-number-value" style="font-size: 24px;" id="browser-count">0</div>
+                </div>
+
+                <!-- Browser Controls: Search and Sort -->
+                <div class="browser-controls" id="browser-controls" style="display: none;">
+                    <div class="browser-search" id="browser-search-container">
+                        <input type="text"
+                               class="browser-search-input"
+                               id="browser-search"
+                               placeholder="Filter by URL or title..."
+                               autocomplete="off">
+                        <svg class="browser-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="11" cy="11" r="8"></circle>
+                            <path d="m21 21-4.35-4.35"></path>
+                        </svg>
+                        <button class="browser-search-clear" id="browser-search-clear" type="button" title="Clear search">
+                            &times;
+                        </button>
+                    </div>
+
+                    <div class="browser-sort">
+                        <span class="browser-sort-label">Sort by:</span>
+                        <select class="browser-sort-select" id="browser-sort-field">
+                            <option value="last_command">Last Command</option>
+                            <option value="connected">Connected Duration</option>
+                        </select>
+                        <button class="browser-sort-direction desc" id="browser-sort-direction" type="button" title="Newest first">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M12 5v14M5 12l7 7 7-7"/>
+                            </svg>
+                        </button>
+                    </div>
+
+                    <span class="browser-result-count" id="browser-result-count"></span>
+                </div>
+
+                <div id="browser-list">
+                    <div class="loading">No browser instances connected</div>
+                </div>
+            </div>
+
             <!-- Server Status Card -->
             <div class="card">
                 <div class="card-header">
-                    <div class="card-title">Bridge Server</div>
+                    <div class="card-title"><span class="material-icons">dns</span>Bridge Server</div>
                     <span class="status-badge running" id="server-status">Running</span>
                 </div>
                 <div class="metric">
@@ -465,7 +1490,7 @@
             <!-- API Server Card -->
             <div class="card">
                 <div class="card-header">
-                    <div class="card-title">API Server</div>
+                    <div class="card-title"><span class="material-icons">api</span>API Server</div>
                     <span class="status-badge" id="api-status">Checking...</span>
                 </div>
                 <div id="api-details">
@@ -491,7 +1516,7 @@
             <!-- Request Statistics Card -->
             <div class="card">
                 <div class="card-header">
-                    <div class="card-title">Request Statistics</div>
+                    <div class="card-title"><span class="material-icons">analytics</span>Request Statistics</div>
                 </div>
                 <div class="metric">
                     <span class="metric-label">Pending</span>
@@ -522,29 +1547,249 @@
             <!-- Script Cache Card -->
             <div class="card">
                 <div class="card-header">
-                    <div class="card-title">Script Cache</div>
+                    <div class="card-title"><span class="material-icons">code</span>Script Cache</div>
                     <span class="cache-count" id="cache-count">0 scripts</span>
                 </div>
                 <div id="cached-scripts-list">
                     <div class="loading">No scripts cached</div>
                 </div>
             </div>
-        </div>
 
-        <!-- Connected Browser Instances -->
-        <div class="card">
-            <div class="card-header">
-                <div class="card-title">Connected Browser Instances</div>
-                <div class="big-number-value" style="font-size: 24px;" id="browser-count">0</div>
+            <!-- Domain Management Card -->
+            <div class="card span-2">
+                <div class="card-header">
+                    <div class="card-title"><span class="material-icons">security</span>Allowed Domains</div>
+                    <span class="cache-count" id="domain-count">0 domains</span>
+                </div>
+
+                <!-- Bypass Controls -->
+                <div class="bypass-controls">
+                    <div class="bypass-row">
+                        <label for="quick-access-duration">
+                            <span class="bypass-icon">⚡</span> Quick Access:
+                        </label>
+                        <select id="quick-access-duration" class="bypass-select">
+                            <option value="0">Disabled</option>
+                            <option value="5">5 minutes</option>
+                            <option value="15">15 minutes</option>
+                            <option value="30">30 minutes</option>
+                            <option value="60">60 minutes</option>
+                        </select>
+                    </div>
+
+                    <div class="bypass-row bypass-timer-row" id="bypass-timer-row" style="display: none;">
+                        <span class="bypass-timer-icon">⏱</span>
+                        <span id="bypass-remaining">-- min remaining</span>
+                        <div class="bypass-bar-inline">
+                            <div class="bypass-bar-fill" id="bypass-bar-fill"></div>
+                        </div>
+                    </div>
+
+                    <div class="bypass-row">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="csp-bypass-toggle">
+                            <span class="checkbox-custom"></span>
+                            Disable CSP (Content Security Policy)
+                        </label>
+                    </div>
+                </div>
+
+                <div class="domain-list" id="domain-list">
+                    <div class="loading">Loading domains...</div>
+                </div>
             </div>
-            <div id="browser-list">
-                <div class="loading">No browser instances connected</div>
+
+            <!-- Plugins Card -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title"><span class="material-icons">extension</span>Plugins</div>
+                    <span class="cache-count" id="plugin-count">0 plugins</span>
+                </div>
+
+                <div class="plugin-list" id="plugin-list">
+                    <div class="loading">Loading plugins...</div>
+                </div>
+
+                <div class="plugins-footer">
+                    <a href="/plugins">
+                        <span class="material-icons" style="font-size: 16px;">open_in_new</span>
+                        Manage all plugins
+                    </a>
+                </div>
             </div>
+
+            <!-- Links Card -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title"><span class="material-icons">link</span>Links</div>
+                </div>
+
+                <div class="links-section">
+                    <div class="links-section-title">Web Interfaces</div>
+                    <div class="links-grid">
+                        <a href="/status" class="link-item">
+                            <span class="material-icons">dashboard</span>
+                            <span class="link-item-text">Dashboard</span>
+                        </a>
+                        <a href="/commands" class="link-item">
+                            <span class="material-icons">terminal</span>
+                            <span class="link-item-text">Commands</span>
+                        </a>
+                        <a href="/plugins" class="link-item">
+                            <span class="material-icons">extension</span>
+                            <span class="link-item-text">Plugins</span>
+                        </a>
+                    </div>
+                </div>
+
+                <div class="links-section">
+                    <div class="links-section-title">API Documentation</div>
+                    <div class="links-grid">
+                        <a href="/docs" class="link-item" target="_blank">
+                            <span class="material-icons">description</span>
+                            <span class="link-item-text">Swagger UI</span>
+                            <span class="material-icons external-icon">open_in_new</span>
+                        </a>
+                        <a href="/redoc" class="link-item" target="_blank">
+                            <span class="material-icons">menu_book</span>
+                            <span class="link-item-text">ReDoc</span>
+                            <span class="material-icons external-icon">open_in_new</span>
+                        </a>
+                        <a href="/openapi.json" class="link-item" target="_blank">
+                            <span class="material-icons">data_object</span>
+                            <span class="link-item-text">OpenAPI Spec</span>
+                            <span class="material-icons external-icon">open_in_new</span>
+                        </a>
+                        <a href="https://roelvangils.github.io/inspekt/" class="link-item external" target="_blank">
+                            <span class="material-icons">auto_stories</span>
+                            <span class="link-item-text">User Guide</span>
+                            <span class="material-icons external-icon">open_in_new</span>
+                        </a>
+                    </div>
+                </div>
+
+                <div class="links-section">
+                    <div class="links-section-title">GitHub</div>
+                    <div class="links-grid">
+                        <a href="https://github.com/roelvangils/inspekt" class="link-item external" target="_blank">
+                            <span class="material-icons">code</span>
+                            <span class="link-item-text">Repository</span>
+                            <span class="material-icons external-icon">open_in_new</span>
+                        </a>
+                        <a href="https://github.com/roelvangils/inspekt/issues" class="link-item external" target="_blank">
+                            <span class="material-icons">bug_report</span>
+                            <span class="link-item-text">Issues</span>
+                            <span class="material-icons external-icon">open_in_new</span>
+                        </a>
+                        <a href="https://github.com/roelvangils/inspekt/discussions" class="link-item external" target="_blank">
+                            <span class="material-icons">forum</span>
+                            <span class="link-item-text">Discussions</span>
+                            <span class="material-icons external-icon">open_in_new</span>
+                        </a>
+                    </div>
+                </div>
+            </div>
+
         </div>
     </div>
 
     <script>
         let lastUpdateTime = null;
+        let expandedBrowsers = new Set();
+        let browserConsoleLogs = {};
+        let pollInterval = 1000;
+        let statusIntervalId = null;
+        let consoleIntervalId = null;
+        let isMacOS = false;  // Will be set on page load
+
+        // Sorting and filtering state
+        let sortField = 'last_command';  // 'last_command' or 'connected'
+        let sortDirection = 'desc';      // 'asc' or 'desc' - default newest first
+        let searchQuery = '';            // Current search filter text
+
+        function toggleBrowser(index) {
+            const isExpanding = !expandedBrowsers.has(index);
+
+            if (isExpanding) {
+                expandedBrowsers.add(index);
+                // Fetch console logs for this browser when expanded
+                fetchConsoleLogsForBrowser(index);
+            } else {
+                expandedBrowsers.delete(index);
+            }
+
+            // Re-render will happen on next status update, but let's update immediately
+            const instance = document.querySelector(`.browser-instance[data-index="${index}"]`);
+            if (instance) {
+                instance.classList.toggle('expanded');
+
+                // Update aria-expanded attribute
+                const header = instance.querySelector('.browser-header');
+                if (header) {
+                    header.setAttribute('aria-expanded', isExpanding ? 'true' : 'false');
+                }
+            }
+        }
+
+        function handleBrowserHeaderKeydown(event, index) {
+            // Toggle on Enter or Space key
+            if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                toggleBrowser(index);
+            }
+        }
+
+        function renderConsoleLogs(logs) {
+            if (!logs || logs.length === 0) {
+                return '<div class="console-empty">No console messages captured</div>';
+            }
+
+            // Get last 15 messages, most recent first
+            const recentLogs = logs.slice(-15).reverse();
+
+            let html = '';
+            recentLogs.forEach(log => {
+                // Timestamp is in ISO format (e.g., "2025-01-15T01:18:45.123Z")
+                let time = '';
+                if (log.timestamp) {
+                    try {
+                        const dt = new Date(log.timestamp);
+                        time = dt.toLocaleTimeString('en-US', {
+                            hour12: false,
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            second: '2-digit'
+                        });
+                    } catch (e) {
+                        time = log.timestamp.substring(11, 19) || '';
+                    }
+                }
+                const level = log.level || 'log';
+                let message = log.message || '';
+
+                // Skip command markers
+                if (message.startsWith('[inspekt:cmd]')) {
+                    return;
+                }
+
+                // Truncate long messages
+                message = message.substring(0, 300);
+
+                html += `
+                    <div class="console-message">
+                        <span class="console-time">${time}</span>
+                        <span class="console-level ${level}"></span>
+                        <span class="console-text">${escapeHtml(message)}</span>
+                    </div>
+                `;
+            });
+
+            if (logs.length > 15) {
+                html += `<div class="console-empty" style="padding: 8px 0;">(showing 15 of ${logs.length} messages)</div>`;
+            }
+
+            return html || '<div class="console-empty">No console messages captured</div>';
+        }
 
         function formatDuration(seconds) {
             if (seconds < 60) {
@@ -558,6 +1803,16 @@
                 const mins = Math.floor((seconds % 3600) / 60);
                 return `${hours}h ${mins}m`;
             }
+        }
+
+        function formatCommandTime(timestamp) {
+            if (!timestamp) return 'Never';
+            const seconds = Math.floor((Date.now() / 1000) - timestamp);
+            if (seconds < 5) return 'Just now';
+            if (seconds < 60) return `${seconds}s ago`;
+            if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+            if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
+            return `${Math.floor(seconds / 86400)}d ago`;
         }
 
         function formatTimeAgo() {
@@ -581,8 +1836,100 @@
             return icons[browserName] || icons['Unknown'];
         }
 
+        function getFaviconUrl(pageUrl) {
+            if (!pageUrl || pageUrl === '-') return null;
+            try {
+                const url = new URL(pageUrl);
+                // Use Google's favicon service for reliable favicons
+                return `https://www.google.com/s2/favicons?domain=${url.hostname}&sz=32`;
+            } catch (e) {
+                return null;
+            }
+        }
+
+        function getVisibilityIcon(isVisible) {
+            if (isVisible) {
+                // Eye open icon for visible tabs
+                return `<svg class="visibility-icon visible" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" title="Tab is visible">
+                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                    <circle cx="12" cy="12" r="3"></circle>
+                </svg>`;
+            } else {
+                // Eye closed/off icon for hidden tabs
+                return `<svg class="visibility-icon hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" title="Tab is hidden">
+                    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
+                    <line x1="1" y1="1" x2="23" y2="23"></line>
+                </svg>`;
+            }
+        }
+
         function updateTimeAgo() {
             document.getElementById('last-update').textContent = `Updated ${formatTimeAgo()}`;
+        }
+
+        // Sort and filter browsers client-side
+        function sortAndFilterBrowsers(browsers) {
+            // Show browsers that either:
+            // 1. Have received an Inspekt command, OR
+            // 2. Are newly connected (less than 5 minutes = 300 seconds)
+            const NEW_CONNECTION_THRESHOLD = 300; // 5 minutes in seconds
+            let filtered = browsers.filter(browser => {
+                const hasCommand = browser.last_command_time != null;
+                const isNew = browser.connected_duration < NEW_CONNECTION_THRESHOLD;
+                return hasCommand || isNew;
+            });
+
+            // Apply search filter (case-insensitive partial match)
+            if (searchQuery.trim()) {
+                const query = searchQuery.toLowerCase().trim();
+                filtered = filtered.filter(browser => {
+                    const url = (browser.url || '').toLowerCase();
+                    const title = (browser.title || '').toLowerCase();
+                    return url.includes(query) || title.includes(query);
+                });
+            }
+
+            // Apply sorting
+            const sorted = [...filtered].sort((a, b) => {
+                let comparison = 0;
+
+                if (sortField === 'last_command') {
+                    // Sort by last command time
+                    // Tabs with commands first (non-null), then by recency
+                    const aTime = a.last_command_time || 0;
+                    const bTime = b.last_command_time || 0;
+                    comparison = bTime - aTime;  // Most recent first
+                } else if (sortField === 'connected') {
+                    // Sort by connected duration (higher = connected longer)
+                    comparison = b.connected_duration - a.connected_duration;
+                }
+
+                // Apply direction: desc means newest/most-recent first
+                return sortDirection === 'desc' ? comparison : -comparison;
+            });
+
+            return sorted;
+        }
+
+        // Update the result count display
+        function updateResultCount(filtered, total) {
+            const countEl = document.getElementById('browser-result-count');
+            if (!countEl) return;
+
+            if (searchQuery.trim() && filtered !== total) {
+                countEl.textContent = `Showing ${filtered} of ${total}`;
+            } else {
+                countEl.textContent = '';
+            }
+        }
+
+        // Update search container class for clear button visibility
+        function updateSearchState() {
+            const container = document.getElementById('browser-search-container');
+            const input = document.getElementById('browser-search');
+            if (container && input) {
+                container.classList.toggle('has-value', input.value.length > 0);
+            }
         }
 
         async function fetchStatus() {
@@ -701,48 +2048,173 @@
 
             // Connected Browser Instances
             const browserCount = data.connected_browsers || 0;
-            document.getElementById('browser-count').textContent = browserCount;
+            const browsers = data.browsers || [];
+
+            // Count visible browsers (new OR has command)
+            const NEW_THRESHOLD = 300; // 5 minutes
+            const visibleCount = browsers.filter(b =>
+                b.last_command_time != null || b.connected_duration < NEW_THRESHOLD
+            ).length;
+
+            // Show visible count, with total in parentheses if different
+            const countDisplay = visibleCount === browserCount
+                ? `${visibleCount}`
+                : `${visibleCount} (${browserCount})`;
+            document.getElementById('browser-count').textContent = countDisplay;
+
+            // Show/hide controls based on used browser count
+            const controlsEl = document.getElementById('browser-controls');
+            if (controlsEl) {
+                controlsEl.style.display = browserCount > 0 ? 'flex' : 'none';
+            }
 
             const browserList = document.getElementById('browser-list');
             if (browserCount === 0) {
                 browserList.innerHTML = '<div class="loading">No browser instances connected</div>';
+                updateResultCount(0, 0);
             } else {
-                const browsers = data.browsers || [];
-                let tableHTML = `
-                    <table class="browser-table">
-                        <thead>
-                            <tr>
-                                <th>Browser Instance</th>
-                                <th>Extension</th>
-                                <th>URL</th>
-                                <th>Connected</th>
-                                <th>Action</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                `;
+                // Store original indices before filtering/sorting
+                const browsersWithIndex = browsers.map((browser, index) => ({
+                    ...browser,
+                    originalIndex: index
+                }));
 
-                browsers.forEach((browser, index) => {
-                    const browserIcon = getBrowserIcon(browser.browser_name);
-                    const browserName = `${browser.browser_name} ${browser.browser_version || ''}`;
-                    const extension = browser.extension_version ? `v${browser.extension_version}` : '-';
-                    const url = browser.url || '-';
-                    const duration = formatDuration(browser.connected_duration || 0);
-                    const recentBadge = browser.is_most_recent ? '<span class="recent-badge">ACTIVE</span>' : '';
+                // Apply sorting and filtering
+                const sortedBrowsers = sortAndFilterBrowsers(browsersWithIndex);
 
-                    tableHTML += `
-                        <tr>
-                            <td class="browser-name">${browserIcon}<span>${browserName}${recentBadge}</span></td>
-                            <td>${extension}</td>
-                            <td class="url-cell" title="${url}">${url}</td>
-                            <td>${duration}</td>
-                            <td><button class="identify-btn" onclick="identifyBrowser(${index})">Identify</button></td>
-                        </tr>
+                // Count visible browsers for result display
+                const visibleBrowsers = browsers.filter(b =>
+                    b.last_command_time != null || b.connected_duration < NEW_THRESHOLD
+                );
+                updateResultCount(sortedBrowsers.length, visibleBrowsers.length);
+
+                if (sortedBrowsers.length === 0) {
+                    // No results - show appropriate message
+                    let message, hint;
+                    if (searchQuery.trim()) {
+                        message = `No browsers match "${escapeHtml(searchQuery)}"`;
+                        hint = 'Try a different search term';
+                    } else if (visibleBrowsers.length === 0 && browsers.length > 0) {
+                        message = 'No recent browser activity';
+                        hint = `${browsers.length} browser${browsers.length !== 1 ? 's' : ''} connected but idle for over 5 minutes`;
+                    } else {
+                        message = 'No matching browsers';
+                        hint = '';
+                    }
+                    browserList.innerHTML = `
+                        <div class="browser-no-results">
+                            <svg class="browser-no-results-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                <circle cx="11" cy="11" r="8"></circle>
+                                <path d="m21 21-4.35-4.35"></path>
+                            </svg>
+                            <div class="browser-no-results-text">${message}</div>
+                            ${hint ? `<div class="browser-no-results-hint">${hint}</div>` : ''}
+                        </div>
                     `;
-                });
+                } else {
+                    let html = '';
 
-                tableHTML += '</tbody></table>';
-                browserList.innerHTML = tableHTML;
+                    sortedBrowsers.forEach((browser) => {
+                        // Use originalIndex for all actions
+                        const index = browser.originalIndex;
+                        const browserIcon = getBrowserIcon(browser.browser_name);
+                        const visibilityIcon = getVisibilityIcon(browser.visible !== false);
+                        const browserName = `${browser.browser_name} ${browser.browser_version || ''}`;
+                        const extension = browser.extension_version ? `v${browser.extension_version}` : '-';
+                        const url = browser.url || '-';
+                        const title = browser.title || '';
+                        const faviconUrl = getFaviconUrl(url);
+                        const duration = formatDuration(browser.connected_duration || 0);
+                        const lastCommand = formatCommandTime(browser.last_command_time);
+                        const recentBadge = browser.is_most_recent ? '<span class="recent-badge">ACTIVE</span>' : '';
+                        const isExpanded = expandedBrowsers.has(index);
+                        const consoleLogs = browserConsoleLogs[index] || { logs: [], counts: { error: 0, warn: 0 } };
+
+                        html += `
+                            <div class="browser-instance ${isExpanded ? 'expanded' : ''}" data-index="${index}">
+                                <div class="browser-header"
+                                     tabindex="0"
+                                     role="button"
+                                     aria-expanded="${isExpanded}"
+                                     aria-controls="browser-body-${index}"
+                                     onclick="toggleBrowser(${index})"
+                                     onkeydown="handleBrowserHeaderKeydown(event, ${index})">
+                                    <div class="browser-header-left">
+                                        <svg class="browser-chevron" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M9 18l6-6-6-6"/>
+                                        </svg>
+                                        ${browserIcon}
+                                        <div class="browser-info">
+                                            <div class="browser-title">
+                                                ${browserName}
+                                                ${visibilityIcon}
+                                                ${recentBadge}
+                                            </div>
+                                            <div class="browser-url-preview">${url}</div>
+                                        </div>
+                                    </div>
+                                    <div class="browser-header-right">
+                                        <div class="browser-stats">
+                                            ${consoleLogs.counts.error > 0 ? `<span class="browser-stat errors">${consoleLogs.counts.error} errors</span>` : ''}
+                                            ${consoleLogs.counts.warn > 0 ? `<span class="browser-stat warnings">${consoleLogs.counts.warn} warnings</span>` : ''}
+                                            <span class="browser-stat" title="Last Inspekt command">${lastCommand}</span>
+                                            <span class="browser-stat" title="Connected duration">${duration}</span>
+                                        </div>
+                                        ${isMacOS ? `<button class="activate-btn" onclick="event.stopPropagation(); activateBrowserTab(${index}, '${escapeJsString(browser.browser_name)}', '${escapeJsString(url)}')" title="Bring this tab to front">Activate</button>` : ''}
+                                        <button class="identify-btn" onclick="event.stopPropagation(); identifyBrowser(${index})">Identify</button>
+                                    </div>
+                                </div>
+                                <div class="browser-body" id="browser-body-${index}">
+                                    <div class="browser-details">
+                                        <div class="browser-detail">
+                                            <span class="browser-detail-label">Page Title</span>
+                                            <span class="browser-detail-value browser-detail-value-with-icon">
+                                                ${faviconUrl ? `<img src="${faviconUrl}" class="favicon" alt="" onerror="this.style.display='none'">` : ''}
+                                                ${title || '-'}
+                                            </span>
+                                        </div>
+                                        <div class="browser-detail">
+                                            <span class="browser-detail-label">Extension Version</span>
+                                            <span class="browser-detail-value">${extension}</span>
+                                        </div>
+                                        <div class="browser-detail">
+                                            <span class="browser-detail-label">Connected</span>
+                                            <span class="browser-detail-value">${duration}</span>
+                                        </div>
+                                        <div class="browser-detail">
+                                            <span class="browser-detail-label">Full URL</span>
+                                            <span class="browser-detail-value" style="word-break: break-all;">${url}</span>
+                                        </div>
+                                    </div>
+                                    <div class="browser-console">
+                                        <div class="browser-console-header">
+                                            <span class="browser-console-title">Console Output</span>
+                                            <div class="console-summary" style="margin: 0; padding: 0; border: none;">
+                                                <div class="console-count error">
+                                                    <span class="count-value">${consoleLogs.counts.error}</span>
+                                                    <span class="count-label">errors</span>
+                                                </div>
+                                                <div class="console-count warn">
+                                                    <span class="count-value">${consoleLogs.counts.warn}</span>
+                                                    <span class="count-label">warnings</span>
+                                                </div>
+                                                <div class="console-count info">
+                                                    <span class="count-value">${consoleLogs.counts.info || 0}</span>
+                                                    <span class="count-label">info</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="browser-console-messages">
+                                            ${renderConsoleLogs(consoleLogs.logs)}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    });
+
+                    browserList.innerHTML = html;
+                }
             }
 
             // Feature 3: Cached Scripts List
@@ -763,6 +2235,339 @@
             }
 
             updateTimeAgo();
+        }
+
+        // ============================================================================
+        // Domain Management Functions
+        // ============================================================================
+
+        // Quick Access duration change handler
+        async function handleQuickAccessChange(duration) {
+            const cspToggle = document.getElementById('csp-bypass-toggle');
+
+            try {
+                // Enable/disable bypass
+                const response = await fetch('http://localhost:8000/api/domains/bypass', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ duration: parseInt(duration) })
+                });
+
+                if (response.ok && parseInt(duration) > 0) {
+                    // Auto-enable CSP bypass when Quick Access is enabled
+                    if (!cspToggle.checked) {
+                        cspToggle.checked = true;
+                        await handleCspToggleChange(true);
+                    }
+                }
+
+                // Refresh display
+                await fetchDomains();
+            } catch (error) {
+                console.error('Error setting quick access:', error);
+            }
+        }
+
+        // CSP toggle change handler
+        async function handleCspToggleChange(enabled) {
+            try {
+                const response = await fetch('http://localhost:8000/api/domains/csp-global', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ enabled: enabled })
+                });
+
+                const data = await response.json();
+                console.log('CSP toggle response:', response.status, data);
+
+                if (!response.ok || !data.ok) {
+                    // Revert toggle on failure
+                    document.getElementById('csp-bypass-toggle').checked = !enabled;
+                    console.error('Failed to toggle CSP bypass:', data.error || data.detail || 'Unknown error');
+                }
+            } catch (error) {
+                console.error('Error toggling CSP:', error);
+                document.getElementById('csp-bypass-toggle').checked = !enabled;
+            }
+        }
+
+        // Fetch and update CSP bypass status
+        async function fetchCspStatus() {
+            try {
+                const response = await fetch('http://localhost:8000/api/domains/csp-global');
+                if (response.ok) {
+                    const data = await response.json();
+                    document.getElementById('csp-bypass-toggle').checked = data.enabled || false;
+                }
+            } catch (error) {
+                console.warn('Could not fetch CSP status:', error.message);
+            }
+        }
+
+        // Domain removal with confirmation
+        async function removeDomain(domain) {
+            if (!confirm(`Remove "${domain}" from allowed domains?`)) {
+                return;
+            }
+
+            try {
+                const response = await fetch('http://localhost:8000/api/domains/remove', {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ domain: domain })
+                });
+
+                if (response.ok) {
+                    await fetchDomains(); // Refresh list
+                } else {
+                    const result = await response.json();
+                    alert(result.detail || result.error || 'Failed to remove domain');
+                }
+            } catch (error) {
+                console.error('Error removing domain:', error);
+                alert('Failed to remove domain');
+            }
+        }
+
+        // Fetch and update domain management card
+        async function fetchDomains() {
+            try {
+                // Fetch domains list
+                const domainsResponse = await fetch('http://localhost:8000/api/domains/list');
+                if (!domainsResponse.ok) throw new Error('Failed to fetch domains');
+                const domainsData = await domainsResponse.json();
+
+                // Fetch bypass status
+                const bypassResponse = await fetch('http://localhost:8000/api/domains/bypass', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ duration: -1 })
+                });
+                const bypassData = bypassResponse.ok ? await bypassResponse.json() : { enabled: false };
+
+                updateDomainsCard(domainsData, bypassData);
+            } catch (error) {
+                console.error('Error fetching domains:', error);
+                document.getElementById('domain-list').innerHTML = '<div class="console-empty">Unable to load domains</div>';
+            }
+        }
+
+        function updateDomainsCard(domainsData, bypassData) {
+            const domains = domainsData.domains || {};
+            const domainCount = Object.keys(domains).length;
+
+            // Update domain count
+            document.getElementById('domain-count').textContent = `${domainCount} domain${domainCount !== 1 ? 's' : ''}`;
+
+            // Update Quick Access dropdown and timer
+            const quickAccessDropdown = document.getElementById('quick-access-duration');
+            const bypassTimerRow = document.getElementById('bypass-timer-row');
+            const bypassRemaining = document.getElementById('bypass-remaining');
+            const bypassBarFill = document.getElementById('bypass-bar-fill');
+
+            if (bypassData.enabled) {
+                const remaining = bypassData.remainingMinutes || 0;
+
+                // Show timer row
+                bypassTimerRow.style.display = 'flex';
+                bypassRemaining.textContent = `${remaining} min remaining`;
+
+                // Update progress bar (max 60 minutes)
+                const maxMinutes = 60;
+                const percentage = Math.min((remaining / maxMinutes) * 100, 100);
+                bypassBarFill.style.width = `${percentage}%`;
+
+                // Set dropdown to closest matching value (don't change if user is interacting)
+                if (document.activeElement !== quickAccessDropdown) {
+                    const options = [60, 30, 15, 5];
+                    const closestOption = options.find(opt => remaining <= opt) || 60;
+                    quickAccessDropdown.value = closestOption.toString();
+                }
+            } else {
+                // Hide timer row
+                bypassTimerRow.style.display = 'none';
+                quickAccessDropdown.value = '0';
+            }
+
+            // Update domain list
+            const domainList = document.getElementById('domain-list');
+            if (domainCount === 0) {
+                domainList.innerHTML = '<div class="console-empty">No domains configured</div>';
+                return;
+            }
+
+            // Sort domains: permanent first, then by date
+            const sortedDomains = Object.entries(domains).sort((a, b) => {
+                if (a[1].permanent && !b[1].permanent) return -1;
+                if (!a[1].permanent && b[1].permanent) return 1;
+                return new Date(b[1].addedAt) - new Date(a[1].addedAt);
+            });
+
+            let html = '';
+            sortedDomains.forEach(([domain, meta]) => {
+                const date = new Date(meta.addedAt);
+                const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+                const removeButton = `<button class="domain-remove-btn" onclick="removeDomain('${domain}')" title="Remove domain">×</button>`;
+
+                html += `
+                    <div class="domain-item">
+                        <span class="domain-name">${domain}</span>
+                        <div class="domain-meta">
+                            <span class="domain-date">${dateStr}</span>
+                            ${removeButton}
+                        </div>
+                    </div>
+                `;
+            });
+
+            domainList.innerHTML = html;
+        }
+
+        // Fetch and update plugins card
+        async function fetchPlugins() {
+            try {
+                const response = await fetch('http://localhost:8000/api/plugins');
+                if (!response.ok) throw new Error('Failed to fetch plugins');
+                const data = await response.json();
+
+                updatePluginsCard(data.plugins || []);
+            } catch (error) {
+                console.error('Error fetching plugins:', error);
+                document.getElementById('plugin-list').innerHTML = '<div class="console-empty">Unable to load plugins</div>';
+            }
+        }
+
+        function updatePluginsCard(plugins) {
+            const pluginCount = plugins.length;
+
+            // Update plugin count
+            document.getElementById('plugin-count').textContent = `${pluginCount} plugin${pluginCount !== 1 ? 's' : ''}`;
+
+            const pluginList = document.getElementById('plugin-list');
+            if (pluginCount === 0) {
+                pluginList.innerHTML = '<div class="console-empty">No plugins installed</div>';
+                return;
+            }
+
+            // Sort by updated_at (most recent first) and take top 10
+            const sortedPlugins = [...plugins]
+                .sort((a, b) => (b.updated_at || 0) - (a.updated_at || 0))
+                .slice(0, 10);
+
+            let html = '';
+            sortedPlugins.forEach(plugin => {
+                const categoryBadge = plugin.category
+                    ? `<span class="plugin-category-badge">${escapeHtml(plugin.category)}</span>`
+                    : '';
+                const mcpBadge = plugin.mcp_exposed
+                    ? '<span class="plugin-mcp-badge">MCP</span>'
+                    : '';
+                const timeAgo = formatRelativeTime(plugin.updated_at);
+
+                html += `
+                    <a href="/plugins?id=${encodeURIComponent(plugin.id)}" class="plugin-item">
+                        <div class="plugin-item-info">
+                            <span class="plugin-item-name">${escapeHtml(plugin.name)}</span>
+                            <div class="plugin-item-meta">
+                                ${categoryBadge}
+                                ${mcpBadge}
+                                <span>${timeAgo}</span>
+                            </div>
+                        </div>
+                        <span class="material-icons plugin-item-arrow">chevron_right</span>
+                    </a>
+                `;
+            });
+
+            pluginList.innerHTML = html;
+        }
+
+        function formatRelativeTime(timestamp) {
+            if (!timestamp) return 'never';
+
+            const now = Math.floor(Date.now() / 1000);
+            const diff = now - timestamp;
+
+            if (diff < 60) return 'just now';
+            if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+            if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+            if (diff < 604800) return `${Math.floor(diff / 86400)}d ago`;
+
+            const date = new Date(timestamp * 1000);
+            return date.toLocaleDateString();
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text || '';
+            return div.innerHTML;
+        }
+
+        // Fetch console logs for a specific browser
+        async function fetchConsoleLogsForBrowser(browserIndex) {
+            try {
+                // Currently the bridge only supports fetching logs from the most recent browser
+                // We'll fetch from the main endpoint and store per-browser
+                const response = await fetch('http://localhost:8765/console/logs');
+                if (!response.ok) throw new Error('Failed to fetch console logs');
+                const data = await response.json();
+
+                // API returns "entries" not "logs"
+                const logs = data.entries || [];
+
+                // Calculate counts by level
+                const counts = { error: 0, warn: 0, info: 0, log: 0, debug: 0 };
+                logs.forEach(log => {
+                    const level = log.level || 'log';
+                    if (counts.hasOwnProperty(level)) {
+                        counts[level]++;
+                    }
+                });
+
+                browserConsoleLogs[browserIndex] = {
+                    logs: logs,
+                    counts: counts
+                };
+
+                // Update the console section in the expanded browser
+                const consoleMessages = document.querySelector(`.browser-instance[data-index="${browserIndex}"] .browser-console-messages`);
+                if (consoleMessages) {
+                    consoleMessages.innerHTML = renderConsoleLogs(logs);
+                }
+
+                // Update the counts in the header
+                const countElements = document.querySelector(`.browser-instance[data-index="${browserIndex}"] .browser-console .console-summary`);
+                if (countElements) {
+                    countElements.querySelector('.console-count.error .count-value').textContent = counts.error;
+                    countElements.querySelector('.console-count.warn .count-value').textContent = counts.warn;
+                    countElements.querySelector('.console-count.info .count-value').textContent = counts.info + counts.log;
+                }
+            } catch (error) {
+                console.error('Error fetching console logs:', error);
+            }
+        }
+
+        // Fetch console logs for all expanded browsers
+        async function fetchAllExpandedConsoleLogs() {
+            for (const index of expandedBrowsers) {
+                await fetchConsoleLogsForBrowser(index);
+            }
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function escapeJsString(str) {
+            if (!str) return '';
+            return str
+                .replace(/\\/g, '\\\\')
+                .replace(/'/g, "\\'")
+                .replace(/"/g, '\\"')
+                .replace(/\n/g, '\\n')
+                .replace(/\r/g, '\\r');
         }
 
         function showError(message) {
@@ -856,11 +2661,180 @@
             }
         }
 
-        // Initial fetch
-        fetchStatus();
+        async function activateBrowserTab(browserIndex, browserName, url) {
+            const btn = event.target;
 
-        // Update every 1 second
-        setInterval(fetchStatus, 1000);
+            try {
+                btn.disabled = true;
+                btn.classList.add('loading');
+
+                const response = await fetch('http://localhost:8000/api/browser/activate-tab', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        browser_name: browserName,
+                        url: url
+                    })
+                });
+
+                const result = await response.json();
+
+                if (response.ok && result.ok) {
+                    btn.classList.remove('loading');
+                    btn.classList.add('success');
+
+                    setTimeout(() => {
+                        btn.classList.remove('success');
+                        btn.disabled = false;
+                    }, 1500);
+                } else {
+                    btn.classList.remove('loading');
+                    btn.classList.add('error');
+
+                    const indicator = document.getElementById('activity-indicator');
+                    const originalClass = indicator.className;
+                    indicator.className = 'activity-indicator inactive';
+                    indicator.querySelector('.activity-value').textContent = result.detail || result.error || 'Activate failed';
+
+                    setTimeout(() => {
+                        btn.classList.remove('error');
+                        btn.disabled = false;
+                        indicator.className = originalClass;
+                    }, 3000);
+                }
+
+            } catch (error) {
+                console.error('Error activating browser tab:', error);
+
+                btn.classList.remove('loading');
+                btn.classList.add('error');
+
+                const indicator = document.getElementById('activity-indicator');
+                const originalClass = indicator.className;
+                indicator.className = 'activity-indicator inactive';
+                indicator.querySelector('.activity-value').textContent = 'Network error';
+
+                setTimeout(() => {
+                    btn.classList.remove('error');
+                    btn.disabled = false;
+                    indicator.className = originalClass;
+                }, 3000);
+            }
+        }
+
+        // Set up polling with configurable interval
+        function startPolling() {
+            // Clear existing intervals
+            if (statusIntervalId) clearInterval(statusIntervalId);
+            if (consoleIntervalId) clearInterval(consoleIntervalId);
+
+            // Start new intervals
+            statusIntervalId = setInterval(fetchStatus, pollInterval);
+            consoleIntervalId = setInterval(fetchAllExpandedConsoleLogs, pollInterval);
+        }
+
+        // Handle interval change
+        document.getElementById('poll-interval').addEventListener('change', function(e) {
+            pollInterval = parseInt(e.target.value, 10);
+            startPolling();
+            // Save preference
+            localStorage.setItem('inspekt-poll-interval', pollInterval);
+        });
+
+        // Load saved preference
+        const savedInterval = localStorage.getItem('inspekt-poll-interval');
+        if (savedInterval) {
+            pollInterval = parseInt(savedInterval, 10);
+            document.getElementById('poll-interval').value = pollInterval;
+        }
+
+        // Browser search input - immediate filtering for responsiveness
+        document.getElementById('browser-search').addEventListener('input', function(e) {
+            searchQuery = e.target.value;
+            updateSearchState();
+            fetchStatus();  // Re-fetch and re-render with filter applied
+        });
+
+        // Clear search button
+        document.getElementById('browser-search-clear').addEventListener('click', function() {
+            const searchInput = document.getElementById('browser-search');
+            searchInput.value = '';
+            searchQuery = '';
+            updateSearchState();
+            fetchStatus();
+            searchInput.focus();
+        });
+
+        // Sort field change
+        document.getElementById('browser-sort-field').addEventListener('change', function(e) {
+            sortField = e.target.value;
+            localStorage.setItem('inspekt-sort-field', sortField);
+            fetchStatus();
+        });
+
+        // Sort direction toggle
+        document.getElementById('browser-sort-direction').addEventListener('click', function() {
+            sortDirection = sortDirection === 'desc' ? 'asc' : 'desc';
+            this.classList.toggle('desc', sortDirection === 'desc');
+            this.title = sortDirection === 'desc' ? 'Newest first' : 'Oldest first';
+            localStorage.setItem('inspekt-sort-direction', sortDirection);
+            fetchStatus();
+        });
+
+        // Load saved sort preferences
+        const savedSortField = localStorage.getItem('inspekt-sort-field');
+        if (savedSortField && (savedSortField === 'last_command' || savedSortField === 'connected')) {
+            sortField = savedSortField;
+            const sortFieldEl = document.getElementById('browser-sort-field');
+            if (sortFieldEl) sortFieldEl.value = sortField;
+        }
+
+        const savedSortDirection = localStorage.getItem('inspekt-sort-direction');
+        if (savedSortDirection && (savedSortDirection === 'asc' || savedSortDirection === 'desc')) {
+            sortDirection = savedSortDirection;
+            const dirBtn = document.getElementById('browser-sort-direction');
+            if (dirBtn) {
+                dirBtn.classList.toggle('desc', sortDirection === 'desc');
+                dirBtn.title = sortDirection === 'desc' ? 'Newest first' : 'Oldest first';
+            }
+        }
+
+        // Check platform for tab activation support
+        async function checkPlatform() {
+            try {
+                const response = await fetch('http://localhost:8000/api/browser/platform');
+                if (response.ok) {
+                    const data = await response.json();
+                    isMacOS = data.is_macos;
+                    console.log('[Dashboard] Platform check:', data.platform, 'supports activation:', isMacOS);
+                }
+            } catch (error) {
+                console.log('[Dashboard] Platform check failed, assuming not macOS');
+                isMacOS = false;
+            }
+        }
+
+        // Initial fetch
+        checkPlatform();  // Check platform first
+        fetchStatus();
+        fetchDomains();
+        fetchPlugins();
+        fetchCspStatus();  // Fetch CSP bypass status
+
+        // Set up event listeners for domain management controls
+        document.getElementById('quick-access-duration').addEventListener('change', (e) => {
+            handleQuickAccessChange(e.target.value);
+        });
+
+        document.getElementById('csp-bypass-toggle').addEventListener('change', (e) => {
+            handleCspToggleChange(e.target.checked);
+        });
+
+        // Start polling
+        startPolling();
+
+        // Update domains every 5 seconds (less frequent as it rarely changes)
+        setInterval(fetchDomains, 5000);
 
         // Update "time ago" every second
         setInterval(updateTimeAgo, 1000);

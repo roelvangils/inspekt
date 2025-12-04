@@ -11,7 +11,7 @@ def get_bridge_executor():
 
     if not executor.is_server_running():
         raise HTTPException(
-            status_code=503, detail="Bridge server is not running. Start it with: inspekt server start"
+            status_code=503, detail="Bridge server is not running. Start it with: inspekt start"
         )
 
     return executor
@@ -23,7 +23,7 @@ def get_bridge_client() -> BridgeClient:
 
     if not client.is_alive():
         raise HTTPException(
-            status_code=503, detail="Bridge server is not running. Start it with: inspekt server start"
+            status_code=503, detail="Bridge server is not running. Start it with: inspekt start"
         )
 
     return client

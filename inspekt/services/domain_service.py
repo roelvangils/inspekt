@@ -247,7 +247,10 @@ class DomainService:
         """
         Check if domain is allowed.
 
-        Checks yolo mode first - if active, all domains are allowed.
+        Checks in order:
+        1. Isolated mode - if active, all domains are allowed (Docker VM)
+        2. Yolo mode - if active, all domains are allowed (time-limited)
+        3. Domain list - checks if domain or parent domain is in allowed list
 
         Supports subdomain matching:
         - If 'github.com' is allowed, 'www.github.com' is also allowed
@@ -255,7 +258,12 @@ class DomainService:
 
         The domain is normalized before checking.
         """
-        # Check yolo mode first - bypasses all domain checks
+        # Check isolated mode first - bypasses ALL domain checks (Docker VM)
+        from inspekt.config import is_isolated_mode
+        if is_isolated_mode():
+            return True
+
+        # Check yolo mode - bypasses all domain checks (time-limited)
         if self.is_yolo_mode_active():
             return True
 
