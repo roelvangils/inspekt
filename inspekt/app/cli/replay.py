@@ -227,6 +227,76 @@ def wait_for_page_ready(
     return {"success": False, "ready_state": "timeout", "elapsed_ms": elapsed_ms, "timed_out": True}
 
 
+def wait_for_visual_script_ready(
+    client: BridgeClient,
+    visual_script: str,
+    timeout_sec: float = 5.0,
+    poll_interval_sec: float = 0.2,
+    verbose: bool = False,
+) -> dict:
+    """Wait for visual script to be ready after navigation.
+
+    After page navigation, the extension's WebSocket connection needs to be
+    re-established before we can inject scripts. This function polls until
+    the visual script is confirmed loaded, retrying injection as needed.
+
+    Args:
+        client: BridgeClient instance
+        visual_script: The visual script content to inject
+        timeout_sec: Maximum time to wait in seconds
+        poll_interval_sec: Time between checks
+        verbose: Whether to print progress messages
+
+    Returns:
+        dict with 'success' (bool), 'injected' (bool), 'elapsed_ms' (int)
+    """
+    start_time = time.time()
+    injected = False
+
+    while time.time() - start_time < timeout_sec:
+        try:
+            # Check if visual script is loaded
+            check_result = client.execute(
+                "typeof window.__INSPEKT_VISUAL__ === 'object' && window.__INSPEKT_VISUAL__ !== null",
+                timeout=2.0
+            )
+
+            if check_result.get("ok") and check_result.get("result") is True:
+                elapsed_ms = int((time.time() - start_time) * 1000)
+                return {"success": True, "injected": injected, "elapsed_ms": elapsed_ms}
+
+            # Not ready - try to inject (might fail if connection not ready yet)
+            if not injected:
+                inject_result = client.execute(visual_script, timeout=3.0)
+                if inject_result.get("ok"):
+                    injected = True
+                    # Give it a moment to initialize
+                    time.sleep(0.1)
+                    continue
+
+        except Exception:
+            pass  # Connection might not be ready yet
+
+        time.sleep(poll_interval_sec)
+
+    # Timeout - one final attempt
+    try:
+        client.execute(visual_script, timeout=3.0)
+        time.sleep(0.1)
+        check = client.execute(
+            "typeof window.__INSPEKT_VISUAL__ === 'object' && window.__INSPEKT_VISUAL__ !== null",
+            timeout=2.0
+        )
+        if check.get("ok") and check.get("result") is True:
+            elapsed_ms = int((time.time() - start_time) * 1000)
+            return {"success": True, "injected": True, "elapsed_ms": elapsed_ms}
+    except Exception:
+        pass
+
+    elapsed_ms = int((time.time() - start_time) * 1000)
+    return {"success": False, "injected": injected, "elapsed_ms": elapsed_ms, "timed_out": True}
+
+
 def send_text_with_typing(client: BridgeClient, text: str, selector: str, clear: bool = True) -> dict:
     """Send text using human-like typing simulation.
 
@@ -1035,16 +1105,27 @@ def replay(
 
         # Interactive mode: show overlay and wait for user input
         if interactive and not dry_run:
-            # If previous step caused navigation, re-inject visual script before showing overlay
-            # (navigation resets the page context, losing our injected scripts)
+            # If previous step caused navigation, ensure visual script is ready before showing overlay
+            # (navigation resets the page context and extension needs to reconnect)
             if needs_visual_reinject:
-                try:
-                    reinject_result = client.execute(visual_script, timeout=10.0)
-                    if verbose and reinject_result.get("ok"):
-                        click.echo(format_system_message("visual script re-injected after navigation"))
-                except Exception as e:
-                    if verbose:
-                        click.echo(format_system_message(f"Warning: could not re-inject visual script: {e}"))
+                visual_ready = wait_for_visual_script_ready(
+                    client,
+                    visual_script,
+                    timeout_sec=5.0,
+                    poll_interval_sec=0.2,
+                    verbose=verbose,
+                )
+
+                if verbose:
+                    if visual_ready.get("success"):
+                        if visual_ready.get("injected"):
+                            click.echo(format_system_message(
+                                f"visual script re-injected ({visual_ready.get('elapsed_ms', 0)}ms)"
+                            ))
+                        else:
+                            click.echo(format_system_message("visual script already present"))
+                    else:
+                        click.echo(format_system_message("Warning: visual script not ready after navigation"))
 
             # Build the interactive prompt step
             previous_step_dict = None
@@ -1221,22 +1302,32 @@ def replay(
 
                             # Re-inject visual script after navigation (it's lost on page change)
                             if visual or audio or lock:
-                                try:
-                                    client.execute(visual_script, timeout=10.0)
+                                visual_ready = wait_for_visual_script_ready(
+                                    client,
+                                    visual_script,
+                                    timeout_sec=5.0,
+                                    poll_interval_sec=0.2,
+                                    verbose=verbose,
+                                )
+
+                                if visual_ready.get("success"):
                                     # Re-enable input lock
                                     if lock:
-                                        client.execute("window.__INSPEKT_VISUAL__.inputLock.enable()", timeout=5.0)
+                                        try:
+                                            client.execute("window.__INSPEKT_VISUAL__.inputLock.enable()", timeout=5.0)
+                                        except Exception:
+                                            pass
                                     # Re-initialize audio context after page navigation (browser audio only)
                                     if use_browser_audio:
-                                        client.execute("window.__INSPEKT_VISUAL__.audio.init()", timeout=5.0)
-                                        if navigated:
-                                            # Play navigate sound to indicate page transition
-                                            client.execute("window.__INSPEKT_VISUAL__.audio.playNavigate()", timeout=5.0)
-                                    elif cli_audio and navigated:
-                                        # CLI audio: navigate sound was already played at step start
-                                        pass
-                                except Exception:
-                                    pass  # Best effort re-injection
+                                        try:
+                                            client.execute("window.__INSPEKT_VISUAL__.audio.init()", timeout=5.0)
+                                            if navigated:
+                                                # Play navigate sound to indicate page transition
+                                                client.execute("window.__INSPEKT_VISUAL__.audio.playNavigate()", timeout=5.0)
+                                        except Exception:
+                                            pass
+                                elif verbose:
+                                    click.echo(format_system_message("Warning: visual script not ready after navigation"))
 
                             # Mark that this step caused navigation
                             # Next navigate step can be skipped since navigation already happened
