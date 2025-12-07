@@ -126,8 +126,13 @@ def samples_to_wav_bytes(samples: list[float]) -> bytes:
     return buffer.getvalue()
 
 
-def play_wav_bytes(wav_bytes: bytes) -> bool:
-    """Play WAV audio bytes using system audio."""
+def play_wav_bytes(wav_bytes: bytes, blocking: bool = False) -> bool:
+    """Play WAV audio bytes using system audio.
+
+    Args:
+        wav_bytes: The WAV file data to play
+        blocking: If True, wait for sound to finish. If False (default), play async.
+    """
     system = platform.system()
 
     # Write to temp file and play
@@ -137,29 +142,51 @@ def play_wav_bytes(wav_bytes: bytes) -> bool:
             temp_path = f.name
 
         if system == 'Darwin':  # macOS
-            subprocess.run(['afplay', temp_path], check=True, capture_output=True)
+            if blocking:
+                subprocess.run(['afplay', temp_path], check=True, capture_output=True)
+                # Clean up after blocking play
+                try:
+                    Path(temp_path).unlink()
+                except Exception:
+                    pass
+            else:
+                # Play async - don't wait, don't capture output
+                # Temp file will be cleaned up by OS (in /tmp)
+                subprocess.Popen(
+                    ['afplay', temp_path],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL
+                )
         elif system == 'Linux':
-            # Try aplay first (ALSA), fall back to paplay (PulseAudio)
-            try:
-                subprocess.run(['aplay', '-q', temp_path], check=True, capture_output=True)
-            except (subprocess.CalledProcessError, FileNotFoundError):
-                subprocess.run(['paplay', temp_path], check=True, capture_output=True)
+            cmd = ['aplay', '-q', temp_path]
+            if blocking:
+                try:
+                    subprocess.run(cmd, check=True, capture_output=True)
+                except (subprocess.CalledProcessError, FileNotFoundError):
+                    subprocess.run(['paplay', temp_path], check=True, capture_output=True)
+                try:
+                    Path(temp_path).unlink()
+                except Exception:
+                    pass
+            else:
+                try:
+                    subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                except FileNotFoundError:
+                    subprocess.Popen(['paplay', temp_path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         elif system == 'Windows':
-            # Use PowerShell to play audio
+            # Windows doesn't have a good async option, use blocking
             ps_script = f'(New-Object Media.SoundPlayer "{temp_path}").PlaySync()'
             subprocess.run(['powershell', '-Command', ps_script], check=True, capture_output=True)
+            try:
+                Path(temp_path).unlink()
+            except Exception:
+                pass
         else:
             return False
 
         return True
     except (subprocess.CalledProcessError, FileNotFoundError):
         return False
-    finally:
-        # Clean up temp file
-        try:
-            Path(temp_path).unlink()
-        except Exception:
-            pass
 
 
 class CLIAudio:

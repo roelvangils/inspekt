@@ -853,6 +853,7 @@ def replay(
 
         # Real-time delay: wait based on timestamp difference from previous step
         # Subtract any time already spent waiting for page load
+        # Note: CLI audio plays asynchronously, so it doesn't affect timing
         if not dry_run and i > 0 and speed != float("inf"):
             timestamp_diff_ms = step_timestamp - previous_timestamp
             # Subtract time we already waited for page load
