@@ -14,13 +14,21 @@
 const InspektPermissions = {
     STORAGE_KEY: 'inspekt_allowed_domains',
     TEMP_BYPASS_KEY: 'inspekt_temp_bypass',
+    PERMANENT_BYPASS_KEY: 'inspekt_permanent_bypass',  // For isolated/VM environments
 
     /**
      * Get the domain from a URL
+     * For file:// URLs, returns 'local-file' as a special domain
      */
     getDomain(url) {
         try {
             const urlObj = new URL(url || window.location.href);
+
+            // Handle file:// URLs - hostname is empty for these
+            if (urlObj.protocol === 'file:') {
+                return 'local-file';
+            }
+
             return urlObj.hostname;
         } catch (e) {
             return null;
@@ -66,6 +74,45 @@ const InspektPermissions = {
         }
 
         return false;
+    },
+
+    /**
+     * Check if permanent bypass is enabled (for isolated/VM environments)
+     * This is set by the bridge server when running in isolated mode
+     */
+    async isPermanentBypassActive() {
+        try {
+            const storage = typeof chrome !== 'undefined' ? chrome.storage : browser.storage;
+            const result = await storage.sync.get(this.PERMANENT_BYPASS_KEY);
+            const bypass = result[this.PERMANENT_BYPASS_KEY];
+            return bypass && bypass.enabled === true;
+        } catch (e) {
+            return false;
+        }
+    },
+
+    /**
+     * Enable or disable permanent bypass (for isolated/VM environments)
+     * @param {boolean} enabled - Whether to enable permanent bypass
+     */
+    async setPermanentBypass(enabled) {
+        const storage = typeof chrome !== 'undefined' ? chrome.storage : browser.storage;
+
+        if (enabled) {
+            await storage.sync.set({
+                [this.PERMANENT_BYPASS_KEY]: {
+                    enabled: true,
+                    enabledAt: new Date().toISOString(),
+                    reason: 'isolated_mode'
+                }
+            });
+            console.log('[Inspekt] Permanent bypass ENABLED (isolated mode)');
+        } else {
+            await storage.sync.remove(this.PERMANENT_BYPASS_KEY);
+            console.log('[Inspekt] Permanent bypass DISABLED');
+        }
+
+        return { ok: true, enabled: enabled };
     },
 
     /**
@@ -201,13 +248,26 @@ const InspektPermissions = {
 
     /**
      * Check if a domain is allowed
-     * Supports subdomain matching and temp bypass
+     * Supports subdomain matching, temp bypass, and permanent bypass (isolated mode)
+     * Local files (file://) are allowed by default
      */
     async isAllowed(domain) {
         domain = domain || this.getDomain();
         if (!domain) return false;
 
-        // Check temp bypass first (bypasses all domain checks)
+        // Local files are always allowed by default
+        // (user already opted in by enabling "Allow access to file URLs" in browser)
+        if (domain === 'local-file') {
+            return true;
+        }
+
+        // Check permanent bypass first (for isolated/VM environments)
+        const permanentBypassActive = await this.isPermanentBypassActive();
+        if (permanentBypassActive) {
+            return true;
+        }
+
+        // Check temp bypass (bypasses all domain checks)
         const bypassActive = await this.isTempBypassActive();
         if (bypassActive) {
             return true;

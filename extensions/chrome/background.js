@@ -12,11 +12,20 @@ console.log('[Inspekt Extension] Background service worker loaded');
 // Track which tabs have Zen Bridge active
 const activeTabs = new Set();
 
+// Track DevTools connections for HAR requests
+const devToolsConnections = new Map();
+const pendingHARRequests = new Map();
+
 // Listen for tab updates to inject into new pages
 chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
     if (changeInfo.status === 'complete') {
         console.log('[Inspekt] Tab updated:', tab.url);
         activeTabs.add(tabId);
+
+        // Inject console hooks when page loads (for console capture feature)
+        if (tab.url?.startsWith('http')) {
+            injectConsoleHooks(tabId);
+        }
 
         // Update icon when page finishes loading
         await updateIconForTab(tabId, tab);
@@ -49,6 +58,19 @@ chrome.storage.onChanged.addListener(async (changes, areaName) => {
         if (changes.inspekt_allowed_domains || changes.inspekt_temp_bypass) {
             console.log('[Inspekt] Permissions changed, updating all icons');
             await updateAllTabIcons();
+
+            // Notify all tabs to re-check permissions and reconnect if needed
+            // This enables commands to work immediately after adding a domain (no page refresh)
+            const tabs = await chrome.tabs.query({});
+            for (const tab of tabs) {
+                try {
+                    await chrome.tabs.sendMessage(tab.id, {
+                        type: 'PERMISSIONS_CHANGED'
+                    });
+                } catch (e) {
+                    // Tab may not have content script loaded (e.g., chrome:// pages)
+                }
+            }
         }
     }
 });
@@ -168,7 +190,173 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             .catch(error => sendResponse({ ok: false, error: String(error) }));
         return true; // Keep channel open for async response
     }
+
+    if (message.type === 'CAPTURE_FULL_PAGE') {
+        // Capture full page screenshot using Chrome DevTools Protocol
+        captureFullPageWithCDP(sender.tab.id, message.options)
+            .then(sendResponse)
+            .catch(error => sendResponse({ ok: false, error: String(error) }));
+        return true; // Keep channel open for async response
+    }
+
+    if (message.type === 'GET_HAR') {
+        // Get HAR data from DevTools (if DevTools is open for this tab)
+        getHARFromDevTools(sender.tab?.id || message.tabId)
+            .then(sendResponse)
+            .catch(error => sendResponse({ ok: false, error: String(error) }));
+        return true; // Keep channel open for async response
+    }
+
+    if (message.type === 'GET_CONSOLE_LOGS') {
+        // Get captured console logs from the page
+        getConsoleLogs(sender.tab?.id || message.tabId)
+            .then(sendResponse)
+            .catch(error => sendResponse({ ok: false, error: String(error) }));
+        return true; // Keep channel open for async response
+    }
+
+    if (message.type === 'CLEAR_CONSOLE_LOGS') {
+        // Clear the console logs buffer in the page
+        clearConsoleLogs(sender.tab?.id || message.tabId)
+            .then(sendResponse)
+            .catch(error => sendResponse({ ok: false, error: String(error) }));
+        return true; // Keep channel open for async response
+    }
+
+    if (message.type === 'CSP_BYPASS_ENABLE') {
+        // Enable CSP bypass for a domain using declarativeNetRequest
+        handleCspBypassEnable(message.domain)
+            .then(sendResponse)
+            .catch(error => sendResponse({ ok: false, error: String(error) }));
+        return true; // Keep channel open for async response
+    }
+
+    if (message.type === 'CSP_BYPASS_DISABLE') {
+        // Disable CSP bypass for a domain
+        handleCspBypassDisable(message.domain)
+            .then(sendResponse)
+            .catch(error => sendResponse({ ok: false, error: String(error) }));
+        return true; // Keep channel open for async response
+    }
+
+    if (message.type === 'CSP_BYPASS_STATUS') {
+        // Get CSP bypass status for a domain
+        handleCspBypassStatus(message.domain)
+            .then(sendResponse)
+            .catch(error => sendResponse({ ok: false, error: String(error) }));
+        return true; // Keep channel open for async response
+    }
+
+    if (message.type === 'CSP_BYPASS_GLOBAL') {
+        // Enable/disable global CSP bypass for ALL domains
+        handleCspBypassGlobal(message.enabled)
+            .then(sendResponse)
+            .catch(error => sendResponse({ ok: false, error: String(error) }));
+        return true; // Keep channel open for async response
+    }
+
+    if (message.type === 'CSP_BYPASS_GLOBAL_STATUS') {
+        // Get global CSP bypass status
+        getGlobalCspBypassStatus()
+            .then(sendResponse)
+            .catch(error => sendResponse({ ok: false, error: String(error) }));
+        return true; // Keep channel open for async response
+    }
 });
+
+// ============================================================================
+// DEVTOOLS CONNECTION HANDLING (for HAR requests)
+// ============================================================================
+
+/**
+ * Listen for connections from DevTools pages
+ */
+chrome.runtime.onConnect.addListener((port) => {
+    // Check if this is a DevTools connection
+    if (port.name.startsWith('devtools-')) {
+        const tabId = parseInt(port.name.replace('devtools-', ''));
+        console.log('[Inspekt] DevTools connected for tab:', tabId);
+
+        // Store the connection
+        devToolsConnections.set(tabId, port);
+
+        // Handle messages from DevTools
+        port.onMessage.addListener((message) => {
+            console.log('[Inspekt] Message from DevTools:', message);
+
+            if (message.type === 'HAR_RESPONSE') {
+                // Resolve the pending HAR request
+                const pending = pendingHARRequests.get(message.requestId);
+                if (pending) {
+                    if (message.error) {
+                        pending.reject(new Error(message.error));
+                    } else {
+                        pending.resolve(message.data);
+                    }
+                    pendingHARRequests.delete(message.requestId);
+                }
+            }
+        });
+
+        // Clean up on disconnect
+        port.onDisconnect.addListener(() => {
+            console.log('[Inspekt] DevTools disconnected for tab:', tabId);
+            devToolsConnections.delete(tabId);
+        });
+    }
+});
+
+/**
+ * Request HAR data from DevTools for a specific tab
+ */
+async function getHARFromDevTools(tabId) {
+    // Check if DevTools is connected for this tab
+    const port = devToolsConnections.get(tabId);
+
+    if (!port) {
+        return {
+            ok: false,
+            error: 'DevTools not open for this tab. Open DevTools (F12) to capture full network data.',
+            hint: 'The HAR export requires Chrome DevTools to be open. Use "inspekt network" for basic network data without DevTools.'
+        };
+    }
+
+    // Generate a unique request ID
+    const requestId = `har-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+    // Create a promise that will be resolved when DevTools responds
+    return new Promise((resolve, reject) => {
+        // Set up timeout
+        const timeout = setTimeout(() => {
+            pendingHARRequests.delete(requestId);
+            reject(new Error('HAR request timed out'));
+        }, 10000); // 10 second timeout
+
+        // Store the promise callbacks
+        pendingHARRequests.set(requestId, {
+            resolve: (data) => {
+                clearTimeout(timeout);
+                resolve(data);
+            },
+            reject: (error) => {
+                clearTimeout(timeout);
+                reject(error);
+            }
+        });
+
+        // Send request to DevTools
+        try {
+            port.postMessage({
+                type: 'GET_HAR',
+                requestId: requestId
+            });
+        } catch (error) {
+            clearTimeout(timeout);
+            pendingHARRequests.delete(requestId);
+            reject(error);
+        }
+    });
+}
 
 /**
  * Copy image blob to clipboard via offscreen document
@@ -311,32 +499,78 @@ async function injectMainWorldVars(tabId) {
 }
 
 /**
- * Execute JavaScript code with multi-tier CSP handling
+ * Execute JavaScript code with CSP handling
  *
- * Tier 1: Try direct execution (fast, clean, works on most sites)
- * Tier 2: Fall back to script tag injection (works on strict CSP sites)
+ * Uses AsyncFunction for code execution. Works on most sites.
+ * For strict CSP sites, CSP bypass is automatically enabled when:
+ * 1. Yolo/bypass mode is active, OR
+ * 2. User manually enables it in the popup
  */
 async function executeWithCSPBypass(tabId, code, requestId) {
     try {
-        // TIER 1: Try direct execution first (fast path)
-        console.log('[Inspekt] Attempting direct execution...');
+        console.log('[Inspekt] Executing code...');
 
-        const directResult = await executeDirectly(tabId, code, requestId);
+        const result = await executeDirectly(tabId, code, requestId);
 
-        // Check if it failed due to CSP
-        if (!directResult.ok && directResult.error &&
-            (directResult.error.includes('EvalError') ||
-             directResult.error.includes('Content Security Policy') ||
-             directResult.error.includes('unsafe-eval'))) {
+        // If execution failed due to CSP, try to auto-enable bypass if yolo mode is active
+        if (!result.ok && result.error &&
+            (result.error.includes('EvalError') ||
+             result.error.includes('Content Security Policy') ||
+             result.error.includes('unsafe-eval'))) {
 
-            console.log('[Inspekt] CSP detected, falling back to script tag injection');
+            console.log('[Inspekt] CSP blocking execution');
 
-            // TIER 2: Fall back to script tag injection
-            return await executeViaScriptTag(tabId, code, requestId);
+            const tab = await chrome.tabs.get(tabId);
+            const domain = new URL(tab.url).hostname;
+
+            // Check if CSP bypass is already enabled
+            const cspBypassEnabled = await isCspBypassEnabled(domain);
+
+            if (!cspBypassEnabled) {
+                // Check if yolo/bypass mode is active
+                const bypassStatus = await getTempBypassStatus();
+
+                if (bypassStatus.enabled) {
+                    // Yolo mode is active - auto-enable CSP bypass for this domain
+                    console.log('[Inspekt] Yolo mode active, auto-enabling CSP bypass for:', domain);
+
+                    const cspResult = await handleCspBypassEnable(domain);
+
+                    if (cspResult.ok) {
+                        // CSP bypass enabled, but page needs refresh
+                        return {
+                            ok: false,
+                            result: null,
+                            error: 'CSP_AUTO_ENABLED: CSP bypass has been automatically enabled for this domain. Refreshing page...',
+                            requestId: requestId,
+                            cspBlocked: true,
+                            autoEnabled: true,
+                            domain: domain
+                        };
+                    }
+                }
+
+                // No yolo mode or auto-enable failed
+                return {
+                    ok: false,
+                    result: null,
+                    error: 'CSP_BLOCKED: This site has strict Content Security Policy. Enable "CSP Bypass" in the Inspekt popup for this domain, then refresh the page. Or run `inspekt yolo` to bypass all restrictions.',
+                    requestId: requestId,
+                    cspBlocked: true
+                };
+            }
+
+            // CSP bypass is enabled but still failing - might be meta tag CSP
+            return {
+                ok: false,
+                result: null,
+                error: 'CSP_META_TAG: This site uses CSP via meta tag which cannot be bypassed. The site must be modified or use a different approach.',
+                requestId: requestId,
+                cspBlocked: true
+            };
         }
 
-        // Direct execution succeeded or failed for non-CSP reasons
-        return directResult;
+        return result;
 
     } catch (error) {
         console.error('[Inspekt] Execution error:', error);
@@ -346,6 +580,19 @@ async function executeWithCSPBypass(tabId, code, requestId) {
             error: String(error),
             requestId: requestId
         };
+    }
+}
+
+/**
+ * Check if CSP bypass is enabled for a domain
+ */
+async function isCspBypassEnabled(domain) {
+    try {
+        const result = await chrome.storage.sync.get('inspekt_csp_bypass_domains');
+        const cspBypassDomains = result['inspekt_csp_bypass_domains'] || {};
+        return !!cspBypassDomains[domain];
+    } catch (error) {
+        return false;
     }
 }
 
@@ -362,7 +609,9 @@ async function executeDirectly(tabId, code, requestId) {
                 try {
                     // Try using AsyncFunction (blocked by strict CSP)
                     const AsyncFunction = Object.getPrototypeOf(async function(){}).constructor;
-                    const fn = new AsyncFunction('return (' + codeToExecute + ')');
+                    // Strip trailing semicolons to avoid syntax error in return wrapper
+                    const cleanCode = codeToExecute.trim().replace(/;+$/, '');
+                    const fn = new AsyncFunction('return (' + cleanCode + ')');
                     let result = await fn();
 
                     // Handle nested promises
@@ -413,113 +662,6 @@ async function executeDirectly(tabId, code, requestId) {
     }
 }
 
-/**
- * TIER 2: Script tag injection (CSP bypass)
- * Works on all sites including those with strict CSP
- * Uses direct code embedding (no eval/Function constructor)
- */
-async function executeViaScriptTag(tabId, code, requestId) {
-    try {
-        const results = await chrome.scripting.executeScript({
-            target: { tabId: tabId },
-            world: 'MAIN',
-            func: (codeToExecute, resultId) => {
-                return new Promise((resolve) => {
-                    try {
-                        // Create a script tag - extensions can inject these even with CSP
-                        const script = document.createElement('script');
-
-                        // CRITICAL: Embed the code DIRECTLY into the script tag's source
-                        // The code becomes part of the static script content, NOT eval'd
-                        // This completely bypasses CSP restrictions
-                        script.textContent = `
-                            (async function() {
-                                try {
-                                    // Execute user code directly (no eval, no Function constructor)
-                                    // The code below is inserted as raw JavaScript source
-                                    const __result__ = await (${codeToExecute});
-
-                                    window['${resultId}'] = {
-                                        ok: true,
-                                        result: __result__,
-                                        error: null
-                                    };
-                                } catch (e) {
-                                    window['${resultId}'] = {
-                                        ok: false,
-                                        result: null,
-                                        error: e.stack || String(e)
-                                    };
-                                }
-                            })();
-                        `;
-
-                        // Inject the script (extension privilege allows this despite CSP)
-                        (document.head || document.documentElement).appendChild(script);
-
-                        // Poll for result
-                        const startTime = Date.now();
-                        const checkInterval = setInterval(() => {
-                            if (window[resultId] !== undefined) {
-                                clearInterval(checkInterval);
-                                const result = window[resultId];
-                                delete window[resultId];
-                                script.remove();
-                                resolve(result);
-                            } else if (Date.now() - startTime > 30000) {
-                                // 30 second timeout
-                                clearInterval(checkInterval);
-                                script.remove();
-                                delete window[resultId];
-                                resolve({
-                                    ok: false,
-                                    result: null,
-                                    error: 'Execution timeout (30s)'
-                                });
-                            }
-                        }, 10);
-
-                    } catch (e) {
-                        resolve({
-                            ok: false,
-                            result: null,
-                            error: 'Script injection failed: ' + String(e)
-                        });
-                    }
-                });
-            },
-            args: [code, `__inspektResult_${requestId}`]
-        });
-
-        if (results && results[0]) {
-            const executionResult = await results[0].result;
-            console.log('[Inspekt] Script tag execution successful');
-
-            return {
-                ok: executionResult.ok,
-                result: executionResult.result,
-                error: executionResult.error,
-                requestId: requestId
-            };
-        }
-
-        return {
-            ok: false,
-            result: null,
-            error: 'No result returned from tab',
-            requestId: requestId
-        };
-
-    } catch (error) {
-        console.error('[Inspekt] Script tag execution error:', error);
-        return {
-            ok: false,
-            result: null,
-            error: String(error),
-            requestId: requestId
-        };
-    }
-}
 
 /**
  * Helper function to check if a string should be split into an array
@@ -913,6 +1055,374 @@ async function handleDomainSync(domains) {
 }
 
 // ============================================================================
+// CSP BYPASS MANAGEMENT (using declarativeNetRequest)
+// ============================================================================
+
+// Track rule IDs for CSP bypass (use unique IDs based on domain hash)
+const CSP_BYPASS_STORAGE_KEY = 'inspekt_csp_bypass_domains';
+
+/**
+ * Generate a unique rule ID for a domain
+ * Uses a simple hash to create consistent IDs
+ */
+function getDomainRuleId(domain) {
+    let hash = 0;
+    for (let i = 0; i < domain.length; i++) {
+        const char = domain.charCodeAt(i);
+        hash = ((hash << 5) - hash) + char;
+        hash = hash & hash; // Convert to 32-bit integer
+    }
+    // Use positive number between 1000-999999 to avoid conflicts
+    return 1000 + Math.abs(hash % 999000);
+}
+
+/**
+ * Enable CSP bypass for a domain
+ * Uses declarativeNetRequest to remove CSP headers
+ */
+async function handleCspBypassEnable(domain) {
+    try {
+        const ruleId = getDomainRuleId(domain);
+
+        // Create rule to remove CSP headers for this domain
+        const rule = {
+            id: ruleId,
+            priority: 1,
+            action: {
+                type: 'modifyHeaders',
+                responseHeaders: [
+                    { header: 'Content-Security-Policy', operation: 'remove' },
+                    { header: 'Content-Security-Policy-Report-Only', operation: 'remove' },
+                    { header: 'X-Content-Security-Policy', operation: 'remove' } // Legacy IE header
+                ]
+            },
+            condition: {
+                urlFilter: `||${domain}`,
+                resourceTypes: ['main_frame', 'sub_frame']
+            }
+        };
+
+        // Add the rule
+        await chrome.declarativeNetRequest.updateDynamicRules({
+            addRules: [rule],
+            removeRuleIds: [ruleId] // Remove any existing rule with same ID first
+        });
+
+        // Store in sync storage
+        const result = await chrome.storage.sync.get(CSP_BYPASS_STORAGE_KEY);
+        const cspBypassDomains = result[CSP_BYPASS_STORAGE_KEY] || {};
+        cspBypassDomains[domain] = {
+            enabled: true,
+            ruleId: ruleId,
+            enabledAt: new Date().toISOString()
+        };
+        await chrome.storage.sync.set({ [CSP_BYPASS_STORAGE_KEY]: cspBypassDomains });
+
+        console.log(`[Inspekt] CSP bypass enabled for ${domain} (rule ID: ${ruleId})`);
+
+        return {
+            ok: true,
+            domain: domain,
+            ruleId: ruleId,
+            message: `CSP bypass enabled for ${domain}. Refresh the page for changes to take effect.`
+        };
+    } catch (error) {
+        console.error('[Inspekt] Failed to enable CSP bypass:', error);
+        return {
+            ok: false,
+            error: String(error)
+        };
+    }
+}
+
+/**
+ * Disable CSP bypass for a domain
+ */
+async function handleCspBypassDisable(domain) {
+    try {
+        const ruleId = getDomainRuleId(domain);
+
+        // Remove the rule
+        await chrome.declarativeNetRequest.updateDynamicRules({
+            removeRuleIds: [ruleId]
+        });
+
+        // Update storage
+        const result = await chrome.storage.sync.get(CSP_BYPASS_STORAGE_KEY);
+        const cspBypassDomains = result[CSP_BYPASS_STORAGE_KEY] || {};
+        delete cspBypassDomains[domain];
+        await chrome.storage.sync.set({ [CSP_BYPASS_STORAGE_KEY]: cspBypassDomains });
+
+        console.log(`[Inspekt] CSP bypass disabled for ${domain}`);
+
+        return {
+            ok: true,
+            domain: domain,
+            message: `CSP bypass disabled for ${domain}. Refresh the page for changes to take effect.`
+        };
+    } catch (error) {
+        console.error('[Inspekt] Failed to disable CSP bypass:', error);
+        return {
+            ok: false,
+            error: String(error)
+        };
+    }
+}
+
+/**
+ * Get CSP bypass status for a domain
+ */
+async function handleCspBypassStatus(domain) {
+    try {
+        const result = await chrome.storage.sync.get(CSP_BYPASS_STORAGE_KEY);
+        const cspBypassDomains = result[CSP_BYPASS_STORAGE_KEY] || {};
+
+        if (cspBypassDomains[domain]) {
+            return {
+                ok: true,
+                domain: domain,
+                enabled: true,
+                ruleId: cspBypassDomains[domain].ruleId,
+                enabledAt: cspBypassDomains[domain].enabledAt
+            };
+        }
+
+        return {
+            ok: true,
+            domain: domain,
+            enabled: false
+        };
+    } catch (error) {
+        return {
+            ok: false,
+            error: String(error)
+        };
+    }
+}
+
+// Global CSP bypass constants
+const CSP_BYPASS_GLOBAL_STORAGE_KEY = 'inspekt_csp_bypass_global';
+const CSP_BYPASS_GLOBAL_RULE_ID = 999; // Fixed rule ID for global bypass
+
+/**
+ * Enable or disable global CSP bypass for ALL domains
+ * Uses a single rule with broad URL matching
+ */
+async function handleCspBypassGlobal(enabled) {
+    try {
+        if (enabled) {
+            // Create rule to remove CSP headers for ALL http/https URLs
+            const rule = {
+                id: CSP_BYPASS_GLOBAL_RULE_ID,
+                priority: 2, // Higher priority than domain-specific rules
+                action: {
+                    type: 'modifyHeaders',
+                    responseHeaders: [
+                        { header: 'Content-Security-Policy', operation: 'remove' },
+                        { header: 'Content-Security-Policy-Report-Only', operation: 'remove' },
+                        { header: 'X-Content-Security-Policy', operation: 'remove' }
+                    ]
+                },
+                condition: {
+                    urlFilter: '|http*',
+                    resourceTypes: ['main_frame', 'sub_frame']
+                }
+            };
+
+            // Add the rule
+            await chrome.declarativeNetRequest.updateDynamicRules({
+                addRules: [rule],
+                removeRuleIds: [CSP_BYPASS_GLOBAL_RULE_ID]
+            });
+
+            // Store state in sync storage
+            await chrome.storage.sync.set({
+                [CSP_BYPASS_GLOBAL_STORAGE_KEY]: {
+                    enabled: true,
+                    enabledAt: new Date().toISOString()
+                }
+            });
+
+            console.log('[Inspekt] Global CSP bypass ENABLED');
+
+            return {
+                ok: true,
+                enabled: true,
+                message: 'Global CSP bypass enabled. Refresh pages for changes to take effect.'
+            };
+        } else {
+            // Remove the global rule
+            await chrome.declarativeNetRequest.updateDynamicRules({
+                removeRuleIds: [CSP_BYPASS_GLOBAL_RULE_ID]
+            });
+
+            // Update storage
+            await chrome.storage.sync.set({
+                [CSP_BYPASS_GLOBAL_STORAGE_KEY]: {
+                    enabled: false
+                }
+            });
+
+            console.log('[Inspekt] Global CSP bypass DISABLED');
+
+            return {
+                ok: true,
+                enabled: false,
+                message: 'Global CSP bypass disabled. Refresh pages for changes to take effect.'
+            };
+        }
+    } catch (error) {
+        console.error('[Inspekt] Failed to toggle global CSP bypass:', error);
+        return {
+            ok: false,
+            error: String(error)
+        };
+    }
+}
+
+/**
+ * Get global CSP bypass status
+ */
+async function getGlobalCspBypassStatus() {
+    try {
+        const result = await chrome.storage.sync.get(CSP_BYPASS_GLOBAL_STORAGE_KEY);
+        const globalBypass = result[CSP_BYPASS_GLOBAL_STORAGE_KEY] || { enabled: false };
+        return {
+            ok: true,
+            enabled: globalBypass.enabled || false,
+            enabledAt: globalBypass.enabledAt
+        };
+    } catch (error) {
+        return {
+            ok: false,
+            enabled: false,
+            error: String(error)
+        };
+    }
+}
+
+// ============================================================================
+// CONSOLE HOOKS INJECTION (for console capture feature)
+// ============================================================================
+
+/**
+ * Inject console hooks into page to capture console.log/error/warn/info/debug
+ * This runs in MAIN world to intercept the actual console calls
+ */
+async function injectConsoleHooks(tabId) {
+    try {
+        await chrome.scripting.executeScript({
+            target: { tabId },
+            world: 'MAIN',
+            func: () => {
+                // Don't re-inject if already hooked
+                if (window.__INSPEKT_CONSOLE_HOOKED__) return;
+                window.__INSPEKT_CONSOLE_HOOKED__ = true;
+
+                const buffer = [];
+                const MAX_MESSAGES = 1000;
+
+                ['log', 'error', 'warn', 'info', 'debug'].forEach(level => {
+                    const original = console[level];
+                    console[level] = function(...args) {
+                        buffer.push({
+                            level,
+                            timestamp: new Date().toISOString(),
+                            message: args.map(a => {
+                                try {
+                                    return typeof a === 'string' ? a : JSON.stringify(a);
+                                } catch {
+                                    return String(a);
+                                }
+                            }).join(' ')
+                        });
+                        // Keep buffer size limited
+                        if (buffer.length > MAX_MESSAGES) buffer.shift();
+                        // Call original console method
+                        return original.apply(console, args);
+                    };
+                });
+
+                // Store buffer reference for retrieval
+                window.__INSPEKT_CONSOLE_LOGS__ = buffer;
+            }
+        });
+        console.log('[Inspekt] Console hooks injected for tab:', tabId);
+    } catch (error) {
+        // Silently fail for restricted pages (chrome://, about:, etc.)
+        console.log('[Inspekt] Could not inject console hooks:', error.message);
+    }
+}
+
+/**
+ * Get console logs from page
+ */
+async function getConsoleLogs(tabId) {
+    try {
+        const results = await chrome.scripting.executeScript({
+            target: { tabId },
+            world: 'MAIN',
+            func: () => {
+                const logs = window.__INSPEKT_CONSOLE_LOGS__ || [];
+                return {
+                    ok: true,
+                    entries: logs,
+                    count: logs.length,
+                    hooked: !!window.__INSPEKT_CONSOLE_HOOKED__
+                };
+            }
+        });
+
+        if (results && results[0]) {
+            return results[0].result;
+        }
+
+        return {
+            ok: false,
+            error: 'No result returned from tab'
+        };
+    } catch (error) {
+        return {
+            ok: false,
+            error: String(error)
+        };
+    }
+}
+
+/**
+ * Clear console logs buffer in page
+ */
+async function clearConsoleLogs(tabId) {
+    try {
+        const results = await chrome.scripting.executeScript({
+            target: { tabId },
+            world: 'MAIN',
+            func: () => {
+                if (window.__INSPEKT_CONSOLE_LOGS__) {
+                    window.__INSPEKT_CONSOLE_LOGS__.length = 0;
+                    return { ok: true, message: 'Console buffer cleared' };
+                }
+                return { ok: true, message: 'No console buffer to clear' };
+            }
+        });
+
+        if (results && results[0]) {
+            return results[0].result;
+        }
+
+        return {
+            ok: false,
+            error: 'No result returned from tab'
+        };
+    } catch (error) {
+        return {
+            ok: false,
+            error: String(error)
+        };
+    }
+}
+
+// ============================================================================
 // ICON STATE MANAGEMENT
 // ============================================================================
 
@@ -1117,6 +1627,166 @@ async function setConnectingIcon(tabId) {
  */
 async function setDefaultIcon(tabId) {
     await chrome.action.setBadgeText({ tabId, text: '' });
+}
+
+// ============================================================================
+// CDP FULL PAGE SCREENSHOT
+// ============================================================================
+
+/**
+ * Capture full page screenshot using Chrome DevTools Protocol
+ * @param {number} tabId - Tab ID to capture
+ * @param {Object} options - Screenshot options
+ * @returns {Promise<Object>} Screenshot result with base64 data
+ */
+async function captureFullPageWithCDP(tabId, options = {}) {
+    const debuggerVersion = '1.3';
+    let attached = false;
+
+    try {
+        // Step 1: Attach debugger
+        await new Promise((resolve, reject) => {
+            chrome.debugger.attach({ tabId }, debuggerVersion, () => {
+                if (chrome.runtime.lastError) {
+                    const error = chrome.runtime.lastError.message;
+                    if (error.includes('Another debugger')) {
+                        reject(new Error('Cannot capture: another debugger is attached. Close DevTools and try again.'));
+                    } else {
+                        reject(new Error(error));
+                    }
+                } else {
+                    attached = true;
+                    resolve();
+                }
+            });
+        });
+
+        console.log('[Inspekt] CDP debugger attached for full page capture');
+
+        // Step 2: Get page layout metrics
+        const metrics = await sendDebuggerCommand(tabId, 'Page.getLayoutMetrics', {});
+        const contentSize = metrics.cssContentSize || metrics.contentSize;
+        const width = Math.ceil(contentSize.width);
+        const height = Math.ceil(contentSize.height);
+
+        console.log('[Inspekt] Page dimensions:', width, 'x', height);
+
+        // Check for maximum height limit (Chrome has 16384px limit)
+        const maxHeight = options.maxHeight || 16384;
+        const captureHeight = Math.min(height, maxHeight);
+        const truncated = height > captureHeight;
+
+        if (truncated) {
+            console.log('[Inspekt] Page truncated from', height, 'to', captureHeight);
+        }
+
+        // Step 3: Override device metrics to match full page
+        const deviceScaleFactor = options.scale || 1;
+        await sendDebuggerCommand(tabId, 'Emulation.setDeviceMetricsOverride', {
+            width: width,
+            height: captureHeight,
+            deviceScaleFactor: deviceScaleFactor,
+            mobile: false
+        });
+
+        // Small delay to ensure metrics are applied
+        await new Promise(resolve => setTimeout(resolve, 100));
+
+        // Step 4: Capture screenshot
+        const format = options.format || 'png';
+        const screenshotParams = {
+            format: format,
+            captureBeyondViewport: true,
+            fromSurface: true,
+            clip: {
+                x: 0,
+                y: 0,
+                width: width,
+                height: captureHeight,
+                scale: 1
+            }
+        };
+
+        if (format === 'jpeg' || format === 'jpg') {
+            screenshotParams.format = 'jpeg';
+            screenshotParams.quality = Math.round((options.quality || 0.92) * 100);
+        }
+
+        const screenshotResult = await sendDebuggerCommand(tabId, 'Page.captureScreenshot', screenshotParams);
+
+        console.log('[Inspekt] Screenshot captured');
+
+        // Step 5: Clear device metrics override
+        await sendDebuggerCommand(tabId, 'Emulation.clearDeviceMetricsOverride', {});
+
+        // Step 6: Detach debugger
+        await detachDebugger(tabId);
+        attached = false;
+
+        console.log('[Inspekt] CDP debugger detached');
+
+        // Build data URL
+        const mimeType = format === 'jpeg' || format === 'jpg' ? 'image/jpeg' :
+                         format === 'webp' ? 'image/webp' : 'image/png';
+
+        return {
+            ok: true,
+            dataUrl: `data:${mimeType};base64,${screenshotResult.data}`,
+            width: width * deviceScaleFactor,
+            height: captureHeight * deviceScaleFactor,
+            fullHeight: height,
+            truncated: truncated,
+            apiUsed: 'chrome.debugger (CDP)'
+        };
+
+    } catch (error) {
+        console.error('[Inspekt] CDP capture error:', error);
+
+        // Ensure debugger is detached on error
+        if (attached) {
+            try {
+                await detachDebugger(tabId);
+            } catch (detachError) {
+                console.error('[Inspekt] Failed to detach debugger:', detachError);
+            }
+        }
+        throw error;
+    }
+}
+
+/**
+ * Send command to Chrome DevTools Protocol
+ */
+function sendDebuggerCommand(tabId, method, params) {
+    return new Promise((resolve, reject) => {
+        chrome.debugger.sendCommand({ tabId }, method, params, (result) => {
+            if (chrome.runtime.lastError) {
+                reject(new Error(chrome.runtime.lastError.message));
+            } else {
+                resolve(result);
+            }
+        });
+    });
+}
+
+/**
+ * Detach debugger from tab
+ */
+function detachDebugger(tabId) {
+    return new Promise((resolve, reject) => {
+        chrome.debugger.detach({ tabId }, () => {
+            if (chrome.runtime.lastError) {
+                // Ignore "not attached" errors
+                if (chrome.runtime.lastError.message.includes('not attached')) {
+                    resolve();
+                } else {
+                    reject(new Error(chrome.runtime.lastError.message));
+                }
+            } else {
+                resolve();
+            }
+        });
+    });
 }
 
 // Note: Screenshot processing is handled in content.js where DOM APIs are available

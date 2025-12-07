@@ -43,12 +43,13 @@
                 });
 
                 // Send response back to MAIN world
+                // Security: use location.origin instead of '*' to prevent cross-origin iframes from intercepting
                 window.postMessage({
                     type: 'INSPEKT_COOKIES_RESPONSE',
                     source: 'inspekt-extension',
                     requestId: message.requestId,
                     response: response
-                }, '*');
+                }, location.origin);
             } catch (error) {
                 // Send error back to MAIN world
                 window.postMessage({
@@ -59,7 +60,7 @@
                         ok: false,
                         error: String(error)
                     }
-                }, '*');
+                }, location.origin);
             }
         }
 
@@ -69,23 +70,32 @@
                 const mode = message.mode;
                 const options = message.options;
 
-                // Capture screenshot using background script
-                const captureResponse = await chrome.runtime.sendMessage({
-                    type: 'CAPTURE_VISIBLE_TAB'
-                });
-
-                if (!captureResponse || !captureResponse.ok) {
-                    throw new Error(captureResponse?.error || 'Failed to capture screenshot');
-                }
-
-                // Process the screenshot in content script (where DOM APIs are available)
                 let result;
-                if (mode === 'node') {
-                    result = await processNodeScreenshot(captureResponse.dataUrl, options);
-                } else if (mode === 'viewport') {
-                    result = await processViewportScreenshot(captureResponse.dataUrl, options);
+
+                // Full page mode uses CDP directly in background script
+                if (mode === 'page') {
+                    result = await chrome.runtime.sendMessage({
+                        type: 'CAPTURE_FULL_PAGE',
+                        options: options
+                    });
                 } else {
-                    throw new Error(`Invalid mode: ${mode}`);
+                    // Node and viewport modes use CAPTURE_VISIBLE_TAB + processing
+                    const captureResponse = await chrome.runtime.sendMessage({
+                        type: 'CAPTURE_VISIBLE_TAB'
+                    });
+
+                    if (!captureResponse || !captureResponse.ok) {
+                        throw new Error(captureResponse?.error || 'Failed to capture screenshot');
+                    }
+
+                    // Process the screenshot in content script (where DOM APIs are available)
+                    if (mode === 'node') {
+                        result = await processNodeScreenshot(captureResponse.dataUrl, options);
+                    } else if (mode === 'viewport') {
+                        result = await processViewportScreenshot(captureResponse.dataUrl, options);
+                    } else {
+                        throw new Error(`Invalid mode: ${mode}`);
+                    }
                 }
 
                 // Send response back to MAIN world
@@ -94,7 +104,7 @@
                     source: 'inspekt-extension',
                     requestId: message.requestId,
                     response: result
-                }, '*');
+                }, location.origin);
             } catch (error) {
                 // Send error back to MAIN world
                 window.postMessage({
@@ -105,7 +115,7 @@
                         ok: false,
                         error: String(error)
                     }
-                }, '*');
+                }, location.origin);
             }
         }
     });
@@ -119,8 +129,9 @@
         'color: #0066ff; font-weight: bold', 'color: inherit');
 
     function isFrontTab() {
-        // Only consider a tab "front" if it's visible AND the top-level window
-        return document.visibilityState === 'visible' && window === window.top;
+        // Only consider a tab "front" if it's the top-level window (not an iframe)
+        // We no longer require visibility - connections are kept alive for hidden tabs too
+        return window === window.top;
     }
 
     function connect() {
@@ -158,14 +169,27 @@
                     // Background script might not be ready
                 });
 
+                // Detect browser name from userAgentData (prefer known browsers over generic entries)
+                let detectedBrowser = 'Chrome';
+                if (navigator.userAgentData?.brands) {
+                    const knownBrowsers = ['Google Chrome', 'Chrome', 'Microsoft Edge', 'Brave', 'Opera', 'Vivaldi'];
+                    for (const brand of navigator.userAgentData.brands) {
+                        if (knownBrowsers.some(known => brand.brand.includes(known))) {
+                            detectedBrowser = brand.brand;
+                            break;
+                        }
+                    }
+                }
+
                 // Send browser info to server
                 const browserInfo = {
                     type: 'browser_info',
                     userAgent: navigator.userAgent,
-                    browserName: navigator.userAgentData?.brands?.[0]?.brand || 'Chrome',
+                    browserName: detectedBrowser,
                     url: window.location.href,
                     title: document.title,
-                    extensionVersion: window.__INSPEKT_BRIDGE_VERSION__ || window.__ZEN_BRIDGE_VERSION__ || null
+                    extensionVersion: window.__INSPEKT_BRIDGE_VERSION__ || window.__ZEN_BRIDGE_VERSION__ || null,
+                    visible: document.visibilityState === 'visible'
                 };
                 ws.send(JSON.stringify(browserInfo));
             };
@@ -180,11 +204,22 @@
                         message.code.includes('orange') &&
                         message.code.includes('overlay');
 
+                    // Check if this is an axe accessibility audit (should work even when tab is hidden)
+                    // This allows running `inspekt axe` from terminal without browser focus
+                    const isAxeCommand = message.code &&
+                        message.code.includes('inspekt-axe');
+
                     // Domain management should work regardless of tab visibility
                     const isDomainManagement = ['DOMAIN_ADD', 'DOMAIN_REMOVE', 'DOMAIN_LIST', 'DOMAIN_BYPASS'].includes(message.type);
 
-                    // Skip visibility check for identify commands, pong responses, and domain management
-                    if (!isFrontTab() && !isIdentifyCommand && !isDomainManagement && message.type !== 'pong') {
+                    // CSP bypass management should work regardless of tab visibility
+                    const isCspManagement = ['CSP_BYPASS_ENABLE', 'CSP_BYPASS_DISABLE', 'CSP_BYPASS_STATUS', 'CSP_BYPASS_GLOBAL', 'CSP_BYPASS_GLOBAL_STATUS'].includes(message.type);
+
+                    // Console management should work regardless of tab visibility
+                    const isConsoleManagement = ['GET_CONSOLE_LOGS', 'CLEAR_CONSOLE_LOGS'].includes(message.type);
+
+                    // Skip visibility check for identify commands, axe commands, pong responses, domain management, CSP management, and console management
+                    if (!isFrontTab() && !isIdentifyCommand && !isAxeCommand && !isDomainManagement && !isCspManagement && !isConsoleManagement && message.type !== 'pong') {
                         console.log('[Inspekt] Message dropped - tab not visible/active:', message.type);
                         return;
                     }
@@ -313,6 +348,212 @@
                                 response: { ok: false, error: err.message }
                             }));
                         }
+
+                    } else if (message.type === 'CSP_BYPASS_ENABLE') {
+                        try {
+                            const response = await chrome.runtime.sendMessage({
+                                type: 'CSP_BYPASS_ENABLE',
+                                domain: message.domain
+                            });
+
+                            ws.send(JSON.stringify({
+                                type: 'response',
+                                requestId: message.requestId,
+                                response: response
+                            }));
+                        } catch (err) {
+                            console.error('[Inspekt] CSP_BYPASS_ENABLE error:', err);
+                            ws.send(JSON.stringify({
+                                type: 'response',
+                                requestId: message.requestId,
+                                response: { ok: false, error: err.message }
+                            }));
+                        }
+
+                    } else if (message.type === 'CSP_BYPASS_DISABLE') {
+                        try {
+                            const response = await chrome.runtime.sendMessage({
+                                type: 'CSP_BYPASS_DISABLE',
+                                domain: message.domain
+                            });
+
+                            ws.send(JSON.stringify({
+                                type: 'response',
+                                requestId: message.requestId,
+                                response: response
+                            }));
+                        } catch (err) {
+                            console.error('[Inspekt] CSP_BYPASS_DISABLE error:', err);
+                            ws.send(JSON.stringify({
+                                type: 'response',
+                                requestId: message.requestId,
+                                response: { ok: false, error: err.message }
+                            }));
+                        }
+
+                    } else if (message.type === 'CSP_BYPASS_STATUS') {
+                        try {
+                            const response = await chrome.runtime.sendMessage({
+                                type: 'CSP_BYPASS_STATUS',
+                                domain: message.domain
+                            });
+
+                            ws.send(JSON.stringify({
+                                type: 'response',
+                                requestId: message.requestId,
+                                response: response
+                            }));
+                        } catch (err) {
+                            console.error('[Inspekt] CSP_BYPASS_STATUS error:', err);
+                            ws.send(JSON.stringify({
+                                type: 'response',
+                                requestId: message.requestId,
+                                response: { ok: false, error: err.message }
+                            }));
+                        }
+
+                    } else if (message.type === 'CSP_BYPASS_GLOBAL') {
+                        try {
+                            const response = await chrome.runtime.sendMessage({
+                                type: 'CSP_BYPASS_GLOBAL',
+                                enabled: message.enabled
+                            });
+
+                            ws.send(JSON.stringify({
+                                type: 'response',
+                                requestId: message.requestId,
+                                response: response
+                            }));
+                        } catch (err) {
+                            console.error('[Inspekt] CSP_BYPASS_GLOBAL error:', err);
+                            ws.send(JSON.stringify({
+                                type: 'response',
+                                requestId: message.requestId,
+                                response: { ok: false, error: err.message }
+                            }));
+                        }
+
+                    } else if (message.type === 'CSP_BYPASS_GLOBAL_STATUS') {
+                        try {
+                            const response = await chrome.runtime.sendMessage({
+                                type: 'CSP_BYPASS_GLOBAL_STATUS'
+                            });
+
+                            ws.send(JSON.stringify({
+                                type: 'response',
+                                requestId: message.requestId,
+                                response: response
+                            }));
+                        } catch (err) {
+                            console.error('[Inspekt] CSP_BYPASS_GLOBAL_STATUS error:', err);
+                            ws.send(JSON.stringify({
+                                type: 'response',
+                                requestId: message.requestId,
+                                response: { ok: false, error: err.message }
+                            }));
+                        }
+
+                    } else if (message.type === 'GET_HAR') {
+                        // Get HAR data from DevTools (requires DevTools to be open)
+                        try {
+                            const response = await chrome.runtime.sendMessage({
+                                type: 'GET_HAR'
+                            });
+
+                            ws.send(JSON.stringify({
+                                type: 'response',
+                                requestId: message.requestId,
+                                response: response
+                            }));
+                        } catch (err) {
+                            console.error('[Inspekt] GET_HAR error:', err);
+                            ws.send(JSON.stringify({
+                                type: 'response',
+                                requestId: message.requestId,
+                                response: {
+                                    ok: false,
+                                    error: err.message,
+                                    hint: 'Make sure DevTools is open (F12) to capture HAR data.'
+                                }
+                            }));
+                        }
+
+                    } else if (message.type === 'GET_CONSOLE_LOGS') {
+                        // Get captured console logs from page
+                        try {
+                            const response = await chrome.runtime.sendMessage({
+                                type: 'GET_CONSOLE_LOGS'
+                            });
+
+                            ws.send(JSON.stringify({
+                                type: 'response',
+                                requestId: message.requestId,
+                                response: response
+                            }));
+                        } catch (err) {
+                            console.error('[Inspekt] GET_CONSOLE_LOGS error:', err);
+                            ws.send(JSON.stringify({
+                                type: 'response',
+                                requestId: message.requestId,
+                                response: {
+                                    ok: false,
+                                    error: err.message
+                                }
+                            }));
+                        }
+
+                    } else if (message.type === 'CLEAR_CONSOLE_LOGS') {
+                        // Clear console logs buffer
+                        try {
+                            const response = await chrome.runtime.sendMessage({
+                                type: 'CLEAR_CONSOLE_LOGS'
+                            });
+
+                            ws.send(JSON.stringify({
+                                type: 'response',
+                                requestId: message.requestId,
+                                response: response
+                            }));
+                        } catch (err) {
+                            console.error('[Inspekt] CLEAR_CONSOLE_LOGS error:', err);
+                            ws.send(JSON.stringify({
+                                type: 'response',
+                                requestId: message.requestId,
+                                response: {
+                                    ok: false,
+                                    error: err.message
+                                }
+                            }));
+                        }
+
+                    } else if (message.type === 'PERMANENT_BYPASS') {
+                        // Enable/disable permanent bypass (for isolated/VM environments)
+                        try {
+                            const enabled = message.enabled !== false;
+                            await ZenPermissions.setPermanentBypass(enabled);
+
+                            ws.send(JSON.stringify({
+                                type: 'response',
+                                requestId: message.requestId,
+                                response: {
+                                    ok: true,
+                                    enabled: enabled,
+                                    message: enabled ?
+                                        'Permanent bypass enabled (isolated mode)' :
+                                        'Permanent bypass disabled'
+                                }
+                            }));
+                        } catch (err) {
+                            console.error('[Inspekt] PERMANENT_BYPASS error:', err);
+                            ws.send(JSON.stringify({
+                                type: 'response',
+                                requestId: message.requestId,
+                                response: {
+                                    ok: false,
+                                    error: err.message
+                                }
+                            }));
+                        }
                     }
 
                 } catch (err) {
@@ -362,48 +603,78 @@
         }
     }, 30000);
 
-    // Handle visibility changes to connect/disconnect appropriately
+    // Handle visibility changes - send visibility updates instead of disconnecting
     document.addEventListener('visibilitychange', async () => {
-        if (document.visibilityState === 'visible' && window === window.top) {
+        const isVisible = document.visibilityState === 'visible';
+
+        if (isVisible && window === window.top) {
             // Tab became visible - connect if needed and domain is allowed
             if (!ws || ws.readyState !== WebSocket.OPEN) {
                 const allowed = await ZenPermissions.isAllowed();
                 if (allowed) {
                     connect();
                 }
+            } else {
+                // Already connected - send visibility update
+                ws.send(JSON.stringify({
+                    type: 'visibility_change',
+                    visible: true
+                }));
             }
-        } else if (document.visibilityState === 'hidden') {
-            // Tab became hidden - disconnect to save resources
-            if (ws && ws.readyState === WebSocket.OPEN) {
-                console.log('[Inspekt] Tab hidden, closing connection');
-                ws.close();
-                ws = null;
-                window.__inspekt_ws__ = null;
-            }
+        } else if (!isVisible && ws && ws.readyState === WebSocket.OPEN) {
+            // Tab became hidden - send visibility update but keep connection alive
+            console.log('[Inspekt] Tab hidden, sending visibility update (connection stays alive)');
+            ws.send(JSON.stringify({
+                type: 'visibility_change',
+                visible: false
+            }));
         }
     });
 
     // DevTools integration is now injected via background script
     // (inline script injection is blocked by CSP)
 
-    // Initial connection - only connect if this is a visible top-level tab AND domain is allowed
+    // Initial connection - always connect if this is a front tab
+    // Permission check happens on code execution, not on connection
+    // This allows the bridge to send permission/bypass commands even before domain is allowed
     async function initializeConnection() {
         if (isFrontTab()) {
-            // Check if domain is allowed (will show opt-in modal if not)
-            const allowed = await ZenPermissions.checkAndRequest();
-            if (allowed) {
-                console.log('[Inspekt] Domain authorized, connecting...');
+            // Always connect to allow bridge to send bypass commands
+            // The permission check happens in the message handler before executing code
+            console.log('[Inspekt] Initializing connection...');
+            connect();
+        }
+    }
+
+    // Handle permission changes (called when domains are added/removed via CLI)
+    // This enables commands to work immediately after adding a domain - no page refresh needed
+    async function handlePermissionChange() {
+        if (isFrontTab()) {
+            const allowed = await ZenPermissions.isAllowed();
+            if (allowed && (!ws || ws.readyState !== WebSocket.OPEN)) {
+                console.log('[Inspekt] Permissions changed - domain now allowed, reconnecting...');
                 connect();
-            } else {
-                console.log('[Inspekt] Domain not authorized. Connection blocked.');
+            } else if (!allowed && ws && ws.readyState === WebSocket.OPEN) {
+                console.log('[Inspekt] Permissions changed - domain no longer allowed, disconnecting...');
+                ws.close();
+                ws = null;
+                window.__inspekt_ws__ = null;
             }
         }
     }
 
     initializeConnection();
 
-    // Message listener for DevTools panel requests
+    // Message listener for DevTools panel requests and permission changes
     chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+        // Handle permission changes from background script
+        // This is triggered when domains are added/removed via CLI
+        if (message.type === 'PERMISSIONS_CHANGED') {
+            handlePermissionChange();
+            sendResponse({ ok: true });
+            return true;
+        }
+
         if (message.action === 'getElementBounds') {
             // Get element bounds for screenshot
             try {

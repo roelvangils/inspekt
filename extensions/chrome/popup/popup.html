@@ -48,6 +48,21 @@
             </div>
         </section>
 
+        <section class="csp-bypass">
+            <h2><span class="material-icons md-18">shield</span> CSP Bypass</h2>
+            <div id="csp-bypass-status" class="csp-status">
+                <span class="csp-info">Some websites block script execution. Enable bypass to allow Inspekt commands.</span>
+            </div>
+            <div class="csp-toggle">
+                <label class="switch">
+                    <input type="checkbox" id="csp-bypass-toggle">
+                    <span class="slider"></span>
+                </label>
+                <span id="csp-bypass-label">Enable for <span id="csp-current-domain">this site</span></span>
+            </div>
+            <div id="csp-bypass-message" class="csp-message hidden"></div>
+        </section>
+
         <footer>
             <div class="links">
                 <a href="https://github.com/roelvangils/inspekt" target="_blank" class="link-button">

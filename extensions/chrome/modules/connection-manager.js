@@ -29,7 +29,7 @@ export class ConnectionManager {
     setupEventListeners() {
         // Server callout copy button
         this.btnCopyServerCommand.addEventListener('click', () => {
-            navigator.clipboard.writeText('inspekt server start').then(() => {
+            navigator.clipboard.writeText('inspekt start').then(() => {
                 console.log('[Inspekt Panel] Server start command copied to clipboard');
                 this.btnCopyServerCommand.innerHTML = '<span class="material-icons md-18">check</span>';
                 setTimeout(() => {

@@ -49,12 +49,13 @@
                 });
 
                 // Send response back to MAIN world
+                // Security: use location.origin instead of '*' to prevent cross-origin iframes from intercepting
                 window.postMessage({
                     type: 'INSPEKT_COOKIES_RESPONSE',
                     source: 'inspekt-extension',
                     requestId: message.requestId,
                     response: response
-                }, '*');
+                }, location.origin);
             } catch (error) {
                 // Send error back to MAIN world
                 window.postMessage({
@@ -65,7 +66,7 @@
                         ok: false,
                         error: String(error)
                     }
-                }, '*');
+                }, location.origin);
             }
         }
     });
@@ -82,6 +83,16 @@
 
     // Listen for messages from popup/background requesting connection status
     browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
+        // Handle permission changes from background script
+        // This is triggered when domains are added/removed via CLI
+        if (message.type === 'PERMISSIONS_CHANGED') {
+            if (typeof InspektWebSocketClient !== 'undefined') {
+                InspektWebSocketClient.handlePermissionChange();
+            }
+            sendResponse({ ok: true });
+            return true;
+        }
+
         if (message.type === 'GET_WS_STATUS') {
             // Return current WebSocket connection status
             const wsConnected = window.__INSPEKT_WS_CONNECTED__;

@@ -62,6 +62,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Setup temp bypass dropdown handler
     setupTempBypassHandler();
 
+    // Load CSP bypass status
+    await loadCspBypassStatus();
+
+    // Setup CSP bypass toggle handler
+    setupCspBypassHandler();
+
     // Check connection status
     await checkConnectionStatus();
 
@@ -149,7 +155,7 @@ async function checkConnectionStatus() {
     } catch (error) {
         console.error('[Inspekt Popup] Error checking status:', error);
         setStatus(statusDot, statusText, 'disconnected',
-            '❌ Server not running. Run: inspekt server start');
+            '❌ Server not running. Run: inspekt start');
     }
 }
 
@@ -305,6 +311,117 @@ function setupTempBypassHandler() {
             }
         } catch (error) {
             console.error('[Inspekt Popup] Error setting temp bypass:', error);
+        }
+    });
+}
+
+// ============================================================================
+// CSP BYPASS MANAGEMENT
+// ============================================================================
+
+async function loadCspBypassStatus() {
+    const toggle = document.getElementById('csp-bypass-toggle');
+    const domainSpan = document.getElementById('csp-current-domain');
+    const messageDiv = document.getElementById('csp-bypass-message');
+
+    try {
+        // Get current tab
+        const tabs = await BrowserAPI.getTabs({ active: true, currentWindow: true });
+        if (!tabs[0] || !tabs[0].url.startsWith('http')) {
+            // Hide CSP section for non-http pages
+            document.querySelector('.csp-bypass').style.display = 'none';
+            return;
+        }
+
+        const tab = tabs[0];
+        const url = new URL(tab.url);
+        const currentDomain = url.hostname;
+
+        // Update domain display
+        domainSpan.textContent = currentDomain;
+
+        // Check if CSP bypass is enabled for this domain
+        const api = typeof chrome !== 'undefined' ? chrome : browser;
+        const response = await api.runtime.sendMessage({
+            type: 'CSP_BYPASS_STATUS',
+            domain: currentDomain
+        });
+
+        if (response && response.ok) {
+            toggle.checked = response.enabled;
+
+            if (response.enabled) {
+                messageDiv.textContent = 'CSP bypass is active. Refresh the page if issues persist.';
+                messageDiv.classList.remove('hidden');
+                messageDiv.classList.add('success');
+            } else {
+                messageDiv.classList.add('hidden');
+            }
+        }
+    } catch (error) {
+        console.error('[Inspekt Popup] Error loading CSP bypass status:', error);
+    }
+}
+
+function setupCspBypassHandler() {
+    const toggle = document.getElementById('csp-bypass-toggle');
+    const messageDiv = document.getElementById('csp-bypass-message');
+
+    toggle.addEventListener('change', async (e) => {
+        const enabled = e.target.checked;
+
+        try {
+            // Get current tab
+            const tabs = await BrowserAPI.getTabs({ active: true, currentWindow: true });
+            if (!tabs[0]) return;
+
+            const tab = tabs[0];
+            const url = new URL(tab.url);
+            const currentDomain = url.hostname;
+
+            const api = typeof chrome !== 'undefined' ? chrome : browser;
+
+            if (enabled) {
+                // Enable CSP bypass
+                const response = await api.runtime.sendMessage({
+                    type: 'CSP_BYPASS_ENABLE',
+                    domain: currentDomain
+                });
+
+                if (response && response.ok) {
+                    messageDiv.textContent = response.message;
+                    messageDiv.classList.remove('hidden', 'error');
+                    messageDiv.classList.add('success');
+                } else {
+                    messageDiv.textContent = response?.error || 'Failed to enable CSP bypass';
+                    messageDiv.classList.remove('hidden', 'success');
+                    messageDiv.classList.add('error');
+                    toggle.checked = false;
+                }
+            } else {
+                // Disable CSP bypass
+                const response = await api.runtime.sendMessage({
+                    type: 'CSP_BYPASS_DISABLE',
+                    domain: currentDomain
+                });
+
+                if (response && response.ok) {
+                    messageDiv.textContent = response.message;
+                    messageDiv.classList.remove('hidden', 'error');
+                    messageDiv.classList.add('success');
+                } else {
+                    messageDiv.textContent = response?.error || 'Failed to disable CSP bypass';
+                    messageDiv.classList.remove('hidden', 'success');
+                    messageDiv.classList.add('error');
+                    toggle.checked = true;
+                }
+            }
+
+        } catch (error) {
+            console.error('[Inspekt Popup] Error toggling CSP bypass:', error);
+            messageDiv.textContent = 'Error: ' + error.message;
+            messageDiv.classList.remove('hidden', 'success');
+            messageDiv.classList.add('error');
         }
     });
 }

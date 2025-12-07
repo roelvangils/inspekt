@@ -147,12 +147,17 @@
             // Store the selected element
             window.__INSPEKT_INSPECTED_ELEMENT__ = el;
 
+            // Track selection source and timestamp
+            window.__INSPEKT_SELECTION_SOURCE__ = 'panel';
+            window.__INSPEKT_SELECTION_TIME__ = Date.now();
+
             // Show confirmation
             console.log(
-                '%c[Inspekt]%c ✓ Element selected: %c' + getElementLabel(el),
+                '%c[Inspekt]%c ✓ Element selected: %c' + getElementLabel(el) + '%c (Inspekt panel)',
                 'color: #0066ff; font-weight: bold',
                 'color: inherit',
-                'color: #00aa00; font-weight: bold'
+                'color: #00aa00; font-weight: bold',
+                'color: #666; font-style: italic'
             );
 
             // Clean up and exit picker mode
