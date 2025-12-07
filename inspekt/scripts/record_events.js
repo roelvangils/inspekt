@@ -582,13 +582,61 @@
     }
 
     /**
+     * Get Shadow DOM information for an element.
+     * Returns info about whether element is inside a Shadow DOM and its host.
+     */
+    function getShadowDOMInfo(element) {
+        if (!element || element.nodeType !== 1) {
+            return { inShadowDOM: false };
+        }
+
+        const rootNode = element.getRootNode();
+
+        // Check if element is inside a Shadow DOM
+        if (rootNode instanceof ShadowRoot) {
+            const host = rootNode.host;
+            // Generate a selector for the shadow host
+            const hostSelectors = generateSelectors(host);
+
+            return {
+                inShadowDOM: true,
+                shadowHost: hostSelectors[0],
+                shadowHostFallbacks: hostSelectors.slice(1, 3),
+                shadowMode: rootNode.mode  // 'open' or 'closed'
+            };
+        }
+
+        return { inShadowDOM: false };
+    }
+
+    /**
+     * Generate a piercing selector for Shadow DOM elements.
+     * Format: "hostSelector >>> innerSelector"
+     */
+    function generatePiercingSelector(element, shadowInfo) {
+        if (!shadowInfo.inShadowDOM) {
+            return null;
+        }
+
+        // Get selectors for the inner element (within shadow root)
+        const innerSelectors = generateSelectors(element);
+        const innerSelector = innerSelectors[0];
+
+        // Combine with shadow host selector
+        return `${shadowInfo.shadowHost} >>> ${innerSelector}`;
+    }
+
+    /**
      * Get target information for an element.
      */
     function getTargetInfo(element) {
         const selectors = generateSelectors(element);
         const text = (element.textContent || '').trim().substring(0, 100);
 
-        return {
+        // Check if element is inside Shadow DOM
+        const shadowInfo = getShadowDOMInfo(element);
+
+        const targetInfo = {
             selector: selectors[0],
             fallback_selectors: selectors.slice(1, 4), // Keep up to 3 fallbacks
             text: text || null,
@@ -596,6 +644,14 @@
             tag: element.tagName.toLowerCase(),
             role: element.getAttribute('role') || null
         };
+
+        // Add Shadow DOM info if element is inside a shadow root
+        if (shadowInfo.inShadowDOM) {
+            targetInfo.shadow_host = shadowInfo.shadowHost;
+            targetInfo.piercing_selector = generatePiercingSelector(element, shadowInfo);
+        }
+
+        return targetInfo;
     }
 
     /**
@@ -682,13 +738,16 @@
     function handleClick(event) {
         // Primary button only (left click)
         if (event.button !== 0) return;
-        recordClick(event.target, event, 'click');
+        // Use composedPath() to get actual target through Shadow DOM boundaries
+        const realTarget = event.composedPath()[0] || event.target;
+        recordClick(realTarget, event, 'click');
     }
 
     function handleContextMenu(event) {
         // Right click (button === 2)
         const timestamp = getTimestamp();
-        const element = event.target;
+        // Use composedPath() to get actual target through Shadow DOM boundaries
+        const element = event.composedPath()[0] || event.target;
         const targetInfo = getTargetInfo(element);
 
         // Check if cursor is over a different element and add to fallbacks
@@ -731,14 +790,18 @@
         if (event.button !== 0) return;
         // Only record if it's a pointer type that might not fire click
         // (some frameworks use pointerdown and call preventDefault)
-        recordClick(event.target, event, 'pointerdown');
+        // Use composedPath() to get actual target through Shadow DOM boundaries
+        const realTarget = event.composedPath()[0] || event.target;
+        recordClick(realTarget, event, 'pointerdown');
     }
 
     function handleMouseDown(event) {
         // Primary button only
         if (event.button !== 0) return;
         // Fallback for older browsers or when pointer events aren't available
-        recordClick(event.target, event, 'mousedown');
+        // Use composedPath() to get actual target through Shadow DOM boundaries
+        const realTarget = event.composedPath()[0] || event.target;
+        recordClick(realTarget, event, 'mousedown');
     }
 
     // Track typing in input fields
