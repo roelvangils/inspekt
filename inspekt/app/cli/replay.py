@@ -1028,6 +1028,17 @@ def replay(
 
         # Interactive mode: show overlay and wait for user input
         if interactive and not dry_run:
+            # If previous step caused navigation, re-inject visual script before showing overlay
+            # (navigation resets the page context, losing our injected scripts)
+            if last_step_navigated and (visual or audio or lock):
+                try:
+                    reinject_result = client.execute(visual_script, timeout=10.0)
+                    if verbose and reinject_result.get("ok"):
+                        click.echo(format_system_message("visual script re-injected after navigation"))
+                except Exception as e:
+                    if verbose:
+                        click.echo(format_system_message(f"Warning: could not re-inject visual script: {e}"))
+
             # Build the interactive prompt step
             previous_step_dict = None
             if i > 0:
