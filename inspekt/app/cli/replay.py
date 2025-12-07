@@ -965,6 +965,13 @@ def replay(
             last_step_navigated = False  # Reset the flag
             continue
 
+        # Interactive mode: re-inject visual script after navigation BEFORE resetting flag
+        # (navigation resets the page context, losing our injected scripts)
+        # Also check if previous step was a navigate action (response might not include navigated flag
+        # because the page context is destroyed when window.location.href is set)
+        prev_was_navigate = i > 0 and steps_to_run[i - 1].action == "navigate"
+        needs_visual_reinject = (last_step_navigated or prev_was_navigate) and interactive and not dry_run and (visual or audio or lock)
+
         # Reset navigation flag at start of each step (will be set if this step navigates)
         last_step_navigated = False
 
@@ -1030,7 +1037,7 @@ def replay(
         if interactive and not dry_run:
             # If previous step caused navigation, re-inject visual script before showing overlay
             # (navigation resets the page context, losing our injected scripts)
-            if last_step_navigated and (visual or audio or lock):
+            if needs_visual_reinject:
                 try:
                     reinject_result = client.execute(visual_script, timeout=10.0)
                     if verbose and reinject_result.get("ok"):
