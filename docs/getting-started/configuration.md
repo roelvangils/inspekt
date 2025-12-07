@@ -881,6 +881,82 @@ Now that you've configured Inspekt to your liking:
 
 ---
 
+## Recording and Replay Audio
+
+The `audio` section controls audio feedback during `inspekt record` and `inspekt replay`.
+
+### `audio.output`
+
+Where to play audio feedback sounds.
+
+**Type**: `"cli"` | `"browser"` | `"off"`
+**Default**: `"cli"`
+
+=== "cli (Default)"
+
+    ```json
+    {
+      "audio": {
+        "output": "cli"
+      }
+    }
+    ```
+
+    Play sounds via system audio (macOS `afplay`, Linux `aplay`).
+
+    **Advantages**:
+    - Works immediately, no browser interaction needed
+    - Plays asynchronously, doesn't slow down replay
+    - Works over SSH if your terminal supports audio
+
+=== "browser"
+
+    ```json
+    {
+      "audio": {
+        "output": "browser"
+      }
+    }
+    ```
+
+    Play sounds via Web Audio API in the browser.
+
+    **Note**: Requires clicking in the browser window first (browser autoplay policy).
+
+    **Use case**: When terminal audio is not available.
+
+=== "off"
+
+    ```json
+    {
+      "audio": {
+        "output": "off"
+      }
+    }
+    ```
+
+    Disable all audio feedback.
+
+    **Use case**: CI/CD environments, quiet operation.
+
+### `audio.volume`
+
+Volume level for audio feedback.
+
+**Type**: `number` (0.0 to 1.0)
+**Default**: `0.5`
+
+```json
+{
+  "audio": {
+    "output": "cli",
+    "volume": 0.7
+  }
+}
+```
+
+---
+
 ## Configuration Reference
 
 Quick reference for all available settings:
@@ -888,6 +964,8 @@ Quick reference for all available settings:
 | Setting | Type | Default | Description |
 |---------|------|---------|-------------|
 | `ai-language` | `string` | `"auto"` | Language for AI operations |
+| `audio.output` | `string` | `"cli"` | Audio output: cli, browser, or off |
+| `audio.volume` | `number` | `0.5` | Audio volume (0.0 to 1.0) |
 | `control.auto-refocus` | `string` | `"only-spa"` | When to auto-refocus |
 | `control.focus-outline` | `string` | `"custom"` | Focus outline style |
 | `control.speak-name` | `boolean` | `false` | Speak element name |
