@@ -452,8 +452,18 @@ def record(
             resume_code = resume_code.replace("CONFIG_PLACEHOLDER", json.dumps(resume_config))
             return resume_code
 
-        # Signal handler for Ctrl+C
+        # Flag for clean shutdown (avoid doing I/O in signal handler)
+        stop_requested = False
+
+        # Signal handler for Ctrl+C - just sets a flag
         def stop_recording(sig, frame):
+            nonlocal stop_requested
+            stop_requested = True
+
+        signal.signal(signal.SIGINT, stop_recording)
+
+        # Cleanup function called from main loop when stop is requested
+        def do_cleanup():
             nonlocal all_steps
 
             click.echo("\n\nStopping recording...")
@@ -461,13 +471,13 @@ def record(
             # Play stop/completion sound (target the specific browser we're recording in)
             if visual_script:
                 try:
-                    client.execute("window.__INSPEKT_VISUAL__.audio.playStop()", timeout=5.0, browser_index=recording_browser_index)
+                    client.execute("window.__INSPEKT_VISUAL__.audio.playStop()", timeout=2.0, browser_index=recording_browser_index)
                 except Exception:
                     pass  # Audio is optional
 
             try:
                 # Stop recording and get final events (target the specific browser)
-                stop_result = client.execute(stop_code, timeout=5.0, browser_index=recording_browser_index)
+                stop_result = client.execute(stop_code, timeout=2.0, browser_index=recording_browser_index)
 
                 if stop_result.get("ok"):
                     stop_response = stop_result.get("result", {})
@@ -706,8 +716,6 @@ def record(
 
             sys.exit(0)
 
-        signal.signal(signal.SIGINT, stop_recording)
-
         # Track consecutive errors for better handling
         consecutive_errors = 0
         max_consecutive_errors = 30  # About 3 seconds of errors before warning
@@ -729,15 +737,18 @@ def record(
 
         # Main polling loop
         while True:
+            # Check if stop was requested (Ctrl+C)
+            if stop_requested:
+                do_cleanup()
+                break
+
             # Check for inactivity
             inactive_seconds = time.time() - last_activity_time
 
             if inactive_seconds >= INACTIVITY_STOP_SECONDS:
                 # Auto-stop due to inactivity
                 click.echo(format_system_message("No activity for 60 seconds. Stopping recording."))
-                # Trigger the stop handler
-                import os
-                os.kill(os.getpid(), signal.SIGINT)
+                do_cleanup()
                 break
 
             if inactive_seconds >= INACTIVITY_WARNING_SECONDS and not inactivity_warning_shown:
@@ -768,6 +779,12 @@ def record(
                             response = {}
 
                     debug_log(f"Response: recordingActive={response.get('recordingActive')}, currentUrl={response.get('currentUrl', 'N/A')[:50] if response.get('currentUrl') else 'N/A'}")
+
+                    # Check if stop was requested from browser (Ctrl+C in browser window)
+                    if response.get("stopRequested"):
+                        debug_log("Stop requested from browser (Ctrl+C)")
+                        do_cleanup()
+                        break
 
                     # Check if recording is still active
                     recording_active = response.get("recordingActive", True)
@@ -854,6 +871,14 @@ def record(
                             continue
                         seen_timestamps.add(event_timestamp)
 
+                        # Skip Ctrl+C keypresses - this is the stop signal, not a real action
+                        if event.get("action") == "keypress":
+                            key = event.get("key", "").lower()
+                            modifiers = event.get("modifiers", [])
+                            if key == "c" and "ctrl" in modifiers:
+                                debug_log("Skipping Ctrl+C keypress (stop signal)")
+                                continue
+
                         step = convert_js_event_to_step(event)
                         all_steps.append(step)
                         step_count += 1
@@ -883,8 +908,7 @@ def record(
                 if recording_browser_index is not None and current_browser_count <= recording_browser_index:
                     # Original tab is no longer available - auto-stop recording
                     click.echo(format_system_message("Recording tab was closed. Stopping recording."))
-                    import os
-                    os.kill(os.getpid(), signal.SIGINT)
+                    do_cleanup()
                     break
 
                 if consecutive_errors == 10 and not waiting_for_reconnect:
