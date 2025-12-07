@@ -15,6 +15,8 @@ import yaml
 
 from inspekt.app.cli.icons import success as success_icon
 from inspekt.client import BridgeClient
+from inspekt.config import get_audio_config
+from inspekt.services.audio import CLIAudio
 from inspekt.domain.recording import (
     ExpectInfo,
     Recording,
@@ -1173,54 +1175,76 @@ def record_tutorial(speak: bool):
     except Exception:
         visual_script = None
 
-    # Inject visual script for audio playback
-    script_loaded = False
-    if visual_script:
-        try:
-            # Inject the visual/audio script
-            result = client.execute(visual_script, timeout=5.0)
-            if result.get("ok"):
-                script_loaded = True
-        except Exception as e:
-            click.echo(format_system_message(f"Failed to load audio script: {e}"), err=True)
+    # Get audio config
+    audio_config = get_audio_config()
+    audio_output = audio_config["output"]  # "cli" | "browser" | "off"
+    audio_volume = audio_config["volume"]
 
-    if not script_loaded:
-        click.echo(format_system_message("Audio not available - continuing without sound"))
+    # Set up audio based on config
+    cli_audio: CLIAudio | None = None
+    use_browser_audio = False
+
+    if audio_output == "off":
+        click.echo(format_system_message("Audio disabled in config - continuing without sound"))
         click.echo()
         click.echo("  Press Enter to see all supported action types...")
         input()
-    else:
-        # Prompt to continue - ask user to click in browser first for audio
-        click.echo("  To hear sound effects, click anywhere in your browser window,")
-        click.echo("  then press Enter here to continue...")
+    elif audio_output == "cli":
+        # CLI audio: no browser interaction needed
+        cli_audio = CLIAudio(volume=audio_volume)
         click.echo()
+        click.echo("  Press Enter to hear all action types with audio feedback...")
         input()
+    else:
+        # Browser audio: inject script and require user interaction
+        script_loaded = False
+        if visual_script:
+            try:
+                result = client.execute(visual_script, timeout=5.0)
+                if result.get("ok"):
+                    script_loaded = True
+            except Exception as e:
+                click.echo(format_system_message(f"Failed to load audio script: {e}"), err=True)
 
-        # Now initialize audio after user has clicked in browser
-        try:
-            init_result = client.execute("""
-                (function() {
-                    if (!window.__INSPEKT_VISUAL__) {
-                        return { ok: false, error: 'Visual module not found' };
-                    }
-                    try {
-                        window.__INSPEKT_VISUAL__.audio.init();
-                        window.__INSPEKT_VISUAL__.audio.warmUp();
-                        // Try to play a test sound
-                        window.__INSPEKT_VISUAL__.audio.playClick();
-                        return { ok: true, state: 'initialized' };
-                    } catch (e) {
-                        return { ok: false, error: e.message };
-                    }
-                })()
-            """, timeout=3.0)
+        if not script_loaded:
+            click.echo(format_system_message("Browser audio not available - using CLI audio"))
+            cli_audio = CLIAudio(volume=audio_volume)
+            click.echo()
+            click.echo("  Press Enter to see all supported action types...")
+            input()
+        else:
+            use_browser_audio = True
+            # Prompt to continue - ask user to click in browser first for audio
+            click.echo("  To hear sound effects, click anywhere in your browser window,")
+            click.echo("  then press Enter here to continue...")
+            click.echo()
+            input()
 
-            if init_result.get("ok"):
-                audio_result = init_result.get("result", {})
-                if not audio_result.get("ok"):
-                    click.echo(format_system_message(f"Audio error: {audio_result.get('error', 'unknown')}"))
-        except Exception as e:
-            click.echo(format_system_message(f"Audio init error: {e}"))
+            # Now initialize audio after user has clicked in browser
+            try:
+                init_result = client.execute("""
+                    (function() {
+                        if (!window.__INSPEKT_VISUAL__) {
+                            return { ok: false, error: 'Visual module not found' };
+                        }
+                        try {
+                            window.__INSPEKT_VISUAL__.audio.init();
+                            window.__INSPEKT_VISUAL__.audio.warmUp();
+                            // Try to play a test sound
+                            window.__INSPEKT_VISUAL__.audio.playClick();
+                            return { ok: true, state: 'initialized' };
+                        } catch (e) {
+                            return { ok: false, error: e.message };
+                        }
+                    })()
+                """, timeout=3.0)
+
+                if init_result.get("ok"):
+                    audio_result = init_result.get("result", {})
+                    if not audio_result.get("ok"):
+                        click.echo(format_system_message(f"Audio error: {audio_result.get('error', 'unknown')}"))
+            except Exception as e:
+                click.echo(format_system_message(f"Audio init error: {e}"))
 
     # Get all action types dynamically from the ActionType Literal
     all_actions = list(get_args(ActionType))
@@ -1365,7 +1389,9 @@ def record_tutorial(speak: bool):
     click.echo()
 
     # Play start playback sound
-    if script_loaded:
+    if cli_audio:
+        cli_audio.play_start_playback()
+    elif use_browser_audio:
         try:
             client.execute("""
                 (function() {
@@ -1399,25 +1425,28 @@ def record_tutorial(speak: bool):
         # Get description for this action
         description = action_descriptions.get(action, action)
 
-        # Play audio in browser
-        try:
-            audio_result = client.execute(
-                f"""
-                (function() {{
-                    if (window.__INSPEKT_VISUAL__) {{
-                        window.__INSPEKT_VISUAL__.audio.playForAction('{action}');
-                        return {{ played: true, action: '{action}' }};
-                    }}
-                    return {{ played: false, error: 'no visual module' }};
-                }})()
-                """,
-                timeout=2.0,
-            )
-            # Debug: show if calls are succeeding
-            if not audio_result.get("ok"):
-                click.echo(format_system_message(f"Audio call failed for {action}"))
-        except Exception as e:
-            click.echo(format_system_message(f"Audio play error: {e}"))
+        # Play audio for this action
+        if cli_audio:
+            cli_audio.play_for_action(action)
+        elif use_browser_audio:
+            try:
+                audio_result = client.execute(
+                    f"""
+                    (function() {{
+                        if (window.__INSPEKT_VISUAL__) {{
+                            window.__INSPEKT_VISUAL__.audio.playForAction('{action}');
+                            return {{ played: true, action: '{action}' }};
+                        }}
+                        return {{ played: false, error: 'no visual module' }};
+                    }})()
+                    """,
+                    timeout=2.0,
+                )
+                # Debug: show if calls are succeeding
+                if not audio_result.get("ok"):
+                    click.echo(format_system_message(f"Audio call failed for {action}"))
+            except Exception as e:
+                click.echo(format_system_message(f"Audio play error: {e}"))
 
         if speak:
             # Speak the action description via browser TTS
@@ -1450,7 +1479,9 @@ def record_tutorial(speak: bool):
             time.sleep(1.0)
 
     # Play stop playback sound
-    if script_loaded:
+    if cli_audio:
+        cli_audio.play_stop_playback()
+    elif use_browser_audio:
         try:
             client.execute("""
                 (function() {
@@ -1504,7 +1535,9 @@ def record_tutorial(speak: bool):
         click.secho(f"     {action_descriptions.get('failure', 'Action failed')}", fg="bright_black", italic=True)
 
     # Play failure sound
-    if script_loaded:
+    if cli_audio:
+        cli_audio.play_failure()
+    elif use_browser_audio:
         try:
             client.execute("""
                 (function() {

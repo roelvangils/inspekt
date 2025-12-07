@@ -14,8 +14,10 @@ import yaml
 
 from inspekt.app.cli.icons import success, error
 from inspekt.client import BridgeClient
+from inspekt.config import get_audio_config
 from inspekt.domain.recording import Recording
 from inspekt.services.applescript_utils import activate_browser_tab
+from inspekt.services.audio import CLIAudio
 from .formatting import (
     format_duration,
     format_step_for_display,
@@ -621,6 +623,24 @@ def replay(
         visual = not no_visual
         audio = not no_audio
 
+    # Get audio config to determine output method
+    audio_config = get_audio_config()
+    audio_output = audio_config["output"]  # "cli" | "browser" | "off"
+    audio_volume = audio_config["volume"]
+
+    # If config says "off", disable audio regardless of CLI flag
+    if audio_output == "off":
+        audio = False
+
+    # Create CLI audio instance if using CLI audio
+    cli_audio: CLIAudio | None = None
+    use_browser_audio = False
+    if audio:
+        if audio_output == "cli":
+            cli_audio = CLIAudio(volume=audio_volume)
+        else:  # "browser"
+            use_browser_audio = True
+
     # Build skip set from options
     skip_actions = set(skip)
     if skip_hover:
@@ -795,12 +815,15 @@ def replay(
                             client.execute("window.__INSPEKT_VISUAL__.inputLock.enable()", timeout=5.0)
                             if verbose:
                                 click.echo(format_system_message("input locked"))
-                        # Play start sound (requires user interaction to unlock audio)
-                        if audio:
-                            # Prompt user to click in browser to unlock audio (browser autoplay policy)
+                        # Play start sound
+                        if cli_audio:
+                            # CLI audio: play directly from Python (no browser interaction needed)
+                            cli_audio.play_start_playback()
+                        elif use_browser_audio:
+                            # Browser audio: requires user interaction to unlock (autoplay policy)
                             click.echo()
                             click.echo(
-                                click.style("  Audio feedback enabled. ", fg="cyan")
+                                click.style("  Audio feedback enabled (browser mode). ", fg="cyan")
                                 + "Click anywhere in your browser window to unlock audio."
                             )
                             click.echo(
@@ -928,6 +951,10 @@ def replay(
 
         click.echo(summary, nl=False)
 
+        # Play action sound via CLI audio (if enabled)
+        if cli_audio and step.action:
+            cli_audio.play_for_action(step.action)
+
         # Handle inspekt commands separately
         if step.action == "inspekt" and step.command:
             cmd_result = run_inspekt_command(step.command)
@@ -1052,12 +1079,15 @@ def replay(
                                     # Re-enable input lock
                                     if lock:
                                         client.execute("window.__INSPEKT_VISUAL__.inputLock.enable()", timeout=5.0)
-                                    # Re-initialize audio context after page navigation
-                                    if audio:
+                                    # Re-initialize audio context after page navigation (browser audio only)
+                                    if use_browser_audio:
                                         client.execute("window.__INSPEKT_VISUAL__.audio.init()", timeout=5.0)
                                         if navigated:
                                             # Play navigate sound to indicate page transition
                                             client.execute("window.__INSPEKT_VISUAL__.audio.playNavigate()", timeout=5.0)
+                                    elif cli_audio and navigated:
+                                        # CLI audio: navigate sound was already played at step start
+                                        pass
                                 except Exception:
                                     pass  # Best effort re-injection
 
@@ -1121,8 +1151,14 @@ def replay(
             except Exception:
                 pass  # Best effort
 
-        if audio:
-            # Play stop playback sound (tritone)
+        if cli_audio:
+            # CLI audio: play stop and success sounds from Python
+            cli_audio.play_stop_playback()
+            if result.all_passed:
+                time.sleep(0.3)
+                cli_audio.play_success()
+        elif use_browser_audio:
+            # Browser audio: play via Web Audio API
             client.execute("window.__INSPEKT_VISUAL__.audio.playStopPlayback()", timeout=5.0)
             time.sleep(0.5)  # Wait for completion sound
             # Then play success chime if all passed

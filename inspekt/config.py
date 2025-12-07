@@ -39,6 +39,11 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "typing": {
         "human-like-typo-rate": 0.05,
     },
+    "paths": {
+        "recordings": ".",  # Current directory
+        "screenshots": ".",  # Current directory
+        "downloads": "~/Downloads",  # User's Downloads folder
+    },
     "screenshot": {
         "optimize": True,
         "format": "png",
@@ -76,6 +81,11 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "axe": {
         "show-badges": True,
     },
+    "audio": {
+        "output": "cli",  # "cli" (Python/system audio) | "browser" (Web Audio) | "off"
+        "volume": 0.5,  # 0.0 to 1.0
+    },
+    "nerdfont": False,  # Enable Nerdfont glyphs in terminal output
     "permissions": {
         "allow-local-files": True,  # Allow file:// URLs without adding to domain list
     },
@@ -196,6 +206,18 @@ def load_config() -> dict[str, Any]:
                     config["permissions"].update(user_config["permissions"])
                 else:
                     config["permissions"] = user_config["permissions"]
+            elif key == "audio" and isinstance(user_config["audio"], dict):
+                # Nested audio config - merge deeply
+                if isinstance(config.get("audio"), dict):
+                    config["audio"].update(user_config["audio"])
+                else:
+                    config["audio"] = user_config["audio"]
+            elif key == "paths" and isinstance(user_config["paths"], dict):
+                # Nested paths config - merge deeply
+                if isinstance(config.get("paths"), dict):
+                    config["paths"].update(user_config["paths"])
+                else:
+                    config["paths"] = user_config["paths"]
             else:
                 # Root-level properties like ai-language - overwrite
                 config[key] = user_config[key]
@@ -513,4 +535,85 @@ def get_permissions_config() -> dict[str, Any]:
 
     return {
         "allow-local-files": allow_local_files,
+    }
+
+
+def is_nerdfont_enabled() -> bool:
+    """
+    Check if Nerdfont glyphs are enabled in config.
+
+    Returns:
+        True if nerdfont option is enabled, False otherwise
+    """
+    config = load_config()
+    return bool(config.get("nerdfont", False))
+
+
+def get_paths_config() -> dict[str, Path]:
+    """
+    Get paths configuration with validation and expansion.
+
+    Expands ~ to home directory and resolves relative paths.
+
+    Returns:
+        Dictionary with 'recordings', 'screenshots', 'downloads' as Path objects
+    """
+    config = load_config()
+    paths_config = config.get("paths", {})
+
+    def resolve_path(path_str: str, default: str) -> Path:
+        """Resolve a path string to an absolute Path."""
+        if not path_str:
+            path_str = default
+
+        # Expand ~ to home directory
+        path = Path(path_str).expanduser()
+
+        # If relative, resolve to absolute (relative to cwd)
+        if not path.is_absolute():
+            path = Path.cwd() / path
+
+        return path
+
+    return {
+        "recordings": resolve_path(
+            paths_config.get("recordings", "."), "."
+        ),
+        "screenshots": resolve_path(
+            paths_config.get("screenshots", "."), "."
+        ),
+        "downloads": resolve_path(
+            paths_config.get("downloads", "~/Downloads"), "~/Downloads"
+        ),
+    }
+
+
+def get_audio_config() -> dict[str, Any]:
+    """
+    Get audio configuration with validation.
+
+    Returns:
+        Audio configuration dictionary with validated values:
+        - output: "cli" | "browser" | "off"
+        - volume: float between 0.0 and 1.0
+    """
+    config = load_config()
+    audio_config = config.get("audio", {})
+
+    # Validate output: must be cli, browser, or off
+    output = audio_config.get("output", "cli").lower()
+    if output not in ["cli", "browser", "off"]:
+        output = "cli"
+
+    # Validate volume: float between 0 and 1
+    volume = audio_config.get("volume", 0.5)
+    try:
+        volume = float(volume)
+        volume = max(0.0, min(1.0, volume))
+    except (ValueError, TypeError):
+        volume = 0.5
+
+    return {
+        "output": output,
+        "volume": volume,
     }
