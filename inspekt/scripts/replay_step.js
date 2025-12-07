@@ -757,11 +757,29 @@
 
     /**
      * Simulate selecting an option in a select element.
+     * Shows a visual preview of the selection being made.
+     *
+     * @param {HTMLSelectElement} element - The select element
+     * @param {string|string[]} value - The value(s) to select
+     * @param {string} optionText - The display text of the option being selected
      */
-    function simulateSelect(element, value) {
+    function simulateSelect(element, value, optionText) {
         // Focus the element
         if (element.focus) {
             element.focus();
+        }
+
+        // Show visual preview of what's being selected
+        if (window.__INSPEKT_VISUAL__ && optionText) {
+            // Use the option text from recording, or fall back to finding it
+            const displayText = optionText;
+            window.__INSPEKT_VISUAL__.showSelectPreview(element, displayText, 600);
+        } else if (window.__INSPEKT_VISUAL__ && !Array.isArray(value)) {
+            // Fall back to finding option text by value
+            const option = Array.from(element.options).find(opt => opt.value === value);
+            if (option) {
+                window.__INSPEKT_VISUAL__.showSelectPreview(element, option.text, 600);
+            }
         }
 
         // Handle multi-select
@@ -1252,7 +1270,7 @@
                     await scrollToElement(element);
                     await showVisualBefore(action, element);
                     playAudio(action);
-                    simulateSelect(element, step.value);
+                    simulateSelect(element, step.value, step.option_text);
                     result.ok = true;
                     await showVisualAfter(action, true);
                 }
@@ -1261,6 +1279,33 @@
                 // Inspekt commands are handled by the CLI, not JavaScript
                 result.ok = true;
                 result.inspektCommand = step.command;
+
+            } else if (action === 'interactive_prompt') {
+                // Interactive mode: show overlay and wait for user input
+                const visual = window.__INSPEKT_VISUAL__;
+                if (visual && visual.interactive) {
+                    // Show the interactive overlay with step info
+                    visual.interactive.show(
+                        step.currentStep,      // Step data for current step
+                        step.previousStep,     // Step data for previous step (may be null)
+                        step.stepNum,          // Current step number (1-based)
+                        step.totalSteps        // Total number of steps
+                    );
+
+                    // Wait for user to press Enter, Space, or Escape
+                    const choice = await visual.interactive.waitForInput();
+
+                    // Hide the overlay
+                    visual.interactive.hide();
+
+                    result.ok = true;
+                    result.choice = choice;  // 'next', 'skip', or 'cancel'
+                } else {
+                    // No visual module available, default to 'next'
+                    result.ok = true;
+                    result.choice = 'next';
+                    result.warning = 'Interactive overlay not available';
+                }
 
             } else {
                 result.error = `Unknown action: ${action}`;

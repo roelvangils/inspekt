@@ -142,6 +142,149 @@
     #inspekt-typing.visible {
       display: block;
     }
+
+    .inspekt-select-preview {
+      position: fixed;
+      background: rgba(0, 0, 0, 0.85);
+      color: ${CONFIG.colors.select};
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 13px;
+      font-weight: 500;
+      z-index: 2147483647;
+      pointer-events: none;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+      border: 1px solid ${CONFIG.colors.select};
+      animation: inspekt-select-preview-in 0.2s ease-out forwards;
+    }
+
+    .inspekt-select-preview::before {
+      content: '▼ ';
+      font-size: 10px;
+      opacity: 0.7;
+    }
+
+    .inspekt-select-preview.fade-out {
+      animation: inspekt-select-preview-out 0.3s ease-in forwards;
+    }
+
+    @keyframes inspekt-select-preview-in {
+      from {
+        opacity: 0;
+        transform: translateY(-4px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    @keyframes inspekt-select-preview-out {
+      from {
+        opacity: 1;
+        transform: translateY(0);
+      }
+      to {
+        opacity: 0;
+        transform: translateY(4px);
+      }
+    }
+
+    /* Interactive replay overlay */
+    #inspekt-interactive-overlay {
+      position: fixed;
+      bottom: 20px;
+      left: 20px;
+      background: rgba(0, 0, 0, 0.9);
+      color: #fff;
+      padding: 16px 20px;
+      border-radius: 8px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, monospace;
+      font-size: 13px;
+      z-index: 2147483647;
+      min-width: 320px;
+      max-width: 450px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      animation: inspekt-interactive-in 0.3s ease-out;
+    }
+
+    @keyframes inspekt-interactive-in {
+      from {
+        opacity: 0;
+        transform: translateY(20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    #inspekt-interactive-overlay .previous-step {
+      color: #888;
+      font-size: 12px;
+      margin-bottom: 8px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    #inspekt-interactive-overlay .previous-step .checkmark {
+      color: ${CONFIG.colors.success};
+      margin-right: 4px;
+    }
+
+    #inspekt-interactive-overlay .step-counter {
+      color: #888;
+      font-size: 11px;
+      margin-bottom: 6px;
+    }
+
+    #inspekt-interactive-overlay .current-step {
+      font-size: 14px;
+      font-weight: 500;
+      margin-bottom: 12px;
+      line-height: 1.4;
+    }
+
+    #inspekt-interactive-overlay .current-step .action-icon {
+      margin-right: 6px;
+    }
+
+    #inspekt-interactive-overlay .current-step .action-name {
+      color: ${CONFIG.colors.click};
+    }
+
+    #inspekt-interactive-overlay .current-step .target-name {
+      color: #fff;
+    }
+
+    #inspekt-interactive-overlay .current-step .target-tag {
+      color: #888;
+      font-size: 12px;
+    }
+
+    #inspekt-interactive-overlay .key-hints {
+      display: flex;
+      gap: 12px;
+      font-size: 11px;
+      color: #666;
+      padding-top: 10px;
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    #inspekt-interactive-overlay .key-hints kbd {
+      background: rgba(255, 255, 255, 0.1);
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-family: inherit;
+      font-size: 10px;
+      margin-right: 4px;
+    }
+
+    #inspekt-interactive-overlay.waiting {
+      border-color: ${CONFIG.colors.click};
+    }
   `;
 
   // ==========================================================================
@@ -367,6 +510,48 @@
       if (this.elements) {
         this.elements.typing.classList.remove('visible');
       }
+    },
+
+    /**
+     * Show select preview overlay below element
+     * @param {Element} element - The select element
+     * @param {string} optionText - The text of the option being selected
+     * @param {number} duration - How long to show the preview (ms), default 600
+     */
+    showSelectPreview(element, optionText, duration = 600) {
+      this.init();
+
+      // Remove any existing preview
+      const existing = document.querySelector('.inspekt-select-preview');
+      if (existing) {
+        existing.remove();
+      }
+
+      const rect = element.getBoundingClientRect();
+      const preview = document.createElement('div');
+      preview.className = 'inspekt-select-preview';
+      preview.textContent = optionText;
+
+      // Position below the select element
+      preview.style.left = `${rect.left}px`;
+      preview.style.top = `${rect.bottom + 6}px`;
+
+      // Add to overlay container (or body if not ready)
+      if (this.elements && this.elements.overlay) {
+        this.elements.overlay.appendChild(preview);
+      } else {
+        document.body.appendChild(preview);
+      }
+
+      // Fade out and remove after duration
+      setTimeout(() => {
+        preview.classList.add('fade-out');
+        setTimeout(() => {
+          preview.remove();
+        }, 300); // Match the fade-out animation duration
+      }, duration);
+
+      return preview;
     },
 
     /**
@@ -913,6 +1098,198 @@
   };
 
   // ==========================================================================
+  // Interactive Replay Module (step-by-step execution with user control)
+  // ==========================================================================
+
+  const InteractiveOverlay = {
+    element: null,
+    keyHandler: null,
+    resolvePromise: null,
+
+    /**
+     * Format a step for display in the overlay
+     */
+    formatStep(step) {
+      if (!step) return 'Starting replay...';
+
+      const action = step.action || 'unknown';
+      const target = step.target || {};
+      const accessibleName = target.accessible_name || target.text || '';
+      const tag = target.tag || '';
+      const selector = target.selector || '';
+
+      // Action icons (Nerd Font)
+      const icons = {
+        navigate: '󰖟',
+        click: '󰍽',
+        rightclick: '󰍽',
+        activate: '󰍽',
+        type: '󰌌',
+        keypress: '󰌌',
+        hover: '󰍽',
+        check: '󰄵',
+        uncheck: '󰄱',
+        select: '󱕅',
+        scroll: '󰍽',
+        inspekt: '󰍉'
+      };
+
+      const icon = icons[action] || '●';
+
+      // Format based on action type
+      if (action === 'navigate') {
+        const url = step.url || '';
+        const shortUrl = url.length > 40 ? url.substring(0, 40) + '...' : url;
+        return `${icon} Navigate to ${shortUrl}`;
+      }
+
+      if (action === 'type') {
+        const charCount = (step.value || '').length;
+        const inputType = target.attributes?.type || 'text';
+        if (step.sensitive) {
+          return `${icon} Type password (${charCount} chars)`;
+        }
+        return `${icon} Type ${charCount} chars into ${inputType} field`;
+      }
+
+      if (action === 'keypress') {
+        const key = step.key || '';
+        const modifiers = step.modifiers || [];
+        const keyStr = modifiers.length > 0 ? modifiers.join('+') + '+' + key : key;
+        return `${icon} Press ${keyStr}`;
+      }
+
+      if (action === 'select') {
+        const optionText = step.option_text || step.value || '';
+        return `${icon} Select "${optionText}"`;
+      }
+
+      if (action === 'check' || action === 'uncheck') {
+        const name = accessibleName || step.value || selector;
+        return `${icon} ${action === 'check' ? 'Check' : 'Uncheck'} "${name}"`;
+      }
+
+      if (action === 'scroll') {
+        const scroll = step.scroll || {};
+        const deltaY = scroll.deltaY || 0;
+        const direction = deltaY > 0 ? 'down' : 'up';
+        return `${icon} Scroll ${direction} ${Math.abs(deltaY)}px`;
+      }
+
+      if (action === 'inspekt') {
+        return `${icon} Run: inspekt ${step.command || ''}`;
+      }
+
+      // Default: click, rightclick, activate, hover
+      const name = accessibleName || selector.substring(0, 30);
+      const tagDisplay = tag ? ` (${tag})` : '';
+      return `${icon} ${action} → "${name}"${tagDisplay}`;
+    },
+
+    /**
+     * Show the interactive overlay
+     */
+    show(currentStep, previousStep, stepNum, totalSteps) {
+      // Remove existing overlay
+      this.hide();
+
+      const overlay = document.createElement('div');
+      overlay.id = 'inspekt-interactive-overlay';
+      overlay.className = 'waiting';
+
+      // Previous step (if any)
+      let previousHtml = '';
+      if (previousStep) {
+        const prevFormatted = this.formatStep(previousStep);
+        previousHtml = `
+          <div class="previous-step">
+            <span class="checkmark">✓</span> ${prevFormatted}
+          </div>
+        `;
+      } else {
+        previousHtml = `
+          <div class="previous-step">
+            <span class="checkmark">▶</span> Interactive replay started
+          </div>
+        `;
+      }
+
+      // Current step
+      const currentFormatted = this.formatStep(currentStep);
+
+      overlay.innerHTML = `
+        ${previousHtml}
+        <div class="step-counter">Step ${stepNum} of ${totalSteps}</div>
+        <div class="current-step">${currentFormatted}</div>
+        <div class="key-hints">
+          <span><kbd>Enter</kbd> Next</span>
+          <span><kbd>Space</kbd> Skip</span>
+          <span><kbd>Esc</kbd> Stop</span>
+        </div>
+      `;
+
+      document.body.appendChild(overlay);
+      this.element = overlay;
+    },
+
+    /**
+     * Hide the overlay and clean up
+     */
+    hide() {
+      if (this.element) {
+        this.element.remove();
+        this.element = null;
+      }
+      if (this.keyHandler) {
+        document.removeEventListener('keydown', this.keyHandler, true);
+        this.keyHandler = null;
+      }
+      this.resolvePromise = null;
+    },
+
+    /**
+     * Wait for user input (Enter, Space, or Escape)
+     * Returns a promise that resolves with 'next', 'skip', or 'cancel'
+     */
+    waitForInput() {
+      return new Promise((resolve) => {
+        this.resolvePromise = resolve;
+
+        this.keyHandler = (event) => {
+          // Only handle trusted events (real user input)
+          if (!event.isTrusted) return;
+
+          if (event.key === 'Enter') {
+            event.preventDefault();
+            event.stopPropagation();
+            event.stopImmediatePropagation();
+            document.removeEventListener('keydown', this.keyHandler, true);
+            this.keyHandler = null;
+            resolve('next');
+          } else if (event.key === ' ') {
+            event.preventDefault();
+            event.stopPropagation();
+            event.stopImmediatePropagation();
+            document.removeEventListener('keydown', this.keyHandler, true);
+            this.keyHandler = null;
+            resolve('skip');
+          } else if (event.key === 'Escape') {
+            event.preventDefault();
+            event.stopPropagation();
+            event.stopImmediatePropagation();
+            document.removeEventListener('keydown', this.keyHandler, true);
+            this.keyHandler = null;
+            resolve('cancel');
+          }
+        };
+
+        // Use capture phase to intercept before page handlers
+        document.addEventListener('keydown', this.keyHandler, true);
+      });
+    }
+  };
+
+  // ==========================================================================
   // Input Lock Module (prevent user interference during replay)
   // ==========================================================================
 
@@ -1025,6 +1402,7 @@
     showError: () => Visual.showError(),
     showTyping: (element) => Visual.showTyping(element),
     hideTyping: () => Visual.hideTyping(),
+    showSelectPreview: (element, optionText, duration) => Visual.showSelectPreview(element, optionText, duration),
     hide: () => Visual.hide(),
     cleanup: () => Visual.cleanup(),
     setColor: (actionType) => Visual.setColor(actionType),
@@ -1065,6 +1443,14 @@
       enable: () => InputLock.enable(),
       disable: () => InputLock.disable(),
       isEnabled: () => InputLock.enabled
+    },
+
+    // Interactive replay (step-by-step execution)
+    interactive: {
+      show: (currentStep, previousStep, stepNum, totalSteps) =>
+        InteractiveOverlay.show(currentStep, previousStep, stepNum, totalSteps),
+      hide: () => InteractiveOverlay.hide(),
+      waitForInput: () => InteractiveOverlay.waitForInput()
     },
 
     // Configuration

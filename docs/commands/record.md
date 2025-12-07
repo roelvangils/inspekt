@@ -77,6 +77,7 @@ inspekt record [OPTIONS] [OUTPUT]
 | `--mask-passwords / --no-mask-passwords` | `--mask-passwords` | Mask password input values |
 | `--min-hover-duration INTEGER` | `200` | Minimum hover duration in ms to record |
 | `--replay` | `false` | Automatically replay the recording after saving |
+| `-i, --interactive` | `false` | Step through replay manually (requires `--replay`) |
 | `--no-audio` | `false` | Disable audio feedback during replay |
 | `--no-visual` | `false` | Disable visual feedback during replay |
 | `--no-feedback` | `false` | Disable both audio and visual feedback during replay |
@@ -102,6 +103,10 @@ inspekt record --min-hover-duration 500
 
 # Record and immediately replay to verify (with visual/audio feedback)
 inspekt record --replay checkout.yaml
+
+# Record and step through replay interactively
+inspekt record --replay -i checkout.yaml
+inspekt record --replay --interactive checkout.yaml
 
 # Record and replay silently (for CI environments)
 inspekt record --replay --no-feedback checkout.yaml

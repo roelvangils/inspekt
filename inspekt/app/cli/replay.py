@@ -558,6 +558,12 @@ def check_inspekt_expectations(command: str, expect: dict, cmd_result: dict) -> 
     is_flag=True,
     help="Try to resize browser window to match recorded viewport dimensions",
 )
+@click.option(
+    "--interactive",
+    "-i",
+    is_flag=True,
+    help="Step through replay manually (Enter=next, Space=skip, Escape=cancel)",
+)
 def replay(
     recording_file: str,
     speed: float,
@@ -577,6 +583,7 @@ def replay(
     no_feedback: bool,
     lock: bool,
     restore_viewport: bool,
+    interactive: bool,
 ):
     """
     Replay a recorded browser interaction session.
@@ -597,6 +604,11 @@ def replay(
         --skip TYPE   Skip specific action types (hover, keypress, type, click)
 
     \b
+    Interactive mode:
+        --interactive, -i   Step through manually in the browser
+                            Press Enter to execute, Space to skip, Escape to cancel
+
+    \b
     Examples:
         inspekt replay login-flow.yaml             # Replay at normal speed
         inspekt replay login-flow.yaml --slow      # Replay at half speed
@@ -604,9 +616,14 @@ def replay(
         inspekt replay login-flow.yaml --skip-hover    # Skip hovers
         inspekt replay login-flow.yaml --dry-run   # Preview steps
         inspekt replay login-flow.yaml --pause-on-fail # Debug failures
+        inspekt replay login-flow.yaml -i          # Interactive step-through
     """
-    # Apply speed presets (priority: instant > very_slow > slow > speed)
-    if instant:
+    # Apply speed presets (priority: interactive > instant > very_slow > slow > speed)
+    if interactive:
+        # Interactive mode: no timing delays, user controls pace
+        step_delay = 0
+        speed = float("inf")
+    elif instant:
         step_delay = 0
         speed = float("inf")  # Effectively no delay
     elif very_slow:
@@ -616,11 +633,12 @@ def replay(
 
     # Compute visual/audio from --no-* flags (default is ON)
     # --no-feedback disables both
-    if no_feedback:
+    # Interactive mode always needs visual (for the overlay)
+    if no_feedback and not interactive:
         visual = False
         audio = False
     else:
-        visual = not no_visual
+        visual = not no_visual or interactive  # Interactive mode requires visual
         audio = not no_audio
 
     # Get audio config to determine output method
@@ -691,6 +709,17 @@ def replay(
 
     if dry_run:
         click.echo("\n[DRY RUN - not executing]\n")
+    elif interactive:
+        click.echo()
+        click.secho("Interactive mode: ", fg="cyan", bold=True, nl=False)
+        click.echo("Press ", nl=False)
+        click.secho("Enter", fg="green", bold=True, nl=False)
+        click.echo(" to execute, ", nl=False)
+        click.secho("Space", fg="yellow", bold=True, nl=False)
+        click.echo(" to skip, ", nl=False)
+        click.secho("Escape", fg="red", bold=True, nl=False)
+        click.echo(" to cancel")
+        click.echo()
     else:
         click.echo()
 
@@ -892,6 +921,7 @@ def replay(
     previous_timestamp = steps_to_run[0].timestamp if steps_to_run else 0
     last_step_navigated = False  # Track if previous step caused navigation
     page_load_wait_ms = 0  # Time spent waiting for page load (subtract from next delay)
+    replay_cancelled = False  # Track if user cancelled in interactive mode
     for i, step in enumerate(steps_to_run):
         actual_index = start_idx + i
         step_dict = step.model_dump(exclude_none=True)
@@ -995,6 +1025,58 @@ def replay(
                 continue
             elif verbose:
                 click.echo(format_system_message(f"condition met: {wait_result.get('reason', '')}"))
+
+        # Interactive mode: show overlay and wait for user input
+        if interactive and not dry_run:
+            # Build the interactive prompt step
+            previous_step_dict = None
+            if i > 0:
+                previous_step_dict = steps_to_run[i - 1].model_dump(exclude_none=True)
+
+            interactive_step = {
+                "action": "interactive_prompt",
+                "currentStep": step_dict,
+                "previousStep": previous_step_dict,
+                "stepNum": actual_index + 1,
+                "totalSteps": total_steps,
+            }
+
+            interactive_json = json.dumps(interactive_step)
+            interactive_code = script_template.replace("STEP_DATA_PLACEHOLDER", interactive_json)
+
+            try:
+                interactive_result = client.execute(interactive_code, timeout=300.0)  # Long timeout for user input
+
+                if interactive_result.get("ok"):
+                    response = interactive_result.get("result", {})
+                    choice = response.get("choice", "next")
+
+                    if choice == "skip":
+                        # User pressed Space - skip this step
+                        click.echo(summary, nl=False)
+                        click.echo(format_status("SKIP"))
+                        result.add_skip(actual_index, step_dict, "Skipped by user (interactive mode)")
+                        if verbose:
+                            click.echo(format_system_message("skipped by user"))
+                        continue
+                    elif choice == "cancel":
+                        # User pressed Escape - cancel the entire replay
+                        click.echo(summary, nl=False)
+                        click.echo(click.style(" CANCELLED", fg="yellow"))
+                        click.echo()
+                        click.secho("Replay cancelled by user.", fg="yellow")
+                        replay_cancelled = True
+                        break
+                    # choice == "next" - continue to execute the step
+                else:
+                    if verbose:
+                        click.echo(format_system_message(f"Interactive prompt failed: {interactive_result.get('error')}"))
+            except Exception as e:
+                if verbose:
+                    click.echo(format_system_message(f"Interactive prompt error: {e}"))
+
+        if replay_cancelled:
+            break
 
         click.echo(summary, nl=False)
 
@@ -1223,11 +1305,29 @@ def replay(
         click.echo(f"Dry run complete. {result.total_steps} steps would be executed.")
         return
 
+    if replay_cancelled:
+        # User cancelled the replay - show partial results
+        duration = format_duration(result.duration_ms)
+        completed = result.passed_steps + result.failed_steps + result.skipped_steps
+        click.secho(f"Replay cancelled after {completed} of {result.total_steps} steps", fg="yellow", bold=True)
+        click.echo(f"  Passed: {result.passed_steps} | Failed: {result.failed_steps} | Skipped: {result.skipped_steps}")
+        click.echo(f"  Duration: {duration}")
+        sys.exit(130)  # Exit code 130 = cancelled by user (like Ctrl+C)
+
     duration = format_duration(result.duration_ms)
 
     if result.all_passed:
         click.secho(success(f"All {result.passed_steps} steps passed"), fg="green", bold=True)
         click.echo(f"  Duration: {duration}")
+        # Show tip about interactive mode (only if not already using it)
+        if not interactive:
+            click.echo()
+            click.secho("Tip:", fg="cyan", bold=True, nl=False)
+            click.echo(" Use ", nl=False)
+            click.secho("--interactive", fg="cyan", nl=False)
+            click.echo(" or ", nl=False)
+            click.secho("-i", fg="cyan", nl=False)
+            click.echo(" to step through manually.")
     else:
         click.secho(error(f"{result.failed_steps} of {result.total_steps} steps failed"), fg="red", bold=True)
         click.echo(f"  Passed: {result.passed_steps} | Failed: {result.failed_steps} | Skipped: {result.skipped_steps}")

@@ -269,6 +269,12 @@ def get_recording_metadata(filepath: Path) -> Optional[dict]:
     is_flag=True,
     help="Disable both audio and visual feedback during replay (requires --replay)",
 )
+@click.option(
+    "--interactive",
+    "-i",
+    is_flag=True,
+    help="Step through replay manually (requires --replay)",
+)
 @click.pass_context
 def record(
     ctx,
@@ -280,6 +286,7 @@ def record(
     no_audio: bool,
     no_visual: bool,
     no_feedback: bool,
+    interactive: bool,
 ):
     """
     Record browser interactions to a YAML file.
@@ -303,6 +310,7 @@ def record(
         inspekt record -o login-flow.yaml # Specific filename
         inspekt record --no-hover         # Skip hover events
         inspekt record --replay           # Record and replay to verify
+        inspekt record --replay -i        # Record and step through replay
         inspekt record --replay --no-feedback  # Replay without audio/visual
     """
     # If a subcommand was invoked, don't run recording
@@ -372,6 +380,20 @@ def record(
         viewport = response.get("viewport", {"width": 1920, "height": 1080})
         zoom = response.get("zoom", 1.0)
         user_agent = response.get("userAgent", "")
+
+        # Check for closed shadow DOM warnings
+        closed_shadow_warnings = response.get("closedShadowWarnings", [])
+        if closed_shadow_warnings:
+            click.echo()
+            click.secho("⚠ Warning: ", fg="yellow", bold=True, nl=False)
+            click.echo("This page contains Web Components with closed shadow DOM.")
+            click.echo("  Interactions inside these components may not be recorded:")
+            for warning in closed_shadow_warnings[:5]:  # Limit to 5
+                tag = warning.get("tagName", "unknown")
+                click.echo(f"    • {click.style(f'<{tag}>', fg='cyan')}")
+            if len(closed_shadow_warnings) > 5:
+                click.echo(f"    ... and {len(closed_shadow_warnings) - 5} more")
+            click.echo()
 
         # Track which browser tab we started recording in
         # This prevents accidentally resuming in a different tab
@@ -706,6 +728,8 @@ def record(
                         no_audio=disable_audio,
                         no_feedback=False,  # Already handled above
                         lock=False,
+                        restore_viewport=False,
+                        interactive=interactive,
                     )
                 except SystemExit as e:
                     # Replay exits with code 1 on failure
