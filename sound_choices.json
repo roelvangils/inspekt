@@ -1,0 +1,21 @@
+{
+  "start_recording": 2,
+  "stop_recording": 4,
+  "start_playback": 2,
+  "stop_playback": 5,
+  "navigate": 2,
+  "click": 3,
+  "rightclick": 5,
+  "activate": 2,
+  "type": 4,
+  "keypress": 5,
+  "hover": 1,
+  "check": 1,
+  "uncheck": 1,
+  "radio": 3,
+  "select": 5,
+  "scroll": 1,
+  "plugin": 1,
+  "inspekt": 3,
+  "failure": 1
+}
