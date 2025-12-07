@@ -920,8 +920,9 @@
             };
 
             // For Tab/Shift-Tab, capture the element that receives focus
+            // We record inside the RAF to ensure we capture the correct target
+            // even when tabbing rapidly
             if (event.key === 'Tab') {
-                // Use requestAnimationFrame to capture focus after it moves
                 requestAnimationFrame(() => {
                     const focusedElement = document.activeElement;
                     if (focusedElement && focusedElement !== document.body) {
@@ -934,10 +935,13 @@
                             role: focusedElement.getAttribute('role') || null
                         };
                     }
+                    // Record after capturing target (fixes race condition with rapid tabbing)
+                    recordEvent(keypressEvent);
                 });
+            } else {
+                // Other special keys: record immediately
+                recordEvent(keypressEvent);
             }
-
-            recordEvent(keypressEvent);
         }
     }
 
