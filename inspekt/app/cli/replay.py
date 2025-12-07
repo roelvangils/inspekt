@@ -772,6 +772,52 @@ def replay(
                 elif verbose:
                     click.echo(format_system_message(f"Viewport set to {current_width}x{current_height}"))
 
+        # Navigate to starting URL and hard reload for clean state
+        starting_url = recording.metadata.starting_url
+        if starting_url:
+            if verbose:
+                click.echo(format_system_message(f"Navigating to {starting_url}..."))
+
+            # Navigate to the starting URL
+            nav_code = f"""
+            (function() {{
+                const targetUrl = {json.dumps(starting_url)};
+                const currentUrl = location.href;
+
+                // Check if we're already on the correct URL
+                if (currentUrl === targetUrl) {{
+                    // Same URL - do a hard reload (bypass cache)
+                    location.reload(true);
+                    return {{ action: 'reload', url: targetUrl }};
+                }} else {{
+                    // Different URL - navigate to it
+                    location.href = targetUrl;
+                    return {{ action: 'navigate', url: targetUrl }};
+                }}
+            }})()
+            """
+
+            try:
+                nav_result = client.execute(nav_code, timeout=5.0)
+                if verbose and nav_result.get("ok"):
+                    action = nav_result.get("result", {}).get("action", "navigate")
+                    click.echo(format_system_message(f"Page {action}ed"))
+
+                # Wait for page to be fully loaded after navigation/reload
+                for attempt in range(30):  # Max 15 seconds
+                    time.sleep(0.5)
+                    ready_result = client.execute("document.readyState", timeout=3.0)
+                    if ready_result.get("ok") and ready_result.get("result") == "complete":
+                        break
+
+                # Small additional delay for any post-load JavaScript
+                time.sleep(0.3)
+
+            except Exception as e:
+                if verbose:
+                    click.echo(format_system_message(f"Navigation warning: {e}"))
+                # Continue anyway - page might still be usable
+
         # Load scripts
         scripts_dir = Path(__file__).parent.parent.parent / "scripts"
 
