@@ -1896,6 +1896,10 @@ async function handleReplayModeDisable() {
 /**
  * Inject the stored visual script into a tab
  * Uses chrome.scripting.executeScript with MAIN world for full page access
+ *
+ * Note: We use a <script> element injection approach because new Function()
+ * is blocked by CSP on many sites. The <script> element with textContent
+ * bypasses CSP when injected from an extension's executeScript.
  */
 async function injectReplayVisualScript(tabId) {
     if (!replayVisualScript) {
@@ -1915,12 +1919,27 @@ async function injectReplayVisualScript(tabId) {
                         return { ok: true, alreadyPresent: true };
                     }
 
-                    // Execute the script
-                    const fn = new Function(scriptCode);
-                    fn();
+                    // Create and inject a script element
+                    // This approach works even with strict CSP because the script
+                    // is injected from a privileged extension context
+                    const script = document.createElement('script');
+                    script.textContent = scriptCode;
+                    (document.head || document.documentElement).appendChild(script);
+                    script.remove(); // Clean up after execution
 
-                    console.log('[Inspekt] Visual script injected via replay mode');
-                    return { ok: true, injected: true };
+                    // Verify injection worked
+                    if (window.__INSPEKT_VISUAL__) {
+                        console.log('[Inspekt] Visual script injected via replay mode');
+                        return { ok: true, injected: true };
+                    } else {
+                        // Fallback to new Function if script element didn't work
+                        // (might be blocked by CSP, but worth trying)
+                        console.log('[Inspekt] Script element failed, trying new Function fallback');
+                        const fn = new Function(scriptCode);
+                        fn();
+                        console.log('[Inspekt] Visual script injected via new Function fallback');
+                        return { ok: true, injected: true, method: 'newFunction' };
+                    }
                 } catch (e) {
                     console.error('[Inspekt] Failed to inject visual script:', e);
                     return { ok: false, error: String(e) };

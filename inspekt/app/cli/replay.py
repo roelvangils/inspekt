@@ -1290,14 +1290,30 @@ def replay(
             step_json = json.dumps(step_dict)
             code = script_template.replace("STEP_DATA_PLACEHOLDER", step_json)
 
-            # For click actions on links/buttons, use a shorter timeout
-            # because navigation may cause the response to be lost
+            # Detect actions that might cause navigation and use shorter timeout
+            # Navigation causes the page to unload before response can be sent
             is_click_action = step.action in ("click", "activate")
+            is_navigate_action = step.action == "navigate"
+            is_enter_keypress = step.action == "keypress" and step.key and step.key.lower() == "enter"
             target = step.target
-            click_timeout = 30.0
+            action_timeout = 30.0
             might_navigate = False
 
-            if is_click_action and target:
+            # Navigate action always navigates (if URL differs from current)
+            if is_navigate_action:
+                might_navigate = True
+                action_timeout = 3.0
+
+            # Enter keypress on a link navigates
+            elif is_enter_keypress and target:
+                tag = target.tag or ""
+                selector = target.selector or ""
+                if tag.lower() == "a" or " > a" in selector or selector.endswith(" a"):
+                    might_navigate = True
+                    action_timeout = 3.0
+
+            # Click on links/buttons might navigate
+            elif is_click_action and target:
                 # Check if this might be a navigation link
                 # Look for clues in the selector or accessible name
                 selector = target.selector or ""
@@ -1315,23 +1331,22 @@ def replay(
                 )
 
                 if might_navigate:
-                    # Use shorter timeout for potential navigation clicks
-                    click_timeout = 3.0
+                    action_timeout = 3.0
 
             try:
                 # Inner try to catch navigation timeouts specifically
                 try:
-                    exec_result = client.execute(code, timeout=click_timeout)
+                    exec_result = client.execute(code, timeout=action_timeout)
                     navigation_timeout = False
-                except Exception as click_exc:
-                    # Check if this is a timeout on a potential navigation click
-                    if is_click_action and might_navigate and "timeout" in str(click_exc).lower():
-                        # Navigation clicks often timeout because the page navigates
-                        # before the JavaScript can send a response - treat as potential success
+                except Exception as nav_exc:
+                    # Check if this is a timeout on an action that might navigate
+                    if might_navigate and "timeout" in str(nav_exc).lower():
+                        # Navigation causes page unload before response can be sent
+                        # Treat timeout as successful navigation
                         navigation_timeout = True
-                        exec_result = {"ok": True, "result": {"ok": True, "mayNavigate": True}}
+                        exec_result = {"ok": True, "result": {"ok": True, "navigated": is_navigate_action, "mayNavigate": not is_navigate_action}}
                         if verbose:
-                            click.echo(format_system_message("Click response lost (navigation in progress)"))
+                            click.echo(format_system_message("Response lost (navigation in progress)"))
                     else:
                         # Re-raise other exceptions
                         raise
