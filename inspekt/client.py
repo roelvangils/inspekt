@@ -68,10 +68,26 @@ def get_expected_userscript_version() -> str | None:
 class BridgeClient:
     """Client for communicating with Inspekt server."""
 
-    def __init__(self, host: str = "127.0.0.1", port: int = 8765):
-        self.base_url = f"http://{host}:{port}"
-        self.host = host
-        self.port = port
+    def __init__(self, host: str = "127.0.0.1", port: int = None):
+        # Allow override via environment variable (for VM isolation)
+        # INSPEKT_BRIDGE_URL takes precedence, then INSPEKT_BRIDGE_PORT, then default
+        import os
+        env_url = os.environ.get("INSPEKT_BRIDGE_URL")
+        env_port = os.environ.get("INSPEKT_BRIDGE_PORT")
+
+        if env_url:
+            self.base_url = env_url.rstrip("/")
+            # Extract host/port from URL for compatibility
+            from urllib.parse import urlparse
+            parsed = urlparse(self.base_url)
+            self.host = parsed.hostname or host
+            self.port = parsed.port or 8765
+        else:
+            if port is None:
+                port = int(env_port) if env_port else 8765
+            self.base_url = f"http://{host}:{port}"
+            self.host = host
+            self.port = port
         self.timeout = 5
         self._version_checked = False  # Track if we've already shown version warning
         self._cached_version = None  # Cache the version to avoid multiple requests
@@ -214,6 +230,30 @@ class BridgeClient:
             pass
         return None
 
+    def get_current_browser_index(self) -> int | None:
+        """Get the index of the most recently active browser.
+
+        Returns the 0-based index of the browser that is currently
+        marked as most_recent in the bridge server, or None if no
+        browser is connected.
+        """
+        status = self.get_status()
+        if not status:
+            return None
+
+        browsers = status.get("browsers", [])
+        for i, browser in enumerate(browsers):
+            if browser.get("is_most_recent"):
+                return i
+        return 0 if browsers else None
+
+    def get_browser_count(self) -> int:
+        """Get the number of connected browsers."""
+        status = self.get_status()
+        if not status:
+            return 0
+        return status.get("connected_browsers", 0)
+
     def get_userscript_version(self) -> str | None:
         """Get installed userscript version from browser."""
         # Return cached version if available
@@ -322,7 +362,7 @@ class BridgeClient:
 
         return None  # Versions match or check failed
 
-    def execute(self, code: str, timeout: float = 10.0, _skip_domain_check: bool = False) -> dict[str, Any]:
+    def execute(self, code: str, timeout: float = 10.0, _skip_domain_check: bool = False, browser_index: int = None) -> dict[str, Any]:
         """
         Execute JavaScript code in the browser and wait for result.
 
@@ -330,6 +370,8 @@ class BridgeClient:
             code: JavaScript code to execute
             timeout: Maximum time to wait for result in seconds
             _skip_domain_check: Internal flag to prevent recursion during domain check
+            browser_index: Optional index of specific browser to target (0-based).
+                          If None, uses the most recently active browser.
 
         Returns:
             Dictionary with execution result
@@ -339,7 +381,7 @@ class BridgeClient:
             TimeoutError: If execution takes longer than timeout
             RuntimeError: If code execution fails in browser
         """
-        _verbose_log("BridgeClient.execute() called", {"timeout": timeout, "code_length": len(code)})
+        _verbose_log("BridgeClient.execute() called", {"timeout": timeout, "code_length": len(code), "browser_index": browser_index})
 
         if not self.is_alive():
             raise ConnectionError("Bridge server is not running. Start it with: inspekt start")
@@ -355,8 +397,14 @@ class BridgeClient:
             http_timeout = timeout + 5
             _verbose_log("Submitting code to bridge", f"POST {self.base_url}/run")
             submit_start = time.time()
+
+            # Build request payload
+            payload = {"code": code}
+            if browser_index is not None:
+                payload["browser_index"] = browser_index
+
             response = self._session.post(
-                f"{self.base_url}/run", json={"code": code}, timeout=http_timeout
+                f"{self.base_url}/run", json=payload, timeout=http_timeout
             )
             response.raise_for_status()
             data = response.json()
@@ -542,3 +590,74 @@ class BridgeClient:
         with open(filepath, encoding="utf-8") as f:
             code = f.read()
         return self.execute(code, timeout)
+
+    def enable_replay_mode(self, visual_script: str, timeout: float = 10.0) -> dict[str, Any]:
+        """
+        Enable replay mode in the browser extension.
+
+        When enabled, the extension auto-injects the visual script on every page load.
+        This eliminates the need for Python to poll and inject after navigation.
+
+        Args:
+            visual_script: The visual script content to inject on page loads
+            timeout: Maximum time to wait for response in seconds
+
+        Returns:
+            Dictionary with result (ok, enabled, message)
+        """
+        url = f"{self.base_url}/replay/enable"
+        try:
+            response = self._session.post(
+                url,
+                json={"visualScript": visual_script},
+                timeout=timeout
+            )
+            return response.json()
+        except requests.exceptions.Timeout:
+            return {"ok": False, "error": "Request timed out"}
+        except requests.exceptions.ConnectionError:
+            return {"ok": False, "error": "Cannot connect to bridge server"}
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
+
+    def disable_replay_mode(self, timeout: float = 10.0) -> dict[str, Any]:
+        """
+        Disable replay mode in the browser extension.
+
+        Args:
+            timeout: Maximum time to wait for response in seconds
+
+        Returns:
+            Dictionary with result (ok, enabled, message)
+        """
+        url = f"{self.base_url}/replay/disable"
+        try:
+            response = self._session.post(url, timeout=timeout)
+            return response.json()
+        except requests.exceptions.Timeout:
+            return {"ok": False, "error": "Request timed out"}
+        except requests.exceptions.ConnectionError:
+            return {"ok": False, "error": "Cannot connect to bridge server"}
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
+
+    def get_replay_mode_status(self, timeout: float = 5.0) -> dict[str, Any]:
+        """
+        Get replay mode status from the browser extension.
+
+        Args:
+            timeout: Maximum time to wait for response in seconds
+
+        Returns:
+            Dictionary with result (ok, enabled, hasScript)
+        """
+        url = f"{self.base_url}/replay/status"
+        try:
+            response = self._session.get(url, timeout=timeout)
+            return response.json()
+        except requests.exceptions.Timeout:
+            return {"ok": False, "error": "Request timed out"}
+        except requests.exceptions.ConnectionError:
+            return {"ok": False, "error": "Cannot connect to bridge server"}
+        except Exception as e:
+            return {"ok": False, "error": str(e)}

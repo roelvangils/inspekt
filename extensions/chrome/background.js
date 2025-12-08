@@ -12,6 +12,10 @@ console.log('[Inspekt Extension] Background service worker loaded');
 // Track which tabs have Zen Bridge active
 const activeTabs = new Set();
 
+// Replay mode state (stored in memory, cleared when extension restarts)
+let replayModeEnabled = false;
+let replayVisualScript = null;
+
 // Track DevTools connections for HAR requests
 const devToolsConnections = new Map();
 const pendingHARRequests = new Map();
@@ -25,6 +29,18 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
         // Inject console hooks when page loads (for console capture feature)
         if (tab.url?.startsWith('http')) {
             injectConsoleHooks(tabId);
+        }
+
+        // Inject visual script when replay mode is active
+        if (replayModeEnabled && replayVisualScript && tab.url?.startsWith('http')) {
+            console.log('[Inspekt] Tab completed - replay mode active, injecting visual script for:', tab.url);
+            await injectReplayVisualScript(tabId);
+        } else if (replayModeEnabled) {
+            console.log('[Inspekt] Tab completed but NOT injecting:', {
+                replayModeEnabled,
+                hasScript: !!replayVisualScript,
+                url: tab.url
+            });
         }
 
         // Update icon when page finishes loading
@@ -261,6 +277,33 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             .then(sendResponse)
             .catch(error => sendResponse({ ok: false, error: String(error) }));
         return true; // Keep channel open for async response
+    }
+
+    if (message.type === 'REPLAY_MODE_ENABLE') {
+        // Enable replay mode - store visual script and inject on page loads
+        console.log('[Inspekt] REPLAY_MODE_ENABLE received, script length:', message.visualScript?.length);
+        handleReplayModeEnable(message.visualScript, sender.tab?.id)
+            .then(sendResponse)
+            .catch(error => sendResponse({ ok: false, error: String(error) }));
+        return true; // Keep channel open for async response
+    }
+
+    if (message.type === 'REPLAY_MODE_DISABLE') {
+        // Disable replay mode
+        handleReplayModeDisable()
+            .then(sendResponse)
+            .catch(error => sendResponse({ ok: false, error: String(error) }));
+        return true; // Keep channel open for async response
+    }
+
+    if (message.type === 'REPLAY_MODE_STATUS') {
+        // Get replay mode status
+        sendResponse({
+            ok: true,
+            enabled: replayModeEnabled,
+            hasScript: !!replayVisualScript
+        });
+        return false;
     }
 });
 
@@ -1791,6 +1834,106 @@ function detachDebugger(tabId) {
 
 // Note: Screenshot processing is handled in content.js where DOM APIs are available
 // Background script only handles the raw capture via chrome.tabs.captureVisibleTab
+
+// ============================================================================
+// REPLAY MODE MANAGEMENT
+// ============================================================================
+
+/**
+ * Enable replay mode - store visual script and inject into current tab
+ * When enabled, the visual script will be auto-injected on every page load
+ */
+async function handleReplayModeEnable(visualScript, currentTabId) {
+    try {
+        replayModeEnabled = true;
+        replayVisualScript = visualScript;
+
+        console.log('[Inspekt] Replay mode ENABLED');
+
+        // Immediately inject into current tab if provided
+        if (currentTabId) {
+            await injectReplayVisualScript(currentTabId);
+        }
+
+        return {
+            ok: true,
+            enabled: true,
+            message: 'Replay mode enabled. Visual script will be auto-injected on page loads.'
+        };
+    } catch (error) {
+        console.error('[Inspekt] Failed to enable replay mode:', error);
+        return {
+            ok: false,
+            error: String(error)
+        };
+    }
+}
+
+/**
+ * Disable replay mode and clean up
+ */
+async function handleReplayModeDisable() {
+    try {
+        replayModeEnabled = false;
+        replayVisualScript = null;
+
+        console.log('[Inspekt] Replay mode DISABLED');
+
+        return {
+            ok: true,
+            enabled: false,
+            message: 'Replay mode disabled.'
+        };
+    } catch (error) {
+        console.error('[Inspekt] Failed to disable replay mode:', error);
+        return {
+            ok: false,
+            error: String(error)
+        };
+    }
+}
+
+/**
+ * Inject the stored visual script into a tab
+ * Uses chrome.scripting.executeScript with MAIN world for full page access
+ */
+async function injectReplayVisualScript(tabId) {
+    if (!replayVisualScript) {
+        console.log('[Inspekt] No visual script stored, skipping injection');
+        return;
+    }
+
+    try {
+        await chrome.scripting.executeScript({
+            target: { tabId: tabId },
+            world: 'MAIN',
+            func: (scriptCode) => {
+                try {
+                    // Check if already injected
+                    if (window.__INSPEKT_VISUAL__) {
+                        console.log('[Inspekt] Visual script already present');
+                        return { ok: true, alreadyPresent: true };
+                    }
+
+                    // Execute the script
+                    const fn = new Function(scriptCode);
+                    fn();
+
+                    console.log('[Inspekt] Visual script injected via replay mode');
+                    return { ok: true, injected: true };
+                } catch (e) {
+                    console.error('[Inspekt] Failed to inject visual script:', e);
+                    return { ok: false, error: String(e) };
+                }
+            },
+            args: [replayVisualScript]
+        });
+
+        console.log('[Inspekt] Visual script injection complete for tab:', tabId);
+    } catch (error) {
+        console.error('[Inspekt] Failed to inject visual script into tab:', tabId, error);
+    }
+}
 
 // Log extension initialization
 console.log('[Inspekt Extension] Version:', chrome.runtime.getManifest().version);

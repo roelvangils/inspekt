@@ -120,7 +120,16 @@
         }
     });
 
-    const WS_URL = 'ws://127.0.0.1:8766/ws';
+    // Detect if running in VM (Chromium on Linux) and use isolated bridge port
+    const isVMBrowser = navigator.userAgent.includes('Linux') &&
+                        (navigator.userAgent.includes('Chromium') || navigator.userAgent.includes('Chrome'));
+    const WS_PORT = isVMBrowser ? 8768 : 8766;
+    const WS_URL = `ws://127.0.0.1:${WS_PORT}/ws`;
+
+    if (isVMBrowser) {
+        console.log('[Inspekt] VM environment detected - using isolated bridge port', WS_PORT);
+    }
+
     let ws = null;
     let reconnectTimer = null;
     const RECONNECT_DELAY = 3000;
@@ -545,6 +554,81 @@
                             }));
                         } catch (err) {
                             console.error('[Inspekt] PERMANENT_BYPASS error:', err);
+                            ws.send(JSON.stringify({
+                                type: 'response',
+                                requestId: message.requestId,
+                                response: {
+                                    ok: false,
+                                    error: err.message
+                                }
+                            }));
+                        }
+
+                    } else if (message.type === 'REPLAY_MODE_ENABLE') {
+                        // Enable replay mode - extension will auto-inject visual script on page loads
+                        console.log('[Inspekt Content] REPLAY_MODE_ENABLE received, script length:', message.visualScript?.length);
+                        try {
+                            const response = await chrome.runtime.sendMessage({
+                                type: 'REPLAY_MODE_ENABLE',
+                                visualScript: message.visualScript
+                            });
+                            console.log('[Inspekt Content] REPLAY_MODE_ENABLE response:', response);
+
+                            ws.send(JSON.stringify({
+                                type: 'response',
+                                requestId: message.requestId,
+                                response: response
+                            }));
+                        } catch (err) {
+                            console.error('[Inspekt] REPLAY_MODE_ENABLE error:', err);
+                            ws.send(JSON.stringify({
+                                type: 'response',
+                                requestId: message.requestId,
+                                response: {
+                                    ok: false,
+                                    error: err.message
+                                }
+                            }));
+                        }
+
+                    } else if (message.type === 'REPLAY_MODE_DISABLE') {
+                        // Disable replay mode
+                        try {
+                            const response = await chrome.runtime.sendMessage({
+                                type: 'REPLAY_MODE_DISABLE'
+                            });
+
+                            ws.send(JSON.stringify({
+                                type: 'response',
+                                requestId: message.requestId,
+                                response: response
+                            }));
+                        } catch (err) {
+                            console.error('[Inspekt] REPLAY_MODE_DISABLE error:', err);
+                            ws.send(JSON.stringify({
+                                type: 'response',
+                                requestId: message.requestId,
+                                response: {
+                                    ok: false,
+                                    error: err.message
+                                }
+                            }));
+                        }
+
+                    } else if (message.type === 'REPLAY_MODE_STATUS') {
+                        // Get replay mode status
+                        try {
+                            const response = await chrome.runtime.sendMessage({
+                                type: 'REPLAY_MODE_STATUS'
+                            });
+
+                            ws.send(JSON.stringify({
+                                type: 'response',
+                                requestId: message.requestId,
+                                response: response
+                            }));
+                        } catch (err) {
+                            console.error('[Inspekt] REPLAY_MODE_STATUS error:', err);
                             ws.send(JSON.stringify({
                                 type: 'response',
                                 requestId: message.requestId,

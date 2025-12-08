@@ -5,6 +5,7 @@ WebSocket-based bridge server using aiohttp (more compatible).
 
 import asyncio
 import json
+import os
 import time
 import uuid
 from typing import Any
@@ -1860,6 +1861,183 @@ async def handle_http_clear_console_logs(request):
     return web.json_response(result.get("response", result))
 
 
+# ============================================================================
+# REPLAY MODE
+# ============================================================================
+
+async def handle_replay_mode_enable(request):
+    """Enable replay mode in the browser extension.
+
+    When enabled, the extension auto-injects the visual script on every page load.
+    This eliminates the need for Python to poll and inject after navigation.
+    """
+    if most_recent_connection is None:
+        return web.json_response(
+            {"ok": False, "error": "No browser connected"},
+            status=503
+        )
+
+    # Get the visual script from request body
+    try:
+        data = await request.json()
+        visual_script = data.get("visualScript")
+        if not visual_script:
+            return web.json_response(
+                {"ok": False, "error": "visualScript is required"},
+                status=400
+            )
+    except Exception as e:
+        return web.json_response(
+            {"ok": False, "error": f"Invalid JSON: {e}"},
+            status=400
+        )
+
+    request_id = str(uuid.uuid4())
+    message = {
+        "type": "REPLAY_MODE_ENABLE",
+        "requestId": request_id,
+        "visualScript": visual_script
+    }
+
+    # Store pending request
+    pending_requests[request_id] = {
+        "timestamp": time.time(),
+        "type": "REPLAY_MODE_ENABLE"
+    }
+
+    # Send to browser
+    print(f"[Bridge] Sending REPLAY_MODE_ENABLE to browser (script length: {len(visual_script)})")
+    await most_recent_connection.send_json(message)
+
+    # Wait for response (with timeout)
+    event = asyncio.Event()
+    pending_events[request_id] = event
+
+    try:
+        await asyncio.wait_for(event.wait(), timeout=10.0)
+        print("[Bridge] REPLAY_MODE_ENABLE response received")
+    except asyncio.TimeoutError:
+        print("[Bridge] REPLAY_MODE_ENABLE timed out!")
+        pending_requests.pop(request_id, None)
+        pending_events.pop(request_id, None)
+        return web.json_response(
+            {"ok": False, "error": "Replay mode enable request timed out"},
+            status=504
+        )
+
+    # Get result
+    result = completed_requests.pop(request_id, None)
+    pending_events.pop(request_id, None)
+
+    if result is None:
+        return web.json_response(
+            {"ok": False, "error": "No response received"},
+            status=500
+        )
+
+    return web.json_response(result.get("response", result))
+
+
+async def handle_replay_mode_disable(request):
+    """Disable replay mode in the browser extension."""
+    if most_recent_connection is None:
+        return web.json_response(
+            {"ok": False, "error": "No browser connected"},
+            status=503
+        )
+
+    request_id = str(uuid.uuid4())
+    message = {
+        "type": "REPLAY_MODE_DISABLE",
+        "requestId": request_id
+    }
+
+    # Store pending request
+    pending_requests[request_id] = {
+        "timestamp": time.time(),
+        "type": "REPLAY_MODE_DISABLE"
+    }
+
+    # Send to browser
+    await most_recent_connection.send_json(message)
+
+    # Wait for response (with timeout)
+    event = asyncio.Event()
+    pending_events[request_id] = event
+
+    try:
+        await asyncio.wait_for(event.wait(), timeout=10.0)
+    except asyncio.TimeoutError:
+        pending_requests.pop(request_id, None)
+        pending_events.pop(request_id, None)
+        return web.json_response(
+            {"ok": False, "error": "Replay mode disable request timed out"},
+            status=504
+        )
+
+    # Get result
+    result = completed_requests.pop(request_id, None)
+    pending_events.pop(request_id, None)
+
+    if result is None:
+        return web.json_response(
+            {"ok": False, "error": "No response received"},
+            status=500
+        )
+
+    return web.json_response(result.get("response", result))
+
+
+async def handle_replay_mode_status(request):
+    """Get replay mode status from the browser extension."""
+    if most_recent_connection is None:
+        return web.json_response(
+            {"ok": False, "error": "No browser connected"},
+            status=503
+        )
+
+    request_id = str(uuid.uuid4())
+    message = {
+        "type": "REPLAY_MODE_STATUS",
+        "requestId": request_id
+    }
+
+    # Store pending request
+    pending_requests[request_id] = {
+        "timestamp": time.time(),
+        "type": "REPLAY_MODE_STATUS"
+    }
+
+    # Send to browser
+    await most_recent_connection.send_json(message)
+
+    # Wait for response (with timeout)
+    event = asyncio.Event()
+    pending_events[request_id] = event
+
+    try:
+        await asyncio.wait_for(event.wait(), timeout=10.0)
+    except asyncio.TimeoutError:
+        pending_requests.pop(request_id, None)
+        pending_events.pop(request_id, None)
+        return web.json_response(
+            {"ok": False, "error": "Replay mode status request timed out"},
+            status=504
+        )
+
+    # Get result
+    result = completed_requests.pop(request_id, None)
+    pending_events.pop(request_id, None)
+
+    if result is None:
+        return web.json_response(
+            {"ok": False, "error": "No response received"},
+            status=500
+        )
+
+    return web.json_response(result.get("response", result))
+
+
 async def handle_static_singlefile(request):
     """Serve the combined SingleFile library as a single JavaScript file."""
     from pathlib import Path
@@ -1958,6 +2136,11 @@ async def main():
     app.router.add_get("/console/logs", handle_http_get_console_logs)
     app.router.add_post("/console/clear", handle_http_clear_console_logs)
 
+    # Replay mode endpoints
+    app.router.add_post("/replay/enable", handle_replay_mode_enable)
+    app.router.add_post("/replay/disable", handle_replay_mode_disable)
+    app.router.add_get("/replay/status", handle_replay_mode_status)
+
     # Static file endpoint for SingleFile library
     app.router.add_get("/static/singlefile.js", handle_static_singlefile)
 
@@ -1977,6 +2160,25 @@ async def main():
     ws_site = web.TCPSite(runner, HOST, PORT + 1)
     await ws_site.start()
     print(f"WebSocket server running on ws://{HOST}:{PORT + 1}/ws")
+
+    # HTTPS server (if certificates are available)
+    ssl_context = None
+    cert_paths = [
+        ("/opt/certs/cert.pem", "/opt/certs/key.pem"),  # Docker VM
+        (os.path.expanduser("~/.inspekt/cert.pem"), os.path.expanduser("~/.inspekt/key.pem")),  # Local
+    ]
+    for cert_path, key_path in cert_paths:
+        if os.path.exists(cert_path) and os.path.exists(key_path):
+            import ssl
+            ssl_context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+            ssl_context.load_cert_chain(cert_path, key_path)
+            break
+
+    if ssl_context:
+        https_site = web.TCPSite(runner, HOST, 443, ssl_context=ssl_context)
+        await https_site.start()
+        print(f"HTTPS server running on https://{HOST}:443")
+
     print("Ready for connections!")
 
     # Start background cleanup task

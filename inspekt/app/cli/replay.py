@@ -231,21 +231,24 @@ def wait_for_visual_script_ready(
     client: BridgeClient,
     visual_script: str,
     timeout_sec: float = 5.0,
-    poll_interval_sec: float = 0.2,
-    verbose: bool = False,
+    poll_interval_sec: float = 0.05,
+    replay_mode: bool = False,
 ) -> dict:
     """Wait for visual script to be ready after navigation.
 
-    After page navigation, the extension's WebSocket connection needs to be
-    re-established before we can inject scripts. This function polls until
-    the visual script is confirmed loaded, retrying injection as needed.
+    When replay_mode is True (recommended), the extension auto-injects the visual
+    script on page load, so we only need to wait for it to be ready. This is much
+    faster than the polling+injection approach.
+
+    When replay_mode is False (fallback), we poll and manually inject the script
+    after the extension's WebSocket reconnects.
 
     Args:
         client: BridgeClient instance
-        visual_script: The visual script content to inject
+        visual_script: The visual script content to inject (only used when replay_mode=False)
         timeout_sec: Maximum time to wait in seconds
         poll_interval_sec: Time between checks
-        verbose: Whether to print progress messages
+        replay_mode: If True, extension handles injection automatically
 
     Returns:
         dict with 'success' (bool), 'injected' (bool), 'elapsed_ms' (int)
@@ -253,26 +256,33 @@ def wait_for_visual_script_ready(
     start_time = time.time()
     injected = False
 
+    # Check code to verify script is ready
+    check_code = (
+        "(() => { "
+        "  if (typeof window.__INSPEKT_VISUAL__ === 'object' && "
+        "      window.__INSPEKT_VISUAL__ !== null && "
+        "      typeof window.__INSPEKT_VISUAL__.interactive === 'object') { "
+        "    return { ready: true, url: location.href }; "
+        "  } "
+        "  return { ready: false }; "
+        "})()"
+    )
+
     while time.time() - start_time < timeout_sec:
         try:
-            # Check if visual script is loaded
-            check_result = client.execute(
-                "typeof window.__INSPEKT_VISUAL__ === 'object' && window.__INSPEKT_VISUAL__ !== null",
-                timeout=2.0
-            )
+            check_result = client.execute(check_code, timeout=2.0)
 
-            if check_result.get("ok") and check_result.get("result") is True:
-                elapsed_ms = int((time.time() - start_time) * 1000)
-                return {"success": True, "injected": injected, "elapsed_ms": elapsed_ms}
+            if check_result.get("ok"):
+                result = check_result.get("result", {})
+                if isinstance(result, dict) and result.get("ready") is True:
+                    elapsed_ms = int((time.time() - start_time) * 1000)
+                    return {"success": True, "injected": injected, "elapsed_ms": elapsed_ms}
 
-            # Not ready - try to inject (might fail if connection not ready yet)
-            if not injected:
-                inject_result = client.execute(visual_script, timeout=3.0)
-                if inject_result.get("ok"):
-                    injected = True
-                    # Give it a moment to initialize
-                    time.sleep(0.1)
-                    continue
+            # Not ready - if not in replay mode, try manual injection
+            if not replay_mode:
+                client.execute(visual_script, timeout=3.0)
+                injected = True
+                time.sleep(0.05)
 
         except Exception:
             pass  # Connection might not be ready yet
@@ -280,21 +290,21 @@ def wait_for_visual_script_ready(
         time.sleep(poll_interval_sec)
 
     # Timeout - one final attempt
-    try:
-        client.execute(visual_script, timeout=3.0)
-        time.sleep(0.1)
-        check = client.execute(
-            "typeof window.__INSPEKT_VISUAL__ === 'object' && window.__INSPEKT_VISUAL__ !== null",
-            timeout=2.0
-        )
-        if check.get("ok") and check.get("result") is True:
-            elapsed_ms = int((time.time() - start_time) * 1000)
-            return {"success": True, "injected": True, "elapsed_ms": elapsed_ms}
-    except Exception:
-        pass
+    if not replay_mode:
+        try:
+            client.execute(visual_script, timeout=3.0)
+            time.sleep(0.3)
+            check = client.execute(check_code, timeout=2.0)
+            if check.get("ok"):
+                result = check.get("result", {})
+                if isinstance(result, dict) and result.get("ready") is True:
+                    elapsed_ms = int((time.time() - start_time) * 1000)
+                    return {"success": True, "injected": True, "elapsed_ms": elapsed_ms}
+        except Exception:
+            pass
 
     elapsed_ms = int((time.time() - start_time) * 1000)
-    return {"success": False, "injected": injected, "elapsed_ms": elapsed_ms, "timed_out": True}
+    return {"success": False, "injected": False, "elapsed_ms": elapsed_ms, "timed_out": True}
 
 
 def send_text_with_typing(client: BridgeClient, text: str, selector: str, clear: bool = True) -> dict:
@@ -939,51 +949,64 @@ def replay(
             sys.exit(1)
 
         # Inject visual feedback script if enabled (also needed for --lock)
+        # We use "replay mode" which tells the extension to auto-inject the visual script
+        # on every page load. This eliminates the need to poll and inject after navigation.
+        replay_mode_enabled = False
         if visual or audio or lock:
             visual_script_path = scripts_dir / "replay_visual.js"
             try:
                 with _builtin_open(visual_script_path) as f:
                     visual_script = f.read()
-                # Inject the script
-                inject_result = client.execute(visual_script, timeout=10.0)
-                if not inject_result.get("ok"):
-                    click.echo(f"Warning: Could not inject visual script: {inject_result.get('error')}", err=True)
-                else:
+
+                # Enable replay mode in the extension - this stores the script and
+                # auto-injects it on every page load
+                replay_mode_result = client.enable_replay_mode(visual_script, timeout=10.0)
+                if replay_mode_result.get("ok"):
+                    replay_mode_enabled = True
                     if verbose:
+                        click.echo(format_system_message("replay mode enabled (auto-inject on navigation)"))
+                else:
+                    # Fallback: inject script directly (extension might not support replay mode)
+                    if verbose:
+                        click.echo(format_system_message("replay mode not available, using direct injection"))
+                    inject_result = client.execute(visual_script, timeout=10.0)
+                    if not inject_result.get("ok"):
+                        click.echo(f"Warning: Could not inject visual script: {inject_result.get('error')}", err=True)
+                    elif verbose:
                         click.echo(format_system_message("visual feedback script injected"))
 
-                    # Verify the visual object was created
-                    verify_result = client.execute("typeof window.__INSPEKT_VISUAL__", timeout=5.0)
-                    if verify_result.get("ok") and verify_result.get("result") == "object":
-                        # Enable input lock if requested
-                        if lock:
-                            client.execute("window.__INSPEKT_VISUAL__.inputLock.enable()", timeout=5.0)
-                            if verbose:
-                                click.echo(format_system_message("input locked"))
-                        # Play start sound
-                        if cli_audio:
-                            # CLI audio: play directly from Python (no browser interaction needed)
-                            cli_audio.play_start_playback()
-                        elif use_browser_audio:
-                            # Browser audio: requires user interaction to unlock (autoplay policy)
-                            click.echo()
-                            click.echo(
-                                click.style("  Audio feedback enabled (browser mode). ", fg="cyan")
-                                + "Click anywhere in your browser window to unlock audio."
-                            )
-                            click.echo(
-                                click.style("  Press Enter", fg="cyan", bold=True)
-                                + " to start playback..."
-                            )
-                            input()
-                            # Resume audio context after user interaction
-                            client.execute("window.__INSPEKT_VISUAL__.audio.ctx && window.__INSPEKT_VISUAL__.audio.ctx.resume()", timeout=5.0)
-                            client.execute("window.__INSPEKT_VISUAL__.audio.playStartPlayback()", timeout=5.0)
-                            time.sleep(0.5)  # Wait for start sound to complete
-                    else:
-                        click.echo("Warning: Visual script injected but __INSPEKT_VISUAL__ not created", err=True)
+                # Verify the visual object was created
+                verify_result = client.execute("typeof window.__INSPEKT_VISUAL__", timeout=5.0)
+                if verify_result.get("ok") and verify_result.get("result") == "object":
+                    # Enable input lock if requested
+                    if lock:
+                        client.execute("window.__INSPEKT_VISUAL__.inputLock.enable()", timeout=5.0)
                         if verbose:
-                            click.echo(format_system_message(f"verify result: {verify_result}"))
+                            click.echo(format_system_message("input locked"))
+                    # Play start sound
+                    if cli_audio:
+                        # CLI audio: play directly from Python (no browser interaction needed)
+                        cli_audio.play_start_playback()
+                    elif use_browser_audio:
+                        # Browser audio: requires user interaction to unlock (autoplay policy)
+                        click.echo()
+                        click.echo(
+                            click.style("  Audio feedback enabled (browser mode). ", fg="cyan")
+                            + "Click anywhere in your browser window to unlock audio."
+                        )
+                        click.echo(
+                            click.style("  Press Enter", fg="cyan", bold=True)
+                            + " to start playback..."
+                        )
+                        input()
+                        # Resume audio context after user interaction
+                        client.execute("window.__INSPEKT_VISUAL__.audio.ctx && window.__INSPEKT_VISUAL__.audio.ctx.resume()", timeout=5.0)
+                        client.execute("window.__INSPEKT_VISUAL__.audio.playStartPlayback()", timeout=5.0)
+                        time.sleep(0.5)  # Wait for start sound to complete
+                else:
+                    click.echo("Warning: Visual script injected but __INSPEKT_VISUAL__ not created", err=True)
+                    if verbose:
+                        click.echo(format_system_message(f"verify result: {verify_result}"))
             except FileNotFoundError:
                 click.echo(f"Warning: Visual script not found: {visual_script_path}", err=True)
 
@@ -1112,20 +1135,31 @@ def replay(
                     client,
                     visual_script,
                     timeout_sec=5.0,
-                    poll_interval_sec=0.2,
-                    verbose=verbose,
+                    poll_interval_sec=0.05,
+                    replay_mode=replay_mode_enabled,
                 )
+
+                if visual_ready.get("success"):
+                    # Re-enable input lock after navigation
+                    if lock:
+                        try:
+                            client.execute("window.__INSPEKT_VISUAL__.inputLock.enable()", timeout=5.0)
+                        except Exception:
+                            pass
+                    # Re-initialize audio context after navigation (browser audio only)
+                    if use_browser_audio:
+                        try:
+                            client.execute("window.__INSPEKT_VISUAL__.audio.init()", timeout=5.0)
+                        except Exception:
+                            pass
 
                 if verbose:
                     if visual_ready.get("success"):
-                        if visual_ready.get("injected"):
-                            click.echo(format_system_message(
-                                f"visual script re-injected ({visual_ready.get('elapsed_ms', 0)}ms)"
-                            ))
-                        else:
-                            click.echo(format_system_message("visual script already present"))
+                        click.echo(format_system_message(
+                            f"visual script ready ({visual_ready.get('elapsed_ms', 0)}ms)"
+                        ))
                     else:
-                        click.echo(format_system_message("Warning: visual script not ready after navigation"))
+                        click.echo(format_system_message("Warning: visual script not ready"))
 
             # Build the interactive prompt step
             previous_step_dict = None
@@ -1145,6 +1179,15 @@ def replay(
 
             try:
                 interactive_result = client.execute(interactive_code, timeout=300.0)  # Long timeout for user input
+
+                if verbose:
+                    result_data = interactive_result.get("result", {})
+                    choice = result_data.get("choice", "unknown")
+                    warning = result_data.get("warning")
+                    if warning:
+                        click.echo(format_system_message(f"Interactive: choice={choice}, warning={warning}"))
+                    else:
+                        click.echo(format_system_message(f"Interactive: choice={choice}"))
 
                 if interactive_result.get("ok"):
                     response = interactive_result.get("result", {})
@@ -1247,8 +1290,51 @@ def replay(
             step_json = json.dumps(step_dict)
             code = script_template.replace("STEP_DATA_PLACEHOLDER", step_json)
 
+            # For click actions on links/buttons, use a shorter timeout
+            # because navigation may cause the response to be lost
+            is_click_action = step.action in ("click", "activate")
+            target = step.target
+            click_timeout = 30.0
+            might_navigate = False
+
+            if is_click_action and target:
+                # Check if this might be a navigation link
+                # Look for clues in the selector or accessible name
+                selector = target.selector or ""
+                tag = target.tag or ""
+                accessible_name = target.accessible_name or ""
+
+                might_navigate = (
+                    tag.lower() == "a" or
+                    "href" in selector.lower() or
+                    " > a" in selector or
+                    selector.endswith(" a") or
+                    "button" in tag.lower() or
+                    # Common navigation patterns
+                    any(x in accessible_name.lower() for x in ["read more", "meer lezen", "lees meer", "open", "go to", "view"])
+                )
+
+                if might_navigate:
+                    # Use shorter timeout for potential navigation clicks
+                    click_timeout = 3.0
+
             try:
-                exec_result = client.execute(code, timeout=30.0)
+                # Inner try to catch navigation timeouts specifically
+                try:
+                    exec_result = client.execute(code, timeout=click_timeout)
+                    navigation_timeout = False
+                except Exception as click_exc:
+                    # Check if this is a timeout on a potential navigation click
+                    if is_click_action and might_navigate and "timeout" in str(click_exc).lower():
+                        # Navigation clicks often timeout because the page navigates
+                        # before the JavaScript can send a response - treat as potential success
+                        navigation_timeout = True
+                        exec_result = {"ok": True, "result": {"ok": True, "mayNavigate": True}}
+                        if verbose:
+                            click.echo(format_system_message("Click response lost (navigation in progress)"))
+                    else:
+                        # Re-raise other exceptions
+                        raise
 
                 if exec_result.get("ok"):
                     response = exec_result.get("result", {})
@@ -1287,7 +1373,11 @@ def replay(
 
                             # Wait for the page to be fully loaded (document.readyState === 'complete')
                             # Use shorter timeout for mayNavigate since it might not actually navigate
-                            timeout = 15.0 if navigated else 5.0
+                            if interactive:
+                                # Interactive mode: shorter timeout, visual script wait handles reconnection
+                                timeout = 8.0 if navigated else 3.0
+                            else:
+                                timeout = 15.0 if navigated else 5.0
                             page_ready = wait_for_page_ready(
                                 client,
                                 timeout_sec=timeout,
@@ -1301,13 +1391,15 @@ def replay(
                                 # Continue anyway - next step execution will fail if truly problematic
 
                             # Re-inject visual script after navigation (it's lost on page change)
-                            if visual or audio or lock:
+                            # Skip if in interactive mode - the interactive block will handle it
+                            # before showing the overlay (avoids duplicate waiting)
+                            if (visual or audio or lock) and not interactive:
                                 visual_ready = wait_for_visual_script_ready(
                                     client,
                                     visual_script,
                                     timeout_sec=5.0,
-                                    poll_interval_sec=0.2,
-                                    verbose=verbose,
+                                    poll_interval_sec=0.05,
+                                    replay_mode=replay_mode_enabled,
                                 )
 
                                 if visual_ready.get("success"):
@@ -1406,6 +1498,12 @@ def replay(
         if visual:
             time.sleep(0.3)  # Brief pause before cleanup
             client.execute("window.__INSPEKT_VISUAL__.cleanup()", timeout=5.0)
+
+        # Disable replay mode if it was enabled
+        if replay_mode_enabled:
+            disable_result = client.disable_replay_mode(timeout=5.0)
+            if verbose and disable_result.get("ok"):
+                click.echo(format_system_message("replay mode disabled"))
 
     # Print summary
     click.echo()
