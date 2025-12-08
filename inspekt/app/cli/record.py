@@ -33,19 +33,43 @@ from .formatting import (
     get_recordings_dir,
 )
 
+import requests
+
+# Bridge server constants
+BRIDGE_HTTP_HOST = "127.0.0.1"
+BRIDGE_HTTP_PORT = 8765
+
 # Save built-in open before it gets shadowed
 _builtin_open = open
+
+
+def check_csp_bypass_enabled() -> bool:
+    """Check if global CSP bypass is enabled in the browser extension."""
+    try:
+        response = requests.get(
+            f"http://{BRIDGE_HTTP_HOST}:{BRIDGE_HTTP_PORT}/csp/global",
+            timeout=2.0
+        )
+        if response.status_code == 200:
+            data = response.json()
+            return data.get("enabled", False)
+    except Exception:
+        pass
+    return False
 
 
 def generate_filename(url: str, timestamp: datetime) -> str:
     """Generate a descriptive filename from URL and timestamp.
 
     Format: recording_{domain}_{path}_{timestamp}.yaml
+    The timestamp is converted to local time for user-friendly filenames.
     """
     parsed = urlparse(url)
     domain = parsed.netloc.replace("www.", "").replace(".", "_").replace(":", "_")
     path = parsed.path.strip("/").replace("/", "_")[:30] or "index"
-    ts = timestamp.strftime("%Y%m%d_%H%M%S")
+    # Convert to local time for the filename
+    local_timestamp = timestamp.astimezone()
+    ts = local_timestamp.strftime("%Y%m%d_%H%M%S")
     return f"recording_{domain}_{path}_{ts}.yaml"
 
 
@@ -326,6 +350,15 @@ def record(
             err=True,
         )
         sys.exit(1)
+
+    # Check CSP bypass status and warn if disabled (especially important for --replay)
+    if replay and not check_csp_bypass_enabled():
+        click.echo()
+        click.secho("  ⚠  CSP bypass is disabled", fg="yellow", bold=True)
+        click.echo("     Some sites may not work correctly during replay.")
+        click.echo("     Enable it with: inspekt domain csp --enable")
+        click.echo("     Or toggle it in the Inspekt extension popup.")
+        click.echo()
 
     # Load the recording script
     scripts_dir = Path(__file__).parent.parent.parent / "scripts"

@@ -26,8 +26,29 @@ from .formatting import (
     get_recordings_dir,
 )
 
+import requests
+
+# Bridge server constants
+BRIDGE_HTTP_HOST = "127.0.0.1"
+BRIDGE_HTTP_PORT = 8765
+
 # Save built-in open before it gets shadowed
 _builtin_open = open
+
+
+def check_csp_bypass_enabled() -> bool:
+    """Check if global CSP bypass is enabled in the browser extension."""
+    try:
+        response = requests.get(
+            f"http://{BRIDGE_HTTP_HOST}:{BRIDGE_HTTP_PORT}/csp/global",
+            timeout=2.0
+        )
+        if response.status_code == 200:
+            data = response.json()
+            return data.get("enabled", False)
+    except Exception:
+        pass
+    return False
 
 
 class ReplayResult:
@@ -822,6 +843,15 @@ def replay(
                 err=True,
             )
             sys.exit(1)
+
+        # Check CSP bypass status and warn if disabled
+        if not check_csp_bypass_enabled():
+            click.echo()
+            click.secho("  ⚠  CSP bypass is disabled", fg="yellow", bold=True)
+            click.echo("     Some sites may not work correctly during replay.")
+            click.echo("     Enable it with: inspekt domain csp --enable")
+            click.echo("     Or toggle it in the Inspekt extension popup.")
+            click.echo()
 
         # Focus the browser tab before starting replay (macOS only)
         focus_browser_tab(client, verbose=verbose)
