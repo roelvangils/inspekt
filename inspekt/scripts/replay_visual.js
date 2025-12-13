@@ -52,7 +52,36 @@
   // CSS Styles
   // ==========================================================================
 
-  const STYLES = `
+  // Font URLs - will be populated from extension or fallback to system fonts
+  let fontUrlRegular = null;
+  let fontUrlBold = null;
+  let fontsLoaded = false;
+
+  // Build styles dynamically to allow font URL injection
+  function buildStyles() {
+    // Font face declarations - only include if we have extension font URLs
+    const fontFaceStyles = fontUrlRegular ? `
+    /* JetBrains Mono Nerd Font for consistent icon rendering */
+    @font-face {
+      font-family: 'JetBrains Mono NF';
+      src: url('${fontUrlRegular}') format('woff2');
+      font-weight: 400;
+      font-style: normal;
+      font-display: block;
+      /* Include Private Use Areas where Nerd Font icons live */
+      unicode-range: U+0000-00FF, U+E000-U+F8FF, U+F0000-U+FFFFF;
+    }
+    @font-face {
+      font-family: 'JetBrains Mono NF';
+      src: url('${fontUrlBold}') format('woff2');
+      font-weight: 700;
+      font-style: normal;
+      font-display: block;
+      unicode-range: U+0000-00FF, U+E000-U+F8FF, U+F0000-U+FFFFF;
+    }
+    ` : '';
+
+    return `${fontFaceStyles}
     @keyframes inspekt-fade-in {
       from { opacity: 0; transform: scale(0.5); }
       to { opacity: 1; transform: scale(1); }
@@ -193,40 +222,107 @@
 
     /* Interactive replay overlay */
     #inspekt-interactive-overlay {
+      /* CSS Variables for dark/light mode */
+      --overlay-bg: rgba(30, 30, 30, 0.85);
+      --overlay-text: #ffffff;
+      --overlay-text-dim: #999;
+      --overlay-border: rgba(255, 255, 255, 0.15);
+      --overlay-kbd-bg: rgba(255, 255, 255, 0.12);
+      --overlay-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+
       position: fixed;
+      z-index: 2147483647;
+      min-width: 340px;
+      max-width: 450px;
+
+      /* Default corner: bottom-left */
       bottom: 20px;
       left: 20px;
-      background: rgba(0, 0, 0, 0.9);
-      color: #fff;
-      padding: 16px 20px;
-      border-radius: 8px;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, monospace;
-      font-size: 13px;
-      z-index: 2147483647;
-      min-width: 320px;
-      max-width: 450px;
-      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
-      border: 1px solid rgba(255, 255, 255, 0.1);
+      right: auto;
+      top: auto;
+
+      background: var(--overlay-bg);
+      color: var(--overlay-text);
+      padding: 18px 22px;
+      border-radius: 12px;
+      font-family: 'JetBrains Mono NF', 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+      font-size: 14px;
+      box-shadow: var(--overlay-shadow);
+      border: 1px solid var(--overlay-border);
+
+      /* Hidden by default, shown via .visible class */
+      opacity: 0;
+
+      /* macOS-like vibrancy effect */
+      backdrop-filter: blur(20px) saturate(180%);
+      -webkit-backdrop-filter: blur(20px) saturate(180%);
+
+      /* Slide-in animation from right */
       animation: inspekt-interactive-in 0.3s ease-out;
+
+      /* Smooth transitions for opacity and corner snapping */
+      transition: opacity 0.15s ease-out, top 0.3s ease, bottom 0.3s ease, left 0.3s ease, right 0.3s ease;
+
+      /* Draggable cursor */
+      cursor: grab;
+      user-select: none;
+    }
+
+    #inspekt-interactive-overlay.visible {
+      opacity: 1;
+    }
+
+    /* Light mode overrides */
+    @media (prefers-color-scheme: light) {
+      #inspekt-interactive-overlay {
+        --overlay-bg: rgba(255, 255, 255, 0.88);
+        --overlay-text: #1a1a1a;
+        --overlay-text-dim: #666;
+        --overlay-border: rgba(0, 0, 0, 0.12);
+        --overlay-kbd-bg: rgba(0, 0, 0, 0.08);
+        --overlay-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+      }
+    }
+
+    /* Corner positioning */
+    #inspekt-interactive-overlay[data-corner="bottom-left"] {
+      bottom: 20px; left: 20px; right: auto; top: auto;
+    }
+    #inspekt-interactive-overlay[data-corner="bottom-right"] {
+      bottom: 20px; right: 20px; left: auto; top: auto;
+    }
+    #inspekt-interactive-overlay[data-corner="top-left"] {
+      top: 20px; left: 20px; right: auto; bottom: auto;
+    }
+    #inspekt-interactive-overlay[data-corner="top-right"] {
+      top: 20px; right: 20px; left: auto; bottom: auto;
+    }
+
+    /* Dragging state */
+    #inspekt-interactive-overlay.dragging {
+      opacity: 0.85;
+      cursor: grabbing;
+      transition: none;
+      transform: scale(0.98);
     }
 
     @keyframes inspekt-interactive-in {
       from {
         opacity: 0;
-        transform: translateY(20px);
+        transform: translateX(30px);
       }
       to {
         opacity: 1;
-        transform: translateY(0);
+        transform: translateX(0);
       }
     }
 
     #inspekt-interactive-overlay .previous-step {
-      color: #888;
+      color: var(--overlay-text-dim);
       font-size: 12px;
       margin-bottom: 8px;
       padding-bottom: 8px;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      border-bottom: 1px solid var(--overlay-border);
     }
 
     #inspekt-interactive-overlay .previous-step .checkmark {
@@ -235,15 +331,31 @@
     }
 
     #inspekt-interactive-overlay .step-counter {
-      color: #888;
+      color: var(--overlay-text-dim);
       font-size: 11px;
-      margin-bottom: 6px;
+      margin-bottom: 4px;
+    }
+
+    /* Progress bar */
+    #inspekt-interactive-overlay .progress-bar {
+      height: 3px;
+      background: var(--overlay-border);
+      border-radius: 2px;
+      margin: 8px 0 10px 0;
+      overflow: hidden;
+    }
+
+    #inspekt-interactive-overlay .progress-fill {
+      height: 100%;
+      background: ${CONFIG.colors.click};
+      border-radius: 2px;
+      transition: width 0.3s ease;
     }
 
     #inspekt-interactive-overlay .current-step {
-      font-size: 14px;
+      font-size: 15px;
       font-weight: 500;
-      margin-bottom: 12px;
+      margin-bottom: 14px;
       line-height: 1.4;
     }
 
@@ -256,46 +368,296 @@
     }
 
     #inspekt-interactive-overlay .current-step .target-name {
-      color: #fff;
+      color: var(--overlay-text);
     }
 
     #inspekt-interactive-overlay .current-step .target-tag {
-      color: #888;
-      font-size: 12px;
+      color: var(--overlay-text-dim);
+      font-size: 13px;
     }
 
     #inspekt-interactive-overlay .key-hints {
       display: flex;
-      gap: 12px;
-      font-size: 11px;
-      color: #666;
-      padding-top: 10px;
-      border-top: 1px solid rgba(255, 255, 255, 0.1);
+      gap: 14px;
+      font-size: 12px;
+      color: var(--overlay-text-dim);
+      padding-top: 12px;
+      border-top: 1px solid var(--overlay-border);
     }
 
     #inspekt-interactive-overlay .key-hints kbd {
-      background: rgba(255, 255, 255, 0.1);
-      padding: 2px 6px;
-      border-radius: 3px;
+      background: var(--overlay-kbd-bg);
+      padding: 3px 8px;
+      border-radius: 4px;
       font-family: inherit;
-      font-size: 10px;
+      font-size: 11px;
       margin-right: 4px;
+      border: 1px solid var(--overlay-border);
     }
 
     #inspekt-interactive-overlay.waiting {
       border-color: ${CONFIG.colors.click};
     }
+
+    /* Drag target zones (shown when dragging) - frosted glass effect */
+    .inspekt-drag-target {
+      position: fixed;
+      /* Width/height set dynamically in createDragTargets() to match overlay */
+      min-width: 340px;
+      max-width: 450px;
+      border-radius: 12px;
+      z-index: 2147483646;
+      opacity: 0;
+      pointer-events: none;
+      /* Frosted glass effect */
+      background: rgba(255, 255, 255, 0.25);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+      transition: opacity 0.2s ease, transform 0.2s ease, background 0.2s ease;
+    }
+
+    .inspekt-drag-target.visible {
+      opacity: 1;
+    }
+
+    .inspekt-drag-target.hover {
+      background: rgba(255, 255, 255, 0.4);
+      border-color: ${CONFIG.colors.click};
+      transform: scale(1.02);
+      box-shadow: 0 4px 30px rgba(59, 130, 246, 0.2);
+    }
+
+    /* Corner positions for drag targets */
+    .inspekt-drag-target[data-corner="top-left"] { top: 20px; left: 20px; }
+    .inspekt-drag-target[data-corner="top-right"] { top: 20px; right: 20px; }
+    .inspekt-drag-target[data-corner="bottom-left"] { bottom: 20px; left: 20px; }
+    .inspekt-drag-target[data-corner="bottom-right"] { bottom: 20px; right: 20px; }
+
+    /* Dark mode - slightly darker frosted glass */
+    @media (prefers-color-scheme: dark) {
+      .inspekt-drag-target {
+        background: rgba(255, 255, 255, 0.15);
+        border-color: rgba(255, 255, 255, 0.2);
+      }
+      .inspekt-drag-target.hover {
+        background: rgba(255, 255, 255, 0.25);
+      }
+    }
+
+    /* Overlay being dragged freely */
+    #inspekt-interactive-overlay.free-drag {
+      position: fixed !important;
+      transition: none !important;
+    }
+
+    /* Snap animation when dropping */
+    #inspekt-interactive-overlay.snapping {
+      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    }
+
+    /* Target indicator arrow for interactive mode */
+    #inspekt-target-indicator {
+      position: fixed;
+      z-index: 2147483646;
+      pointer-events: none;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      /* Smooth transitions for movement */
+      transition: left 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+                  top 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+                  opacity 0.3s ease-out;
+    }
+
+    #inspekt-target-indicator .arrow {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      background: var(--arrow-color, ${CONFIG.colors.click});
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4), 0 0 0 4px rgba(255, 255, 255, 0.2);
+      animation: inspekt-arrow-pulse 1.2s ease-in-out infinite;
+    }
+
+    @keyframes inspekt-arrow-pulse {
+      0%, 100% {
+        transform: scale(1);
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4), 0 0 0 4px rgba(255, 255, 255, 0.2);
+      }
+      50% {
+        transform: scale(1.15);
+        box-shadow: 0 6px 30px rgba(0, 0, 0, 0.5), 0 0 0 8px rgba(255, 255, 255, 0.3);
+      }
+    }
+
+    #inspekt-target-indicator .arrow svg {
+      width: 28px;
+      height: 28px;
+      fill: white;
+      filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.3));
+    }
+
+    /* Arrow pointing directions */
+    #inspekt-target-indicator[data-direction="right"] .arrow svg {
+      transform: rotate(0deg);
+    }
+    #inspekt-target-indicator[data-direction="left"] .arrow svg {
+      transform: rotate(180deg);
+    }
+    #inspekt-target-indicator[data-direction="down"] .arrow svg {
+      transform: rotate(90deg);
+    }
+    #inspekt-target-indicator[data-direction="up"] .arrow svg {
+      transform: rotate(-90deg);
+    }
+
+    /* Spotlight effect - dims the page except for the target area */
+    #inspekt-spotlight {
+      position: fixed;
+      z-index: 2147483644;
+      pointer-events: none;
+      border-radius: 50%;
+      /* Radial gradient creates the soft feathered spotlight effect */
+      background: radial-gradient(
+        circle,
+        transparent 0%,
+        transparent 30%,
+        rgba(0, 0, 0, 0.3) 60%,
+        rgba(0, 0, 0, 0.55) 100%
+      );
+      /* Huge box-shadow extends the darkness to cover the entire viewport */
+      box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.55);
+      /* Blur the edges for a soft theatre spotlight look */
+      filter: blur(15px);
+      /* Smooth transitions for movement */
+      transition: left 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+                  top 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+                  width 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+                  height 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+                  opacity 0.3s ease-out;
+    }
+
+    /* Assertion overlay - shows test results in interactive mode */
+    #inspekt-assertion-overlay {
+      /* Purple/blue color scheme to distinguish from main overlay */
+      --assertion-bg: rgba(88, 28, 135, 0.9);
+      --assertion-text: #ffffff;
+      --assertion-text-dim: rgba(255, 255, 255, 0.7);
+      --assertion-border: rgba(168, 85, 247, 0.5);
+      --assertion-pass-bg: rgba(34, 197, 94, 0.2);
+      --assertion-pass-border: rgba(34, 197, 94, 0.6);
+      --assertion-fail-bg: rgba(239, 68, 68, 0.2);
+      --assertion-fail-border: rgba(239, 68, 68, 0.6);
+
+      position: fixed;
+      z-index: 2147483647; /* Just below interactive overlay */
+
+      /* Match width of interactive overlay */
+      width: 340px;
+      box-sizing: border-box;
+
+      background: var(--assertion-bg);
+      color: var(--assertion-text);
+      padding: 12px 16px;
+      border-radius: 10px;
+      font-family: 'JetBrains Mono NF', 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+      font-size: 13px;
+      border: 1px solid var(--assertion-border);
+
+      /* Vibrancy effect - match interactive overlay */
+      backdrop-filter: blur(20px) saturate(180%);
+      -webkit-backdrop-filter: blur(20px) saturate(180%);
+
+      /* Subtle fade animation */
+      opacity: 0;
+      transition: opacity 0.2s ease-out;
+      pointer-events: none;
+    }
+
+    #inspekt-assertion-overlay.visible {
+      opacity: 1;
+    }
+
+    #inspekt-assertion-overlay.pass {
+      --assertion-bg: rgba(20, 83, 45, 0.92);
+      --assertion-border: var(--assertion-pass-border);
+    }
+
+    #inspekt-assertion-overlay.fail {
+      --assertion-bg: rgba(127, 29, 29, 0.92);
+      --assertion-border: var(--assertion-fail-border);
+    }
+
+    #inspekt-assertion-overlay .assertion-content {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    #inspekt-assertion-overlay .assertion-icon {
+      font-size: 16px;
+      flex-shrink: 0;
+    }
+
+    #inspekt-assertion-overlay .assertion-message {
+      font-style: italic;
+      line-height: 1.4;
+      flex: 1;
+    }
+
+    #inspekt-assertion-overlay .assertion-details {
+      font-size: 11px;
+      color: var(--assertion-text-dim);
+      margin-top: 8px;
+      padding-top: 8px;
+      border-top: 1px solid rgba(255, 255, 255, 0.15);
+    }
+
+    /* Light mode */
+    @media (prefers-color-scheme: light) {
+      #inspekt-assertion-overlay {
+        --assertion-bg: rgba(147, 51, 234, 0.92);
+        --assertion-text: #ffffff;
+        --assertion-text-dim: rgba(255, 255, 255, 0.8);
+      }
+      #inspekt-assertion-overlay.pass {
+        --assertion-bg: rgba(22, 163, 74, 0.92);
+      }
+      #inspekt-assertion-overlay.fail {
+        --assertion-bg: rgba(220, 38, 38, 0.92);
+      }
+    }
+
+    /* Checking/loading state */
+    #inspekt-assertion-overlay.checking {
+      --assertion-bg: rgba(88, 28, 135, 0.9);
+    }
+
+    #inspekt-assertion-overlay.checking .assertion-icon {
+      animation: inspekt-assertion-spin 1s linear infinite;
+    }
+
+    @keyframes inspekt-assertion-spin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+
   `;
+  }
 
   // ==========================================================================
   // DOM Setup
   // ==========================================================================
 
   function createOverlay() {
-    // Inject styles
+    // Inject styles (with dynamically loaded font URLs)
     const styleEl = document.createElement('style');
     styleEl.id = 'inspekt-visual-styles';
-    styleEl.textContent = STYLES;
+    styleEl.textContent = buildStyles();
     document.head.appendChild(styleEl);
 
     // Create overlay container
@@ -578,6 +940,10 @@
         if (styles) styles.remove();
         this.elements = null;
       }
+      // Also clean up interactive overlay, assertion overlay, and target indicator
+      InteractiveOverlay.hide();
+      AssertionOverlay.remove();
+      TargetIndicator.hide();
     }
   };
 
@@ -1040,6 +1406,18 @@
     },
 
     /**
+     * Pause sound - distinctive attention chime
+     * Different from action sounds to indicate "waiting for input"
+     */
+    playPause() {
+      if (!this.ensureReady()) return;
+
+      // Two-note rising chime (A5 → C6) for attention/pause
+      this.playTone(880, 0.15, 'sine', CONFIG.audioVolume * 0.4, 0);    // A5 note
+      this.playTone(1047, 0.15, 'sine', CONFIG.audioVolume * 0.4, 0.15); // C6 note
+    },
+
+    /**
      * Play sound based on action type
      */
     playForAction(actionType) {
@@ -1086,6 +1464,9 @@
         case 'inspekt':
           this.playInspekt();
           break;
+        case 'pause':
+          this.playPause();
+          break;
         case 'failure':
         case 'error':
           this.playError();
@@ -1098,6 +1479,197 @@
   };
 
   // ==========================================================================
+  // Target Indicator Module (shows arrow pointing to next action target)
+  // ==========================================================================
+
+  const TargetIndicator = {
+    indicatorElement: null,
+    spotlightElement: null,
+
+    /**
+     * Actions that should show the target indicator
+     */
+    shouldShowForAction(action) {
+      const showActions = ['click', 'rightclick', 'activate', 'type', 'check', 'uncheck', 'select', 'radio'];
+      return showActions.includes(action);
+    },
+
+    /**
+     * Actions that should show for keypress (only Tab/Shift+Tab)
+     */
+    shouldShowForKeypress(step) {
+      if (step.action !== 'keypress') return false;
+      const key = (step.key || '').toLowerCase();
+      return key === 'tab';
+    },
+
+    /**
+     * Get color for action type
+     */
+    getColorForAction(action) {
+      const colors = {
+        click: CONFIG.colors.click,
+        rightclick: CONFIG.colors.click,
+        activate: CONFIG.colors.activate,
+        type: CONFIG.colors.type,
+        keypress: CONFIG.colors.keypress,
+        check: CONFIG.colors.check,
+        uncheck: CONFIG.colors.uncheck,
+        select: CONFIG.colors.select,
+        radio: CONFIG.colors.radio
+      };
+      return colors[action] || CONFIG.colors.click;
+    },
+
+    /**
+     * Show the target indicator for a step
+     */
+    show(step) {
+      // Check if we should show for this action
+      const action = step?.action;
+      if (!action) {
+        this.hide();
+        return;
+      }
+
+      const shouldShow = this.shouldShowForAction(action) || this.shouldShowForKeypress(step);
+      if (!shouldShow) {
+        this.hide();
+        return;
+      }
+
+      // Get the target selector
+      const selector = step.target?.selector;
+      if (!selector) {
+        this.hide();
+        return;
+      }
+
+      // Find the target element
+      let targetElement;
+      try {
+        targetElement = document.querySelector(selector);
+      } catch (e) {
+        // Invalid selector
+        this.hide();
+        return;
+      }
+
+      if (!targetElement) {
+        this.hide();
+        return;
+      }
+
+      // Get element position
+      const rect = targetElement.getBoundingClientRect();
+      const color = this.getColorForAction(action);
+
+      // Calculate spotlight size (add padding around element)
+      const padding = 60;
+      const spotlightWidth = rect.width + padding * 2;
+      const spotlightHeight = rect.height + padding * 2;
+      // Use the larger dimension to make it circular, with minimum size
+      const spotlightSize = Math.max(spotlightWidth, spotlightHeight, 150);
+
+      // Center of the element
+      const centerX = rect.left + rect.width / 2;
+      const centerY = rect.top + rect.height / 2;
+
+      // Create spotlight if it doesn't exist
+      if (!this.spotlightElement) {
+        this.spotlightElement = document.createElement('div');
+        this.spotlightElement.id = 'inspekt-spotlight';
+        // Set initial position immediately (no transition for first appearance)
+        this.spotlightElement.style.transition = 'none';
+        this.spotlightElement.style.opacity = '0';
+        document.body.appendChild(this.spotlightElement);
+        // Force reflow, then enable transitions and fade in
+        this.spotlightElement.offsetHeight;
+        this.spotlightElement.style.transition = '';
+        this.spotlightElement.style.opacity = '1';
+      }
+
+      // Position spotlight centered on the element
+      this.spotlightElement.style.width = `${spotlightSize}px`;
+      this.spotlightElement.style.height = `${spotlightSize}px`;
+      this.spotlightElement.style.left = `${centerX - spotlightSize / 2}px`;
+      this.spotlightElement.style.top = `${centerY - spotlightSize / 2}px`;
+
+      // Calculate best position for the arrow (prefer left side of element)
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
+      const arrowSize = 48;
+      const gap = 20;
+
+      let arrowX, arrowY, direction;
+
+      // Try left side first
+      if (rect.left > arrowSize + gap + 20) {
+        arrowX = rect.left - arrowSize - gap;
+        arrowY = rect.top + rect.height / 2 - arrowSize / 2;
+        direction = 'right';
+      }
+      // Try right side
+      else if (rect.right + arrowSize + gap + 20 < viewportWidth) {
+        arrowX = rect.right + gap;
+        arrowY = rect.top + rect.height / 2 - arrowSize / 2;
+        direction = 'left';
+      }
+      // Try top
+      else if (rect.top > arrowSize + gap + 20) {
+        arrowX = rect.left + rect.width / 2 - arrowSize / 2;
+        arrowY = rect.top - arrowSize - gap;
+        direction = 'down';
+      }
+      // Try bottom
+      else {
+        arrowX = rect.left + rect.width / 2 - arrowSize / 2;
+        arrowY = rect.bottom + gap;
+        direction = 'up';
+      }
+
+      // Clamp to viewport
+      arrowX = Math.max(10, Math.min(arrowX, viewportWidth - arrowSize - 10));
+      arrowY = Math.max(10, Math.min(arrowY, viewportHeight - arrowSize - 10));
+
+      // Create indicator if it doesn't exist
+      if (!this.indicatorElement) {
+        this.indicatorElement = document.createElement('div');
+        this.indicatorElement.id = 'inspekt-target-indicator';
+        // Arrow SVG (pointing right by default, rotated via CSS)
+        this.indicatorElement.innerHTML = `
+          <div class="arrow">
+            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+              <path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z"/>
+            </svg>
+          </div>
+        `;
+        document.body.appendChild(this.indicatorElement);
+      }
+
+      // Update position and direction
+      this.indicatorElement.setAttribute('data-direction', direction);
+      this.indicatorElement.style.left = `${arrowX}px`;
+      this.indicatorElement.style.top = `${arrowY}px`;
+      this.indicatorElement.style.setProperty('--arrow-color', color);
+    },
+
+    /**
+     * Hide and remove the target indicator
+     */
+    hide() {
+      if (this.indicatorElement) {
+        this.indicatorElement.remove();
+        this.indicatorElement = null;
+      }
+      if (this.spotlightElement) {
+        this.spotlightElement.remove();
+        this.spotlightElement = null;
+      }
+    }
+  };
+
+  // ==========================================================================
   // Interactive Replay Module (step-by-step execution with user control)
   // ==========================================================================
 
@@ -1105,6 +1677,247 @@
     element: null,
     keyHandler: null,
     resolvePromise: null,
+    currentCorner: 'bottom-left',
+    isDragging: false,
+    dragStartX: 0,
+    dragStartY: 0,
+    dragOffsetX: 0,
+    dragOffsetY: 0,
+    initialRect: null,
+    boundDragMove: null,
+    boundDragEnd: null,
+    dragTargets: [],
+    positionLoaded: false,
+
+    /**
+     * Load saved corner position from extension storage
+     */
+    async loadPosition() {
+      if (this.positionLoaded) return this.currentCorner;
+
+      return new Promise((resolve) => {
+        const requestId = `pos-load-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+        const handler = (event) => {
+          if (event.data?.type === 'INSPEKT_OVERLAY_POSITION_RESPONSE' &&
+              event.data?.source === 'inspekt-extension' &&
+              event.data?.requestId === requestId) {
+            window.removeEventListener('message', handler);
+            this.currentCorner = event.data.corner || 'bottom-left';
+            this.positionLoaded = true;
+            resolve(this.currentCorner);
+          }
+        };
+
+        window.addEventListener('message', handler);
+
+        // Request position from extension
+        window.postMessage({
+          type: 'INSPEKT_GET_OVERLAY_POSITION',
+          source: 'inspekt-page',
+          requestId: requestId
+        }, '*');
+
+        // Timeout after 500ms - use default if extension doesn't respond
+        setTimeout(() => {
+          window.removeEventListener('message', handler);
+          if (!this.positionLoaded) {
+            this.positionLoaded = true;
+            resolve(this.currentCorner);
+          }
+        }, 500);
+      });
+    },
+
+    /**
+     * Save corner position to extension storage
+     */
+    savePosition(corner) {
+      window.postMessage({
+        type: 'INSPEKT_SAVE_OVERLAY_POSITION',
+        source: 'inspekt-page',
+        requestId: `pos-save-${Date.now()}`,
+        corner: corner
+      }, '*');
+    },
+
+    /**
+     * Get the bounding rect of the target element for a step
+     */
+    getTargetRect(step) {
+      if (!step?.target?.selector) return null;
+
+      try {
+        const element = document.querySelector(step.target.selector);
+        if (!element) return null;
+        return element.getBoundingClientRect();
+      } catch (e) {
+        return null;
+      }
+    },
+
+    /**
+     * Calculate the overlay rect for a given corner
+     */
+    getOverlayRectForCorner(corner) {
+      const margin = 20;
+      // Estimate overlay dimensions (or use actual if available)
+      const width = this.element ? this.element.offsetWidth : 380;
+      const height = this.element ? this.element.offsetHeight : 180;
+
+      const viewport = {
+        width: window.innerWidth,
+        height: window.innerHeight
+      };
+
+      let left, top;
+
+      switch (corner) {
+        case 'top-left':
+          left = margin;
+          top = margin;
+          break;
+        case 'top-right':
+          left = viewport.width - width - margin;
+          top = margin;
+          break;
+        case 'bottom-left':
+          left = margin;
+          top = viewport.height - height - margin;
+          break;
+        case 'bottom-right':
+          left = viewport.width - width - margin;
+          top = viewport.height - height - margin;
+          break;
+        default:
+          left = margin;
+          top = viewport.height - height - margin;
+      }
+
+      return { left, top, width, height, right: left + width, bottom: top + height };
+    },
+
+    /**
+     * Check if two rects overlap (with padding for breathing room)
+     */
+    rectsOverlap(rect1, rect2, padding = 20) {
+      if (!rect1 || !rect2) return false;
+
+      return !(
+        rect1.right + padding < rect2.left ||
+        rect1.left - padding > rect2.right ||
+        rect1.bottom + padding < rect2.top ||
+        rect1.top - padding > rect2.bottom
+      );
+    },
+
+    /**
+     * Find the best corner that doesn't overlap with the target element
+     * Returns the current corner if no overlap, or the best alternative
+     */
+    findBestCorner(targetRect) {
+      if (!targetRect) return this.currentCorner;
+
+      const corners = ['bottom-left', 'bottom-right', 'top-left', 'top-right'];
+      const currentOverlayRect = this.getOverlayRectForCorner(this.currentCorner);
+
+      // If current corner doesn't overlap, keep it
+      if (!this.rectsOverlap(currentOverlayRect, targetRect)) {
+        return this.currentCorner;
+      }
+
+      // Find first corner that doesn't overlap (prefer same side - bottom vs top)
+      const isCurrentBottom = this.currentCorner.startsWith('bottom');
+      const isCurrentLeft = this.currentCorner.includes('left');
+
+      // Priority: same vertical side first, then opposite
+      const priorityOrder = isCurrentBottom
+        ? ['bottom-right', 'bottom-left', 'top-left', 'top-right']
+        : ['top-right', 'top-left', 'bottom-left', 'bottom-right'];
+
+      // Adjust priority to prefer opposite horizontal side first
+      if (isCurrentLeft) {
+        // Current is left, prefer right corners
+        priorityOrder.sort((a, b) => {
+          const aIsRight = a.includes('right') ? 0 : 1;
+          const bIsRight = b.includes('right') ? 0 : 1;
+          return aIsRight - bIsRight;
+        });
+      }
+
+      for (const corner of priorityOrder) {
+        if (corner === this.currentCorner) continue;
+        const overlayRect = this.getOverlayRectForCorner(corner);
+        if (!this.rectsOverlap(overlayRect, targetRect)) {
+          return corner;
+        }
+      }
+
+      // All corners overlap - return current (user can drag if needed)
+      return this.currentCorner;
+    },
+
+    /**
+     * Auto-reposition overlay if it would cover the target element
+     * Moves to a different corner if needed
+     * @param {object} step - The current step data
+     * @param {boolean} instant - If true, reposition instantly without animation
+     */
+    autoRepositionForTarget(step, instant = false) {
+      const targetRect = this.getTargetRect(step);
+      if (!targetRect) return;
+
+      const bestCorner = this.findBestCorner(targetRect);
+
+      if (bestCorner !== this.currentCorner) {
+        if (instant) {
+          // Instant repositioning (used on first show)
+          this.snapToCorner(bestCorner);
+        } else {
+          // Animated repositioning
+          this.snapToCornerAnimated(bestCorner);
+        }
+      }
+    },
+
+    /**
+     * Create drag target zones for other corners
+     * Sizes them to match the actual overlay dimensions
+     */
+    createDragTargets() {
+      const corners = ['top-left', 'top-right', 'bottom-left', 'bottom-right'];
+      const targets = [];
+
+      // Get actual overlay dimensions to size targets correctly
+      const overlayRect = this.element ? this.element.getBoundingClientRect() : null;
+
+      corners.forEach(corner => {
+        if (corner === this.currentCorner) return; // Skip current corner
+
+        const target = document.createElement('div');
+        target.className = 'inspekt-drag-target';
+        target.setAttribute('data-corner', corner);
+
+        // Match overlay dimensions if available
+        if (overlayRect) {
+          target.style.width = `${overlayRect.width}px`;
+          target.style.height = `${overlayRect.height}px`;
+        }
+
+        document.body.appendChild(target);
+        targets.push(target);
+      });
+
+      return targets;
+    },
+
+    /**
+     * Remove all drag targets
+     */
+    removeDragTargets() {
+      this.dragTargets.forEach(target => target.remove());
+      this.dragTargets = [];
+    },
 
     /**
      * Format a step for display in the overlay
@@ -1118,23 +1931,24 @@
       const tag = target.tag || '';
       const selector = target.selector || '';
 
-      // Action icons (Nerd Font)
+      // Action icons (Nerd Font) - matches icons.py ACTION_ICONS exactly
       const icons = {
-        navigate: '󰖟',
-        click: '󰍽',
-        rightclick: '󰍽',
-        activate: '󰍽',
-        type: '󰌌',
-        keypress: '󰌌',
-        hover: '󰍽',
-        check: '󰄵',
-        uncheck: '󰄱',
-        select: '󱕅',
-        scroll: '󰍽',
-        inspekt: '󰍉'
+        navigate: '\u{f059f}',    // 󰖟 nf-md-web
+        click: '\u{f0cfd}',       // 󰳽 nf-md-cursor_default_click
+        rightclick: '\u{f0cfd}',  // 󰳽 nf-md-cursor_default_click
+        activate: '\u{f0311}',    // 󰌑 nf-md-keyboard_return
+        type: '\u{f05e7}',        // 󰗧 nf-md-form_textbox
+        keypress: '\uf11c',       //  nf-fa-keyboard_o
+        hover: '\u{f0208}',       // 󰈈 nf-md-eye
+        scroll: '\u{f0599}',      // 󰖙 nf-md-unfold_more_vertical
+        check: '\u{f0c52}',       // 󰱒 nf-md-checkbox_marked_circle
+        uncheck: '\uf0c8',        //  nf-fa-square
+        select: '\u{f1400}',      // 󱐀 nf-md-form_dropdown
+        radio: '\u{f043e}',       // 󰐾 nf-md-radiobox_marked
+        inspekt: '\uf002'         //  nf-fa-search
       };
 
-      const icon = icons[action] || '●';
+      const icon = icons[action] || '\u2022'; // bullet as fallback
 
       // Format based on action type
       if (action === 'navigate') {
@@ -1190,55 +2004,303 @@
      * Show the interactive overlay
      */
     show(currentStep, previousStep, stepNum, totalSteps) {
-      // Remove existing overlay
-      this.hide();
+      // Track if this is the first show (for instant vs animated repositioning)
+      const isFirstShow = !this.element;
 
-      const overlay = document.createElement('div');
-      overlay.id = 'inspekt-interactive-overlay';
-      overlay.className = 'waiting';
-
-      // Previous step (if any)
-      let previousHtml = '';
-      if (previousStep) {
-        const prevFormatted = this.formatStep(previousStep);
-        previousHtml = `
-          <div class="previous-step">
-            <span class="checkmark">✓</span> ${prevFormatted}
+      // Create overlay shell if it doesn't exist (with static key hints)
+      if (!this.element) {
+        const overlay = document.createElement('div');
+        overlay.id = 'inspekt-interactive-overlay';
+        overlay.className = 'waiting';
+        overlay.setAttribute('data-corner', this.currentCorner);
+        overlay.innerHTML = `
+          <div class="previous-step"></div>
+          <div class="step-counter"></div>
+          <div class="progress-bar">
+            <div class="progress-fill"></div>
+          </div>
+          <div class="current-step"></div>
+          <div class="key-hints">
+            <span><kbd>Enter</kbd> Next</span>
+            <span><kbd>Space</kbd> Skip</span>
+            <span><kbd>Esc</kbd> Stop</span>
           </div>
         `;
-      } else {
-        previousHtml = `
-          <div class="previous-step">
-            <span class="checkmark">▶</span> Interactive replay started
-          </div>
-        `;
+        document.body.appendChild(overlay);
+        this.element = overlay;
+        // Initialize dragging for new overlay
+        this.initDrag();
+        // Fade in on first show
+        requestAnimationFrame(() => {
+          this.element.classList.add('visible');
+        });
       }
 
+      // Update only the dynamic content (no innerHTML replacement on container)
+      const previousEl = this.element.querySelector('.previous-step');
+      const counterEl = this.element.querySelector('.step-counter');
+      const progressEl = this.element.querySelector('.progress-fill');
+      const currentEl = this.element.querySelector('.current-step');
+
+      // Previous step content
+      if (previousStep) {
+        const prevFormatted = this.formatStep(previousStep);
+        previousEl.innerHTML = `<span class="checkmark">✓</span> ${prevFormatted}`;
+      } else {
+        previousEl.innerHTML = `<span class="checkmark">▶</span> Interactive replay started`;
+      }
+
+      // Step counter
+      counterEl.textContent = `Step ${stepNum} of ${totalSteps}`;
+
+      // Progress bar
+      const progressPercent = (stepNum / totalSteps) * 100;
+      progressEl.style.width = `${progressPercent}%`;
+
       // Current step
-      const currentFormatted = this.formatStep(currentStep);
+      currentEl.innerHTML = this.formatStep(currentStep);
 
-      overlay.innerHTML = `
-        ${previousHtml}
-        <div class="step-counter">Step ${stepNum} of ${totalSteps}</div>
-        <div class="current-step">${currentFormatted}</div>
-        <div class="key-hints">
-          <span><kbd>Enter</kbd> Next</span>
-          <span><kbd>Space</kbd> Skip</span>
-          <span><kbd>Esc</kbd> Stop</span>
-        </div>
-      `;
+      // Ensure visible class is set
+      if (!this.element.classList.contains('visible')) {
+        this.element.classList.add('visible');
+      }
 
-      document.body.appendChild(overlay);
-      this.element = overlay;
+      // Auto-reposition if overlay would cover the target element
+      // Use instant positioning on first show, animated on subsequent shows
+      this.autoRepositionForTarget(currentStep, isFirstShow);
+
+      // Show target indicator arrow for the current step
+      TargetIndicator.show(currentStep);
     },
 
     /**
-     * Hide the overlay and clean up
+     * Initialize drag-to-corner functionality
+     */
+    initDrag() {
+      if (!this.element) return;
+
+      this.boundDragMove = this.onDragMove.bind(this);
+      this.boundDragEnd = this.onDragEnd.bind(this);
+
+      this.element.addEventListener('mousedown', this.onDragStart.bind(this));
+    },
+
+    /**
+     * Handle drag start
+     */
+    onDragStart(e) {
+      // Don't drag when clicking on kbd elements
+      if (e.target.tagName === 'KBD') return;
+
+      this.isDragging = true;
+      this.dragStartX = e.clientX;
+      this.dragStartY = e.clientY;
+
+      // Capture initial overlay position and offset for free dragging
+      const rect = this.element.getBoundingClientRect();
+      this.dragOffsetX = e.clientX - rect.left;
+      this.dragOffsetY = e.clientY - rect.top;
+      this.initialRect = rect;
+
+      // Switch to free-positioning mode
+      this.element.classList.add('dragging', 'free-drag');
+      this.element.style.left = `${rect.left}px`;
+      this.element.style.top = `${rect.top}px`;
+      this.element.style.right = 'auto';
+      this.element.style.bottom = 'auto';
+
+      // Hide assertion overlay during drag
+      AssertionOverlay.hide();
+
+      // Create and show drag targets
+      this.dragTargets = this.createDragTargets();
+      // Small delay to allow CSS transition
+      requestAnimationFrame(() => {
+        this.dragTargets.forEach(t => t.classList.add('visible'));
+      });
+
+      document.addEventListener('mousemove', this.boundDragMove);
+      document.addEventListener('mouseup', this.boundDragEnd);
+
+      e.preventDefault();
+    },
+
+    /**
+     * Handle drag move - move overlay with cursor and highlight targets
+     */
+    onDragMove(e) {
+      if (!this.isDragging) return;
+
+      // Move overlay with cursor
+      this.element.style.left = `${e.clientX - this.dragOffsetX}px`;
+      this.element.style.top = `${e.clientY - this.dragOffsetY}px`;
+
+      // Check which drag target (if any) the cursor is over
+      this.dragTargets.forEach(target => {
+        const rect = target.getBoundingClientRect();
+        const isOver = e.clientX >= rect.left && e.clientX <= rect.right &&
+                       e.clientY >= rect.top && e.clientY <= rect.bottom;
+        target.classList.toggle('hover', isOver);
+      });
+    },
+
+    /**
+     * Handle drag end - snap to nearest corner with animation
+     */
+    onDragEnd(e) {
+      if (!this.isDragging) return;
+
+      this.isDragging = false;
+      this.element.classList.remove('dragging');
+
+      document.removeEventListener('mousemove', this.boundDragMove);
+      document.removeEventListener('mouseup', this.boundDragEnd);
+
+      // Check if dropped on a specific target
+      let droppedCorner = null;
+      this.dragTargets.forEach(target => {
+        const rect = target.getBoundingClientRect();
+        const isOver = e.clientX >= rect.left && e.clientX <= rect.right &&
+                       e.clientY >= rect.top && e.clientY <= rect.bottom;
+        if (isOver) {
+          droppedCorner = target.getAttribute('data-corner');
+        }
+      });
+
+      // Remove drag targets
+      this.removeDragTargets();
+
+      // Determine corner - use dropped target or calculate from position
+      let newCorner;
+      if (droppedCorner) {
+        newCorner = droppedCorner;
+      } else {
+        const viewportWidth = window.innerWidth;
+        const viewportHeight = window.innerHeight;
+        const isRight = e.clientX > viewportWidth / 2;
+        const isBottom = e.clientY > viewportHeight / 2;
+        newCorner = `${isBottom ? 'bottom' : 'top'}-${isRight ? 'right' : 'left'}`;
+      }
+
+      // Animate snap to corner
+      this.snapToCornerAnimated(newCorner);
+
+      // Save position to extension storage
+      this.savePosition(newCorner);
+    },
+
+    /**
+     * Snap overlay to a specific corner with smooth animation
+     */
+    snapToCornerAnimated(corner) {
+      if (!this.element) return;
+
+      // Get current position before changing anything
+      const currentRect = this.element.getBoundingClientRect();
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
+      const margin = 20;
+
+      // Calculate target position for the new corner
+      let targetLeft, targetTop;
+
+      switch (corner) {
+        case 'top-left':
+          targetLeft = margin;
+          targetTop = margin;
+          break;
+        case 'top-right':
+          targetLeft = viewportWidth - currentRect.width - margin;
+          targetTop = margin;
+          break;
+        case 'bottom-left':
+          targetLeft = margin;
+          targetTop = viewportHeight - currentRect.height - margin;
+          break;
+        case 'bottom-right':
+          targetLeft = viewportWidth - currentRect.width - margin;
+          targetTop = viewportHeight - currentRect.height - margin;
+          break;
+        default:
+          targetLeft = margin;
+          targetTop = viewportHeight - currentRect.height - margin;
+      }
+
+      // Step 1: Convert current CSS positioning to absolute left/top
+      // This ensures we animate FROM the current visual position
+      this.element.style.transition = 'none';
+      this.element.style.top = `${currentRect.top}px`;
+      this.element.style.bottom = 'auto';
+      this.element.style.left = `${currentRect.left}px`;
+      this.element.style.right = 'auto';
+      this.element.classList.add('free-drag');
+
+      // Step 2: Force reflow to apply the position change instantly
+      this.element.offsetHeight;
+
+      // Step 3: Re-enable transitions and animate to target
+      this.element.style.transition = '';
+      this.element.classList.add('snapping');
+      this.element.style.left = `${targetLeft}px`;
+      this.element.style.top = `${targetTop}px`;
+
+      // Update assertion overlay position
+      AssertionOverlay.updatePosition(corner, false);
+
+      // Update current corner
+      this.currentCorner = corner;
+
+      // Step 4: After animation completes, switch back to corner-based positioning
+      setTimeout(() => {
+        this.element.classList.remove('free-drag', 'snapping');
+        this.element.style.transition = '';
+        this.element.style.left = '';
+        this.element.style.top = '';
+        this.element.style.right = '';
+        this.element.style.bottom = '';
+        this.element.setAttribute('data-corner', corner);
+
+        // Show assertion overlay again if it exists (with fade-in animation)
+        if (AssertionOverlay.element) {
+          AssertionOverlay.element.classList.add('visible');
+        }
+      }, 260); // Slightly longer than the 250ms transition
+    },
+
+    /**
+     * Snap overlay to a specific corner (instant, used for initialization)
+     */
+    snapToCorner(corner) {
+      this.currentCorner = corner;
+      if (this.element) {
+        this.element.setAttribute('data-corner', corner);
+      }
+      // Also move the assertion overlay to follow (instant)
+      AssertionOverlay.updatePosition(corner, false);
+    },
+
+    /**
+     * Hide the overlay (keeps element in DOM for reuse)
      */
     hide() {
+      // Clean up drag listeners if dragging was interrupted
+      if (this.boundDragMove) {
+        document.removeEventListener('mousemove', this.boundDragMove);
+      }
+      if (this.boundDragEnd) {
+        document.removeEventListener('mouseup', this.boundDragEnd);
+      }
+      this.isDragging = false;
+
+      // Clean up any drag targets
+      this.removeDragTargets();
+
+      // Note: Don't hide TargetIndicator here - it will be updated by the next show() call
+      // or explicitly hidden when replay ends
+
+      // Just hide visually, keep element in DOM for smooth transitions
       if (this.element) {
-        this.element.remove();
-        this.element = null;
+        this.element.classList.remove('visible');
       }
       if (this.keyHandler) {
         document.removeEventListener('keydown', this.keyHandler, true);
@@ -1255,7 +2317,20 @@
       return new Promise((resolve) => {
         this.resolvePromise = resolve;
 
+        // Debounce: ignore keypresses for a short time after overlay appears
+        // This prevents the Enter from the previous step from immediately triggering this one
+        const startTime = Date.now();
+        const debounceMs = 150; // Ignore keypresses in first 150ms
+
         this.keyHandler = (event) => {
+          // Ignore events during debounce period
+          const elapsed = Date.now() - startTime;
+          if (elapsed < debounceMs) {
+            event.preventDefault();
+            event.stopPropagation();
+            return;
+          }
+
           // Only handle trusted events (real user input)
           if (!event.isTrusted) return;
 
@@ -1290,6 +2365,221 @@
   };
 
   // ==========================================================================
+  // Assertion Overlay Module (shows test results in interactive mode)
+  // ==========================================================================
+
+  const AssertionOverlay = {
+    element: null,
+
+    /**
+     * Generate assertion description from expect object
+     */
+    generateDescription(expect) {
+      if (!expect) return null;
+
+      const parts = [];
+      if (expect.visible) parts.push(`visible: ${expect.visible}`);
+      if (expect.hidden) parts.push(`hidden: ${expect.hidden}`);
+      if (expect.text_contains) parts.push(`text contains: "${expect.text_contains}"`);
+      if (expect.url_contains) parts.push(`URL contains: "${expect.url_contains}"`);
+      if (expect.focused) parts.push('element has focus');
+      if (expect.checked) parts.push(`checked: ${expect.checked}`);
+      if (expect.unchecked) parts.push(`unchecked: ${expect.unchecked}`);
+      if (expect.value_equals !== undefined) parts.push(`value equals: "${expect.value_equals}"`);
+      if (expect.count && expect.count_equals !== undefined) {
+        parts.push(`count(${expect.count}) = ${expect.count_equals}`);
+      }
+
+      return parts.length > 0 ? parts.join(', ') : null;
+    },
+
+    /**
+     * Get position relative to main overlay
+     * Uses the same corner as the interactive overlay, positioned above/below it
+     */
+    getPosition(mainCorner) {
+      const mainOverlay = InteractiveOverlay.element;
+      const corner = mainCorner || InteractiveOverlay.currentCorner || 'bottom-left';
+      const margin = 20; // Same margin as interactive overlay
+      const gap = 10; // Gap between overlays
+
+      // Get the main overlay's height (or estimate if not available)
+      let mainHeight = 180; // Default estimate (interactive overlay is typically ~170-180px)
+      if (mainOverlay) {
+        const rect = mainOverlay.getBoundingClientRect();
+        if (rect.height > 0) {
+          mainHeight = rect.height;
+        }
+      }
+
+      // Position based on corner
+      const isTop = corner.startsWith('top');
+      const isLeft = corner.includes('left');
+
+      if (isTop) {
+        // Main is at top, assertion goes below it
+        // top: margin (main's top) + mainHeight + gap
+        return {
+          top: `${margin + mainHeight + gap}px`,
+          bottom: 'auto',
+          left: isLeft ? `${margin}px` : 'auto',
+          right: isLeft ? 'auto' : `${margin}px`
+        };
+      } else {
+        // Main is at bottom, assertion goes above it
+        // We need to position from bottom, accounting for main overlay height + gap
+        return {
+          top: 'auto',
+          bottom: `${margin + mainHeight + gap}px`,
+          left: isLeft ? `${margin}px` : 'auto',
+          right: isLeft ? 'auto' : `${margin}px`
+        };
+      }
+    },
+
+    /**
+     * Show assertion overlay in "checking" state
+     */
+    showChecking(expect, mainCorner) {
+      const message = expect?.message || this.generateDescription(expect) || 'Checking assertions...';
+      const details = this.generateDescription(expect);
+
+      this.show({
+        status: 'checking',
+        message,
+        details: details !== message ? details : null
+      }, mainCorner);
+    },
+
+    /**
+     * Show assertion overlay with result
+     */
+    showResult(expect, passed, failures, mainCorner) {
+      const message = expect?.message || this.generateDescription(expect) || (passed ? 'Assertion passed' : 'Assertion failed');
+      const details = failures && failures.length > 0 ? failures.join('\n') : null;
+
+      this.show({
+        status: passed ? 'pass' : 'fail',
+        message,
+        details
+      }, mainCorner);
+    },
+
+    /**
+     * Show the assertion overlay
+     */
+    show(options, mainCorner) {
+      const { status, message, details } = options;
+
+      // Create element if needed
+      if (!this.element) {
+        this.element = document.createElement('div');
+        this.element.id = 'inspekt-assertion-overlay';
+        document.body.appendChild(this.element);
+      }
+
+      // Get icon based on status
+      let icon;
+      if (status === 'checking') {
+        icon = '\u{f0150}'; // 󰅐 nf-md-loading (spinner)
+      } else if (status === 'pass') {
+        icon = '\u{f012c}'; // 󰄬 nf-md-check (simple checkmark)
+      } else {
+        icon = '\u{f0156}'; // 󰅖 nf-md-close (simple cross)
+      }
+
+      // Build HTML - compact single-line layout
+      let html = `
+        <div class="assertion-content">
+          <span class="assertion-icon">${icon}</span>
+          <span class="assertion-message">${this.escapeHtml(message)}</span>
+        </div>
+      `;
+
+      if (details) {
+        html += `<div class="assertion-details">${this.escapeHtml(details)}</div>`;
+      }
+
+      this.element.innerHTML = html;
+
+      // Set status class
+      this.element.className = status;
+
+      // Position relative to main overlay
+      const pos = this.getPosition(mainCorner || InteractiveOverlay.currentCorner || 'bottom-left');
+      this.element.style.top = pos.top || 'auto';
+      this.element.style.bottom = pos.bottom || 'auto';
+      this.element.style.left = pos.left || 'auto';
+      this.element.style.right = pos.right || 'auto';
+
+      // Make visible with slight delay for animation
+      requestAnimationFrame(() => {
+        this.element.classList.add('visible');
+      });
+    },
+
+    /**
+     * Update position to follow the main overlay's corner
+     */
+    updatePosition(corner, animated = false) {
+      if (!this.element) return;
+
+      const pos = this.getPosition(corner);
+
+      if (animated) {
+        // Add transition for smooth following
+        this.element.style.transition = 'top 0.25s ease-out, bottom 0.25s ease-out, left 0.25s ease-out, right 0.25s ease-out, opacity 0.2s ease-out';
+      }
+
+      this.element.style.top = pos.top || 'auto';
+      this.element.style.bottom = pos.bottom || 'auto';
+      this.element.style.left = pos.left || 'auto';
+      this.element.style.right = pos.right || 'auto';
+
+      if (animated) {
+        // Reset transition after animation
+        setTimeout(() => {
+          if (this.element) {
+            this.element.style.transition = 'opacity 0.2s ease-out';
+          }
+        }, 260);
+      }
+    },
+
+    /**
+     * Hide the assertion overlay
+     */
+    hide() {
+      if (this.element) {
+        this.element.classList.remove('visible');
+      }
+    },
+
+    /**
+     * Remove the assertion overlay from DOM
+     */
+    remove() {
+      if (this.element) {
+        this.element.remove();
+        this.element = null;
+      }
+    },
+
+    /**
+     * Escape HTML to prevent XSS
+     */
+    escapeHtml(str) {
+      if (!str) return '';
+      return str
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/\n/g, '<br>');
+    }
+  };
+
+  // ==========================================================================
   // Input Lock Module (prevent user interference during replay)
   // ==========================================================================
 
@@ -1297,6 +2587,7 @@
     enabled: false,
     styleElement: null,
     handlers: {},
+    previousFocus: null,
 
     /**
      * Block an event from propagating (only if it's a real user event)
@@ -1307,18 +2598,67 @@
       if (!event.isTrusted) {
         return true; // Allow synthetic events to proceed
       }
+
+      // Check for Ctrl+C - allow it to stop the replay
+      if (event.type === 'keydown' && event.key === 'c' && event.ctrlKey && !event.metaKey && !event.altKey) {
+        // Set stop flag - Python will detect this
+        window.__INSPEKT_REPLAY_STOP_REQUESTED__ = true;
+        // Prevent default copy behavior during replay
+        event.preventDefault();
+        event.stopPropagation();
+        event.stopImmediatePropagation();
+        return false;
+      }
+
+      // When interactive overlay is visible, handle events specially
+      if (InteractiveOverlay.element) {
+        // Allow keyboard events for overlay navigation (Enter, Space, Escape)
+        if (event.type === 'keydown' || event.type === 'keyup' || event.type === 'keypress') {
+          // ONLY allow Enter, Space, Escape - these control the overlay
+          if (event.key === 'Enter' || event.key === ' ' || event.key === 'Escape') {
+            return true; // Let the interactive overlay handle these
+          }
+          // Block ALL other keys: Tab, arrows, Page Up/Down, Home/End, function keys, etc.
+          event.preventDefault();
+          event.stopPropagation();
+          event.stopImmediatePropagation();
+          return false;
+        }
+
+        // Allow mouse events on the interactive overlay (for dragging)
+        if (event.type.startsWith('mouse')) {
+          const overlayEl = InteractiveOverlay.element;
+          const target = event.target;
+
+          // Check if the event target is the overlay or inside it
+          if (overlayEl && (overlayEl === target || overlayEl.contains(target))) {
+            return true; // Allow drag interactions on overlay
+          }
+
+          // Also allow mouse events when dragging (targets are on body)
+          if (InteractiveOverlay.isDragging) {
+            return true;
+          }
+        }
+      }
+
       event.preventDefault();
       event.stopPropagation();
       event.stopImmediatePropagation();
       return false;
     },
 
+
     /**
      * Enable input lock - hide cursor and block all user input
+     * Uses event blocking only (no inert) to preserve visual focus outlines and hover states
      */
     enable() {
       if (this.enabled) return;
       this.enabled = true;
+
+      // Store the currently focused element to restore later
+      this.previousFocus = document.activeElement;
 
       // Hide cursor with CSS
       this.styleElement = document.createElement('style');
@@ -1332,6 +2672,16 @@
         }
         #inspekt-overlay {
           pointer-events: none !important;
+        }
+        /* Make interactive overlay and its contents interactive */
+        #inspekt-interactive-overlay,
+        #inspekt-interactive-overlay * {
+          pointer-events: auto !important;
+          cursor: grab !important;
+        }
+        #inspekt-interactive-overlay.dragging,
+        #inspekt-interactive-overlay.dragging * {
+          cursor: grabbing !important;
         }
       `;
       document.head.appendChild(this.styleElement);
@@ -1359,10 +2709,10 @@
       this.handlers.touchend = (e) => this.blockEvent(e);
 
       // Add all event listeners with capture to intercept before anything else
-      const options = { capture: true, passive: false };
+      const listenerOptions = { capture: true, passive: false };
       for (const [eventType, handler] of Object.entries(this.handlers)) {
-        document.addEventListener(eventType, handler, options);
-        window.addEventListener(eventType, handler, options);
+        document.addEventListener(eventType, handler, listenerOptions);
+        window.addEventListener(eventType, handler, listenerOptions);
       }
     },
 
@@ -1386,6 +2736,16 @@
         window.removeEventListener(eventType, handler, options);
       }
       this.handlers = {};
+
+      // Restore previous focus if it still exists in the DOM
+      if (this.previousFocus && document.contains(this.previousFocus)) {
+        try {
+          this.previousFocus.focus();
+        } catch (e) {
+          // Element might not be focusable anymore
+        }
+      }
+      this.previousFocus = null;
     }
   };
 
@@ -1431,6 +2791,7 @@
       playSelect: () => Audio.playSelect(),
       playPlugin: () => Audio.playPlugin(),
       playInspekt: () => Audio.playInspekt(),
+      playPause: () => Audio.playPause(),
       // Feedback sounds
       playError: () => Audio.playError(),
       playSuccess: () => Audio.playSuccess(),
@@ -1439,10 +2800,21 @@
     },
 
     // Input lock (prevent user interference during replay)
+    // Uses event blocking only - preserves visual focus outlines and hover states
     inputLock: {
       enable: () => InputLock.enable(),
       disable: () => InputLock.disable(),
       isEnabled: () => InputLock.enabled
+    },
+
+    // Stop request (Ctrl+C pressed in browser)
+    isStopRequested: () => !!window.__INSPEKT_REPLAY_STOP_REQUESTED__,
+    clearStopRequest: () => { window.__INSPEKT_REPLAY_STOP_REQUESTED__ = false; },
+
+    // Target indicator (arrow pointing to next action target)
+    targetIndicator: {
+      show: (step) => TargetIndicator.show(step),
+      hide: () => TargetIndicator.hide()
     },
 
     // Interactive replay (step-by-step execution)
@@ -1453,11 +2825,113 @@
       waitForInput: () => InteractiveOverlay.waitForInput()
     },
 
+    // Assertion overlay (shows pass/fail for assertions in interactive mode)
+    assertion: {
+      showChecking: (expect, mainCorner) => AssertionOverlay.showChecking(expect, mainCorner),
+      showResult: (expect, passed, failures, mainCorner) => AssertionOverlay.showResult(expect, passed, failures, mainCorner),
+      show: (options, mainCorner) => AssertionOverlay.show(options, mainCorner),
+      hide: () => AssertionOverlay.hide(),
+      remove: () => AssertionOverlay.remove()
+    },
+
     // Configuration
     config: CONFIG
   };
 
-  // Initialize overlay on load
-  Visual.init();
+  // ==========================================================================
+  // Font URL Loading (from extension)
+  // ==========================================================================
+
+  /**
+   * Request font URLs from the Chrome extension
+   * Falls back to system fonts if extension doesn't respond
+   */
+  async function loadFontUrls() {
+    return new Promise((resolve) => {
+      const requestId = `font-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+      const handler = (event) => {
+        if (event.data?.type === 'INSPEKT_FONT_URLS_RESPONSE' &&
+            event.data?.source === 'inspekt-extension' &&
+            event.data?.requestId === requestId) {
+          window.removeEventListener('message', handler);
+
+          if (event.data.fontUrls) {
+            fontUrlRegular = event.data.fontUrls.regular;
+            fontUrlBold = event.data.fontUrls.bold;
+            console.log('[Inspekt Visual] Loaded font URLs from extension');
+          }
+          resolve(true);
+        }
+      };
+
+      window.addEventListener('message', handler);
+
+      // Request font URLs from extension
+      window.postMessage({
+        type: 'INSPEKT_GET_FONT_URLS',
+        source: 'inspekt-page',
+        requestId: requestId
+      }, '*');
+
+      // Timeout after 300ms - use system fonts if extension doesn't respond
+      setTimeout(() => {
+        window.removeEventListener('message', handler);
+        resolve(false);
+      }, 300);
+    });
+  }
+
+  /**
+   * Ensure fonts are actually loaded before rendering
+   * Uses the CSS Font Loading API to verify font availability
+   */
+  async function ensureFontsLoaded() {
+    if (fontsLoaded || !fontUrlRegular) {
+      return;
+    }
+
+    try {
+      // Try to load the font explicitly
+      await document.fonts.load('400 16px "JetBrains Mono NF"');
+      fontsLoaded = true;
+      console.log('[Inspekt Visual] Nerd Font loaded successfully');
+    } catch (e) {
+      console.warn('[Inspekt Visual] Font failed to load, using fallback:', e);
+    }
+  }
+
+  /**
+   * Re-inject styles after font URLs are loaded
+   * Called when styles need to be updated (e.g., after fonts load)
+   */
+  function updateStyles() {
+    const existingStyle = document.getElementById('inspekt-visual-styles');
+    if (existingStyle) {
+      existingStyle.textContent = buildStyles();
+    }
+  }
+
+  // ==========================================================================
+  // Initialization
+  // ==========================================================================
+
+  // Load font URLs first, then initialize visual overlay
+  (async function init() {
+    await loadFontUrls();
+
+    // Initialize visual overlay (creates DOM and injects styles)
+    Visual.init();
+
+    // If we got font URLs, ensure they're actually loaded
+    if (fontUrlRegular) {
+      await ensureFontsLoaded();
+      // Re-inject styles now that fonts are loaded
+      updateStyles();
+    }
+
+    // Pre-load position for interactive overlay
+    InteractiveOverlay.loadPosition().catch(() => {});
+  })();
 
 })();

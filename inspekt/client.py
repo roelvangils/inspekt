@@ -563,18 +563,7 @@ class BridgeClient:
                 raise ConnectionError(f"Failed to get result: {e}")
 
         _verbose_log(f"Timeout after {poll_count} polls", f"elapsed={time.time() - start_time:.3f}s")
-        raise TimeoutError(
-            f"No response from browser after {timeout} seconds.\n\n"
-            "Possible causes:\n"
-            "  • No browser tab is open with the userscript active\n"
-            "  • Content Security Policy (CSP) is blocking the connection\n"
-            "  • Browser userscript manager (Tampermonkey/Violentmonkey) is disabled\n\n"
-            "Troubleshooting:\n"
-            "  • Open browser console (F12) and check for Inspekt messages\n"
-            "  • Look for CSP warnings in red/orange\n"
-            "  • Verify: inspekt status\n"
-            "  • Read: https://roelvangils.github.io/zen-bridge/troubleshooting/csp-issues/"
-        )
+        raise TimeoutError(f"No response from browser after {timeout} seconds.")
 
     def execute_file(self, filepath: str, timeout: float = 10.0) -> dict[str, Any]:
         """

@@ -23,12 +23,26 @@
             return;
         }
 
+        // Helper: Check if input element supports selection APIs
+        // Some input types (email, number, date, etc.) throw InvalidStateError
+        function supportsSelection(el) {
+            if (el.tagName !== 'INPUT') return true;
+            var type = (el.type || 'text').toLowerCase();
+            // These types do NOT support selectionStart/selectionEnd
+            var noSelectionTypes = ['email', 'number', 'date', 'datetime-local', 'month', 'time', 'week', 'color'];
+            return noSelectionTypes.indexOf(type) === -1;
+        }
+
+        var canUseSelection = supportsSelection(activeEl);
+
         // Clear existing content if requested
         if (clearFirst) {
             if (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA') {
                 activeEl.value = '';
-                activeEl.selectionStart = 0;
-                activeEl.selectionEnd = 0;
+                if (canUseSelection) {
+                    activeEl.selectionStart = 0;
+                    activeEl.selectionEnd = 0;
+                }
             } else if (activeEl.isContentEditable) {
                 activeEl.textContent = '';
             }
@@ -435,11 +449,16 @@
             activeEl.dispatchEvent(createKeyEvent('keypress', char));
 
             if (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA') {
-                var start = activeEl.selectionStart;
-                var end = activeEl.selectionEnd;
-                var value = activeEl.value;
-                activeEl.value = value.substring(0, start) + char + value.substring(end);
-                activeEl.selectionStart = activeEl.selectionEnd = start + 1;
+                if (canUseSelection) {
+                    var start = activeEl.selectionStart;
+                    var end = activeEl.selectionEnd;
+                    var value = activeEl.value;
+                    activeEl.value = value.substring(0, start) + char + value.substring(end);
+                    activeEl.selectionStart = activeEl.selectionEnd = start + 1;
+                } else {
+                    // For email, number, etc. - just append to value
+                    activeEl.value = activeEl.value + char;
+                }
             } else if (activeEl.isContentEditable) {
                 var selection = window.getSelection();
                 var range = selection.getRangeAt(0);
@@ -469,15 +488,23 @@
             activeEl.dispatchEvent(backspaceEvent);
 
             if (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA') {
-                var start = activeEl.selectionStart;
-                var end = activeEl.selectionEnd;
-                var value = activeEl.value;
-                if (start === end && start > 0) {
-                    activeEl.value = value.substring(0, start - 1) + value.substring(end);
-                    activeEl.selectionStart = activeEl.selectionEnd = start - 1;
-                } else if (start !== end) {
-                    activeEl.value = value.substring(0, start) + value.substring(end);
-                    activeEl.selectionStart = activeEl.selectionEnd = start;
+                if (canUseSelection) {
+                    var start = activeEl.selectionStart;
+                    var end = activeEl.selectionEnd;
+                    var value = activeEl.value;
+                    if (start === end && start > 0) {
+                        activeEl.value = value.substring(0, start - 1) + value.substring(end);
+                        activeEl.selectionStart = activeEl.selectionEnd = start - 1;
+                    } else if (start !== end) {
+                        activeEl.value = value.substring(0, start) + value.substring(end);
+                        activeEl.selectionStart = activeEl.selectionEnd = start;
+                    }
+                } else {
+                    // For email, number, etc. - just remove last character
+                    var value = activeEl.value;
+                    if (value.length > 0) {
+                        activeEl.value = value.substring(0, value.length - 1);
+                    }
                 }
             } else if (activeEl.isContentEditable) {
                 var selection = window.getSelection();

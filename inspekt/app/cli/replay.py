@@ -19,8 +19,12 @@ from inspekt.domain.recording import Recording
 from inspekt.services.applescript_utils import activate_browser_tab
 from inspekt.services.audio import CLIAudio
 from .formatting import (
+    format_assertion_result,
     format_duration,
+    format_paused_step_for_display,
+    format_skipped_step_for_display,
     format_step_for_display,
+    format_step_header,
     format_status,
     format_system_message,
     get_recordings_dir,
@@ -31,6 +35,46 @@ import requests
 # Bridge server constants
 BRIDGE_HTTP_HOST = "127.0.0.1"
 BRIDGE_HTTP_PORT = 8765
+
+
+def complete_recording_files(ctx, param, incomplete):
+    """Shell completion for recording files.
+
+    Returns recording_*.yaml files in the current directory that match
+    the incomplete input.
+    """
+    cwd = Path.cwd()
+    recording_files = list(cwd.glob("recording_*.yaml"))
+
+    # Filter by incomplete prefix and return filenames
+    matches = []
+    for f in recording_files:
+        name = f.name
+        if name.startswith(incomplete) or incomplete in name:
+            matches.append(name)
+
+    return sorted(matches, key=lambda x: -cwd.joinpath(x).stat().st_mtime)
+
+
+def find_most_recent_recording() -> Optional[Path]:
+    """
+    Find the most recently modified recording file in the current directory.
+
+    Looks for files matching 'recording_*.yaml' and returns the one
+    with the most recent modification time.
+
+    Returns:
+        Path to the most recent recording file, or None if not found.
+    """
+    cwd = Path.cwd()
+    recording_files = list(cwd.glob("recording_*.yaml"))
+
+    if not recording_files:
+        return None
+
+    # Sort by modification time (most recent first)
+    recording_files.sort(key=lambda f: f.stat().st_mtime, reverse=True)
+    return recording_files[0]
 
 # Save built-in open before it gets shadowed
 _builtin_open = open
@@ -183,7 +227,18 @@ def wait_for_reconnection(
 
             if result.get("ok"):
                 if consecutive_failures > 0 and verbose:
-                    click.echo(format_system_message("Reconnected to browser"))
+                    # Get current domain for the message
+                    try:
+                        from urllib.parse import urlparse
+                        url_result = client.execute("window.location.href", timeout=1.0)
+                        if url_result.get("ok"):
+                            url = url_result.get("result", "")
+                            domain = urlparse(url).netloc or url
+                            click.echo(format_system_message(f"Playback resumed on {domain}", icon="resume"))
+                        else:
+                            click.echo(format_system_message("Playback resumed", icon="resume"))
+                    except Exception:
+                        click.echo(format_system_message("Playback resumed", icon="resume"))
                 return True
 
         except Exception:
@@ -530,41 +585,93 @@ def wait_for_condition(
     }
 
 
+def _generate_assertion_description(expect) -> str | None:
+    """Generate a human-readable description of assertions when no message is provided."""
+    if not expect:
+        return None
+
+    parts = []
+    if expect.visible:
+        parts.append(f"visible: {expect.visible}")
+    if expect.hidden:
+        parts.append(f"hidden: {expect.hidden}")
+    if expect.text_contains:
+        parts.append(f"text contains: {expect.text_contains}")
+    if expect.url_contains:
+        parts.append(f"URL contains: {expect.url_contains}")
+    if expect.focused:
+        parts.append("element has focus")
+    if expect.checked:
+        parts.append(f"checked: {expect.checked}")
+    if expect.unchecked:
+        parts.append(f"unchecked: {expect.unchecked}")
+    if expect.value_equals is not None:
+        selector = expect.value or "target"
+        parts.append(f"value equals: {expect.value_equals}")
+    if expect.count is not None and expect.count_equals is not None:
+        parts.append(f"count({expect.count}) = {expect.count_equals}")
+
+    return ", ".join(parts) if parts else None
+
+
 def check_inspekt_expectations(command: str, expect: dict, cmd_result: dict) -> list[str]:
     """Check expectations for an inspekt command."""
+    import re
+
     failures = []
 
     if not expect:
         return failures
 
+    stdout = cmd_result.get("stdout", "")
+
     # For console commands, check if output is empty
     if "console" in command and expect.get("empty"):
-        stdout = cmd_result.get("stdout", "")
         # Check if there are any log entries (non-empty, non-header output)
         lines = [l for l in stdout.strip().split("\n") if l.strip() and not l.startswith("Console")]
         if lines:
             failures.append(f"Expected no console messages, but found: {len(lines)} message(s)")
 
     # For axe commands, check violations
-    if "axe" in command and expect.get("violations") is not None:
-        max_violations = expect["violations"]
-        stdout = cmd_result.get("stdout", "")
+    # Use "allowed-violations" (default: 0 = strict mode)
+    if "axe" in command:
+        # Support both "allowed-violations" (preferred) and legacy "violations"
+        allowed = expect.get("allowed-violations", expect.get("violations", 0))
         # Try to parse violation count from output
-        # This is a simplified check - axe output format may vary
-        if "violation" in stdout.lower():
-            # Count violations mentioned
-            import re
-            matches = re.findall(r"(\d+)\s*violation", stdout.lower())
-            if matches:
-                actual_violations = int(matches[0])
-                if actual_violations > max_violations:
-                    failures.append(f"Expected max {max_violations} violations, found {actual_violations}")
+        matches = re.findall(r"(\d+)\s*violation", stdout.lower())
+        if matches:
+            actual_violations = int(matches[0])
+            if actual_violations > allowed:
+                failures.append(f"Expected max {allowed} violations, found {actual_violations}")
+        elif "0 violations" not in stdout.lower() and allowed == 0:
+            # If we can't parse and expect 0, check for "0 violations" text
+            if "violation" in stdout.lower():
+                failures.append("Expected 0 violations but found some (could not parse count)")
+
+    # Generic output assertions (work with any inspekt command)
+    if expect.get("output-contains"):
+        text = expect["output-contains"]
+        if text not in stdout:
+            failures.append(f"Output does not contain: '{text}'")
+
+    if expect.get("output-not-contains"):
+        text = expect["output-not-contains"]
+        if text in stdout:
+            failures.append(f"Output should not contain: '{text}'")
+
+    if expect.get("output-matches"):
+        pattern = expect["output-matches"]
+        try:
+            if not re.search(pattern, stdout, re.MULTILINE):
+                failures.append(f"Output does not match pattern: '{pattern}'")
+        except re.error as e:
+            failures.append(f"Invalid regex pattern '{pattern}': {e}")
 
     return failures
 
 
 @click.command()
-@click.argument("recording_file", type=click.Path(exists=True))
+@click.argument("recording_file", type=click.Path(exists=True), required=False, default=None, shell_complete=complete_recording_files)
 @click.option(
     "--speed",
     type=float,
@@ -665,8 +772,56 @@ def check_inspekt_expectations(command: str, expect: dict, cmd_result: dict) -> 
     is_flag=True,
     help="Step through replay manually (Enter=next, Space=skip, Escape=cancel)",
 )
+@click.option(
+    "--stop-on-error",
+    "-e",
+    is_flag=True,
+    help="Stop replay on first failure (assertion or execution error)",
+)
+@click.option(
+    "--skip-tests",
+    "-T",
+    is_flag=True,
+    help="Skip assertion checks (run actions without evaluating expect conditions)",
+)
+@click.option(
+    "--restore-state",
+    is_flag=True,
+    help="Restore all captured state (cookies, localStorage, sessionStorage)",
+)
+@click.option(
+    "--restore-cookies",
+    is_flag=True,
+    help="Restore cookies from recording state",
+)
+@click.option(
+    "--restore-storage",
+    is_flag=True,
+    help="Restore localStorage/sessionStorage from recording state",
+)
+@click.option(
+    "--verify-checksum",
+    is_flag=True,
+    help="Verify DOM structure checksum matches recording",
+)
+@click.option(
+    "--strict-preconditions",
+    is_flag=True,
+    help="Halt replay if preconditions are not met (default: warn only)",
+)
+@click.option(
+    "--strict-checksum",
+    is_flag=True,
+    help="Halt replay if checksum does not match (default: warn only)",
+)
+@click.option(
+    "--progress",
+    "-p",
+    is_flag=True,
+    help="Show compact progress bar instead of step-by-step output",
+)
 def replay(
-    recording_file: str,
+    recording_file: Optional[str],
     speed: float,
     slow: bool,
     very_slow: bool,
@@ -685,6 +840,15 @@ def replay(
     lock: bool,
     restore_viewport: bool,
     interactive: bool,
+    stop_on_error: bool,
+    skip_tests: bool,
+    restore_state: bool,
+    restore_cookies: bool,
+    restore_storage: bool,
+    verify_checksum: bool,
+    strict_preconditions: bool,
+    strict_checksum: bool,
+    progress: bool,
 ):
     """
     Replay a recorded browser interaction session.
@@ -711,6 +875,7 @@ def replay(
 
     \b
     Examples:
+        inspekt replay                             # Replay most recent recording
         inspekt replay login-flow.yaml             # Replay at normal speed
         inspekt replay login-flow.yaml --slow      # Replay at half speed
         inspekt replay login-flow.yaml --instant   # Fast replay, no delays
@@ -719,11 +884,23 @@ def replay(
         inspekt replay login-flow.yaml --pause-on-fail # Debug failures
         inspekt replay login-flow.yaml -i          # Interactive step-through
     """
+    # If no recording file specified, find the most recent one
+    auto_selected = False
+    if recording_file is None:
+        recent = find_most_recent_recording()
+        if recent is None:
+            click.echo("Error: No recording file specified and no recording_*.yaml files found in current directory.", err=True)
+            sys.exit(1)
+        recording_file = str(recent)
+        auto_selected = True
+
     # Apply speed presets (priority: interactive > instant > very_slow > slow > speed)
     if interactive:
         # Interactive mode: no timing delays, user controls pace
         step_delay = 0
         speed = float("inf")
+        # Interactive mode always enables input lock to prevent Tab/keyboard interference
+        lock = True
     elif instant:
         step_delay = 0
         speed = float("inf")  # Effectively no delay
@@ -741,6 +918,11 @@ def replay(
     else:
         visual = not no_visual or interactive  # Interactive mode requires visual
         audio = not no_audio
+
+    # Enable input lock by default when visual feedback is enabled
+    # This prevents user interaction during replay (hiding cursor, blocking keyboard/mouse)
+    if visual:
+        lock = True
 
     # Get audio config to determine output method
     audio_config = get_audio_config()
@@ -797,16 +979,46 @@ def replay(
     # Format the recording date nicely
     recorded_date = recording.metadata.created_at.strftime("%B %d, %Y at %H:%M")
 
-    click.echo(f"\nReplaying: {recording_path.name}")
-    click.echo(f"Recorded: {recorded_date}")
-    click.echo(f"URL: {recording.metadata.starting_url}")
-    viewport = recording.metadata.viewport
-    click.echo(f"Viewport: {viewport.width}x{viewport.height}")
-    click.echo(f"Steps: {len(steps_to_run)} of {total_steps}", nl=False)
+    # Get file's last modified time from filesystem
+    file_mtime = datetime.fromtimestamp(recording_path.stat().st_mtime)
+    last_modified = file_mtime.strftime("%B %d, %Y at %H:%M")
+
+    # Build title with optional (last modified) suffix
+    title_suffix = " (last modified)" if auto_selected else ""
+    title = f"{recording_path.name}{title_suffix}"
+
+    # Support both v1.0 (viewport in metadata) and v1.1 (viewport in state)
+    viewport = recording.state.viewport if recording.state else getattr(recording.metadata, 'viewport', None)
+    viewport_str = f"{viewport.width}×{viewport.height}" if viewport else "unknown"
+
+    # Build steps string
+    steps_str = f"{len(steps_to_run)} of {total_steps}"
     if start_step > 1 or end_step:
-        click.echo(f" (steps {start_idx + 1}-{end_idx})")
-    else:
-        click.echo()
+        steps_str += f" (steps {start_idx + 1}-{end_idx})"
+
+    # Display metadata in a table
+    from inspekt.app.cli.table import Table
+
+    # Build rows for width calculation
+    rows = [
+        ["Recorded", recorded_date],
+        ["Last Modified", last_modified],
+        ["URL", recording.metadata.starting_url],
+        ["Viewport", viewport_str],
+        ["Steps", steps_str],
+    ]
+
+    table = Table(["Key", "Value"], title=title, icon="󰨛")
+    table.set_data(rows)
+
+    click.echo()
+    table.print_header(skip_column_headers=True)
+    table.print_row(["Recorded", recorded_date])
+    table.print_row(["Last Modified", last_modified])
+    table.print_row(["URL", click.style(recording.metadata.starting_url, fg="blue", underline=True)])
+    table.print_row(["Viewport", viewport_str])
+    table.print_row(["Steps", steps_str])
+    table.print_footer()
 
     if dry_run:
         click.echo("\n[DRY RUN - not executing]\n")
@@ -857,10 +1069,9 @@ def replay(
         focus_browser_tab(client, verbose=verbose)
 
         # Restore viewport if requested
-        if restore_viewport:
-            recorded_viewport = recording.metadata.viewport
-            target_width = recorded_viewport.width
-            target_height = recorded_viewport.height
+        if restore_viewport and viewport:
+            target_width = viewport.width
+            target_height = viewport.height
 
             if verbose:
                 click.echo(format_system_message(f"Restoring viewport to {target_width}x{target_height}..."))
@@ -957,6 +1168,166 @@ def replay(
                     click.echo(format_system_message(f"Navigation warning: {e}"))
                 # Continue anyway - page might still be usable
 
+        # State restoration and verification (v1.1 format)
+        if recording.state:
+            import base64
+
+            # Verify preconditions if present
+            if recording.preconditions and recording.preconditions.required:
+                if verbose:
+                    click.echo(format_system_message("Checking preconditions..."))
+
+                for precondition in recording.preconditions.required:
+                    check_code = f"""
+                        (function() {{
+                            try {{
+                                const el = document.querySelector({json.dumps(precondition.selector)});
+                                return {{ found: !!el }};
+                            }} catch (e) {{
+                                return {{ found: false, error: e.message }};
+                            }}
+                        }})()
+                    """
+                    check_result = client.execute(check_code, timeout=3.0)
+                    if check_result.get("ok"):
+                        result_data = check_result.get("result", {})
+                        if not result_data.get("found"):
+                            desc = precondition.description or precondition.selector
+                            if strict_preconditions:
+                                click.secho(f"✗ Precondition failed: {desc}", fg="red")
+                                click.echo("  Use --no-strict-preconditions to continue anyway")
+                                sys.exit(1)
+                            else:
+                                click.secho(f"⚠ Precondition not met: {desc}", fg="yellow")
+                        elif verbose:
+                            desc = precondition.description or precondition.selector
+                            click.echo(format_system_message(f"✓ {desc}"))
+
+            # Verify checksum if requested
+            if verify_checksum and recording.state.checksum:
+                import hashlib
+                if verbose:
+                    click.echo(format_system_message("Verifying DOM checksum..."))
+
+                checksum_code = """
+                    (function() {
+                        function getStructure(node) {
+                            if (node.nodeType !== 1) return '';
+                            const children = Array.from(node.children).map(getStructure).join('');
+                            return '<' + node.tagName.toLowerCase() + '>' + children + '</' + node.tagName.toLowerCase() + '>';
+                        }
+                        return getStructure(document.body);
+                    })()
+                """
+                checksum_result = client.execute(checksum_code, timeout=5.0)
+                if checksum_result.get("ok"):
+                    structure = checksum_result.get("result", "")
+                    current_hash = f"sha256:{hashlib.sha256(structure.encode()).hexdigest()}"
+
+                    if current_hash != recording.state.checksum:
+                        if strict_checksum:
+                            click.secho("✗ DOM checksum mismatch - page structure has changed", fg="red")
+                            click.echo("  Use --no-strict-checksum to continue anyway")
+                            sys.exit(1)
+                        else:
+                            click.secho("⚠ DOM checksum mismatch - page structure differs from recording", fg="yellow")
+                    elif verbose:
+                        click.echo(format_system_message("✓ DOM checksum matches"))
+
+            # Restore cookies if requested
+            should_restore_cookies = restore_state or restore_cookies
+            if should_restore_cookies and recording.state.cookies:
+                if verbose:
+                    click.echo(format_system_message("Restoring cookies..."))
+
+                try:
+                    cookies_json = base64.b64decode(recording.state.cookies).decode()
+                    cookies_list = json.loads(cookies_json)
+
+                    # Use extension bridge to set cookies (supports HttpOnly)
+                    restore_code = f"""
+                        new Promise((resolve) => {{
+                            const requestId = 'set-cookies-' + Date.now();
+                            const handler = (event) => {{
+                                if (event.data?.type === 'INSPEKT_SET_COOKIES_RESPONSE' &&
+                                    event.data?.requestId === requestId) {{
+                                    window.removeEventListener('message', handler);
+                                    resolve(event.data.response);
+                                }}
+                            }};
+                            window.addEventListener('message', handler);
+                            window.postMessage({{
+                                type: 'INSPEKT_SET_COOKIES',
+                                source: 'inspekt-page',
+                                requestId: requestId,
+                                cookies: {json.dumps(cookies_list)}
+                            }}, '*');
+                            setTimeout(() => {{
+                                window.removeEventListener('message', handler);
+                                resolve({{ ok: false, error: 'timeout' }});
+                            }}, 3000);
+                        }})
+                    """
+                    result = client.execute(restore_code, timeout=5.0)
+                    if verbose:
+                        if result.get("ok"):
+                            click.echo(format_system_message(f"✓ Restored {len(cookies_list)} cookies"))
+                        else:
+                            click.secho("⚠ Failed to restore cookies", fg="yellow")
+                except Exception as e:
+                    click.secho(f"⚠ Cookie restoration failed: {e}", fg="yellow")
+
+            # Restore localStorage/sessionStorage if requested
+            should_restore_storage = restore_state or restore_storage
+            if should_restore_storage:
+                if recording.state.local_storage:
+                    try:
+                        storage_json = base64.b64decode(recording.state.local_storage).decode()
+                        storage_data = json.loads(storage_json)
+
+                        restore_code = f"""
+                            (function() {{
+                                const data = {json.dumps(storage_data)};
+                                Object.entries(data).forEach(([k, v]) => localStorage.setItem(k, v));
+                                return {{ restored: Object.keys(data).length }};
+                            }})()
+                        """
+                        result = client.execute(restore_code, timeout=3.0)
+                        if verbose and result.get("ok"):
+                            count = result.get("result", {}).get("restored", 0)
+                            click.echo(format_system_message(f"✓ Restored {count} localStorage keys"))
+                    except Exception as e:
+                        click.secho(f"⚠ localStorage restoration failed: {e}", fg="yellow")
+
+                if recording.state.session_storage:
+                    try:
+                        storage_json = base64.b64decode(recording.state.session_storage).decode()
+                        storage_data = json.loads(storage_json)
+
+                        restore_code = f"""
+                            (function() {{
+                                const data = {json.dumps(storage_data)};
+                                Object.entries(data).forEach(([k, v]) => sessionStorage.setItem(k, v));
+                                return {{ restored: Object.keys(data).length }};
+                            }})()
+                        """
+                        result = client.execute(restore_code, timeout=3.0)
+                        if verbose and result.get("ok"):
+                            count = result.get("result", {}).get("restored", 0)
+                            click.echo(format_system_message(f"✓ Restored {count} sessionStorage keys"))
+                    except Exception as e:
+                        click.secho(f"⚠ sessionStorage restoration failed: {e}", fg="yellow")
+
+            # Restore scroll position if state has scroll data
+            if recording.state.scroll and (recording.state.scroll.x > 0 or recording.state.scroll.y > 0):
+                scroll_x = recording.state.scroll.x
+                scroll_y = recording.state.scroll.y
+                if verbose:
+                    click.echo(format_system_message(f"Restoring scroll position to ({scroll_x}, {scroll_y})..."))
+
+                scroll_code = f"window.scrollTo({scroll_x}, {scroll_y})"
+                client.execute(scroll_code, timeout=2.0)
+
         # Load scripts
         scripts_dir = Path(__file__).parent.parent.parent / "scripts"
 
@@ -1009,10 +1380,13 @@ def replay(
                 verify_result = client.execute("typeof window.__INSPEKT_VISUAL__", timeout=5.0)
                 if verify_result.get("ok") and verify_result.get("result") == "object":
                     # Enable input lock if requested
+                    # Uses event blocking to prevent user interference while preserving visual focus outlines
                     if lock:
                         client.execute("window.__INSPEKT_VISUAL__.inputLock.enable()", timeout=5.0)
                         if verbose:
                             click.echo(format_system_message("input locked"))
+                    # Clear any previous stop request flag (from previous replay)
+                    client.execute("window.__INSPEKT_VISUAL__.clearStopRequest()", timeout=1.0)
                     # Play start sound
                     if cli_audio:
                         # CLI audio: play directly from Python (no browser interaction needed)
@@ -1040,15 +1414,45 @@ def replay(
             except FileNotFoundError:
                 click.echo(f"Warning: Visual script not found: {visual_script_path}", err=True)
 
+    # Print step header (unless in progress bar mode)
+    if not progress:
+        click.echo(format_step_header())
+
+    # Progress bar setup for --progress mode
+    progress_bar = None
+    if progress and not dry_run:
+        progress_bar = click.progressbar(
+            length=len(steps_to_run),
+            label="Replaying",
+            show_eta=True,
+            show_percent=True,
+            fill_char=click.style("█", fg="green"),
+            empty_char=click.style("░", fg="bright_black"),
+        )
+        progress_bar.__enter__()
+
     # Execute steps
     previous_timestamp = steps_to_run[0].timestamp if steps_to_run else 0
     last_step_navigated = False  # Track if previous step caused navigation
     page_load_wait_ms = 0  # Time spent waiting for page load (subtract from next delay)
     replay_cancelled = False  # Track if user cancelled in interactive mode
+
     for i, step in enumerate(steps_to_run):
         actual_index = start_idx + i
         step_dict = step.model_dump(exclude_none=True)
         step_timestamp = step.timestamp or 0  # Get timestamp from step for display
+
+        # Check if Ctrl+C was pressed in browser (non-interactive mode)
+        if not dry_run and client and (visual or lock):
+            try:
+                stop_check = client.execute("window.__INSPEKT_VISUAL__.isStopRequested()", timeout=1.0)
+                if stop_check.get("ok") and stop_check.get("result"):
+                    click.echo()
+                    click.secho("Replay stopped by user (Ctrl+C in browser).", fg="yellow")
+                    replay_cancelled = True
+                    break
+            except Exception:
+                pass  # If check fails, continue with replay
 
         # Real-time delay: wait based on timestamp difference from previous step
         # Subtract any time already spent waiting for page load
@@ -1068,41 +1472,38 @@ def replay(
 
         # Check if this action type should be skipped
         if step.action in skip_actions:
-            summary = format_step_for_display(step_dict, actual_index + 1, step_timestamp, reserve_suffix_width=5)
-            click.echo(summary, nl=False)
-            click.echo(format_status("SKIP"))
+            if not progress:
+                summary = format_step_for_display(step_dict, actual_index + 1, step_timestamp, reserve_suffix_width=5)
+                click.echo(summary, nl=False)
+                click.echo(format_status("SKIP"))
             result.add_skip(actual_index, step_dict, f"Skipped by --skip {step.action}")
-            if verbose:
+            if verbose and not progress:
                 click.echo(format_system_message(f"skipped: {step.action} in skip list"))
             continue
 
         # Skip navigate steps that follow a click that already caused navigation
         # The click already triggered the navigation, so this step is redundant
         if step.action == "navigate" and last_step_navigated and i > 0:
-            summary = format_step_for_display(step_dict, actual_index + 1, step_timestamp, reserve_suffix_width=5)
-            click.echo(summary, nl=False)
-            click.echo(format_status("OK"))
+            if not progress:
+                summary = format_step_for_display(step_dict, actual_index + 1, step_timestamp, reserve_suffix_width=5)
+                click.echo(summary, nl=False)
+                click.echo(format_status("OK"))
             result.add_success(actual_index, step_dict)  # Count as success since navigation happened
-            if verbose:
+            if verbose and not progress:
                 click.echo(format_system_message("navigation already occurred from previous click"))
             last_step_navigated = False  # Reset the flag
             continue
 
-        # Interactive mode: re-inject visual script after navigation BEFORE resetting flag
-        # (navigation resets the page context, losing our injected scripts)
-        # Also check if previous step was a navigate action (response might not include navigated flag
-        # because the page context is destroyed when window.location.href is set)
-        prev_was_navigate = i > 0 and steps_to_run[i - 1].action == "navigate"
-        needs_visual_reinject = (last_step_navigated or prev_was_navigate) and interactive and not dry_run and (visual or audio or lock)
-
         # Reset navigation flag at start of each step (will be set if this step navigates)
         last_step_navigated = False
 
-        # Display step
-        summary = format_step_for_display(step_dict, actual_index + 1, step_timestamp, reserve_suffix_width=5)
+        # Display step (skip in progress mode)
+        summary = format_step_for_display(step_dict, actual_index + 1, step_timestamp, reserve_suffix_width=5) if not progress else ""
 
         if dry_run:
             click.echo(summary)
+            if step.mode and step.mode != "continue":
+                click.echo(format_system_message(f"mode: {step.mode}"))
             if step.skip_if:
                 skip_dict = step.skip_if.model_dump(exclude_none=True)
                 click.echo(format_system_message(f"skip_if: {skip_dict}"))
@@ -1114,16 +1515,50 @@ def replay(
                 click.echo(format_system_message(f"expect: {expect_dict}"))
             continue
 
+        # Check step mode (skip, pause, continue)
+        step_mode = step.mode or "continue"
+
+        if step_mode == "skip":
+            # Unconditional skip - mode: skip takes precedence over skip_if
+            skipped_summary = format_skipped_step_for_display(step_dict, actual_index + 1, step_timestamp)
+            if not progress:
+                click.echo(skipped_summary)
+            result.add_skip(actual_index, step_dict, "mode: skip")
+            continue
+
+        if step_mode == "pause" and not interactive:
+            # Pause mode - wait for user to press Enter (but not in interactive mode)
+            # Show the paused step indicator
+            if not progress:
+                paused_summary = format_paused_step_for_display(step_dict, actual_index + 1, step_timestamp)
+                click.echo(paused_summary)
+
+            # Display pause prompt and wait for Enter
+            click.echo()
+            click.secho("⏸ Paused.", fg="yellow", bold=True, nl=False)
+            click.echo(" Press Enter to continue…", nl=False)
+
+            # Play attention sound via CLI audio (if enabled)
+            if visual_script:
+                try:
+                    client.execute("window.__INSPEKT_VISUAL__.audio.playPause()", timeout=2.0)
+                except Exception:
+                    pass  # Ignore audio errors
+
+            input()  # Wait for Enter
+            click.echo()  # Newline after Enter
+
         # Check skip_if condition before executing
         if step.skip_if and condition_script_template:
             skip_dict = step.skip_if.model_dump(exclude_none=True)
             skip_result = check_condition(client, skip_dict, condition_script_template)
 
             if skip_result.get("met"):
-                click.echo(summary, nl=False)
-                click.echo(format_status("SKIP"))
+                if not progress:
+                    click.echo(summary, nl=False)
+                    click.echo(format_status("SKIP"))
                 result.add_skip(actual_index, step_dict, f"skip_if: {skip_result.get('reason', 'condition met')}")
-                if verbose:
+                if verbose and not progress:
                     click.echo(format_system_message(f"skipped: {skip_result.get('reason', '')}"))
                 continue
 
@@ -1132,7 +1567,7 @@ def replay(
             wait_dict = step.wait_for.model_dump(exclude_none=True)
             timeout_ms = step.wait_for.timeout or 5000  # Default 5 seconds
 
-            if verbose:
+            if verbose and not progress:
                 click.echo(format_system_message(f"waiting for condition (timeout: {timeout_ms}ms)..."))
 
             wait_result = wait_for_condition(
@@ -1143,54 +1578,22 @@ def replay(
             )
 
             if wait_result.get("timed_out"):
-                click.echo(summary, nl=False)
-                click.echo(format_status("FAIL"))
+                if not progress:
+                    click.echo(summary, nl=False)
+                    click.echo(format_status("FAIL"))
                 result.add_failure(
                     actual_index,
                     step_dict,
                     f"wait_for timed out after {timeout_ms}ms: {wait_result.get('reason', '')}",
                 )
-                if verbose:
+                if verbose and not progress:
                     click.echo(format_system_message(f"timeout: {wait_result.get('reason', '')}"))
                 continue
-            elif verbose:
+            elif verbose and not progress:
                 click.echo(format_system_message(f"condition met: {wait_result.get('reason', '')}"))
 
         # Interactive mode: show overlay and wait for user input
         if interactive and not dry_run:
-            # If previous step caused navigation, ensure visual script is ready before showing overlay
-            # (navigation resets the page context and extension needs to reconnect)
-            if needs_visual_reinject:
-                visual_ready = wait_for_visual_script_ready(
-                    client,
-                    visual_script,
-                    timeout_sec=5.0,
-                    poll_interval_sec=0.05,
-                    replay_mode=replay_mode_enabled,
-                )
-
-                if visual_ready.get("success"):
-                    # Re-enable input lock after navigation
-                    if lock:
-                        try:
-                            client.execute("window.__INSPEKT_VISUAL__.inputLock.enable()", timeout=5.0)
-                        except Exception:
-                            pass
-                    # Re-initialize audio context after navigation (browser audio only)
-                    if use_browser_audio:
-                        try:
-                            client.execute("window.__INSPEKT_VISUAL__.audio.init()", timeout=5.0)
-                        except Exception:
-                            pass
-
-                if verbose:
-                    if visual_ready.get("success"):
-                        click.echo(format_system_message(
-                            f"visual script ready ({visual_ready.get('elapsed_ms', 0)}ms)"
-                        ))
-                    else:
-                        click.echo(format_system_message("Warning: visual script not ready"))
-
             # Build the interactive prompt step
             previous_step_dict = None
             if i > 0:
@@ -1250,7 +1653,8 @@ def replay(
         if replay_cancelled:
             break
 
-        click.echo(summary, nl=False)
+        if not progress:
+            click.echo(summary, nl=False)
 
         # Play action sound via CLI audio (if enabled)
         if cli_audio and step.action:
@@ -1266,18 +1670,21 @@ def replay(
                 assertion_failures = check_inspekt_expectations(step.command, expect_dict, cmd_result)
 
                 if assertion_failures:
-                    click.echo(format_status("FAIL"))
+                    if not progress:
+                        click.echo(format_status("FAIL"))
                     result.add_failure(actual_index, step_dict, "Assertion failed", assertion_failures)
-                    if verbose:
+                    if verbose and not progress:
                         for failure in assertion_failures:
                             click.echo(format_system_message(f"⚠ {failure}"))
                 else:
-                    click.echo(format_status("OK"))
+                    if not progress:
+                        click.echo(format_status("OK"))
                     result.add_success(actual_index, step_dict)
             else:
-                click.echo(format_status("FAIL"))
+                if not progress:
+                    click.echo(format_status("FAIL"))
                 result.add_failure(actual_index, step_dict, cmd_result.get("error", "Command failed"))
-                if verbose:
+                if verbose and not progress:
                     click.echo(format_system_message(f"Error: {cmd_result.get('error', 'Unknown')}"))
 
         # Handle type actions with human-like typing
@@ -1286,7 +1693,8 @@ def replay(
             selector = target.selector if target else None
 
             if not selector:
-                click.echo(format_status("FAIL"))
+                if not progress:
+                    click.echo(format_status("FAIL"))
                 result.add_failure(actual_index, step_dict, "No selector for type action")
             else:
                 # Use fallback selectors if primary fails
@@ -1305,19 +1713,27 @@ def replay(
                         break
 
                 if typing_success:
-                    click.echo(format_status("OK"))
+                    if not progress:
+                        click.echo(format_status("OK"))
                     result.add_success(actual_index, step_dict)
-                    if verbose and used_selector != selector:
+                    if verbose and not progress and used_selector != selector:
                         click.echo(format_system_message(f"used fallback: {used_selector}"))
                 else:
-                    click.echo(format_status("FAIL"))
+                    if not progress:
+                        click.echo(format_status("FAIL"))
                     result.add_failure(actual_index, step_dict, type_result.get("error", "Typing failed"))
-                    if verbose:
+                    if verbose and not progress:
                         click.echo(format_system_message(f"Error: {type_result.get('error', 'Unknown')}"))
 
         else:
             # Execute via JavaScript (for click, hover, keypress, navigate)
-            step_json = json.dumps(step_dict)
+            # Add flags to step data
+            step_data = step_dict.copy()
+            if skip_tests:
+                step_data["skipTests"] = True
+            if interactive:
+                step_data["isInteractive"] = True
+            step_json = json.dumps(step_data)
             code = script_template.replace("STEP_DATA_PLACEHOLDER", step_json)
 
             # Detect actions that might cause navigation and use shorter timeout
@@ -1385,18 +1801,32 @@ def replay(
                     response = exec_result.get("result", {})
 
                     if response.get("ok"):
-                        # Check for assertion failures
+                        # Action succeeded - show OK for the step
+                        if not progress:
+                            click.echo(format_status("OK"))
+
+                        # Check for assertion failures (separate from action success)
                         assertion_failures = response.get("failures", [])
 
                         if assertion_failures or response.get("assertionsFailed"):
-                            click.echo(format_status("FAIL"))
+                            # Action succeeded but assertion failed
                             result.add_failure(actual_index, step_dict, "Assertion failed", assertion_failures)
+                            # Show assertion message with failure indicator
+                            if step.expect:
+                                assertion_msg = step.expect.message or _generate_assertion_description(step.expect)
+                                if assertion_msg:
+                                    click.echo(format_assertion_result(assertion_msg, passed=False))
                             if verbose:
                                 for failure in assertion_failures:
                                     click.echo(format_system_message(f"⚠ {failure}"))
                         else:
-                            click.echo(format_status("OK"))
                             result.add_success(actual_index, step_dict)
+                            # Show assertion message if present (always, not just verbose)
+                            # But only if assertions were actually evaluated (not skipped)
+                            if step.expect and not skip_tests:
+                                assertion_msg = step.expect.message or _generate_assertion_description(step.expect)
+                                if assertion_msg:
+                                    click.echo(format_assertion_result(assertion_msg, passed=True))
 
                             if verbose and response.get("usedSelector"):
                                 used = response["usedSelector"]
@@ -1436,9 +1866,7 @@ def replay(
                                 # Continue anyway - next step execution will fail if truly problematic
 
                             # Re-inject visual script after navigation (it's lost on page change)
-                            # Skip if in interactive mode - the interactive block will handle it
-                            # before showing the overlay (avoids duplicate waiting)
-                            if (visual or audio or lock) and not interactive:
+                            if (visual or audio or lock):
                                 visual_ready = wait_for_visual_script_ready(
                                     client,
                                     visual_script,
@@ -1509,11 +1937,27 @@ def replay(
                     click.echo("\n    Replay aborted by user.")
                     break
 
+        # Stop on first error if requested
+        if stop_on_error and result.failed_steps > 0:
+            if result.failures and result.failures[-1]["step"] == actual_index + 1:
+                click.echo()
+                click.secho("Stopped on first error (--stop-on-error).", fg="yellow")
+                replay_cancelled = True
+                break
+
         # Additional fixed delay between steps (on top of real-time timing)
         # Only applies if --step-delay is explicitly set to a non-zero value
         if not dry_run and step_delay > 0 and i < len(steps_to_run) - 1:
             delay = step_delay / 1000.0
             time.sleep(delay)
+
+        # Update progress bar after each step
+        if progress_bar:
+            progress_bar.update(1)
+
+    # Close progress bar
+    if progress_bar:
+        progress_bar.__exit__(None, None, None)
 
     result.end_time = datetime.now()
 
@@ -1588,6 +2032,7 @@ def replay(
         # Show failures
         click.echo()
         click.secho("Failures:", fg="red")
+        has_browser_timeout = False
         for failure in result.failures:
             click.echo(f"\n  Step {failure['step']}: {failure['action']}")
             if failure.get("selector"):
@@ -1596,6 +2041,26 @@ def replay(
             if failure.get("assertion_failures"):
                 for af in failure["assertion_failures"]:
                     click.echo(f"    - {af}")
+            # Track if any failures are browser timeouts
+            if "No response from browser" in failure.get("error", ""):
+                has_browser_timeout = True
+
+        # Show browser connection troubleshooting once if needed
+        if has_browser_timeout:
+            click.echo()
+            click.secho("Browser connection issue detected.", fg="yellow", bold=True)
+            click.echo()
+            click.echo("Possible causes:")
+            click.echo("  • No browser tab is open with the Inspekt extension active")
+            click.echo("  • The extension is disabled or not installed")
+            click.echo("  • Content Security Policy (CSP) is blocking the connection")
+            click.echo()
+            click.echo("Troubleshooting:")
+            click.echo("  • Open browser console (F12) and check for Inspekt messages")
+            click.echo("  • Look for CSP warnings in red/orange")
+            click.echo("  • Verify connection: ", nl=False)
+            click.secho("inspekt status", fg="cyan")
+            click.echo("  • Try refreshing the page or restarting the browser")
 
         # Show tip for slow pages
         click.echo()

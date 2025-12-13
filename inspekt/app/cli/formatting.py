@@ -6,7 +6,7 @@ from pathlib import Path
 
 import click
 
-from inspekt.app.cli.icons import get_action_icon, get_status_icon
+from inspekt.app.cli.icons import get_action_icon, get_keypress_icon, get_status_icon, get_step_mode_icon
 
 
 def get_terminal_width() -> int:
@@ -127,16 +127,37 @@ def get_recordings_dir() -> Path:
     return recordings_dir
 
 
+def format_step_header(use_color: bool = True, indent: bool = True) -> str:
+    """Format the header row for step display.
+
+    Args:
+        use_color: Whether to use ANSI colors
+        indent: Whether to include 2-space indent (False for recording mode)
+
+    Returns:
+        Formatted header string with columns: STEP, TIME, COMMAND, DETAILS
+    """
+    # Header aligned to match step format:
+    # "{indent}{0001}   {00:00}   {icon  action   }   details"
+    #          4ch     5ch       12ch (icon+2sp+9ch)
+    prefix = "  " if indent else ""
+    header = f"{prefix}STEP   TIME       COMMAND     DETAILS"
+    if use_color:
+        return click.style(header, fg="bright_black")
+    return header
+
+
 def format_step_for_display(
     step: dict,
     step_num: int = 0,
     elapsed_ms: int = 0,
     use_color: bool = True,
     reserve_suffix_width: int = 0,
+    indent: bool = True,
 ) -> str:
     """Format a step for terminal display with colors.
 
-    Format: 001  00:00  action    → selector "name" (tag)
+    Format:   0001   00:00   󰖟  navigate   details…
 
     Args:
         step: Step dictionary with action, target, etc.
@@ -144,6 +165,7 @@ def format_step_for_display(
         elapsed_ms: Elapsed time in milliseconds
         use_color: Whether to use ANSI colors
         reserve_suffix_width: Reserve this many characters at the end (for status like " OK")
+        indent: Whether to include 2-space indent (False for recording mode)
 
     Returns:
         Formatted string, truncated to fit terminal width
@@ -162,19 +184,24 @@ def format_step_for_display(
     # Get terminal width for truncation (minus reserved suffix space)
     term_width = get_terminal_width() - reserve_suffix_width
 
-    # Format components
-    step_num_str = f"{step_num:03d}"
+    # Format components (4 digits for step number, 3 spaces between columns)
+    step_num_str = f"{step_num:04d}"
     elapsed = format_elapsed(elapsed_ms)
     action_str = action.ljust(9)
 
     # Get action icon (if nerdfont enabled)
-    action_icon = get_action_icon(action) if use_color else None
+    # For keypress, get the specific icon based on key and modifiers
+    if action == "keypress" and use_color:
+        key = step.get("key", "")
+        modifiers = step.get("modifiers", [])
+        action_icon = get_keypress_icon(key, modifiers)
+    else:
+        action_icon = get_action_icon(action) if use_color else None
 
     # Color scheme
     if use_color:
         step_num_colored = click.style(step_num_str, fg="cyan", bold=True)
         elapsed_colored = click.style(elapsed, fg="bright_black")
-        arrow = click.style("→", fg="bright_black")
 
         # Action colors based on type
         action_colors = {
@@ -193,24 +220,25 @@ def format_step_for_display(
         }
         action_color = action_colors.get(action, "white")
 
-        # Add icon before action if available
+        # Add icon before action if available (with extra space for readability)
         if action_icon:
-            action_display = f"{action_icon} {action_str}"
+            action_display = f"{action_icon}  {action_str}"
         else:
-            action_display = action_str
+            action_display = f"   {action_str}"  # Align with icon width
         action_colored = click.style(action_display, fg=action_color)
     else:
         step_num_colored = step_num_str
         elapsed_colored = elapsed
-        arrow = "→"
         action_colored = action_str
 
-    prefix = f"{step_num_colored}  {elapsed_colored}  {action_colored} {arrow}"
+    # Build prefix with optional 2-space indent and 3-space column gaps
+    indent_str = "  " if indent else ""
+    prefix = f"{indent_str}{step_num_colored}   {elapsed_colored}   {action_colored}"
 
     if action == "navigate":
         url = step.get("url", "")
         url_display = click.style(url, fg="blue", underline=True) if use_color else url
-        result = f"{prefix} {url_display}"
+        result = f"{prefix}   {url_display}"
         return truncate_to_width(result, term_width)
 
     elif action in ("click", "rightclick", "activate"):
@@ -221,9 +249,9 @@ def format_step_for_display(
         name_color = "bright_green" if action == "activate" else "green"
         name_display = click.style(f'"{name}"', fg=name_color) if name and use_color else (f'"{name}"' if name else "")
         if name:
-            result = f"{prefix} {sel_display} {name_display}{tag_display}"
+            result = f"{prefix}   {sel_display} {name_display}{tag_display}"
         else:
-            result = f"{prefix} {sel_display}{tag_display}"
+            result = f"{prefix}   {sel_display}{tag_display}"
         return truncate_to_width(result, term_width)
 
     elif action == "type":
@@ -234,11 +262,11 @@ def format_step_for_display(
         type_display = click.style(f" [{input_type}]", fg="bright_black") if input_type and input_type != "text" and use_color else (f" [{input_type}]" if input_type and input_type != "text" else "")
         if step.get("sensitive"):
             pwd_display = click.style("(password)", fg="red") if use_color else "(password)"
-            result = f"{prefix} {sel_display} {pwd_display}"
+            result = f"{prefix}   {sel_display} {pwd_display}"
         else:
             char_count = len(value)
             chars_display = click.style(f"({char_count} chars)", fg="yellow") if use_color else f"({char_count} chars)"
-            result = f"{prefix} {sel_display} {chars_display}{type_display}"
+            result = f"{prefix}   {sel_display} {chars_display}{type_display}"
         return truncate_to_width(result, term_width)
 
     elif action == "keypress":
@@ -253,9 +281,9 @@ def format_step_for_display(
         # For Tab/Shift-Tab, show the accessible name of the focused element
         if key == "Tab" and accessible_name:
             name_display = click.style(f"({accessible_name})", fg="bright_black") if use_color else f"({accessible_name})"
-            result = f"{prefix} {key_display} {name_display}"
+            result = f"{prefix}   {key_display} {name_display}"
         else:
-            result = f"{prefix} {key_display}"
+            result = f"{prefix}   {key_display}"
         return truncate_to_width(result, term_width)
 
     elif action == "hover":
@@ -264,9 +292,9 @@ def format_step_for_display(
         tag_display = click.style(f" ({tag})", fg="bright_black") if tag and use_color else (f" ({tag})" if tag else "")
         name_display = click.style(f'"{name}"', fg="white") if name and use_color else (f'"{name}"' if name else "")
         if name:
-            result = f"{prefix} {sel_display} {name_display}{tag_display}"
+            result = f"{prefix}   {sel_display} {name_display}{tag_display}"
         else:
-            result = f"{prefix} {sel_display}{tag_display}"
+            result = f"{prefix}   {sel_display}{tag_display}"
         return truncate_to_width(result, term_width)
 
     elif action == "check":
@@ -280,9 +308,9 @@ def format_step_for_display(
         # Prefer value over name for radio buttons
         display = value_display if value else name_display
         if display:
-            result = f"{prefix} {sel_display} {display}"
+            result = f"{prefix}   {sel_display} {display}"
         else:
-            result = f"{prefix} {sel_display}"
+            result = f"{prefix}   {sel_display}"
         return truncate_to_width(result, term_width)
 
     elif action == "uncheck":
@@ -291,9 +319,9 @@ def format_step_for_display(
         sel_display = selector[:35] if len(selector) > 35 else selector
         name_display = click.style(f'"{name}"', fg="red") if name and use_color else (f'"{name}"' if name else "")
         if name:
-            result = f"{prefix} {sel_display} {name_display}"
+            result = f"{prefix}   {sel_display} {name_display}"
         else:
-            result = f"{prefix} {sel_display}"
+            result = f"{prefix}   {sel_display}"
         return truncate_to_width(result, term_width)
 
     elif action == "select":
@@ -305,9 +333,9 @@ def format_step_for_display(
         display_text = option_text or value
         if display_text:
             text_display = click.style(f'"{display_text}"', fg="cyan") if use_color else f'"{display_text}"'
-            result = f"{prefix} {sel_display} {text_display}"
+            result = f"{prefix}   {sel_display} {text_display}"
         else:
-            result = f"{prefix} {sel_display}"
+            result = f"{prefix}   {sel_display}"
         return truncate_to_width(result, term_width)
 
     elif action == "scroll":
@@ -333,27 +361,252 @@ def format_step_for_display(
         if use_color:
             direction_display = click.style(direction, fg="blue", bold=True)
             amount_display = click.style(amount, fg="bright_black")
-            result = f"{prefix} {direction_display} {amount_display}"
+            result = f"{prefix}   {direction_display} {amount_display}"
         else:
-            result = f"{prefix} {direction} {amount}"
+            result = f"{prefix}   {direction} {amount}"
         return truncate_to_width(result, term_width)
 
     elif action == "inspekt":
         cmd = step.get("command", "")
         cmd_display = click.style(cmd, fg="cyan") if use_color else cmd
-        result = f"{prefix} {cmd_display}"
+        result = f"{prefix}   {cmd_display}"
         return truncate_to_width(result, term_width)
 
-    result = f"{prefix} {json.dumps(step)[:40]}"
+    result = f"{prefix}   {json.dumps(step)[:40]}"
     return truncate_to_width(result, term_width)
 
 
-def format_system_message(message: str, use_color: bool = True) -> str:
-    """Format a system message with ... prefix, truncated to terminal width."""
+def format_skipped_step_for_display(
+    step: dict,
+    step_num: int = 0,
+    elapsed_ms: int = 0,
+    use_color: bool = True,
+    indent: bool = True,
+) -> str:
+    """Format a skipped step for terminal display with dimmed style.
+
+    Format:   0003   00:02   󰓓  skip       "Accept" button (skipped)
+
+    Args:
+        step: Step dictionary with action, target, etc.
+        step_num: Step number (displayed with leading zeros)
+        elapsed_ms: Elapsed time in milliseconds
+        use_color: Whether to use ANSI colors
+        indent: Whether to include 2-space indent
+
+    Returns:
+        Formatted string in dimmed style indicating the step was skipped
+    """
+    action = step.get("action", "unknown")
+    target = step.get("target", {})
+    accessible_name = target.get("accessible_name", "") if target else ""
+    tag = target.get("tag", "") if target else ""
+
+    # Sanitize accessible_name
+    if accessible_name:
+        accessible_name = strip_icon_font_chars(accessible_name)
+        accessible_name = " ".join(accessible_name.split())
+
+    # Get terminal width
     term_width = get_terminal_width()
-    dots = click.style("...", fg="bright_black", bold=True) if use_color else "..."
+
+    # Format components
+    step_num_str = f"{step_num:04d}"
+    elapsed = format_elapsed(elapsed_ms)
+
+    # Get skip icon
+    skip_icon = get_step_mode_icon("skip") if use_color else None
+
+    if use_color:
+        # Everything dimmed for skipped steps
+        step_num_colored = click.style(step_num_str, fg="bright_black")
+        elapsed_colored = click.style(elapsed, fg="bright_black")
+
+        # Show skip icon and "skip" as action
+        if skip_icon:
+            action_display = f"{skip_icon}  {'skip'.ljust(9)}"
+        else:
+            action_display = f"   {'skip'.ljust(9)}"
+        action_colored = click.style(action_display, fg="bright_black")
+    else:
+        step_num_colored = step_num_str
+        elapsed_colored = elapsed
+        action_colored = "skip".ljust(9)
+
+    # Build prefix
+    indent_str = "  " if indent else ""
+    prefix = f"{indent_str}{step_num_colored}   {elapsed_colored}   {action_colored}"
+
+    # Build details based on action type
+    if action == "navigate":
+        url = step.get("url", "")
+        details = url[:40] + "…" if len(url) > 40 else url
+    elif action in ("click", "rightclick", "activate", "hover", "check", "uncheck"):
+        name = accessible_name or sanitize_display_name(target.get("text", "") if target else "")
+        tag_suffix = f" ({tag})" if tag else ""
+        details = f'"{name}"{tag_suffix}' if name else step.get("target", {}).get("selector", "")[:35]
+    elif action == "type":
+        char_count = len(step.get("value", ""))
+        details = f"({char_count} chars)"
+    elif action == "keypress":
+        key = step.get("key", "")
+        modifiers = step.get("modifiers", [])
+        details = "+".join(modifiers + [key]) if modifiers else key
+    elif action == "select":
+        option_text = step.get("option_text", "") or step.get("value", "")
+        details = f'"{option_text}"' if option_text else ""
+    elif action == "scroll":
+        scroll = step.get("scroll", {})
+        delta_y = scroll.get("deltaY", 0)
+        direction = "↓" if delta_y > 0 else ("↑" if delta_y < 0 else "→")
+        pixels = abs(delta_y) if delta_y != 0 else abs(scroll.get("deltaX", 0))
+        details = f"{direction} {pixels}px"
+    elif action == "inspekt":
+        details = step.get("command", "")
+    else:
+        details = ""
+
+    # Add (skipped) suffix
+    if use_color:
+        details_display = click.style(details, fg="bright_black")
+        suffix = click.style(" (skipped)", fg="bright_black", italic=True)
+    else:
+        details_display = details
+        suffix = " (skipped)"
+
+    result = f"{prefix}   {details_display}{suffix}"
+    return truncate_to_width(result, term_width)
+
+
+def format_paused_step_for_display(
+    step: dict,
+    step_num: int = 0,
+    elapsed_ms: int = 0,
+    use_color: bool = True,
+    indent: bool = True,
+) -> str:
+    """Format a paused step indicator for terminal display.
+
+    Format:   0003   00:02   ⏸  pause      "Submit" button
+
+    Args:
+        step: Step dictionary with action, target, etc.
+        step_num: Step number (displayed with leading zeros)
+        elapsed_ms: Elapsed time in milliseconds
+        use_color: Whether to use ANSI colors
+        indent: Whether to include 2-space indent
+
+    Returns:
+        Formatted string showing the step is paused (before execution)
+    """
+    action = step.get("action", "unknown")
+    target = step.get("target", {})
+    accessible_name = target.get("accessible_name", "") if target else ""
+    tag = target.get("tag", "") if target else ""
+
+    # Sanitize accessible_name
+    if accessible_name:
+        accessible_name = strip_icon_font_chars(accessible_name)
+        accessible_name = " ".join(accessible_name.split())
+
+    # Get terminal width
+    term_width = get_terminal_width()
+
+    # Format components
+    step_num_str = f"{step_num:04d}"
+    elapsed = format_elapsed(elapsed_ms)
+
+    # Get pause icon
+    pause_icon = get_step_mode_icon("pause") if use_color else None
+
+    if use_color:
+        # Yellow-ish color for paused steps
+        step_num_colored = click.style(step_num_str, fg="yellow")
+        elapsed_colored = click.style(elapsed, fg="bright_black")
+
+        # Show pause icon and "pause" as action
+        if pause_icon:
+            action_display = f"{pause_icon}  {'pause'.ljust(9)}"
+        else:
+            action_display = f"   {'pause'.ljust(9)}"
+        action_colored = click.style(action_display, fg="yellow")
+    else:
+        step_num_colored = step_num_str
+        elapsed_colored = elapsed
+        action_colored = "pause".ljust(9)
+
+    # Build prefix
+    indent_str = "  " if indent else ""
+    prefix = f"{indent_str}{step_num_colored}   {elapsed_colored}   {action_colored}"
+
+    # Build details based on action type
+    if action == "navigate":
+        url = step.get("url", "")
+        details = url[:40] + "…" if len(url) > 40 else url
+    elif action in ("click", "rightclick", "activate", "hover", "check", "uncheck"):
+        name = accessible_name or sanitize_display_name(target.get("text", "") if target else "")
+        tag_suffix = f" ({tag})" if tag else ""
+        details = f'"{name}"{tag_suffix}' if name else step.get("target", {}).get("selector", "")[:35]
+    elif action == "type":
+        char_count = len(step.get("value", ""))
+        details = f"({char_count} chars)"
+    elif action == "keypress":
+        key = step.get("key", "")
+        modifiers = step.get("modifiers", [])
+        details = "+".join(modifiers + [key]) if modifiers else key
+    elif action == "select":
+        option_text = step.get("option_text", "") or step.get("value", "")
+        details = f'"{option_text}"' if option_text else ""
+    elif action == "scroll":
+        scroll = step.get("scroll", {})
+        delta_y = scroll.get("deltaY", 0)
+        direction = "↓" if delta_y > 0 else ("↑" if delta_y < 0 else "→")
+        pixels = abs(delta_y) if delta_y != 0 else abs(scroll.get("deltaX", 0))
+        details = f"{direction} {pixels}px"
+    elif action == "inspekt":
+        details = step.get("command", "")
+    else:
+        details = ""
+
+    if use_color:
+        details_display = click.style(details, fg="yellow")
+    else:
+        details_display = details
+
+    result = f"{prefix}   {details_display}"
+    return truncate_to_width(result, term_width)
+
+
+def format_system_message(message: str, use_color: bool = True, icon: str | None = None) -> str:
+    """Format a system message with ----   --:-- prefix to align with step output.
+
+    Aligns with COMMAND column (3 spaces after time, then icon or placeholder, then message).
+
+    Args:
+        message: The message text to display
+        use_color: Whether to use ANSI colors
+        icon: Optional icon to display (e.g., "resume" for play icon)
+    """
+    from inspekt.app.cli.icons import get_indicator
+
+    term_width = get_terminal_width()
+    # Use dashes and placeholder time to align with step columns (STEP   TIME)
+    prefix = click.style("----   --:--", fg="bright_black") if use_color else "----   --:--"
     msg = click.style(message, fg="bright_black", italic=True) if use_color else message
-    result = f"{dots}  {msg}"
+
+    # Get icon if specified
+    icon_str = ""
+    if icon:
+        icon_glyph = get_indicator(icon)
+        if icon_glyph:
+            icon_str = f"{icon_glyph}  "  # icon + 2 spaces after (like other actions)
+
+    # Format: prefix + 3 spaces (separator) + icon + 2 spaces + message
+    if icon_str:
+        result = f"{prefix}   {icon_str}{msg}"  # 3 spaces before icon
+    else:
+        result = f"{prefix}      {msg}"  # 6 spaces when no icon
+
     return truncate_to_width(result, term_width)
 
 
@@ -379,8 +632,54 @@ def format_status(status: str, use_color: bool = True) -> str:
         status_icon = get_status_icon("unknown")
 
     if status_icon:
-        # For OK, just show the green icon without text
+        # For OK and FAIL, just show the icon without text
         if status == "OK":
             return " " + click.style(status_icon, fg="green")
+        elif status == "FAIL":
+            return " " + click.style(status_icon, fg="red")
         return " " + click.style(f"{status_icon} {status}", fg=color)
     return " " + click.style(status, fg=color)
+
+
+def format_assertion_result(message: str, passed: bool, use_color: bool = True) -> str:
+    """Format an assertion result aligned with the DETAILS column.
+
+    Example output:
+                                 visible: #cookie-banner 󰄬
+    """
+    from inspekt.app.cli.icons import ASSERTION_ICON
+    from inspekt.config import is_nerdfont_enabled
+
+    term_width = get_terminal_width()
+
+    # Indentation to align with DETAILS column
+    # Format: 2(indent) + 4(step) + 3(gap) + 5(time) + 3(gap) + 12(cmd) + 3(gap) = 32
+    indent = " " * 32
+
+    if not use_color:
+        status = "OK" if passed else "FAIL"
+        result = f"{indent}{message} {status}"
+        return truncate_to_width(result, term_width)
+
+    # Get light bulb icon if nerdfont enabled
+    bulb = ASSERTION_ICON if is_nerdfont_enabled() else ""
+
+    # Get pass/fail icon
+    if passed:
+        status_icon = get_status_icon("pass") or "✓"
+        color = "green"
+    else:
+        status_icon = get_status_icon("fail") or "✗"
+        color = "red"
+
+    # Format: indent + light bulb + message + status icon
+    bulb_styled = click.style(bulb, fg="bright_black") if bulb else ""
+    message_styled = click.style(message, fg=color)
+    status_styled = click.style(status_icon, fg=color)
+
+    if bulb:
+        result = f"{indent}{bulb_styled} {message_styled} {status_styled}"
+    else:
+        result = f"{indent}{message_styled} {status_styled}"
+
+    return truncate_to_width(result, term_width)

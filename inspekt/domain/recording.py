@@ -23,16 +23,76 @@ class ViewportInfo(BaseModel):
     height: int
 
 
+class RecordedOn(BaseModel):
+    """Recording context information."""
+
+    platform: Optional[str] = None  # e.g., "darwin", "win32", "linux"
+    browser: Optional[str] = None  # e.g., "Chrome", "Firefox"
+    browser_version: Optional[str] = None  # e.g., "131.0"
+
+
+class ScrollPosition(BaseModel):
+    """Scroll position coordinates."""
+
+    x: IntFromFloat = 0
+    y: IntFromFloat = 0
+
+
+class Precondition(BaseModel):
+    """A required element for replay to proceed."""
+
+    selector: str
+    description: Optional[str] = None
+
+
+class PreconditionsInfo(BaseModel):
+    """Preconditions that must be met before replay starts."""
+
+    required: list[Precondition] = Field(default_factory=list)
+    url_pattern: Optional[str] = None  # URL glob pattern
+    title_contains: Optional[str] = None
+
+
+class ReplaySettings(BaseModel):
+    """Settings that control replay behavior."""
+
+    # Restoration settings (mostly OFF by default)
+    restore_viewport: bool = True
+    restore_scroll: bool = False
+    restore_cookies: bool = False
+    restore_local_storage: bool = False
+    restore_session_storage: bool = False
+
+    # Validation settings
+    verify_preconditions: bool = True
+    verify_checksum: bool = False
+    halt_on_precondition_fail: bool = False
+    halt_on_checksum_mismatch: bool = False
+
+
+class StateInfo(BaseModel):
+    """Page state captured at recording time."""
+
+    viewport: ViewportInfo
+    zoom: float = 1.0
+    scroll: ScrollPosition = Field(default_factory=ScrollPosition)
+
+    # Optional state capture (only if --capture-state used)
+    cookies: Optional[str] = None  # Base64-encoded JSON
+    local_storage: Optional[str] = None  # Base64-encoded JSON
+    session_storage: Optional[str] = None  # Base64-encoded JSON
+    checksum: Optional[str] = None  # DOM structure hash
+
+
 class RecordingMetadata(BaseModel):
     """Metadata for a recording session."""
 
-    version: str = "1.0"
+    version: str = "1.1"
     created_at: datetime
     duration_ms: int
     starting_url: str
-    viewport: ViewportInfo
-    zoom: float = 1.0
     user_agent: Optional[str] = None
+    recorded_on: Optional[RecordedOn] = None
 
 
 class TargetInfo(BaseModel):
@@ -69,6 +129,7 @@ class ExpectInfo(BaseModel):
     # Text/URL assertions
     text_contains: Optional[str] = None
     url_contains: Optional[str] = None
+    ignore_case: Optional[bool] = None  # Case-insensitive matching for text_contains
 
     # Focus assertion
     focused: Optional[bool] = None  # Check if target element has focus
@@ -91,13 +152,21 @@ class ExpectInfo(BaseModel):
 
     # Inspekt command assertions
     empty: Optional[bool] = None  # For console checks (no messages)
-    violations: Optional[int] = None  # For axe checks (max violations)
+    allowed_violations: Optional[int] = Field(default=None, alias="allowed-violations")  # For axe checks (max violations allowed, default 0 if checking axe)
+
+    # Generic output assertions (work with any inspekt command)
+    output_contains: Optional[str] = Field(default=None, alias="output-contains")  # Check stdout contains text
+    output_not_contains: Optional[str] = Field(default=None, alias="output-not-contains")  # Check stdout doesn't contain text
+    output_matches: Optional[str] = Field(default=None, alias="output-matches")  # Check stdout matches regex
 
     # Metadata
     message: Optional[str] = None  # Description of expectation
 
 
 ActionType = Literal["navigate", "click", "rightclick", "activate", "type", "keypress", "hover", "check", "uncheck", "radio", "select", "scroll", "plugin", "inspekt"]
+
+# Step execution modes for replay
+StepMode = Literal["continue", "skip", "pause"]
 
 
 class ConditionInfo(BaseModel):
@@ -110,6 +179,7 @@ class ConditionInfo(BaseModel):
     # Text/URL conditions
     text_contains: Optional[str] = None
     url_contains: Optional[str] = None
+    ignore_case: Optional[bool] = None  # Case-insensitive matching for text_contains
 
     # Element state conditions
     checked: Optional[str] = None  # Selector for checked checkbox/radio
@@ -148,11 +218,17 @@ class RecordingStep(BaseModel):
     # Optional assertions
     expect: Optional[ExpectInfo] = None
 
+    # Step execution mode (continue=default, skip, pause)
+    mode: Optional[StepMode] = None
+
 
 class Recording(BaseModel):
     """Complete recording of a browser interaction session."""
 
     metadata: RecordingMetadata
+    state: Optional[StateInfo] = None
+    preconditions: Optional[PreconditionsInfo] = None
+    replay: Optional[ReplaySettings] = None
     steps: list[RecordingStep] = Field(default_factory=list)
 
     def to_yaml_dict(self) -> dict:

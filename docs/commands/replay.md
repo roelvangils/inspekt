@@ -5,7 +5,10 @@ The `inspekt replay` command executes recorded browser interactions from a YAML 
 ## Quick Start
 
 ```bash
-# Replay a recording
+# Replay most recent recording (auto-finds recording_*.yaml)
+inspekt replay
+
+# Replay a specific recording
 inspekt replay login-flow.yaml
 
 # Interactive mode - step through manually
@@ -62,14 +65,14 @@ inspekt replay checkout-flow.yaml
 ## Command Options
 
 ```bash
-inspekt replay [OPTIONS] RECORDING_FILE
+inspekt replay [OPTIONS] [RECORDING_FILE]
 ```
 
 ### Arguments
 
 | Argument | Description |
 |----------|-------------|
-| `RECORDING_FILE` | Path to the YAML recording file (required) |
+| `RECORDING_FILE` | Path to the YAML recording file. If omitted, automatically uses the most recently modified `recording_*.yaml` file in the current directory. |
 
 ### Options
 
@@ -92,11 +95,20 @@ inspekt replay [OPTIONS] RECORDING_FILE
 | `--no-audio` | `false` | Disable audio cues (enabled by default) |
 | `--no-feedback` | `false` | Disable both visual and audio feedback |
 | `--lock` | `false` | Lock input during replay (hide cursor, ignore input) |
+| `--restore-state` | `false` | Restore all captured state (cookies, storage) |
+| `--restore-cookies` | `false` | Restore cookies from recording |
+| `--restore-storage` | `false` | Restore localStorage/sessionStorage |
+| `--verify-checksum` | `false` | Verify DOM structure matches recording |
+| `--strict-preconditions` | `false` | Halt if preconditions fail (default: warn) |
+| `--strict-checksum` | `false` | Halt if checksum mismatches (default: warn) |
 
 ### Examples
 
 ```bash
-# Basic replay
+# Auto-find and replay most recent recording
+inspekt replay
+
+# Basic replay of specific file
 inspekt replay login.yaml
 
 # Interactive mode - step through manually
@@ -133,6 +145,18 @@ inspekt replay login.yaml --no-feedback
 
 # Disable only audio (keep visual indicators)
 inspekt replay login.yaml --no-audio
+
+# Restore captured page state (cookies, storage)
+inspekt replay login.yaml --restore-state
+
+# Restore only cookies
+inspekt replay login.yaml --restore-cookies
+
+# Verify DOM checksum (warn on mismatch)
+inspekt replay login.yaml --verify-checksum --verbose
+
+# Strict mode - halt on precondition or checksum failure
+inspekt replay login.yaml --strict-preconditions --strict-checksum
 ```
 
 ## Real-Time Playback
@@ -285,8 +309,10 @@ This is useful for verifying that each recorded action replays correctly.
 ### Normal Output
 
 ```
-Replaying: login-flow.yaml
+Replaying: login-flow.yaml (last modified)
+Recorded: December 12, 2025 at 14:30
 URL: https://example.com/login
+Viewport: 1280x720
 Steps: 12 of 12
 
   [1] navigate → https://example.com/login OK
@@ -405,6 +431,46 @@ element.scrollIntoView({
 ```
 
 This means **scroll events are not needed in recordings**.
+
+### Step Execution Mode
+
+Control how individual steps are executed using the `mode` property:
+
+| Mode | Behavior |
+|------|----------|
+| `continue` | Execute normally (default) |
+| `skip` | Skip step unconditionally |
+| `pause` | Wait for Enter key before executing |
+
+```yaml
+# Skip a step unconditionally
+- action: hover
+  mode: skip
+  target:
+    selector: "#cookie-banner button"
+
+# Pause before an important step
+- action: click
+  mode: pause
+  target:
+    selector: "#submit-order"
+    accessible_name: "Place Order"
+```
+
+When `mode: pause` is used, replay displays the step and waits:
+
+```
+0004   00:03    pause      "Place Order" (button)
+
+⏸ Paused. Press Enter to continue…
+```
+
+After pressing Enter, the step executes normally.
+
+!!! tip "When to use mode"
+    - Use `mode: skip` to permanently disable steps without deleting them
+    - Use `mode: pause` for steps that need manual verification before proceeding
+    - Use `skip_if` for conditional skipping based on page state
 
 ### Conditional Execution
 
