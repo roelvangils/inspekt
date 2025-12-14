@@ -1,6 +1,7 @@
 """Record browser interactions to a YAML file for later replay."""
 
 import json
+import re
 import signal
 import sys
 import time
@@ -13,25 +14,32 @@ from urllib.parse import urlparse
 import click
 import yaml
 
-from inspekt.app.cli.icons import success as success_icon
+from inspekt.app.cli.icons import success as success_icon, get_indicator
 from inspekt.client import BridgeClient
 from inspekt.config import get_audio_config
 from inspekt.services.audio import CLIAudio
 from inspekt.domain.recording import (
     ExpectInfo,
+    FileInfo,
     Recording,
+    RecordedOn,
     RecordingMetadata,
     RecordingStep,
     ScrollInfo,
+    ScrollPosition,
+    StateInfo,
     TargetInfo,
     ViewportInfo,
 )
 from .formatting import (
     format_duration,
+    format_elapsed,
     format_step_for_display,
+    format_step_header,
     format_system_message,
     get_recordings_dir,
 )
+from .recording_utils import find_most_recent_recording, complete_recording_files
 
 import requests
 
@@ -89,6 +97,7 @@ def convert_js_event_to_step(event: dict) -> RecordingStep:
             accessible_name=t.get("accessible_name"),
             tag=t.get("tag"),
             role=t.get("role"),
+            input_type=t.get("input_type"),
         )
 
     # Build scroll info if present
@@ -105,6 +114,21 @@ def convert_js_event_to_step(event: dict) -> RecordingStep:
     # Get click_at position [x%, y%] if present
     click_at = event.get("click_at")
 
+    # Build files list for upload actions
+    files = None
+    if event.get("files"):
+        files = [
+            FileInfo(
+                name=f.get("name", "unknown"),
+                type=f.get("type", "application/octet-stream"),
+                size=f.get("size", 0),
+                lastModified=f.get("lastModified"),
+                content=f.get("content"),
+                external_path=f.get("external_path"),
+            )
+            for f in event["files"]
+        ]
+
     return RecordingStep(
         timestamp=timestamp,
         action=action,
@@ -117,6 +141,7 @@ def convert_js_event_to_step(event: dict) -> RecordingStep:
         scroll=scroll,
         command=event.get("command"),
         click_at=click_at,
+        files=files,
         expect=None,  # User adds expectations manually
     )
 
@@ -141,6 +166,749 @@ def datetime_representer(dumper, data):
 
 RecordingYAMLDumper.add_representer(str, str_representer)
 RecordingYAMLDumper.add_representer(datetime, datetime_representer)
+
+
+def _truncate(text: str, max_len: int = 40) -> str:
+    """Truncate text with ellipsis if too long."""
+    if len(text) <= max_len:
+        return text
+    return text[: max_len - 1] + "…"
+
+
+def _describe_target(target: dict) -> str:
+    """Generate human-readable target description.
+
+    Prioritizes: accessible_name > text > selector
+    Uses tag/role for context (link, button, input, etc.)
+    """
+    if not target:
+        return "element"
+
+    name = target.get("accessible_name") or target.get("text")
+    tag = target.get("tag", "element")
+    role = target.get("role")
+
+    # Normalize whitespace in name (collapse newlines and multiple spaces)
+    if name:
+        name = " ".join(name.split())
+
+    if name:
+        name = _truncate(name, 30)
+        if tag == "a":
+            return f"link '{name}'"
+        elif tag == "button":
+            return f"button '{name}'"
+        elif tag == "input":
+            input_type = target.get("attributes", {}).get("type", "text")
+            return f"{input_type} input '{name}'"
+        elif tag == "select":
+            return f"dropdown '{name}'"
+        elif tag == "textarea":
+            return f"text area '{name}'"
+        elif role:
+            return f"{role} '{name}'"
+        else:
+            return f"{tag} '{name}'"
+    else:
+        selector = target.get("selector", "")
+        if selector:
+            return f"'{_truncate(selector, 35)}'"
+        return "element"
+
+
+def _describe_assertion(expect: dict) -> str:
+    """Generate assertion suffix for step comment.
+
+    Returns a suffix string like "and wait for '.modal' to appear"
+    or empty string if no meaningful assertion.
+    """
+    if not expect:
+        return ""
+
+    # If there's a custom message, use that
+    if expect.get("message"):
+        return f" — {_truncate(expect['message'], 50)}"
+
+    parts = []
+
+    # Visibility assertions (most common)
+    if expect.get("visible"):
+        parts.append(f"wait for '{_truncate(expect['visible'], 25)}' to appear")
+    if expect.get("hidden"):
+        parts.append(f"wait for '{_truncate(expect['hidden'], 25)}' to disappear")
+
+    # Text/URL assertions
+    if expect.get("text_contains"):
+        parts.append(f"check page contains '{_truncate(expect['text_contains'], 20)}'")
+    if expect.get("url_contains"):
+        parts.append(f"check URL contains '{_truncate(expect['url_contains'], 20)}'")
+
+    # Element state assertions
+    if expect.get("checked"):
+        parts.append(f"verify '{_truncate(expect['checked'], 20)}' is checked")
+    if expect.get("unchecked"):
+        parts.append(f"verify '{_truncate(expect['unchecked'], 20)}' is unchecked")
+    if expect.get("focused"):
+        parts.append("verify element has focus")
+    if expect.get("value_equals") is not None:
+        parts.append(f"verify value equals '{_truncate(str(expect['value_equals']), 15)}'")
+    if expect.get("disabled"):
+        parts.append(f"verify '{_truncate(expect['disabled'], 20)}' is disabled")
+
+    # Count assertions
+    if expect.get("count") and expect.get("count_equals") is not None:
+        parts.append(f"verify {expect['count_equals']} elements match '{_truncate(expect['count'], 20)}'")
+
+    # Inspekt-specific assertions
+    if expect.get("allowed_violations") is not None or expect.get("allowed-violations") is not None:
+        violations = expect.get("allowed_violations") or expect.get("allowed-violations") or 0
+        return f" ({violations} violations allowed)"
+    if expect.get("empty"):
+        return " (expect no messages)"
+
+    if parts:
+        # Join with "and" if multiple, but limit to most important
+        return " and " + parts[0]
+
+    return ""
+
+
+def _describe_condition(skip_if: dict = None, wait_for: dict = None) -> str:
+    """Generate condition context for step comment.
+
+    Returns prefix/suffix for skip_if or wait_for conditions.
+    """
+    parts = []
+
+    if skip_if:
+        if skip_if.get("visible"):
+            parts.append(f"skip if '{_truncate(skip_if['visible'], 20)}' visible")
+        elif skip_if.get("hidden"):
+            parts.append(f"skip if '{_truncate(skip_if['hidden'], 20)}' hidden")
+        elif skip_if.get("text_contains"):
+            parts.append(f"skip if page contains '{_truncate(skip_if['text_contains'], 15)}'")
+
+    if wait_for:
+        if wait_for.get("visible"):
+            parts.append(f"after waiting for '{_truncate(wait_for['visible'], 20)}'")
+        elif wait_for.get("hidden"):
+            parts.append(f"after '{_truncate(wait_for['hidden'], 20)}' disappears")
+        elif wait_for.get("text_contains"):
+            parts.append(f"after '{_truncate(wait_for['text_contains'], 15)}' appears")
+
+    if parts:
+        return " (" + ", ".join(parts) + ")"
+    return ""
+
+
+def construct_step_comment(step_num: int, step: dict, include_assertions: bool = True) -> str:
+    """Generate a human-readable YAML comment for a recording step.
+
+    Args:
+        step_num: Step number (1-indexed)
+        step: Step dictionary with action, target, expect, etc.
+        include_assertions: Whether to include expect/skip_if/wait_for in comment.
+            Set to False to generate "base" comment for comparison.
+
+    Returns:
+        Comment string like "# Step 001 · Click on button 'Submit'"
+    """
+    action = step.get("action", "unknown")
+    target = step.get("target", {})
+    expect = step.get("expect", {}) if include_assertions else {}
+    skip_if = step.get("skip_if", {}) if include_assertions else {}
+    wait_for = step.get("wait_for", {}) if include_assertions else {}
+
+    # Start with step number
+    prefix = f"# Step {step_num:04d} · "
+
+    # Build action description based on type
+    if action == "navigate":
+        url = step.get("url", "")
+        display_url = _truncate(url, 55)
+        description = f"Navigate to {display_url}"
+
+    elif action == "click":
+        description = f"Click on {_describe_target(target)}"
+
+    elif action == "rightclick":
+        description = f"Right-click on {_describe_target(target)}"
+
+    elif action == "activate":
+        description = f"Activate {_describe_target(target)} via keyboard"
+
+    elif action == "type":
+        value = step.get("value", "")
+        sensitive = step.get("sensitive", False)
+        target_desc = _describe_target(target)
+
+        if sensitive:
+            description = f"Type password into {target_desc}"
+        elif value:
+            display_value = _truncate(value, 25)
+            description = f"Type '{display_value}' into {target_desc}"
+        else:
+            description = f"Type into {target_desc}"
+
+    elif action == "keypress":
+        key = step.get("key", "")
+        modifiers = step.get("modifiers", [])
+
+        if modifiers:
+            key_combo = "+".join(modifiers) + "+" + key
+        else:
+            key_combo = key
+
+        # Add context for common keys
+        if key == "Tab":
+            accessible_name = target.get("accessible_name", "") if target else ""
+            if accessible_name:
+                description = f"Press {key_combo} (focus moves to '{_truncate(accessible_name, 25)}')"
+            else:
+                description = f"Press {key_combo}"
+        elif key == "Enter":
+            description = f"Press {key_combo} to submit"
+        elif key == "Escape":
+            description = f"Press {key_combo} to close"
+        else:
+            description = f"Press {key_combo}"
+
+    elif action == "hover":
+        description = f"Hover over {_describe_target(target)}"
+
+    elif action == "check":
+        value = step.get("value", "")
+        name = target.get("accessible_name") or target.get("text") if target else ""
+        if value:
+            description = f"Check '{_truncate(value, 30)}'"
+        elif name:
+            description = f"Check checkbox '{_truncate(name, 30)}'"
+        else:
+            description = f"Check {_describe_target(target)}"
+
+    elif action == "uncheck":
+        name = target.get("accessible_name") or target.get("text") if target else ""
+        if name:
+            description = f"Uncheck checkbox '{_truncate(name, 30)}'"
+        else:
+            description = f"Uncheck {_describe_target(target)}"
+
+    elif action == "radio":
+        value = step.get("value", "")
+        if value:
+            description = f"Select radio option '{_truncate(value, 30)}'"
+        else:
+            description = f"Select {_describe_target(target)}"
+
+    elif action == "select":
+        option_text = step.get("option_text", "")
+        value = step.get("value", "")
+        display_option = option_text or value
+
+        if display_option:
+            target_desc = _describe_target(target)
+            description = f"Select '{_truncate(display_option, 25)}' from {target_desc}"
+        else:
+            description = f"Select from {_describe_target(target)}"
+
+    elif action == "scroll":
+        scroll = step.get("scroll", {})
+        delta_y = scroll.get("deltaY", 0)
+        delta_x = scroll.get("deltaX", 0)
+
+        if delta_y > 0:
+            description = f"Scroll down {delta_y}px"
+        elif delta_y < 0:
+            description = f"Scroll up {abs(delta_y)}px"
+        elif delta_x != 0:
+            direction = "right" if delta_x > 0 else "left"
+            description = f"Scroll {direction} {abs(delta_x)}px"
+        else:
+            x, y = scroll.get("x", 0), scroll.get("y", 0)
+            description = f"Scroll to position ({x}, {y})"
+
+    elif action == "inspekt":
+        command = step.get("command", "")
+        description = f"Run 'inspekt {command}'"
+
+    elif action == "plugin":
+        command = step.get("command", "")
+        description = f"Run plugin: {command}"
+
+    else:
+        description = f"{action}"
+
+    # Add assertion context
+    assertion_suffix = _describe_assertion(expect)
+
+    # Add condition context
+    condition_suffix = _describe_condition(skip_if, wait_for)
+
+    return prefix + description + assertion_suffix + condition_suffix
+
+
+def _extract_comment_description(comment: str) -> str:
+    """Extract the description part after 'Step XXX · '.
+
+    Args:
+        comment: Full comment like "# Step 001 · Click on button 'Submit'"
+
+    Returns:
+        Just the description: "Click on button 'Submit'"
+    """
+    match = re.match(r'^#\s*Step\s+\d+\s*·\s*(.*)$', comment)
+    return match.group(1).strip() if match else comment.lstrip("# ").strip()
+
+
+def _detect_fragile_selectors(steps: list) -> list:
+    """Detect potentially fragile CSS selectors in recording steps.
+
+    Returns list of (step_num, selector, reason) tuples.
+    """
+    warnings = []
+
+    # Patterns that indicate fragile selectors
+    fragile_patterns = [
+        # Auto-generated IDs from frameworks
+        (r'#react-select-\d+', "React Select auto-generated ID"),
+        (r'#ember\d+', "Ember.js auto-generated ID"),
+        (r'#ng-\w+-\d+', "Angular auto-generated ID"),
+        (r'#radix-', "Radix UI auto-generated ID"),
+        (r'#headlessui-', "Headless UI auto-generated ID"),
+        (r'#__next', "Next.js internal ID"),
+        (r'#__nuxt', "Nuxt.js internal ID"),
+        # Index-based selectors (fragile when content changes)
+        (r':nth-child\(\d+\)', "Index-based selector (:nth-child)"),
+        (r':nth-of-type\(\d+\)', "Index-based selector (:nth-of-type)"),
+    ]
+
+    for i, step in enumerate(steps):
+        step_num = i + 1
+        target = step.get("target", {})
+        selector = target.get("selector", "")
+
+        if not selector:
+            continue
+
+        # Check for fragile patterns
+        found_pattern = False
+        for pattern, reason in fragile_patterns:
+            if re.search(pattern, selector):
+                warnings.append((step_num, selector, reason))
+                found_pattern = True
+                break  # One warning per selector
+
+        # Check for overly long CSS paths (> 5 levels deep) - skip if already warned
+        if not found_pattern and (selector.count(" > ") >= 5 or selector.count(" ") >= 6):
+            warnings.append((step_num, selector, "Long CSS path (may break if DOM structure changes)"))
+
+    return warnings
+
+
+def _validate_timestamps(steps: list) -> list:
+    """Validate that timestamps are in ascending order.
+
+    Returns list of (step_num, timestamp, prev_timestamp, issue) tuples.
+    """
+    warnings = []
+    prev_timestamp = -1
+
+    for i, step in enumerate(steps):
+        step_num = i + 1
+        timestamp = step.get("timestamp", 0)
+
+        if timestamp < prev_timestamp:
+            warnings.append((step_num, timestamp, prev_timestamp, "out of order"))
+
+        prev_timestamp = timestamp
+
+    return warnings
+
+
+def _normalize_step_keys(step: dict) -> dict:
+    """Normalize key order in a step dictionary.
+
+    Preferred order: timestamp, action, url, target, value, key, modifiers,
+    scroll, click_at, expect, skip_if, wait_for
+    """
+    key_order = [
+        "timestamp",
+        "action",
+        "url",
+        "target",
+        "value",
+        "sensitive",
+        "key",
+        "modifiers",
+        "scroll",
+        "click_at",
+        "command",
+        "expect",
+        "skip_if",
+        "wait_for",
+    ]
+
+    # Start with ordered keys
+    ordered = {}
+    for key in key_order:
+        if key in step:
+            ordered[key] = step[key]
+
+    # Add any remaining keys not in the order list
+    for key in step:
+        if key not in ordered:
+            ordered[key] = step[key]
+
+    return ordered
+
+
+def _normalize_target_keys(target: dict) -> dict:
+    """Normalize key order in a target dictionary."""
+    key_order = [
+        "selector",
+        "fallback_selectors",
+        "text",
+        "accessible_name",
+        "tag",
+        "role",
+    ]
+
+    ordered = {}
+    for key in key_order:
+        if key in target:
+            ordered[key] = target[key]
+
+    for key in target:
+        if key not in ordered:
+            ordered[key] = target[key]
+
+    return ordered
+
+
+def _clean_empty_values(data: dict) -> dict:
+    """Recursively remove empty/null values from a dictionary."""
+    if isinstance(data, dict):
+        return {
+            k: _clean_empty_values(v)
+            for k, v in data.items()
+            if v is not None and v != [] and v != {} and v != ""
+        }
+    elif isinstance(data, list):
+        return [_clean_empty_values(item) for item in data if item is not None]
+    return data
+
+
+def tidy_recording(
+    filepath: Path,
+    dry_run: bool = False,
+    force_comments: bool = False,
+    skip_comments: bool = False,
+    skip_normalize: bool = False,
+    skip_clean: bool = False,
+) -> dict:
+    """Tidy up a recording file comprehensively.
+
+    Operations performed:
+    1. Validate YAML syntax (abort if invalid)
+    2. Detect fragile selectors (warnings only)
+    3. Validate timestamp order (warnings only)
+    4. Re-number steps sequentially
+    5. Enrich comments with assertion info (preserving customizations)
+    6. Normalize key order for consistency
+    7. Remove empty/null values
+    8. Re-serialize with proper indentation
+
+    Args:
+        filepath: Path to the recording YAML file
+        dry_run: If True, show changes without modifying file
+        force_comments: If True, replace ALL comments (ignore user customizations)
+        skip_comments: If True, skip comment updates
+        skip_normalize: If True, skip key order normalization
+        skip_clean: If True, skip empty value removal
+
+    Returns:
+        Dict with report: {
+            stats: {...},
+            comment_changes: [...],
+            warnings: {fragile_selectors: [...], timestamps: [...]},
+            operations: {...}
+        }
+    """
+    # Read the file
+    with _builtin_open(filepath, "r") as f:
+        content = f.read()
+
+    # 1. Validate YAML syntax
+    try:
+        data = yaml.safe_load(content)
+    except yaml.YAMLError as e:
+        raise ValueError(f"Invalid YAML syntax: {e}")
+
+    if not data or "steps" not in data:
+        raise ValueError(f"Invalid recording file: missing 'steps' section")
+
+    steps = data["steps"]
+    if not steps:
+        raise ValueError(f"Invalid recording file: no steps found")
+
+    # Initialize report
+    report = {
+        "stats": {
+            "total_steps": len(steps),
+            "comments_enriched": 0,
+            "comments_preserved": 0,
+            "comments_forced": 0,
+            "steps_renumbered": 0,
+            "keys_normalized": 0,
+            "empty_values_removed": 0,
+        },
+        "comment_changes": [],
+        "warnings": {
+            "fragile_selectors": [],
+            "timestamps": [],
+        },
+        "operations": {
+            "yaml_validated": True,
+            "comments_updated": not skip_comments,
+            "keys_normalized": not skip_normalize,
+            "empty_cleaned": not skip_clean,
+        },
+    }
+
+    # 2. Detect fragile selectors (warnings only)
+    report["warnings"]["fragile_selectors"] = _detect_fragile_selectors(steps)
+
+    # 3. Validate timestamps (warnings only)
+    report["warnings"]["timestamps"] = _validate_timestamps(steps)
+
+    # Parse into Recording model for comment generation
+    recording = Recording(**data)
+
+    # 4-7. Process the file - we need to handle comments AND structure
+    # Read original comments from file
+    lines = content.split("\n")
+    original_comments = {}  # step_index -> comment text
+
+    step_index = 0
+    in_steps_section = False
+    for line in lines:
+        if line.strip() == "steps:":
+            in_steps_section = True
+            continue
+        if in_steps_section and line.strip() and not line.startswith(" ") and not line.startswith("-") and not line.startswith("#"):
+            in_steps_section = False
+        if in_steps_section and line.strip().startswith("# Step"):
+            original_comments[step_index] = line.strip()
+            step_index += 1
+
+    # Process steps
+    new_steps = []
+    for i, step in enumerate(steps):
+        step_num = i + 1
+        step_dict = step.copy()
+
+        # Normalize target keys if present
+        if not skip_normalize and "target" in step_dict:
+            step_dict["target"] = _normalize_target_keys(step_dict["target"])
+            report["stats"]["keys_normalized"] += 1
+
+        # Normalize step keys
+        if not skip_normalize:
+            step_dict = _normalize_step_keys(step_dict)
+
+        # Clean empty values
+        if not skip_clean:
+            original_len = len(str(step_dict))
+            step_dict = _clean_empty_values(step_dict)
+            if len(str(step_dict)) < original_len:
+                report["stats"]["empty_values_removed"] += 1
+
+        new_steps.append(step_dict)
+
+    # Generate new comments
+    new_comments = {}
+    if not skip_comments:
+        for i, step in enumerate(new_steps):
+            step_num = i + 1
+            existing_comment = original_comments.get(i, "")
+            existing_desc = _extract_comment_description(existing_comment) if existing_comment else ""
+
+            # Get step from recording model for proper comment generation
+            rec_step = recording.steps[i]
+            step_model_dict = rec_step.model_dump(exclude_none=True)
+
+            # Generate base comment (without assertions) for comparison
+            base_comment = construct_step_comment(step_num, step_model_dict, include_assertions=False)
+            base_desc = _extract_comment_description(base_comment)
+
+            # Generate full comment (with assertions)
+            full_comment = construct_step_comment(step_num, step_model_dict, include_assertions=True)
+            full_desc = _extract_comment_description(full_comment)
+
+            # Decide what to do
+            if force_comments:
+                new_comments[i] = full_comment
+                if existing_desc and existing_desc != full_desc:
+                    report["stats"]["comments_forced"] += 1
+                    report["comment_changes"].append({
+                        "step": step_num,
+                        "old": existing_desc,
+                        "new": full_desc,
+                        "type": "forced",
+                    })
+            elif not existing_desc or existing_desc == base_desc:
+                # No existing comment or user hasn't customized → use full comment
+                new_comments[i] = full_comment
+                if existing_desc and full_desc != base_desc:
+                    report["stats"]["comments_enriched"] += 1
+                    report["comment_changes"].append({
+                        "step": step_num,
+                        "old": existing_desc,
+                        "new": full_desc,
+                        "type": "enriched",
+                    })
+            else:
+                # User has customized → preserve but update step number
+                new_comments[i] = f"# Step {step_num:04d} · {existing_desc}"
+                report["stats"]["comments_preserved"] += 1
+                report["comment_changes"].append({
+                    "step": step_num,
+                    "old": existing_desc,
+                    "new": existing_desc,
+                    "type": "preserved",
+                })
+
+            # Check for renumbering
+            if existing_comment:
+                old_num_match = re.match(r'^#\s*Step\s+(\d+)', existing_comment)
+                if old_num_match:
+                    old_num = int(old_num_match.group(1))
+                    if old_num != step_num:
+                        report["stats"]["steps_renumbered"] += 1
+
+    # Build new data structure
+    new_data = {}
+
+    # Preserve header comments by keeping metadata order
+    key_order = ["steps", "metadata", "state", "preconditions", "replay"]
+    for key in key_order:
+        if key == "steps":
+            new_data["steps"] = new_steps
+        elif key in data:
+            if not skip_clean:
+                new_data[key] = _clean_empty_values(data[key])
+            else:
+                new_data[key] = data[key]
+
+    # Add any remaining keys
+    for key in data:
+        if key not in new_data:
+            new_data[key] = data[key]
+
+    # Generate output with comments
+    if not dry_run:
+        # Build header
+        metadata = data.get("metadata", {})
+        header = f"""# Inspekt Recording v{metadata.get('version', '1.1')}
+# Generated: {metadata.get('created_at', 'unknown')}
+# Duration: {metadata.get('duration_ms', 0) / 1000:.1f}s
+# URL: {metadata.get('starting_url', 'unknown')}
+#
+# Edit this file to:
+# - Add 'expect:' assertions to steps
+# - Insert 'inspekt' command steps for accessibility checks
+# - Remove unwanted steps
+#
+# Example assertion:
+#   expect:
+#     visible: ".success-message"
+#     url_contains: "/dashboard"
+
+"""
+
+        # Build steps section with comments
+        steps_yaml = "steps:\n"
+        for i, step in enumerate(new_steps):
+            if i in new_comments:
+                steps_yaml += new_comments[i] + "\n"
+            step_yaml = yaml.dump([step], default_flow_style=False, allow_unicode=True, sort_keys=False)
+            steps_yaml += step_yaml
+
+        # Build other sections
+        other_yaml = ""
+        for key in ["metadata", "state", "preconditions", "replay"]:
+            if key in new_data and key != "steps":
+                section_yaml = yaml.dump({key: new_data[key]}, default_flow_style=False, allow_unicode=True, sort_keys=False)
+                other_yaml += section_yaml
+
+        # Write output
+        output = header + steps_yaml + other_yaml
+        with _builtin_open(filepath, "w") as f:
+            f.write(output)
+
+    return report
+
+
+import base64
+
+
+def process_upload_files(recording: Recording, filepath: Path) -> None:
+    """Process upload steps, saving large files (>100KB) externally.
+
+    Files with needs_external_storage=True have their content saved to a separate
+    directory and the YAML references them by path instead of embedding base64.
+    """
+    recording_name = filepath.stem
+    recording_dir = filepath.parent
+    files_dir = None
+
+    for step in recording.steps:
+        if step.action != "upload" or not step.files:
+            continue
+
+        for file_info in step.files:
+            # Check if this file needs external storage (marked by JS)
+            # We detect this by checking if content contains needs_external_storage marker
+            content = file_info.content
+            if not content:
+                continue
+
+            # Large files (>100KB) should be stored externally
+            # JS marks these, but we also check size as fallback
+            needs_external = file_info.size > 100 * 1024 if file_info.size else False
+
+            if needs_external and content:
+                # Create files directory if needed
+                if files_dir is None:
+                    files_dir = recording_dir / f"{recording_name}_files"
+                    files_dir.mkdir(exist_ok=True)
+
+                # Extract base64 data (remove data URL prefix)
+                if "," in content:
+                    base64_data = content.split(",")[1]
+                else:
+                    base64_data = content
+
+                try:
+                    file_bytes = base64.b64decode(base64_data)
+
+                    # Handle duplicate filenames by adding suffix
+                    file_path = files_dir / file_info.name
+                    counter = 1
+                    while file_path.exists():
+                        stem = Path(file_info.name).stem
+                        suffix = Path(file_info.name).suffix
+                        file_path = files_dir / f"{stem}_{counter}{suffix}"
+                        counter += 1
+
+                    file_path.write_bytes(file_bytes)
+
+                    # Update file_info: remove content, add external_path
+                    file_info.content = None
+                    file_info.external_path = f"{recording_name}_files/{file_path.name}"
+                except Exception as e:
+                    # If decoding fails, keep the inline content
+                    click.echo(f"Warning: Could not save external file {file_info.name}: {e}", err=True)
 
 
 def save_recording_to_yaml(recording: Recording, filepath: Path) -> None:
@@ -178,9 +946,28 @@ def save_recording_to_yaml(recording: Recording, filepath: Path) -> None:
 
     data = clean_dict(data)
 
+    # Reorder top-level keys: steps first (main content), then config sections
+    ordered_data = {}
+    key_order = ["steps", "metadata", "state", "preconditions", "replay"]
+    for key in key_order:
+        if key in data:
+            ordered_data[key] = data[key]
+    # Add any remaining keys not in the order list
+    for key in data:
+        if key not in ordered_data:
+            ordered_data[key] = data[key]
+
+    # Pre-build comments for each step using the original step data
+    # This gives us access to all fields (expect, skip_if, wait_for, etc.)
+    step_comments = []
+    for i, step in enumerate(recording.steps):
+        step_dict = step.model_dump(exclude_none=True)
+        comment = construct_step_comment(i + 1, step_dict)
+        step_comments.append(comment)
+
     # Generate YAML content
     yaml_content = yaml.dump(
-        data,
+        ordered_data,
         Dumper=RecordingYAMLDumper,
         default_flow_style=False,
         sort_keys=False,
@@ -188,39 +975,38 @@ def save_recording_to_yaml(recording: Recording, filepath: Path) -> None:
         width=120,
     )
 
-    # Post-process to add accessible name comments before steps
+    # Post-process to add comments and blank lines between steps
     lines = yaml_content.split('\n')
     output_lines = []
-    i = 0
-    while i < len(lines):
-        line = lines[i]
+    step_number = 0
+    in_steps_section = False
 
-        # Check if this is a step entry (starts with "- action:")
-        if line.strip().startswith('- action:'):
-            # Look ahead for accessible_name in this step's target
-            accessible_name = None
-            j = i + 1
-            indent_level = len(line) - len(line.lstrip())
+    for line in lines:
+        # Track when we enter/exit the steps section
+        if line.strip() == 'steps:':
+            in_steps_section = True
+            output_lines.append(line)
+            continue
+        elif in_steps_section and line.strip() and not line.startswith(' ') and not line.startswith('-'):
+            # We've exited the steps section (hit another top-level key)
+            in_steps_section = False
+            # Add section separator before metadata/state
+            if output_lines and output_lines[-1].strip():
+                output_lines.append('')
 
-            while j < len(lines):
-                next_line = lines[j]
-                # Stop if we hit the next step or end of steps
-                if next_line.strip().startswith('- action:') or (next_line.strip() and not next_line.startswith(' ' * (indent_level + 1))):
-                    break
-                # Look for accessible_name
-                if 'accessible_name:' in next_line:
-                    # Extract the value
-                    parts = next_line.split('accessible_name:', 1)
-                    if len(parts) > 1:
-                        accessible_name = parts[1].strip().strip('"').strip("'")
-                j += 1
+        # Check if this is a step entry (starts with "- " at step indent level)
+        if in_steps_section and line.startswith('- '):
+            # Add blank line before step (except first step)
+            if step_number > 0 and output_lines and output_lines[-1].strip():
+                output_lines.append('')
 
-            # Add comment if we found an accessible name
-            if accessible_name:
-                output_lines.append(f'  # → {accessible_name}')
+            # Insert the pre-built comment
+            if step_number < len(step_comments):
+                output_lines.append(step_comments[step_number])
+
+            step_number += 1
 
         output_lines.append(line)
-        i += 1
 
     with _builtin_open(filepath, "w") as f:
         f.write(header)
@@ -235,12 +1021,25 @@ def get_recording_metadata(filepath: Path) -> Optional[dict]:
         if not data or "metadata" not in data:
             return None
         meta = data["metadata"]
+        steps = data.get("steps", [])
+
+        # Count assertions (steps with 'expect' field)
+        assertions = sum(1 for s in steps if s.get("expect"))
+
+        # Get file modification time
+        import os
+        from datetime import datetime
+        mtime = os.path.getmtime(filepath)
+        modified_at = datetime.fromtimestamp(mtime)
+
         return {
             "name": filepath.name,
             "path": filepath,
             "created_at": meta.get("created_at"),
+            "modified_at": modified_at,
             "duration_ms": meta.get("duration_ms", 0),
-            "steps": len(data.get("steps", [])),
+            "steps": len(steps),
+            "assertions": assertions,
             "url": meta.get("starting_url", ""),
         }
     except Exception:
@@ -276,6 +1075,12 @@ def get_recording_metadata(filepath: Path) -> Optional[dict]:
     help="Automatically replay the recording after saving to verify it works",
 )
 @click.option(
+    "--edit",
+    "-e",
+    is_flag=True,
+    help="Open the recording in your default editor after saving",
+)
+@click.option(
     "--no-audio",
     "no_audio",
     is_flag=True,
@@ -299,6 +1104,22 @@ def get_recording_metadata(filepath: Path) -> Optional[dict]:
     is_flag=True,
     help="Step through replay manually (requires --replay)",
 )
+@click.option(
+    "--capture-state",
+    is_flag=True,
+    help="Capture cookies, localStorage, and scroll position for replay",
+)
+@click.option(
+    "--storage-keys",
+    type=str,
+    default=None,
+    help="Comma-separated list of localStorage/sessionStorage keys to capture",
+)
+@click.option(
+    "--checksum",
+    is_flag=True,
+    help="Generate DOM structure checksum for state verification",
+)
 @click.pass_context
 def record(
     ctx,
@@ -307,10 +1128,14 @@ def record(
     mask_passwords: bool,
     min_hover_duration: int,
     replay: bool,
+    edit: bool,
     no_audio: bool,
     no_visual: bool,
     no_feedback: bool,
     interactive: bool,
+    capture_state: bool,
+    storage_keys: Optional[str],
+    checksum: bool,
 ):
     """
     Record browser interactions to a YAML file.
@@ -322,20 +1147,14 @@ def record(
     to add assertions for automated testing.
 
     \b
-    Commands:
-        inspekt record tutorial           # Interactive tutorial
-        inspekt record list               # List all recordings
-        inspekt record show FILE          # Show recording details
-        inspekt record delete FILE        # Delete a recording
-
-    \b
     Examples:
         inspekt record                    # Auto-generates filename
         inspekt record -o login-flow.yaml # Specific filename
         inspekt record --no-hover         # Skip hover events
+        inspekt record --edit             # Record and open in editor
         inspekt record --replay           # Record and replay to verify
         inspekt record --replay -i        # Record and step through replay
-        inspekt record --replay --no-feedback  # Replay without audio/visual
+        inspekt record --edit --replay    # Edit, then replay to verify
     """
     # If a subcommand was invoked, don't run recording
     if ctx.invoked_subcommand is not None:
@@ -411,6 +1230,7 @@ def record(
         start_url = response.get("startUrl", "")
         start_time = datetime.now(timezone.utc)
         viewport = response.get("viewport", {"width": 1920, "height": 1080})
+        initial_scroll = response.get("scroll", {"x": 0, "y": 0})
         zoom = response.get("zoom", 1.0)
         user_agent = response.get("userAgent", "")
 
@@ -427,6 +1247,78 @@ def record(
             if len(closed_shadow_warnings) > 5:
                 click.echo(f"    ... and {len(closed_shadow_warnings) - 5} more")
             click.echo()
+
+        # Check for media elements (audio/video with controls)
+        media_elements = response.get("mediaElements")
+        if media_elements:
+            from inspekt.app.cli.table import wrap_text
+            audio_count = media_elements.get("audioCount", 0)
+            video_count = media_elements.get("videoCount", 0)
+
+            # Build description with natural language
+            parts = []
+            if audio_count > 0:
+                parts.append("an audio player" if audio_count == 1 else f"{audio_count} audio players")
+            if video_count > 0:
+                parts.append("a video player" if video_count == 1 else f"{video_count} video players")
+            element_desc = " and ".join(parts)
+
+            msg = f"This page contains {element_desc} with native controls. Media players are treated as a single Tab stop. Use Space/Enter to play/pause, Arrow keys for seek/volume."
+            click.echo()
+            click.secho("⚠ ", fg="yellow", bold=True, nl=False)
+            click.echo(wrap_text(msg, indent="", subsequent_indent="  "))
+
+        # Check for native control inputs (range, date, time, color, etc.)
+        native_inputs = response.get("nativeControlInputs")
+        if native_inputs:
+            from inspekt.app.cli.table import wrap_text
+            types = native_inputs.get("types", {})
+
+            # Build description of input types found with natural language
+            type_names = {
+                "range": "range slider",
+                "date": "date picker",
+                "time": "time picker",
+                "datetime-local": "datetime picker",
+                "month": "month picker",
+                "week": "week picker",
+                "number": "number spinner",
+                "color": "color picker"
+            }
+
+            type_parts = []
+            for input_type, input_count in sorted(types.items()):
+                name = type_names.get(input_type, input_type)
+                if input_count == 1:
+                    # Use "a" or "an" for singular
+                    article = "an" if name[0] in "aeiou" else "a"
+                    type_parts.append(f"{article} {name}")
+                else:
+                    type_parts.append(f"{input_count} {name}s")
+
+            if len(type_parts) <= 2:
+                type_desc = " and ".join(type_parts)
+            else:
+                type_desc = ", ".join(type_parts[:-1]) + " and " + type_parts[-1]
+
+            # Use "its" for singular, "their" for plural
+            total_count = sum(types.values())
+            pronoun = "its" if total_count == 1 else "their"
+            msg = f"This page has {type_desc}. You can adjust {pronoun} values, but Inspekt intentionally does not record user interactions on native elements. The final selected value will be recorded once you leave the element."
+            click.echo()
+            click.secho("⚠ ", fg="yellow", bold=True, nl=False)
+            click.echo(wrap_text(msg, indent="", subsequent_indent="  "))
+
+        # Check for file inputs (now supported!)
+        file_inputs = response.get("fileInputs")
+        if file_inputs:
+            from inspekt.app.cli.table import wrap_text
+            count = file_inputs.get("count", 0)
+            count_str = "a file input" if count == 1 else f"{count} file inputs"
+            msg = f"This page has {count_str}. Inspekt cannot access the file picker or view files on your computer, but it will record file uploads and save the files for replay (maximum size: 10 MB). Do not upload sensitive files."
+            click.echo()
+            click.secho("⚠ ", fg="yellow", bold=True, nl=False)
+            click.echo(wrap_text(msg, indent="", subsequent_indent="  "))
 
         # Track which browser tab we started recording in
         # This prevents accidentally resuming in a different tab
@@ -465,7 +1357,7 @@ def record(
         # Display recording header
         from inspekt.config import is_nerdfont_enabled
         record_icon = "\U000f044a " if is_nerdfont_enabled() else ""  # 󰑊 nf-md-record
-        recording_label = click.style(f"{record_icon}Recording", fg="red", bold=True)
+        recording_label = click.style(f"{record_icon}Now recording", fg="red", bold=True)
         ctrl_c = click.style(" Ctrl+C ", fg="black", bg="bright_yellow")
         click.echo(f"\n{recording_label}: {start_url}")
         click.echo(f"Press {ctrl_c} to stop and save\n")
@@ -480,11 +1372,21 @@ def record(
         # Collected steps
         all_steps: list[RecordingStep] = []
 
+        # Undo stack for redo functionality
+        undo_stack: list[RecordingStep] = []
+
         # Track seen event timestamps to prevent duplicates after resume
         seen_timestamps: set[int] = set()
 
         # Step counter for display
         step_count = 0
+
+        # Recording paused state (Ctrl+Shift+P)
+        is_paused = False
+        pause_start_time: float | None = None  # Track when pause started
+
+        # Header display flag (show header only after first action)
+        header_shown = False
 
         # Track recording start time for resume (milliseconds since epoch)
         recording_start_epoch_ms = int(start_time.timestamp() * 1000)
@@ -518,10 +1420,10 @@ def record(
         signal.signal(signal.SIGINT, stop_recording)
 
         # Cleanup function called from main loop when stop is requested
-        def do_cleanup():
+        def do_cleanup(allow_retry: bool = True):
             nonlocal all_steps
 
-            click.echo("\n\nStopping recording...")
+            click.echo("\nStopping recording… " + success_icon(""))
 
             # Play stop/completion sound (target the specific browser we're recording in)
             if visual_script:
@@ -559,22 +1461,192 @@ def record(
                 click.echo(f"Warning: Error during stop: {e}", err=True)
                 duration_ms = int((datetime.now(timezone.utc) - start_time).total_seconds() * 1000)
 
+            # Build state info
+            state_info = StateInfo(
+                viewport=ViewportInfo(
+                    width=viewport.get("width", 1920),
+                    height=viewport.get("height", 1080),
+                ),
+                zoom=zoom,
+                scroll=ScrollPosition(
+                    x=initial_scroll.get("x", 0),
+                    y=initial_scroll.get("y", 0),
+                ),
+            )
+
+            # Capture additional state if --capture-state flag was used
+            if capture_state:
+                import base64
+                # Capture cookies via extension
+                try:
+                    cookies_result = client.execute("""
+                        new Promise((resolve) => {
+                            const requestId = 'cookies-' + Date.now() + '-' + Math.random().toString(36).slice(2);
+                            const handler = (event) => {
+                                if (event.data?.type === 'INSPEKT_COOKIES_RESPONSE' &&
+                                    event.data?.source === 'inspekt-extension' &&
+                                    event.data?.requestId === requestId) {
+                                    window.removeEventListener('message', handler);
+                                    resolve(event.data.response);
+                                }
+                            };
+                            window.addEventListener('message', handler);
+                            window.postMessage({
+                                type: 'INSPEKT_GET_COOKIES_ENHANCED',
+                                source: 'inspekt-page',
+                                requestId: requestId
+                            }, '*');
+                            // Timeout after 3 seconds
+                            setTimeout(() => {
+                                window.removeEventListener('message', handler);
+                                resolve({ ok: false, error: 'timeout' });
+                            }, 3000);
+                        })
+                    """, timeout=5.0, browser_index=recording_browser_index)
+                    if cookies_result.get("ok"):
+                        cookies_data = cookies_result.get("result", {})
+                        if cookies_data.get("ok") and cookies_data.get("cookies"):
+                            cookies_json = json.dumps(cookies_data["cookies"])
+                            state_info.cookies = base64.b64encode(cookies_json.encode()).decode()
+                except Exception as e:
+                    click.echo(f"Warning: Failed to capture cookies: {e}", err=True)
+
+                # Capture localStorage/sessionStorage
+                storage_keys_list = storage_keys.split(",") if storage_keys else None
+                try:
+                    storage_code = """
+                        (function() {
+                            const keys = KEYS_PLACEHOLDER;
+                            const getStorage = (storage) => {
+                                const result = {};
+                                if (keys) {
+                                    keys.forEach(k => {
+                                        const v = storage.getItem(k.trim());
+                                        if (v !== null) result[k.trim()] = v;
+                                    });
+                                }
+                                return result;
+                            };
+                            return {
+                                localStorage: getStorage(localStorage),
+                                sessionStorage: getStorage(sessionStorage)
+                            };
+                        })()
+                    """.replace("KEYS_PLACEHOLDER", json.dumps(storage_keys_list) if storage_keys_list else "null")
+
+                    storage_result = client.execute(storage_code, timeout=3.0, browser_index=recording_browser_index)
+                    if storage_result.get("ok"):
+                        storage_data = storage_result.get("result", {})
+                        if storage_data.get("localStorage"):
+                            local_json = json.dumps(storage_data["localStorage"])
+                            state_info.local_storage = base64.b64encode(local_json.encode()).decode()
+                        if storage_data.get("sessionStorage"):
+                            session_json = json.dumps(storage_data["sessionStorage"])
+                            state_info.session_storage = base64.b64encode(session_json.encode()).decode()
+                except Exception as e:
+                    click.echo(f"Warning: Failed to capture storage: {e}", err=True)
+
+            # Capture DOM checksum if --checksum flag was used
+            if checksum:
+                import hashlib
+                try:
+                    checksum_result = client.execute("""
+                        (function() {
+                            // Generate a hash of the DOM structure (tags only, no text/attrs)
+                            function getStructure(node) {
+                                if (node.nodeType !== 1) return '';
+                                const children = Array.from(node.children).map(getStructure).join('');
+                                return '<' + node.tagName.toLowerCase() + '>' + children + '</' + node.tagName.toLowerCase() + '>';
+                            }
+                            return getStructure(document.body);
+                        })()
+                    """, timeout=5.0, browser_index=recording_browser_index)
+                    if checksum_result.get("ok"):
+                        structure = checksum_result.get("result", "")
+                        hash_value = hashlib.sha256(structure.encode()).hexdigest()
+                        state_info.checksum = f"sha256:{hash_value}"
+                except Exception as e:
+                    click.echo(f"Warning: Failed to generate checksum: {e}", err=True)
+
+            # Extract browser info from user agent
+            recorded_on = None
+            import platform as platform_module
+            if user_agent:
+                browser_name = "Chrome"  # Default
+                browser_version = None
+                if "Firefox/" in user_agent:
+                    browser_name = "Firefox"
+                    import re
+                    match = re.search(r"Firefox/([\d.]+)", user_agent)
+                    if match:
+                        browser_version = match.group(1)
+                elif "Edg/" in user_agent:
+                    browser_name = "Edge"
+                    import re
+                    match = re.search(r"Edg/([\d.]+)", user_agent)
+                    if match:
+                        browser_version = match.group(1)
+                elif "Chrome/" in user_agent:
+                    import re
+                    match = re.search(r"Chrome/([\d.]+)", user_agent)
+                    if match:
+                        browser_version = match.group(1)
+
+                recorded_on = RecordedOn(
+                    platform=platform_module.system().lower(),
+                    browser=browser_name,
+                    browser_version=browser_version,
+                )
+
             # Build recording
             recording = Recording(
                 metadata=RecordingMetadata(
-                    version="1.0",
+                    version="1.1",
                     created_at=start_time,
                     duration_ms=duration_ms,
                     starting_url=start_url,
-                    viewport=ViewportInfo(
-                        width=viewport.get("width", 1920),
-                        height=viewport.get("height", 1080),
-                    ),
-                    zoom=zoom,
                     user_agent=user_agent or None,
+                    recorded_on=recorded_on,
                 ),
+                state=state_info,
                 steps=all_steps,
             )
+
+            # Check for failed recording (only navigate action = likely JS conflict)
+            is_failed_recording = (
+                len(all_steps) == 1 and
+                all_steps[0].action == "navigate"
+            )
+
+            if is_failed_recording:
+                # Recording failed - likely due to leftover JS from previous recording
+                click.echo()
+                click.secho("Attention: ", fg="yellow", bold=True, nl=False)
+                click.echo("Recording failed. Only the initial page load was captured.")
+                click.echo()
+                click.echo("This usually happens when a previous recording's JavaScript")
+                click.echo("is still active on the page.")
+                click.echo()
+
+                if allow_retry:
+                    # Offer to refresh and retry
+                    if click.confirm("Refresh the page and try again?", default=True):
+                        # Refresh the page
+                        try:
+                            click.echo("Refreshing page… " + success_icon(""))
+                            client.execute("location.reload()", timeout=5.0, browser_index=recording_browser_index)
+                            time.sleep(1.5)  # Wait for page reload
+                            return "retry"  # Signal to retry
+                        except Exception as e:
+                            click.echo(f"Error refreshing page: {e}", err=True)
+                            sys.exit(1)
+                    else:
+                        click.echo("Recording discarded.")
+                        sys.exit(0)
+                else:
+                    # No retry for inactivity timeout
+                    click.echo("Recording discarded.")
+                    sys.exit(0)
 
             # Determine output path
             if output:
@@ -587,27 +1659,36 @@ def record(
             # Ensure parent directory exists
             output_path.parent.mkdir(parents=True, exist_ok=True)
 
+            # Process upload files - save large files externally
+            process_upload_files(recording, output_path)
+
             # Save recording
             try:
                 save_recording_to_yaml(recording, output_path)
-                click.echo("\n" + "─" * 70)
-                click.secho(success_icon("Recording saved"), fg="green", bold=True)
-                click.echo(f"  File:     {output_path}")
-                click.echo(f"  Duration: {format_duration(duration_ms)}")
+
                 # Count steps excluding hovers
                 non_hover_steps = sum(1 for s in all_steps if s.action != "hover")
-                hover_steps = len(all_steps) - non_hover_steps
-                if hover_steps > 0:
-                    click.echo(f"  Steps:    {non_hover_steps} (hover actions excluded)")
+
+                # Display simplified recording saved info
+                click.echo(f"Recording saved to {click.style(output_path.name, bold=True)} ({format_duration(duration_ms)}, {non_hover_steps} actions) " + success_icon(""))
+
+                if edit and replay:
+                    click.echo(f"\nOpening in editor, then starting replay…")
+                elif edit:
+                    click.echo(f"\nOpening in editor…")
+                elif replay:
+                    click.echo(f"\nStarting verification replay…")
                 else:
-                    click.echo(f"  Steps:    {len(all_steps)}")
-                if replay:
-                    click.echo(f"\nStarting verification replay...")
-                else:
-                    click.echo(f"\nReplay with: inspekt replay {output_path.name}")
+                    click.echo(f"\nWhat you can do next:")
+                    click.echo(f" - Edit:   inspekt record edit {output_path.name}")
+                    click.echo(f" - Replay: inspekt replay {output_path.name} --interactive")
             except Exception as e:
                 click.echo(f"Error saving recording: {e}", err=True)
                 sys.exit(1)
+
+            # Open in editor if --edit flag was set
+            if edit:
+                click.launch(str(output_path))
 
             # Auto-replay if --replay flag was set
             if replay:
@@ -627,7 +1708,7 @@ def record(
 
                 # Refresh the page before replay to reset state (focus, scroll position, etc.)
                 click.echo()
-                click.echo("Refreshing page before replay...")
+                click.echo("Refreshing page before replay…")
                 try:
                     replay_client.execute("location.reload()", timeout=5.0)
                     # Wait for page to start reloading
@@ -678,7 +1759,7 @@ def record(
                 click.echo()
                 frequencies = {3: 440, 2: 523, 1: 659}  # A4, C5, E5 - ascending
                 for i in range(3, 0, -1):
-                    click.echo(f"\rStarting replay in {i}...", nl=False)
+                    click.echo(f"\rStarting replay in {i}…", nl=False)
                     try:
                         beep_code = countdown_beep.replace("FREQ_PLACEHOLDER", str(frequencies[i]))
                         replay_client.execute(beep_code, timeout=1.0)
@@ -796,20 +1877,70 @@ def record(
         while True:
             # Check if stop was requested (Ctrl+C)
             if stop_requested:
-                do_cleanup()
+                result = do_cleanup()
+                if result == "retry":
+                    # Reset state for retry
+                    stop_requested = False
+                    all_steps = []
+                    undo_stack = []
+                    step_count = 0
+                    is_paused = False
+                    pause_start_time = None
+                    header_shown = False
+                    seen_timestamps = set()
+                    last_activity_time = time.time()
+                    inactivity_warning_shown = False
+                    start_time = datetime.now(timezone.utc)
+
+                    # Re-inject recording script
+                    retry_result = client.execute(start_code, timeout=10.0)
+                    if not retry_result.get("ok"):
+                        click.echo(f"Error restarting recording: {retry_result.get('error')}", err=True)
+                        sys.exit(1)
+
+                    retry_response = retry_result.get("result", {})
+                    start_url = retry_response.get("startUrl", start_url)
+
+                    # Display recording header again
+                    click.echo(f"\n{recording_label}: {start_url}")
+                    click.echo(f"Press {ctrl_c} to stop and save\n")
+
+                    # Play start sound
+                    if visual_script:
+                        try:
+                            client.execute("window.__INSPEKT_VISUAL__.audio.playStart()", timeout=5.0, browser_index=recording_browser_index)
+                            time.sleep(0.4)
+                        except Exception:
+                            pass
+
+                    continue  # Continue polling loop
                 break
 
             # Check for inactivity
             inactive_seconds = time.time() - last_activity_time
 
             if inactive_seconds >= INACTIVITY_STOP_SECONDS:
-                # Auto-stop due to inactivity
-                click.echo(format_system_message("No activity for 60 seconds. Stopping recording."))
-                do_cleanup()
+                # Auto-stop due to inactivity - custom format with stop icon
+                elapsed_ms = int((datetime.now(timezone.utc) - start_time).total_seconds() * 1000)
+                elapsed_str = format_elapsed(elapsed_ms)
+                prefix = click.style(f"----   {elapsed_str}", fg="bright_black")
+                stop_icon = get_indicator("stop") or ""
+                icon_str = f"{stop_icon}  " if stop_icon else ""
+                msg = click.style("No activity for 60 seconds. Recording stopped.", fg="bright_black", italic=True)
+                click.echo(f"{prefix}   {icon_str}{msg}")
+                # For inactivity timeout, don't offer retry - just discard if failed
+                do_cleanup(allow_retry=False)
                 break
 
             if inactive_seconds >= INACTIVITY_WARNING_SECONDS and not inactivity_warning_shown:
-                click.echo(format_system_message("No activity for 30 seconds. Recording will stop in 30 seconds."))
+                # Custom format with hourglass icon, timestamp, and ellipsis
+                elapsed_ms = int((datetime.now(timezone.utc) - start_time).total_seconds() * 1000)
+                elapsed_str = format_elapsed(elapsed_ms)
+                prefix = click.style(f"----   {elapsed_str}", fg="bright_black")
+                hourglass = "\uf252"  # nf-fa-hourglass_end
+                icon_str = f"{hourglass}  "
+                msg = click.style("No activity for 30 seconds. Recording will stop in 30 seconds…", fg="bright_black", italic=True)
+                click.echo(f"{prefix}   {icon_str}{msg}")
                 inactivity_warning_shown = True
 
             try:
@@ -820,7 +1951,7 @@ def record(
 
                 # Reset error count on successful communication
                 if consecutive_errors > 0 and waiting_for_reconnect:
-                    click.echo(format_system_message("Reconnected"))
+                    click.echo(format_system_message("Reconnected", icon="resume"))
                 consecutive_errors = 0
                 waiting_for_reconnect = False
 
@@ -840,8 +1971,130 @@ def record(
                     # Check if stop was requested from browser (Ctrl+C in browser window)
                     if response.get("stopRequested"):
                         debug_log("Stop requested from browser (Ctrl+C)")
-                        do_cleanup()
+                        result = do_cleanup()
+                        if result == "retry":
+                            # Reset state for retry (same as Ctrl+C from CLI)
+                            all_steps = []
+                            undo_stack = []
+                            step_count = 0
+                            is_paused = False
+                            pause_start_time = None
+                            header_shown = False
+                            seen_timestamps = set()
+                            last_activity_time = time.time()
+                            inactivity_warning_shown = False
+                            start_time = datetime.now(timezone.utc)
+
+                            # Re-inject recording script
+                            retry_result = client.execute(start_code, timeout=10.0)
+                            if not retry_result.get("ok"):
+                                click.echo(f"Error restarting recording: {retry_result.get('error')}", err=True)
+                                sys.exit(1)
+
+                            retry_response = retry_result.get("result", {})
+                            start_url = retry_response.get("startUrl", start_url)
+
+                            # Display recording header again
+                            click.echo(f"\n{recording_label}: {start_url}")
+                            click.echo(f"Press {ctrl_c} to stop and save\n")
+
+                            # Play start sound
+                            if visual_script:
+                                try:
+                                    client.execute("window.__INSPEKT_VISUAL__.audio.playStart()", timeout=5.0, browser_index=recording_browser_index)
+                                    time.sleep(0.4)
+                                except Exception:
+                                    pass
+
+                            continue  # Continue polling loop
                         break
+
+                    # =====================================================================
+                    # Recording Control Signals (Pause, Undo, Redo)
+                    # =====================================================================
+
+                    # Handle pause toggle (Ctrl+Shift+P in browser)
+                    if response.get("pauseToggled"):
+                        is_paused = response.get("isPaused", False)
+                        if is_paused:
+                            pause_start_time = time.time()
+                            # Show pause message with timestamp
+                            elapsed_ms = int((datetime.now(timezone.utc) - start_time).total_seconds() * 1000)
+                            elapsed_str = format_elapsed(elapsed_ms)
+                            prefix = click.style(f"----   {elapsed_str}", fg="bright_black")
+                            pause_icon = get_indicator("pause") or ""
+                            icon_str = f"{pause_icon}  " if pause_icon else ""
+                            msg = click.style("Recording paused", fg="bright_black", italic=True)
+                            click.echo(f"{prefix}   {icon_str}{msg}")
+                        else:
+                            # Calculate pause duration and elapsed time
+                            elapsed_ms = int((datetime.now(timezone.utc) - start_time).total_seconds() * 1000)
+                            elapsed_str = format_elapsed(elapsed_ms)
+                            pause_duration_sec = int(time.time() - pause_start_time) if pause_start_time else 0
+                            pause_start_time = None
+                            # Format: "0001   00:56   󰐊  Recording resumed after 45 seconds"
+                            prefix = click.style(f"----   {elapsed_str}", fg="bright_black")
+                            icon_glyph = get_indicator("resume") or ""
+                            icon_str = f"{icon_glyph}  " if icon_glyph else ""
+                            # Format duration naturally
+                            if pause_duration_sec == 0:
+                                duration_str = "less than a second"
+                            elif pause_duration_sec == 1:
+                                duration_str = "one second"
+                            else:
+                                duration_str = f"{pause_duration_sec} seconds"
+                            msg = click.style(f"Resumed after {duration_str}", fg="bright_black", italic=True)
+                            click.echo(f"{prefix}   {icon_str}{msg}")
+
+                    # Handle undo request (Ctrl+Shift+Z in browser)
+                    if response.get("undoRequested"):
+                        # Calculate elapsed time for timestamp
+                        elapsed_ms = int((datetime.now(timezone.utc) - start_time).total_seconds() * 1000)
+                        elapsed_str = format_elapsed(elapsed_ms)
+                        if all_steps:
+                            undone_step = all_steps.pop()
+                            undo_stack.append(undone_step)
+                            # Remember the step number before decrementing
+                            undone_step_num = step_count
+                            step_count -= 1
+                            # Format: "----   00:15   󰕌  Undo #0005 keypress" (dark grey timestamp)
+                            action = undone_step.action
+                            prefix = click.style(f"----   {elapsed_str}", fg="bright_black")
+                            undo_icon = get_indicator("undo") or ""
+                            icon_str = f"{undo_icon}  " if undo_icon else ""
+                            msg = click.style(f"Undo #{undone_step_num:04d} {action}", fg="bright_black", italic=True)
+                            click.echo(f"{prefix}   {icon_str}{msg}")
+                        else:
+                            # Show red icon for "Nothing to undo" (dark grey timestamp)
+                            icon_glyph = get_indicator("undo") or ""
+                            prefix = click.style(f"----   {elapsed_str}", fg="bright_black")
+                            icon_str = click.style(f"{icon_glyph}  ", fg="red") if icon_glyph else ""
+                            msg = click.style("Nothing to undo", fg="red")
+                            click.echo(f"{prefix}   {icon_str}{msg}")
+
+                    # Handle redo request (Ctrl+Shift+Y in browser)
+                    if response.get("redoRequested"):
+                        # Calculate elapsed time for timestamp
+                        elapsed_ms = int((datetime.now(timezone.utc) - start_time).total_seconds() * 1000)
+                        elapsed_str = format_elapsed(elapsed_ms)
+                        if undo_stack:
+                            redone_step = undo_stack.pop()
+                            all_steps.append(redone_step)
+                            step_count += 1
+                            # Format: "----   00:15   󰑎  Redo #0005 keypress" (dark grey timestamp)
+                            action = redone_step.action
+                            prefix = click.style(f"----   {elapsed_str}", fg="bright_black")
+                            redo_icon = get_indicator("redo") or ""
+                            icon_str = f"{redo_icon}  " if redo_icon else ""
+                            msg = click.style(f"Redo #{step_count:04d} {action}", fg="bright_black", italic=True)
+                            click.echo(f"{prefix}   {icon_str}{msg}")
+                        else:
+                            # Show red icon for "Nothing to redo" (dark grey timestamp)
+                            icon_glyph = get_indicator("redo") or ""
+                            prefix = click.style(f"----   {elapsed_str}", fg="bright_black")
+                            icon_str = click.style(f"{icon_glyph}  ", fg="red") if icon_glyph else ""
+                            msg = click.style("Nothing to redo", fg="red")
+                            click.echo(f"{prefix}   {icon_str}{msg}")
 
                     # Check if recording is still active
                     recording_active = response.get("recordingActive", True)
@@ -866,9 +2119,9 @@ def record(
                             all_steps.append(nav_step)
                             step_count += 1
 
-                            # Display navigation
+                            # Display navigation (no indent during recording)
                             nav_event = {"action": "navigate", "url": new_url}
-                            display = format_step_for_display(nav_event, step_count, elapsed_ms)
+                            display = format_step_for_display(nav_event, step_count, elapsed_ms, indent=False)
                             click.echo(display)
 
                             last_known_url = new_url
@@ -901,7 +2154,7 @@ def record(
                                 domain = parsed.netloc or resumed_url
                             except Exception:
                                 domain = resumed_url
-                            click.echo(format_system_message(f"Recording resumed on {domain}"))
+                            click.echo(format_system_message(f"Recording resumed on {domain}", icon="resume"))
                             # Reset inactivity tracking
                             last_activity_time = time.time()
                             inactivity_warning_shown = False
@@ -915,10 +2168,19 @@ def record(
                     # Normal case: recording is active, process events
                     events = response.get("events", [])
 
+                    # Skip event processing if paused (shouldn't happen since browser blocks too)
+                    if is_paused:
+                        events = []
+
                     if events:
                         # Reset inactivity tracking when we get events
                         last_activity_time = time.time()
                         inactivity_warning_shown = False
+
+                        # Clear redo stack when new events are recorded
+                        # (standard undo/redo behavior: new actions invalidate redo history)
+                        if undo_stack:
+                            undo_stack.clear()
 
                     for event in events:
                         # Deduplicate events based on timestamp (prevents duplicates after resume)
@@ -947,8 +2209,13 @@ def record(
                         if event.get("action") == "navigate":
                             last_known_url = event.get("url", last_known_url)
 
-                        # Display real-time feedback with step number and elapsed time
-                        display = format_step_for_display(event, step_count, elapsed_ms)
+                        # Display table header before first step
+                        if not header_shown:
+                            click.echo(format_step_header(indent=False))
+                            header_shown = True
+
+                        # Display real-time feedback with step number and elapsed time (no indent during recording)
+                        display = format_step_for_display(event, step_count, elapsed_ms, indent=False)
                         click.echo(display)
 
                 else:
@@ -965,16 +2232,17 @@ def record(
                 if recording_browser_index is not None and current_browser_count <= recording_browser_index:
                     # Original tab is no longer available - auto-stop recording
                     click.echo(format_system_message("Recording tab was closed. Stopping recording."))
-                    do_cleanup()
+                    # Tab is closed, can't retry
+                    do_cleanup(allow_retry=False)
                     break
 
                 if consecutive_errors == 10 and not waiting_for_reconnect:
                     # First warning after ~1 second of errors
-                    click.echo(format_system_message("Waiting for browser to reconnect..."))
+                    click.echo(format_system_message("Waiting for browser to reconnect…"))
                     waiting_for_reconnect = True
                 elif consecutive_errors >= max_consecutive_errors and consecutive_errors % 30 == 0:
                     # Periodic warning every 3 seconds
-                    click.echo(format_system_message("Still waiting for browser connection..."))
+                    click.echo(format_system_message("Still waiting for browser connection…"))
 
             except Exception as e:
                 # Other errors - log if verbose, otherwise ignore
@@ -985,6 +2253,166 @@ def record(
 
     except Exception as e:
         click.echo(f"\nError: {e}", err=True)
+        sys.exit(1)
+
+
+@record.command("tidy")
+@click.argument("file", type=click.Path(exists=True), required=False)
+@click.option("--dry-run", is_flag=True, help="Preview changes without modifying the file")
+@click.option("--force", is_flag=True, help="Replace ALL comments, ignoring user customizations")
+@click.option("--no-comments", is_flag=True, help="Skip comment updates")
+@click.option("--no-normalize", is_flag=True, help="Skip key order normalization")
+@click.option("--no-clean", is_flag=True, help="Skip empty value removal")
+@click.option("--quiet", "-q", is_flag=True, help="Only show warnings and summary")
+def tidy(file: Optional[str], dry_run: bool, force: bool, no_comments: bool, no_normalize: bool, no_clean: bool, quiet: bool):
+    """
+    Tidy up a recording file.
+
+    Performs comprehensive cleanup of a recording YAML file.
+    If no file is specified, uses the most recently modified recording.
+
+    \b
+    Operations (all enabled by default):
+    ✓ Validate YAML syntax (abort if invalid)
+    ✓ Detect fragile selectors (warnings only)
+    ✓ Validate timestamp order (warnings only)
+    ✓ Re-number steps sequentially (0001, 0002, 0003...)
+    ✓ Enrich comments with assertion info
+    ✓ Normalize key order for consistency
+    ✓ Remove empty/null values
+    ✓ Fix indentation (2 spaces)
+
+    \b
+    Examples:
+        inspekt record tidy                             # Tidy last modified
+        inspekt record tidy recording.yaml              # Full tidy
+        inspekt record tidy recording.yaml --dry-run    # Preview changes
+        inspekt record tidy recording.yaml --force      # Replace all comments
+        inspekt record tidy recording.yaml -q           # Quiet mode
+    """
+    # Use last modified file if none specified
+    if file is None:
+        recent = find_most_recent_recording()
+        if recent is None:
+            click.echo("Error: No file specified and no recording_*.yaml files found.", err=True)
+            sys.exit(1)
+        filepath = recent
+        click.echo(f"Using: {filepath.name} (last modified)\n")
+    else:
+        filepath = Path(file)
+
+    if not quiet:
+        if dry_run:
+            click.echo(f"Previewing changes for {click.style(filepath.name, bold=True)}...\n")
+        else:
+            click.echo(f"Tidying up {click.style(filepath.name, bold=True)}...\n")
+
+    try:
+        report = tidy_recording(
+            filepath,
+            dry_run=dry_run,
+            force_comments=force,
+            skip_comments=no_comments,
+            skip_normalize=no_normalize,
+            skip_clean=no_clean,
+        )
+
+        stats = report["stats"]
+        comment_changes = report["comment_changes"]
+        warnings = report["warnings"]
+
+        # Show warnings first (always shown)
+        if warnings["fragile_selectors"]:
+            click.echo(click.style("⚠ Fragile Selectors Detected:", fg="yellow", bold=True))
+            for step_num, selector, reason in warnings["fragile_selectors"]:
+                step_label = click.style(f"Step {step_num:04d}", fg="cyan")
+                click.echo(f"  {step_label}: {reason}")
+                selector_preview = selector[:60] + "…" if len(selector) > 60 else selector
+                click.echo(f"            {click.style(selector_preview, fg='bright_black')}")
+            click.echo()
+
+        if warnings["timestamps"]:
+            click.echo(click.style("⚠ Timestamp Issues:", fg="yellow", bold=True))
+            for step_num, ts, prev_ts, issue in warnings["timestamps"]:
+                step_label = click.style(f"Step {step_num:04d}", fg="cyan")
+                click.echo(f"  {step_label}: timestamp {ts}ms is {issue} (previous: {prev_ts}ms)")
+            click.echo()
+
+        # Show comment changes (unless quiet)
+        if not quiet and comment_changes:
+            click.echo(click.style("Comments:", bold=True))
+            for change in comment_changes:
+                step_num = change["step"]
+                old_desc = change["old"]
+                new_desc = change["new"]
+                change_type = change["type"]
+
+                step_label = click.style(f"Step {step_num:04d}", fg="cyan", bold=True)
+                old_truncated = old_desc[:50] + "…" if len(old_desc) > 50 else old_desc
+                new_truncated = new_desc[:50] + "…" if len(new_desc) > 50 else new_desc
+
+                if change_type == "enriched":
+                    click.echo(f"  {step_label}: {old_truncated}")
+                    click.echo(f"           → {click.style(new_truncated, fg='green')}")
+                elif change_type == "forced":
+                    click.echo(f"  {step_label}: {click.style(old_truncated, fg='red', strikethrough=True)}")
+                    click.echo(f"           → {click.style(new_truncated, fg='yellow')}")
+                elif change_type == "preserved":
+                    click.echo(f"  {step_label}: {old_truncated} {click.style('(preserved)', fg='bright_black')}")
+            click.echo()
+
+        # Summary report
+        click.echo(click.style("Summary:", bold=True))
+
+        # Build summary parts
+        summary_items = []
+
+        if stats["comments_enriched"] > 0:
+            summary_items.append(("Comments enriched", stats["comments_enriched"], "green"))
+        if stats["comments_preserved"] > 0:
+            summary_items.append(("Comments preserved", stats["comments_preserved"], "cyan"))
+        if stats["comments_forced"] > 0:
+            summary_items.append(("Comments replaced", stats["comments_forced"], "yellow"))
+        if stats["steps_renumbered"] > 0:
+            summary_items.append(("Steps renumbered", stats["steps_renumbered"], "yellow"))
+        if stats["keys_normalized"] > 0:
+            summary_items.append(("Keys normalized", stats["keys_normalized"], "blue"))
+        if stats["empty_values_removed"] > 0:
+            summary_items.append(("Empty values removed", stats["empty_values_removed"], "magenta"))
+
+        # Show what was skipped
+        if no_comments:
+            summary_items.append(("Comment updates", "skipped", "bright_black"))
+        if no_normalize:
+            summary_items.append(("Key normalization", "skipped", "bright_black"))
+        if no_clean:
+            summary_items.append(("Empty cleanup", "skipped", "bright_black"))
+
+        # Warning counts
+        if warnings["fragile_selectors"]:
+            summary_items.append(("Fragile selectors", len(warnings["fragile_selectors"]), "yellow"))
+        if warnings["timestamps"]:
+            summary_items.append(("Timestamp issues", len(warnings["timestamps"]), "yellow"))
+
+        # Display summary
+        for label, value, color in summary_items:
+            value_str = click.style(str(value), fg=color)
+            click.echo(f"  {label}: {value_str}")
+
+        click.echo(f"  Total steps: {stats['total_steps']}")
+
+        # Final status
+        click.echo()
+        if dry_run:
+            click.echo(click.style("Dry run complete.", fg="cyan") + " No changes were made.")
+        else:
+            click.echo(click.style("✓ File tidied successfully.", fg="green"))
+
+    except ValueError as e:
+        click.echo(click.style(f"✗ Validation Error: {e}", fg="red"), err=True)
+        sys.exit(1)
+    except Exception as e:
+        click.echo(click.style(f"✗ Error: {e}", fg="red"), err=True)
         sys.exit(1)
 
 
@@ -1020,12 +2448,12 @@ def list_recordings(limit: Optional[int], output_json: bool):
         if meta:
             recordings.append(meta)
 
-    # Sort by creation date (newest first)
-    recordings.sort(key=lambda r: r.get("created_at") or "", reverse=True)
+    # Sort by creation date (oldest first, newest at bottom)
+    recordings.sort(key=lambda r: r.get("created_at") or "")
 
-    # Apply limit
+    # Apply limit (keep the most recent N, which are at the end after sorting)
     if limit:
-        recordings = recordings[:limit]
+        recordings = recordings[-limit:]
 
     if not recordings:
         if output_json:
@@ -1043,70 +2471,122 @@ def list_recordings(limit: Optional[int], output_json: bool):
                 "name": r["name"],
                 "path": str(r["path"]),
                 "created_at": r["created_at"].isoformat() if hasattr(r.get("created_at"), "isoformat") else str(r.get("created_at")),
+                "modified_at": r["modified_at"].isoformat() if hasattr(r.get("modified_at"), "isoformat") else str(r.get("modified_at")),
                 "duration_ms": r["duration_ms"],
                 "steps": r["steps"],
+                "assertions": r.get("assertions", 0),
                 "url": r["url"],
             })
         click.echo(json.dumps(output, indent=2))
         return
 
-    # Table output
-    click.echo(f"\nRecordings ({recordings_dir})\n")
-    click.echo("─" * 90)
-    click.echo(f"{'NAME':<45} {'DATE':<12} {'DURATION':<10} {'STEPS':<6} URL")
-    click.echo("─" * 90)
+    # Table output using Table class
+    from inspekt.app.cli.table import Table
+    from datetime import datetime
 
-    for r in recordings:
-        name = r["name"]
-        if len(name) > 44:
-            name = name[:41] + "..."
-
-        # Format date
-        created = r.get("created_at")
-        if hasattr(created, "strftime"):
-            date_str = created.strftime("%b %d %Y")
-        elif isinstance(created, str):
+    def format_datetime(dt) -> str:
+        """Format datetime as YY/MM/DD HH:MM in local time."""
+        if hasattr(dt, "strftime"):
+            return dt.strftime("%y/%m/%d %H:%M")
+        elif isinstance(dt, str):
             try:
-                from datetime import datetime
-                dt = datetime.fromisoformat(created.replace("Z", "+00:00"))
-                date_str = dt.strftime("%b %d %Y")
+                parsed = datetime.fromisoformat(dt.replace("Z", "+00:00"))
+                # Convert to local time
+                local_dt = parsed.astimezone()
+                return local_dt.strftime("%y/%m/%d %H:%M")
             except:
-                date_str = str(created)[:10]
-        else:
-            date_str = "N/A"
+                return dt[:14] if len(dt) >= 14 else dt
+        return "N/A"
+
+    # Find the most recently modified recording
+    last_modified_path = None
+    if recordings:
+        most_recent = max(recordings, key=lambda r: r.get("modified_at") or datetime.min)
+        last_modified_path = most_recent["path"]
+
+    # Build rows
+    rows = []
+    total_steps = 0
+    total_assertions = 0
+    total_duration_ms = 0
+    for r in recordings:
+        # Filename only (no path)
+        filename = r["name"]
+
+        # Format created and modified dates
+        created_str = format_datetime(r.get("created_at"))
+        modified_str = format_datetime(r.get("modified_at"))
 
         # Format duration
-        duration = format_duration(r["duration_ms"])
+        duration_ms = r["duration_ms"]
+        duration = format_duration(duration_ms)
 
-        # Format URL (truncate)
-        url = r["url"]
-        if url.startswith("https://"):
-            url = url[8:]
-        elif url.startswith("http://"):
-            url = url[7:]
-        if len(url) > 30:
-            url = url[:27] + "..."
+        # Get counts
+        steps = r["steps"]
+        assertions = r.get("assertions", 0)
+        total_steps += steps
+        total_assertions += assertions
+        total_duration_ms += duration_ms
 
-        click.echo(f"{name:<45} {date_str:<12} {duration:<10} {r['steps']:<6} {url}")
+        rows.append({
+            "path": r["path"],
+            "values": [filename, created_str, modified_str, duration, str(steps), str(assertions)]
+        })
 
-    click.echo("─" * 90)
-    click.echo(f"Total: {len(recordings)} recording(s)")
+    # Create table with title
+    table = Table(
+        ["File", "Created", "Modified", "Duration", "Steps", "Assertions"],
+        title=f"Recordings ({len(rows)})",
+        icon="󰕧",
+        alignments=["left", "left", "left", "right", "right", "right"]
+    )
+    table.set_data([r["values"] for r in rows])
+
+    click.echo()
+    table.print_header()
+    for r in rows:
+        # Highlight last modified row (only if there's more than one row)
+        is_last_modified = r["path"] == last_modified_path and len(rows) > 1
+        table.print_row(r["values"], highlight=is_last_modified)
+
+    # Print summary with totals
+    table.print_summary(["Total", "", "", format_duration(total_duration_ms), str(total_steps), str(total_assertions)])
+    table.print_footer()
+
+    # Show tip if no assertions exist
+    if total_assertions == 0 and len(rows) > 0:
+        click.echo()
+        tip_label = click.style("TIP:", fg="cyan", bold=True)
+        doc_link = click.style("http://localhost:8008/guide/recording-replay/#adding-assertions", fg="blue", underline=True)
+        click.echo(f"{tip_label} Add assertions to your recordings to verify expected outcomes.")
+        click.echo(f"     See {doc_link}")
+        click.echo(f"     (requires: inspekt start --docs)")
 
 
 @record.command("show")
-@click.argument("recording_file", type=click.Path(exists=True))
-def show_recording(recording_file: str):
+@click.argument("recording_file", type=click.Path(exists=True), required=False, shell_complete=complete_recording_files)
+def show_recording(recording_file: Optional[str]):
     """
     Show details of a recording file.
 
     Displays metadata and step summary for a recording.
+    If no file is specified, uses the most recently modified recording.
 
     \b
     Examples:
+        inspekt record show                # Show last modified recording
         inspekt record show login-flow.yaml
-        inspekt record show ~/.inspekt/recordings/example_com_20251202.yaml
     """
-    filepath = Path(recording_file)
+    # Use last modified file if none specified
+    if recording_file is None:
+        recent = find_most_recent_recording()
+        if recent is None:
+            click.echo("Error: No recording file specified and no recording_*.yaml files found.", err=True)
+            sys.exit(1)
+        filepath = recent
+        click.echo(f"Using: {filepath.name} (last modified)\n")
+    else:
+        filepath = Path(recording_file)
 
     try:
         with _builtin_open(filepath) as f:
@@ -1165,18 +2645,30 @@ def show_recording(recording_file: str):
 
 
 @record.command("delete")
-@click.argument("recording_file", type=click.Path(exists=True))
+@click.argument("recording_file", type=click.Path(exists=True), required=False, shell_complete=complete_recording_files)
 @click.option("--force", "-f", is_flag=True, help="Skip confirmation")
-def delete_recording(recording_file: str, force: bool):
+def delete_recording(recording_file: Optional[str], force: bool):
     """
     Delete a recording file.
 
+    If no file is specified, uses the most recently modified recording.
+
     \b
     Examples:
+        inspekt record delete                # Delete last modified recording
         inspekt record delete login-flow.yaml
         inspekt record delete --force old-recording.yaml
     """
-    filepath = Path(recording_file)
+    # Use last modified file if none specified
+    if recording_file is None:
+        recent = find_most_recent_recording()
+        if recent is None:
+            click.echo("Error: No recording file specified and no recording_*.yaml files found.", err=True)
+            sys.exit(1)
+        filepath = recent
+        click.echo(f"Using: {filepath.name} (last modified)\n")
+    else:
+        filepath = Path(recording_file)
 
     if not force:
         click.echo(f"Delete recording: {filepath.name}?")
@@ -1189,6 +2681,42 @@ def delete_recording(recording_file: str, force: bool):
         click.secho(success_icon(f"Deleted: {filepath.name}"), fg="green")
     except Exception as e:
         click.echo(f"Error deleting file: {e}", err=True)
+        sys.exit(1)
+
+
+@record.command("edit")
+@click.argument("recording_file", type=click.Path(exists=True), required=False, shell_complete=complete_recording_files)
+def edit_recording(recording_file: Optional[str]):
+    """
+    Open a recording file in your default editor.
+
+    If no file is specified, uses the most recently modified recording.
+
+    \b
+    Examples:
+        inspekt record edit                # Edit last modified recording
+        inspekt record edit login-flow.yaml
+    """
+    import subprocess
+    import os
+
+    # Use last modified file if none specified
+    if recording_file is None:
+        recent = find_most_recent_recording()
+        if recent is None:
+            click.echo("Error: No recording file specified and no recording_*.yaml files found.", err=True)
+            sys.exit(1)
+        filepath = recent
+        click.echo(f"Opening: {filepath.name} (last modified)")
+    else:
+        filepath = Path(recording_file)
+        click.echo(f"Opening: {filepath.name}")
+
+    # Use click.edit() which handles $EDITOR, $VISUAL, and fallback
+    try:
+        click.edit(filename=str(filepath))
+    except click.ClickException as e:
+        click.echo(f"Error opening editor: {e}", err=True)
         sys.exit(1)
 
 
@@ -1268,13 +2796,13 @@ def record_tutorial(speak: bool):
     if audio_output == "off":
         click.echo(format_system_message("Audio disabled in config - continuing without sound"))
         click.echo()
-        click.echo("  Press Enter to see all supported action types...")
+        click.echo("  Press Enter to see all supported action types…")
         input()
     elif audio_output == "cli":
         # CLI audio: no browser interaction needed
         cli_audio = CLIAudio(volume=audio_volume)
         click.echo()
-        click.echo("  Press Enter to hear all action types with audio feedback...")
+        click.echo("  Press Enter to hear all action types with audio feedback…")
         input()
     else:
         # Browser audio: inject script and require user interaction
@@ -1291,13 +2819,13 @@ def record_tutorial(speak: bool):
             click.echo(format_system_message("Browser audio not available - using CLI audio"))
             cli_audio = CLIAudio(volume=audio_volume)
             click.echo()
-            click.echo("  Press Enter to see all supported action types...")
+            click.echo("  Press Enter to see all supported action types…")
             input()
         else:
             use_browser_audio = True
             # Prompt to continue - ask user to click in browser first for audio
             click.echo("  To hear sound effects, click anywhere in your browser window,")
-            click.echo("  then press Enter here to continue...")
+            click.echo("  then press Enter here to continue…")
             click.echo()
             input()
 
@@ -1369,6 +2897,15 @@ def record_tutorial(speak: bool):
                 "attributes": {"type": "email"},
             },
         },
+        "set": {
+            "action": "set",
+            "value": "14:35",
+            "target": {
+                "selector": "input#time",
+                "tag": "input",
+                "input_type": "time",
+            },
+        },
         "keypress": {
             "action": "keypress",
             "key": "Tab",
@@ -1422,6 +2959,37 @@ def record_tutorial(speak: bool):
                 "deltaY": 350,
             },
         },
+        "toggle": {
+            "action": "toggle",
+            "value": "open",
+            "target": {
+                "selector": "details > summary",
+                "accessible_name": "FAQ: Shipping information",
+                "tag": "summary",
+            },
+        },
+        "dialog": {
+            "action": "dialog",
+            "value": "modal",
+            "target": {
+                "selector": "#confirm-dialog",
+                "tag": "dialog",
+            },
+        },
+        "upload": {
+            "action": "upload",
+            "target": {
+                "selector": "#profile-pic",
+                "tag": "input",
+            },
+            "files": [
+                {
+                    "name": "photo.jpg",
+                    "type": "image/jpeg",
+                    "size": 45678,
+                }
+            ],
+        },
         "inspekt": {
             "action": "inspekt",
             "command": "axe --level 2aa",
@@ -1452,6 +3020,7 @@ def record_tutorial(speak: bool):
         "rightclick": "Right-click for context menu",
         "activate": "Keyboard activation with Enter or Space",
         "type": "Type text into input field",
+        "set": "Set value on native control",
         "keypress": "Press a keyboard shortcut",
         "hover": "Hover over an element",
         "check": "Check a checkbox",
@@ -1459,6 +3028,9 @@ def record_tutorial(speak: bool):
         "radio": "Select a radio button",
         "select": "Select from a dropdown",
         "scroll": "Scroll the page",
+        "toggle": "Toggle a details disclosure",
+        "dialog": "Open or close a modal dialog",
+        "upload": "Upload a file",
         "plugin": "Run an Inspekt plugin",
         "inspekt": "Run an Inspekt command",
         "failure": "When an action fails",
@@ -1466,7 +3038,7 @@ def record_tutorial(speak: bool):
 
     # Display simulated recording output
     click.echo()
-    click.secho("  Recording started...", fg="green")
+    click.secho("  Recording started…", fg="green")
     click.echo()
 
     # Play start playback sound

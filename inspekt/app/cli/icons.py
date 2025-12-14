@@ -71,6 +71,10 @@ INDICATOR_ICONS: dict[str, str] = {
     "bypass": "\uf0e7",                #  nf-fa-bolt
     "command": "\uf054",               #  nf-fa-chevron_right
     "resume": "\ueacf",                #  nf-cod-debug_continue (resume)
+    "pause": "\uf04c",                 #  nf-fa-pause (recording paused)
+    "undo": "\U000f054c",              # 󰕌 nf-md-undo (undo action)
+    "redo": "\U000f044e",              # 󰑎 nf-md-redo (redo action)
+    "stop": "\uf04d",                  #  nf-fa-stop (recording stopped)
 }
 
 # Recording action icons - used in record and replay commands
@@ -80,6 +84,7 @@ ACTION_ICONS: dict[str, str] = {
     "rightclick": "\U000f0cfd",        # 󰳽 nf-md-cursor_default_click (same as click)
     "activate": "\U000f0311",          # 󰌑 nf-md-keyboard_return (Enter key)
     "type": "\U000f05e7",              # 󰗧 nf-md-form_textbox
+    "set": "\U000f0219",               # 󰈙 nf-md-file_document_edit (default for set)
     "keypress": "\uf11c",              #  nf-fa-keyboard_o (default for other keys)
     "hover": "\U000f0208",             # 󰈈 nf-md-eye (looking at element)
     "scroll": "\U000f0599",            # 󰖙 nf-md-unfold_more_vertical (scroll)
@@ -87,7 +92,22 @@ ACTION_ICONS: dict[str, str] = {
     "uncheck": "\uf0c8",               #  nf-fa-square (empty square)
     "select": "\U000f1400",            # 󱐀 nf-md-form_dropdown (dropdown)
     "radio": "\U000f043e",             # 󰐾 nf-md-radiobox_marked (radio button)
+    "toggle": "\U000f0142",            # 󰅂 nf-md-chevron_down (expand/collapse)
+    "dialog": "\U000f05a4",            # 󰖤 nf-md-window_maximize (dialog/modal)
+    "upload": "\U000f0552",            # 󰕒 nf-md-upload (file upload)
     "inspekt": "\uf002",               #  nf-fa-search
+}
+
+# Native control set icons - used for 'set' action with different input types
+NATIVE_CONTROL_ICONS: dict[str, str] = {
+    "time": "\U000f0589",              # 󰖉 nf-md-clock_outline
+    "date": "\U000f00ed",              # 󰃭 nf-md-calendar
+    "datetime-local": "\U000f00f0",    # 󰃰 nf-md-calendar_clock
+    "month": "\U000f00ed",             # 󰃭 nf-md-calendar
+    "week": "\U000f00ed",              # 󰃭 nf-md-calendar
+    "range": "\ue690",                 #  nf-seti-config
+    "number": "\uf4f7",                #  nf-oct-number
+    "color": "\U000f03d8",             # 󰏘 nf-md-palette
 }
 
 # Step mode icons - used for skip/pause modes in replay
@@ -247,6 +267,23 @@ def get_action_icon(action: str) -> str | None:
     if not is_nerdfont_enabled():
         return None
     return ACTION_ICONS.get(action.lower())
+
+
+def get_native_control_icon(input_type: str) -> str | None:
+    """
+    Get icon for a native control input type.
+
+    Args:
+        input_type: The input type (e.g., "time", "date", "range", "color")
+
+    Returns:
+        The Nerdfont glyph if nerdfont is enabled, None otherwise
+    """
+    from inspekt.config import is_nerdfont_enabled
+
+    if not is_nerdfont_enabled():
+        return None
+    return NATIVE_CONTROL_ICONS.get(input_type.lower())
 
 
 def get_keypress_icon(key: str, modifiers: list[str] | None = None) -> str | None:
