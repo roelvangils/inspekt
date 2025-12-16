@@ -26,6 +26,34 @@ def is_isolated_mode() -> bool:
     return os.environ.get(ISOLATED_ENV_VAR, "").lower() in ("1", "true", "yes")
 
 
+# Bridge server ports
+# In isolated mode (VM), the bridge runs on different ports to avoid conflicts
+BRIDGE_HTTP_PORT_DEFAULT = 8765
+BRIDGE_HTTP_PORT_ISOLATED = 8767
+BRIDGE_WS_PORT_DEFAULT = 8766
+BRIDGE_WS_PORT_ISOLATED = 8768
+
+
+def get_bridge_port() -> int:
+    """
+    Get the correct bridge HTTP port based on environment.
+
+    Returns:
+        8767 in isolated mode (VM), 8765 otherwise
+    """
+    return BRIDGE_HTTP_PORT_ISOLATED if is_isolated_mode() else BRIDGE_HTTP_PORT_DEFAULT
+
+
+def get_bridge_ws_port() -> int:
+    """
+    Get the correct bridge WebSocket port based on environment.
+
+    Returns:
+        8768 in isolated mode (VM), 8766 otherwise
+    """
+    return BRIDGE_WS_PORT_ISOLATED if is_isolated_mode() else BRIDGE_WS_PORT_DEFAULT
+
+
 # Default configuration
 DEFAULT_CONFIG: dict[str, Any] = {
     "ai-language": "auto",

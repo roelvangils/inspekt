@@ -34,6 +34,7 @@
       click: '#3b82f6',      // blue
       activate: '#8b5cf6',   // purple
       type: '#f59e0b',       // amber
+      set: '#f59e0b',        // amber (same as type for native control values)
       check: '#10b981',      // green
       uncheck: '#10b981',    // green
       select: '#06b6d4',     // cyan
@@ -699,6 +700,7 @@
      * Set the circle color based on action type
      */
     setColor(actionType) {
+      this.init();  // Ensure overlay exists before accessing elements
       const color = CONFIG.colors[actionType] || CONFIG.colors.default;
       this.elements.circle.style.borderColor = color;
     },
@@ -715,10 +717,11 @@
         const endX = x;
         const endY = y;
 
-        // If no previous position, just set directly
+        // If no previous position, just set directly (no animation needed)
         if (startX === 0 && startY === 0) {
-          this.elements.circle.style.left = `${endX}px`;
-          this.elements.circle.style.top = `${endY}px`;
+          const circle = this.elements.circle;
+          circle.style.left = `${endX}px`;
+          circle.style.top = `${endY}px`;
           this.currentPosition = { x: endX, y: endY };
           resolve();
           return;
@@ -742,7 +745,17 @@
         const controlX = midX + perpX * offset;
         const controlY = midY + perpY * offset;
 
+        // Store reference at animation start to guard against cleanup during animation
+        const circle = this.elements.circle;
+
         const animate = (currentTime) => {
+          // Guard: if cleanup happened during animation, abort gracefully
+          if (!this.elements || !circle.isConnected) {
+            this.currentPosition = { x: endX, y: endY };
+            resolve();
+            return;
+          }
+
           const elapsed = currentTime - startTime;
           const progress = Math.min(elapsed / duration, 1);
 
@@ -756,8 +769,8 @@
           const currentX = (1 - t) ** 2 * startX + 2 * (1 - t) * t * controlX + t ** 2 * endX;
           const currentY = (1 - t) ** 2 * startY + 2 * (1 - t) * t * controlY + t ** 2 * endY;
 
-          this.elements.circle.style.left = `${currentX}px`;
-          this.elements.circle.style.top = `${currentY}px`;
+          circle.style.left = `${currentX}px`;
+          circle.style.top = `${currentY}px`;
 
           if (progress < 1) {
             this.animationFrame = requestAnimationFrame(animate);
@@ -955,6 +968,10 @@
     ctx: null,
     enabled: true,
     initialized: false,
+
+    // Audio cue recording for video (--include-effects)
+    recordingForVideo: false,
+    recordingStartTime: 0,
 
     init() {
       if (this.initialized) return this.enabled;
@@ -1434,6 +1451,9 @@
         case 'type':
           this.playKeystroke();
           break;
+        case 'set':
+          this.playKeystroke();  // Same sound as type for setting native control values
+          break;
         case 'keypress':
           this.playKeypress();
           break;
@@ -1455,6 +1475,21 @@
         case 'radio':
           this.playRadio();
           break;
+        case 'toggle':
+          this.playClick();  // Use click sound for toggle actions
+          break;
+        case 'dialog':
+          this.playClick();  // Use click sound for dialog actions
+          break;
+        case 'jsdialog':
+          this.playClick();  // Use click sound for JS dialog actions
+          break;
+        case 'upload':
+          this.playClick();  // Use click sound for upload actions
+          break;
+        case 'download':
+          this.playClick();  // Use click sound for download actions
+          break;
         case 'hover':
           this.playHover();
           break;
@@ -1475,6 +1510,35 @@
           // No sound for unknown actions
           break;
       }
+
+      // If recording audio cues for video, send cue to bridge
+      if (this.recordingForVideo && actionType) {
+        const timestampMs = Math.round(performance.now() - this.recordingStartTime);
+        fetch('http://127.0.0.1:8765/audio/cue', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            timestamp_ms: timestampMs,
+            action: actionType
+          })
+        }).catch(() => {}); // Fire and forget - don't block replay
+      }
+    },
+
+    /**
+     * Start recording audio cues for video
+     * Called when replay starts with --video --include-effects
+     */
+    startRecordingForVideo() {
+      this.recordingForVideo = true;
+      this.recordingStartTime = performance.now();
+    },
+
+    /**
+     * Stop recording audio cues for video
+     */
+    stopRecordingForVideo() {
+      this.recordingForVideo = false;
     }
   };
 
@@ -1490,7 +1554,7 @@
      * Actions that should show the target indicator
      */
     shouldShowForAction(action) {
-      const showActions = ['click', 'rightclick', 'activate', 'type', 'check', 'uncheck', 'select', 'radio'];
+      const showActions = ['click', 'rightclick', 'activate', 'type', 'set', 'check', 'uncheck', 'select', 'radio'];
       return showActions.includes(action);
     },
 
@@ -1512,6 +1576,7 @@
         rightclick: CONFIG.colors.click,
         activate: CONFIG.colors.activate,
         type: CONFIG.colors.type,
+        set: CONFIG.colors.set,
         keypress: CONFIG.colors.keypress,
         check: CONFIG.colors.check,
         uncheck: CONFIG.colors.uncheck,
@@ -1938,6 +2003,7 @@
         rightclick: '\u{f0cfd}',  // 󰳽 nf-md-cursor_default_click
         activate: '\u{f0311}',    // 󰌑 nf-md-keyboard_return
         type: '\u{f05e7}',        // 󰗧 nf-md-form_textbox
+        set: '\u{f05e7}',         // 󰗧 nf-md-form_textbox (default, overridden below)
         keypress: '\uf11c',       //  nf-fa-keyboard_o
         hover: '\u{f0208}',       // 󰈈 nf-md-eye
         scroll: '\u{f0599}',      // 󰖙 nf-md-unfold_more_vertical
@@ -1945,10 +2011,28 @@
         uncheck: '\uf0c8',        //  nf-fa-square
         select: '\u{f1400}',      // 󱐀 nf-md-form_dropdown
         radio: '\u{f043e}',       // 󰐾 nf-md-radiobox_marked
+        jsdialog: '\ue60c',       //  nf-seti-javascript
         inspekt: '\uf002'         //  nf-fa-search
       };
 
-      const icon = icons[action] || '\u2022'; // bullet as fallback
+      // Native control icons - matches icons.py NATIVE_CONTROL_ICONS
+      const nativeControlIcons = {
+        time: '\u{f0589}',           // 󰖉 nf-md-clock_outline
+        date: '\u{f00ed}',           // 󰃭 nf-md-calendar
+        'datetime-local': '\u{f00f0}', // 󰃰 nf-md-calendar_clock
+        month: '\u{f00ed}',          // 󰃭 nf-md-calendar
+        week: '\u{f00ed}',           // 󰃭 nf-md-calendar
+        range: '\ue690',              //  nf-seti-config
+        number: '\uf4f7',            //  nf-oct-number
+        color: '\u{f03d8}'           // 󰏘 nf-md-palette
+      };
+
+      // Get icon - for 'set' action, use native control-specific icon
+      let icon = icons[action] || '\u2022'; // bullet as fallback
+      if (action === 'set') {
+        const inputType = target.input_type || '';
+        icon = nativeControlIcons[inputType] || icons.set;
+      }
 
       // Format based on action type
       if (action === 'navigate') {
@@ -1964,6 +2048,23 @@
           return `${icon} Type password (${charCount} chars)`;
         }
         return `${icon} Type ${charCount} chars into ${inputType} field`;
+      }
+
+      if (action === 'set') {
+        const value = step.value || '';
+        const inputType = target.input_type || '';
+        const typeNames = {
+          time: 'time',
+          date: 'date',
+          'datetime-local': 'date & time',
+          month: 'month',
+          week: 'week',
+          range: 'range',
+          number: 'number',
+          color: 'color'
+        };
+        const typeName = typeNames[inputType] || 'value';
+        return `${icon} Set ${typeName} to ${value}`;
       }
 
       if (action === 'keypress') {
@@ -1992,6 +2093,18 @@
 
       if (action === 'inspekt') {
         return `${icon} Run: inspekt ${step.command || ''}`;
+      }
+
+      if (action === 'jsdialog') {
+        const dialogType = step.dialog_type || 'alert';
+        const message = step.message || '';
+        const shortMessage = message.length > 30 ? message.substring(0, 30) + '...' : message;
+        const typeLabels = { alert: 'Alert', confirm: 'Confirm', prompt: 'Prompt' };
+        const typeLabel = typeLabels[dialogType] || dialogType;
+        if (message) {
+          return `${icon} ${typeLabel}: "${shortMessage}"`;
+        }
+        return `${icon} ${typeLabel} dialog`;
       }
 
       // Default: click, rightclick, activate, hover
@@ -2750,6 +2863,246 @@
   };
 
   // ==========================================================================
+  // JavaScript Dialog Overlay (for alert, confirm, prompt during replay)
+  // ==========================================================================
+
+  const JsDialogOverlay = {
+    backdrop: null,
+    overlay: null,
+    timeout: null,
+    typeInterval: null,
+
+    /**
+     * Show a Chrome-style dialog overlay
+     * @param {string} dialogType - 'alert', 'confirm', or 'prompt'
+     * @param {string} message - The dialog message
+     * @param {*} result - The recorded result (true/false for confirm, string/null for prompt)
+     * @param {number} duration - How long to show overlay in ms (default 1500)
+     * @returns {Promise} Resolves after the overlay animation completes
+     */
+    show: function(dialogType, message, result, duration = 1500) {
+      return new Promise((resolve) => {
+        // Remove any existing overlay
+        this.hide();
+
+        // Inject shared dialog styles if not already present
+        if (!document.getElementById('inspekt-dialog-styles')) {
+          const styleEl = document.createElement('style');
+          styleEl.id = 'inspekt-dialog-styles';
+          styleEl.textContent = `DIALOG_STYLES_PLACEHOLDER`;
+          document.head.appendChild(styleEl);
+        }
+
+        // Get domain for heading (includes port if present)
+        const domain = window.location.host || 'This page';
+
+        // Create backdrop (dims the page)
+        this.backdrop = document.createElement('div');
+        this.backdrop.className = 'inspekt-dialog-backdrop inspekt-fade-in';
+
+        // Create dialog overlay
+        this.overlay = document.createElement('div');
+        this.overlay.className = 'inspekt-dialog inspekt-fade-in';
+
+        // Build buttons based on dialog type
+        let buttonsHtml = '';
+        if (dialogType === 'alert') {
+          buttonsHtml = `<button class="inspekt-dialog-btn inspekt-dialog-btn-primary">OK</button>`;
+        } else {
+          // confirm and prompt have Cancel + OK
+          buttonsHtml = `
+            <button class="inspekt-dialog-btn inspekt-dialog-btn-secondary">Cancel</button>
+            <button class="inspekt-dialog-btn inspekt-dialog-btn-primary">OK</button>
+          `;
+        }
+
+        // Build input for prompt
+        let inputHtml = '';
+        if (dialogType === 'prompt') {
+          inputHtml = `<input class="inspekt-dialog-input" type="text" readonly />`;
+        }
+
+        this.overlay.innerHTML = `
+          <div class="inspekt-dialog-heading">${this.escapeHtml(domain)} says</div>
+          <div class="inspekt-dialog-message">${this.escapeHtml(message) || ''}</div>
+          ${inputHtml}
+          <div class="inspekt-dialog-buttons">
+            ${buttonsHtml}
+          </div>
+        `;
+
+        document.body.appendChild(this.backdrop);
+        document.body.appendChild(this.overlay);
+
+        // For prompt dialogs, animate typing the result
+        if (dialogType === 'prompt' && result !== null && result !== undefined) {
+          const input = this.overlay.querySelector('.inspekt-dialog-input');
+          if (input) {
+            const text = String(result);
+            let i = 0;
+            // Calculate typing speed based on duration (leave 500ms for viewing)
+            const availableTime = Math.max(duration - 500, 500);
+            const charDelay = Math.min(50, availableTime / text.length);
+            this.typeInterval = setInterval(() => {
+              if (i < text.length) {
+                input.value = text.substring(0, ++i);
+              } else {
+                clearInterval(this.typeInterval);
+                this.typeInterval = null;
+              }
+            }, charDelay);
+          }
+        }
+
+        // Auto-hide after recorded duration with fade-out
+        // Ensure minimum 500ms visibility for readability
+        const showDuration = Math.max(duration - 100, 500);
+        this.timeout = setTimeout(() => {
+          if (this.overlay) {
+            this.overlay.classList.remove('inspekt-fade-in');
+            this.overlay.classList.add('inspekt-fade-out');
+            if (this.backdrop) {
+              this.backdrop.classList.remove('inspekt-fade-in');
+              this.backdrop.classList.add('inspekt-fade-out');
+            }
+            setTimeout(() => {
+              this.hide();
+              resolve();
+            }, 100);
+          } else {
+            resolve();
+          }
+        }, showDuration);
+      });
+    },
+
+    hide: function() {
+      if (this.timeout) {
+        clearTimeout(this.timeout);
+        this.timeout = null;
+      }
+      if (this.typeInterval) {
+        clearInterval(this.typeInterval);
+        this.typeInterval = null;
+      }
+      if (this.backdrop && this.backdrop.parentNode) {
+        this.backdrop.parentNode.removeChild(this.backdrop);
+      }
+      this.backdrop = null;
+      if (this.overlay && this.overlay.parentNode) {
+        this.overlay.parentNode.removeChild(this.overlay);
+      }
+      this.overlay = null;
+    },
+
+    escapeHtml: function(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+  };
+
+  // ==========================================================================
+  // JavaScript Dialog Interception (for replay)
+  // ==========================================================================
+
+  const JsDialogInterceptor = {
+    enabled: false,
+    originals: null,
+    pendingResults: [],  // Queue of expected results from jsdialog steps
+
+    /**
+     * Enable interception of alert, confirm, prompt during replay
+     * Shows synthetic overlay instead of native dialog
+     */
+    enable: function() {
+      if (this.enabled) return;
+
+      // Store originals
+      this.originals = {
+        alert: window.alert,
+        confirm: window.confirm,
+        prompt: window.prompt
+      };
+
+      const self = this;
+
+      // Replace alert - show synthetic overlay, return undefined
+      window.alert = function(message) {
+        console.log('[Inspekt Replay] alert() intercepted:', message);
+        // Get pending result (for the message match)
+        const pending = self.popPendingResult('alert');
+        // Show synthetic overlay (non-blocking)
+        JsDialogOverlay.show('alert', message, true);
+        return undefined;
+      };
+
+      // Replace confirm - show synthetic overlay, return queued result
+      window.confirm = function(message) {
+        console.log('[Inspekt Replay] confirm() intercepted:', message);
+        const pending = self.popPendingResult('confirm');
+        const result = pending !== undefined ? pending : true;
+        // Show synthetic overlay with the result
+        JsDialogOverlay.show('confirm', message, result);
+        return result;
+      };
+
+      // Replace prompt - show synthetic overlay, return queued result
+      window.prompt = function(message, defaultValue) {
+        console.log('[Inspekt Replay] prompt() intercepted:', message);
+        const pending = self.popPendingResult('prompt');
+        const result = pending !== undefined ? pending : (defaultValue || '');
+        // Show synthetic overlay with the result
+        JsDialogOverlay.show('prompt', message, result);
+        return result;
+      };
+
+      this.enabled = true;
+    },
+
+    /**
+     * Disable interception and restore original functions
+     */
+    disable: function() {
+      if (!this.enabled || !this.originals) return;
+
+      window.alert = this.originals.alert;
+      window.confirm = this.originals.confirm;
+      window.prompt = this.originals.prompt;
+
+      this.originals = null;
+      this.pendingResults = [];
+      this.enabled = false;
+    },
+
+    /**
+     * Queue an expected result for the next dialog call
+     * @param {string} type - 'alert', 'confirm', or 'prompt'
+     * @param {*} result - The expected result
+     */
+    queueResult: function(type, result) {
+      this.pendingResults.push({ type, result });
+    },
+
+    /**
+     * Pop the next pending result for a dialog type
+     * @param {string} type - 'alert', 'confirm', or 'prompt'
+     * @returns {*} The pending result or undefined
+     */
+    popPendingResult: function(type) {
+      const index = this.pendingResults.findIndex(p => p.type === type);
+      if (index >= 0) {
+        const item = this.pendingResults.splice(index, 1)[0];
+        return item.result;
+      }
+      return undefined;
+    }
+  };
+
+  // ==========================================================================
   // Public API
   // ==========================================================================
 
@@ -2796,7 +3149,11 @@
       playError: () => Audio.playError(),
       playSuccess: () => Audio.playSuccess(),
       // Action dispatcher
-      playForAction: (actionType) => Audio.playForAction(actionType)
+      playForAction: (actionType) => Audio.playForAction(actionType),
+      // Video audio recording
+      startRecordingForVideo: () => Audio.startRecordingForVideo(),
+      stopRecordingForVideo: () => Audio.stopRecordingForVideo(),
+      isRecordingForVideo: () => Audio.recordingForVideo
     },
 
     // Input lock (prevent user interference during replay)
@@ -2832,6 +3189,18 @@
       show: (options, mainCorner) => AssertionOverlay.show(options, mainCorner),
       hide: () => AssertionOverlay.hide(),
       remove: () => AssertionOverlay.remove()
+    },
+
+    // JavaScript dialog overlay (for alert, confirm, prompt)
+    showJsDialogOverlay: (type, message, result) => JsDialogOverlay.show(type, message, result),
+    hideJsDialogOverlay: () => JsDialogOverlay.hide(),
+
+    // JavaScript dialog interception (prevents blocking during replay)
+    jsDialogInterceptor: {
+      enable: () => JsDialogInterceptor.enable(),
+      disable: () => JsDialogInterceptor.disable(),
+      queueResult: (type, result) => JsDialogInterceptor.queueResult(type, result),
+      isEnabled: () => JsDialogInterceptor.enabled
     },
 
     // Configuration
@@ -2913,6 +3282,24 @@
   }
 
   // ==========================================================================
+  // CDP Dialog Overlay Bridge
+  // ==========================================================================
+
+  /**
+   * Listen for CDP dialog interception notifications from the extension
+   * When CDP intercepts a dialog (Page.javascriptDialogOpening), the extension
+   * sends a message to show a visual overlay for user feedback
+   */
+  window.addEventListener('message', (event) => {
+    if (event.data?.type === 'INSPEKT_SHOW_DIALOG_OVERLAY' &&
+        event.data?.source === 'inspekt-extension') {
+      const { dialogType, message, result, duration } = event.data;
+      console.log('[Inspekt Visual] CDP dialog intercepted, showing overlay:', { dialogType, message, result, duration });
+      JsDialogOverlay.show(dialogType, message, result, duration);
+    }
+  });
+
+  // ==========================================================================
   // Initialization
   // ==========================================================================
 
@@ -2932,6 +3319,12 @@
 
     // Pre-load position for interactive overlay
     InteractiveOverlay.loadPosition().catch(() => {});
+
+    // IMPORTANT: Always enable JS-level dialog interception during replay
+    // This prevents native alert/confirm/prompt from blocking the replay
+    // Works as a fallback even if CDP interception fails (e.g., DevTools open)
+    JsDialogInterceptor.enable();
+    console.log('[Inspekt Visual] JS dialog interceptor enabled (replay mode)');
   })();
 
 })();

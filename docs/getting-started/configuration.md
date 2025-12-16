@@ -957,6 +957,129 @@ Volume level for audio feedback.
 
 ---
 
+## Replay Configuration
+
+The `replay` section controls behavior of `inspekt replay`.
+
+### `replay.validate`
+
+Whether to run preflight validation before replaying recordings.
+
+**Type**: `boolean`
+**Default**: `true`
+
+Validation checks for:
+- YAML syntax errors
+- Missing external files (for uploads)
+- Invalid action types
+- Timestamp anomalies
+- Large time gaps between steps
+
+=== "Enabled (Default)"
+
+    ```json
+    {
+      "replay": {
+        "validate": true
+      }
+    }
+    ```
+
+    Validates recordings before replay. Shows errors that block replay and warnings that prompt for confirmation.
+
+=== "Disabled"
+
+    ```json
+    {
+      "replay": {
+        "validate": false
+      }
+    }
+    ```
+
+    Skips validation for faster replay startup. Use when you trust the recording files or in CI environments where recordings have been pre-validated.
+
+!!! tip "Per-command override"
+    You can skip validation for a single replay without changing config:
+    ```bash
+    inspekt replay my-recording.yaml --skip-validation
+    ```
+
+See [inspekt validate](../commands/validate.md) for standalone validation.
+
+---
+
+## Record Configuration
+
+The `record` section controls behavior of `inspekt record`.
+
+### `record.max-actions-per-second`
+
+Rate limit to prevent runaway recordings from held keys or infinite loops.
+
+**Type**: `number`
+**Default**: `10`
+**Range**: `1` - `100`
+
+```json
+{
+  "record": {
+    "max-actions-per-second": 10
+  }
+}
+```
+
+When exceeded, recording automatically stops and saves with a warning.
+
+### `record.synthetic-dialogs`
+
+Use non-blocking HTML overlays instead of native `alert()`, `confirm()`, and `prompt()` dialogs during recording.
+
+**Type**: `boolean`
+**Default**: `false`
+
+=== "Native Dialogs (Default)"
+
+    ```json
+    {
+      "record": {
+        "synthetic-dialogs": false
+      }
+    }
+    ```
+
+    Native browser dialogs appear when the page calls `alert()`, `confirm()`, or `prompt()`. These block JavaScript execution until you interact with them.
+
+    **Use case**: Manual testing where you want authentic user experience.
+
+=== "Synthetic Dialogs"
+
+    ```json
+    {
+      "record": {
+        "synthetic-dialogs": true
+      }
+    }
+    ```
+
+    Styled HTML overlays appear instead of native dialogs. These don't block JavaScript - functions return immediately with default values.
+
+    **Use cases**:
+    - AI agent recording
+    - Browser automation
+    - CI/CD environments
+    - Headless browser testing
+
+!!! tip "CLI Override"
+    Enable for a single recording without changing config:
+    ```bash
+    inspekt record --synthetic-dialogs my-recording.yaml
+    ```
+
+See [JavaScript Dialogs in Recording](../guide/recording-replay.md#javascript-dialogs-alert-confirm-prompt) for detailed usage.
+
+---
+
 ## Configuration Reference
 
 Quick reference for all available settings:
@@ -966,6 +1089,9 @@ Quick reference for all available settings:
 | `ai-language` | `string` | `"auto"` | Language for AI operations |
 | `audio.output` | `string` | `"cli"` | Audio output: cli, browser, or off |
 | `audio.volume` | `number` | `0.5` | Audio volume (0.0 to 1.0) |
+| `record.max-actions-per-second` | `number` | `10` | Rate limit for recording (actions/sec) |
+| `record.synthetic-dialogs` | `boolean` | `false` | Use non-blocking HTML overlays for JS dialogs |
+| `replay.validate` | `boolean` | `true` | Run preflight validation before replay |
 | `control.auto-refocus` | `string` | `"only-spa"` | When to auto-refocus |
 | `control.focus-outline` | `string` | `"custom"` | Focus outline style |
 | `control.speak-name` | `boolean` | `false` | Speak element name |

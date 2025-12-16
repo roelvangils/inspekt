@@ -20,6 +20,7 @@ from pathlib import Path
 import click
 
 from inspekt.app.cli.base import builtin_open
+from inspekt.app.cli.util import open_or_download
 from inspekt.client import BridgeClient
 
 
@@ -78,7 +79,7 @@ def generate_output_path(
     Args:
         title: Page title
         url: Page URL
-        output_dir: Output directory (default: ~/Downloads/{domain}/)
+        output_dir: Output directory (default: config.paths.downloads/{domain}/)
         filename: Custom filename (optional)
 
     Returns:
@@ -101,13 +102,17 @@ def generate_output_path(
     if output_dir:
         return output_dir / generated_name
 
-    # Default: save to ~/Downloads/{domain}/
+    # Default: save to downloads directory from config, with domain subfolder
+    from inspekt.config import get_paths_config
+    paths = get_paths_config()
+    downloads_dir = paths["downloads"]
+
     domain = extract_domain_from_url(url)
     if domain:
-        default_dir = Path.home() / "Downloads" / domain
+        default_dir = downloads_dir / domain
         return default_dir / generated_name
 
-    return Path(generated_name)
+    return downloads_dir / generated_name
 
 
 @click.command()
@@ -173,6 +178,12 @@ def generate_output_path(
     is_flag=True,
     help='Output result as JSON (for scripting)'
 )
+@click.option(
+    '--open',
+    'open_after',
+    is_flag=True,
+    help='Open saved file in default application'
+)
 def save(
     output: str | None,
     output_dir: str | None,
@@ -186,6 +197,7 @@ def save(
     optimize: bool,
     quiet: bool,
     output_json: bool,
+    open_after: bool,
 ):
     """
     Save the current page as a single HTML file.
@@ -194,8 +206,9 @@ def save(
     the SingleFile library. The saved page represents the CURRENT DOM STATE,
     including any JavaScript-rendered content.
 
-    By default, pages are saved to ~/Downloads/{domain}/ where {domain} is
-    extracted from the page URL (e.g. ~/Downloads/github.com/Page_Title.html).
+    By default, pages are saved to {downloads}/{domain}/ where {downloads} is
+    configured in config.json (default: ~/Downloads) and {domain} is extracted
+    from the page URL (e.g. ~/Downloads/github.com/Page_Title.html).
 
     Features:
     - CSS stylesheets (inlined and deduplicated)
@@ -226,11 +239,15 @@ def save(
                 "error": "Bridge server is not running"
             }))
         else:
+            from inspekt.app.cli.table import _style_with_inline_code
             click.echo(
-                "Error: Bridge server is not running. Start it with: inspekt start",
+                _style_with_inline_code("Error: Bridge server is not running. Start it with `inspekt start`.", base_fg="red"),
                 err=True
             )
         sys.exit(1)
+
+    # Initialize progress bar variable (will be set inside try block if needed)
+    progress_bar = None
 
     try:
         # Build options for SingleFile
@@ -283,15 +300,28 @@ def save(
 
         singlefile_code = "\n".join(singlefile_code_parts)
 
+        # Progress indicator for non-quiet mode
+        progress_bar = None
         if not quiet and not output_json:
             if remote_images:
-                click.echo("Capturing page (keeping images as remote URLs)...", err=True)
+                label = "Capturing page (remote images)"
             elif no_images:
-                click.echo("Capturing page (skipping images)...", err=True)
+                label = "Capturing page (no images)"
             else:
-                click.echo("Capturing page with embedded images (this may take a moment)...", err=True)
-                click.echo("  Tip: Use --remote-images for faster saves (keeps image URLs)", err=True)
-                click.echo("       Use --no-images to skip images entirely", err=True)
+                label = "Capturing page"
+
+            # Create a progress bar with indeterminate progress (we'll update manually)
+            # Using 100 as a fake length, will complete when done
+            progress_bar = click.progressbar(
+                length=100,
+                label=label,
+                show_eta=False,
+                show_percent=True,
+                fill_char=click.style("█", fg="cyan"),
+                empty_char=click.style("░", fg="bright_black"),
+            )
+            progress_bar.__enter__()
+            progress_bar.update(10)  # Show initial progress
 
         # Combine library + capture script into ONE execute call (same pattern as axe-core)
         # This avoids timeout issues and race conditions
@@ -404,7 +434,14 @@ def save(
 
         result = client.execute(full_script, timeout=180.0)
 
+        # Update progress after capture completes
+        if progress_bar:
+            progress_bar.update(70)  # Capture complete
+
         if not result.get("ok"):
+            if progress_bar:
+                progress_bar.update(20)  # Complete the bar before error
+                progress_bar.__exit__(None, None, None)
             error_msg = result.get("error", "Unknown error")
             if output_json:
                 click.echo(json.dumps({
@@ -419,6 +456,9 @@ def save(
         page_result = result.get("result", {})
 
         if not page_result.get("ok"):
+            if progress_bar:
+                progress_bar.update(20)  # Complete the bar before error
+                progress_bar.__exit__(None, None, None)
             error_msg = page_result.get("error", "Failed to capture page")
             if output_json:
                 click.echo(json.dumps({
@@ -439,6 +479,9 @@ def save(
         stats = page_result.get("stats", {})
 
         if not content:
+            if progress_bar:
+                progress_bar.update(20)
+                progress_bar.__exit__(None, None, None)
             if output_json:
                 click.echo(json.dumps({
                     "ok": False,
@@ -459,9 +502,18 @@ def save(
         # Ensure parent directory exists
         output_path.parent.mkdir(parents=True, exist_ok=True)
 
+        # Update progress before writing
+        if progress_bar:
+            progress_bar.update(15)  # 95% complete
+
         # Write the file
         with builtin_open(output_path, 'w', encoding='utf-8') as f:
             f.write(content)
+
+        # Complete and close progress bar
+        if progress_bar:
+            progress_bar.update(5)  # 100% complete
+            progress_bar.__exit__(None, None, None)
 
         # Calculate file size
         file_size = len(content.encode('utf-8'))
@@ -487,7 +539,13 @@ def save(
                 # Quiet mode: just output the path for piping
                 click.echo(str(output_path.absolute()))
 
+        # Open file if --open flag was set (skip for JSON/quiet modes as they're for piping)
+        if open_after and not output_json and not quiet:
+            open_or_download(output_path)
+
     except FileNotFoundError as e:
+        if progress_bar:
+            progress_bar.__exit__(None, None, None)
         if output_json:
             click.echo(json.dumps({
                 "ok": False,
@@ -498,6 +556,8 @@ def save(
         sys.exit(1)
 
     except (ConnectionError, TimeoutError, RuntimeError) as e:
+        if progress_bar:
+            progress_bar.__exit__(None, None, None)
         if output_json:
             click.echo(json.dumps({
                 "ok": False,

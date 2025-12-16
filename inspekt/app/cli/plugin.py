@@ -22,11 +22,36 @@ from pathlib import Path
 import click
 import requests
 
+from inspekt.app.cli.util import open_or_download
 from inspekt.services.plugin_service import get_plugin_service, parse_bookmarklet
 
 # Bridge server defaults
 BRIDGE_HTTP_HOST = "127.0.0.1"
 BRIDGE_HTTP_PORT = 8765
+
+
+def complete_plugin_names(ctx, param, incomplete):
+    """Shell completion for plugin names/IDs."""
+    try:
+        plugin_service = get_plugin_service()
+        plugins = plugin_service.list_plugins()
+
+        matches = []
+        for p in plugins:
+            # Include both name and ID for completion
+            name = p.get("name", "")
+            plugin_id = p.get("id", "")
+
+            # Match on name (case-insensitive)
+            if incomplete.lower() in name.lower():
+                matches.append(name)
+            # Match on ID
+            elif incomplete.lower() in plugin_id.lower():
+                matches.append(plugin_id)
+
+        return sorted(set(matches))
+    except Exception:
+        return []
 
 
 @click.group()
@@ -146,7 +171,7 @@ def plugin_add(name, code, file_path, url, description, category, tags, mcp, ret
 
 
 @plugin.command(name="remove")
-@click.argument("name_or_id")
+@click.argument("name_or_id", shell_complete=complete_plugin_names)
 @click.option("--force", "-f", is_flag=True, help="Skip confirmation")
 def plugin_remove(name_or_id, force):
     """
@@ -190,7 +215,7 @@ def plugin_remove(name_or_id, force):
 
 
 @plugin.command(name="run")
-@click.argument("name_or_id")
+@click.argument("name_or_id", shell_complete=complete_plugin_names)
 @click.option("--timeout", "-t", type=int, default=30, help="Execution timeout (seconds)")
 @click.option("--json", "-j", "output_json", is_flag=True, help="Output result as JSON")
 @click.option("--quiet", "-q", is_flag=True, help="Suppress console output")
@@ -263,7 +288,7 @@ def plugin_run(name_or_id, timeout, output_json, quiet):
 
 
 @plugin.command(name="unload")
-@click.argument("name_or_id")
+@click.argument("name_or_id", shell_complete=complete_plugin_names)
 @click.option("--timeout", "-t", type=int, default=30, help="Execution timeout (seconds)")
 @click.option("--json", "-j", "output_json", is_flag=True, help="Output result as JSON")
 @click.option("--quiet", "-q", is_flag=True, help="Suppress console output")
@@ -348,7 +373,7 @@ def plugin_unload(name_or_id, timeout, output_json, quiet):
 
 
 @plugin.command(name="show")
-@click.argument("name_or_id")
+@click.argument("name_or_id", shell_complete=complete_plugin_names)
 @click.option("--json", "-j", "output_json", is_flag=True, help="Output as JSON")
 def plugin_show(name_or_id, output_json):
     """
@@ -385,7 +410,8 @@ def plugin_show(name_or_id, output_json):
 @plugin.command(name="export")
 @click.option("--output", "-o", type=click.Path(), help="Output file path")
 @click.option("--ids", help="Comma-separated plugin IDs to export")
-def plugin_export(output, ids):
+@click.option("--open", "open_after", is_flag=True, help="Open exported file in default application")
+def plugin_export(output, ids, open_after):
     """
     Export plugins to JSON file.
 
@@ -396,6 +422,7 @@ def plugin_export(output, ids):
         inspekt plugin export
         inspekt plugin export --output my-plugins.json
         inspekt plugin export --ids text-spacing,dark-mode
+        inspekt plugin export -o plugins.json --open
     """
     try:
         plugin_service = get_plugin_service()
@@ -414,6 +441,10 @@ def plugin_export(output, ids):
             with open(output, "w", encoding="utf-8") as f:
                 f.write(json_str)
             click.echo(f"Exported {result['count']} plugin(s) to {output}")
+
+            # Open file if --open flag was set
+            if open_after:
+                open_or_download(output)
         else:
             click.echo(json_str)
 
@@ -554,15 +585,17 @@ def _execute_plugin(
 
 def _display_plugins(plugins: list[dict]) -> None:
     """Display plugins in table format with auto-width columns and title bar."""
+    from inspekt.app.cli.icons import get_icon
     from inspekt.app.cli.table import Table
 
     headers = ["Name", "Category", "MCP", "Runs"]
     alignments = ["left", "left", "center", "right"]
     title = f"Plugins ({len(plugins)})"
+    icon = get_icon("Plugins")
 
     if not plugins:
         # For empty tables, use minimum widths based on headers
-        table = Table(headers, alignments=alignments, title=title)
+        table = Table(headers, alignments=alignments, title=title, icon=icon)
         table.set_data([])  # Empty data, widths based on headers
         table.print_empty_message("No plugins found")
         return
@@ -580,7 +613,7 @@ def _display_plugins(plugins: list[dict]) -> None:
             str(p.get("run_count", 0)),
         ])
 
-    table = Table(headers, alignments=alignments, title=title)
+    table = Table(headers, alignments=alignments, title=title, icon=icon)
     table.set_data(rows)
     table.print_header()
 

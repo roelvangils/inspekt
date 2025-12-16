@@ -439,6 +439,194 @@ class CLIAudio:
             return player()
         return False
 
+    # ==========================================================================
+    # Sample generation (for video audio tracks)
+    # ==========================================================================
+
+    def _get_samples_for_action(self, action: str) -> list[float]:
+        """Get raw samples for an action (without playing).
+
+        Used to generate audio tracks for video recordings.
+        """
+        # Map actions to sample generators (similar to play_for_action but returns samples)
+        if action == 'start_recording':
+            t1 = self._tone(300, 0.12, 'triangle', self.volume * 0.4)
+            t2 = self._tone(450, 0.1, 'triangle', self.volume * 0.44, delay=0.1)
+            t3 = self._tone(600, 0.15, 'sine', self.volume * 0.5, delay=0.18)
+            return mix_samples(t1, t2, t3)
+
+        elif action == 'stop_recording':
+            t1 = self._tone(550, 0.1, 'triangle', self.volume * 0.45)
+            t2 = self._tone(400, 0.1, 'triangle', self.volume * 0.4, delay=0.08)
+            t3 = self._tone(300, 0.15, 'sine', self.volume * 0.35, delay=0.16)
+            return mix_samples(t1, t2, t3)
+
+        elif action == 'start_playback':
+            t1 = self._tone(350, 0.1, 'sine', self.volume * 0.35)
+            t2 = self._tone(525, 0.1, 'sine', self.volume * 0.4, delay=0.1)
+            t3 = self._tone(700, 0.15, 'triangle', self.volume * 0.45, delay=0.18)
+            return mix_samples(t1, t2, t3)
+
+        elif action == 'stop_playback':
+            t1 = self._tone(600, 0.12, 'sine', self.volume * 0.4)
+            t2 = self._tone(450, 0.12, 'sine', self.volume * 0.35, delay=0.12)
+            t3 = self._tone(350, 0.18, 'sine', self.volume * 0.3, delay=0.24)
+            return mix_samples(t1, t2, t3)
+
+        elif action == 'navigate':
+            samples = []
+            duration = 0.08
+            num_samples = int(SAMPLE_RATE * duration)
+            for i in range(num_samples):
+                t = i / SAMPLE_RATE
+                progress = i / num_samples
+                freq = 400 + 400 * progress
+                vol = self.volume * 0.35 * (1 - progress * 0.5)
+                sample = vol * math.sin(2 * math.pi * freq * t)
+                samples.append(sample)
+            return apply_envelope(samples, attack=0.005, decay=0.02)
+
+        elif action == 'click':
+            t1 = self._tone(1200, 0.015, 'square', self.volume * 0.2)
+            t2 = self._tone(300, 0.03, 'sine', self.volume * 0.25, delay=0.01)
+            return mix_samples(t1, t2)
+
+        elif action == 'rightclick':
+            t1 = self._tone(150, 0.04, 'sine', self.volume * 0.35)
+            t2 = self._tone(100, 0.05, 'sine', self.volume * 0.25, delay=0.02)
+            return mix_samples(t1, t2)
+
+        elif action == 'activate':
+            return self._tone(700, 0.12, 'sine', self.volume * 0.35)
+
+        elif action in ('type', 'set'):
+            t1 = self._tone(1400, 0.01, 'square', self.volume * 0.15)
+            t2 = self._tone(200, 0.04, 'sine', self.volume * 0.2, delay=0.008)
+            return mix_samples(t1, t2)
+
+        elif action == 'keypress':
+            return self._tone(250, 0.05, 'sine', self.volume * 0.25)
+
+        elif action == 'hover':
+            samples = []
+            duration = 0.1
+            num_samples = int(SAMPLE_RATE * duration)
+            for i in range(num_samples):
+                t = i / SAMPLE_RATE
+                progress = i / num_samples
+                freq = 800 - 400 * progress
+                vol = self.volume * 0.15 * math.sin(math.pi * progress)
+                sample = vol * math.sin(2 * math.pi * freq * t)
+                samples.append(sample)
+            return samples
+
+        elif action == 'check':
+            t1 = self._tone(500, 0.06, 'sine', self.volume * 0.3)
+            t2 = self._tone(700, 0.08, 'sine', self.volume * 0.35, delay=0.05)
+            return mix_samples(t1, t2)
+
+        elif action == 'uncheck':
+            t1 = self._tone(700, 0.06, 'sine', self.volume * 0.3)
+            t2 = self._tone(500, 0.08, 'sine', self.volume * 0.35, delay=0.05)
+            return mix_samples(t1, t2)
+
+        elif action == 'radio':
+            return self._tone(800, 0.08, 'triangle', self.volume * 0.35)
+
+        elif action == 'select':
+            t1 = self._tone(450, 0.05, 'sine', self.volume * 0.25)
+            t2 = self._tone(550, 0.06, 'sine', self.volume * 0.3, delay=0.04)
+            return mix_samples(t1, t2)
+
+        elif action == 'scroll':
+            samples = []
+            duration = 0.08
+            num_samples = int(SAMPLE_RATE * duration)
+            for i in range(num_samples):
+                t = i / SAMPLE_RATE
+                progress = i / num_samples
+                freq = 500 - 150 * progress
+                vol = self.volume * 0.15 * (1 - progress * 0.3)
+                sample = vol * math.sin(2 * math.pi * freq * t)
+                samples.append(sample)
+            return apply_envelope(samples, attack=0.01, decay=0.02)
+
+        elif action == 'plugin':
+            t1 = self._tone(500, 0.1, 'sine', self.volume * 0.4)
+            t2 = self._tone(500, 0.1, 'sine', self.volume * 0.4, delay=0.15)
+            return mix_samples(t1, t2)
+
+        elif action == 'inspekt':
+            t1 = self._tone(650, 0.1, 'triangle', self.volume * 0.35)
+            t2 = self._tone(650, 0.1, 'triangle', self.volume * 0.35, delay=0.14)
+            return mix_samples(t1, t2)
+
+        elif action in ('failure', 'error'):
+            t1 = self._tone(150, 0.15, 'square', self.volume * 0.25)
+            t2 = self._tone(155, 0.15, 'square', self.volume * 0.25)
+            t3 = self._tone(200, 0.1, 'triangle', self.volume * 0.2, delay=0.08)
+            return mix_samples(t1, t2, t3)
+
+        elif action == 'success':
+            t1 = self._tone(523, 0.1, 'sine', self.volume * 0.3)
+            t2 = self._tone(659, 0.1, 'sine', self.volume * 0.35, delay=0.1)
+            t3 = self._tone(784, 0.15, 'sine', self.volume * 0.4, delay=0.2)
+            return mix_samples(t1, t2, t3)
+
+        elif action == 'pause':
+            t1 = self._tone(880, 0.15, 'sine', self.volume * 0.4)
+            t2 = self._tone(1047, 0.15, 'sine', self.volume * 0.4, delay=0.15)
+            return mix_samples(t1, t2)
+
+        # Fallback actions use click sound
+        elif action in ('toggle', 'dialog', 'jsdialog', 'upload', 'download'):
+            t1 = self._tone(1200, 0.015, 'square', self.volume * 0.2)
+            t2 = self._tone(300, 0.03, 'sine', self.volume * 0.25, delay=0.01)
+            return mix_samples(t1, t2)
+
+        # Unknown action - return silence
+        return []
+
+    def generate_audio_track(self, cues: list[dict], total_duration_ms: int) -> bytes:
+        """Generate WAV audio track with sounds placed at specific timestamps.
+
+        Args:
+            cues: List of {timestamp_ms: int, action: str} dicts
+            total_duration_ms: Total track duration in milliseconds (from video)
+
+        Returns:
+            WAV file bytes ready to be merged with video
+        """
+        # Calculate total samples needed
+        total_samples = int((total_duration_ms / 1000) * SAMPLE_RATE)
+
+        # Generate each sound and place at timestamp
+        all_tracks = []
+        for cue in cues:
+            timestamp_ms = cue.get('timestamp_ms', 0)
+            action = cue.get('action', '')
+
+            # Get samples for this action
+            samples = self._get_samples_for_action(action)
+            if samples:
+                # Delay to correct timestamp
+                delayed = delay_samples(samples, timestamp_ms / 1000)
+                all_tracks.append(delayed)
+
+        # Mix all tracks together
+        if all_tracks:
+            mixed = mix_samples(*all_tracks)
+        else:
+            mixed = [0.0] * total_samples
+
+        # Pad or trim to exact duration
+        if len(mixed) < total_samples:
+            mixed.extend([0.0] * (total_samples - len(mixed)))
+        elif len(mixed) > total_samples:
+            mixed = mixed[:total_samples]
+
+        return samples_to_wav_bytes(mixed)
+
 
 # Global instance for convenience
 _cli_audio: CLIAudio | None = None

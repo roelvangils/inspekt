@@ -1,0 +1,371 @@
+/*
+ * Inspekt Browser VM - Custom noVNC Base CSS
+ * A minimal, clean replacement for the default noVNC styles
+ */
+
+/* ===========================================
+ * BASE SETUP
+ * =========================================== */
+
+/* Dark mode (default) */
+:root {
+  --bg: #1f2020;
+  --text: #e0e0e0;
+  --text-dim: #888;
+  --accent: #4a9eff;
+  --accent-hover: #3a8eef;
+}
+
+/* Light mode */
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg: #d6e2fb;
+    --text: #333;
+    --text-dim: #666;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background: var(--bg);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  color: var(--text);
+  touch-action: none;
+}
+
+/* Override inline background styles on noVNC screen container */
+#noVNC_screen > div,
+#noVNC_container > div {
+  background: var(--bg) !important;
+}
+
+/* ===========================================
+ * HIDE NOVNC BRANDING
+ * =========================================== */
+
+.noVNC_logo {
+  display: none !important;
+}
+
+/* ===========================================
+ * CONTROL BAR (left sidebar) - HIDDEN
+ * =========================================== */
+
+#noVNC_control_bar_anchor {
+  display: none !important;
+}
+
+/* ===========================================
+ * CONNECT SCREEN
+ * =========================================== */
+
+/* Base centering for dialogs */
+.noVNC_center {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg);
+  z-index: 60;
+}
+
+/* Hide credentials dialog by default (has both .noVNC_center AND .noVNC_connect_layer) */
+.noVNC_center.noVNC_connect_layer {
+  display: none !important;
+}
+
+/* Show credentials only when JS adds .noVNC_open */
+.noVNC_center.noVNC_connect_layer.noVNC_open {
+  display: flex !important;
+}
+
+/* Hide connect dialog when connected */
+:root.noVNC_connected .noVNC_center {
+  display: none !important;
+}
+
+#noVNC_connect_dlg {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+}
+
+#noVNC_connect_button {
+  background: var(--accent);
+  border: none;
+  border-radius: 8px;
+  padding: 16px 48px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+#noVNC_connect_button:hover {
+  background: var(--accent-hover);
+}
+
+#noVNC_connect_button > div {
+  color: white;
+  font-size: 16px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+#noVNC_connect_button img {
+  display: none;
+}
+
+/* ===========================================
+ * CREDENTIALS DIALOG (password prompt)
+ * =========================================== */
+
+#noVNC_credentials_dlg {
+  background: #2a2a2a;
+  border: 1px solid #444;
+  border-radius: 8px;
+  padding: 24px;
+}
+
+#noVNC_credentials_dlg ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+#noVNC_credentials_dlg li {
+  margin-bottom: 12px;
+}
+
+#noVNC_credentials_dlg label {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--text-dim);
+  font-size: 14px;
+}
+
+#noVNC_credentials_dlg input {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #444;
+  border-radius: 4px;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 14px;
+}
+
+#noVNC_credentials_dlg input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+#noVNC_credentials_dlg .noVNC_submit {
+  background: var(--accent);
+  border: none;
+  border-radius: 6px;
+  padding: 10px 24px;
+  color: white;
+  font-size: 14px;
+  cursor: pointer;
+  margin-top: 8px;
+}
+
+/* ===========================================
+ * TRANSITION / LOADING SCREEN
+ * =========================================== */
+
+#noVNC_transition {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+  background: var(--bg);
+  z-index: 50;
+}
+
+/* Show transition during loading/connecting/reconnecting states (matching noVNC JS) */
+:root.noVNC_loading #noVNC_transition,
+:root.noVNC_connecting #noVNC_transition,
+:root.noVNC_disconnecting #noVNC_transition,
+:root.noVNC_reconnecting #noVNC_transition {
+  display: flex;
+}
+
+#noVNC_transition_text {
+  color: var(--text-dim);
+  font-size: 14px;
+}
+
+#noVNC_cancel_reconnect_button {
+  background: #444;
+  border: none;
+  border-radius: 6px;
+  padding: 10px 24px;
+  color: var(--text);
+  font-size: 14px;
+  cursor: pointer;
+}
+
+#noVNC_cancel_reconnect_button:hover {
+  background: #555;
+}
+
+/* Spinner */
+.noVNC_spinner {
+  position: relative;
+  width: 10px;
+  height: 10px;
+}
+
+.noVNC_spinner,
+.noVNC_spinner::before,
+.noVNC_spinner::after {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  background: var(--accent);
+  animation: spinner 1s linear infinite;
+}
+
+.noVNC_spinner::before,
+.noVNC_spinner::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+.noVNC_spinner::before {
+  animation-delay: -0.1s;
+}
+
+.noVNC_spinner::after {
+  animation-delay: 0.1s;
+}
+
+@keyframes spinner {
+  0% { box-shadow: -60px 10px 0 rgba(74, 158, 255, 0); width: 20px; }
+  25% { box-shadow: 20px 10px 0 rgba(74, 158, 255, 1); width: 10px; }
+  50% { box-shadow: 60px 10px 0 rgba(74, 158, 255, 0); width: 10px; }
+}
+
+/* ===========================================
+ * STATUS BAR
+ * =========================================== */
+
+#noVNC_status {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  padding: 8px 16px;
+  background: #2a2a2a;
+  color: var(--text-dim);
+  font-size: 13px;
+  text-align: center;
+  z-index: 100;
+  display: none;
+}
+
+#noVNC_status.noVNC_open {
+  display: block;
+}
+
+/* ===========================================
+ * VNC SCREEN CONTAINER
+ * =========================================== */
+
+#noVNC_container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  height: 100%;
+  background: var(--bg);
+  z-index: 0;
+}
+
+#noVNC_keyboardinput {
+  position: fixed;
+  top: -100px;
+  left: -100px;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+/* ===========================================
+ * FALLBACK ERROR SCREEN
+ * =========================================== */
+
+#noVNC_fallback_error {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg);
+  color: #ff6b6b;
+  font-size: 14px;
+  text-align: center;
+  padding: 20px;
+  z-index: 1000;
+}
+
+.noVNC_error #noVNC_fallback_error {
+  display: flex;
+}
+
+/* ===========================================
+ * UTILITY CLASSES
+ * =========================================== */
+
+.noVNC_hidden {
+  display: none !important;
+}
+
+.noVNC_disabled {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.noVNC_center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ===========================================
+ * LOADING STATE (before JS loads)
+ * =========================================== */
+
+html.noVNC_loading body {
+  background: var(--bg);
+}
+
+html.noVNC_loading #noVNC_transition {
+  display: flex;
+}

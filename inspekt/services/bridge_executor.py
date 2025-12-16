@@ -20,6 +20,7 @@ from typing import Any
 import click
 
 from inspekt.client import BridgeClient
+from inspekt.config import get_bridge_port
 
 
 def _verbose_log(message: str, data: Any = None) -> None:
@@ -40,7 +41,7 @@ class BridgeExecutor:
     def __init__(
         self,
         host: str = "127.0.0.1",
-        port: int = 8765,
+        port: int = None,
         max_retries: int = 3,
         retry_delay: float = 0.5,
     ):
@@ -49,12 +50,12 @@ class BridgeExecutor:
 
         Args:
             host: Bridge server host (default: localhost)
-            port: Bridge server port (default: 8765)
+            port: Bridge server port. If None, auto-detects based on environment.
             max_retries: Maximum number of retry attempts on transient failures
             retry_delay: Initial delay between retries in seconds (exponential backoff)
         """
         self.host = host
-        self.port = port
+        self.port = port if port is not None else get_bridge_port()
         self.max_retries = max_retries
         self.retry_delay = retry_delay
         self._client: BridgeClient | None = None
@@ -143,10 +144,16 @@ class BridgeExecutor:
 
         # Check for active browser connections immediately
         if not self.has_active_browser_connection():
-            click.echo(
-                "Error: Request timeout. Please ensure the extension is installed in Firefox and/or Chrome, and that the Inspekt Panel is visible.",
-                err=True,
-            )
+            click.echo(err=True)
+            click.secho("No browser connection found.", fg="red", bold=True, err=True)
+            click.echo(err=True)
+            click.echo("  * Ensure that the latest version of the Inspekt extension is installed", err=True)
+            click.echo("    and enabled in Firefox or Chrome.", err=True)
+            click.echo("  * Make sure that a JavaScript dialog is not blocking access to the page.", err=True)
+            click.echo("  * In some cases, you may need to disable CSP. You can do this by clicking", err=True)
+            click.echo("    the toggle in the Inspekt UI that appears when you click the icon in", err=True)
+            click.echo("    your toolbar.", err=True)
+            click.echo()
             sys.exit(1)
         _verbose_log("Browser connection check passed", f"{time.time() - start_time:.3f}s")
 
@@ -482,7 +489,7 @@ _default_executor: BridgeExecutor | None = None
 
 def get_executor(
     host: str = "127.0.0.1",
-    port: int = 8765,
+    port: int = None,
     max_retries: int = 3,
 ) -> BridgeExecutor:
     """
@@ -490,7 +497,7 @@ def get_executor(
 
     Args:
         host: Bridge server host
-        port: Bridge server port
+        port: Bridge server port. If None, auto-detects based on environment.
         max_retries: Maximum retry attempts
 
     Returns:

@@ -110,7 +110,7 @@ Or look for the version in the console on page load:
 
 **Features:**
 - WebSocket-based communication
-- DevTools integration with `zenStore($0)`
+- DevTools integration with `inspektStore($0)`
 - Keepalive ping/pong
 - Auto-reconnection on disconnect
 - Visibility-based connection management

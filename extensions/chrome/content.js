@@ -64,6 +64,71 @@
             }
         }
 
+        // Handle GET_OVERLAY_POSITION requests from MAIN world
+        if (message && message.type === 'INSPEKT_GET_OVERLAY_POSITION' && message.source === 'inspekt-page') {
+            try {
+                const result = await chrome.storage.local.get('inspekt_overlay_corner');
+                window.postMessage({
+                    type: 'INSPEKT_OVERLAY_POSITION_RESPONSE',
+                    source: 'inspekt-extension',
+                    requestId: message.requestId,
+                    corner: result.inspekt_overlay_corner || 'bottom-left'
+                }, location.origin);
+            } catch (error) {
+                window.postMessage({
+                    type: 'INSPEKT_OVERLAY_POSITION_RESPONSE',
+                    source: 'inspekt-extension',
+                    requestId: message.requestId,
+                    corner: 'bottom-left' // Default on error
+                }, location.origin);
+            }
+        }
+
+        // Handle SAVE_OVERLAY_POSITION requests from MAIN world
+        if (message && message.type === 'INSPEKT_SAVE_OVERLAY_POSITION' && message.source === 'inspekt-page') {
+            try {
+                await chrome.storage.local.set({ inspekt_overlay_corner: message.corner });
+                window.postMessage({
+                    type: 'INSPEKT_OVERLAY_POSITION_SAVED',
+                    source: 'inspekt-extension',
+                    requestId: message.requestId,
+                    ok: true
+                }, location.origin);
+            } catch (error) {
+                window.postMessage({
+                    type: 'INSPEKT_OVERLAY_POSITION_SAVED',
+                    source: 'inspekt-extension',
+                    requestId: message.requestId,
+                    ok: false,
+                    error: String(error)
+                }, location.origin);
+            }
+        }
+
+        // Handle GET_EXTENSION_FONT_URLS requests from MAIN world
+        if (message && message.type === 'INSPEKT_GET_FONT_URLS' && message.source === 'inspekt-page') {
+            try {
+                const fontUrls = {
+                    regular: chrome.runtime.getURL('fonts/JetBrainsMonoNerdFont-Regular.woff2'),
+                    bold: chrome.runtime.getURL('fonts/JetBrainsMonoNerdFont-Bold.woff2')
+                };
+                window.postMessage({
+                    type: 'INSPEKT_FONT_URLS_RESPONSE',
+                    source: 'inspekt-extension',
+                    requestId: message.requestId,
+                    fontUrls: fontUrls
+                }, location.origin);
+            } catch (error) {
+                window.postMessage({
+                    type: 'INSPEKT_FONT_URLS_RESPONSE',
+                    source: 'inspekt-extension',
+                    requestId: message.requestId,
+                    fontUrls: null,
+                    error: String(error)
+                }, location.origin);
+            }
+        }
+
         // Handle CAPTURE_SCREENSHOT requests from MAIN world
         if (message && message.type === 'INSPEKT_CAPTURE_SCREENSHOT' && message.source === 'inspekt-page') {
             try {
@@ -117,6 +182,295 @@
                     }
                 }, location.origin);
             }
+        }
+
+        // ========== DOWNLOAD MONITORING BRIDGE ==========
+
+        // Handle START_DOWNLOAD_MONITORING requests from MAIN world
+        if (message && message.type === 'INSPEKT_START_DOWNLOAD_MONITORING' && message.source === 'inspekt-page') {
+            try {
+                const response = await chrome.runtime.sendMessage({
+                    type: 'START_DOWNLOAD_MONITORING',
+                    sessionId: message.sessionId
+                });
+
+                window.postMessage({
+                    type: 'INSPEKT_DOWNLOAD_MONITORING_RESPONSE',
+                    source: 'inspekt-extension',
+                    requestId: message.requestId,
+                    response: response
+                }, location.origin);
+            } catch (error) {
+                window.postMessage({
+                    type: 'INSPEKT_DOWNLOAD_MONITORING_RESPONSE',
+                    source: 'inspekt-extension',
+                    requestId: message.requestId,
+                    response: { ok: false, error: String(error) }
+                }, location.origin);
+            }
+        }
+
+        // Handle STOP_DOWNLOAD_MONITORING requests from MAIN world
+        if (message && message.type === 'INSPEKT_STOP_DOWNLOAD_MONITORING' && message.source === 'inspekt-page') {
+            try {
+                const response = await chrome.runtime.sendMessage({
+                    type: 'STOP_DOWNLOAD_MONITORING',
+                    sessionId: message.sessionId
+                });
+
+                window.postMessage({
+                    type: 'INSPEKT_DOWNLOAD_MONITORING_STOPPED',
+                    source: 'inspekt-extension',
+                    requestId: message.requestId,
+                    response: response
+                }, location.origin);
+            } catch (error) {
+                window.postMessage({
+                    type: 'INSPEKT_DOWNLOAD_MONITORING_STOPPED',
+                    source: 'inspekt-extension',
+                    requestId: message.requestId,
+                    response: { ok: false, error: String(error) }
+                }, location.origin);
+            }
+        }
+
+        // Handle START_SCREENCAST requests from MAIN world (video recording)
+        if (message && message.type === 'INSPEKT_START_SCREENCAST' && message.source === 'inspekt-page') {
+            try {
+                const response = await chrome.runtime.sendMessage({
+                    type: 'START_SCREENCAST',
+                    settings: message.settings,
+                    requestId: message.requestId
+                });
+
+                window.postMessage({
+                    type: 'INSPEKT_SCREENCAST_STARTED',
+                    source: 'inspekt-extension',
+                    requestId: message.requestId,
+                    response: response || { ok: true }
+                }, location.origin);
+            } catch (error) {
+                window.postMessage({
+                    type: 'INSPEKT_SCREENCAST_STARTED',
+                    source: 'inspekt-extension',
+                    requestId: message.requestId,
+                    response: { ok: false, error: String(error) }
+                }, location.origin);
+            }
+        }
+
+        // Handle STOP_SCREENCAST requests from MAIN world (video recording)
+        if (message && message.type === 'INSPEKT_STOP_SCREENCAST' && message.source === 'inspekt-page') {
+            try {
+                const response = await chrome.runtime.sendMessage({
+                    type: 'STOP_SCREENCAST',
+                    requestId: message.requestId
+                });
+
+                window.postMessage({
+                    type: 'INSPEKT_SCREENCAST_STOPPED',
+                    source: 'inspekt-extension',
+                    requestId: message.requestId,
+                    response: response || { ok: true }
+                }, location.origin);
+            } catch (error) {
+                window.postMessage({
+                    type: 'INSPEKT_SCREENCAST_STOPPED',
+                    source: 'inspekt-extension',
+                    requestId: message.requestId,
+                    response: { ok: false, error: String(error) }
+                }, location.origin);
+            }
+        }
+
+        // Handle GET_DOWNLOAD_CONTENT requests from MAIN world
+        if (message && message.type === 'INSPEKT_GET_DOWNLOAD_CONTENT' && message.source === 'inspekt-page') {
+            try {
+                const response = await chrome.runtime.sendMessage({
+                    type: 'GET_DOWNLOAD_FILE_CONTENT',
+                    downloadId: message.downloadId
+                });
+
+                window.postMessage({
+                    type: 'INSPEKT_DOWNLOAD_CONTENT_RESPONSE',
+                    source: 'inspekt-extension',
+                    requestId: message.requestId,
+                    response: response
+                }, location.origin);
+            } catch (error) {
+                window.postMessage({
+                    type: 'INSPEKT_DOWNLOAD_CONTENT_RESPONSE',
+                    source: 'inspekt-extension',
+                    requestId: message.requestId,
+                    response: { ok: false, error: String(error) }
+                }, location.origin);
+            }
+        }
+
+        // ========== CDP DIALOG INTERCEPTION BRIDGE ==========
+
+        // Handle ENABLE_DIALOG_INTERCEPTION requests from MAIN world
+        if (message && message.type === 'INSPEKT_ENABLE_DIALOG_INTERCEPTION' && message.source === 'inspekt-page') {
+            try {
+                const response = await chrome.runtime.sendMessage({
+                    type: 'ENABLE_DIALOG_INTERCEPTION',
+                    queue: message.queue || []
+                });
+
+                window.postMessage({
+                    type: 'INSPEKT_DIALOG_INTERCEPTION_RESPONSE',
+                    source: 'inspekt-extension',
+                    requestId: message.requestId,
+                    response: response
+                }, location.origin);
+            } catch (error) {
+                window.postMessage({
+                    type: 'INSPEKT_DIALOG_INTERCEPTION_RESPONSE',
+                    source: 'inspekt-extension',
+                    requestId: message.requestId,
+                    response: { ok: false, error: String(error) }
+                }, location.origin);
+            }
+        }
+
+        // Handle DISABLE_DIALOG_INTERCEPTION requests from MAIN world
+        if (message && message.type === 'INSPEKT_DISABLE_DIALOG_INTERCEPTION' && message.source === 'inspekt-page') {
+            try {
+                const response = await chrome.runtime.sendMessage({
+                    type: 'DISABLE_DIALOG_INTERCEPTION'
+                });
+
+                window.postMessage({
+                    type: 'INSPEKT_DIALOG_INTERCEPTION_DISABLED',
+                    source: 'inspekt-extension',
+                    requestId: message.requestId,
+                    response: response
+                }, location.origin);
+            } catch (error) {
+                window.postMessage({
+                    type: 'INSPEKT_DIALOG_INTERCEPTION_DISABLED',
+                    source: 'inspekt-extension',
+                    requestId: message.requestId,
+                    response: { ok: false, error: String(error) }
+                }, location.origin);
+            }
+        }
+
+        // Handle QUEUE_DIALOG_RESULT requests from MAIN world
+        if (message && message.type === 'INSPEKT_QUEUE_DIALOG_RESULT' && message.source === 'inspekt-page') {
+            try {
+                const response = await chrome.runtime.sendMessage({
+                    type: 'QUEUE_DIALOG_RESULT',
+                    dialogType: message.dialogType,
+                    result: message.result
+                });
+
+                window.postMessage({
+                    type: 'INSPEKT_DIALOG_RESULT_QUEUED',
+                    source: 'inspekt-extension',
+                    requestId: message.requestId,
+                    response: response
+                }, location.origin);
+            } catch (error) {
+                window.postMessage({
+                    type: 'INSPEKT_DIALOG_RESULT_QUEUED',
+                    source: 'inspekt-extension',
+                    requestId: message.requestId,
+                    response: { ok: false, error: String(error) }
+                }, location.origin);
+            }
+        }
+
+        // ========== ZOOM LEVEL BRIDGE ==========
+
+        // Handle GET_ZOOM_LEVEL requests from MAIN world
+        if (message && message.type === 'INSPEKT_GET_ZOOM_LEVEL' && message.source === 'inspekt-page') {
+            try {
+                const response = await chrome.runtime.sendMessage({
+                    type: 'GET_ZOOM_LEVEL'
+                });
+
+                window.postMessage({
+                    type: 'INSPEKT_ZOOM_LEVEL_RESPONSE',
+                    source: 'inspekt-extension',
+                    requestId: message.requestId,
+                    response: response
+                }, location.origin);
+            } catch (error) {
+                window.postMessage({
+                    type: 'INSPEKT_ZOOM_LEVEL_RESPONSE',
+                    source: 'inspekt-extension',
+                    requestId: message.requestId,
+                    response: { ok: false, error: String(error) }
+                }, location.origin);
+            }
+        }
+
+        // Handle SET_ZOOM_LEVEL requests from MAIN world
+        if (message && message.type === 'INSPEKT_SET_ZOOM_LEVEL' && message.source === 'inspekt-page') {
+            try {
+                const response = await chrome.runtime.sendMessage({
+                    type: 'SET_ZOOM_LEVEL',
+                    zoomFactor: message.zoomFactor
+                });
+
+                window.postMessage({
+                    type: 'INSPEKT_ZOOM_SET_RESPONSE',
+                    source: 'inspekt-extension',
+                    requestId: message.requestId,
+                    response: response
+                }, location.origin);
+            } catch (error) {
+                window.postMessage({
+                    type: 'INSPEKT_ZOOM_SET_RESPONSE',
+                    source: 'inspekt-extension',
+                    requestId: message.requestId,
+                    response: { ok: false, error: String(error) }
+                }, location.origin);
+            }
+        }
+    });
+
+    // Listen for download events from background script and forward to MAIN world
+    chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+        // Forward download start/complete events to MAIN world
+        if (message.type === 'INSPEKT_DOWNLOAD_STARTED' || message.type === 'INSPEKT_DOWNLOAD_COMPLETE') {
+            window.postMessage({
+                type: message.type,
+                source: 'inspekt-extension',
+                sessionId: message.sessionId,
+                download: message.download
+            }, location.origin);
+            sendResponse({ ok: true });
+            return true;
+        }
+
+        // Forward dialog overlay notification to MAIN world (for visual feedback during CDP interception)
+        if (message.type === 'SHOW_DIALOG_OVERLAY') {
+            window.postMessage({
+                type: 'INSPEKT_SHOW_DIALOG_OVERLAY',
+                source: 'inspekt-extension',
+                dialogType: message.dialogType,
+                message: message.message,
+                result: message.result,
+                duration: message.duration  // How long to show overlay (matches recorded duration)
+            }, location.origin);
+            sendResponse({ ok: true });
+            return true;
+        }
+
+        // Forward screencast frames to bridge server (for video recording)
+        if (message.type === 'SCREENCAST_FRAME') {
+            const ws = window.__inspekt_ws__;
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: 'screencast_frame',
+                    timestamp: message.timestamp,
+                    data: message.data
+                }));
+            }
+            sendResponse({ ok: true });
+            return true;
         }
     });
 
@@ -227,8 +581,16 @@
                     // Console management should work regardless of tab visibility
                     const isConsoleManagement = ['GET_CONSOLE_LOGS', 'CLEAR_CONSOLE_LOGS'].includes(message.type);
 
-                    // Skip visibility check for identify commands, axe commands, pong responses, domain management, CSP management, and console management
-                    if (!isFrontTab() && !isIdentifyCommand && !isAxeCommand && !isDomainManagement && !isCspManagement && !isConsoleManagement && message.type !== 'pong') {
+                    // Screencast (video recording) should work regardless of tab visibility
+                    const isScreencastManagement = ['START_SCREENCAST', 'STOP_SCREENCAST'].includes(message.type);
+
+                    // Debug logging for screencast
+                    if (isScreencastManagement) {
+                        console.log('[Inspekt Content] SCREENCAST message detected:', message.type, 'isFrontTab:', isFrontTab());
+                    }
+
+                    // Skip visibility check for identify commands, axe commands, pong responses, domain management, CSP management, console management, and screencast
+                    if (!isFrontTab() && !isIdentifyCommand && !isAxeCommand && !isDomainManagement && !isCspManagement && !isConsoleManagement && !isScreencastManagement && message.type !== 'pong') {
                         console.log('[Inspekt] Message dropped - tab not visible/active:', message.type);
                         return;
                     }
@@ -636,6 +998,58 @@
                                     ok: false,
                                     error: err.message
                                 }
+                            }));
+                        }
+
+                    } else if (message.type === 'START_SCREENCAST') {
+                        // Start screencast (video recording)
+                        console.log('[Inspekt Content] START_SCREENCAST received, requestId:', message.requestId);
+                        try {
+                            const response = await chrome.runtime.sendMessage({
+                                type: 'START_SCREENCAST',
+                                settings: message.settings,
+                                requestId: message.requestId
+                            });
+
+                            console.log('[Inspekt Content] START_SCREENCAST response from background:', response);
+                            ws.send(JSON.stringify({
+                                type: 'screencast_ack',
+                                requestId: message.requestId,
+                                ok: response?.ok ?? true,
+                                error: response?.error
+                            }));
+                            console.log('[Inspekt Content] screencast_ack sent');
+                        } catch (err) {
+                            console.error('[Inspekt Content] START_SCREENCAST error:', err);
+                            ws.send(JSON.stringify({
+                                type: 'screencast_ack',
+                                requestId: message.requestId,
+                                ok: false,
+                                error: err.message
+                            }));
+                        }
+
+                    } else if (message.type === 'STOP_SCREENCAST') {
+                        // Stop screencast (video recording)
+                        try {
+                            const response = await chrome.runtime.sendMessage({
+                                type: 'STOP_SCREENCAST',
+                                requestId: message.requestId
+                            });
+
+                            ws.send(JSON.stringify({
+                                type: 'screencast_ack',
+                                requestId: message.requestId,
+                                ok: response?.ok ?? true,
+                                error: response?.error
+                            }));
+                        } catch (err) {
+                            console.error('[Inspekt] STOP_SCREENCAST error:', err);
+                            ws.send(JSON.stringify({
+                                type: 'screencast_ack',
+                                requestId: message.requestId,
+                                ok: false,
+                                error: err.message
                             }));
                         }
                     }

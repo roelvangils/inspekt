@@ -139,6 +139,33 @@ class DomainManagementResponse(BaseModel):
     model_config = {"extra": "forbid"}
 
 
+class ScreencastFrameMessage(BaseModel):
+    """Screencast frame message for video recording.
+
+    Sent from browser to server with each captured frame.
+    """
+
+    type: Literal["screencast_frame"] = "screencast_frame"
+    timestamp: float = Field(..., description="Frame capture timestamp")
+    data: str = Field(..., description="Base64-encoded image data")
+
+    model_config = {"extra": "forbid"}
+
+
+class ScreencastAckMessage(BaseModel):
+    """Screencast acknowledgment message.
+
+    Sent from browser to server in response to start/stop screencast commands.
+    """
+
+    type: Literal["screencast_ack"] = "screencast_ack"
+    requestId: str = Field(..., description="Request ID matching the original command")
+    ok: bool = Field(default=True, description="Whether the operation succeeded")
+    error: Optional[str] = Field(default=None, description="Error message if failed")
+
+    model_config = {"extra": "forbid"}
+
+
 # Union type for all incoming WebSocket messages (browser → server)
 IncomingMessage = (
     ExecuteResult
@@ -148,6 +175,8 @@ IncomingMessage = (
     | BrowserInfoMessage
     | VisibilityChangeMessage
     | DomainManagementResponse
+    | ScreencastFrameMessage
+    | ScreencastAckMessage
 )
 
 # Union type for all outgoing WebSocket messages (server → browser)

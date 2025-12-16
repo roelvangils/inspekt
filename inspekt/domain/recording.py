@@ -1,7 +1,7 @@
 """Data models for browser interaction recordings."""
 
 from datetime import datetime
-from typing import Annotated, Literal, Optional
+from typing import Annotated, Literal, Optional, Union
 
 from pydantic import BaseModel, BeforeValidator, Field
 
@@ -74,8 +74,16 @@ class StateInfo(BaseModel):
     """Page state captured at recording time."""
 
     viewport: ViewportInfo
-    zoom: float = 1.0
+    zoom: float = 1.0  # devicePixelRatio (layout zoom)
+    browser_zoom_level: float = 1.0  # Actual Chrome zoom level (1.0 = 100%)
     scroll: ScrollPosition = Field(default_factory=ScrollPosition)
+
+    # Matching requirements (from --match-viewport, --match-zoom-level flags)
+    require_viewport_match: bool = False
+    require_zoom_match: bool = False
+
+    # Window mode at recording time (fullscreen/kiosk cannot be resized)
+    window_mode: Optional[Literal["normal", "fullscreen", "kiosk"]] = None
 
     # Optional state capture (only if --capture-state used)
     cookies: Optional[str] = None  # Base64-encoded JSON
@@ -108,6 +116,8 @@ class TargetInfo(BaseModel):
     # Shadow DOM support
     shadow_host: Optional[str] = None  # Selector for the shadow host element
     piercing_selector: Optional[str] = None  # Full selector: "host >>> inner"
+    # Native control input type (for set action)
+    input_type: Optional[str] = None  # e.g., "range", "date", "time", "color"
 
 
 class ScrollInfo(BaseModel):
@@ -117,6 +127,44 @@ class ScrollInfo(BaseModel):
     y: IntFromFloat  # Absolute scroll position Y
     deltaX: IntFromFloat = 0  # Scroll amount X
     deltaY: IntFromFloat = 0  # Scroll amount Y
+
+
+class FileInfo(BaseModel):
+    """Information about an uploaded file."""
+
+    name: str  # Original filename
+    type: str  # MIME type (e.g., "image/jpeg")
+    size: int  # File size in bytes
+    lastModified: Optional[int] = None  # Unix timestamp in milliseconds
+
+    # Content storage (mutually exclusive)
+    content: Optional[str] = None  # Temporary base64 during transfer (removed before YAML save)
+    external_path: Optional[str] = None  # Relative path to saved file
+
+
+class DownloadInfo(BaseModel):
+    """Information about a downloaded file."""
+
+    filename: str  # Saved filename
+    url: str  # Download URL
+    mime_type: str  # MIME type (e.g., "application/pdf")
+    size: int  # File size in bytes
+    download_start: int  # Unix timestamp ms when download started
+    download_end: int  # Unix timestamp ms when download completed
+
+    # Storage
+    external_path: Optional[str] = None  # Relative path to saved file
+
+    # Source path (temporary - used during recording to copy file, removed before YAML save)
+    full_path: Optional[str] = None  # Full filesystem path from Chrome's download location
+
+    # Content (fallback - only used if full_path copy fails)
+    content: Optional[str] = None  # base64 content during transfer
+
+    # Optional metadata
+    content_disposition: Optional[str] = None  # Original Content-Disposition header
+    referrer: Optional[str] = None  # Page that triggered download
+    download_id: Optional[int] = None  # Browser download ID (for retrieval)
 
 
 class ExpectInfo(BaseModel):
@@ -159,11 +207,25 @@ class ExpectInfo(BaseModel):
     output_not_contains: Optional[str] = Field(default=None, alias="output-not-contains")  # Check stdout doesn't contain text
     output_matches: Optional[str] = Field(default=None, alias="output-matches")  # Check stdout matches regex
 
+    # Download assertions
+    download_exists: Optional[bool] = None  # File was successfully downloaded
+    download_mime_type: Optional[str] = None  # Exact MIME type match
+    download_mime_type_contains: Optional[str] = None  # Partial MIME match (e.g., "image/")
+    download_size: Optional[int] = None  # Exact file size in bytes
+    download_size_min: Optional[int] = None  # Minimum file size
+    download_size_max: Optional[int] = None  # Maximum file size
+    download_filename: Optional[str] = None  # Expected filename
+    download_filename_contains: Optional[str] = None  # Partial filename match
+    download_content_contains: Optional[str] = None  # Text content check (text files only)
+    download_checksum: Optional[str] = None  # MD5/SHA256 hash (format: "sha256:abc123")
+    download_shell: Optional[str] = None  # Shell command from allowlist
+    download_timeout: Optional[int] = Field(default=None)  # Download timeout in ms (default 30000)
+
     # Metadata
     message: Optional[str] = None  # Description of expectation
 
 
-ActionType = Literal["navigate", "click", "rightclick", "activate", "type", "keypress", "hover", "check", "uncheck", "radio", "select", "scroll", "plugin", "inspekt"]
+ActionType = Literal["navigate", "click", "rightclick", "activate", "type", "set", "keypress", "hover", "check", "uncheck", "radio", "select", "scroll", "toggle", "dialog", "jsdialog", "upload", "download", "plugin", "inspekt"]
 
 # Step execution modes for replay
 StepMode = Literal["continue", "skip", "pause"]
@@ -207,6 +269,15 @@ class RecordingStep(BaseModel):
     modifiers: list[str] = Field(default_factory=list)  # For keypress (ctrl, shift, alt, meta)
     scroll: Optional[ScrollInfo] = None  # For scroll action
     command: Optional[str] = None  # For inspekt action
+    files: Optional[list[FileInfo]] = None  # For upload action
+    download: Optional[DownloadInfo] = None  # For download action
+
+    # For jsdialog action (alert, confirm, prompt)
+    dialog_type: Optional[str] = None  # 'alert', 'confirm', or 'prompt'
+    message: Optional[str] = None  # Dialog message
+    default_value: Optional[str] = None  # Default value for prompt
+    result: Optional[Union[bool, str]] = None  # User's response (bool for confirm, str for prompt)
+    duration: Optional[int] = None  # How long dialog was shown (ms) - for replay timing
 
     # Click position as [x%, y%] within element (more robust than absolute coordinates)
     click_at: Optional[list[int]] = None

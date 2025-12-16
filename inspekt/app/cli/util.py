@@ -21,6 +21,77 @@ from inspekt.app.cli.exec import _format_console_entry, _get_console_logs_since
 from inspekt.client import BridgeClient
 
 
+def make_file_link(path: str | Path, display_text: str | None = None) -> str:
+    """
+    Create an OSC 8 terminal hyperlink for a file path.
+
+    OSC 8 is the standard escape sequence for terminal hyperlinks:
+    \\033]8;;URL\\033\\\\TEXT\\033]8;;\\033\\\\
+
+    This makes file paths clickable in terminals that support OSC 8,
+    including xterm.js used in the Browser VM control panel.
+    """
+    path_str = str(path)
+    display = display_text or path_str
+    # Use file:// URL for local files
+    file_url = f"file://{path_str}"
+    # OSC 8 escape sequence: \033]8;;URL\033\\TEXT\033]8;;\033\\
+    return f"\033]8;;{file_url}\033\\{display}\033]8;;\033\\"
+
+
+def open_or_download(path: str | Path) -> bool:
+    """
+    Open a file in the default application, or download it if in VM.
+
+    In the VM environment (INSPEKT_ISOLATED=1), files cannot be opened
+    with xdg-open because there's no desktop environment. Instead, emit
+    an OSC 1337 escape sequence that the control panel's terminal
+    intercepts to trigger a download to the host browser.
+
+    Note: OSC 1337 downloads only work in the control panel's xterm.js
+    terminal, not in docker exec sessions. The terminal-server.py sets
+    INSPEKT_TERMINAL=control-panel to indicate the proper terminal.
+
+    Args:
+        path: Path to the file to open/download
+
+    Returns:
+        True if action was taken, False if file doesn't exist
+    """
+    import os
+    from inspekt.config import is_isolated_mode
+
+    path = Path(path).resolve()
+
+    if not path.exists():
+        return False
+
+    if is_isolated_mode():
+        # Check if we're in the control panel terminal (supports OSC 1337)
+        in_control_panel = os.environ.get('INSPEKT_TERMINAL') == 'control-panel'
+
+        if in_control_panel:
+            # VM + control panel: emit escape sequence for download
+            # Format: OSC 1337 ; download=<path> BEL
+            # The control panel's xterm.js terminal intercepts this sequence
+            # and triggers a file download via the control server's /download endpoint
+            print(f'\033]1337;download={path}\007', end='')
+            print(f'↓ {path.name}')  # User feedback showing download icon
+        else:
+            # VM but not in control panel (e.g., docker exec)
+            # OSC 1337 won't work - inform user how to download
+            click.echo(f'📁 {path}')
+            click.secho(
+                'Tip: Use the control panel terminal (port 6080) for automatic downloads.',
+                fg='yellow', dim=True
+            )
+        return True
+    else:
+        # Normal environment: open with default application
+        click.launch(str(path))
+        return True
+
+
 @click.command()
 def repl():
     """
@@ -34,7 +105,8 @@ def repl():
     client = BridgeClient()
 
     if not client.is_alive():
-        click.echo("Error: Bridge server is not running. Start it with: inspekt start", err=True)
+        from inspekt.app.cli.table import _style_with_inline_code
+        click.echo(_style_with_inline_code("Error: Bridge server is not running. Start it with `inspekt start`.", base_fg="red"), err=True)
         sys.exit(1)
 
     click.echo("Inspekt REPL - Type JavaScript code, 'exit' to quit")
@@ -119,7 +191,8 @@ def userscript():
 @click.option("--list", "list_only", is_flag=True, help="Only list files without downloading")
 @click.option("--json", "output_json", is_flag=True, help="Output as JSON (requires --list)")
 @click.option("-t", "--timeout", type=float, default=30.0, help="Timeout in seconds (default: 30)")
-def download(output, list_only, output_json, timeout):
+@click.option("--open", "open_after", is_flag=True, help="Open downloaded file in default application")
+def download(output, list_only, output_json, timeout, open_after):
     """
     Find and download files from the current page.
 
@@ -139,7 +212,8 @@ def download(output, list_only, output_json, timeout):
     client = BridgeClient()
 
     if not client.is_alive():
-        click.echo("Error: Bridge server is not running. Start it with: inspekt start", err=True)
+        from inspekt.app.cli.table import _style_with_inline_code
+        click.echo(_style_with_inline_code("Error: Bridge server is not running. Start it with `inspekt start`.", base_fg="red"), err=True)
         sys.exit(1)
 
     # Execute the find_downloads script
@@ -369,13 +443,22 @@ def download(output, list_only, output_json, timeout):
                 else:
                     size_str = f"{file_size / 1024:.1f} KB"
 
-                click.echo(f"    Saved to {output_path} ({size_str})")
+                click.echo(f"    Saved to {make_file_link(output_path)} ({size_str})")
                 success_count += 1
 
             except Exception as e:
                 click.echo(f"    Error downloading {filename}: {e}", err=True)
 
         click.echo(f"\nDownloaded {success_count} of {len(files_to_download)} files successfully.")
+
+        # Open file or directory if --open flag was set
+        if open_after and success_count > 0:
+            if success_count == 1:
+                # Open the single downloaded file
+                open_or_download(output_path)
+            else:
+                # Multiple files: open the downloads directory
+                open_or_download(downloads_dir)
 
     except (ConnectionError, TimeoutError, RuntimeError) as e:
         click.echo(f"Error: {e}", err=True)
@@ -400,7 +483,8 @@ def md_link(output_json):
     client = BridgeClient()
 
     if not client.is_alive():
-        click.echo("Error: Bridge server is not running. Start it with: inspekt start", err=True)
+        from inspekt.app.cli.table import _style_with_inline_code
+        click.echo(_style_with_inline_code("Error: Bridge server is not running. Start it with `inspekt start`.", base_fg="red"), err=True)
         sys.exit(1)
 
     # Get current page URL and title

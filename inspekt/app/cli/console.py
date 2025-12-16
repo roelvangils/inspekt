@@ -21,6 +21,7 @@ from datetime import datetime
 
 import click
 
+from inspekt.app.cli.icons import success, get_indicator, get_log_level_icon
 from inspekt.app.cli.table import Table
 from inspekt.client import BridgeClient
 
@@ -130,8 +131,9 @@ def list_logs(level, limit, output_json, tail):
                     "error": "Bridge server is not running"
                 }))
             else:
+                from inspekt.app.cli.table import _style_with_inline_code
                 click.echo(
-                    "Error: Bridge server is not running. Start it with: inspekt start",
+                    _style_with_inline_code("Error: Bridge server is not running. Start it with `inspekt start`.", base_fg="red"),
                     err=True
                 )
             sys.exit(1)
@@ -210,11 +212,15 @@ def list_logs(level, limit, output_json, tail):
 
                 color = level_colors.get(entry_level, 'white')
 
+                # Get log level icon (if nerdfont enabled)
+                level_icon = get_log_level_icon(entry_level)
+                level_display = f"{level_icon} [{entry_level}]" if level_icon else f"[{entry_level}]"
+
                 # Check for special table format
                 if message.startswith('[table:json]'):
                     click.echo(
                         f"{click.style(time_str, dim=True)} "
-                        f"{click.style(f'[{entry_level}]', fg=color)} "
+                        f"{click.style(level_display, fg=color)} "
                         f"{click.style('[table]', fg='blue')}"
                     )
                     render_console_table(message[12:])  # Skip '[table:json]' prefix
@@ -223,9 +229,10 @@ def list_logs(level, limit, output_json, tail):
                 # Check for command marker (from inspekt eval)
                 if message.startswith('[inspekt:cmd]'):
                     cmd_text = message[13:]  # Skip '[inspekt:cmd]' prefix
+                    cmd_icon = get_indicator("command") or "▸"
                     click.echo(
                         f"{click.style(time_str, dim=True)} "
-                        f"{click.style('▸', fg='green')} "
+                        f"{click.style(cmd_icon, fg='green')} "
                         f"{click.style(cmd_text, fg='green')}"
                     )
                     continue
@@ -260,7 +267,7 @@ def list_logs(level, limit, output_json, tail):
 
                 click.echo(
                     f"{click.style(time_str, dim=True)} "
-                    f"{click.style(f'[{entry_level}]', fg=color)} "
+                    f"{click.style(level_display, fg=color)} "
                     f"{display_message}"
                 )
 
@@ -305,8 +312,9 @@ def clear_logs(output_json):
                     "error": "Bridge server is not running"
                 }))
             else:
+                from inspekt.app.cli.table import _style_with_inline_code
                 click.echo(
-                    "Error: Bridge server is not running. Start it with: inspekt start",
+                    _style_with_inline_code("Error: Bridge server is not running. Start it with `inspekt start`.", base_fg="red"),
                     err=True
                 )
             sys.exit(1)
@@ -328,7 +336,7 @@ def clear_logs(output_json):
         if output_json:
             click.echo(json.dumps({"ok": True, "message": "Console buffer cleared"}))
         else:
-            click.echo("✓ Console buffer cleared")
+            click.echo(success("Console buffer cleared"))
 
     except requests.exceptions.ConnectionError:
         if output_json:

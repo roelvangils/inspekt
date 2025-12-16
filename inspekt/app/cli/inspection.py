@@ -15,6 +15,7 @@ from pathlib import Path
 
 import click
 
+from inspekt.app.cli.icons import get_section_icon, warning as warn_icon
 from inspekt.config import get_screenshot_config
 from inspekt.services.bridge_executor import BridgeExecutor
 from inspekt.services.script_loader import ScriptLoader
@@ -33,10 +34,10 @@ def inspect(ctx, selector):
     If no selector is provided, shows details of the currently selected element.
 
     Examples:
-        zen inspect "h1"              # Select and show details
-        zen inspect "#header"
-        zen inspect ".main-content"
-        zen inspect                   # Show currently selected element
+        inspekt inspect "h1"              # Select and show details
+        inspekt inspect "#header"
+        inspekt inspect ".main-content"
+        inspekt inspect                   # Show currently selected element
     """
     executor = BridgeExecutor()
     executor.ensure_server_running()
@@ -97,15 +98,15 @@ def inspected(output_json):
     """
     Get information about the currently inspected element.
 
-    Shows details about the element from DevTools inspection or from 'zen inspect'.
+    Shows details about the element from DevTools inspection or from 'inspekt inspect'.
 
     To capture element from DevTools:
         1. Right-click element → Inspect
-        2. In DevTools Console: zenStore()
+        2. In DevTools Console: inspektStore()
         3. Run: inspekt inspected
 
     Or select programmatically:
-        zen inspect "h1"
+        inspekt inspect "h1"
         inspekt inspected
     """
     executor = BridgeExecutor()
@@ -134,7 +135,8 @@ def inspected(output_json):
             else:
                 click.echo(f"Error: {response['error']}", err=True)
                 if response.get("hint"):
-                    click.echo(f"Hint: {response['hint']}", err=True)
+                    from inspekt.app.cli.table import print_hint
+                    print_hint(response['hint'])
             sys.exit(1)
 
         # JSON output
@@ -181,7 +183,9 @@ def inspected(output_json):
 
         # Dimensions
         dim = response["dimensions"]
-        click.echo("\nDimensions:")
+        dim_icon = get_section_icon("dimensions") or ""
+        dim_prefix = f"{dim_icon} " if dim_icon else ""
+        click.echo(f"\n{dim_prefix}Dimensions:")
         click.echo(f"  Position: x={dim['left']}, y={dim['top']}")
         click.echo(f"  Size:     {dim['width']}×{dim['height']}px")
         click.echo(
@@ -204,7 +208,9 @@ def inspected(output_json):
 
         # Accessibility
         a11y = response.get("accessibility", {})
-        click.echo("\nAccessibility:")
+        a11y_icon = get_section_icon("accessibility") or ""
+        a11y_prefix = f"{a11y_icon} " if a11y_icon else ""
+        click.echo(f"\n{a11y_prefix}Accessibility:")
         click.echo(f"  Role:            {a11y.get('role', 'N/A')}")
 
         # Accessible Name (computed)
@@ -220,9 +226,9 @@ def inspected(output_json):
         else:
             click.echo("  Accessible Name: (none)")
             if name_source == "missing alt attribute":
-                click.echo("  ⚠️  Warning: Image missing alt attribute")
+                click.echo(f"  {warn_icon('Warning: Image missing alt attribute')}")
             elif name_source == "none":
-                click.echo("  ⚠️  Warning: No accessible name found")
+                click.echo(f"  {warn_icon('Warning: No accessible name found')}")
 
         if a11y.get("ariaLabel"):
             click.echo(f"  ARIA Label:      {a11y['ariaLabel']}")
@@ -260,7 +266,9 @@ def inspected(output_json):
         click.echo(f"  Children: {response.get('childCount', 0)}")
 
         # Styles
-        click.echo("\nStyles:")
+        styles_icon = get_section_icon("styles") or ""
+        styles_prefix = f"{styles_icon} " if styles_icon else ""
+        click.echo(f"\n{styles_prefix}Styles:")
         for key, value in response["styles"].items():
             click.echo(f"  {key}: {value}")
 
@@ -471,7 +479,10 @@ def screenshot_node(selector, output, margin, margin_color, optimize, scale, for
             else:
                 filename = f"{timestamp}_{tag_name}.{format}"
 
-            output = filename
+            # Use screenshots directory from config
+            from inspekt.config import get_paths_config
+            paths = get_paths_config()
+            output = str(paths["screenshots"] / filename)
             click.echo(f"Auto-generated filename: {filename}")
 
         # Save image

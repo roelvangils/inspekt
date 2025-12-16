@@ -60,45 +60,67 @@ class AxeUpdater:
             {
                 "version": "4.12.0",
                 "tarball": "https://...",
-                "shasum": "abc123..."
+                "shasum": "abc123...",
+                "release_date": "2025-10-09T16:39:18.813Z"
             }
         """
         try:
+            # First get basic version info from /latest endpoint (fast)
             response = requests.get(self.npm_registry_url, timeout=timeout)
             response.raise_for_status()
             data = response.json()
 
-            return {
+            result = {
                 "version": data.get("version"),
                 "tarball": data.get("dist", {}).get("tarball"),
                 "shasum": data.get("dist", {}).get("shasum"),
+                "release_date": None,
             }
+
+            # Try to get release date from full package data
+            try:
+                full_url = "https://registry.npmjs.org/axe-core"
+                full_response = requests.get(full_url, timeout=timeout)
+                full_response.raise_for_status()
+                full_data = full_response.json()
+
+                # Get release date for this version from the time field
+                times = full_data.get("time", {})
+                version = result["version"]
+                if version and version in times:
+                    result["release_date"] = times[version]
+            except (requests.RequestException, json.JSONDecodeError, KeyError):
+                # Continue without release date if this fails
+                pass
+
+            return result
         except (requests.RequestException, json.JSONDecodeError, KeyError):
             return None
 
-    def is_update_available(self) -> tuple[bool, Optional[str], Optional[str]]:
+    def is_update_available(self) -> tuple[bool, Optional[str], Optional[str], Optional[str]]:
         """
         Check if an update is available.
 
         Returns:
-            Tuple of (update_available, current_version, latest_version)
+            Tuple of (update_available, current_version, latest_version, release_date)
         """
         current = self.get_current_version()
         if not current:
-            return False, None, None
+            return False, None, None, None
 
         latest_info = self.check_latest_version()
         if not latest_info or not latest_info.get("version"):
-            return False, current, None
+            return False, current, None, None
 
         latest = latest_info["version"]
+        release_date = latest_info.get("release_date")
 
         try:
             # Use packaging.version for proper semver comparison
             update_available = version.parse(latest) > version.parse(current)
-            return update_available, current, latest
+            return update_available, current, latest, release_date
         except version.InvalidVersion:
-            return False, current, latest
+            return False, current, latest, release_date
 
     def download_version(self, ver: str) -> Optional[Path]:
         """

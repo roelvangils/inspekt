@@ -18,6 +18,7 @@ import sys
 
 import click
 
+from inspekt.app.cli.icons import success, warning as warn_icon
 from inspekt.services.bridge_executor import get_executor
 from inspekt.services.script_loader import ScriptLoader
 
@@ -216,7 +217,7 @@ def storage_set(key, value, cookies, local, session, storage_type, max_age, expi
         "session": "sessionStorage"
     }[storage_type_name]
 
-    click.echo(f"✓ Item set in {storage_display}: {key}")
+    click.echo(success(f"Item set in {storage_display}: {key}"))
 
 
 @storage.command(name="delete")
@@ -267,7 +268,7 @@ def storage_delete(key, cookies, local, session, storage_type):
         "session": "sessionStorage"
     }[storage_type_name]
 
-    click.echo(f"✓ Item deleted from {storage_display}: {key}")
+    click.echo(success(f"Item deleted from {storage_display}: {key}"))
 
 
 @storage.command(name="clear")
@@ -320,7 +321,7 @@ def storage_clear(cookies, local, session, all, storage_type, force):
         storage_result = result.get("storage", {}).get(storage_key, {})
         deleted = storage_result.get("deleted", 0)
         display_name = _get_storage_display_name(storage_type)
-        click.echo(f"✓ Cleared {deleted} item(s) from {display_name}")
+        click.echo(success(f"Cleared {deleted} item(s) from {display_name}"))
 
 
 # ============================================================================
@@ -396,8 +397,9 @@ def _get_storage_display_name(storage_type):
 
 def _show_deprecation_warning(old_flag, new_flag):
     """Show deprecation warning for legacy flags."""
+    deprecation_msg = f"'{old_flag}' flag is deprecated and will be removed in v2.0.0"
     click.echo(
-        f"⚠ Warning: '{old_flag}' flag is deprecated and will be removed in v2.0.0\n"
+        f"{warn_icon(deprecation_msg)}\n"
         f"   Use '{new_flag}' instead\n",
         err=True
     )

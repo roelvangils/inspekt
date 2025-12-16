@@ -49,7 +49,7 @@ You can click the currently inspected element (from DevTools):
 
 ```bash
 # In DevTools, select an element ($0)
-# In browser console: zenStore($0)
+# In browser console: inspektStore($0)
 
 # Then click it
 inspekt click
@@ -295,11 +295,11 @@ You can also store the currently selected element in DevTools:
 
 1. Open DevTools (F12)
 2. Select an element (inspect tool or click in Elements panel)
-3. In console, run: `zenStore($0)`
+3. In console, run: `inspektStore($0)`
 4. Then use: `inspekt inspected`
 
 !!! tip "Workflow"
-    Use `inspekt inspect` to find elements programmatically, or use DevTools + `zenStore($0)` for visual selection.
+    Use `inspekt inspect` to find elements programmatically, or use DevTools + `inspektStore($0)` for visual selection.
 
 ---
 

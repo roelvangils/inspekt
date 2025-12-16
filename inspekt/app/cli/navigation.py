@@ -1,5 +1,5 @@
 """
-Navigation commands for Zen Browser Bridge CLI.
+Navigation commands for Inspekt Browser Bridge CLI.
 
 This module provides commands for browser navigation:
 - open: Navigate to a URL
@@ -18,6 +18,7 @@ import sys
 
 import click
 
+from inspekt.app.cli.icons import success
 from inspekt.services.bridge_executor import get_executor
 
 
@@ -42,13 +43,13 @@ def open(url, wait, timeout):
 
     Examples:
         # Navigate to a URL:
-        zen open "https://example.com"
+        inspekt open "https://example.com"
 
         # Navigate and wait for page load:
-        zen open "https://example.com" --wait
+        inspekt open "https://example.com" --wait
 
         # Navigate with custom timeout:
-        zen open "https://example.com" --wait --timeout 60
+        inspekt open "https://example.com" --wait --timeout 60
     """
     executor = get_executor()
 
@@ -96,11 +97,11 @@ def open(url, wait, timeout):
     if wait:
         response = result.get("result", {})
         if response.get("ok"):
-            click.echo(f"✓ Page loaded: {response.get('url', url)}")
+            click.echo(success(f"Page loaded: {response.get('url', url)}"))
         else:
             click.echo("Navigation initiated")
     else:
-        click.echo("✓ Navigation initiated")
+        click.echo(success("Navigation initiated"))
 
 
 @click.command()
@@ -109,7 +110,7 @@ def back():
     Go back to the previous page in browser history.
 
     Example:
-        zen back
+        inspekt back
     """
     executor = get_executor()
 
@@ -118,7 +119,7 @@ def back():
     result = executor.execute(code, timeout=10.0)
     executor.check_result_ok(result)
 
-    click.echo("✓ Navigated back")
+    click.echo(success("Navigated back"))
 
 
 @click.command(hidden=True)
@@ -134,7 +135,7 @@ def forward():
     Go forward to the next page in browser history.
 
     Example:
-        zen forward
+        inspekt forward
     """
     executor = get_executor()
 
@@ -143,7 +144,7 @@ def forward():
     result = executor.execute(code, timeout=10.0)
     executor.check_result_ok(result)
 
-    click.echo("✓ Navigated forward")
+    click.echo(success("Navigated forward"))
 
 
 @click.command(hidden=True)
@@ -161,19 +162,19 @@ def reload(hard):
 
     Examples:
         # Normal reload:
-        zen reload
+        inspekt reload
 
         # Hard reload (bypass cache):
-        zen reload --hard
+        inspekt reload --hard
     """
     executor = get_executor()
 
     if hard:
         code = "(window.location.reload(true), true)"
-        msg = "✓ Hard reload initiated"
+        msg = success("Hard reload initiated")
     else:
         code = "(window.location.reload(), true)"
-        msg = "✓ Reload initiated"
+        msg = success("Reload initiated")
 
     result = executor.execute(code, timeout=10.0)
     executor.check_result_ok(result)
@@ -189,10 +190,10 @@ def refresh(hard):
 
     Examples:
         # Normal reload:
-        zen refresh
+        inspekt refresh
 
         # Hard reload (bypass cache):
-        zen refresh --hard
+        inspekt refresh --hard
     """
     # Just call the reload function
     ctx = click.get_current_context()
@@ -205,7 +206,7 @@ def pageup():
     Scroll up one page (one viewport height).
 
     Example:
-        zen pageup
+        inspekt pageup
     """
     executor = get_executor()
 
@@ -214,7 +215,7 @@ def pageup():
     result = executor.execute(code, timeout=10.0)
     executor.check_result_ok(result)
 
-    click.echo("✓ Scrolled up one page")
+    click.echo(success("Scrolled up one page"))
 
 
 @click.command(hidden=True)
@@ -230,7 +231,7 @@ def pagedown():
     Scroll down one page (one viewport height).
 
     Example:
-        zen pagedown
+        inspekt pagedown
     """
     executor = get_executor()
 
@@ -239,7 +240,7 @@ def pagedown():
     result = executor.execute(code, timeout=10.0)
     executor.check_result_ok(result)
 
-    click.echo("✓ Scrolled down one page")
+    click.echo(success("Scrolled down one page"))
 
 
 @click.command(hidden=True)
@@ -255,7 +256,7 @@ def top():
     Scroll to the top of the page.
 
     Example:
-        zen top
+        inspekt top
     """
     executor = get_executor()
 
@@ -264,7 +265,7 @@ def top():
     result = executor.execute(code, timeout=10.0)
     executor.check_result_ok(result)
 
-    click.echo("✓ Scrolled to top")
+    click.echo(success("Scrolled to top"))
 
 
 @click.command(hidden=True)
@@ -280,7 +281,7 @@ def bottom():
     Scroll to the bottom of the page.
 
     Example:
-        zen bottom
+        inspekt bottom
     """
     executor = get_executor()
 
@@ -289,7 +290,7 @@ def bottom():
     result = executor.execute(code, timeout=10.0)
     executor.check_result_ok(result)
 
-    click.echo("✓ Scrolled to bottom")
+    click.echo(success("Scrolled to bottom"))
 
 
 @click.command(hidden=True)

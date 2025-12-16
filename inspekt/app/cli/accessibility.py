@@ -17,11 +17,41 @@ from pathlib import Path
 import click
 
 from inspekt.app.cli.base import builtin_open
+from inspekt.app.cli.icons import get_icon, success, error, warning as warn_icon
 from inspekt.app.cli.table import Table, print_wrapped
 from inspekt.client import BridgeClient
 
 
-def _build_axe_config(level: str, tags: str | None, include_passes: bool, include_incomplete: bool) -> dict:
+def _parse_rule_ids(rule_options: tuple[str, ...]) -> list[str]:
+    """
+    Parse rule IDs from multiple option flags and comma-separated values.
+
+    Supports both formats:
+        --disable-rule color-contrast --disable-rule label
+        --disable-rule color-contrast,label
+
+    Args:
+        rule_options: Tuple of rule ID strings (from multiple flags)
+
+    Returns:
+        Flat list of individual rule IDs
+    """
+    rule_ids = []
+    for item in rule_options:
+        # Split on commas and strip whitespace
+        parts = [r.strip() for r in item.split(',') if r.strip()]
+        rule_ids.extend(parts)
+    return rule_ids
+
+
+def _build_axe_config(
+    level: str,
+    tags: str | None,
+    include_passes: bool,
+    include_incomplete: bool,
+    disable_rules: list[str] | None = None,
+    enable_rules: list[str] | None = None
+) -> dict:
     """
     Build axe-core configuration object from CLI arguments.
 
@@ -30,11 +60,33 @@ def _build_axe_config(level: str, tags: str | None, include_passes: bool, includ
         tags: Additional comma-separated tags
         include_passes: Whether to include passing checks
         include_incomplete: Whether to include incomplete checks
+        disable_rules: List of rule IDs to disable (e.g., ['color-contrast', 'label'])
+        enable_rules: List of rule IDs to run exclusively (all others disabled)
 
     Returns:
         Configuration dict for axe.run()
+
+    Note:
+        enable_rules takes precedence over disable_rules if both are specified.
+        When enable_rules is set, only those specific rules will run.
     """
-    # Map WCAG levels to axe tags
+    config = {"resultTypes": ["violations"]}
+
+    # Add optional result types
+    if include_passes:
+        config["resultTypes"].append("passes")
+    if include_incomplete:
+        config["resultTypes"].append("incomplete")
+
+    # If enable_rules is specified, run ONLY those rules (ignore level/tags)
+    if enable_rules:
+        config["runOnly"] = {
+            "type": "rule",
+            "values": enable_rules
+        }
+        return config
+
+    # Otherwise, use WCAG level-based tags
     level_mapping = {
         "2a": ["wcag2a"],
         "2aa": ["wcag2a", "wcag2aa"],
@@ -52,20 +104,14 @@ def _build_axe_config(level: str, tags: str | None, include_passes: bool, includ
         additional_tags = [tag.strip() for tag in tags.split(",")]
         axe_tags.extend(additional_tags)
 
-    # Build config
-    config = {
-        "runOnly": {
-            "type": "tag",
-            "values": axe_tags
-        },
-        "resultTypes": ["violations"]
+    config["runOnly"] = {
+        "type": "tag",
+        "values": axe_tags
     }
 
-    # Add optional result types
-    if include_passes:
-        config["resultTypes"].append("passes")
-    if include_incomplete:
-        config["resultTypes"].append("incomplete")
+    # Disable specific rules if requested
+    if disable_rules:
+        config["rules"] = {rule_id: {"enabled": False} for rule_id in disable_rules}
 
     return config
 
@@ -238,7 +284,7 @@ def _build_axe_context(client: BridgeClient, scoped: str | None, exclude_selecto
 
         # Show selection source confirmation if panel selection was required
         if require_panel_selection:
-            click.echo(click.style("✓", fg="green") + " Element selected via Inspekt panel picker", err=True)
+            click.echo(click.style(success("Element selected via Inspekt panel picker"), fg="green"), err=True)
 
         # Display scoped element with separator lines
         click.echo(f"Scoping to inspected element:", err=True)
@@ -399,12 +445,6 @@ def _list_available_rules(client: BridgeClient, timeout: float, output_json: boo
             click.echo(json.dumps({"rules": rules, "stats": stats, "axeVersion": data.get("axeVersion")}, indent=2))
             return
 
-        # Display rules in a formatted list
-        click.echo()
-        click.echo(click.style(f"Available Axe-core Rules (v{data.get('axeVersion', 'unknown')})", bold=True))
-        click.echo(click.style(f"Total: {stats.get('total', 0)} rules", fg="bright_black"))
-        click.echo()
-
         # Group rules by WCAG level
         wcag_groups = {
             "wcag2a": [],
@@ -430,37 +470,71 @@ def _list_available_rules(client: BridgeClient, timeout: float, output_json: boo
             else:
                 wcag_groups["other"].append(rule)
 
-        # Display groups
-        group_labels = {
-            "wcag2a": "WCAG 2.0 Level A",
-            "wcag2aa": "WCAG 2.0 Level AA",
-            "wcag21aa": "WCAG 2.1 Level AA",
-            "wcag22aa": "WCAG 2.2 Level AA",
-            "best-practice": "Best Practice",
-            "other": "Other"
-        }
+        # Display groups with tables
+        group_info = [
+            ("wcag2a", "WCAG 2.0 Level A", "2a"),
+            ("wcag2aa", "WCAG 2.0 Level AA", "2aa"),
+            ("wcag21aa", "WCAG 2.1 Level AA", "21aa"),
+            ("wcag22aa", "WCAG 2.2 Level AA", "22aa"),
+            ("best-practice", "Best Practice", "best-practice"),
+            ("other", "Other", None),
+        ]
 
-        for group_key, group_label in group_labels.items():
+        click.echo()
+        total_shown = 0
+
+        for group_key, group_label, level_flag in group_info:
             group_rules = wcag_groups.get(group_key, [])
             if not group_rules:
                 continue
 
-            click.echo(click.style(f"{group_label} ({len(group_rules)} rules)", fg="cyan", bold=True))
+            # Sort rules alphabetically by ID
+            group_rules.sort(key=lambda r: r.get("id", ""))
+
+            # Build table data
+            rows = []
             for rule in group_rules:
                 rule_id = rule.get("id", "")
                 description = rule.get("description", "")
-                # Truncate description if too long
-                if len(description) > 80:
-                    description = description[:77] + "..."
-                click.echo(f"  {click.style(rule_id, fg='green')}: {description}")
-            click.echo()
+                rows.append([rule_id, description])
 
-        # Show usage hint
-        click.echo(click.style("Usage:", bold=True))
-        click.echo("  inspekt axe --rule <rule-id>")
+            # Create table with title showing count and level flag
+            title = f"{group_label} ({len(group_rules)} rules)"
+            table = Table(
+                headers=["Rule ID", "Description"],
+                title=title,
+            )
+            table.set_data(rows)
+
+            # Print table
+            table.print_header()
+            for row in rows:
+                rule_id, description = row
+                table.print_row(
+                    [rule_id, description],
+                    colors=["green", None]
+                )
+            table.print_footer()
+
+            # Show level flag hint
+            if level_flag:
+                from inspekt.app.cli.table import _style_with_inline_code
+                hint = f"  Use: `inspekt axe --level {level_flag}`" if level_flag != "best-practice" else "  Use: `inspekt axe --tags best-practice`"
+                click.echo(_style_with_inline_code(hint, base_fg="bright_black"))
+
+            click.echo()
+            total_shown += len(group_rules)
+
+        # Summary
+        click.echo(click.style(f"Total: {total_shown} rules (axe-core v{data.get('axeVersion', 'unknown')})", fg="bright_black"))
         click.echo()
-        click.echo(click.style("Example:", bold=True))
-        click.echo("  inspekt axe --rule color-contrast")
+
+        # Show usage hints
+        from inspekt.app.cli.table import _style_with_inline_code
+        click.echo(click.style("Usage Examples:", bold=True))
+        click.echo(_style_with_inline_code("  `inspekt axe --rule color-contrast`        ", base_fg="white") + click.style("# Check single rule", fg="bright_black"))
+        click.echo(_style_with_inline_code("  `inspekt axe --enable-rule color-contrast` ", base_fg="white") + click.style("# Check only this rule", fg="bright_black"))
+        click.echo(_style_with_inline_code("  `inspekt axe --disable-rule label`         ", base_fg="white") + click.style("# Exclude specific rule", fg="bright_black"))
         click.echo()
 
     except (ConnectionError, TimeoutError, RuntimeError) as e:
@@ -505,7 +579,7 @@ def _format_detailed_violation_output(violations: list[dict], url: str, rule_id:
     """Format violations with detailed information for single-rule checks."""
     if not violations:
         click.echo()
-        click.echo(click.style(f"✓ No violations found for rule: {rule_id}", fg="green", bold=True))
+        click.echo(click.style(success(f"No violations found for rule: {rule_id}"), fg="green", bold=True))
         click.echo()
         click.echo(f"Tested: {url}")
         return
@@ -591,9 +665,10 @@ def _format_detailed_violation_output(violations: list[dict], url: str, rule_id:
 
             if _auto_select_element(selector, rule_id):
                 click.echo()
-                click.echo(click.style("✓ Element auto-selected and highlighted in browser", fg="green"))
+                click.echo(click.style(success("Element auto-selected and highlighted in browser"), fg="green"))
                 click.echo(f"  Selector: {click.style(selector, fg='yellow')}")
-                click.echo(f"  Run {click.style('inspekt inspected', bold=True)} to view full element details")
+                from inspekt.app.cli.table import _style_with_inline_code
+                click.echo(_style_with_inline_code("  Run `inspekt inspected` to view full element details", base_fg="white"))
 
     # Footer
     click.echo()
@@ -611,7 +686,7 @@ def _format_table_output(violations: list[dict], url: str, summary: dict, compac
     """
     if not violations:
         click.echo()
-        click.echo(click.style("✓ No accessibility violations found!", fg="green", bold=True))
+        click.echo(click.style(success("No accessibility violations found!"), fg="green", bold=True))
         if not compact:
             click.echo(f"Tested: {url}")
             click.echo(f"Passes: {summary.get('passCount', 0)}")
@@ -642,7 +717,8 @@ def _format_table_output(violations: list[dict], url: str, summary: dict, compac
     # Create table with auto-width and title
     violation_count = summary.get('violationCount', len(violations))
     title = f"Accessibility Violations ({violation_count})"
-    table = Table(headers, alignments=alignments, title=title)
+    icon = get_icon("Accessibility")
+    table = Table(headers, alignments=alignments, title=title, icon=icon)
     table.set_data(rows)
     table.print_header()
 
@@ -766,7 +842,21 @@ def _format_table_output(violations: list[dict], url: str, summary: dict, compac
     default=False,
     help="Monitor and re-run audit on each page navigation (press Ctrl+C to stop). CLI only."
 )
-def axe(level, rule, list_rules, tags, include_passes, include_incomplete, output_json, timeout, no_select, scoped, exclude, require_panel_selection, show_badges, interactive, dev_css, persistent):
+@click.option(
+    "--disable-rule",
+    type=str,
+    multiple=True,
+    metavar="RULE_ID",
+    help="Disable specific rules by ID. Supports comma-separated values."
+)
+@click.option(
+    "--enable-rule",
+    type=str,
+    multiple=True,
+    metavar="RULE_ID",
+    help="Run ONLY these rules (all others disabled). Supports comma-separated values."
+)
+def axe(level, rule, list_rules, tags, include_passes, include_incomplete, output_json, timeout, no_select, scoped, exclude, require_panel_selection, show_badges, interactive, dev_css, persistent, disable_rule, enable_rule):
     """
     Run axe-core accessibility audit on the current page.
 
@@ -800,10 +890,20 @@ def axe(level, rule, list_rules, tags, include_passes, include_incomplete, outpu
         inspekt axe --scoped "main,nav,footer"         # Test multiple regions
         inspekt axe --scoped inspected --require-panel-selection  # Require Inspekt panel
 
-        # Excluding elements
+        # Excluding elements (CSS selectors)
         inspekt axe --exclude "header,footer"          # Exclude header and footer
         inspekt axe --exclude header --exclude footer  # Multiple --exclude flags
         inspekt axe --scoped "main" --exclude ".ad"    # Combined scoping and exclusion
+
+        # Disabling rules (exclude specific rules)
+        inspekt axe --disable-rule color-contrast           # Ignore one rule
+        inspekt axe --disable-rule color-contrast,label     # Comma-separated
+        inspekt axe --disable-rule color-contrast --disable-rule label  # Multiple flags
+
+        # Enabling rules (run ONLY specific rules, all others disabled)
+        inspekt axe --enable-rule color-contrast            # Check only contrast
+        inspekt axe --enable-rule color-contrast,label      # Check only these two
+        inspekt axe --enable-rule link-name,button-name     # Focus on naming rules
 
         # Other options
         inspekt axe --list-rules                       # List all available rules
@@ -819,10 +919,23 @@ def axe(level, rule, list_rules, tags, include_passes, include_incomplete, outpu
         click.echo("Error: --rule and --level are mutually exclusive. Use --rule for specific rules or --level for WCAG conformance testing.", err=True)
         sys.exit(1)
 
+    # Validation: --enable-rule and --disable-rule are mutually exclusive
+    if enable_rule and disable_rule:
+        click.echo("Error: --enable-rule and --disable-rule are mutually exclusive.", err=True)
+        click.echo("  Use --enable-rule to run ONLY specific rules (whitelist).", err=True)
+        click.echo("  Use --disable-rule to run all rules EXCEPT specific ones (blacklist).", err=True)
+        sys.exit(1)
+
+    # Validation: --enable-rule and --rule are mutually exclusive
+    if enable_rule and rule:
+        click.echo("Error: --enable-rule and --rule are mutually exclusive. Both specify which rules to run.", err=True)
+        sys.exit(1)
+
     client = BridgeClient()
 
     if not client.is_alive():
-        click.echo("Error: Bridge server is not running. Start it with: inspekt start", err=True)
+        from inspekt.app.cli.table import _style_with_inline_code
+        click.echo(_style_with_inline_code("Error: Bridge server is not running. Start it with `inspekt start`.", base_fg="red"), err=True)
         sys.exit(1)
 
     # Handle --list-rules flag
@@ -847,7 +960,10 @@ def axe(level, rule, list_rules, tags, include_passes, include_incomplete, outpu
             config["resultTypes"].append("incomplete")
     else:
         # WCAG level-based check (existing behavior)
-        config = _build_axe_config(level, tags, include_passes, include_incomplete)
+        # Parse comma-separated and multiple flag values
+        disabled_rules = _parse_rule_ids(disable_rule) if disable_rule else None
+        enabled_rules = _parse_rule_ids(enable_rule) if enable_rule else None
+        config = _build_axe_config(level, tags, include_passes, include_incomplete, disabled_rules, enabled_rules)
 
     # Parse and validate exclude selectors
     exclude_selectors = _parse_selectors(exclude)
@@ -1163,7 +1279,7 @@ def axe(level, rule, list_rules, tags, include_passes, include_incomplete, outpu
                         # Display results based on whether new violations were found
                         if badges_created == 0:
                             # No new violations found
-                            click.echo(click.style("✓ No new accessibility violations found", fg="green", bold=True) + " • Press Ctrl+C to stop", err=True)
+                            click.echo(click.style(success("No new accessibility violations found"), fg="green", bold=True) + " • Press Ctrl+C to stop", err=True)
                         else:
                             # New violations found - show table with only new violations
                             new_violations = data.get("violations", [])
@@ -1368,9 +1484,9 @@ def autocomplete(threshold, include_hidden, include_disabled, output_json, timeo
         # Footer with WCAG info
         click.echo(click.style("─" * 60, fg="bright_black"))
         if violations == 0:
-            click.echo(click.style("✓ Page is compliant with WCAG 2.1 SC 1.3.5", fg="green", bold=True))
+            click.echo(click.style(success("Page is compliant with WCAG 2.1 SC 1.3.5"), fg="green", bold=True))
         else:
-            click.echo(click.style(f"✗ Found {violations} WCAG 2.1 SC 1.3.5 violation(s)", fg="red", bold=True))
+            click.echo(click.style(error(f"Found {violations} WCAG 2.1 SC 1.3.5 violation(s)"), fg="red", bold=True))
 
         click.echo(click.style(f"Confidence threshold: {threshold} | Multi-language: EN, DE, NL, FR", fg="bright_black"))
         click.echo()

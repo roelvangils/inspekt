@@ -188,9 +188,10 @@ def display_selection(response, content_type="text", show_tip=True, pretty=None,
 
     # Show tips
     if show_tip:
+        from inspekt.app.cli.table import _style_with_inline_code
         click.echo("Tips:")
-        click.echo(f"  • Use `inspekt selection {content_type} --raw` for raw {content_type.upper()} output")
-        click.echo(f"  • Type `inspekt selection {content_type} --help` for advanced options")
+        click.echo(_style_with_inline_code(f"  • Use `inspekt selection {content_type} --raw` for raw {content_type.upper()} output", base_fg="white"))
+        click.echo(_style_with_inline_code(f"  • Type `inspekt selection {content_type} --help` for advanced options", base_fg="white"))
 
 
 @click.group(invoke_without_command=True)
@@ -247,7 +248,8 @@ def text(raw, output_json):
             click.echo(json.dumps({"hasSelection": False, "text": "", "length": 0}, indent=2))
         elif not raw:
             click.echo("No text selected")
-            click.echo("Hint: Select some text in the browser first, then run: zen selection text")
+            from inspekt.app.cli.table import print_hint
+            print_hint("Select some text in the browser first, then run `inspekt selection text`.")
         sys.exit(0)
 
     text_content = response.get("text", "")
@@ -262,9 +264,9 @@ def text(raw, output_json):
         click.echo(json.dumps(output, indent=2))
         return
 
-    # Raw mode: just print the text, nothing else
+    # Raw mode: just print the text, nothing else (strip trailing whitespace)
     if raw:
-        click.echo(text_content)
+        click.echo(text_content.rstrip())
         return
 
     # Formatted display
@@ -302,7 +304,8 @@ def html(raw, output_json, pretty, compact, colors, theme):
             click.echo(json.dumps({"hasSelection": False, "html": "", "length": 0}, indent=2))
         elif not raw:
             click.echo("No text selected")
-            click.echo("Hint: Select some text in the browser first, then run: `inspekt selection html`")
+            from inspekt.app.cli.table import print_hint
+            print_hint("Select some text in the browser first, then run `inspekt selection html`.")
         sys.exit(0)
 
     html_content = response.get("html", "")
@@ -327,9 +330,9 @@ def html(raw, output_json, pretty, compact, colors, theme):
         click.echo(json.dumps(output, indent=2))
         return
 
-    # Raw mode: just print the HTML, nothing else
+    # Raw mode: just print the HTML, nothing else (strip trailing whitespace)
     if raw:
-        click.echo(html_content)
+        click.echo(html_content.rstrip())
         return
 
     # Formatted display - pass flags to display function
@@ -348,7 +351,8 @@ def markdown(raw, output_json):
             click.echo(json.dumps({"hasSelection": False, "markdown": "", "length": 0}, indent=2))
         elif not raw:
             click.echo("No text selected")
-            click.echo("Hint: Select some text in the browser first, then run: zen selection markdown")
+            from inspekt.app.cli.table import print_hint
+            print_hint("Select some text in the browser first, then run `inspekt selection markdown`.")
         sys.exit(0)
 
     html_content = response.get("html", "")
@@ -365,9 +369,9 @@ def markdown(raw, output_json):
         click.echo(json.dumps(output, indent=2))
         return
 
-    # Raw mode: just print the markdown, nothing else
+    # Raw mode: just print the markdown, nothing else (strip trailing whitespace)
     if raw:
-        click.echo(markdown_content)
+        click.echo(markdown_content.rstrip())
         return
 
     # Formatted display
@@ -382,9 +386,9 @@ def selected(raw, output_json):
     """
     [DEPRECATED] Get the current text selection in the browser.
 
-    Please use 'zen selection text' instead.
+    Please use 'inspekt selection text' instead.
     """
-    click.echo("Warning: 'zen selected' is deprecated. Use 'zen selection text' instead.\n", err=True)
+    click.echo("Warning: 'inspekt selected' is deprecated. Use 'inspekt selection text' instead.\n", err=True)
 
     response = get_selection_data()
 
@@ -393,7 +397,8 @@ def selected(raw, output_json):
             click.echo(json.dumps({"hasSelection": False, "text": "", "length": 0}, indent=2))
         elif not raw:
             click.echo("No text selected")
-            click.echo("Hint: Select some text in the browser first, then run: zen selection text")
+            from inspekt.app.cli.table import print_hint
+            print_hint("Select some text in the browser first, then run `inspekt selection text`.")
         sys.exit(0)
 
     text_content = response.get("text", "")

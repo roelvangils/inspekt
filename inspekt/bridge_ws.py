@@ -72,6 +72,18 @@ IDLE_CONNECTION_THRESHOLD = 3600
 # Script loader service (singleton)
 script_loader = ScriptLoader()
 
+# Screencast state (for video recording)
+screencast_active: bool = False
+screencast_frames: list[dict] = []  # List of {timestamp, data} dicts
+screencast_max_frames: int = 10000  # Max frames to buffer (prevent memory overflow)
+screencast_settings: dict = {}  # fps, quality, format
+screencast_interrupted: dict | None = None  # Set when recording is interrupted (e.g., user opens DevTools)
+
+# Audio cue state (for video audio effects)
+audio_cues: list[dict] = []  # List of {timestamp_ms, action} dicts
+audio_recording_active: bool = False
+audio_recording_start_time: float = 0.0  # time.time() when recording started
+
 # Server tracking
 server_start_time = time.time()  # Track server uptime
 connection_times: dict = {}  # Track when each connection was established
@@ -614,6 +626,29 @@ async def websocket_handler(request):
                             if request_id in pending_events:
                                 pending_events[request_id].set()
 
+                    elif message_type == "screencast_frame":
+                        # Browser sending a screencast frame (video recording)
+                        handle_screencast_frame(data)
+
+                    elif message_type == "screencast_ack":
+                        # Browser acknowledging screencast start/stop
+                        request_id = data.get("requestId")
+
+                        if request_id and request_id in pending_requests:
+                            # Store the acknowledgment
+                            completed_requests[request_id] = {
+                                "ok": data.get("ok", True),
+                                "error": data.get("error"),
+                                "timestamp": time.time()
+                            }
+
+                            # Remove from pending
+                            del pending_requests[request_id]
+
+                            # Notify waiting HTTP request
+                            if request_id in pending_events:
+                                pending_events[request_id].set()
+
                 except json.JSONDecodeError:
                     print(f"Invalid JSON from browser: {msg.data}")
                 except Exception as e:
@@ -764,7 +799,7 @@ async def handle_http_result(request):
             del pending_requests[request_id]
             pending_events.pop(request_id, None)
             return web.json_response(
-                {"ok": False, "error": "Request timeout. Please ensure the extension is installed in Firefox and/or Chrome, and that the Inspekt Panel is visible."}
+                {"ok": False, "error": "no_browser_connected"}
             )
 
         try:
@@ -2082,6 +2117,388 @@ async def handle_static_singlefile(request):
         )
 
 
+# ============================================================================
+# SCREENCAST (VIDEO RECORDING) ENDPOINTS
+# ============================================================================
+
+async def handle_screencast_start(request):
+    """HTTP endpoint: Start screencast recording.
+
+    Initiates CDP Page.startScreencast on the browser to stream frames.
+    Frames are buffered on the server until retrieved via /screencast/frames.
+    """
+    global most_recent_connection, screencast_active, screencast_frames, screencast_settings, screencast_interrupted
+
+    # Clear any previous interrupt state
+    screencast_interrupted = None
+
+    if most_recent_connection is None:
+        return web.json_response(
+            {"ok": False, "error": "No browser connected"},
+            status=503
+        )
+
+    if screencast_active:
+        return web.json_response(
+            {"ok": True, "message": "Screencast already active", "active": True}
+        )
+
+    # Get settings from request body
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+
+    fps = body.get("fps", 10)
+    quality = body.get("quality", 80)
+    format = body.get("format", "jpeg")
+
+    # Store settings
+    screencast_settings = {
+        "fps": fps,
+        "quality": quality,
+        "format": format,
+    }
+
+    # Clear any existing frames
+    screencast_frames = []
+
+    # Send start command to browser
+    request_id = str(uuid.uuid4())
+    message = {
+        "type": "START_SCREENCAST",
+        "requestId": request_id,
+        "settings": screencast_settings
+    }
+
+    pending_requests[request_id] = {
+        "timestamp": time.time(),
+        "type": "START_SCREENCAST"
+    }
+
+    print(f"[Bridge] Sending START_SCREENCAST to browser, requestId={request_id[:8]}...")
+    await most_recent_connection.send_json(message)
+    print(f"[Bridge] START_SCREENCAST sent, waiting for acknowledgment...")
+
+    # Wait for acknowledgment
+    event = asyncio.Event()
+    pending_events[request_id] = event
+
+    try:
+        await asyncio.wait_for(event.wait(), timeout=10.0)
+        print(f"[Bridge] START_SCREENCAST acknowledgment received")
+    except asyncio.TimeoutError:
+        print(f"[Bridge] START_SCREENCAST timed out after 10s - no acknowledgment received")
+        pending_requests.pop(request_id, None)
+        pending_events.pop(request_id, None)
+        return web.json_response(
+            {"ok": False, "error": "Screencast start timed out"},
+            status=504
+        )
+
+    result = completed_requests.pop(request_id, None)
+    pending_events.pop(request_id, None)
+
+    if result and result.get("ok"):
+        screencast_active = True
+        return web.json_response({
+            "ok": True,
+            "message": "Screencast started",
+            "settings": screencast_settings
+        })
+    else:
+        error = result.get("error", "Unknown error") if result else "No response"
+        return web.json_response(
+            {"ok": False, "error": f"Failed to start screencast: {error}"},
+            status=500
+        )
+
+
+async def handle_screencast_stop(request):
+    """HTTP endpoint: Stop screencast recording.
+
+    Stops CDP Page.stopScreencast on the browser.
+    Any buffered frames can still be retrieved via /screencast/frames.
+    Also clears the frame buffer to prevent memory leaks between sessions.
+    """
+    global most_recent_connection, screencast_active, screencast_frames
+
+    if most_recent_connection is None:
+        screencast_active = False
+        frames_count = len(screencast_frames)
+        # Don't clear buffer - let Python side collect remaining frames
+        return web.json_response(
+            {"ok": True, "message": "No browser connected, screencast marked inactive", "frames_buffered": frames_count}
+        )
+
+    if not screencast_active:
+        frames_count = len(screencast_frames)
+        # Don't clear buffer - let Python side collect remaining frames
+        return web.json_response(
+            {"ok": True, "message": "Screencast not active", "active": False, "frames_buffered": frames_count}
+        )
+
+    # Send stop command to browser
+    request_id = str(uuid.uuid4())
+    message = {
+        "type": "STOP_SCREENCAST",
+        "requestId": request_id
+    }
+
+    pending_requests[request_id] = {
+        "timestamp": time.time(),
+        "type": "STOP_SCREENCAST"
+    }
+
+    await most_recent_connection.send_json(message)
+
+    # Wait for acknowledgment (short timeout - don't block if browser disconnected)
+    event = asyncio.Event()
+    pending_events[request_id] = event
+
+    try:
+        await asyncio.wait_for(event.wait(), timeout=2.0)
+    except asyncio.TimeoutError:
+        # Stop anyway on timeout - browser may have disconnected
+        print("[Bridge] Screencast stop acknowledgment timed out (browser may be disconnected)")
+
+    pending_requests.pop(request_id, None)
+    pending_events.pop(request_id, None)
+    completed_requests.pop(request_id, None)
+
+    screencast_active = False
+
+    # Return frame count - buffer is NOT cleared here to allow collection after stop
+    # The Python ScreencastCapture.stop() method will collect remaining frames
+    # Buffer is cleared when frames are retrieved via /screencast/frames
+    frames_count = len(screencast_frames)
+
+    return web.json_response({
+        "ok": True,
+        "message": "Screencast stopped",
+        "frames_buffered": frames_count
+    })
+
+
+async def handle_screencast_frames(request):
+    """HTTP endpoint: Get buffered screencast frames.
+
+    Returns all buffered frames and clears the buffer.
+    Call this periodically during long recordings to prevent memory overflow.
+    """
+    global screencast_frames
+
+    frames_to_return = screencast_frames.copy()
+    screencast_frames = []  # Clear buffer after retrieval
+
+    return web.json_response({
+        "ok": True,
+        "frames": frames_to_return,
+        "count": len(frames_to_return),
+        "active": screencast_active
+    })
+
+
+async def handle_screencast_status(request):
+    """HTTP endpoint: Get screencast status."""
+    return web.json_response({
+        "ok": True,
+        "active": screencast_active,
+        "frames_buffered": len(screencast_frames),
+        "settings": screencast_settings if screencast_active else None,
+        "interrupted": screencast_interrupted
+    })
+
+
+async def handle_screencast_interrupted(request):
+    """HTTP endpoint: Receive notification that screencast was interrupted.
+
+    Called by background.js when the debugger is detached (e.g., user opens DevTools).
+    This allows the CLI to know the recording was interrupted and inform the user.
+    """
+    global screencast_interrupted, screencast_active
+
+    try:
+        data = await request.json()
+    except Exception:
+        return web.json_response({"ok": False, "error": "Invalid JSON"}, status=400)
+
+    reason = data.get("reason", "unknown")
+    frames_captured = data.get("framesCaptured", 0)
+
+    print(f"[Bridge] Screencast interrupted: {reason} (captured {frames_captured} frames)")
+
+    screencast_interrupted = {
+        "reason": reason,
+        "frames_captured": frames_captured,
+        "timestamp": time.time()
+    }
+    screencast_active = False
+
+    return web.json_response({
+        "ok": True,
+        "message": f"Interrupt notification received: {reason}"
+    })
+
+
+async def handle_screencast_frame_post(request):
+    """HTTP endpoint: Receive a single screencast frame via POST.
+
+    This endpoint is used by the background.js to post frames directly,
+    bypassing the content script WebSocket (which gets replaced on navigation).
+
+    Auto-activates screencast on first frame received - this allows JavaScript
+    postMessage path to start screencast without needing HTTP /screencast/start.
+    """
+    global screencast_frames, screencast_active
+
+    try:
+        data = await request.json()
+    except Exception:
+        return web.json_response({"ok": False, "error": "Invalid JSON"}, status=400)
+
+    # Auto-activate on first frame (supports JavaScript postMessage start path)
+    if not screencast_active:
+        screencast_active = True
+        print("[Bridge] Screencast auto-activated on first frame")
+
+    if len(screencast_frames) >= screencast_max_frames:
+        # Buffer full - drop oldest frame
+        screencast_frames.pop(0)
+
+    screencast_frames.append({
+        "timestamp": data.get("timestamp", time.time()),
+        "data": data.get("data", ""),  # Base64 encoded image
+    })
+
+    return web.json_response({"ok": True, "frames_buffered": len(screencast_frames)})
+
+
+def handle_screencast_frame(data: dict):
+    """Handle incoming screencast frame from browser.
+
+    Called by websocket_handler when a SCREENCAST_FRAME message arrives.
+    """
+    global screencast_frames
+
+    if not screencast_active:
+        return  # Ignore frames if not actively capturing
+
+    if len(screencast_frames) >= screencast_max_frames:
+        # Buffer full - drop oldest frame
+        screencast_frames.pop(0)
+
+    screencast_frames.append({
+        "timestamp": data.get("timestamp", time.time()),
+        "data": data.get("data", ""),  # Base64 encoded image
+    })
+
+
+# ============================================================================
+# Audio Cue Endpoints (for video audio effects)
+# ============================================================================
+
+
+async def handle_audio_start(request):
+    """HTTP endpoint: Start audio cue recording.
+
+    Clears any existing cues and marks recording as active.
+    Called when video recording starts with --include-effects.
+    """
+    global audio_cues, audio_recording_active, audio_recording_start_time
+
+    audio_cues = []
+    audio_recording_active = True
+    audio_recording_start_time = time.time()
+
+    return web.json_response({
+        "ok": True,
+        "message": "Audio cue recording started",
+        "start_time": audio_recording_start_time
+    })
+
+
+async def handle_audio_stop(request):
+    """HTTP endpoint: Stop audio cue recording.
+
+    Marks recording as inactive. Cues are preserved for retrieval.
+    """
+    global audio_recording_active
+
+    audio_recording_active = False
+    cue_count = len(audio_cues)
+
+    return web.json_response({
+        "ok": True,
+        "message": "Audio cue recording stopped",
+        "cues_recorded": cue_count
+    })
+
+
+async def handle_audio_cue(request):
+    """HTTP endpoint: Record an audio cue.
+
+    Called by JavaScript when a sound effect plays during replay.
+    Stores the timestamp and action type for later audio generation.
+    """
+    global audio_cues
+
+    if not audio_recording_active:
+        return web.json_response({
+            "ok": False,
+            "error": "Audio recording not active"
+        })
+
+    try:
+        data = await request.json()
+    except Exception:
+        return web.json_response({
+            "ok": False,
+            "error": "Invalid JSON"
+        })
+
+    timestamp_ms = data.get("timestamp_ms", 0)
+    action = data.get("action", "unknown")
+
+    audio_cues.append({
+        "timestamp_ms": timestamp_ms,
+        "action": action
+    })
+
+    return web.json_response({
+        "ok": True,
+        "cues_buffered": len(audio_cues)
+    })
+
+
+async def handle_audio_cues(request):
+    """HTTP endpoint: Get all recorded audio cues.
+
+    Returns all cues and clears the buffer.
+    Called after video encoding to generate the audio track.
+    """
+    global audio_cues
+
+    cues_to_return = audio_cues.copy()
+    audio_cues = []  # Clear buffer after retrieval
+
+    return web.json_response({
+        "ok": True,
+        "cues": cues_to_return,
+        "count": len(cues_to_return)
+    })
+
+
+async def handle_audio_status(request):
+    """HTTP endpoint: Get audio recording status."""
+    return web.json_response({
+        "ok": True,
+        "active": audio_recording_active,
+        "cues_buffered": len(audio_cues),
+        "start_time": audio_recording_start_time if audio_recording_active else None
+    })
+
+
 async def main():
     """Start HTTP and WebSocket server."""
     print("Inspekt WebSocket Server (aiohttp)")
@@ -2143,6 +2560,21 @@ async def main():
 
     # Static file endpoint for SingleFile library
     app.router.add_get("/static/singlefile.js", handle_static_singlefile)
+
+    # Screencast (video recording) endpoints
+    app.router.add_post("/screencast/start", handle_screencast_start)
+    app.router.add_post("/screencast/stop", handle_screencast_stop)
+    app.router.add_get("/screencast/frames", handle_screencast_frames)
+    app.router.add_get("/screencast/status", handle_screencast_status)
+    app.router.add_post("/screencast/frame", handle_screencast_frame_post)  # Direct frame POST from background.js
+    app.router.add_post("/screencast/interrupted", handle_screencast_interrupted)  # DevTools interrupt notification
+
+    # Audio cue endpoints (for video audio effects)
+    app.router.add_post("/audio/start", handle_audio_start)
+    app.router.add_post("/audio/stop", handle_audio_stop)
+    app.router.add_post("/audio/cue", handle_audio_cue)
+    app.router.add_get("/audio/cues", handle_audio_cues)
+    app.router.add_get("/audio/status", handle_audio_status)
 
     # WebSocket endpoint for browser
     app.router.add_get("/ws", websocket_handler)

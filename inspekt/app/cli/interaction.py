@@ -1,5 +1,5 @@
 """
-Interaction commands for the Zen Browser Bridge CLI.
+Interaction commands for the Inspekt Browser Bridge CLI.
 
 This module provides commands for browser interaction:
 - type: Type text character by character
@@ -92,7 +92,8 @@ def _send_text(text, selector, delay_ms, clear=True):
         if response.get("error"):
             click.echo(f"Error: {response['error']}", err=True)
             if response.get("hint"):
-                click.echo(f"Hint: {response['hint']}", err=True)
+                from inspekt.app.cli.table import print_hint
+                print_hint(response['hint'])
             sys.exit(1)
 
         click.echo(response.get("message", "Text sent successfully"))
@@ -119,19 +120,19 @@ def type_text(text, selector, speed, clear):
 
     Examples:
         # Type at maximum speed (clears existing text):
-        zen type "Hello World"
+        inspekt type "Hello World"
 
         # Type with human-like random delays (~50 WPM):
-        zen type "Hello, how are you?" --speed 0
+        inspekt type "Hello, how are you?" --speed 0
 
         # Type at 10 characters per second:
-        zen type "test@example.com" --speed 10
+        inspekt type "test@example.com" --speed 10
 
         # Type without clearing existing text:
-        zen type "append this" --no-clear
+        inspekt type "append this" --no-clear
 
         # Type into a specific field:
-        zen type "password123" --selector "input[type=password]"
+        inspekt type "password123" --selector "input[type=password]"
     """
     # Calculate delay in milliseconds from speed (chars/sec)
     if speed == 0:
@@ -157,17 +158,17 @@ def paste(text, selector, clear):
     or into a specific element if --selector is provided.
 
     By default, clears any existing text before pasting.
-    This is equivalent to 'zen type' with maximum speed.
+    This is equivalent to 'inspekt type' with maximum speed.
 
     Examples:
         # Paste (clears existing text):
-        zen paste "Hello World"
+        inspekt paste "Hello World"
 
         # Paste without clearing:
-        zen paste "append this" --no-clear
+        inspekt paste "append this" --no-clear
 
         # Paste into specific element:
-        zen paste "test@example.com" --selector "input[type=email]"
+        inspekt paste "test@example.com" --selector "input[type=email]"
     """
     _send_text(text, selector, 0, clear)
 
@@ -179,13 +180,13 @@ def send(text, selector):
     """
     [DEPRECATED] Send text to the browser by typing it character by character.
 
-    Please use 'zen type' or 'zen paste' instead.
+    Please use 'inspekt type' or 'inspekt paste' instead.
 
     Examples:
-        zen type "Hello World"
-        zen paste "test@example.com" --selector "input[type=email]"
+        inspekt type "Hello World"
+        inspekt paste "test@example.com" --selector "input[type=email]"
     """
-    click.echo("Warning: 'zen send' is deprecated. Use 'zen type' or 'zen paste' instead.\n", err=True)
+    click.echo("Warning: 'inspekt send' is deprecated. Use 'inspekt type' or 'inspekt paste' instead.\n", err=True)
     _send_text(text, selector, 0, clear=True)
 
 
@@ -195,16 +196,16 @@ def click_element(selector):
     """
     Click on an element.
 
-    Uses the stored element from 'zen inspect' by default, or specify a selector.
+    Uses the stored element from 'inspekt inspect' by default, or specify a selector.
 
     Examples:
         # Click on stored element:
-        zen inspect "button#submit"
-        zen click
+        inspekt inspect "button#submit"
+        inspekt click
 
         # Click directly on element:
-        zen click "button#submit"
-        zen click ".primary-button"
+        inspekt click "button#submit"
+        inspekt click ".primary-button"
     """
     _perform_click(selector, "click")
 
@@ -215,12 +216,12 @@ def double_click(selector):
     """
     Double-click on an element.
 
-    Uses the stored element from 'zen inspect' by default, or specify a selector.
+    Uses the stored element from 'inspekt inspect' by default, or specify a selector.
 
     Examples:
-        zen double-click "div.item"
-        zen inspect "div.item"
-        zen double-click
+        inspekt double-click "div.item"
+        inspekt inspect "div.item"
+        inspekt double-click
     """
     _perform_click(selector, "dblclick")
 
@@ -238,12 +239,12 @@ def right_click(selector):
     """
     Right-click (context menu) on an element.
 
-    Uses the stored element from 'zen inspect' by default, or specify a selector.
+    Uses the stored element from 'inspekt inspect' by default, or specify a selector.
 
     Examples:
-        zen right-click "a.download-link"
-        zen inspect "a.download-link"
-        zen right-click
+        inspekt right-click "a.download-link"
+        inspekt inspect "a.download-link"
+        inspekt right-click
     """
     _perform_click(selector, "contextmenu")
 
@@ -317,19 +318,19 @@ def wait(selector, timeout, visible, hidden, text):
 
     Examples:
         # Wait for element to exist (up to 30 seconds):
-        zen wait "button#submit"
+        inspekt wait "button#submit"
 
         # Wait for element to be visible:
-        zen wait ".modal" --visible
+        inspekt wait ".modal" --visible
 
         # Wait for element to be hidden:
-        zen wait ".loading-spinner" --hidden
+        inspekt wait ".loading-spinner" --hidden
 
         # Wait for element to contain text:
-        zen wait "h1" --text "Success"
+        inspekt wait "h1" --text "Success"
 
         # Custom timeout (10 seconds):
-        zen wait "div.result" --timeout 10
+        inspekt wait "div.result" --timeout 10
     """
     executor = BridgeExecutor()
     executor.ensure_server_running()

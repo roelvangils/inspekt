@@ -20,6 +20,7 @@ from typing import Optional
 
 import click
 
+from inspekt.app.cli.icons import get_icon, get_section_icon
 from inspekt.app.cli.table import Table, format_size, format_time, format_status, get_type_color
 from inspekt.services.bridge_executor import BridgeExecutor
 from inspekt.services.script_loader import ScriptLoader
@@ -111,7 +112,8 @@ def _display_table(entries: list, show_domain: bool = False, summary: dict = Non
 
     # Create table with auto-width and title
     title = f"Network Requests ({len(entries)})"
-    table = Table(headers, alignments=alignments, title=title)
+    icon = get_icon("Network")
+    table = Table(headers, alignments=alignments, title=title, icon=icon)
     table.set_data(rows)
     table.print_header()
 
@@ -131,7 +133,9 @@ def _display_table(entries: list, show_domain: bool = False, summary: dict = Non
 def _display_summary(summary: dict):
     """Display summary statistics."""
     click.echo()
-    click.echo(click.style("Summary:", bold=True))
+    summary_icon = get_section_icon("summary") or ""
+    icon_prefix = f"{summary_icon} " if summary_icon else ""
+    click.echo(click.style(f"{icon_prefix}Summary:", bold=True))
     click.echo(f"  Total requests: {summary['totalRequests']}")
     click.echo(f"  Total transfer: {format_size(summary['totalTransferSize'])}")
     click.echo(f"  Average time:   {format_time(summary['averageDuration'])}")
@@ -145,7 +149,9 @@ def _display_summary(summary: dict):
     # Type breakdown
     if summary.get("byType"):
         click.echo()
-        click.echo("  By type:")
+        type_icon = get_section_icon("by_type") or ""
+        type_prefix = f"  {type_icon} " if type_icon else "  "
+        click.echo(f"{type_prefix}By type:")
         for type_name, count in sorted(summary["byType"].items(), key=lambda x: -x[1]):
             click.echo(f"    {type_name}: {count}")
 
@@ -153,12 +159,16 @@ def _display_summary(summary: dict):
     if summary.get("slowestRequest"):
         slow = summary["slowestRequest"]
         click.echo()
-        click.echo(f"  Slowest: {_truncate(slow['name'], 40)} ({format_time(slow['duration'])})")
+        slowest_icon = get_section_icon("slowest") or ""
+        slowest_prefix = f"  {slowest_icon} " if slowest_icon else "  "
+        click.echo(f"{slowest_prefix}Slowest: {_truncate(slow['name'], 40)} ({format_time(slow['duration'])})")
 
     # Largest request
     if summary.get("largestRequest") and summary["largestRequest"]["size"] > 0:
         large = summary["largestRequest"]
-        click.echo(f"  Largest: {_truncate(large['name'], 40)} ({format_size(large['size'])})")
+        largest_icon = get_section_icon("largest") or ""
+        largest_prefix = f"  {largest_icon} " if largest_icon else "  "
+        click.echo(f"{largest_prefix}Largest: {_truncate(large['name'], 40)} ({format_size(large['size'])})")
 
 
 def _try_har_silently(executor: BridgeExecutor) -> Optional[dict]:
@@ -190,11 +200,9 @@ def _try_har_silently(executor: BridgeExecutor) -> Optional[dict]:
 
 def _show_devtools_hint():
     """Show a hint about opening DevTools for more information."""
+    from inspekt.app.cli.table import print_hint
     click.echo()
-    click.echo(
-        click.style("Tip: ", fg="cyan", bold=True) +
-        "Open DevTools (F12) and refresh the page to see HTTP status codes, headers, and error details."
-    )
+    print_hint("Open DevTools (`F12`) and refresh the page to see HTTP status codes, headers, and error details.")
 
 
 def _run_network_command(
@@ -561,7 +569,7 @@ def _get_har_data(executor: BridgeExecutor) -> dict:
     except requests.exceptions.ConnectionError:
         return {
             "ok": False,
-            "error": "Bridge server not running. Start it with: inspekt start"
+            "error": "Bridge server not running. Start it with: `inspekt start`"
         }
     except requests.exceptions.Timeout:
         return {
@@ -660,7 +668,8 @@ def _display_har_table(entries: list, show_domain: bool = False, show_status: bo
 
     # Create table with auto-width and title
     title = f"Network Requests ({len(entries)})"
-    table = Table(headers, alignments=alignments, title=title)
+    icon = get_icon("Network")
+    table = Table(headers, alignments=alignments, title=title, icon=icon)
     table.set_data(rows)
     table.print_header()
 
@@ -685,7 +694,9 @@ def _display_har_table(entries: list, show_domain: bool = False, show_status: bo
 def _display_har_summary(summary: dict):
     """Display HAR summary statistics."""
     click.echo()
-    click.echo(click.style("Summary:", bold=True))
+    summary_icon = get_section_icon("summary") or ""
+    icon_prefix = f"{summary_icon} " if summary_icon else ""
+    click.echo(click.style(f"{icon_prefix}Summary:", bold=True))
     click.echo(f"  Total requests: {summary.get('totalRequests', 0)}")
     click.echo(f"  Total transfer: {format_size(summary.get('totalTransferSize', 0))}")
     click.echo(f"  Average time:   {format_time(summary.get('averageDuration', 0))}")
@@ -694,7 +705,9 @@ def _display_har_summary(summary: dict):
     by_status = summary.get("byStatus", {})
     if by_status:
         click.echo()
-        click.echo("  By status:")
+        status_icon = get_section_icon("by_status") or ""
+        status_prefix = f"  {status_icon} " if status_icon else "  "
+        click.echo(f"{status_prefix}By status:")
         for status_group, count in sorted(by_status.items(), key=lambda x: int(x[0])):
             status_label = {
                 "200": "2xx (Success)",
@@ -718,7 +731,9 @@ def _display_har_summary(summary: dict):
     by_type = summary.get("byType", {})
     if by_type:
         click.echo()
-        click.echo("  By type:")
+        type_icon = get_section_icon("by_type") or ""
+        type_prefix = f"  {type_icon} " if type_icon else "  "
+        click.echo(f"{type_prefix}By type:")
         for type_name, count in sorted(by_type.items(), key=lambda x: -x[1]):
             click.echo(f"    {type_name}: {count}")
 
@@ -726,14 +741,18 @@ def _display_har_summary(summary: dict):
     slowest = summary.get("slowestRequest")
     if slowest:
         click.echo()
+        slowest_icon = get_section_icon("slowest") or ""
+        slowest_prefix = f"  {slowest_icon} " if slowest_icon else "  "
         status_str = f" ({slowest.get('status', '')})" if slowest.get('status') else ""
-        click.echo(f"  Slowest: {_truncate(slowest.get('name', ''), 35)}{status_str} ({format_time(slowest.get('duration', 0))})")
+        click.echo(f"{slowest_prefix}Slowest: {_truncate(slowest.get('name', ''), 35)}{status_str} ({format_time(slowest.get('duration', 0))})")
 
     # Largest request
     largest = summary.get("largestRequest")
     if largest and largest.get("size", 0) > 0:
+        largest_icon = get_section_icon("largest") or ""
+        largest_prefix = f"  {largest_icon} " if largest_icon else "  "
         status_str = f" ({largest.get('status', '')})" if largest.get('status') else ""
-        click.echo(f"  Largest: {_truncate(largest.get('name', ''), 35)}{status_str} ({format_size(largest.get('size', 0))})")
+        click.echo(f"{largest_prefix}Largest: {_truncate(largest.get('name', ''), 35)}{status_str} ({format_size(largest.get('size', 0))})")
 
 
 @network.command(name="har")
@@ -790,7 +809,8 @@ def network_har(output_json, sort_by, show_domain, only_external, only_errors, l
         hint = data.get("hint", "")
         click.echo(click.style(f"Error: {error}", fg="red"), err=True)
         if hint:
-            click.echo(click.style(f"Hint: {hint}", fg="yellow"), err=True)
+            from inspekt.app.cli.table import print_hint
+            print_hint(hint)
         sys.exit(1)
 
     # If raw HAR requested, output and exit

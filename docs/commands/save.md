@@ -65,6 +65,7 @@ inspekt save
 ```bash
 --output, -o <path>    Custom output filename
 --dir, -d <path>       Output directory
+--open                 Open saved file in default application
 ```
 
 **Default behavior:**
@@ -82,6 +83,9 @@ inspekt save -d ~/web-archives
 
 # Both
 inspekt save -d ~/archives -o important-page.html
+
+# Save and open immediately
+inspekt save --open
 ```
 
 ### Image Handling

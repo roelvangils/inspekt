@@ -1,0 +1,16 @@
+# PulseAudio configuration for Inspekt Browser VM
+# Creates a null sink for capturing audio output from applications
+
+# Core modules (container-friendly, no session bus needed)
+load-module module-native-protocol-unix auth-anonymous=1 socket=/tmp/pulse-socket
+load-module module-native-protocol-tcp auth-anonymous=1
+
+# Load null sink module for audio capture
+# This creates a virtual audio output device that we can monitor
+load-module module-null-sink sink_name=audio_out sink_properties=device.description="Inspekt_Audio_Output"
+
+# Set the null sink as the default output
+set-default-sink audio_out
+
+# Disable suspend on idle (keep audio running)
+load-module module-suspend-on-idle timeout=0

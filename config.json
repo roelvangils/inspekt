@@ -1,4 +1,5 @@
 {
+  "nerdfont": true,
   "ai-language": "auto",
   "ai": {
     "endpoint": "https://thoth.elevenways.be/v1/chat/completions",
@@ -49,8 +50,12 @@
     "summarize": {
       "enabled": true,
       "ttl_days": 7,
-      "similarity_threshold": 0.90,
+      "similarity_threshold": 0.9,
       "max_entries": 50
     }
+  },
+  "viewport_offsets": {
+    "width": 87,
+    "height": 76
   }
 }

@@ -139,6 +139,11 @@ nav:
       - Data Extraction: guide/data-extraction.md
       - AI Features: guide/ai-features.md
       - Control Mode: guide/control-mode.md
+      - Recording & Replay: guide/recording-replay.md
+      - Video Recording: guide/video-recording.md
+      - Viewport & Zoom Matching: guide/viewport-zoom-matching.md
+      - Native Controls: guide/native-controls.md
+      - Accessibility Testing: guide/accessibility-testing.md
       - Caching: caching.md
       - Advanced Usage: guide/advanced.md
   - API Reference:
@@ -147,6 +152,7 @@ nav:
       - URL Scheme (inspekt://): url-scheme.md
       - Command Reference:
           - inspekt do: commands/do.md
+          - inspekt vm: commands/vm.md
       - Services: api/services.md
       - Models: api/models.md
       - Protocol: api/protocol.md

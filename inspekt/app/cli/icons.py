@@ -75,6 +75,9 @@ INDICATOR_ICONS: dict[str, str] = {
     "undo": "\U000f054c",              # 󰕌 nf-md-undo (undo action)
     "redo": "\U000f044e",              # 󰑎 nf-md-redo (redo action)
     "stop": "\uf04d",                  #  nf-fa-stop (recording stopped)
+    "tip": "\uf400",                   #  nf-oct-light_bulb (informational tip)
+    "video": "\U000f022b",             # 󰈫 nf-md-filmstrip (video recording)
+    "audio": "\U000f057e",             # 󰕾 nf-md-volume_high (audio effects)
 }
 
 # Recording action icons - used in record and replay commands
@@ -94,7 +97,9 @@ ACTION_ICONS: dict[str, str] = {
     "radio": "\U000f043e",             # 󰐾 nf-md-radiobox_marked (radio button)
     "toggle": "\U000f0142",            # 󰅂 nf-md-chevron_down (expand/collapse)
     "dialog": "\U000f05a4",            # 󰖤 nf-md-window_maximize (dialog/modal)
+    "jsdialog": "\ue60c",               #  nf-seti-javascript (JS alert/confirm/prompt)
     "upload": "\U000f0552",            # 󰕒 nf-md-upload (file upload)
+    "download": "\U000f01da",          # 󰇚 nf-md-download (file download)
     "inspekt": "\uf002",               #  nf-fa-search
 }
 

@@ -1,0 +1,4988 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inspekt Browser VM</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%23667eea'/><text x='50' y='68' font-size='50' text-anchor='middle' fill='white' font-family='system-ui' font-weight='bold'>I</text></svg>">
+    <!-- xterm.js -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css">
+    <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xterm-addon-web-links@0.9.0/lib/xterm-addon-web-links.min.js"></script>
+    <!-- ninja-keys command palette -->
+    <script type="module" src="https://unpkg.com/ninja-keys?module"></script>
+    <style>
+        /* JetBrains Mono Nerd Font for terminal */
+        @font-face {
+            font-family: 'JetBrains Mono NF';
+            src: url('fonts/JetBrainsMonoNerdFont-Regular.woff2') format('woff2');
+            font-weight: 400;
+            font-style: normal;
+            font-display: swap;
+        }
+        @font-face {
+            font-family: 'JetBrains Mono NF';
+            src: url('fonts/JetBrainsMonoNerdFont-Bold.woff2') format('woff2');
+            font-weight: 700;
+            font-style: normal;
+            font-display: swap;
+        }
+        @font-face {
+            font-family: 'JetBrains Mono NF';
+            src: url('fonts/JetBrainsMonoNerdFont-Italic.woff2') format('woff2');
+            font-weight: 400;
+            font-style: italic;
+            font-display: swap;
+        }
+        @font-face {
+            font-family: 'JetBrains Mono NF';
+            src: url('fonts/JetBrainsMonoNerdFont-Light.woff2') format('woff2');
+            font-weight: 300;
+            font-style: normal;
+            font-display: swap;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        /* Dark mode (default) */
+        :root {
+            --bg-page: #0f0f1a;
+            --bg-bar: #1f2020;
+            --bg-btn: #3a3a3a;
+            --bg-btn-hover: #4a4a4a;
+            --text: #ccc;
+            --text-bright: #fff;
+            --text-dim: #888;
+            --divider: #444;
+            --accent: #667eea;
+            --accent-secondary: #764ba2;
+            --success: #28a745;
+            --danger: #dc3545;
+        }
+
+        /* Light mode */
+        @media (prefers-color-scheme: light) {
+            :root {
+                --bg-page: #e8eef7;
+                --bg-bar: #d6e2fb;
+                --bg-btn: #c4d4f4;
+                --bg-btn-hover: #b0c4e8;
+                --text: #444;
+                --text-bright: #1a1a1a;
+                --text-dim: #666;
+                --divider: #b8c8e8;
+            }
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg-page);
+            color: var(--text-bright);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* =============================================
+         * Splash Screen
+         * ============================================= */
+        .splash-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: var(--bg-page);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            transition: opacity 0.5s ease, visibility 0.5s ease;
+        }
+
+        .splash-screen.hidden {
+            opacity: 0;
+            visibility: hidden;
+        }
+
+        .splash-logo {
+            width: 120px;
+            height: 120px;
+            background: linear-gradient(135deg, var(--accent) 0%, var(--accent-secondary) 100%);
+            border-radius: 28px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 64px;
+            font-weight: bold;
+            color: white;
+            margin-bottom: 24px;
+            box-shadow: 0 20px 60px rgba(102, 126, 234, 0.3);
+            animation: logoFloat 3s ease-in-out infinite;
+        }
+
+        @keyframes logoFloat {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+
+        .splash-title {
+            font-size: 36px;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--accent) 0%, var(--accent-secondary) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 8px;
+        }
+
+        .splash-subtitle {
+            font-size: 16px;
+            color: var(--text-dim);
+            margin-bottom: 48px;
+        }
+
+        .splash-loader {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            color: var(--text);
+            font-size: 14px;
+        }
+
+        .splash-spinner {
+            width: 24px;
+            height: 24px;
+            border: 3px solid var(--divider);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .splash-status {
+            color: var(--text-dim);
+        }
+
+        /* =============================================
+         * Control Bar
+         * ============================================= */
+        .control-bar {
+            background: var(--bg-bar);
+            padding: 10px 16px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-shrink: 0;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-right: 8px;
+        }
+
+        .logo-icon {
+            width: 32px;
+            height: 32px;
+            background: linear-gradient(135deg, var(--accent) 0%, var(--accent-secondary) 100%);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 16px;
+            color: white;
+        }
+
+        .logo-text {
+            font-weight: 600;
+            font-size: 16px;
+            color: var(--text-bright);
+        }
+
+        .logo-badge {
+            font-size: 10px;
+            background: var(--bg-btn);
+            color: var(--text-dim);
+            padding: 2px 6px;
+            border-radius: 4px;
+            margin-left: -4px;
+        }
+
+        .divider {
+            width: 1px;
+            height: 24px;
+            background: var(--divider);
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 6px;
+        }
+
+        button {
+            background: var(--bg-btn);
+            color: var(--text);
+            border: none;
+            padding: 8px 14px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.15s ease;
+            font-family: inherit;
+        }
+
+        button:hover {
+            background: var(--bg-btn-hover);
+            color: var(--text-bright);
+        }
+
+        button:active {
+            transform: scale(0.98);
+        }
+
+        button.primary {
+            background: linear-gradient(135deg, var(--accent) 0%, var(--accent-secondary) 100%);
+            border: none;
+            color: var(--text-bright);
+        }
+
+        button.primary:hover {
+            opacity: 0.9;
+        }
+
+        button.danger {
+            background: var(--danger);
+            color: white;
+        }
+
+        button.danger:hover {
+            background: #c82333;
+        }
+
+        button svg {
+            width: 16px;
+            height: 16px;
+            fill: currentColor;
+        }
+
+        /* Navigation buttons (icon only) */
+        button.nav-btn {
+            padding: 8px 10px;
+        }
+
+        button.nav-btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        /* URL Bar */
+        .url-bar {
+            flex: 1;
+            max-width: 500px;
+            padding: 8px 12px;
+            border: none;
+            border-radius: 6px;
+            background: var(--bg-btn);
+            color: var(--text);
+            font-size: 13px;
+            font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
+            outline: none;
+            transition: all 0.15s ease;
+        }
+
+        .url-bar:focus {
+            background: var(--bg-page);
+            box-shadow: 0 0 0 2px var(--accent);
+        }
+
+        .url-bar::placeholder {
+            color: var(--text-dim);
+        }
+
+        .status {
+            margin-left: auto;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 12px;
+            color: var(--text-dim);
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--success);
+            animation: pulse 2s infinite;
+        }
+
+        .status-dot.disconnected {
+            background: var(--danger);
+            animation: none;
+        }
+
+        .status-dot.connecting {
+            background: #ffc107;
+            animation: pulse 0.5s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        /* =============================================
+         * Tab Bar
+         * ============================================= */
+        .tab-bar {
+            display: flex;
+            align-items: center;
+            background: var(--bg-bar);
+            padding: 0 8px;
+            height: 36px;
+            border-bottom: 1px solid var(--divider);
+        }
+
+        .tabs-container {
+            display: flex;
+            align-items: center;
+            gap: 2px;
+            min-width: 0;
+            flex: 1;
+            overflow-x: auto;
+            overflow-y: hidden;
+            scrollbar-width: none;
+        }
+
+        .tabs-container::-webkit-scrollbar {
+            display: none;
+        }
+
+        .tab {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 12px;
+            background: var(--bg-btn);
+            border-radius: 8px 8px 0 0;
+            cursor: pointer;
+            min-width: 120px;
+            max-width: 200px;
+            height: 32px;
+            transition: all 0.15s ease;
+            user-select: none;
+            position: relative;
+        }
+
+        .tab:hover {
+            background: var(--bg-btn-hover);
+        }
+
+        .tab.active {
+            background: var(--bg-page);
+            color: var(--text-bright);
+        }
+
+        .tab.dragging {
+            opacity: 0.5;
+            transform: scale(0.95);
+        }
+
+        .tab.drag-over {
+            border-left: 2px solid var(--accent);
+        }
+
+        .tab-favicon {
+            width: 16px;
+            height: 16px;
+            flex-shrink: 0;
+            border-radius: 2px;
+        }
+
+        .tab-favicon-placeholder {
+            width: 16px;
+            height: 16px;
+            flex-shrink: 0;
+            background: var(--divider);
+            border-radius: 2px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            color: var(--text-dim);
+        }
+
+        .tab-title {
+            flex: 1;
+            font-size: 12px;
+            color: var(--text);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .tab.active .tab-title {
+            color: var(--text-bright);
+        }
+
+        .tab-close {
+            width: 18px;
+            height: 18px;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: transparent;
+            border: none;
+            color: var(--text-dim);
+            cursor: pointer;
+            opacity: 0;
+            transition: all 0.15s ease;
+            flex-shrink: 0;
+            font-size: 14px;
+            line-height: 1;
+        }
+
+        .tab:hover .tab-close,
+        .tab.active .tab-close {
+            opacity: 1;
+        }
+
+        .tab-close:hover {
+            background: var(--danger);
+            color: white;
+        }
+
+        .new-tab-btn {
+            width: 28px;
+            height: 28px;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: transparent;
+            border: none;
+            color: var(--text-dim);
+            cursor: pointer;
+            transition: all 0.15s ease;
+            font-size: 18px;
+            margin-left: 4px;
+            flex-shrink: 0;
+        }
+
+        .new-tab-btn:hover {
+            background: var(--bg-btn);
+            color: var(--text-bright);
+        }
+
+        /* =============================================
+         * VNC Container
+         * ============================================= */
+        .vnc-container {
+            flex: 1;
+            position: relative;
+            background: var(--bg-page);
+            overflow: hidden;
+        }
+
+        .vnc-container iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+
+        /* =============================================
+         * Focus Overlay (click-to-interact prompt)
+         * ============================================= */
+        .focus-overlay {
+            position: fixed;
+            top: 48px; /* Below toolbar */
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.3);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            z-index: 100;
+            backdrop-filter: blur(2px);
+            animation: fadeIn 0.2s ease-out;
+        }
+
+        .focus-overlay.visible {
+            display: flex;
+        }
+
+        .focus-overlay-hint {
+            background: var(--bg-card);
+            color: var(--text-primary);
+            padding: 16px 32px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 500;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+            pointer-events: none;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        /* =============================================
+         * Dropdown Menu
+         * ============================================= */
+        .dropdown {
+            position: relative;
+        }
+
+        .dropdown-menu {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            margin-top: 4px;
+            background: var(--bg-bar);
+            border-radius: 8px;
+            padding: 4px;
+            min-width: 200px;
+            display: none;
+            z-index: 100;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+        }
+
+        .dropdown-menu.show {
+            display: block;
+        }
+
+        .dropdown-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 12px;
+            color: var(--text);
+            text-decoration: none;
+            border-radius: 6px;
+            font-size: 13px;
+            cursor: pointer;
+            border: none;
+            background: none;
+            width: 100%;
+            text-align: left;
+            transition: all 0.15s ease;
+        }
+
+        .dropdown-item:hover {
+            background: var(--bg-btn);
+            color: var(--text-bright);
+        }
+
+        .dropdown-item svg {
+            width: 16px;
+            height: 16px;
+            fill: currentColor;
+            opacity: 0.7;
+        }
+
+        .dropdown-divider {
+            height: 1px;
+            background: var(--divider);
+            margin: 4px 0;
+        }
+
+        /* =============================================
+         * Toast Notifications
+         * ============================================= */
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%) translateY(100px);
+            background: var(--bg-bar);
+            color: var(--text-bright);
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 14px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+            transition: transform 0.3s ease;
+            z-index: 1000;
+        }
+
+        .toast.show {
+            transform: translateX(-50%) translateY(0);
+        }
+
+        .toast.success {
+            background: var(--success);
+            color: white;
+        }
+
+        .toast.error {
+            background: var(--danger);
+            color: white;
+        }
+
+        /* =============================================
+         * Command Palette (ninja-keys)
+         * ============================================= */
+        ninja-keys {
+            --ninja-accent-color: var(--primary);
+            --ninja-font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            --ninja-z-index: 2000;
+            /* Dark theme */
+            --ninja-modal-background: rgba(20, 20, 30, 0.95);
+            --ninja-backdrop-filter: blur(16px);
+            --ninja-overflow-background: rgba(20, 20, 30, 0.95);
+            --ninja-text-color: #e0e0e0;
+            --ninja-placeholder-color: #888;
+            --ninja-selected-background: rgba(102, 126, 234, 0.2);
+            --ninja-footer-background: rgba(30, 30, 40, 0.9);
+            --ninja-key-border-radius: 6px;
+            --ninja-secondary-text-color: #888;
+            --ninja-icon-color: #888;
+            --ninja-secondary-background-color: rgba(40, 40, 50, 0.8);
+            --ninja-actions-height: 400px;
+        }
+
+        /* Output Panel for structured command results */
+        .output-panel {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            max-height: 50vh;
+            background: rgba(15, 15, 25, 0.95);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-top: 1px solid var(--border);
+            transform: translateY(100%);
+            transition: transform 0.3s ease;
+            z-index: 1500;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .output-panel.open {
+            transform: translateY(0);
+        }
+
+        .output-panel-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 20px;
+            border-bottom: 1px solid var(--border);
+            background: rgba(30, 30, 40, 0.8);
+        }
+
+        .output-panel-title {
+            font-weight: 600;
+            color: var(--text-bright);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .output-panel-close {
+            background: none;
+            border: none;
+            color: var(--text-dim);
+            cursor: pointer;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 18px;
+        }
+
+        .output-panel-close:hover {
+            background: var(--bg-secondary);
+            color: var(--text-bright);
+        }
+
+        .output-panel-content {
+            flex: 1;
+            overflow: auto;
+            padding: 16px 20px;
+            font-family: 'JetBrains Mono NF', monospace;
+            font-size: 13px;
+            line-height: 1.6;
+            color: var(--text);
+            white-space: pre-wrap;
+        }
+
+        .output-panel-content table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .output-panel-content th,
+        .output-panel-content td {
+            padding: 8px 12px;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .output-panel-content th {
+            color: var(--text-dim);
+            font-weight: 500;
+            font-size: 12px;
+            text-transform: uppercase;
+        }
+
+        /* =============================================
+         * Terminal Overlay
+         * ============================================= */
+        .terminal-overlay {
+            position: fixed;
+            top: 72px;
+            right: 20px;
+            width: calc(50% - 40px);
+            height: calc(100% - 92px);
+            /* Frosted glass effect with large blur */
+            background: rgba(15, 15, 25, 0.5);
+            backdrop-filter: blur(40px) saturate(150%);
+            -webkit-backdrop-filter: blur(40px) saturate(150%);
+            border-radius: 16px;
+            /* Enhanced shadow for depth */
+            box-shadow:
+                0 25px 50px -12px rgba(0, 0, 0, 0.5),
+                0 12px 24px -8px rgba(0, 0, 0, 0.3),
+                inset 0 1px 0 rgba(255, 255, 255, 0.08),
+                inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+            transform: translateX(calc(100% + 20px));
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            z-index: 50;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .terminal-overlay.open {
+            transform: translateX(0);
+        }
+
+        .terminal-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 12px;
+            background: rgba(0, 0, 0, 0.3);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .terminal-title {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+            color: #ccc;
+        }
+
+        .terminal-title svg {
+            width: 16px;
+            height: 16px;
+            fill: currentColor;
+            opacity: 0.7;
+        }
+
+        .terminal-close {
+            background: none;
+            border: none;
+            padding: 4px 8px;
+            color: #888;
+            cursor: pointer;
+            font-size: 12px;
+            border-radius: 4px;
+        }
+
+        .terminal-close:hover {
+            background: rgba(255, 255, 255, 0.1);
+            color: #fff;
+        }
+
+        .terminal-link-settings {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 12px;
+            color: #888;
+        }
+
+        .terminal-link-settings label {
+            white-space: nowrap;
+        }
+
+        .terminal-link-settings select {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 4px;
+            padding: 4px 8px;
+            color: #ccc;
+            font-size: 12px;
+            cursor: pointer;
+        }
+
+        .terminal-link-settings select:hover {
+            background: rgba(255, 255, 255, 0.15);
+        }
+
+        .terminal-link-settings select:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        @media (prefers-color-scheme: light) {
+            .terminal-link-settings {
+                color: #666;
+            }
+            .terminal-link-settings select {
+                background: rgba(0, 0, 0, 0.05);
+                border-color: rgba(0, 0, 0, 0.2);
+                color: #333;
+            }
+        }
+
+        .terminal-container {
+            flex: 1;
+            padding: 16px;
+            padding-top: 12px;
+            overflow: hidden;
+        }
+
+        .terminal-container .xterm {
+            height: 100%;
+            padding: 8px;
+        }
+
+        /* Make xterm.js viewport transparent for blur effect */
+        .terminal-container .xterm-viewport,
+        .terminal-container .xterm-screen {
+            background: transparent !important;
+        }
+
+        /* Terminal button active state */
+        button.terminal-active {
+            background: var(--accent) !important;
+            color: white !important;
+        }
+
+        /* DevTools button active state */
+        button.devtools-active {
+            background: linear-gradient(135deg, #f39c12 0%, #e74c3c 100%) !important;
+            color: white !important;
+        }
+
+        /* Light mode adjustments */
+        @media (prefers-color-scheme: light) {
+            .terminal-overlay {
+                background: rgba(255, 255, 255, 0.5);
+                box-shadow:
+                    0 25px 50px -12px rgba(0, 0, 0, 0.15),
+                    0 12px 24px -8px rgba(0, 0, 0, 0.08),
+                    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+                    inset 0 0 0 1px rgba(0, 0, 0, 0.08);
+            }
+            .terminal-header {
+                background: rgba(0, 0, 0, 0.04);
+                border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+            }
+            .terminal-title {
+                color: #333;
+            }
+            .terminal-close {
+                color: #666;
+            }
+            .terminal-close:hover {
+                background: rgba(0, 0, 0, 0.08);
+                color: #000;
+            }
+        }
+
+        /* =============================================
+         * Tab Thumbnail Preview
+         * ============================================= */
+        .thumbnail-preview {
+            position: fixed;
+            z-index: 1000;
+            background: var(--bg-bar);
+            border: 1px solid var(--divider);
+            border-radius: 8px;
+            padding: 4px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            pointer-events: none;
+            opacity: 0;
+            visibility: hidden;
+            /* Position transition always 500ms, opacity for fade in/out */
+            transition: left 0.5s cubic-bezier(0.4, 0, 0.2, 1),
+                        top 0.5s cubic-bezier(0.4, 0, 0.2, 1),
+                        opacity 0.2s ease,
+                        visibility 0.2s ease;
+        }
+
+        .thumbnail-preview.visible {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .thumbnail-preview.moving {
+            /* Keep visible during movement */
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .thumbnail-preview .thumbnail-images {
+            position: relative;
+            width: 240px;
+            height: 135px;  /* 16:9 aspect ratio */
+            border-radius: 4px;
+            overflow: hidden;
+            background: var(--bg-btn);
+        }
+
+        .thumbnail-preview .thumbnail-images img {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 240px;
+            height: auto;
+            border-radius: 4px;
+            transition: opacity 0.3s ease;
+        }
+
+        .thumbnail-preview .thumbnail-images img.thumbnail-current {
+            opacity: 1;
+        }
+
+        .thumbnail-preview .thumbnail-images img.thumbnail-next {
+            opacity: 0;
+        }
+
+        .thumbnail-preview .thumbnail-url {
+            font-size: 11px;
+            color: var(--text-dim);
+            padding: 4px 4px 0;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 240px;
+        }
+
+        /* =============================================
+         * Auto-Scan Toggle
+         * ============================================= */
+        .auto-scan-toggle {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 12px;
+            background: var(--bg-btn);
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            color: var(--text);
+            transition: all 0.15s ease;
+            user-select: none;
+        }
+
+        .auto-scan-toggle:hover {
+            background: var(--bg-btn-hover);
+            color: var(--text-bright);
+        }
+
+        .auto-scan-toggle input[type="checkbox"] {
+            width: 16px;
+            height: 16px;
+            cursor: pointer;
+            accent-color: var(--accent);
+        }
+
+        .auto-scan-toggle.active {
+            background: var(--accent);
+            color: white;
+        }
+
+        /* Grid View Button */
+        .grid-view-btn {
+            width: 28px;
+            height: 28px;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: transparent;
+            border: none;
+            color: var(--text-dim);
+            cursor: pointer;
+            transition: all 0.15s ease;
+            margin-left: 8px;
+            flex-shrink: 0;
+        }
+
+        .grid-view-btn:hover {
+            background: var(--bg-btn);
+            color: var(--text-bright);
+        }
+
+        .grid-view-btn.active {
+            background: var(--accent);
+            color: white;
+        }
+
+        /* =============================================
+         * Tab Grid Overlay
+         * ============================================= */
+        .tab-grid-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(15, 15, 26, 0.85);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            z-index: 60;
+            display: none;
+            flex-direction: column;
+            padding: 24px;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .tab-grid-overlay.open {
+            display: flex;
+            opacity: 1;
+        }
+
+        /* Light mode adjustments */
+        @media (prefers-color-scheme: light) {
+            .tab-grid-overlay {
+                background: rgba(232, 238, 247, 0.9);
+            }
+        }
+
+        .tab-grid-header {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 20px;
+            flex-shrink: 0;
+        }
+
+        .tab-grid-header h2 {
+            margin: 0;
+            font-size: 24px;
+            font-weight: 600;
+            color: var(--text-bright);
+        }
+
+        .tab-grid-header .tab-count {
+            font-size: 14px;
+            color: var(--text-dim);
+        }
+
+        .close-grid-btn {
+            margin-left: auto;
+            background: var(--bg-btn);
+            border: none;
+            color: var(--text);
+            width: 32px;
+            height: 32px;
+            font-size: 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.15s ease;
+        }
+
+        .close-grid-btn:hover {
+            background: var(--danger);
+            color: white;
+        }
+
+        .tab-grid-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 20px;
+            overflow-y: auto;
+            flex: 1;
+            padding: 4px;
+        }
+
+        .tab-grid-card {
+            background: var(--bg-bar);
+            border-radius: 12px;
+            overflow: hidden;
+            cursor: pointer;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            position: relative;
+        }
+
+        .tab-grid-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 32px rgba(102, 126, 234, 0.3);
+        }
+
+        .tab-grid-card.active {
+            outline: 2px solid var(--accent);
+            outline-offset: 2px;
+        }
+
+        .card-thumbnail {
+            aspect-ratio: 16/9;
+            background: var(--bg-btn);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .card-thumbnail img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .card-thumbnail .placeholder {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 48px;
+            font-weight: bold;
+            color: var(--text-dim);
+            background: linear-gradient(135deg, var(--bg-btn) 0%, var(--bg-bar) 100%);
+        }
+
+        .card-close {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            background: rgba(0, 0, 0, 0.6);
+            border: none;
+            color: white;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            cursor: pointer;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .tab-grid-card:hover .card-close {
+            opacity: 1;
+        }
+
+        .card-close:hover {
+            background: var(--danger);
+        }
+
+        .card-info {
+            padding: 12px;
+        }
+
+        .card-title {
+            font-weight: 500;
+            font-size: 14px;
+            color: var(--text-bright);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            margin-bottom: 4px;
+        }
+
+        .card-url {
+            font-size: 12px;
+            color: var(--text-dim);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .card-stats {
+            display: flex;
+            gap: 12px;
+            padding: 0 12px 8px;
+        }
+
+        .card-stats .stat {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 12px;
+            color: var(--text-dim);
+        }
+
+        .card-stats .stat-a11y { color: var(--danger); }
+        .card-stats .stat-errors { color: #ffc107; }
+        .card-stats .stat-alt { color: var(--accent); }
+        .card-stats .stat.zero { opacity: 0.5; }
+
+        .card-command {
+            padding: 8px 12px;
+            font-size: 11px;
+            color: var(--text-dim);
+            border-top: 1px solid var(--divider);
+        }
+
+        /* Loading skeleton for grid cards */
+        .tab-grid-card.loading .card-thumbnail {
+            background: linear-gradient(90deg, var(--bg-btn) 25%, var(--bg-bar) 50%, var(--bg-btn) 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s infinite;
+        }
+
+        @keyframes shimmer {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+
+        /* =============================================
+         * Restart Modal
+         * ============================================= */
+        .restart-modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(15, 15, 26, 0.85);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            z-index: 70;
+            display: none;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .restart-modal-overlay.open {
+            display: flex;
+        }
+
+        .restart-modal {
+            background: var(--bg-bar);
+            border-radius: 16px;
+            padding: 24px;
+            max-width: 420px;
+            width: 90%;
+            box-shadow: 0 24px 64px rgba(0, 0, 0, 0.5);
+        }
+
+        .restart-modal h2 {
+            margin: 0 0 20px 0;
+            color: var(--text-bright);
+            font-size: 20px;
+            font-weight: 600;
+        }
+
+        .restart-option {
+            width: 100%;
+            background: var(--bg-btn);
+            border: 1px solid var(--divider);
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 12px;
+            cursor: pointer;
+            text-align: left;
+            transition: all 0.2s ease;
+        }
+
+        .restart-option:hover {
+            background: rgba(102, 126, 234, 0.1);
+            border-color: var(--accent);
+        }
+
+        .restart-option-hard:hover {
+            background: rgba(239, 68, 68, 0.1);
+            border-color: var(--danger);
+        }
+
+        .restart-option-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 8px;
+        }
+
+        .restart-icon {
+            font-size: 20px;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--bg);
+            border-radius: 8px;
+        }
+
+        .restart-title {
+            font-weight: 600;
+            color: var(--text-bright);
+            flex: 1;
+        }
+
+        .restart-time {
+            font-size: 12px;
+            color: var(--text-dim);
+            background: var(--bg);
+            padding: 4px 8px;
+            border-radius: 4px;
+        }
+
+        .restart-desc {
+            margin: 0;
+            font-size: 13px;
+            color: var(--text-dim);
+            line-height: 1.5;
+        }
+
+        .keep-tabs-option {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 8px;
+            padding: 16px;
+            background: var(--bg-btn);
+            border-radius: 8px;
+            margin: 16px 0;
+            cursor: pointer;
+        }
+
+        .keep-tabs-option input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            accent-color: var(--accent);
+        }
+
+        .keep-tabs-label {
+            font-weight: 500;
+            color: var(--text-bright);
+        }
+
+        .keep-tabs-option small {
+            width: 100%;
+            margin-left: 26px;
+            font-size: 12px;
+            color: var(--text-dim);
+        }
+
+        .restart-cancel {
+            width: 100%;
+            background: transparent;
+            border: 1px solid var(--divider);
+            border-radius: 8px;
+            padding: 12px;
+            color: var(--text);
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s ease;
+        }
+
+        .restart-cancel:hover {
+            background: var(--bg-btn);
+            color: var(--text-bright);
+        }
+
+        /* =============================================
+         * CDP Setup Modal
+         * ============================================= */
+        .cdp-modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(15, 15, 26, 0.85);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            z-index: 70;
+            display: none;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .cdp-modal-overlay.open {
+            display: flex;
+        }
+
+        .cdp-modal {
+            background: var(--bg-bar);
+            border-radius: 16px;
+            padding: 24px;
+            max-width: 600px;
+            width: 90%;
+            max-height: 85vh;
+            overflow-y: auto;
+            box-shadow: 0 24px 64px rgba(0, 0, 0, 0.5);
+        }
+
+        .cdp-modal h2 {
+            margin: 0 0 8px 0;
+            color: var(--text-bright);
+            font-size: 20px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .cdp-modal h2 svg {
+            width: 24px;
+            height: 24px;
+            fill: var(--accent);
+        }
+
+        .cdp-modal-subtitle {
+            color: var(--text-dim);
+            font-size: 14px;
+            margin-bottom: 20px;
+        }
+
+        .cdp-section {
+            background: var(--bg-btn);
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 16px;
+        }
+
+        .cdp-section-title {
+            font-weight: 600;
+            color: var(--text-bright);
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .cdp-section-title .step-number {
+            background: var(--accent);
+            color: white;
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        .cdp-code-block {
+            background: var(--bg-page);
+            border-radius: 8px;
+            padding: 12px;
+            font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
+            font-size: 13px;
+            color: var(--text);
+            overflow-x: auto;
+            position: relative;
+            margin-bottom: 8px;
+        }
+
+        .cdp-code-block code {
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+
+        .cdp-copy-btn {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            background: var(--bg-btn);
+            border: none;
+            color: var(--text-dim);
+            padding: 4px 8px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 11px;
+            transition: all 0.15s ease;
+        }
+
+        .cdp-copy-btn:hover {
+            background: var(--accent);
+            color: white;
+        }
+
+        .cdp-copy-btn.copied {
+            background: var(--success);
+            color: white;
+        }
+
+        .cdp-info-text {
+            font-size: 13px;
+            color: var(--text-dim);
+            line-height: 1.6;
+            margin: 8px 0;
+        }
+
+        .cdp-info-text code {
+            background: var(--bg-page);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
+            font-size: 12px;
+        }
+
+        .cdp-warning {
+            background: rgba(255, 193, 7, 0.1);
+            border: 1px solid rgba(255, 193, 7, 0.3);
+            border-radius: 8px;
+            padding: 12px;
+            margin: 16px 0;
+            display: flex;
+            gap: 10px;
+            align-items: flex-start;
+        }
+
+        .cdp-warning-icon {
+            color: #ffc107;
+            font-size: 18px;
+            flex-shrink: 0;
+        }
+
+        .cdp-warning-text {
+            font-size: 13px;
+            color: var(--text);
+            line-height: 1.5;
+        }
+
+        .cdp-tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 16px;
+            border-bottom: 1px solid var(--divider);
+            padding-bottom: 8px;
+        }
+
+        .cdp-tab {
+            background: transparent;
+            border: none;
+            color: var(--text-dim);
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.15s ease;
+        }
+
+        .cdp-tab:hover {
+            color: var(--text-bright);
+            background: var(--bg-btn);
+        }
+
+        .cdp-tab.active {
+            color: var(--text-bright);
+            background: var(--accent);
+        }
+
+        .cdp-tab-content {
+            display: none;
+        }
+
+        .cdp-tab-content.active {
+            display: block;
+        }
+
+        .cdp-actions {
+            display: flex;
+            gap: 12px;
+            margin-top: 20px;
+            flex-wrap: wrap;
+        }
+
+        .cdp-actions button {
+            flex: 1;
+            min-width: 150px;
+            justify-content: center;
+        }
+
+        .cdp-actions button.primary {
+            background: linear-gradient(135deg, var(--accent) 0%, var(--accent-secondary) 100%);
+        }
+
+        .cdp-actions button.secondary {
+            background: var(--bg-btn);
+            border: 1px solid var(--divider);
+        }
+
+        .cdp-cancel {
+            width: 100%;
+            background: transparent;
+            border: 1px solid var(--divider);
+            border-radius: 8px;
+            padding: 12px;
+            color: var(--text);
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s ease;
+            margin-top: 12px;
+        }
+
+        .cdp-cancel:hover {
+            background: var(--bg-btn);
+            color: var(--text-bright);
+        }
+
+        .cdp-ws-section {
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+        }
+
+        .cdp-ws-section .cdp-section-title svg {
+            width: 18px;
+            height: 18px;
+            fill: var(--accent);
+        }
+
+        .cdp-success-text {
+            color: var(--success);
+        }
+
+        /* =============================================
+         * Recordings Modal
+         * ============================================= */
+        .recordings-modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(15, 15, 26, 0.85);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            z-index: 70;
+            display: none;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .recordings-modal-overlay.open {
+            display: flex;
+        }
+
+        .recordings-modal {
+            background: var(--bg-bar);
+            border-radius: 16px;
+            padding: 24px;
+            max-width: 800px;
+            width: 95%;
+            max-height: 85vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 24px 64px rgba(0, 0, 0, 0.5);
+        }
+
+        .recordings-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 16px;
+        }
+
+        .recordings-header h2 {
+            margin: 0;
+            color: var(--text-bright);
+            font-size: 20px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .recordings-header h2 svg {
+            width: 24px;
+            height: 24px;
+            fill: var(--accent);
+        }
+
+        .recordings-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .recordings-list {
+            flex: 1;
+            overflow-y: auto;
+            min-height: 200px;
+        }
+
+        .recording-item {
+            display: grid;
+            grid-template-columns: 1fr auto auto auto;
+            gap: 12px;
+            align-items: center;
+            padding: 12px 16px;
+            background: var(--bg-btn);
+            border-radius: 8px;
+            margin-bottom: 8px;
+        }
+
+        .recording-item:hover {
+            background: var(--bg-btn-hover);
+        }
+
+        .recording-info {
+            min-width: 0;
+        }
+
+        .recording-name {
+            color: var(--text-bright);
+            font-weight: 500;
+            font-size: 14px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .recording-meta {
+            color: var(--text-dim);
+            font-size: 12px;
+            margin-top: 4px;
+        }
+
+        .recording-badge {
+            background: var(--accent);
+            color: white;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        .recording-btn {
+            padding: 6px 12px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.2s;
+        }
+
+        .recording-btn.download {
+            background: var(--accent);
+            color: white;
+        }
+
+        .recording-btn.download:hover {
+            filter: brightness(1.1);
+        }
+
+        .recording-btn.delete {
+            background: transparent;
+            color: var(--danger);
+            border: 1px solid var(--danger);
+        }
+
+        .recording-btn.delete:hover {
+            background: var(--danger);
+            color: white;
+        }
+
+        .recordings-empty {
+            text-align: center;
+            padding: 40px;
+            color: var(--text-dim);
+        }
+
+        .recordings-empty svg {
+            width: 48px;
+            height: 48px;
+            fill: var(--text-dim);
+            margin-bottom: 12px;
+        }
+    </style>
+</head>
+<body>
+    <!-- Splash Screen -->
+    <div class="splash-screen" id="splashScreen">
+        <div class="splash-logo">I</div>
+        <div class="splash-title">Inspekt</div>
+        <div class="splash-subtitle">Browser VM</div>
+        <div class="splash-loader">
+            <div class="splash-spinner"></div>
+            <span class="splash-status" id="splashStatus">Initializing...</span>
+        </div>
+    </div>
+
+    <!-- Control Bar -->
+    <div class="control-bar" id="controlBar">
+        <div class="logo">
+            <div class="logo-icon">I</div>
+            <span class="logo-text">Inspekt</span>
+            <span class="logo-badge">VM</span>
+        </div>
+
+        <div class="divider"></div>
+
+        <!-- Navigation Buttons -->
+        <div class="btn-group">
+            <button class="nav-btn" onclick="goBack()" title="Go back">
+                <svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+            </button>
+            <button class="nav-btn" onclick="goForward()" title="Go forward">
+                <svg viewBox="0 0 24 24"><path d="M12 4l-1.41 1.41L16.17 11H4v2h12.17l-5.58 5.59L12 20l8-8z"/></svg>
+            </button>
+            <button class="nav-btn" onclick="reloadPage()" title="Reload page">
+                <svg viewBox="0 0 24 24"><path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
+            </button>
+        </div>
+
+        <!-- URL Bar -->
+        <input type="text" class="url-bar" id="urlBar" placeholder="Enter URL..." onkeydown="handleUrlKeydown(event)">
+
+        <div class="divider"></div>
+
+        <!-- Terminal Button -->
+        <button onclick="toggleTerminal()" title="Open terminal">
+            <svg viewBox="0 0 24 24"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 14H4V8h16v10z"/><path d="M7 15l4-4-4-4"/></svg>
+            Terminal
+        </button>
+
+        <!-- DevTools Button -->
+        <button id="devtoolsBtn" onclick="toggleDevTools()" title="Toggle DevTools (D)">
+            <svg viewBox="0 0 24 24"><path d="M22.7 19l-9.1-9.1c.9-2.3.4-5-1.5-6.9-2-2-5-2.4-7.4-1.3L9 6 6 9 1.6 4.7C.4 7.1.9 10.1 2.9 12.1c1.9 1.9 4.6 2.4 6.9 1.5l9.1 9.1c.4.4 1 .4 1.4 0l2.3-2.3c.5-.4.5-1.1.1-1.4z"/></svg>
+            DevTools
+        </button>
+
+        <!-- Audio Toggle Button -->
+        <button id="audioBtn" onclick="toggleAudio()" title="Toggle Audio (A)">
+            <svg id="audioIconOff" viewBox="0 0 24 24"><path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/></svg>
+            <svg id="audioIconOn" viewBox="0 0 24 24" style="display:none;"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
+            Audio
+        </button>
+
+        <div class="divider"></div>
+
+        <!-- Auto-Scan Toggle -->
+        <label class="auto-scan-toggle" id="autoScanToggle" title="Auto-scan tabs for accessibility issues after 5 seconds">
+            <input type="checkbox" id="autoScanCheckbox" onchange="toggleAutoScan(this.checked)">
+            <span>Auto-scan</span>
+        </label>
+
+        <div class="btn-group">
+            <div class="dropdown">
+                <button onclick="toggleDropdown(this)" title="Run Inspekt commands">
+                    <svg viewBox="0 0 24 24"><path d="M9.4 16.6L4.8 12l4.6-4.6L8 6l-6 6 6 6 1.4-1.4zm5.2 0l4.6-4.6-4.6-4.6L16 6l6 6-6 6-1.4-1.4z"/></svg>
+                    Inspekt
+                    <svg viewBox="0 0 24 24" style="width:12px;height:12px;margin-left:2px;"><path d="M7 10l5 5 5-5z"/></svg>
+                </button>
+                <div class="dropdown-menu">
+                    <button class="dropdown-item" onclick="runInspekt('info')">
+                        <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
+                        Page Info
+                    </button>
+                    <button class="dropdown-item" onclick="runInspekt('axe')">
+                        <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
+                        Accessibility Audit
+                    </button>
+                    <button class="dropdown-item" onclick="runInspekt('links')">
+                        <svg viewBox="0 0 24 24"><path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"/></svg>
+                        Extract Links
+                    </button>
+                    <button class="dropdown-item" onclick="runInspekt('outline')">
+                        <svg viewBox="0 0 24 24"><path d="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V7H7z"/></svg>
+                        Page Outline
+                    </button>
+                    <div class="dropdown-divider"></div>
+                    <button class="dropdown-item" onclick="runInspekt('screenshot')">
+                        <svg viewBox="0 0 24 24"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>
+                        Screenshot
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="btn-group">
+            <button onclick="openRecordingsModal()" title="Recordings">
+                <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="4" fill="currentColor"/></svg>
+                Recordings
+            </button>
+            <button onclick="openRestartModal()" title="Restart environment">
+                <svg viewBox="0 0 24 24"><path d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z"/></svg>
+                Restart
+            </button>
+            <button onclick="toggleFullscreen()" title="Fullscreen (F)">
+                <svg viewBox="0 0 24 24"><path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/></svg>
+            </button>
+        </div>
+
+        <div class="status">
+            <span class="status-dot connecting" id="statusDot"></span>
+            <span id="statusText">Connecting...</span>
+        </div>
+    </div>
+
+    <!-- Tab Bar -->
+    <div class="tab-bar" id="tabBar">
+        <div class="tabs-container" id="tabsContainer">
+            <!-- Tabs will be dynamically inserted here -->
+        </div>
+        <button class="new-tab-btn" onclick="createNewTab()" title="New tab (Ctrl+T)">+</button>
+        <button class="grid-view-btn" id="gridViewBtn" onclick="toggleTabGrid()" title="Tab overview">
+            <svg width="16" height="16" viewBox="0 0 16 16">
+                <rect x="1" y="1" width="6" height="6" rx="1" fill="currentColor"/>
+                <rect x="9" y="1" width="6" height="6" rx="1" fill="currentColor"/>
+                <rect x="1" y="9" width="6" height="6" rx="1" fill="currentColor"/>
+                <rect x="9" y="9" width="6" height="6" rx="1" fill="currentColor"/>
+            </svg>
+        </button>
+    </div>
+
+    <!-- VNC Container -->
+    <div class="vnc-container" id="vncContainer"></div>
+
+    <!-- Click-to-focus overlay (appears when terminal closes) -->
+    <div class="focus-overlay" id="focusOverlay" onclick="hideFocusOverlay()">
+        <div class="focus-overlay-hint">Click anywhere to interact with browser</div>
+    </div>
+
+    <!-- Toast -->
+    <div class="toast" id="toast"></div>
+
+    <!-- Command Palette -->
+    <ninja-keys id="commandPalette" placeholder="Type a command..." openHotkey="cmd+k,ctrl+k" hideBreadcrumbs></ninja-keys>
+
+    <!-- Output Panel for command results -->
+    <div class="output-panel" id="outputPanel">
+        <div class="output-panel-header">
+            <div class="output-panel-title">
+                <span id="outputPanelIcon">📋</span>
+                <span id="outputPanelTitle">Output</span>
+            </div>
+            <button class="output-panel-close" onclick="closeOutputPanel()" title="Close (Escape)">×</button>
+        </div>
+        <div class="output-panel-content" id="outputPanelContent"></div>
+    </div>
+
+    <!-- Tab Thumbnail Preview -->
+    <div class="thumbnail-preview" id="thumbnailPreview">
+        <div class="thumbnail-images">
+            <img class="thumbnail-current" src="" alt="Tab preview">
+            <img class="thumbnail-next" src="" alt="Tab preview">
+        </div>
+        <div class="thumbnail-url"></div>
+    </div>
+
+    <!-- Tab Grid Overlay -->
+    <div class="tab-grid-overlay" id="tabGridOverlay">
+        <div class="tab-grid-header">
+            <h2>Tab Overview</h2>
+            <span class="tab-count" id="gridTabCount"></span>
+            <button class="close-grid-btn" onclick="closeTabGrid()" title="Close (Escape)">×</button>
+        </div>
+        <div class="tab-grid-container" id="tabGridContainer">
+            <!-- Cards will be rendered by JavaScript -->
+        </div>
+    </div>
+
+    <!-- Terminal Overlay -->
+    <div class="terminal-overlay" id="terminalOverlay">
+        <div class="terminal-header">
+            <div class="terminal-title">
+                <svg viewBox="0 0 24 24"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 14H4V8h16v10z"/><path d="M7 15l4-4-4-4"/></svg>
+                Terminal
+            </div>
+            <div class="terminal-link-settings">
+                <label for="terminalTheme">Theme</label>
+                <select id="terminalTheme" onchange="applyTerminalTheme(this.value)">
+                    <optgroup label="Dark">
+                        <option value="tokyo-night">Tokyo Night</option>
+                        <option value="dracula">Dracula</option>
+                        <option value="nord">Nord</option>
+                        <option value="catppuccin-mocha">Catppuccin Mocha</option>
+                        <option value="gruvbox-dark">Gruvbox Dark</option>
+                        <option value="monokai-soda">Monokai Soda</option>
+                    </optgroup>
+                    <optgroup label="Light">
+                        <option value="tomorrow">Tomorrow</option>
+                        <option value="github">GitHub</option>
+                        <option value="catppuccin-latte">Catppuccin Latte</option>
+                        <option value="solarized-light">Solarized Light</option>
+                    </optgroup>
+                </select>
+            </div>
+            <div class="terminal-link-settings">
+                <label for="linkTarget">Open links in</label>
+                <select id="linkTarget">
+                    <option value="vm" selected>Virtual Machine</option>
+                    <option value="host">Host Browser</option>
+                    <option value="auto">Auto-decide</option>
+                </select>
+            </div>
+            <button class="terminal-close" onclick="toggleTerminal()">Close ✕</button>
+        </div>
+        <div class="terminal-container" id="terminalContainer"></div>
+    </div>
+
+    <!-- Restart Modal -->
+    <div class="restart-modal-overlay" id="restartModalOverlay">
+        <div class="restart-modal">
+            <h2>Restart Environment</h2>
+
+            <button class="restart-option" onclick="performSoftRestart()">
+                <div class="restart-option-header">
+                    <span class="restart-icon">↻</span>
+                    <span class="restart-title">Soft Restart</span>
+                    <span class="restart-time">~2 seconds</span>
+                </div>
+                <p class="restart-desc">
+                    Restarts all services (VNC, window manager, browser).<br>
+                    Browser cache, cookies, and history are preserved.
+                </p>
+            </button>
+
+            <button class="restart-option restart-option-hard" onclick="performHardRestart()">
+                <div class="restart-option-header">
+                    <span class="restart-icon">⟳</span>
+                    <span class="restart-title">Hard Restart</span>
+                    <span class="restart-time">~10 seconds</span>
+                </div>
+                <p class="restart-desc">
+                    Destroys and recreates the entire environment.<br>
+                    Fresh browser with no cache, cookies, or history.
+                </p>
+            </button>
+
+            <label class="keep-tabs-option">
+                <input type="checkbox" id="keepTabsCheckbox" checked>
+                <span class="keep-tabs-label">Keep Tabs</span>
+                <small>Your open tabs will be restored after restart.</small>
+            </label>
+
+            <button class="restart-cancel" onclick="closeRestartModal()">Cancel</button>
+        </div>
+    </div>
+
+    <!-- CDP Setup Modal -->
+    <div class="cdp-modal-overlay" id="cdpModalOverlay">
+        <div class="cdp-modal">
+            <h2>
+                <svg viewBox="0 0 24 24"><path d="M22.7 19l-9.1-9.1c.9-2.3.4-5-1.5-6.9-2-2-5-2.4-7.4-1.3L9 6 6 9 1.6 4.7C.4 7.1.9 10.1 2.9 12.1c1.9 1.9 4.6 2.4 6.9 1.5l9.1 9.1c.4.4 1 .4 1.4 0l2.3-2.3c.5-.4.5-1.1.1-1.4z"/></svg>
+                Remote DevTools Setup
+            </h2>
+            <p class="cdp-modal-subtitle">Connect your local Chrome DevTools to inspect and debug the VM browser.</p>
+
+            <!-- Connection Method Tabs -->
+            <div class="cdp-tabs">
+                <button class="cdp-tab active" onclick="switchCdpTab(this, 'direct')">Direct Connection</button>
+                <button class="cdp-tab" onclick="switchCdpTab(this, 'ssh')">SSH Tunnel (Secure)</button>
+            </div>
+
+            <!-- Direct Connection Tab -->
+            <div class="cdp-tab-content active" id="cdp-tab-direct">
+                <div class="cdp-section">
+                    <div class="cdp-section-title">
+                        <span class="step-number">1</span>
+                        Open Chrome Inspect Page
+                    </div>
+                    <p class="cdp-info-text">In your local Chrome browser, navigate to:</p>
+                    <div class="cdp-code-block">
+                        <code>chrome://inspect/#devices</code>
+                        <button class="cdp-copy-btn" onclick="copyCdpText('chrome://inspect/#devices', this)">Copy</button>
+                    </div>
+                </div>
+
+                <div class="cdp-section">
+                    <div class="cdp-section-title">
+                        <span class="step-number">2</span>
+                        Configure Network Target
+                    </div>
+                    <p class="cdp-info-text">Click "Configure..." next to "Discover network targets" and add:</p>
+                    <div class="cdp-code-block">
+                        <code id="cdpHostPort">localhost:9222</code>
+                        <button class="cdp-copy-btn" onclick="copyCdpText(document.getElementById('cdpHostPort').textContent, this)">Copy</button>
+                    </div>
+                    <p class="cdp-info-text">If running Docker with port mapping, use the mapped port instead.</p>
+                </div>
+
+                <div class="cdp-section">
+                    <div class="cdp-section-title">
+                        <span class="step-number">3</span>
+                        Connect to Target
+                    </div>
+                    <p class="cdp-info-text">The VM browser tabs will appear under "Remote Target". Click "inspect" to open DevTools.</p>
+                </div>
+
+                <div class="cdp-warning">
+                    <span class="cdp-warning-icon">&#x26A0;</span>
+                    <div class="cdp-warning-text">
+                        <strong>Security Note:</strong> CDP has no authentication. Only expose port 9222 on trusted networks or use SSH tunneling for remote access.
+                    </div>
+                </div>
+            </div>
+
+            <!-- SSH Tunnel Tab -->
+            <div class="cdp-tab-content" id="cdp-tab-ssh">
+                <div class="cdp-section">
+                    <div class="cdp-section-title">
+                        <span class="step-number">1</span>
+                        Create SSH Tunnel
+                    </div>
+                    <p class="cdp-info-text">Run this command on your local machine:</p>
+                    <div class="cdp-code-block">
+                        <code>ssh -L 9222:localhost:9222 user@your-server-host</code>
+                        <button class="cdp-copy-btn" onclick="copyCdpText('ssh -L 9222:localhost:9222 user@your-server-host', this)">Copy</button>
+                    </div>
+                    <p class="cdp-info-text">Replace <code>user@your-server-host</code> with your SSH credentials.</p>
+                </div>
+
+                <div class="cdp-section">
+                    <div class="cdp-section-title">
+                        <span class="step-number">2</span>
+                        Open Chrome Inspect Page
+                    </div>
+                    <p class="cdp-info-text">With the tunnel active, navigate to:</p>
+                    <div class="cdp-code-block">
+                        <code>chrome://inspect/#devices</code>
+                        <button class="cdp-copy-btn" onclick="copyCdpText('chrome://inspect/#devices', this)">Copy</button>
+                    </div>
+                </div>
+
+                <div class="cdp-section">
+                    <div class="cdp-section-title">
+                        <span class="step-number">3</span>
+                        Configure Network Target
+                    </div>
+                    <p class="cdp-info-text">Add this target (the tunnel forwards to the VM):</p>
+                    <div class="cdp-code-block">
+                        <code>localhost:9222</code>
+                        <button class="cdp-copy-btn" onclick="copyCdpText('localhost:9222', this)">Copy</button>
+                    </div>
+                </div>
+
+                <p class="cdp-info-text cdp-success-text">
+                    &#x2713; SSH tunnel encrypts all traffic between your machine and the server.
+                </p>
+            </div>
+
+            <!-- WebSocket URL Section (always visible) -->
+            <div class="cdp-section cdp-ws-section">
+                <div class="cdp-section-title">
+                    <svg viewBox="0 0 24 24"><path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"/></svg>
+                    Primary WebSocket URL
+                </div>
+                <div class="cdp-code-block">
+                    <code id="cdpWebSocketUrl">Loading...</code>
+                    <button class="cdp-copy-btn" onclick="copyCdpText(document.getElementById('cdpWebSocketUrl').textContent, this)">Copy</button>
+                </div>
+                <p class="cdp-info-text">Use this URL for programmatic CDP connections (Puppeteer, Playwright, etc.)</p>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="cdp-actions">
+                <button class="primary" onclick="openChromeInspect()">
+                    <svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:currentColor;"><path d="M19 19H5V5h7V3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"/></svg>
+                    Open chrome://inspect
+                </button>
+                <button class="secondary" onclick="openDevToolsInVM()">
+                    <svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:currentColor;"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>
+                    Open DevTools in VM
+                </button>
+            </div>
+
+            <button class="cdp-cancel" onclick="closeCdpModal()">Cancel</button>
+        </div>
+    </div>
+
+    <!-- Recordings Modal -->
+    <div class="recordings-modal-overlay" id="recordingsModalOverlay" onclick="if(event.target===this)closeRecordingsModal()">
+        <div class="recordings-modal">
+            <div class="recordings-header">
+                <h2>
+                    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="4" fill="currentColor"/></svg>
+                    Recordings
+                </h2>
+                <div class="recordings-actions">
+                    <button class="recording-btn download" onclick="downloadAllRecordings()" title="Download all as ZIP">
+                        Download All
+                    </button>
+                    <button class="cdp-cancel" onclick="closeRecordingsModal()">Close</button>
+                </div>
+            </div>
+            <div class="recordings-list" id="recordingsList">
+                <div class="recordings-empty">
+                    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="4" fill="currentColor"/></svg>
+                    <p>No recordings yet</p>
+                    <small>Use <code>inspekt record</code> to create recordings</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // =============================================
+        // Port Configuration (supports local dev & server deployment)
+        // =============================================
+        // Use 127.0.0.1 instead of localhost to force IPv4 (Docker port forwarding issue)
+        const VNC_HOST = window.location.hostname === 'localhost' ? '127.0.0.1' : window.location.hostname;
+
+        // Smart port detection:
+        // - Inside container: page=6080 → control=8888, terminal=8889
+        // - External mapping: page=7080 → control=7888, terminal=7889
+        // - Override via URL params: ?control_port=X&terminal_port=Y&vnc_port=Z
+        const urlParams = new URLSearchParams(window.location.search);
+        const pagePort = parseInt(window.location.port) || 80;
+
+        function detectPort(paramName, internalDefault, portSuffix) {
+            // 1. Check URL param override (highest priority)
+            const override = urlParams.get(paramName);
+            if (override) return parseInt(override);
+
+            // 2. If served from internal container port (6080), use internal defaults
+            if (pagePort === 6080) return internalDefault;
+
+            // 3. Calculate from page port: replace last 3 digits
+            //    e.g., 7080 → 7888 (base 7000 + suffix 888)
+            const base = Math.floor(pagePort / 1000) * 1000;
+            return base + portSuffix;
+        }
+
+        const VNC_PORT = urlParams.get('vnc_port') ? parseInt(urlParams.get('vnc_port')) : pagePort;
+        const CONTROL_PORT = detectPort('control_port', 8888, 888);
+        const TERMINAL_PORT = detectPort('terminal_port', 8889, 889);
+
+        // Log port configuration for debugging
+        console.log('[Inspekt] Port config:', { pagePort, VNC_PORT, CONTROL_PORT, TERMINAL_PORT });
+
+        // Terminal color themes (with semi-transparent backgrounds for blur effect)
+        const TERMINAL_THEMES = {
+            'tokyo-night': {
+                background: 'rgba(26, 27, 38, 0.8)', foreground: '#c0caf5', cursor: '#c0caf5', cursorAccent: '#1a1b26',
+                selectionBackground: 'rgba(102, 126, 234, 0.4)',
+                black: '#15161e', red: '#f7768e', green: '#9ece6a', yellow: '#e0af68',
+                blue: '#7aa2f7', magenta: '#bb9af7', cyan: '#7dcfff', white: '#a9b1d6',
+                brightBlack: '#414868', brightRed: '#f7768e', brightGreen: '#9ece6a', brightYellow: '#e0af68',
+                brightBlue: '#7aa2f7', brightMagenta: '#bb9af7', brightCyan: '#7dcfff', brightWhite: '#c0caf5'
+            },
+            'dracula': {
+                background: 'rgba(40, 42, 54, 0.8)', foreground: '#f8f8f2', cursor: '#f8f8f2',
+                selectionBackground: '#44475a',
+                black: '#21222c', red: '#ff5555', green: '#50fa7b', yellow: '#f1fa8c',
+                blue: '#bd93f9', magenta: '#ff79c6', cyan: '#8be9fd', white: '#f8f8f2',
+                brightBlack: '#6272a4', brightRed: '#ff6e6e', brightGreen: '#69ff94', brightYellow: '#ffffa5',
+                brightBlue: '#d6acff', brightMagenta: '#ff92df', brightCyan: '#a4ffff', brightWhite: '#ffffff'
+            },
+            'nord': {
+                background: 'rgba(46, 52, 64, 0.8)', foreground: '#d8dee9', cursor: '#eceff4',
+                selectionBackground: '#eceff4',
+                black: '#3b4252', red: '#bf616a', green: '#a3be8c', yellow: '#ebcb8b',
+                blue: '#81a1c1', magenta: '#b48ead', cyan: '#88c0d0', white: '#e5e9f0',
+                brightBlack: '#596377', brightRed: '#bf616a', brightGreen: '#a3be8c', brightYellow: '#ebcb8b',
+                brightBlue: '#81a1c1', brightMagenta: '#b48ead', brightCyan: '#8fbcbb', brightWhite: '#eceff4'
+            },
+            'catppuccin-mocha': {
+                background: 'rgba(30, 30, 46, 0.8)', foreground: '#cdd6f4', cursor: '#f5e0dc',
+                selectionBackground: '#585b70',
+                black: '#45475a', red: '#f38ba8', green: '#a6e3a1', yellow: '#f9e2af',
+                blue: '#89b4fa', magenta: '#f5c2e7', cyan: '#94e2d5', white: '#a6adc8',
+                brightBlack: '#585b70', brightRed: '#f37799', brightGreen: '#89d88b', brightYellow: '#ebd391',
+                brightBlue: '#74a8fc', brightMagenta: '#f2aede', brightCyan: '#6bd7ca', brightWhite: '#bac2de'
+            },
+            'gruvbox-dark': {
+                background: 'rgba(40, 40, 40, 0.8)', foreground: '#ebdbb2', cursor: '#ebdbb2',
+                selectionBackground: '#665c54',
+                black: '#282828', red: '#cc241d', green: '#98971a', yellow: '#d79921',
+                blue: '#458588', magenta: '#b16286', cyan: '#689d6a', white: '#a89984',
+                brightBlack: '#928374', brightRed: '#fb4934', brightGreen: '#b8bb26', brightYellow: '#fabd2f',
+                brightBlue: '#83a598', brightMagenta: '#d3869b', brightCyan: '#8ec07c', brightWhite: '#ebdbb2'
+            },
+            'monokai-soda': {
+                background: 'rgba(26, 26, 26, 0.8)', foreground: '#c4c5b5', cursor: '#f6f7ec',
+                selectionBackground: '#343434',
+                black: '#1a1a1a', red: '#f4005f', green: '#98e024', yellow: '#fa8419',
+                blue: '#9d65ff', magenta: '#f4005f', cyan: '#58d1eb', white: '#c4c5b5',
+                brightBlack: '#625e4c', brightRed: '#f4005f', brightGreen: '#98e024', brightYellow: '#e0d561',
+                brightBlue: '#9d65ff', brightMagenta: '#f4005f', brightCyan: '#58d1eb', brightWhite: '#f6f6ef'
+            },
+            'tomorrow': {
+                background: 'rgba(255, 255, 255, 0.85)', foreground: '#4d4d4c', cursor: '#4d4d4c',
+                selectionBackground: '#d6d6d6',
+                black: '#000000', red: '#c82829', green: '#718c00', yellow: '#eab700',
+                blue: '#4271ae', magenta: '#8959a8', cyan: '#3e999f', white: '#ffffff',
+                brightBlack: '#000000', brightRed: '#c82829', brightGreen: '#718c00', brightYellow: '#eab700',
+                brightBlue: '#4271ae', brightMagenta: '#8959a8', brightCyan: '#3e999f', brightWhite: '#ffffff'
+            },
+            'github': {
+                background: 'rgba(244, 244, 244, 0.85)', foreground: '#3e3e3e', cursor: '#3f3f3f',
+                selectionBackground: '#a9c1e2',
+                black: '#3e3e3e', red: '#970b16', green: '#07962a', yellow: '#c5bb94',
+                blue: '#003e8a', magenta: '#e94691', cyan: '#7cc4df', white: '#b2b2b2',
+                brightBlack: '#666666', brightRed: '#de0000', brightGreen: '#7ac895', brightYellow: '#d7b600',
+                brightBlue: '#2e6cba', brightMagenta: '#f29592', brightCyan: '#00c7cb', brightWhite: '#ffffff'
+            },
+            'catppuccin-latte': {
+                background: 'rgba(239, 241, 245, 0.85)', foreground: '#4c4f69', cursor: '#dc8a78',
+                selectionBackground: '#acb0be',
+                black: '#5c5f77', red: '#d20f39', green: '#40a02b', yellow: '#df8e1d',
+                blue: '#1e66f5', magenta: '#ea76cb', cyan: '#179299', white: '#acb0be',
+                brightBlack: '#6c6f85', brightRed: '#de293e', brightGreen: '#49af3d', brightYellow: '#eea02d',
+                brightBlue: '#456eff', brightMagenta: '#fe85d8', brightCyan: '#2d9fa8', brightWhite: '#bcc0cc'
+            },
+            'solarized-light': {
+                background: 'rgba(253, 246, 227, 0.85)', foreground: '#657b83', cursor: '#657b83',
+                selectionBackground: '#eee8d5',
+                black: '#073642', red: '#dc322f', green: '#859900', yellow: '#b58900',
+                blue: '#268bd2', magenta: '#d33682', cyan: '#2aa198', white: '#eee8d5',
+                brightBlack: '#002b36', brightRed: '#cb4b16', brightGreen: '#586e75', brightYellow: '#657b83',
+                brightBlue: '#839496', brightMagenta: '#6c71c4', brightCyan: '#93a1a1', brightWhite: '#fdf6e3'
+            }
+        };
+
+        let isConnected = false;
+        let terminal = null;
+        let terminalSocket = null;
+        let fitAddon = null;
+        let isTerminalOpen = false;
+        let hasTerminalSession = false; // Track if we have an active terminal session
+
+        // Splash screen management
+        function updateSplashStatus(message) {
+            const status = document.getElementById('splashStatus');
+            if (status) status.textContent = message;
+        }
+
+        function hideSplash() {
+            const splash = document.getElementById('splashScreen');
+            if (splash) {
+                splash.classList.add('hidden');
+                setTimeout(() => splash.remove(), 500);
+            }
+        }
+
+        // Connect to VNC
+        function connectVNC() {
+            updateSplashStatus('Connecting to VM...');
+
+            const container = document.getElementById('vncContainer');
+            const params = new URLSearchParams({
+                autoconnect: 'true',
+                resize: 'scale',
+                reconnect: 'true',
+                reconnect_delay: '1000',
+                show_dot: 'false',
+                bell: 'false',
+                view_only: 'false'
+            });
+
+            const iframe = document.createElement('iframe');
+            // Use same protocol as parent page to avoid mixed content issues
+            const protocol = window.location.protocol;
+            iframe.src = `${protocol}//${VNC_HOST}:${VNC_PORT}/vnc.html?${params}`;
+
+            iframe.onload = () => {
+                updateSplashStatus('VM ready!');
+                setTimeout(() => {
+                    hideSplash();
+                    updateStatus(true);
+                    // Check for saved tabs to restore (after restart)
+                    setTimeout(restoreTabsFromStorage, 2000);
+                }, 500);
+            };
+
+            iframe.onerror = () => {
+                updateSplashStatus('Connection failed. Retrying...');
+                updateStatus(false);
+            };
+
+            container.appendChild(iframe);
+        }
+
+        // Update connection status
+        function updateStatus(connected) {
+            const dot = document.getElementById('statusDot');
+            const text = document.getElementById('statusText');
+            isConnected = connected;
+
+            dot.classList.remove('connecting', 'disconnected');
+
+            if (connected) {
+                text.textContent = 'Connected';
+            } else {
+                dot.classList.add('disconnected');
+                text.textContent = 'Disconnected';
+            }
+        }
+
+        // Show toast notification
+        function showToast(message, type = '', duration = 3000) {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.className = 'toast show ' + type;
+            setTimeout(() => toast.classList.remove('show'), duration);
+        }
+
+        // Toggle dropdown menu
+        function toggleDropdown(btn) {
+            const menu = btn.nextElementSibling;
+            const isOpen = menu.classList.contains('show');
+            document.querySelectorAll('.dropdown-menu').forEach(m => m.classList.remove('show'));
+            if (!isOpen) menu.classList.add('show');
+        }
+
+        // Close dropdowns when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.dropdown')) {
+                document.querySelectorAll('.dropdown-menu').forEach(m => m.classList.remove('show'));
+            }
+        });
+
+        // Show Chrome browser
+        async function showChrome() {
+            showToast('Focusing Chrome...');
+            try {
+                const response = await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/chrome`);
+                const data = await response.json();
+                showToast(data.message || 'Chrome focused', 'success');
+            } catch (e) {
+                showToast('Failed to focus Chrome', 'error');
+            }
+        }
+
+        // =============================================
+        // Browser Navigation
+        // =============================================
+
+        let currentUrl = '';
+
+        async function goBack() {
+            try {
+                const response = await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/back`);
+                const data = await response.json();
+                if (data.ok) {
+                    updateCurrentUrl();
+                } else {
+                    showToast(data.error || 'Cannot go back', 'error');
+                }
+            } catch (e) {
+                showToast('Navigation failed', 'error');
+            }
+        }
+
+        async function goForward() {
+            try {
+                const response = await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/forward`);
+                const data = await response.json();
+                if (data.ok) {
+                    updateCurrentUrl();
+                } else {
+                    showToast(data.error || 'Cannot go forward', 'error');
+                }
+            } catch (e) {
+                showToast('Navigation failed', 'error');
+            }
+        }
+
+        async function reloadPage() {
+            try {
+                const response = await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/reload-page`);
+                const data = await response.json();
+                if (data.ok) {
+                    showToast('Page reloaded', 'success');
+                } else {
+                    showToast(data.error || 'Reload failed', 'error');
+                }
+            } catch (e) {
+                showToast('Reload failed', 'error');
+            }
+        }
+
+        async function navigateTo(url) {
+            if (!url) return;
+
+            // Add protocol if missing
+            if (!url.startsWith('http://') && !url.startsWith('https://')) {
+                url = 'https://' + url;
+            }
+
+            const urlBar = document.getElementById('urlBar');
+            urlBar.value = url;
+
+            try {
+                const response = await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/navigate?url=${encodeURIComponent(url)}`);
+                const data = await response.json();
+                if (data.ok) {
+                    setTimeout(updateCurrentUrl, 1000);
+                } else {
+                    showToast(data.error || 'Navigation failed', 'error');
+                }
+            } catch (e) {
+                showToast('Navigation failed', 'error');
+            }
+        }
+
+        function handleUrlKeydown(event) {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                const urlBar = document.getElementById('urlBar');
+                navigateTo(urlBar.value);
+                urlBar.blur();
+            }
+        }
+
+        async function updateCurrentUrl() {
+            try {
+                const response = await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/url`);
+                const data = await response.json();
+                if (data.ok && data.url) {
+                    const urlBar = document.getElementById('urlBar');
+                    // Only update if not focused (avoid interrupting user typing)
+                    if (document.activeElement !== urlBar && data.url !== currentUrl) {
+                        urlBar.value = data.url;
+                        currentUrl = data.url;
+                    }
+                }
+            } catch (e) {
+                // Silently fail - don't spam errors
+            }
+        }
+
+        // Poll for URL updates every 2 seconds
+        setInterval(updateCurrentUrl, 2000);
+
+        // =============================================
+        // Terminal File Download
+        // =============================================
+
+        // Regex to detect download escape sequences: OSC 1337 ; download=<path> BEL
+        const DOWNLOAD_MARKER_REGEX = /\x1b\]1337;download=([^\x07]+)\x07/g;
+
+        // Regex to detect hide-terminal escape sequence: OSC 1337 ; hide-terminal BEL
+        const HIDE_TERMINAL_REGEX = /\x1b\]1337;hide-terminal\x07/g;
+
+        async function triggerFileDownload(filePath) {
+            // Use fetch + blob to avoid cross-origin navigation issue
+            // (anchor click with download attribute fails cross-origin and navigates instead)
+            const filename = filePath.split('/').pop();
+            const downloadUrl = `http://${VNC_HOST}:${CONTROL_PORT}/download?path=${encodeURIComponent(filePath)}`;
+
+            try {
+                const response = await fetch(downloadUrl);
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+                const blob = await response.blob();
+                const blobUrl = URL.createObjectURL(blob);
+
+                const a = document.createElement('a');
+                a.href = blobUrl;
+                a.download = filename;
+                a.click();
+
+                // Clean up blob URL after download starts
+                setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+                showToast(`Downloaded: ${filename}`, 'success');
+            } catch (error) {
+                console.error('[Download] Failed:', error);
+                showToast(`Download failed: ${error.message}`, 'error');
+            }
+        }
+
+        // =============================================
+        // Focus Overlay (click-to-interact prompt)
+        // =============================================
+
+        /**
+         * Try to focus the VNC canvas directly without user interaction.
+         * Uses multiple strategies: focus(), click(), and synthetic MouseEvent.
+         * Returns true if we think it worked, false otherwise.
+         */
+        function tryFocusVNC() {
+            try {
+                const vncIframe = document.querySelector('#vncContainer iframe');
+                if (!vncIframe) return false;
+
+                // Focus the iframe itself first
+                vncIframe.focus();
+
+                // Try to access the canvas inside (same-origin should allow this)
+                const iframeDoc = vncIframe.contentDocument || vncIframe.contentWindow?.document;
+                if (iframeDoc) {
+                    // noVNC uses a canvas element for rendering
+                    const canvas = iframeDoc.querySelector('canvas');
+                    if (canvas) {
+                        // Ensure canvas is focusable
+                        if (!canvas.hasAttribute('tabindex')) {
+                            canvas.setAttribute('tabindex', '0');
+                        }
+
+                        // Strategy 1: Direct focus
+                        canvas.focus();
+
+                        // Strategy 2: Synthetic click (may grant focus)
+                        canvas.click();
+
+                        // Strategy 3: Dispatch a full MouseEvent at canvas center
+                        const rect = canvas.getBoundingClientRect();
+                        const clickEvent = new MouseEvent('click', {
+                            bubbles: true,
+                            cancelable: true,
+                            view: iframeDoc.defaultView,
+                            clientX: rect.left + rect.width / 2,
+                            clientY: rect.top + rect.height / 2
+                        });
+                        canvas.dispatchEvent(clickEvent);
+
+                        // Also dispatch mousedown/mouseup (some handlers need these)
+                        const mousedownEvent = new MouseEvent('mousedown', {
+                            bubbles: true,
+                            cancelable: true,
+                            view: iframeDoc.defaultView,
+                            clientX: rect.left + rect.width / 2,
+                            clientY: rect.top + rect.height / 2,
+                            button: 0
+                        });
+                        const mouseupEvent = new MouseEvent('mouseup', {
+                            bubbles: true,
+                            cancelable: true,
+                            view: iframeDoc.defaultView,
+                            clientX: rect.left + rect.width / 2,
+                            clientY: rect.top + rect.height / 2,
+                            button: 0
+                        });
+                        canvas.dispatchEvent(mousedownEvent);
+                        canvas.dispatchEvent(mouseupEvent);
+
+                        // Focus again after synthetic events
+                        canvas.focus();
+
+                        // Check if focus landed on canvas
+                        if (iframeDoc.activeElement === canvas) {
+                            console.log('[Inspekt] VNC canvas focused successfully');
+                        }
+                    }
+                }
+
+                // Always call /chrome/click to focus AND click in the VM-side Chromium
+                // This uses xdotool to activate the window and click, enabling keyboard input
+                fetch(`http://${VNC_HOST}:${CONTROL_PORT}/chrome/click`).catch(() => {});
+                console.log('[Inspekt] Requested VM-side focus via xdotool');
+                return true;
+            } catch (e) {
+                console.log('[Inspekt] Failed to focus VNC:', e);
+                return false;
+            }
+        }
+
+        function showFocusOverlay() {
+            const overlay = document.getElementById('focusOverlay');
+            overlay.classList.add('visible');
+        }
+
+        function hideFocusOverlay() {
+            const overlay = document.getElementById('focusOverlay');
+            overlay.classList.remove('visible');
+
+            // After hiding overlay, try to focus the VNC iframe
+            // This may work since we just had a real user click
+            setTimeout(() => {
+                const vncIframe = document.querySelector('#vncContainer iframe');
+                if (vncIframe) {
+                    vncIframe.focus();
+                    // Try to focus the noVNC canvas inside the iframe
+                    try {
+                        const canvas = vncIframe.contentDocument?.querySelector('canvas');
+                        if (canvas) {
+                            canvas.focus();
+                        }
+                    } catch (e) {
+                        // Cross-origin, ignore
+                    }
+                }
+                // Also trigger Chrome focus inside VM
+                fetch(`http://${VNC_HOST}:${CONTROL_PORT}/chrome`).catch(() => {});
+            }, 50);
+        }
+
+        // =============================================
+        // Terminal Management
+        // =============================================
+
+        function toggleTerminal() {
+            const overlay = document.getElementById('terminalOverlay');
+            const termBtn = document.querySelector('button[onclick="toggleTerminal()"]');
+
+            if (isTerminalOpen) {
+                // Hide terminal (keep session alive)
+                overlay.classList.remove('open');
+                overlay.inert = true; // Make overlay non-interactive while hidden
+                if (termBtn) termBtn.classList.remove('terminal-active');
+                isTerminalOpen = false;
+
+                // Try to auto-focus VNC (best effort, no blocking overlay)
+                setTimeout(() => tryFocusVNC(), 100);
+            } else {
+                // Show terminal
+                overlay.classList.add('open');
+                overlay.inert = false; // Make overlay interactive when shown
+                if (termBtn) termBtn.classList.add('terminal-active');
+                isTerminalOpen = true;
+
+                // Focus the terminal
+                if (terminal) {
+                    terminal.focus();
+                    if (fitAddon) fitAddon.fit();
+                }
+            }
+        }
+
+        function applyTerminalTheme(themeName) {
+            if (!terminal) return;
+            const theme = TERMINAL_THEMES[themeName];
+            if (theme) {
+                terminal.options.theme = theme;
+                localStorage.setItem('terminalTheme', themeName);
+            }
+        }
+
+        let terminalInitialized = false; // Ensure we only connect ONCE
+
+        function connectTerminal() {
+            if (terminalInitialized) {
+                console.log('[Terminal] Already initialized, skipping');
+                return;
+            }
+            terminalInitialized = true;
+            console.log('[Terminal] Initializing connection...');
+
+            const container = document.getElementById('terminalContainer');
+
+            // Create terminal
+            if (!terminal) {
+                console.log('[Terminal] Creating terminal instance');
+                const savedTheme = localStorage.getItem('terminalTheme') || 'tokyo-night';
+                terminal = new Terminal({
+                    cursorBlink: true,
+                    fontSize: 14,
+                    fontFamily: "'JetBrains Mono NF', 'JetBrains Mono', Menlo, Monaco, monospace",
+                    theme: TERMINAL_THEMES[savedTheme] || TERMINAL_THEMES['tokyo-night'],
+                    lineHeight: 1.2,
+                    letterSpacing: 0
+                });
+                // Set dropdown to match saved theme
+                document.getElementById('terminalTheme').value = savedTheme;
+
+                fitAddon = new FitAddon.FitAddon();
+                terminal.loadAddon(fitAddon);
+
+                // Custom link handler - respects dropdown setting and handles file:// URLs
+                const linkHandler = async (event, uri) => {
+                    event.preventDefault();
+
+                    // Handle file:// URLs - download from VM
+                    if (uri.startsWith('file://')) {
+                        const filePath = uri.replace('file://', '');
+                        try {
+                            const checkUrl = `http://${VNC_HOST}:${CONTROL_PORT}/file-exists?path=${encodeURIComponent(filePath)}`;
+                            const checkResp = await fetch(checkUrl);
+                            const data = await checkResp.json();
+
+                            if (data.exists) {
+                                showToast(`Downloading: ${data.filename}`, 'success');
+                                // Use fetch + blob to avoid cross-origin navigation
+                                const downloadUrl = `http://${VNC_HOST}:${CONTROL_PORT}/download?path=${encodeURIComponent(filePath)}`;
+                                const downloadResp = await fetch(downloadUrl);
+                                if (!downloadResp.ok) throw new Error(`HTTP ${downloadResp.status}`);
+
+                                const blob = await downloadResp.blob();
+                                const blobUrl = URL.createObjectURL(blob);
+                                const a = document.createElement('a');
+                                a.href = blobUrl;
+                                a.download = data.filename;
+                                a.click();
+                                setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+                            } else {
+                                showToast(`File not found: ${filePath}`, 'error');
+                            }
+                        } catch (err) {
+                            console.error('File download failed:', err);
+                            showToast(`Error: ${err.message}`, 'error');
+                        }
+                        return;
+                    }
+
+                    const linkTarget = document.getElementById('linkTarget').value;
+                    let openInVM = false;
+
+                    if (linkTarget === 'vm') {
+                        openInVM = true;
+                    } else if (linkTarget === 'host') {
+                        openInVM = false;
+                    } else if (linkTarget === 'auto') {
+                        // Auto-decide based on hostname
+                        try {
+                            const url = new URL(uri);
+                            const hostname = url.hostname.toLowerCase();
+                            // Check if localhost, inspekt, or IP address
+                            const isLocal = hostname === 'localhost' ||
+                                           hostname === 'inspekt' ||
+                                           hostname === '127.0.0.1' ||
+                                           hostname === '0.0.0.0' ||
+                                           /^(\d{1,3}\.){3}\d{1,3}$/.test(hostname) ||  // IPv4
+                                           hostname.startsWith('[') ||  // IPv6
+                                           hostname === '::1';
+                            openInVM = isLocal;
+                        } catch (e) {
+                            openInVM = false;
+                        }
+                    }
+
+                    if (openInVM) {
+                        // Open in VM's browser in a NEW TAB via control server
+                        fetch(`http://${VNC_HOST}:${CONTROL_PORT}/tabs/new?url=${encodeURIComponent(uri)}`)
+                            .then(response => {
+                                if (response.ok) {
+                                    showToast(`Opening in VM (new tab): ${uri}`, 'success');
+                                } else {
+                                    showToast('Failed to open URL', 'error');
+                                }
+                            })
+                            .catch(() => showToast('Failed to open URL', 'error'));
+                    } else {
+                        // Open in host browser in a NEW TAB
+                        window.open(uri, '_blank', 'noopener,noreferrer');
+                        showToast(`Opening in host (new tab): ${uri}`, 'success');
+                    }
+                };
+
+                // Standard WebLinksAddon for http/https URLs
+                const webLinksAddon = new WebLinksAddon.WebLinksAddon(linkHandler);
+                terminal.loadAddon(webLinksAddon);
+
+                // File path link provider - detects /root/... paths and makes them downloadable
+                terminal.registerLinkProvider({
+                    provideLinks: (bufferLineNumber, callback) => {
+                        const line = terminal.buffer.active.getLine(bufferLineNumber);
+                        if (!line) {
+                            callback(undefined);
+                            return;
+                        }
+
+                        const text = line.translateToString(true);
+
+                        // Debug: log every line being checked
+                        if (text.includes('/root') || text.includes('/tmp')) {
+                            console.log('[LinkProvider] Checking line:', bufferLineNumber, '→', JSON.stringify(text));
+                        }
+
+                        const links = [];
+
+                        // Simple regex: match paths starting with /root/ or /tmp/ etc.
+                        const regex = /\/(?:root|tmp|home|opt)\/[\w.\-\/]+/g;
+                        let match;
+
+                        while ((match = regex.exec(text)) !== null) {
+                            const filePath = match[0];
+                            const startX = match.index + 1;
+                            const endX = startX + filePath.length;
+
+                            console.log('[LinkProvider] Found path:', filePath, 'at', startX, '-', endX);
+
+                            links.push({
+                                range: {
+                                    start: { x: startX, y: bufferLineNumber + 1 },
+                                    end: { x: endX, y: bufferLineNumber + 1 }
+                                },
+                                text: filePath,
+                                activate: async (event, text) => {
+                                    console.log('[LinkProvider] Clicked:', text);
+                                    try {
+                                        const checkResp = await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/file-exists?path=${encodeURIComponent(text)}`);
+                                        const data = await checkResp.json();
+                                        if (data.exists) {
+                                            showToast(`Downloading: ${data.filename}`, 'success');
+                                            // Use fetch + blob to avoid cross-origin navigation
+                                            const downloadUrl = `http://${VNC_HOST}:${CONTROL_PORT}/download?path=${encodeURIComponent(text)}`;
+                                            const downloadResp = await fetch(downloadUrl);
+                                            if (!downloadResp.ok) throw new Error(`HTTP ${downloadResp.status}`);
+
+                                            const blob = await downloadResp.blob();
+                                            const blobUrl = URL.createObjectURL(blob);
+                                            const a = document.createElement('a');
+                                            a.href = blobUrl;
+                                            a.download = data.filename;
+                                            a.click();
+                                            setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+                                        } else {
+                                            showToast(`File not found: ${text}`, 'error');
+                                        }
+                                    } catch (e) {
+                                        showToast(`Error: ${e.message}`, 'error');
+                                    }
+                                }
+                            });
+                        }
+
+                        console.log('[LinkProvider] Returning', links.length, 'links for line', bufferLineNumber);
+                        callback(links.length > 0 ? links : undefined);
+                    }
+                });
+                console.log('[Terminal] LinkProvider registered successfully');
+
+                terminal.open(container);
+                console.log('[Terminal] Terminal opened');
+                fitAddon.fit();
+
+                // Intercept Escape key to close terminal instead of sending to shell
+                terminal.attachCustomKeyEventHandler((event) => {
+                    // Only capture keys when terminal is actually open/visible
+                    if (!isTerminalOpen) {
+                        return false; // Don't capture any keys when terminal is hidden
+                    }
+
+                    if (event.key === 'Escape' && event.type === 'keydown') {
+                        // Stop the event from bubbling to document handler
+                        event.stopPropagation();
+                        event.preventDefault();
+                        // Use toggleTerminal() to close so focus logic runs
+                        toggleTerminal();
+                        return false;
+                    }
+                    // Allow all other keys to be processed normally (when terminal is open)
+                    return true;
+                });
+
+                // Handle terminal input
+                terminal.onData(data => {
+                    if (terminalSocket && terminalSocket.readyState === WebSocket.OPEN) {
+                        terminalSocket.send(data);
+                    }
+                });
+
+                // Handle resize
+                window.addEventListener('resize', () => {
+                    if (isTerminalOpen && fitAddon) {
+                        fitAddon.fit();
+                        sendTerminalSize();
+                    }
+                });
+            }
+
+            // Connect WebSocket
+            const cols = terminal.cols;
+            const rows = terminal.rows;
+            const wsUrl = `ws://${VNC_HOST}:${TERMINAL_PORT}?cols=${cols}&rows=${rows}`;
+
+            terminal.writeln('\x1b[33mConnecting to terminal...\x1b[0m');
+
+            terminalSocket = new WebSocket(wsUrl);
+
+            terminalSocket.onopen = () => {
+                terminal.writeln('\x1b[32mConnected!\x1b[0m\r\n');
+                terminal.focus();
+                fitAddon.fit();
+                sendTerminalSize();
+                hasTerminalSession = true; // Mark that we have an active session
+            };
+
+            terminalSocket.onmessage = (event) => {
+                const data = event.data;
+
+                // Check for download escape sequences and trigger downloads
+                let match;
+                DOWNLOAD_MARKER_REGEX.lastIndex = 0; // Reset regex state
+                while ((match = DOWNLOAD_MARKER_REGEX.exec(data)) !== null) {
+                    const filePath = match[1];
+                    triggerFileDownload(filePath);
+                }
+
+                // Check for hide-terminal escape sequence
+                // CLI tools emit this to request terminal auto-hide (e.g., when recording starts)
+                const hasHideSignal = HIDE_TERMINAL_REGEX.test(data);
+                HIDE_TERMINAL_REGEX.lastIndex = 0; // Reset regex state
+                console.log('[Terminal] Message received, isTerminalOpen:', isTerminalOpen, 'hasHideSignal:', hasHideSignal);
+                if (hasHideSignal) {
+                    console.log('[Terminal] Hide signal detected! Raw data:', JSON.stringify(data.slice(0, 100)));
+                }
+                if (isTerminalOpen && hasHideSignal) {
+                    console.log('[Terminal] Hiding terminal now');
+                    setTimeout(() => {
+                        toggleTerminal(); // Close terminal and focus VNC
+                    }, 100);
+                }
+
+                // Strip escape sequences before writing to terminal
+                let cleanData = data.replace(DOWNLOAD_MARKER_REGEX, '');
+                cleanData = cleanData.replace(HIDE_TERMINAL_REGEX, '');
+                terminal.write(cleanData);
+            };
+
+            terminalSocket.onclose = () => {
+                hasTerminalSession = false; // Session ended
+                if (isTerminalOpen) {
+                    terminal.writeln('\r\n\x1b[31mDisconnected from terminal.\x1b[0m');
+                }
+            };
+
+            terminalSocket.onerror = (error) => {
+                terminal.writeln('\r\n\x1b[31mConnection error. Is the VM running?\x1b[0m');
+                console.error('[Terminal] WebSocket error:', error);
+            };
+        }
+
+        function disconnectTerminal() {
+            if (terminalSocket) {
+                terminalSocket.close();
+                terminalSocket = null;
+            }
+        }
+
+        function sendTerminalSize() {
+            if (terminalSocket && terminalSocket.readyState === WebSocket.OPEN && terminal) {
+                const resizeMsg = JSON.stringify({
+                    type: 'resize',
+                    cols: terminal.cols,
+                    rows: terminal.rows
+                });
+                terminalSocket.send(resizeMsg);
+            }
+        }
+
+        // Legacy function for compatibility
+        function showTerminal() {
+            toggleTerminal();
+        }
+
+        // =============================================
+        // Audio Streaming
+        // =============================================
+
+        const AUDIO_PORT = 6081;
+        let isAudioEnabled = false;
+        let audioSocket = null;
+        let audioElement = null;
+        let mediaSource = null;
+        let sourceBuffer = null;
+        let audioDataQueue = [];
+        let directFeed = true;
+
+        function initAudioElement() {
+            if (!audioElement) {
+                audioElement = document.createElement('audio');
+                audioElement.id = 'vmAudio';
+                document.body.appendChild(audioElement);
+            }
+        }
+
+        function updateAudioButton() {
+            const iconOff = document.getElementById('audioIconOff');
+            const iconOn = document.getElementById('audioIconOn');
+            const btn = document.getElementById('audioBtn');
+
+            if (isAudioEnabled) {
+                iconOff.style.display = 'none';
+                iconOn.style.display = 'block';
+                btn.classList.add('active');
+            } else {
+                iconOff.style.display = 'block';
+                iconOn.style.display = 'none';
+                btn.classList.remove('active');
+            }
+        }
+
+        async function toggleAudio() {
+            if (isAudioEnabled) {
+                await stopAudio();
+                showToast('Audio disabled', 'info');
+            } else {
+                await startAudio();
+            }
+            updateAudioButton();
+        }
+
+        async function startAudio() {
+            if (isAudioEnabled) return;
+
+            initAudioElement();
+
+            const mime = 'audio/webm; codecs="opus"';
+            if (!MediaSource.isTypeSupported(mime)) {
+                showToast('Audio codec not supported by browser', 'error');
+                return;
+            }
+
+            try {
+                mediaSource = new MediaSource();
+                audioElement.src = URL.createObjectURL(mediaSource);
+
+                await new Promise((resolve, reject) => {
+                    mediaSource.addEventListener('sourceopen', () => {
+                        try {
+                            sourceBuffer = mediaSource.addSourceBuffer(mime);
+                            sourceBuffer.mode = 'sequence';
+
+                            sourceBuffer.addEventListener('updateend', () => {
+                                if (sourceBuffer.updating) return;
+
+                                if (audioDataQueue.length === 0) {
+                                    directFeed = true;
+                                    return;
+                                }
+
+                                const data = audioDataQueue.shift();
+                                try {
+                                    sourceBuffer.appendBuffer(data);
+                                } catch (e) {
+                                    if (e.name === 'QuotaExceededError') {
+                                        emptyAudioBuffer();
+                                    }
+                                }
+                            });
+
+                            resolve();
+                        } catch (e) {
+                            reject(e);
+                        }
+                    }, { once: true });
+
+                    mediaSource.addEventListener('error', reject, { once: true });
+                });
+
+                // Connect to audio WebSocket
+                const wsUrl = `ws://${VNC_HOST}:${AUDIO_PORT}`;
+                audioSocket = new WebSocket(wsUrl);
+                audioSocket.binaryType = 'arraybuffer';
+
+                audioSocket.addEventListener('open', () => {
+                    // Send handshake
+                    audioSocket.send('CD:opus\nBR:96000\n\n');
+                });
+
+                audioSocket.addEventListener('message', async (event) => {
+                    const data = event.data;
+
+                    // Check for READY response
+                    if (typeof data === 'string' || data instanceof ArrayBuffer && data.byteLength < 20) {
+                        const text = typeof data === 'string' ? data : new TextDecoder().decode(data);
+                        if (text.trim() === 'READY') {
+                            isAudioEnabled = true;
+                            updateAudioButton();
+                            showToast('Audio enabled - click anywhere to start playback', 'success');
+
+                            // Auto-play on user interaction
+                            document.body.addEventListener('click', async () => {
+                                try {
+                                    audioElement.playbackRate = 1.003; // Slight speedup to reduce drift
+                                    await audioElement.play();
+                                } catch (e) {
+                                    if (e.name !== 'AbortError') {
+                                        console.error('[Audio] Playback error:', e);
+                                    }
+                                }
+                            }, { capture: true, once: true });
+
+                            return;
+                        }
+                        if (text.startsWith('ERR:')) {
+                            showToast(`Audio error: ${text.substring(4)}`, 'error');
+                            await stopAudio();
+                            return;
+                        }
+                    }
+
+                    // Feed audio data
+                    feedAudioData(data);
+                });
+
+                audioSocket.addEventListener('error', async () => {
+                    showToast('Audio connection failed', 'error');
+                    await stopAudio();
+                });
+
+                audioSocket.addEventListener('close', async () => {
+                    if (isAudioEnabled) {
+                        showToast('Audio connection closed', 'info');
+                        await stopAudio();
+                    }
+                });
+
+            } catch (e) {
+                console.error('[Audio] Setup error:', e);
+                showToast(`Audio setup failed: ${e.message}`, 'error');
+                await stopAudio();
+            }
+        }
+
+        function feedAudioData(data) {
+            if (!sourceBuffer || mediaSource.readyState !== 'open') return;
+
+            if (directFeed && !sourceBuffer.updating) {
+                try {
+                    sourceBuffer.appendBuffer(data);
+                    directFeed = false;
+                } catch (e) {
+                    if (e.name === 'QuotaExceededError') {
+                        emptyAudioBuffer();
+                        audioDataQueue.push(data);
+                    }
+                }
+            } else {
+                audioDataQueue.push(data);
+            }
+        }
+
+        function emptyAudioBuffer() {
+            if (!sourceBuffer || sourceBuffer.buffered.length === 0) return;
+            const bufferEnd = sourceBuffer.buffered.end(0);
+            const removeEnd = bufferEnd - 30; // Keep 30 seconds
+            if (removeEnd > 0) {
+                sourceBuffer.remove(0, removeEnd);
+            }
+        }
+
+        async function stopAudio() {
+            isAudioEnabled = false;
+            directFeed = true;
+            audioDataQueue = [];
+
+            if (audioSocket) {
+                audioSocket.close();
+                audioSocket = null;
+            }
+
+            if (audioElement) {
+                audioElement.pause();
+                audioElement.removeAttribute('src');
+                audioElement.currentTime = 0;
+            }
+
+            if (mediaSource && mediaSource.readyState === 'open') {
+                try {
+                    mediaSource.endOfStream();
+                } catch (e) {}
+            }
+            mediaSource = null;
+            sourceBuffer = null;
+
+            updateAudioButton();
+        }
+
+        // =============================================
+        // DevTools Management
+        // =============================================
+
+        let isDevToolsOpen = false;
+        let cdpConnectionInfo = null;
+
+        // Main DevTools toggle - always shows CDP modal to give user choice
+        function toggleDevTools() {
+            // Always show the CDP setup modal - user can choose remote or in-VM DevTools
+            openCdpModal();
+        }
+
+        // Internal function to toggle DevTools in VM
+        async function toggleDevToolsInVM() {
+            try {
+                const response = await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/devtools/toggle`);
+                const data = await response.json();
+                if (data.ok) {
+                    isDevToolsOpen = !isDevToolsOpen;
+                    updateDevToolsButton();
+                    showToast(isDevToolsOpen ? 'DevTools opened' : 'DevTools closed');
+                } else {
+                    showToast(data.error || 'Failed to toggle DevTools', 'error');
+                }
+            } catch (e) {
+                showToast('Failed to toggle DevTools: ' + e.message, 'error');
+            }
+        }
+
+        function updateDevToolsButton() {
+            const btn = document.getElementById('devtoolsBtn');
+            if (btn) {
+                btn.classList.toggle('devtools-active', isDevToolsOpen);
+            }
+        }
+
+        async function checkDevToolsStatus() {
+            try {
+                const response = await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/devtools/status`);
+                const data = await response.json();
+                if (data.ok) {
+                    isDevToolsOpen = data.open;
+                    updateDevToolsButton();
+                }
+            } catch (e) {
+                // Ignore errors on status check
+            }
+        }
+
+        // =============================================
+        // CDP Setup Modal
+        // =============================================
+
+        function openCdpModal() {
+            const overlay = document.getElementById('cdpModalOverlay');
+            overlay.classList.add('open');
+            fetchCdpConnectionInfo();
+        }
+
+        function closeCdpModal() {
+            const overlay = document.getElementById('cdpModalOverlay');
+            overlay.classList.remove('open');
+        }
+
+        async function fetchCdpConnectionInfo() {
+            const wsUrlElement = document.getElementById('cdpWebSocketUrl');
+            const hostPortElement = document.getElementById('cdpHostPort');
+
+            try {
+                const response = await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/devtools/connection-info`);
+                const data = await response.json();
+
+                if (data.ok) {
+                    cdpConnectionInfo = data;
+
+                    // Update WebSocket URL (replace localhost with actual host for external access)
+                    if (data.primary_ws_url) {
+                        const externalWsUrl = data.primary_ws_url.replace('localhost', VNC_HOST);
+                        wsUrlElement.textContent = externalWsUrl;
+                    } else {
+                        wsUrlElement.textContent = 'No debuggable page found';
+                    }
+
+                    // Update host:port display
+                    hostPortElement.textContent = `${VNC_HOST}:${data.cdp_port}`;
+                } else {
+                    wsUrlElement.textContent = 'Error: ' + (data.error || 'Unknown error');
+                }
+            } catch (e) {
+                wsUrlElement.textContent = 'Error: Failed to fetch connection info';
+                console.error('[CDP] Failed to fetch connection info:', e);
+            }
+        }
+
+        function switchCdpTab(button, tabName) {
+            // Update tab buttons
+            document.querySelectorAll('.cdp-tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            button.classList.add('active');
+
+            // Update tab content
+            document.querySelectorAll('.cdp-tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            document.getElementById(`cdp-tab-${tabName}`).classList.add('active');
+        }
+
+        function copyCdpText(text, button) {
+            navigator.clipboard.writeText(text).then(() => {
+                const originalText = button.textContent;
+                button.textContent = 'Copied!';
+                button.classList.add('copied');
+                setTimeout(() => {
+                    button.textContent = originalText;
+                    button.classList.remove('copied');
+                }, 2000);
+            }).catch(err => {
+                console.error('[CDP] Failed to copy:', err);
+                showToast('Failed to copy to clipboard', 'error');
+            });
+        }
+
+        function openChromeInspect() {
+            // Note: chrome:// URLs cannot be opened programmatically due to browser security
+            // Show instructions instead
+            showToast('Copy "chrome://inspect/#devices" and paste in your browser\'s address bar');
+            copyCdpText('chrome://inspect/#devices', document.querySelector('.cdp-actions .primary'));
+            closeCdpModal();
+        }
+
+        function openDevToolsInVM() {
+            closeCdpModal();
+            // Open DevTools inside the VM
+            toggleDevToolsInVM();
+        }
+
+        // Run Inspekt command
+        async function runInspekt(command) {
+            document.querySelectorAll('.dropdown-menu').forEach(m => m.classList.remove('show'));
+            showToast(`Running inspekt ${command}...`);
+
+            try {
+                const response = await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/inspekt/${command}`);
+                const data = await response.json();
+                if (data.ok) {
+                    showToast(`inspekt ${command} completed`, 'success');
+                    console.log(data.output);
+                } else {
+                    showToast(`Error: ${data.error}`, 'error', 5000);
+                }
+            } catch (error) {
+                showToast('Command failed: ' + error.message, 'error');
+            }
+        }
+
+        // =============================================
+        // Command Palette (ninja-keys)
+        // =============================================
+
+        // Output types: 'toast' (quick), 'panel' (structured data), 'terminal' (interactive)
+        const inspektCommands = [
+            // Navigation
+            { id: 'open', title: 'Open URL', icon: '🌐', section: 'Navigation', output: 'toast', keywords: 'navigate go to' },
+            { id: 'back', title: 'Go Back', icon: '←', section: 'Navigation', output: 'toast', keywords: 'previous history' },
+            { id: 'forward', title: 'Go Forward', icon: '→', section: 'Navigation', output: 'toast', keywords: 'next history' },
+            { id: 'reload', title: 'Reload Page', icon: '🔄', section: 'Navigation', output: 'toast', keywords: 'refresh' },
+            { id: 'top', title: 'Scroll to Top', icon: '⬆', section: 'Navigation', output: 'toast', keywords: 'beginning start' },
+            { id: 'bottom', title: 'Scroll to Bottom', icon: '⬇', section: 'Navigation', output: 'toast', keywords: 'end' },
+
+            // Extraction
+            { id: 'outline', title: 'Extract Page Outline', icon: '📋', section: 'Extraction', output: 'panel', keywords: 'headings structure h1 h2 h3' },
+            { id: 'links', title: 'Extract Links', icon: '🔗', section: 'Extraction', output: 'panel', keywords: 'urls hrefs' },
+            { id: 'info', title: 'Page Information', icon: 'ℹ️', section: 'Extraction', output: 'panel', keywords: 'metadata title' },
+            { id: 'selection', title: 'Get Selected Text', icon: '✂️', section: 'Extraction', output: 'panel', keywords: 'copy highlight' },
+            { id: 'describe', title: 'Describe Page (AI)', icon: '📝', section: 'Extraction', output: 'panel', keywords: 'summarize ai claude' },
+            { id: 'summarize', title: 'Summarize Page (AI)', icon: '📄', section: 'Extraction', output: 'panel', keywords: 'summary ai claude' },
+            { id: 'ask', title: 'Ask About Page (AI)', icon: '💬', section: 'Extraction', output: 'terminal', keywords: 'question ai claude chat' },
+
+            // Accessibility
+            { id: 'axe', title: 'Run Accessibility Audit', icon: '♿', section: 'Accessibility', output: 'panel', keywords: 'wcag a11y violations' },
+            { id: 'axe --level 2aaa', title: 'Audit (WCAG AAA)', icon: '♿', section: 'Accessibility', output: 'panel', keywords: 'wcag aaa strict' },
+            { id: 'autocomplete', title: 'Check Autocomplete', icon: '📝', section: 'Accessibility', output: 'panel', keywords: 'forms inputs' },
+
+            // Interaction
+            { id: 'click', title: 'Click Element', icon: '👆', section: 'Interaction', output: 'toast', keywords: 'tap press' },
+            { id: 'type', title: 'Type Text', icon: '⌨️', section: 'Interaction', output: 'toast', keywords: 'input keyboard' },
+            { id: 'focus', title: 'Focus Element', icon: '🎯', section: 'Interaction', output: 'toast', keywords: 'select' },
+            { id: 'screenshot', title: 'Take Screenshot', icon: '📷', section: 'Interaction', output: 'toast', keywords: 'capture image' },
+            { id: 'screenshot --full', title: 'Full Page Screenshot', icon: '📷', section: 'Interaction', output: 'toast', keywords: 'capture full' },
+
+            // Recording
+            { id: 'record', title: 'Start Recording', icon: '🔴', section: 'Recording', output: 'terminal', keywords: 'capture actions' },
+            { id: 'replay', title: 'Replay Recording', icon: '▶️', section: 'Recording', output: 'terminal', keywords: 'playback' },
+
+            // Storage
+            { id: 'cookies list', title: 'List Cookies', icon: '🍪', section: 'Storage', output: 'panel', keywords: 'storage' },
+            { id: 'storage list', title: 'List Local Storage', icon: '💾', section: 'Storage', output: 'panel', keywords: 'localstorage' },
+
+            // Network
+            { id: 'network', title: 'Network Requests', icon: '🌍', section: 'Network', output: 'panel', keywords: 'requests fetch xhr' },
+            { id: 'har', title: 'HAR Export', icon: '📦', section: 'Network', output: 'panel', keywords: 'archive http' },
+            { id: 'robots', title: 'Check robots.txt', icon: '🤖', section: 'Network', output: 'panel', keywords: 'crawl seo' },
+
+            // Console
+            { id: 'console', title: 'Browser Console', icon: '💻', section: 'Console', output: 'panel', keywords: 'logs errors' },
+            { id: 'console --errors', title: 'Console Errors Only', icon: '❌', section: 'Console', output: 'panel', keywords: 'errors exceptions' },
+            { id: 'js', title: 'Execute JavaScript', icon: '📜', section: 'Console', output: 'terminal', keywords: 'eval run code' },
+
+            // Domain Analysis
+            { id: 'domain whois', title: 'WHOIS Lookup', icon: '🔍', section: 'Domain', output: 'panel', keywords: 'ownership registrar' },
+            { id: 'domain dns', title: 'DNS Records', icon: '🌐', section: 'Domain', output: 'panel', keywords: 'nameserver mx' },
+            { id: 'domain ssl', title: 'SSL Certificate', icon: '🔒', section: 'Domain', output: 'panel', keywords: 'https tls' },
+        ];
+
+        // Convert to ninja-keys format
+        function buildCommandPaletteData() {
+            return inspektCommands.map(cmd => ({
+                id: cmd.id,
+                title: cmd.title,
+                icon: cmd.icon,
+                section: cmd.section,
+                keywords: cmd.keywords,
+                handler: () => executeCommand(cmd)
+            }));
+        }
+
+        // Output Panel Functions
+        function openOutputPanel(title, icon, content) {
+            const panel = document.getElementById('outputPanel');
+            document.getElementById('outputPanelTitle').textContent = title;
+            document.getElementById('outputPanelIcon').textContent = icon;
+            document.getElementById('outputPanelContent').innerHTML = content;
+            panel.classList.add('open');
+        }
+
+        function closeOutputPanel() {
+            document.getElementById('outputPanel').classList.remove('open');
+        }
+
+        // Execute command based on output type
+        async function executeCommand(cmd) {
+            const { id, title, icon, output } = cmd;
+
+            if (output === 'terminal') {
+                // Open terminal and run command
+                openTerminal();
+                setTimeout(() => {
+                    if (window.term) {
+                        // Send command to terminal
+                        fetch(`http://${VNC_HOST}:${CONTROL_PORT}/inspekt/${encodeURIComponent(id)}`);
+                    }
+                }, 300);
+                showToast(`Running ${title}...`);
+                return;
+            }
+
+            if (output === 'toast') {
+                // Simple command - just show toast
+                showToast(`Running ${title}...`);
+                try {
+                    const response = await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/inspekt/${encodeURIComponent(id)}`);
+                    const data = await response.json();
+                    if (data.ok) {
+                        showToast(`${title} completed`, 'success');
+                    } else {
+                        showToast(`Error: ${data.error}`, 'error', 5000);
+                    }
+                } catch (error) {
+                    showToast(`Failed: ${error.message}`, 'error');
+                }
+                return;
+            }
+
+            if (output === 'panel') {
+                // Structured output - show in panel
+                showToast(`Running ${title}...`);
+                try {
+                    const response = await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/inspekt/${encodeURIComponent(id)}`);
+                    const data = await response.json();
+
+                    if (data.ok) {
+                        // Format output for panel
+                        let content = formatOutputForPanel(id, data.output);
+                        openOutputPanel(title, icon, content);
+                        showToast(`${title} completed`, 'success');
+                    } else {
+                        showToast(`Error: ${data.error}`, 'error', 5000);
+                    }
+                } catch (error) {
+                    showToast(`Failed: ${error.message}`, 'error');
+                }
+                return;
+            }
+        }
+
+        // Format command output for panel display
+        function formatOutputForPanel(commandId, output) {
+            // Try to parse as JSON first
+            let data;
+            try {
+                data = typeof output === 'string' ? JSON.parse(output) : output;
+            } catch {
+                // Plain text output
+                return `<pre style="white-space: pre-wrap; font-family: 'JetBrains Mono NF', monospace; font-size: 12px;">${escapeHtml(output)}</pre>`;
+            }
+
+            // Format based on command type
+            if (commandId === 'axe' || commandId.startsWith('axe ')) {
+                return formatAxeOutput(data);
+            }
+            if (commandId === 'outline') {
+                return formatOutlineOutput(data);
+            }
+            if (commandId === 'links') {
+                return formatLinksOutput(data);
+            }
+            if (commandId === 'info') {
+                return formatInfoOutput(data);
+            }
+            if (commandId.includes('cookies') || commandId.includes('storage')) {
+                return formatStorageOutput(data);
+            }
+            if (commandId === 'console' || commandId.startsWith('console ')) {
+                return formatConsoleOutput(data);
+            }
+
+            // Default: pretty print JSON
+            return `<pre style="white-space: pre-wrap; font-family: 'JetBrains Mono NF', monospace; font-size: 12px;">${escapeHtml(JSON.stringify(data, null, 2))}</pre>`;
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function formatAxeOutput(data) {
+            if (!data.violations || data.violations.length === 0) {
+                return `<div style="padding: 20px; text-align: center; color: #10b981;">
+                    <div style="font-size: 48px; margin-bottom: 10px;">✓</div>
+                    <div style="font-size: 18px; font-weight: 600;">No accessibility violations found!</div>
+                </div>`;
+            }
+
+            let html = `<div style="margin-bottom: 10px; color: #f59e0b;">Found ${data.violations.length} violation(s)</div>`;
+            html += '<table><thead><tr><th>Impact</th><th>Rule</th><th>Description</th><th>Count</th></tr></thead><tbody>';
+
+            data.violations.forEach(v => {
+                const impactColor = {
+                    critical: '#ef4444',
+                    serious: '#f97316',
+                    moderate: '#f59e0b',
+                    minor: '#3b82f6'
+                }[v.impact] || '#888';
+
+                html += `<tr>
+                    <td><span style="color: ${impactColor}; font-weight: 600;">${v.impact}</span></td>
+                    <td style="font-family: monospace;">${escapeHtml(v.id)}</td>
+                    <td>${escapeHtml(v.description)}</td>
+                    <td>${v.nodes?.length || 1}</td>
+                </tr>`;
+            });
+
+            html += '</tbody></table>';
+            return html;
+        }
+
+        function formatOutlineOutput(data) {
+            if (!data.headings || data.headings.length === 0) {
+                return '<div style="padding: 20px; text-align: center; color: #888;">No headings found on this page.</div>';
+            }
+
+            let html = '<div style="font-family: monospace; line-height: 1.8;">';
+            data.headings.forEach(h => {
+                const indent = (parseInt(h.level.replace('h', '')) - 1) * 20;
+                const color = h.level === 'h1' ? '#60a5fa' : h.level === 'h2' ? '#34d399' : '#888';
+                html += `<div style="padding-left: ${indent}px;">
+                    <span style="color: ${color}; font-weight: 600;">${h.level}</span> ${escapeHtml(h.text)}
+                </div>`;
+            });
+            html += '</div>';
+            return html;
+        }
+
+        function formatLinksOutput(data) {
+            const links = data.links || data;
+            if (!links || links.length === 0) {
+                return '<div style="padding: 20px; text-align: center; color: #888;">No links found on this page.</div>';
+            }
+
+            let html = `<div style="margin-bottom: 10px;">Found ${links.length} link(s)</div>`;
+            html += '<table><thead><tr><th>Text</th><th>URL</th><th>Type</th></tr></thead><tbody>';
+
+            links.slice(0, 100).forEach(link => {
+                html += `<tr>
+                    <td>${escapeHtml(link.text || '(no text)')}</td>
+                    <td style="max-width: 300px; overflow: hidden; text-overflow: ellipsis;">${escapeHtml(link.href || link.url)}</td>
+                    <td>${link.type || '-'}</td>
+                </tr>`;
+            });
+
+            if (links.length > 100) {
+                html += `<tr><td colspan="3" style="text-align: center; color: #888;">... and ${links.length - 100} more</td></tr>`;
+            }
+
+            html += '</tbody></table>';
+            return html;
+        }
+
+        function formatInfoOutput(data) {
+            let html = '<table>';
+            const fields = ['title', 'url', 'description', 'author', 'language', 'viewport'];
+            fields.forEach(field => {
+                if (data[field]) {
+                    html += `<tr><th style="text-align: left; width: 120px;">${field}</th><td>${escapeHtml(String(data[field]))}</td></tr>`;
+                }
+            });
+            html += '</table>';
+            return html;
+        }
+
+        function formatStorageOutput(data) {
+            const items = data.cookies || data.items || data;
+            if (!items || items.length === 0) {
+                return '<div style="padding: 20px; text-align: center; color: #888;">No items found.</div>';
+            }
+
+            let html = '<table><thead><tr><th>Name</th><th>Value</th></tr></thead><tbody>';
+            items.forEach(item => {
+                const name = item.name || item.key;
+                const value = item.value || '';
+                html += `<tr>
+                    <td style="font-family: monospace;">${escapeHtml(name)}</td>
+                    <td style="max-width: 400px; overflow: hidden; text-overflow: ellipsis;">${escapeHtml(value.substring(0, 100))}${value.length > 100 ? '...' : ''}</td>
+                </tr>`;
+            });
+            html += '</tbody></table>';
+            return html;
+        }
+
+        function formatConsoleOutput(data) {
+            const logs = data.logs || data.messages || data;
+            if (!logs || logs.length === 0) {
+                return '<div style="padding: 20px; text-align: center; color: #888;">Console is empty.</div>';
+            }
+
+            let html = '<div style="font-family: monospace; font-size: 12px; line-height: 1.6;">';
+            logs.forEach(log => {
+                const color = {
+                    error: '#ef4444',
+                    warn: '#f59e0b',
+                    info: '#3b82f6',
+                    log: '#888'
+                }[log.level] || '#888';
+                html += `<div style="padding: 4px 8px; border-bottom: 1px solid #333;">
+                    <span style="color: ${color};">[${log.level}]</span> ${escapeHtml(log.text || log.message)}
+                </div>`;
+            });
+            html += '</div>';
+            return html;
+        }
+
+        // Initialize command palette
+        function initCommandPalette() {
+            const ninja = document.getElementById('commandPalette');
+            if (ninja) {
+                // Wait for custom element to be defined
+                customElements.whenDefined('ninja-keys').then(() => {
+                    ninja.data = buildCommandPaletteData();
+                    console.log('[CommandPalette] Initialized with', inspektCommands.length, 'commands');
+                }).catch(err => {
+                    console.error('[CommandPalette] Failed to initialize:', err);
+                });
+            }
+        }
+
+        // Initialize on DOM ready
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initCommandPalette);
+        } else {
+            // Give time for the module to load
+            setTimeout(initCommandPalette, 500);
+        }
+
+        // =============================================
+        // Restart Modal & Tab Persistence
+        // =============================================
+
+        // Save current tabs to localStorage (survives container restarts)
+        function saveTabsToStorage() {
+            const tabData = tabs.map(t => ({ url: t.url, title: t.title }));
+            localStorage.setItem('inspekt_saved_tabs', JSON.stringify(tabData));
+            console.log('[Restart] Saved', tabData.length, 'tabs to localStorage');
+        }
+
+        // Restore tabs from localStorage
+        async function restoreTabsFromStorage() {
+            const saved = localStorage.getItem('inspekt_saved_tabs');
+            if (!saved) return;
+
+            try {
+                const tabData = JSON.parse(saved);
+                localStorage.removeItem('inspekt_saved_tabs'); // Clear after reading
+
+                if (tabData.length === 0) return;
+
+                showToast(`Restoring ${tabData.length} tab(s)...`);
+                console.log('[Restart] Restoring tabs:', tabData);
+
+                for (let i = 0; i < tabData.length; i++) {
+                    const tab = tabData[i];
+                    // First tab: navigate current tab, rest: create new tabs
+                    if (i === 0) {
+                        await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/navigate?url=${encodeURIComponent(tab.url)}`);
+                    } else {
+                        await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/tabs/new?url=${encodeURIComponent(tab.url)}`);
+                    }
+                    await new Promise(r => setTimeout(r, 500)); // Small delay between tabs
+                }
+
+                showToast('Tabs restored!', 'success');
+            } catch (e) {
+                console.error('[Restart] Failed to restore tabs:', e);
+            }
+        }
+
+        // Open restart modal
+        function openRestartModal() {
+            document.getElementById('restartModalOverlay').classList.add('open');
+        }
+
+        // Close restart modal
+        function closeRestartModal() {
+            document.getElementById('restartModalOverlay').classList.remove('open');
+        }
+
+        // =============================================
+        // Recordings Modal Functions
+        // =============================================
+
+        // Open recordings modal
+        function openRecordingsModal() {
+            document.getElementById('recordingsModalOverlay').classList.add('open');
+            loadRecordings();
+        }
+
+        // Close recordings modal
+        function closeRecordingsModal() {
+            document.getElementById('recordingsModalOverlay').classList.remove('open');
+        }
+
+        // Load recordings list
+        async function loadRecordings() {
+            const container = document.getElementById('recordingsList');
+
+            try {
+                const response = await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/recordings`);
+                const data = await response.json();
+
+                if (!data.ok || !data.recordings || data.recordings.length === 0) {
+                    container.innerHTML = `
+                        <div class="recordings-empty">
+                            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="4" fill="currentColor"/></svg>
+                            <p>No recordings yet</p>
+                            <small>Use <code>inspekt record</code> to create recordings</small>
+                        </div>
+                    `;
+                    return;
+                }
+
+                container.innerHTML = data.recordings.map(r => {
+                    const duration = formatDuration(r.duration_ms);
+                    const date = formatDate(r.created_at);
+                    const url = r.url.replace(/^https?:\/\//, '').substring(0, 30);
+
+                    return `
+                        <div class="recording-item">
+                            <div class="recording-info">
+                                <div class="recording-name">${escapeHtml(r.name)}</div>
+                                <div class="recording-meta">${date} • ${duration} • ${r.steps} steps • ${url}</div>
+                            </div>
+                            <span class="recording-badge">${r.steps}</span>
+                            <button class="recording-btn download" onclick="downloadRecording('${escapeHtml(r.name)}')">Download</button>
+                            <button class="recording-btn delete" onclick="deleteRecording('${escapeHtml(r.name)}')">Delete</button>
+                        </div>
+                    `;
+                }).join('');
+            } catch (e) {
+                console.error('[Recordings] Failed to load:', e);
+                container.innerHTML = `
+                    <div class="recordings-empty">
+                        <p>Failed to load recordings</p>
+                        <small>${e.message}</small>
+                    </div>
+                `;
+            }
+        }
+
+        // Format duration in ms to human readable
+        function formatDuration(ms) {
+            if (ms < 1000) return `${ms}ms`;
+            if (ms < 60000) return `${(ms / 1000).toFixed(1)}s`;
+            const minutes = Math.floor(ms / 60000);
+            const seconds = Math.floor((ms % 60000) / 1000);
+            return `${minutes}m ${seconds}s`;
+        }
+
+        // Format date string
+        function formatDate(dateStr) {
+            try {
+                const date = new Date(dateStr);
+                return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+            } catch (e) {
+                return dateStr ? dateStr.substring(0, 10) : 'N/A';
+            }
+        }
+
+        // Escape HTML
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Download single recording
+        function downloadRecording(name) {
+            const url = `http://${VNC_HOST}:${CONTROL_PORT}/recordings/${encodeURIComponent(name)}/download`;
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = name;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            showToast(`Downloading ${name}`);
+        }
+
+        // Download all recordings as ZIP
+        function downloadAllRecordings() {
+            const url = `http://${VNC_HOST}:${CONTROL_PORT}/recordings/download-all`;
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'inspekt-recordings.zip';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            showToast('Downloading all recordings as ZIP');
+        }
+
+        // Delete recording
+        async function deleteRecording(name) {
+            if (!confirm(`Delete recording "${name}"?`)) return;
+
+            try {
+                const response = await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/recordings/${encodeURIComponent(name)}/delete`);
+                const data = await response.json();
+
+                if (data.ok) {
+                    showToast(`Deleted ${name}`);
+                    loadRecordings();
+                } else {
+                    showToast(`Failed to delete: ${data.error}`);
+                }
+            } catch (e) {
+                showToast(`Error: ${e.message}`);
+            }
+        }
+
+        // Perform soft restart (supervisorctl restart all)
+        async function performSoftRestart() {
+            const keepTabs = document.getElementById('keepTabsCheckbox').checked;
+
+            if (keepTabs) {
+                saveTabsToStorage();
+            }
+
+            closeRestartModal();
+            showToast('Performing soft restart...');
+            updateStatus(false);
+            document.getElementById('statusDot').classList.add('connecting');
+            document.getElementById('statusText').textContent = 'Restarting...';
+
+            try {
+                await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/reboot`);
+            } catch (e) {
+                // Expected - connection will drop
+            }
+
+            // Poll for reconnection
+            pollForReconnection();
+        }
+
+        // Perform hard restart (container destruction + recreation)
+        async function performHardRestart() {
+            const keepTabs = document.getElementById('keepTabsCheckbox').checked;
+
+            if (keepTabs) {
+                saveTabsToStorage();
+            }
+
+            closeRestartModal();
+            showToast('Performing hard restart... This may take ~10 seconds.');
+            updateStatus(false);
+            document.getElementById('statusDot').classList.add('connecting');
+            document.getElementById('statusText').textContent = 'Hard restarting...';
+
+            try {
+                await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/hard-reboot`);
+            } catch (e) {
+                // Expected - connection drops immediately
+            }
+
+            // Poll for reconnection
+            pollForReconnection();
+        }
+
+        // Poll for server reconnection after restart
+        function pollForReconnection() {
+            let attempts = 0;
+            const maxAttempts = 60; // 60 seconds timeout
+
+            const interval = setInterval(async () => {
+                attempts++;
+                try {
+                    const resp = await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/tabs`, {
+                        signal: AbortSignal.timeout(2000)
+                    });
+                    if (resp.ok) {
+                        clearInterval(interval);
+                        showToast('Environment restarted!', 'success');
+                        // Reload page to reinitialize VNC connection
+                        setTimeout(() => location.reload(), 500);
+                    }
+                } catch (e) {
+                    // Still down, keep polling
+                    if (attempts >= maxAttempts) {
+                        clearInterval(interval);
+                        showToast('Restart timeout - please refresh manually', 'error');
+                    }
+                }
+            }, 1000);
+        }
+
+        // Toggle fullscreen
+        function toggleFullscreen() {
+            const container = document.getElementById('vncContainer');
+            const iframe = container.querySelector('iframe');
+
+            if (iframe) {
+                if (document.fullscreenElement) {
+                    document.exitFullscreen();
+                } else {
+                    iframe.requestFullscreen();
+                }
+            }
+        }
+
+        // Check health periodically
+        async function checkHealth() {
+            try {
+                const response = await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/health`, {
+                    signal: AbortSignal.timeout(2000)
+                });
+                if (response.ok) {
+                    if (!isConnected) updateStatus(true);
+                }
+            } catch {
+                if (isConnected) updateStatus(false);
+            }
+        }
+
+        // =============================================
+        // Theme Sync (Dark/Light Mode)
+        // =============================================
+
+        // Detect host color scheme preference
+        function getColorScheme() {
+            return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        }
+
+        // Sync color scheme to VM
+        async function syncColorScheme(scheme) {
+            try {
+                const response = await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/theme/${scheme}`, {
+                    method: 'POST'
+                });
+                const data = await response.json();
+                if (data.ok && data.changed) {
+                    console.log(`[Theme] Synced to ${scheme} mode`);
+                    showToast(`Switched to ${scheme} mode`, 'success');
+                }
+            } catch (e) {
+                console.error('[Theme] Failed to sync:', e);
+            }
+        }
+
+        // Listen for host theme changes
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+            const scheme = e.matches ? 'dark' : 'light';
+            console.log(`[Theme] Host changed to ${scheme} mode`);
+            syncColorScheme(scheme);
+        });
+
+        // =============================================
+        // Tab Management (Real Chrome Tabs via CDP)
+        // =============================================
+
+        let tabs = [];
+        let activeTabId = null;
+        let draggedTab = null;
+
+        // =============================================
+        // Tab Thumbnail Management
+        // =============================================
+
+        const tabActivationTimes = {};  // {tabId: timestamp}
+        const MIN_TIME_FOR_THUMBNAIL = 2000;  // 2 seconds
+        let thumbnailHoverTimeout = null;
+        let thumbnailHideTimeout = null;  // Delay before hiding (allows smooth transition between tabs)
+        const THUMBNAIL_HOVER_DELAY = 300;  // ms before showing thumbnail
+        const THUMBNAIL_HIDE_DELAY = 100;   // ms delay before hiding (allows transition to next tab)
+        let currentThumbnailTabId = null;  // Track which tab's thumbnail is showing
+
+        function onTabActivated(tabId) {
+            tabActivationTimes[tabId] = Date.now();
+            // Also track for auto-scan
+            tabVisitTimes[tabId] = { startTime: Date.now(), scanned: false };
+        }
+
+        function shouldCaptureThumbnail(tabId) {
+            const activatedAt = tabActivationTimes[tabId];
+            if (!activatedAt) return false;
+            return (Date.now() - activatedAt) >= MIN_TIME_FOR_THUMBNAIL;
+        }
+
+        async function captureTabThumbnail(tabId) {
+            try {
+                await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/tabs/${tabId}/screenshot`);
+            } catch (e) {
+                console.warn('[Thumbnails] Failed to capture:', e);
+            }
+        }
+
+        function calculateThumbnailPosition(tabElement) {
+            const rect = tabElement.getBoundingClientRect();
+            const previewWidth = 248;  // 240px img + 8px padding
+
+            // Calculate left position (center under tab, but keep in viewport)
+            let left = rect.left + (rect.width / 2) - (previewWidth / 2);
+            left = Math.max(8, Math.min(left, window.innerWidth - previewWidth - 8));
+
+            return {
+                left: left,
+                top: rect.bottom + 8
+            };
+        }
+
+        async function showThumbnail(tabId, tabElement) {
+            // Don't show thumbnail for active tab
+            if (tabId === activeTabId) {
+                console.log('[Thumbnail] showThumbnail: skipping active tab', tabId);
+                return;
+            }
+
+            // Cancel any pending hide - we're showing a new thumbnail
+            clearTimeout(thumbnailHideTimeout);
+            thumbnailHideTimeout = null;
+
+            const preview = document.getElementById('thumbnailPreview');
+            const currentImg = preview.querySelector('.thumbnail-current');
+            const nextImg = preview.querySelector('.thumbnail-next');
+            const urlDiv = preview.querySelector('.thumbnail-url');
+
+            // Calculate position first
+            const pos = calculateThumbnailPosition(tabElement);
+
+            // If already showing a thumbnail, animate to new position with crossfade
+            const isAlreadyVisible = preview.classList.contains('visible') || preview.classList.contains('moving');
+
+            console.log('[Thumbnail] showThumbnail:', tabId, 'isAlreadyVisible:', isAlreadyVisible, 'currentThumbnailTabId:', currentThumbnailTabId);
+
+            if (isAlreadyVisible && currentThumbnailTabId !== tabId) {
+                // Moving to a different tab - animate position and crossfade
+                console.log('[Thumbnail] → ANIMATING to new position');
+                preview.classList.add('moving');
+
+                // Set new position (will animate due to CSS transition)
+                preview.style.left = `${pos.left}px`;
+                preview.style.top = `${pos.top}px`;
+
+                // Fetch new thumbnail and crossfade
+                try {
+                    const response = await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/tabs/${tabId}/thumbnail`);
+                    const data = await response.json();
+
+                    if (data.ok && data.thumbnail) {
+                        // Load new image in the "next" slot
+                        nextImg.src = `data:image/jpeg;base64,${data.thumbnail}`;
+
+                        // Wait for image to load, then crossfade
+                        nextImg.onload = () => {
+                            // Crossfade: fade in next, fade out current
+                            nextImg.classList.add('thumbnail-current');
+                            nextImg.classList.remove('thumbnail-next');
+                            currentImg.classList.add('thumbnail-next');
+                            currentImg.classList.remove('thumbnail-current');
+
+                            // After crossfade completes, swap the images back for next time
+                            setTimeout(() => {
+                                currentImg.src = nextImg.src;
+                                currentImg.classList.add('thumbnail-current');
+                                currentImg.classList.remove('thumbnail-next');
+                                nextImg.classList.add('thumbnail-next');
+                                nextImg.classList.remove('thumbnail-current');
+                                nextImg.src = '';
+                            }, 350);
+                        };
+
+                        // Update URL
+                        const tab = tabs.find(t => t.id === tabId);
+                        if (tab) {
+                            urlDiv.textContent = tab.url;
+                        }
+
+                        currentThumbnailTabId = tabId;
+                    }
+                } catch (e) {
+                    console.warn('[Thumbnails] Failed to fetch:', e);
+                }
+            } else if (!isAlreadyVisible) {
+                // First show - no animation, just appear
+                try {
+                    const response = await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/tabs/${tabId}/thumbnail`);
+                    const data = await response.json();
+
+                    if (data.ok && data.thumbnail) {
+                        currentImg.src = `data:image/jpeg;base64,${data.thumbnail}`;
+
+                        // Update URL
+                        const tab = tabs.find(t => t.id === tabId);
+                        if (tab) {
+                            urlDiv.textContent = tab.url;
+                        }
+
+                        // Set position BEFORE making visible (fixes top-left jump)
+                        // Disable transition temporarily for initial positioning
+                        preview.style.transition = 'none';
+                        preview.style.left = `${pos.left}px`;
+                        preview.style.top = `${pos.top}px`;
+
+                        // Force reflow to apply position immediately
+                        preview.offsetHeight;
+
+                        // Re-enable transitions
+                        preview.style.transition = '';
+
+                        // Now make visible
+                        preview.classList.add('visible');
+                        currentThumbnailTabId = tabId;
+                    }
+                } catch (e) {
+                    console.warn('[Thumbnails] Failed to fetch:', e);
+                }
+            }
+        }
+
+        function hideThumbnail() {
+            // Use a delay so that moving between tabs allows smooth transition
+            console.log('[Thumbnail] hideThumbnail called, scheduling hide in', THUMBNAIL_HIDE_DELAY, 'ms');
+            clearTimeout(thumbnailHideTimeout);
+            thumbnailHideTimeout = setTimeout(() => {
+                console.log('[Thumbnail] hide timeout fired, hiding now');
+                const preview = document.getElementById('thumbnailPreview');
+                preview.classList.remove('visible');
+                preview.classList.remove('moving');
+                currentThumbnailTabId = null;
+            }, THUMBNAIL_HIDE_DELAY);
+        }
+
+        function hideThumbnailImmediately() {
+            clearTimeout(thumbnailHideTimeout);
+            const preview = document.getElementById('thumbnailPreview');
+            preview.classList.remove('visible');
+            preview.classList.remove('moving');
+            currentThumbnailTabId = null;
+        }
+
+        // =============================================
+        // Tab Grid Overview
+        // =============================================
+
+        const gridState = {
+            isOpen: false,
+            scanData: {}  // {tabId: {a11y_violations, console_errors, missing_alt, last_command, thumbnail}}
+        };
+
+        // Auto-scan state
+        let autoScanEnabled = false;
+        const tabVisitTimes = {};  // {tabId: {startTime, scanned}}
+        const AUTO_SCAN_THRESHOLD = 5000;  // 5 seconds
+
+        async function toggleTabGrid() {
+            if (gridState.isOpen) {
+                closeTabGrid();
+            } else {
+                await openTabGrid();
+            }
+        }
+
+        async function openTabGrid() {
+            gridState.isOpen = true;
+            const overlay = document.getElementById('tabGridOverlay');
+            const gridBtn = document.getElementById('gridViewBtn');
+
+            // Show overlay
+            overlay.classList.add('open');
+            if (gridBtn) gridBtn.classList.add('active');
+
+            // Hide thumbnail preview
+            hideThumbnailImmediately();
+
+            // Update tab count
+            document.getElementById('gridTabCount').textContent = `${tabs.length} tab${tabs.length !== 1 ? 's' : ''}`;
+
+            // Show loading state and fetch data
+            renderTabGridLoading();
+            await refreshGridData();
+            renderTabGrid();
+        }
+
+        function closeTabGrid() {
+            gridState.isOpen = false;
+            const overlay = document.getElementById('tabGridOverlay');
+            const gridBtn = document.getElementById('gridViewBtn');
+
+            overlay.classList.remove('open');
+            if (gridBtn) gridBtn.classList.remove('active');
+        }
+
+        function renderTabGridLoading() {
+            const container = document.getElementById('tabGridContainer');
+            container.innerHTML = tabs.map(tab => `
+                <div class="tab-grid-card loading" data-tab-id="${tab.id}">
+                    <div class="card-thumbnail"></div>
+                    <div class="card-info">
+                        <div class="card-title">${escapeHtml(tab.title || 'New Tab')}</div>
+                        <div class="card-url">${escapeHtml(tab.url || '')}</div>
+                    </div>
+                    <div class="card-stats">
+                        <span class="stat">Loading...</span>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        async function refreshGridData() {
+            try {
+                // Trigger scan for all tabs
+                await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/tabs/scan-all`);
+
+                // Fetch scan data and thumbnails for each tab in parallel
+                const promises = tabs.map(async (tab) => {
+                    try {
+                        const [scanResp, thumbResp] = await Promise.all([
+                            fetch(`http://${VNC_HOST}:${CONTROL_PORT}/tabs/${tab.id}/scan-data`),
+                            fetch(`http://${VNC_HOST}:${CONTROL_PORT}/tabs/${tab.id}/thumbnail`)
+                        ]);
+
+                        const scanData = await scanResp.json();
+                        const thumbData = await thumbResp.json();
+
+                        gridState.scanData[tab.id] = {
+                            a11y_violations: scanData.a11y_violations,
+                            console_errors: scanData.console_errors,
+                            missing_alt: scanData.missing_alt,
+                            last_command: scanData.last_command,
+                            thumbnail: thumbData.thumbnail
+                        };
+                    } catch (e) {
+                        console.warn('[Grid] Failed to fetch data for tab:', tab.id, e);
+                        gridState.scanData[tab.id] = {
+                            a11y_violations: null,
+                            console_errors: null,
+                            missing_alt: null,
+                            last_command: null,
+                            thumbnail: null
+                        };
+                    }
+                });
+
+                await Promise.all(promises);
+            } catch (e) {
+                console.error('[Grid] Failed to refresh data:', e);
+            }
+        }
+
+        function renderTabGrid() {
+            const container = document.getElementById('tabGridContainer');
+            container.innerHTML = tabs.map(tab => {
+                const data = gridState.scanData[tab.id] || {};
+                const isActive = tab.id === activeTabId;
+
+                // Get domain initial for placeholder
+                let domainInitial = '?';
+                try {
+                    const url = new URL(tab.url || 'about:blank');
+                    domainInitial = url.hostname.charAt(0).toUpperCase() || '?';
+                } catch (e) {
+                    domainInitial = tab.title?.charAt(0)?.toUpperCase() || '?';
+                }
+
+                return `
+                    <div class="tab-grid-card ${isActive ? 'active' : ''}"
+                         onclick="onGridCardClick('${tab.id}')" data-tab-id="${tab.id}">
+                        <div class="card-thumbnail">
+                            ${data.thumbnail
+                                ? `<img src="data:image/jpeg;base64,${data.thumbnail}" alt="">`
+                                : `<div class="placeholder">${domainInitial}</div>`}
+                            ${tabs.length > 1
+                                ? `<button class="card-close" onclick="event.stopPropagation(); closeTabFromGrid('${tab.id}')" title="Close tab">×</button>`
+                                : ''}
+                        </div>
+                        <div class="card-info">
+                            <div class="card-title">${escapeHtml(tab.title || 'New Tab')}</div>
+                            <div class="card-url">${escapeHtml(tab.url || '')}</div>
+                        </div>
+                        <div class="card-stats">
+                            <span class="stat stat-a11y ${data.a11y_violations === 0 ? 'zero' : ''}" title="Accessibility issues">
+                                ⚠ ${data.a11y_violations ?? '—'}
+                            </span>
+                            <span class="stat stat-errors ${data.console_errors === 0 ? 'zero' : ''}" title="Console errors">
+                                ! ${data.console_errors ?? '—'}
+                            </span>
+                            <span class="stat stat-alt ${data.missing_alt === 0 ? 'zero' : ''}" title="Images missing alt text">
+                                🖼 ${data.missing_alt ?? '—'}
+                            </span>
+                        </div>
+                        <div class="card-command">
+                            Last: ${data.last_command || '—'}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function onGridCardClick(tabId) {
+            closeTabGrid();
+            activateTab(tabId);
+        }
+
+        async function closeTabFromGrid(tabId) {
+            await closeTab(tabId);
+            // Update tab count
+            document.getElementById('gridTabCount').textContent = `${tabs.length} tab${tabs.length !== 1 ? 's' : ''}`;
+            // Re-render grid without the closed tab
+            delete gridState.scanData[tabId];
+            renderTabGrid();
+        }
+
+        // Auto-scan toggle
+        async function toggleAutoScan(enabled) {
+            autoScanEnabled = enabled;
+            const toggle = document.getElementById('autoScanToggle');
+            if (toggle) {
+                toggle.classList.toggle('active', enabled);
+            }
+
+            // Persist to server
+            try {
+                await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/settings/auto-scan`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ enabled })
+                });
+                console.log('[Auto-scan]', enabled ? 'Enabled' : 'Disabled');
+            } catch (e) {
+                console.error('[Auto-scan] Failed to save setting:', e);
+            }
+        }
+
+        // Auto-scan interval - check every second if we should scan the current tab
+        setInterval(async () => {
+            if (!autoScanEnabled || !activeTabId) return;
+
+            const visit = tabVisitTimes[activeTabId];
+            if (visit && !visit.scanned && Date.now() - visit.startTime >= AUTO_SCAN_THRESHOLD) {
+                visit.scanned = true;
+                try {
+                    await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/tabs/${activeTabId}/scan`);
+                    console.log('[Auto-scan] Scanned tab:', activeTabId);
+                } catch (e) {
+                    console.warn('[Auto-scan] Failed to scan tab:', e);
+                }
+            }
+        }, 1000);
+
+        // Helper function to escape HTML
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Fetch tabs from server
+        async function fetchTabs() {
+            try {
+                const response = await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/tabs`);
+                const data = await response.json();
+                if (data.ok) {
+                    const serverTabs = data.tabs;
+
+                    // Preserve local tab order, but update tab data (title, url, favicon)
+                    // and handle new/closed tabs
+                    const serverTabIds = new Set(serverTabs.map(t => t.id));
+                    const localTabIds = new Set(tabs.map(t => t.id));
+
+                    // Remove tabs that no longer exist on server
+                    tabs = tabs.filter(t => serverTabIds.has(t.id));
+
+                    // Update existing tabs with fresh data from server
+                    tabs = tabs.map(localTab => {
+                        const serverTab = serverTabs.find(t => t.id === localTab.id);
+                        return serverTab || localTab;
+                    });
+
+                    // Add new tabs from server (tabs we don't have locally)
+                    serverTabs.forEach(serverTab => {
+                        if (!localTabIds.has(serverTab.id)) {
+                            tabs.push(serverTab);
+                        }
+                    });
+
+                    renderTabs();
+
+                    // Update URL bar if we have an active tab
+                    const activeTab = tabs.find(t => t.id === activeTabId) || tabs[0];
+                    if (activeTab) {
+                        // If this is a new active tab, track activation time
+                        if (activeTabId !== activeTab.id) {
+                            onTabActivated(activeTab.id);
+                        }
+                        activeTabId = activeTab.id;
+                        // Initialize activation time if not set
+                        if (!tabActivationTimes[activeTabId]) {
+                            onTabActivated(activeTabId);
+                        }
+                        const urlBar = document.getElementById('urlBar');
+                        if (document.activeElement !== urlBar) {
+                            urlBar.value = activeTab.url;
+                            currentUrl = activeTab.url;
+                        }
+                    }
+                }
+            } catch (e) {
+                console.error('[Tabs] Failed to fetch tabs:', e);
+            }
+        }
+
+        // Render tabs in the tab bar (smart update to avoid flicker)
+        function renderTabs() {
+            const container = document.getElementById('tabsContainer');
+            const existingTabEls = container.querySelectorAll('.tab');
+            const existingTabMap = new Map();
+
+            // Build map of existing tab elements
+            existingTabEls.forEach(el => {
+                existingTabMap.set(el.dataset.tabId, el);
+            });
+
+            // Track which tabs we've processed
+            const processedIds = new Set();
+
+            tabs.forEach((tab, index) => {
+                processedIds.add(tab.id);
+                let tabEl = existingTabMap.get(tab.id);
+
+                if (tabEl) {
+                    // Update existing tab element (no DOM recreation = no flicker)
+                    tabEl.className = 'tab' + (tab.id === activeTabId ? ' active' : '');
+                    tabEl.dataset.index = index;
+
+                    // Update title
+                    const titleEl = tabEl.querySelector('.tab-title');
+                    if (titleEl) {
+                        titleEl.textContent = tab.title || 'New Tab';
+                        titleEl.title = tab.title + '\n' + tab.url;
+                    }
+
+                    // Update close button visibility
+                    let closeBtn = tabEl.querySelector('.tab-close');
+                    if (tabs.length > 1 && !closeBtn) {
+                        closeBtn = document.createElement('button');
+                        closeBtn.className = 'tab-close';
+                        closeBtn.innerHTML = '×';
+                        closeBtn.title = 'Close tab';
+                        closeBtn.onclick = (e) => {
+                            e.stopPropagation();
+                            closeTab(tab.id);
+                        };
+                        tabEl.appendChild(closeBtn);
+                    } else if (tabs.length <= 1 && closeBtn) {
+                        closeBtn.remove();
+                    }
+
+                    // Move to correct position if needed
+                    const currentIndex = Array.from(container.children).indexOf(tabEl);
+                    if (currentIndex !== index) {
+                        if (index === 0) {
+                            container.prepend(tabEl);
+                        } else {
+                            const prevTab = container.children[index - 1];
+                            if (prevTab) {
+                                prevTab.after(tabEl);
+                            }
+                        }
+                    }
+                } else {
+                    // Create new tab element
+                    tabEl = createTabElement(tab, index);
+                    if (index === 0) {
+                        container.prepend(tabEl);
+                    } else if (container.children[index - 1]) {
+                        container.children[index - 1].after(tabEl);
+                    } else {
+                        container.appendChild(tabEl);
+                    }
+                }
+            });
+
+            // Remove tabs that no longer exist
+            existingTabMap.forEach((el, id) => {
+                if (!processedIds.has(id)) {
+                    el.remove();
+                }
+            });
+        }
+
+        // Create a new tab element
+        function createTabElement(tab, index) {
+            const tabEl = document.createElement('div');
+            tabEl.className = 'tab' + (tab.id === activeTabId ? ' active' : '');
+            tabEl.draggable = true;
+            tabEl.dataset.tabId = tab.id;
+            tabEl.dataset.index = index;
+
+            // Favicon
+            if (tab.favicon) {
+                const favicon = document.createElement('img');
+                favicon.className = 'tab-favicon';
+                favicon.src = tab.favicon;
+                favicon.onerror = () => {
+                    favicon.style.display = 'none';
+                    const placeholder = document.createElement('div');
+                    placeholder.className = 'tab-favicon-placeholder';
+                    placeholder.textContent = '🌐';
+                    tabEl.insertBefore(placeholder, tabEl.firstChild);
+                };
+                tabEl.appendChild(favicon);
+            } else {
+                const placeholder = document.createElement('div');
+                placeholder.className = 'tab-favicon-placeholder';
+                placeholder.textContent = '🌐';
+                tabEl.appendChild(placeholder);
+            }
+
+            // Title
+            const title = document.createElement('span');
+            title.className = 'tab-title';
+            title.textContent = tab.title || 'New Tab';
+            title.title = tab.title + '\n' + tab.url;
+            tabEl.appendChild(title);
+
+            // Close button (only show if more than 1 tab)
+            if (tabs.length > 1) {
+                const closeBtn = document.createElement('button');
+                closeBtn.className = 'tab-close';
+                closeBtn.innerHTML = '×';
+                closeBtn.title = 'Close tab';
+                closeBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    closeTab(tab.id);
+                };
+                tabEl.appendChild(closeBtn);
+            }
+
+            // Click to activate
+            tabEl.onclick = () => activateTab(tab.id);
+
+            // Hover events for thumbnail preview
+            tabEl.onmouseenter = () => {
+                // Cancel any pending hide immediately
+                clearTimeout(thumbnailHideTimeout);
+                thumbnailHideTimeout = null;
+
+                const preview = document.getElementById('thumbnailPreview');
+                const isVisible = preview.classList.contains('visible') || preview.classList.contains('moving');
+
+                console.log('[Thumbnail] mouseenter tab:', tab.id, 'isVisible:', isVisible, 'currentThumbnailTabId:', currentThumbnailTabId);
+
+                if (isVisible && currentThumbnailTabId !== tab.id) {
+                    // Thumbnail already showing for different tab - transition immediately
+                    console.log('[Thumbnail] → transitioning to new tab immediately');
+                    clearTimeout(thumbnailHoverTimeout);
+                    showThumbnail(tab.id, tabEl);
+                } else if (!isVisible) {
+                    // Not visible - use normal delay
+                    console.log('[Thumbnail] → not visible, using delay');
+                    clearTimeout(thumbnailHoverTimeout);
+                    thumbnailHoverTimeout = setTimeout(() => {
+                        showThumbnail(tab.id, tabEl);
+                    }, THUMBNAIL_HOVER_DELAY);
+                } else {
+                    console.log('[Thumbnail] → same tab, ignoring');
+                }
+            };
+            tabEl.onmouseleave = () => {
+                console.log('[Thumbnail] mouseleave tab:', tab.id);
+                clearTimeout(thumbnailHoverTimeout);
+                hideThumbnail();
+            };
+
+            // Drag events
+            tabEl.ondragstart = handleDragStart;
+            tabEl.ondragover = handleDragOver;
+            tabEl.ondragenter = handleDragEnter;
+            tabEl.ondragleave = handleDragLeave;
+            tabEl.ondrop = handleDrop;
+            tabEl.ondragend = handleDragEnd;
+
+            return tabEl;
+        }
+
+        // Create a new tab
+        async function createNewTab() {
+            try {
+                const response = await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/tabs/new?url=about:blank`);
+                const data = await response.json();
+                if (data.ok) {
+                    activeTabId = data.tab.id;
+                    await fetchTabs();
+                    showToast('New tab created', 'success');
+                } else {
+                    showToast(data.error || 'Failed to create tab', 'error');
+                }
+            } catch (e) {
+                showToast('Failed to create tab', 'error');
+            }
+        }
+
+        // Activate (switch to) a tab
+        async function activateTab(tabId) {
+            if (tabId === activeTabId) return;
+
+            // Capture thumbnail of current tab before switching (if user spent enough time)
+            if (activeTabId && shouldCaptureThumbnail(activeTabId)) {
+                // Fire and forget - don't wait for screenshot
+                captureTabThumbnail(activeTabId);
+            }
+
+            try {
+                const response = await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/tabs/${tabId}/activate`);
+                const data = await response.json();
+                if (data.ok) {
+                    activeTabId = tabId;
+                    onTabActivated(tabId);  // Track when this tab became active
+                    renderTabs();
+                    // Update URL bar
+                    const tab = tabs.find(t => t.id === tabId);
+                    if (tab) {
+                        document.getElementById('urlBar').value = tab.url;
+                        currentUrl = tab.url;
+                    }
+                } else {
+                    showToast(data.error || 'Failed to switch tab', 'error');
+                }
+            } catch (e) {
+                showToast('Failed to switch tab', 'error');
+            }
+        }
+
+        // Close a tab
+        async function closeTab(tabId) {
+            try {
+                const response = await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/tabs/${tabId}/close`);
+                const data = await response.json();
+                if (data.ok) {
+                    // If we closed the active tab, switch to another
+                    if (tabId === activeTabId) {
+                        const remainingTabs = tabs.filter(t => t.id !== tabId);
+                        if (remainingTabs.length > 0) {
+                            activeTabId = remainingTabs[0].id;
+                            await activateTab(activeTabId);
+                        }
+                    }
+                    await fetchTabs();
+                } else {
+                    showToast(data.error || 'Failed to close tab', 'error');
+                }
+            } catch (e) {
+                showToast('Failed to close tab', 'error');
+            }
+        }
+
+        // Drag and drop handlers
+        function handleDragStart(e) {
+            draggedTab = e.target;
+            e.target.classList.add('dragging');
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/plain', e.target.dataset.tabId);
+            // Hide thumbnail immediately during drag
+            clearTimeout(thumbnailHoverTimeout);
+            hideThumbnailImmediately();
+        }
+
+        function handleDragOver(e) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+        }
+
+        function handleDragEnter(e) {
+            e.preventDefault();
+            const tab = e.target.closest('.tab');
+            if (tab && tab !== draggedTab) {
+                tab.classList.add('drag-over');
+            }
+        }
+
+        function handleDragLeave(e) {
+            const tab = e.target.closest('.tab');
+            if (tab) {
+                tab.classList.remove('drag-over');
+            }
+        }
+
+        function handleDrop(e) {
+            e.preventDefault();
+            const targetTab = e.target.closest('.tab');
+            if (targetTab && draggedTab && targetTab !== draggedTab) {
+                const draggedId = draggedTab.dataset.tabId;
+                const targetId = targetTab.dataset.tabId;
+                const draggedIndex = tabs.findIndex(t => t.id === draggedId);
+                const targetIndex = tabs.findIndex(t => t.id === targetId);
+
+                // Reorder tabs array
+                const [removed] = tabs.splice(draggedIndex, 1);
+                tabs.splice(targetIndex, 0, removed);
+                renderTabs();
+            }
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('drag-over'));
+        }
+
+        function handleDragEnd(e) {
+            e.target.classList.remove('dragging');
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('drag-over'));
+            draggedTab = null;
+        }
+
+        // Poll for tab updates every 2 seconds
+        setInterval(fetchTabs, 2000);
+
+        // Terminal visibility state polling (for recording workflow)
+        // When inspekt record starts, the CLI signals the control server to hide the terminal
+        // When recording stops, the CLI signals to show it again
+        let lastTerminalHiddenState = false;
+
+        async function checkTerminalState() {
+            try {
+                const resp = await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/ui/terminal-state`, {
+                    signal: AbortSignal.timeout(1000)
+                });
+                if (resp.ok) {
+                    const data = await resp.json();
+                    // Only act on state changes to avoid flickering
+                    if (data.hidden !== lastTerminalHiddenState) {
+                        lastTerminalHiddenState = data.hidden;
+                        if (data.hidden && isTerminalOpen) {
+                            // Recording started - hide terminal so user can interact with browser
+                            toggleTerminal();
+                        } else if (!data.hidden && !isTerminalOpen) {
+                            // Recording stopped - show terminal again
+                            toggleTerminal();
+                        }
+                    }
+                }
+            } catch (e) {
+                // Ignore errors - terminal state is optional functionality
+            }
+        }
+
+        // Poll terminal state every 1 second
+        setInterval(checkTerminalState, 1000);
+
+        // Check if running in dev mode and update title
+        async function checkDevMode() {
+            try {
+                const response = await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/dev-mode`);
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.dev_mode) {
+                        document.title = '[DEV] ' + document.title;
+                        console.log('[Inspekt] Development mode active - source files mounted from host');
+                    }
+                }
+            } catch (e) {
+                // Ignore errors - dev mode indicator is not critical
+            }
+        }
+
+        // Initialize
+        window.addEventListener('load', () => {
+            updateSplashStatus('Loading...');
+            setTimeout(connectVNC, 500);
+            setInterval(checkHealth, 5000);
+
+            // Connect terminal in background (so it's ready when user opens it)
+            setTimeout(connectTerminal, 1000);
+
+            // Check dev mode and update title
+            setTimeout(checkDevMode, 1000);
+
+            // Sync theme on initial load (with small delay to let VM start)
+            setTimeout(() => syncColorScheme(getColorScheme()), 2000);
+
+            // Fetch tabs on load (with small delay to let Chrome start)
+            setTimeout(fetchTabs, 1500);
+        });
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', (e) => {
+            // Escape to close overlays or toggle terminal
+            if (e.key === 'Escape') {
+                // Close output panel first (highest priority)
+                if (document.getElementById('outputPanel').classList.contains('open')) {
+                    e.preventDefault();
+                    closeOutputPanel();
+                    return;
+                }
+                // Close CDP modal
+                if (document.getElementById('cdpModalOverlay').classList.contains('open')) {
+                    e.preventDefault();
+                    closeCdpModal();
+                    return;
+                }
+                // Close restart modal
+                if (document.getElementById('restartModalOverlay').classList.contains('open')) {
+                    e.preventDefault();
+                    closeRestartModal();
+                    return;
+                }
+                // Close grid overlay
+                if (gridState.isOpen) {
+                    e.preventDefault();
+                    closeTabGrid();
+                    return;
+                }
+                // Toggle terminal (open if closed, close if open)
+                e.preventDefault();
+                toggleTerminal();
+                return;
+            }
+
+            // Cmd/Ctrl+K for command palette (works everywhere)
+            if (e.key === 'k' && (e.ctrlKey || e.metaKey)) {
+                e.preventDefault();
+                const ninja = document.getElementById('commandPalette');
+                if (ninja) {
+                    ninja.open();
+                }
+                return;
+            }
+
+            // Ctrl+T for new tab (works everywhere)
+            if (e.key === 't' && (e.ctrlKey || e.metaKey)) {
+                e.preventDefault();
+                createNewTab();
+                return;
+            }
+
+            // Ctrl+W to close current tab
+            if (e.key === 'w' && (e.ctrlKey || e.metaKey) && activeTabId && tabs.length > 1) {
+                e.preventDefault();
+                closeTab(activeTabId);
+                return;
+            }
+
+            // Skip other shortcuts if typing in input fields
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+
+            // G for grid view (when not in terminal or grid)
+            if (e.key === 'g' && !e.ctrlKey && !e.metaKey && !isTerminalOpen && !gridState.isOpen) {
+                e.preventDefault();
+                toggleTabGrid();
+                return;
+            }
+
+            // F for fullscreen
+            if (e.key === 'f' && !e.ctrlKey && !e.metaKey && !isTerminalOpen && !gridState.isOpen) {
+                e.preventDefault();
+                toggleFullscreen();
+                return;
+            }
+
+            // D for DevTools
+            if (e.key === 'd' && !e.ctrlKey && !e.metaKey && !isTerminalOpen && !gridState.isOpen) {
+                e.preventDefault();
+                toggleDevTools();
+            }
+
+            // A for Audio
+            if (e.key === 'a' && !e.ctrlKey && !e.metaKey && !isTerminalOpen && !gridState.isOpen) {
+                e.preventDefault();
+                toggleAudio();
+            }
+        });
+
+        // Check DevTools status on page load
+        checkDevToolsStatus();
+    </script>
+</body>
+</html>

@@ -32,6 +32,7 @@ from .formatting import (
     get_recordings_dir,
 )
 from .recording_utils import load_external_file_content
+from .util import open_or_download
 
 import requests
 
@@ -1013,6 +1014,12 @@ def run_download_shell_command(command: str, file_path: Path) -> dict:
     help="Open video file in default application after creation",
 )
 @click.option(
+    "--include-effects/--no-effects",
+    "include_effects",
+    default=False,
+    help="Include audio effects in video (click sounds, etc.)",
+)
+@click.option(
     "--match-viewport",
     is_flag=True,
     help="Attempt to resize browser to match recorded viewport dimensions",
@@ -1055,6 +1062,7 @@ def replay(
     video_output: Optional[str],
     video_fps: Optional[int],
     open_after: bool,
+    include_effects: bool,
     match_viewport: bool,
     match_zoom_level: bool,
 ):
@@ -1119,7 +1127,7 @@ def replay(
 
     if video_output is not None:
         # Check if ffmpeg is installed
-        from inspekt.services.ffmpeg_utils import ensure_ffmpeg, get_ffmpeg_version
+        from inspekt.services.ffmpeg_utils import ensure_ffmpeg, get_ffmpeg_version, probe_video, merge_audio_video
 
         if not ensure_ffmpeg(auto_prompt=True):
             click.echo("Error: ffmpeg is required for video recording.", err=True)
@@ -1140,7 +1148,7 @@ def replay(
             video_filename = rec_path.stem + "_replay.mp4"
             resolved_video_path = Path.cwd() / video_filename
         else:
-            resolved_video_path = Path(video_output)
+            resolved_video_path = Path(video_output).resolve()
             # Add .mp4 extension if missing
             if not resolved_video_path.suffix:
                 resolved_video_path = resolved_video_path.with_suffix(".mp4")
@@ -1211,7 +1219,7 @@ def replay(
     if audio_output == "off":
         audio = False
 
-    # Create CLI audio instance if using CLI audio
+    # Create CLI audio instance if using CLI audio or if --include-effects is used
     cli_audio: CLIAudio | None = None
     use_browser_audio = False
     if audio:
@@ -1219,6 +1227,10 @@ def replay(
             cli_audio = CLIAudio(volume=audio_volume)
         else:  # "browser"
             use_browser_audio = True
+
+    # Also create CLI audio if --include-effects is used (for generating audio track)
+    if include_effects and cli_audio is None:
+        cli_audio = CLIAudio(volume=audio_volume)
 
     # Build skip set from options
     skip_actions = set(skip)
@@ -1339,10 +1351,8 @@ def replay(
         client = BridgeClient()
 
         if not client.is_alive():
-            click.echo(
-                "Error: Bridge server is not running. Start it with: inspekt start",
-                err=True,
-            )
+            from inspekt.app.cli.table import _style_with_inline_code
+            click.echo(_style_with_inline_code("Error: Bridge server is not running. Start it with `inspekt start`.", base_fg="red"), err=True)
             sys.exit(1)
 
         # Check CSP bypass status and warn if disabled
@@ -1368,19 +1378,21 @@ def replay(
         # Issue 11: Enforce require_viewport_match and require_zoom_match from YAML
         if recording.state:
             if recording.state.require_viewport_match and not match_viewport:
-                click.secho(
-                    "⚠ This recording requires viewport matching (require_viewport_match: true).",
-                    fg="yellow",
+                from inspekt.app.cli.table import print_warning
+                print_warning(
+                    "This recording requires viewport matching (`require_viewport_match: true`). "
+                    "Auto-enabling `--match-viewport` for faithful replay."
                 )
-                click.echo("  Auto-enabling --match-viewport for faithful replay.")
+                click.echo()  # Extra line break before step table
                 match_viewport = True
 
             if recording.state.require_zoom_match and not match_zoom_level:
-                click.secho(
-                    "⚠ This recording requires zoom matching (require_zoom_match: true).",
-                    fg="yellow",
+                from inspekt.app.cli.table import print_warning
+                print_warning(
+                    "This recording requires zoom matching (`require_zoom_match: true`). "
+                    "Auto-enabling `--match-zoom-level` for faithful replay."
                 )
-                click.echo("  Auto-enabling --match-zoom-level for faithful replay.")
+                click.echo()  # Extra line break before step table
                 match_zoom_level = True
 
         # Get current viewport and zoom level for comparison
@@ -1440,6 +1452,58 @@ def replay(
         # Get recorded viewport and zoom from state
         recorded_viewport = recording.state.viewport if recording.state else None
         recorded_zoom = recording.state.browser_zoom_level if recording.state else 1.0
+        recorded_window_mode = recording.state.window_mode if recording.state else None
+
+        # Detect current window mode (fullscreen/kiosk/normal)
+        # In fullscreen/kiosk mode, viewport cannot be resized
+        current_window_mode = None
+        in_fullscreen_mode = False
+        fullscreen_check_js = """(function(){
+            const isFullscreenAPI = !!(document.fullscreenElement ||
+                                       document.webkitFullscreenElement ||
+                                       document.mozFullScreenElement);
+            const viewportEqualsScreen = window.innerWidth === window.screen.width &&
+                                          window.innerHeight === window.screen.height;
+            const outerEqualsScreen = window.outerWidth === window.screen.width &&
+                                       window.outerHeight === window.screen.height;
+            return {
+                isFullscreen: isFullscreenAPI,
+                isKiosk: !isFullscreenAPI && viewportEqualsScreen && outerEqualsScreen,
+                mode: isFullscreenAPI ? 'fullscreen' :
+                      (viewportEqualsScreen && outerEqualsScreen ? 'kiosk' : 'normal')
+            };
+        })()"""
+
+        try:
+            fs_result = client.execute(fullscreen_check_js, timeout=5.0)
+            if fs_result.get("ok"):
+                fs_info = fs_result.get("result", {})
+                current_window_mode = fs_info.get("mode", "normal")
+                in_fullscreen_mode = current_window_mode in ("fullscreen", "kiosk")
+        except Exception:
+            pass  # Default to normal mode if detection fails
+
+        # Handle mode mismatches between recording and replay
+        if recorded_window_mode and current_window_mode:
+            if recorded_window_mode != current_window_mode:
+                if recorded_window_mode in ("fullscreen", "kiosk") and current_window_mode == "normal":
+                    # Recording was in fullscreen, replay is in normal mode
+                    click.echo()
+                    click.secho(
+                        f"Note: Recording was made in {recorded_window_mode} mode, "
+                        f"but replay is in normal window mode.",
+                        fg="blue",
+                    )
+                    click.echo(f"   Viewport dimensions may differ. Use --match-viewport to resize.")
+                elif current_window_mode in ("fullscreen", "kiosk") and recorded_window_mode == "normal":
+                    # Recording was normal, replay is in fullscreen
+                    click.echo()
+                    click.secho(
+                        f"Warning: Recording was made in normal window mode, "
+                        f"but replay is in {current_window_mode} mode.",
+                        fg="yellow",
+                    )
+                    click.echo(f"   Exit {current_window_mode} mode (press F11 or Esc) if viewport dimensions need to match.")
 
         # Check for viewport/zoom mismatch and show warning
         viewport_mismatch = False
@@ -1502,11 +1566,28 @@ def replay(
                     if verbose:
                         click.echo(format_system_message(f"Zoom level set to {recorded_zoom:.0%}"))
                 else:
-                    click.secho(f"⚠ Could not set zoom level to {recorded_zoom:.0%}", fg="yellow")
+                    from inspekt.app.cli.table import print_warning
+                    print_warning(f"Could not set zoom level to {recorded_zoom:.0%}")
             except Exception as e:
-                click.secho(f"⚠ Error setting zoom level: {e}", fg="yellow")
+                from inspekt.app.cli.table import print_warning
+                print_warning(f"Error setting zoom level: {e}")
 
         # Issue 4: Apply viewport matching with cached offsets (same logic as record.py)
+        # Skip viewport matching in fullscreen/kiosk mode (window cannot be resized)
+        if match_viewport and viewport_mismatch and recorded_viewport and in_fullscreen_mode:
+            # Cannot resize in fullscreen/kiosk mode - show warning and skip
+            click.echo()
+            click.secho(
+                f"Warning: Browser is in {current_window_mode} mode. Cannot resize viewport.",
+                fg="yellow",
+            )
+            click.echo(f"   Recorded viewport: {recorded_viewport.width}×{recorded_viewport.height}")
+            click.echo(f"   Current viewport: {current_width}×{current_height}")
+            click.echo(f"   Exit {current_window_mode} mode (press F11 or Esc) to enable viewport matching.")
+            click.echo()
+            # Disable viewport matching for this run
+            match_viewport = False
+
         if match_viewport and viewport_mismatch and recorded_viewport:
             target_width = recorded_viewport.width
             target_height = recorded_viewport.height
@@ -1713,7 +1794,8 @@ def replay(
                         f"recorded {target_width}x{target_height}",
                         fg="yellow",
                     )
-                    click.echo("  Tip: Manually resize your browser window for best results.")
+                    from inspekt.app.cli.table import print_hint
+                    print_hint("Manually resize your browser window for best results.")
                 elif verbose:
                     click.echo(format_system_message(f"Viewport set to {current_width}x{current_height}"))
 
@@ -1789,11 +1871,13 @@ def replay(
                         if not result_data.get("found"):
                             desc = precondition.description or precondition.selector
                             if strict_preconditions:
-                                click.secho(f"✗ Precondition failed: {desc}", fg="red")
-                                click.echo("  Use --no-strict-preconditions to continue anyway")
+                                from inspekt.app.cli.table import print_error, print_hint
+                                print_error(f"Precondition failed: {desc}")
+                                print_hint("Use `--no-strict-preconditions` to continue anyway.")
                                 sys.exit(1)
                             else:
-                                click.secho(f"⚠ Precondition not met: {desc}", fg="yellow")
+                                from inspekt.app.cli.table import print_warning
+                                print_warning(f"Precondition not met: {desc}")
                         elif verbose:
                             desc = precondition.description or precondition.selector
                             click.echo(format_system_message(f"✓ {desc}"))
@@ -1821,11 +1905,14 @@ def replay(
 
                     if current_hash != recording.state.checksum:
                         if strict_checksum:
-                            click.secho("✗ DOM checksum mismatch - page structure has changed", fg="red")
-                            click.echo("  Use --no-strict-checksum to continue anyway")
+                            from inspekt.app.cli.table import print_error
+                            print_error("DOM checksum mismatch - page structure has changed")
+                            from inspekt.app.cli.table import print_hint
+                            print_hint("Use `--no-strict-checksum` to continue anyway.")
                             sys.exit(1)
                         else:
-                            click.secho("⚠ DOM checksum mismatch - page structure differs from recording", fg="yellow")
+                            from inspekt.app.cli.table import print_warning
+                            print_warning("DOM checksum mismatch - page structure differs from recording")
                     elif verbose:
                         click.echo(format_system_message("✓ DOM checksum matches"))
 
@@ -1868,9 +1955,11 @@ def replay(
                         if result.get("ok"):
                             click.echo(format_system_message(f"✓ Restored {len(cookies_list)} cookies"))
                         else:
-                            click.secho("⚠ Failed to restore cookies", fg="yellow")
+                            from inspekt.app.cli.table import print_warning
+                            print_warning("Failed to restore cookies")
                 except Exception as e:
-                    click.secho(f"⚠ Cookie restoration failed: {e}", fg="yellow")
+                    from inspekt.app.cli.table import print_warning
+                    print_warning(f"Cookie restoration failed: {e}")
 
             # Restore localStorage/sessionStorage if requested
             should_restore_storage = restore_state or restore_storage
@@ -1892,7 +1981,8 @@ def replay(
                             count = result.get("result", {}).get("restored", 0)
                             click.echo(format_system_message(f"✓ Restored {count} localStorage keys"))
                     except Exception as e:
-                        click.secho(f"⚠ localStorage restoration failed: {e}", fg="yellow")
+                        from inspekt.app.cli.table import print_warning
+                        print_warning(f"`localStorage` restoration failed: {e}")
 
                 if recording.state.session_storage:
                     try:
@@ -1911,7 +2001,8 @@ def replay(
                             count = result.get("result", {}).get("restored", 0)
                             click.echo(format_system_message(f"✓ Restored {count} sessionStorage keys"))
                     except Exception as e:
-                        click.secho(f"⚠ sessionStorage restoration failed: {e}", fg="yellow")
+                        from inspekt.app.cli.table import print_warning
+                        print_warning(f"`sessionStorage` restoration failed: {e}")
 
             # Restore scroll position if state has scroll data
             if recording.state.scroll and (recording.state.scroll.x > 0 or recording.state.scroll.y > 0):
@@ -2030,6 +2121,7 @@ def replay(
                 fg="yellow",
             )
             click.echo()
+
         click.echo(format_step_header())
 
     # Progress bar setup for --progress mode
@@ -2083,6 +2175,17 @@ def replay(
                 click.echo(format_system_message(f"download monitoring started, files will be saved to: {replay_downloads_dir}"))
         else:
             click.echo(f"Warning: Could not start download monitoring: {start_result.get('error')}", err=True)
+
+    # Measure viewport height BEFORE any debugger attachment
+    # This is needed to detect the automation banner height for video cropping
+    pre_debugger_viewport_height = 0
+    if video_recording_enabled and not dry_run and client:
+        try:
+            viewport_result = client.execute("({ height: window.innerHeight })", timeout=2.0)
+            if viewport_result.get("ok") and viewport_result.get("result"):
+                pre_debugger_viewport_height = viewport_result["result"].get("height", 0)
+        except Exception:
+            pass
 
     # Collect jsdialog steps for CDP interception
     # Store as list of (index, step) tuples so we can track which are remaining
@@ -2205,17 +2308,178 @@ def replay(
                 click.echo(format_system_message(f"CDP dialog interception error: {e} (using JS fallback)"))
 
     # Start video recording if enabled (BEFORE first step to capture all frames)
+    banner_crop_height = 0  # Height of automation banner to crop from video
+    banner_compensation_succeeded = False  # Track if we successfully resized to compensate
+    original_zoom_level = None  # Store original zoom to restore after video recording
     if video_recording_enabled and not dry_run and client:
         from inspekt.services.screencast import ScreencastCapture
 
+        # ScreencastCapture auto-detects the correct port (8767 in VM, 8765 otherwise)
         screencast_capture = ScreencastCapture(
             fps=actual_fps,
             quality=actual_quality,
         )
 
+        # Reset browser zoom to 100% for consistent video dimensions
+        # Browser zoom affects how CDP screencast captures frames
+        try:
+            get_zoom_js = """
+            (async () => {
+                return new Promise((resolve) => {
+                    const requestId = 'zoom-video-' + Date.now();
+                    const handler = (event) => {
+                        if (event.data?.type === 'INSPEKT_ZOOM_LEVEL_RESPONSE' &&
+                            event.data?.requestId === requestId) {
+                            window.removeEventListener('message', handler);
+                            resolve(event.data.response?.zoomFactor || 1.0);
+                        }
+                    };
+                    window.addEventListener('message', handler);
+                    window.postMessage({
+                        type: 'INSPEKT_GET_ZOOM_LEVEL',
+                        source: 'inspekt-page',
+                        requestId: requestId
+                    }, '*');
+                    setTimeout(() => resolve(1.0), 2000);
+                });
+            })()
+            """
+            zoom_result = client.execute(get_zoom_js, timeout=3.0)
+            if zoom_result.get("ok"):
+                original_zoom_level = float(zoom_result.get("result", 1.0))
+
+                # Reset to 100% if zoom is different (>5% tolerance)
+                if abs(original_zoom_level - 1.0) > 0.05:
+                    set_zoom_js = """
+                    (async () => {
+                        return new Promise((resolve) => {
+                            const requestId = 'reset-zoom-' + Date.now();
+                            const handler = (event) => {
+                                if (event.data?.type === 'INSPEKT_ZOOM_SET_RESPONSE' &&
+                                    event.data?.requestId === requestId) {
+                                    window.removeEventListener('message', handler);
+                                    resolve(event.data.response);
+                                }
+                            };
+                            window.addEventListener('message', handler);
+                            window.postMessage({
+                                type: 'INSPEKT_SET_ZOOM_LEVEL',
+                                source: 'inspekt-page',
+                                requestId: requestId,
+                                zoomFactor: 1.0
+                            }, '*');
+                            setTimeout(() => resolve({ ok: false }), 2000);
+                        });
+                    })()
+                    """
+                    set_result = client.execute(set_zoom_js, timeout=3.0)
+                    if set_result.get("ok") and set_result.get("result", {}).get("ok"):
+                        click.echo(format_system_message(
+                            f"Reset zoom to 100% for video (was {original_zoom_level:.0%})",
+                            icon="video"
+                        ))
+                        time.sleep(0.2)  # Let browser settle after zoom change
+
+                        # Re-measure viewport height after zoom reset (dimensions may have changed)
+                        try:
+                            height_result = client.execute("window.innerHeight", timeout=2.0)
+                            if height_result.get("ok"):
+                                pre_debugger_viewport_height = height_result.get("result", pre_debugger_viewport_height)
+                        except Exception:
+                            pass
+        except Exception as e:
+            if verbose:
+                click.echo(format_system_message(f"Could not reset zoom: {e}", icon="video"))
+
+        # Detect and compensate for automation banner BEFORE starting screencast
+        # The banner appears when debugger is attached (e.g., for CDP dialog interception)
+        # We measured pre_debugger_viewport_height before any debugger attachment
+        # Skip banner compensation in fullscreen/kiosk mode (window cannot be expanded)
+        if pre_debugger_viewport_height > 0 and recorded_viewport and not in_fullscreen_mode:
+            try:
+                # Measure current viewport (after debugger may have been attached for dialog interception)
+                viewport_result = client.execute("({ height: window.innerHeight })", timeout=2.0)
+                if viewport_result.get("ok") and viewport_result.get("result"):
+                    current_height = viewport_result["result"].get("height", 0)
+
+                    if current_height < pre_debugger_viewport_height:
+                        # Banner detected - viewport shrank after debugger attached
+                        banner_height = pre_debugger_viewport_height - current_height
+                        target_height = recorded_viewport.height
+
+                        # Expand window to restore target viewport height
+                        expand_by = target_height - current_height
+                        if expand_by > 0:
+                            # Use AppleScript to directly expand window bounds
+                            # (JS resizeTo is blocked by browsers for security)
+                            import platform
+                            resize_success = False
+                            new_height = current_height
+
+                            if platform.system() == "Darwin":
+                                from inspekt.services.applescript_utils import AppleScriptExecutor
+                                executor = AppleScriptExecutor()
+
+                                # Iteratively expand until we reach target height
+                                # This handles display scaling issues (Retina displays)
+                                for attempt in range(5):
+                                    remaining = target_height - new_height
+                                    if remaining <= 2:  # Close enough
+                                        break
+
+                                    # Directly expand window height by the needed amount
+                                    expand_script = f'''
+tell application "Google Chrome"
+    set frontWindow to front window
+    set {{x1, y1, x2, y2}} to bounds of frontWindow
+    set bounds of frontWindow to {{x1, y1, x2, y2 + {remaining}}}
+end tell
+'''
+                                    as_result = executor.execute(expand_script, timeout=3.0)
+                                    if not as_result.ok:
+                                        break
+
+                                    time.sleep(0.15)  # Let resize settle
+
+                                    # Check new height
+                                    verify_result = client.execute("window.innerHeight", timeout=2.0)
+                                    new_height = verify_result.get("result", 0) if verify_result.get("ok") else 0
+
+                                resize_success = new_height >= target_height - 2
+
+                            if resize_success:
+                                banner_compensation_succeeded = True  # Don't apply fallback crop
+                                click.echo(format_system_message(
+                                    f"Compensated for automation banner (viewport now: {new_height}px)",
+                                    icon="video"
+                                ))
+                            else:
+                                if verbose:
+                                    click.echo(format_system_message(
+                                        f"Resize: viewport is {new_height}px (target: {target_height}px)",
+                                        icon="video"
+                                    ))
+                    else:
+                        if verbose:
+                            click.echo(format_system_message("No banner detected (viewport unchanged)", icon="video"))
+            except Exception as e:
+                click.echo(format_system_message(f"Could not compensate for banner: {e}", icon="video"))
+        else:
+            if verbose:
+                if in_fullscreen_mode:
+                    click.echo(format_system_message(
+                        f"Skipping banner compensation (browser in {current_window_mode} mode)",
+                        icon="video"
+                    ))
+                else:
+                    click.echo(format_system_message(
+                        f"Skipping banner check: pre_height={pre_debugger_viewport_height}, recorded={recorded_viewport is not None}",
+                        icon="video"
+                    ))
+
         # Start screencast immediately via postMessage to extension
         # This happens before the loop so first step frames are captured
-        time.sleep(0.3)  # Brief stabilization after visual script injection
+        time.sleep(0.3)  # Brief stabilization
 
         screencast_js = f"""
 (function() {{
@@ -2237,7 +2501,7 @@ def replay(
             type: 'INSPEKT_START_SCREENCAST',
             source: 'inspekt-page',
             requestId: requestId,
-            settings: {{ fps: {actual_fps}, quality: {actual_quality} }}
+            settings: {{ fps: {actual_fps}, quality: {actual_quality}, preDebuggerHeight: {pre_debugger_viewport_height} }}
         }}, '*');
 
         // Timeout after 5 seconds
@@ -2251,12 +2515,82 @@ def replay(
         try:
             sc_result = client.execute(screencast_js, timeout=10.0)
             if sc_result.get("ok") and sc_result.get("result", {}).get("ok"):
+                # Screencast started - debugger is now attached and banner may have appeared
+                # Check if banner appeared and try to compensate by expanding window
+                sc_response = sc_result.get("result", {})
+                reported_banner = sc_response.get("bannerHeight", 0)
+
+                if reported_banner > 0 and not banner_compensation_succeeded and not in_fullscreen_mode:
+                    # Banner appeared after debugger attached - try to expand window
+                    target_height = recorded_viewport.height if recorded_viewport else 0
+
+                    if target_height > 0:
+                        import platform
+                        if platform.system() == "Darwin":
+                            from inspekt.services.applescript_utils import AppleScriptExecutor
+                            executor = AppleScriptExecutor()
+
+                            # Get current viewport height
+                            current_h_result = client.execute("window.innerHeight", timeout=2.0)
+                            current_height = current_h_result.get("result", 0) if current_h_result.get("ok") else 0
+
+                            # Iteratively expand until we reach target height
+                            for attempt in range(5):
+                                remaining = target_height - current_height
+                                if remaining <= 2:  # Close enough
+                                    banner_compensation_succeeded = True
+                                    click.echo(format_system_message(
+                                        f"Compensated for automation banner (viewport now: {current_height}px)",
+                                        icon="video"
+                                    ))
+                                    break
+
+                                # Expand window height
+                                expand_script = f'''
+tell application "Google Chrome"
+    set frontWindow to front window
+    set {{x1, y1, x2, y2}} to bounds of frontWindow
+    set bounds of frontWindow to {{x1, y1, x2, y2 + {remaining}}}
+end tell
+'''
+                                as_result = executor.execute(expand_script, timeout=3.0)
+                                if not as_result.ok:
+                                    break
+
+                                time.sleep(0.15)  # Let resize settle
+
+                                # Check new height
+                                verify_result = client.execute("window.innerHeight", timeout=2.0)
+                                current_height = verify_result.get("result", 0) if verify_result.get("ok") else 0
+
+                            # Brief stabilization after compensation
+                            time.sleep(0.2)
+
+                    # Only use cropping as last resort if expansion failed
+                    if not banner_compensation_succeeded and banner_crop_height == 0:
+                        banner_crop_height = reported_banner
+
                 video_start_elapsed = int((datetime.now() - result.start_time).total_seconds() * 1000)
                 click.echo(format_system_message(f"Recording video at {actual_fps} frames per second…", icon="video", elapsed_ms=video_start_elapsed))
-                screencast_capture.set_capturing(True)  # Use public method instead of private attribute
+                screencast_capture.set_capturing(True)  # Start collecting frames AFTER compensation
+
+                # Start audio cue recording if --include-effects is enabled
+                if include_effects:
+                    try:
+                        # Start audio recording in JavaScript (captures timestamps when sounds play)
+                        client.execute("window.__INSPEKT_REPLAY_VISUAL__.audio.startRecordingForVideo()", timeout=2.0)
+                        # Also notify bridge server to start collecting cues
+                        import requests
+                        requests.post("http://127.0.0.1:8765/audio/start", timeout=2.0)
+                        if verbose:
+                            click.echo(format_system_message("Recording audio cues for video…", icon="audio"))
+                    except Exception as e:
+                        if verbose:
+                            click.echo(format_system_message(f"Could not start audio cue recording: {e}", icon="warning"))
             else:
                 error_msg = sc_result.get("result", {}).get("error", sc_result.get("error", "Unknown error"))
-                click.secho(f"⚠ Could not start video recording: {error_msg}", fg="yellow")
+                from inspekt.app.cli.table import print_warning
+                print_warning(f"Could not start video recording: {error_msg}")
                 # Send stop command to clean up extension state even on failure
                 try:
                     client.execute("window.postMessage({type: 'INSPEKT_STOP_SCREENCAST', source: 'inspekt-page'}, '*')", timeout=2.0)
@@ -2265,7 +2599,8 @@ def replay(
                 video_recording_enabled = False
                 screencast_capture = None
         except Exception as e:
-            click.secho(f"⚠ Video recording error: {e}", fg="yellow")
+            from inspekt.app.cli.table import print_warning
+            print_warning(f"Video recording error: {e}")
             # Send stop command to clean up extension state even on failure
             try:
                 client.execute("window.postMessage({type: 'INSPEKT_STOP_SCREENCAST', source: 'inspekt-page'}, '*')", timeout=2.0)
@@ -2865,9 +3200,12 @@ def replay(
             interrupt_info = screencast_capture.check_interrupted()
             if interrupt_info:
                 reason = interrupt_info.get("reason", "unknown")
-                click.echo()
-                click.secho(f"⚠ Video recording interrupted: {reason}", fg="yellow")
-                click.secho("  Video will be saved with frames captured so far.", fg="yellow")
+                # "tab closed" often happens during cross-origin navigation (Chrome site isolation)
+                # This is expected and doesn't prevent video capture - suppress misleading warning
+                if reason != "tab closed":
+                    click.echo()
+                    from inspekt.app.cli.table import print_warning
+                    print_warning(f"Video recording interrupted: {reason}. Video will be saved with frames captured so far.")
                 screencast_capture.set_capturing(False)  # Mark as no longer capturing
 
         # Additional fixed delay between steps (on top of real-time timing)
@@ -2945,13 +3283,19 @@ def replay(
                     fps=int(round(real_fps)),  # Use calculated FPS for correct playback
                     format=output_format,
                     progress_callback=None,  # No progress output
+                    crop_top=banner_crop_height,  # Crop automation banner from top
                 )
                 encode_duration = time.time() - encode_start_time
 
                 if encode_result.get("ok"):
                     video_saved_path = resolved_video_path
                     file_size = resolved_video_path.stat().st_size
-                    file_size_mb = file_size / (1024 * 1024)
+
+                    # Format file size appropriately (KB for small files, MB for larger)
+                    if file_size < 1024 * 1024:  # Less than 1 MB
+                        file_size_str = f"{file_size / 1024:.1f} KB"
+                    else:
+                        file_size_str = f"{file_size / (1024 * 1024):.1f} MB"
 
                     # Show encoding done message
                     encode_done_elapsed = int((datetime.now() - result.start_time).total_seconds() * 1000)
@@ -2963,17 +3307,154 @@ def replay(
 
                     # Show video saved message
                     saved_elapsed = int((datetime.now() - result.start_time).total_seconds() * 1000)
-                    click.echo(format_system_message(f"Video saved: {clickable_name} ({file_size_mb:.1f} MB)", icon="video", elapsed_ms=saved_elapsed, truncate=False))
+                    click.echo(format_system_message(f"Video saved: {clickable_name} ({file_size_str})", icon="video", elapsed_ms=saved_elapsed, truncate=False))
+
+                    # Merge audio effects if --include-effects was used
+                    if include_effects:
+                        try:
+                            import requests
+                            import tempfile
+
+                            # Stop audio recording in JavaScript
+                            client.execute("window.__INSPEKT_REPLAY_VISUAL__.audio.stopRecordingForVideo()", timeout=2.0)
+
+                            # Get audio cues from bridge server
+                            cues_response = requests.get("http://127.0.0.1:8765/audio/cues", timeout=5.0)
+                            cues_data = cues_response.json()
+                            cues = cues_data.get("cues", [])
+
+                            if cues:
+                                # Generate audio track
+                                audio_start_elapsed = int((datetime.now() - result.start_time).total_seconds() * 1000)
+                                click.echo(format_system_message(f"Generating audio track ({len(cues)} effects)…", icon="audio", elapsed_ms=audio_start_elapsed))
+
+                                # Get video duration from probe
+                                temp_video_info = probe_video(resolved_video_path)
+                                video_duration_ms = int((temp_video_info.get("duration", 0) if temp_video_info else 0) * 1000)
+
+                                if video_duration_ms > 0:
+                                    # Generate audio track using CLIAudio
+                                    audio_bytes = cli_audio.generate_audio_track(cues, video_duration_ms)
+
+                                    # Save to temp file
+                                    with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as temp_audio:
+                                        temp_audio.write(audio_bytes)
+                                        temp_audio_path = temp_audio.name
+
+                                    # Merge audio with video
+                                    temp_video_path = str(resolved_video_path) + ".temp.mp4"
+                                    import shutil
+                                    shutil.move(str(resolved_video_path), temp_video_path)
+
+                                    merge_result = merge_audio_video(
+                                        temp_video_path,
+                                        temp_audio_path,
+                                        str(resolved_video_path)
+                                    )
+
+                                    # Cleanup temp files
+                                    try:
+                                        Path(temp_video_path).unlink(missing_ok=True)
+                                        Path(temp_audio_path).unlink(missing_ok=True)
+                                    except Exception:
+                                        pass
+
+                                    if merge_result.get("ok"):
+                                        audio_done_elapsed = int((datetime.now() - result.start_time).total_seconds() * 1000)
+                                        click.echo(format_system_message(f"Added {len(cues)} audio effects to video", icon="audio", elapsed_ms=audio_done_elapsed))
+
+                                        # Update file size display
+                                        new_file_size = resolved_video_path.stat().st_size
+                                        if new_file_size < 1024 * 1024:
+                                            file_size_str = f"{new_file_size / 1024:.1f} KB"
+                                        else:
+                                            file_size_str = f"{new_file_size / (1024 * 1024):.1f} MB"
+                                    else:
+                                        if verbose:
+                                            click.echo(format_system_message(f"Could not merge audio: {merge_result.get('error')}", icon="warning"))
+                            elif verbose:
+                                click.echo(format_system_message("No audio effects recorded", icon="info"))
+                        except Exception as e:
+                            if verbose:
+                                click.echo(format_system_message(f"Audio merge error: {e}", icon="warning"))
+
+                    # Probe video file for sanity check
+                    video_info = probe_video(resolved_video_path)
+                    if video_info:
+                        # Format duration as mm:ss or just seconds for short videos
+                        duration_secs = video_info.get("duration", 0)
+                        if duration_secs >= 60:
+                            mins = int(duration_secs // 60)
+                            secs = int(duration_secs % 60)
+                            duration_str = f"{mins}:{secs:02d}"
+                        else:
+                            duration_str = f"{duration_secs:.1f}s"
+
+                        # Build info string with dimensions, duration, fps, and codec
+                        width = video_info.get("width", 0)
+                        height = video_info.get("height", 0)
+                        fps = video_info.get("fps", 0)
+                        codec = video_info.get("codec", "unknown")
+
+                        info_parts = []
+                        if width and height:
+                            info_parts.append(f"{width}×{height}")
+                        if duration_secs > 0:
+                            info_parts.append(duration_str)
+                        if fps > 0:
+                            info_parts.append(f"{fps:.0f} fps")
+                        if codec and codec != "unknown":
+                            info_parts.append(codec)
+
+                        if info_parts:
+                            info_str = " · ".join(info_parts)
+                            probe_elapsed = int((datetime.now() - result.start_time).total_seconds() * 1000)
+                            click.echo(format_system_message(f"Video verified: {info_str}", icon="video", elapsed_ms=probe_elapsed))
 
                     # Open video file if --open flag was set
                     if open_after:
-                        click.launch(str(resolved_video_path))
+                        open_or_download(resolved_video_path)
                 else:
-                    click.secho(f"⚠ Video encoding failed: {encode_result.get('error')}", fg="yellow")
+                    from inspekt.app.cli.table import print_warning
+                    print_warning(f"Video encoding failed: {encode_result.get('error')}")
             else:
-                click.secho("⚠ No frames captured for video", fg="yellow")
+                from inspekt.app.cli.table import print_warning
+                print_warning("No frames captured for video")
         except Exception as e:
-            click.secho(f"⚠ Video encoding error: {e}", fg="yellow")
+            from inspekt.app.cli.table import print_warning
+            print_warning(f"Video encoding error: {e}")
+
+        # Restore original zoom level if we changed it
+        if original_zoom_level and abs(original_zoom_level - 1.0) > 0.05 and client:
+            try:
+                restore_zoom_js = f"""
+                (async () => {{
+                    return new Promise((resolve) => {{
+                        const requestId = 'restore-zoom-' + Date.now();
+                        const handler = (event) => {{
+                            if (event.data?.type === 'INSPEKT_ZOOM_SET_RESPONSE' &&
+                                event.data?.requestId === requestId) {{
+                                window.removeEventListener('message', handler);
+                                resolve(event.data.response);
+                            }}
+                        }};
+                        window.addEventListener('message', handler);
+                        window.postMessage({{
+                            type: 'INSPEKT_SET_ZOOM_LEVEL',
+                            source: 'inspekt-page',
+                            requestId: requestId,
+                            zoomFactor: {original_zoom_level}
+                        }}, '*');
+                        setTimeout(() => resolve({{ ok: false }}), 2000);
+                    }});
+                }})()
+                """
+                restore_result = client.execute(restore_zoom_js, timeout=3.0)
+                if restore_result.get("ok") and restore_result.get("result", {}).get("ok"):
+                    if verbose:
+                        click.echo(format_system_message(f"Restored zoom to {original_zoom_level:.0%}", icon="video"))
+            except Exception:
+                pass  # Best effort restoration
 
     # Play completion sound and cleanup visual overlay
     if not dry_run and client and (visual or audio or lock):
@@ -3042,12 +3523,8 @@ def replay(
         # Show tip about interactive mode (only if not already using it)
         if not interactive:
             click.echo()
-            click.secho("Tip:", fg="cyan", bold=True, nl=False)
-            click.echo(" Use ", nl=False)
-            click.secho("--interactive", fg="cyan", nl=False)
-            click.echo(" or ", nl=False)
-            click.secho("-i", fg="cyan", nl=False)
-            click.echo(" to step through manually.")
+            from inspekt.app.cli.table import print_hint
+            print_hint("Use `--interactive` or `-i` to step through manually.")
     else:
         click.secho(error(f"{result.failed_steps} of {result.total_steps} steps failed"), fg="red", bold=True)
         click.echo(f"  Passed: {result.passed_steps} | Failed: {result.failed_steps} | Skipped: {result.skipped_steps}")
@@ -3080,19 +3557,15 @@ def replay(
             click.echo("  • Content Security Policy (CSP) is blocking the connection")
             click.echo()
             click.echo("Troubleshooting:")
-            click.echo("  • Open browser console (F12) and check for Inspekt messages")
+            from inspekt.app.cli.table import _style_with_inline_code
+            click.echo(_style_with_inline_code("  • Open browser console (`F12`) and check for Inspekt messages", base_fg="white"))
             click.echo("  • Look for CSP warnings in red/orange")
-            click.echo("  • Verify connection: ", nl=False)
-            click.secho("inspekt status", fg="cyan")
+            click.echo(_style_with_inline_code("  • Verify connection: `inspekt status`", base_fg="white"))
             click.echo("  • Try refreshing the page or restarting the browser")
 
         # Show tip for slow pages
         click.echo()
-        click.secho("Tip:", fg="yellow", bold=True, nl=False)
-        click.echo(" If pages load slowly, try ", nl=False)
-        click.secho("--slow", fg="cyan", nl=False)
-        click.echo(" or ", nl=False)
-        click.secho("--very-slow", fg="cyan", nl=False)
-        click.echo(" for more reliable playback.")
+        from inspekt.app.cli.table import print_hint
+        print_hint("If pages load slowly, try `--slow` or `--very-slow` for more reliable playback.")
 
         sys.exit(1)

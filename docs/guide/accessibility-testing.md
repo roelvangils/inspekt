@@ -209,6 +209,9 @@ inspekt axe --level 2aaa
 ```bash
 inspekt axe --level 21aa
 # Look for "color-contrast" violations
+
+# Or check ONLY color contrast issues
+inspekt axe --enable-rule color-contrast
 ```
 
 ### 2. Missing Alt Text

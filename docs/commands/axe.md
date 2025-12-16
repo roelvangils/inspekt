@@ -129,6 +129,53 @@ inspekt axe --level 21aa --tags best-practice,experimental
 - `experimental` - Cutting-edge accessibility rules
 - `wcag***` - Specific WCAG tags (auto-included via `--level`)
 
+### Filtering Rules
+
+Control which rules are included or excluded from your audit:
+
+```bash
+--disable-rule <rules>    Exclude specific rules (blacklist)
+--enable-rule <rules>     Run ONLY these rules (whitelist)
+```
+
+Both options support comma-separated values and can be used multiple times.
+
+**Disable specific rules (blacklist):**
+```bash
+# Exclude color contrast checks
+inspekt axe --disable-rule color-contrast
+
+# Exclude multiple rules (comma-separated)
+inspekt axe --disable-rule color-contrast,label,link-name
+
+# Exclude multiple rules (multiple flags)
+inspekt axe --disable-rule color-contrast --disable-rule label
+```
+
+Use `--disable-rule` when you want to run all rules EXCEPT specific ones. This is useful for:
+- Ignoring known issues you've documented
+- Excluding rules that don't apply to your context
+- Focusing on new violations by excluding accepted issues
+
+**Enable specific rules (whitelist):**
+```bash
+# Check ONLY color contrast
+inspekt axe --enable-rule color-contrast
+
+# Check only these two rules
+inspekt axe --enable-rule color-contrast,label
+
+# Focus on naming rules
+inspekt axe --enable-rule link-name,button-name,image-alt
+```
+
+Use `--enable-rule` when you want to run ONLY specific rules (all others disabled). This is useful for:
+- Focused testing of specific issues
+- Quick checks for known problem areas
+- Targeted regression testing
+
+**Note:** `--enable-rule` and `--disable-rule` are mutually exclusive.
+
 ### Rule-Specific Testing
 
 Target individual accessibility rules for focused testing:

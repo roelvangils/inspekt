@@ -5,6 +5,13 @@ Get up and running with Inspekt in just 5 minutes! This hands-on tutorial will w
 !!! note "Prerequisites"
     Make sure you've completed the [Installation](installation.md) guide before starting this tutorial.
 
+!!! tip "Enable Shell Completion"
+    For a better experience, enable tab completion:
+    ```bash
+    inspekt completion install
+    ```
+    This lets you tab-complete commands, options, and file arguments. See [Shell Completion](installation.md#step-15-enable-shell-completion-recommended) for details.
+
 ## Quick Start Workflow
 
 Here's what we'll cover in this tutorial:
@@ -787,8 +794,9 @@ Try these exercises to build your skills:
 | Page description | `inspektdescribe` |
 | Keyboard control | `inspektcontrol` |
 | Watch events | `inspektwatch input` |
-| Server status | `inspektserver status` |
-| Get help | `inspekt--help` |
+| Server status | `inspekt server status` |
+| Enable completion | `inspekt completion install` |
+| Get help | `inspekt --help` |
 
 ---
 

@@ -245,11 +245,31 @@
 
     // Helper to record an event (push to array + persist to IndexedDB)
     // Skips recording when paused (Ctrl+Alt+P)
+    // Enforces action rate limiting to prevent runaway recordings
     function recordEvent(event) {
         // Don't record events while paused
         if (window.__INSPEKT_PAUSED__) {
             return;
         }
+
+        // Action rate limiting using sliding window
+        const now = getTimestamp();
+
+        // Remove timestamps older than the rate window (1 second)
+        actionTimestamps = actionTimestamps.filter(t => now - t < RATE_WINDOW_MS);
+
+        // Check if adding this action would exceed the limit
+        if (actionTimestamps.length >= MAX_ACTIONS_PER_SECOND) {
+            // Rate limit exceeded - stop recording
+            console.warn(`[Inspekt Record] Action rate limit exceeded (${MAX_ACTIONS_PER_SECOND}/sec). Stopping recording.`);
+            window.__INSPEKT_STOP_REQUESTED__ = true;
+            window.__INSPEKT_STOP_REASON__ = `action_rate_limit:${MAX_ACTIONS_PER_SECOND}`;
+            return;  // Don't record this event
+        }
+
+        // Track this action's timestamp
+        actionTimestamps.push(now);
+
         window.__INSPEKT_RECORD_EVENTS__.push(event);
         persistEventToStorage(event);
     }
@@ -591,26 +611,25 @@
     }
 
     /**
-     * Get all focusable elements on the page in tab order.
-     * Used to manually handle Tab navigation for media elements.
+     * Selector for focusable elements.
      */
-    function getFocusableElements() {
-        const selector = [
-            'a[href]',
-            'button:not([disabled])',
-            'input:not([disabled]):not([type="hidden"])',
-            'select:not([disabled])',
-            'textarea:not([disabled])',
-            '[tabindex]:not([tabindex="-1"])',
-            '[contenteditable="true"]',
-            'audio[controls]',
-            'video[controls]'
-        ].join(', ');
+    const FOCUSABLE_SELECTOR = [
+        'a[href]',
+        'button:not([disabled])',
+        'input:not([disabled]):not([type="hidden"])',
+        'select:not([disabled])',
+        'textarea:not([disabled])',
+        '[tabindex]:not([tabindex="-1"])',
+        '[contenteditable="true"]',
+        'audio[controls]',
+        'video[controls]'
+    ].join(', ');
 
-        const elements = Array.from(document.querySelectorAll(selector));
-
-        // Filter out hidden elements and sort by tabindex
-        return elements.filter(el => {
+    /**
+     * Check if an element is visible and focusable.
+     */
+    function isElementVisible(el) {
+        try {
             const style = window.getComputedStyle(el);
             if (style.display === 'none' || style.visibility === 'hidden') {
                 return false;
@@ -619,7 +638,97 @@
                 return false;
             }
             return true;
-        }).sort((a, b) => {
+        } catch (e) {
+            return false;
+        }
+    }
+
+    /**
+     * Check if an iframe is same-origin and accessible.
+     */
+    function isIframeAccessible(iframe) {
+        try {
+            // Try to access the iframe's document - will throw if cross-origin
+            const doc = iframe.contentDocument || iframe.contentWindow?.document;
+            return doc !== null && doc !== undefined;
+        } catch (e) {
+            return false;
+        }
+    }
+
+    /**
+     * Check for cross-origin iframes and warn about potential unrecordable dialogs.
+     * JS dialogs (alert/confirm/prompt) from cross-origin iframes cannot be intercepted.
+     */
+    function checkCrossOriginIframes() {
+        const iframes = document.querySelectorAll('iframe');
+        const crossOriginIframes = Array.from(iframes).filter(iframe => !isIframeAccessible(iframe));
+
+        if (crossOriginIframes.length > 0) {
+            const srcs = crossOriginIframes
+                .map(f => f.src || '(no src)')
+                .slice(0, 3)  // Limit to first 3
+                .join(', ');
+            const more = crossOriginIframes.length > 3 ? ` (+${crossOriginIframes.length - 3} more)` : '';
+            console.warn(
+                `[Inspekt] Page has ${crossOriginIframes.length} cross-origin iframe(s): ${srcs}${more}\n` +
+                `Dialogs (alert/confirm/prompt) triggered from these iframes cannot be recorded.`
+            );
+        }
+    }
+
+    /**
+     * Get focusable elements from a document (main or iframe).
+     * Does NOT recurse into iframes - caller handles that.
+     */
+    function getFocusableElementsFromDoc(doc) {
+        if (!doc) return [];
+        try {
+            const elements = Array.from(doc.querySelectorAll(FOCUSABLE_SELECTOR));
+            return elements.filter(isElementVisible);
+        } catch (e) {
+            return [];
+        }
+    }
+
+    /**
+     * Get all focusable elements on the page in tab order,
+     * including elements inside same-origin iframes.
+     * Used to manually handle Tab navigation for media elements and focus trapping.
+     */
+    function getFocusableElements() {
+        const result = [];
+
+        // Get elements from main document, including iframes
+        const mainSelector = FOCUSABLE_SELECTOR + ', iframe';
+        const mainElements = Array.from(document.querySelectorAll(mainSelector))
+            .filter(isElementVisible);
+
+        for (const el of mainElements) {
+            if (el.tagName === 'IFRAME') {
+                // For same-origin iframes, include their focusable contents
+                if (isIframeAccessible(el)) {
+                    const iframeDoc = el.contentDocument || el.contentWindow.document;
+                    const iframeElements = getFocusableElementsFromDoc(iframeDoc);
+
+                    // If iframe has focusable elements, add them instead of the iframe
+                    if (iframeElements.length > 0) {
+                        result.push(...iframeElements);
+                    } else {
+                        // Empty iframe is still a tab stop
+                        result.push(el);
+                    }
+                } else {
+                    // Cross-origin iframe is a single tab stop
+                    result.push(el);
+                }
+            } else {
+                result.push(el);
+            }
+        }
+
+        // Sort by tabindex (positive tabindex first, then DOM order)
+        return result.sort((a, b) => {
             const tabA = parseInt(a.getAttribute('tabindex') || '0', 10);
             const tabB = parseInt(b.getAttribute('tabindex') || '0', 10);
             if (tabA > 0 && tabB > 0) return tabA - tabB;
@@ -627,6 +736,34 @@
             if (tabB > 0) return 1;
             return 0;
         });
+    }
+
+    /**
+     * Focus an element, handling elements inside iframes.
+     */
+    function focusElement(el) {
+        if (!el) return;
+
+        // Check if element is inside an iframe
+        const ownerDoc = el.ownerDocument;
+        if (ownerDoc !== document) {
+            // Element is in an iframe - find and focus the iframe first
+            const iframes = document.querySelectorAll('iframe');
+            for (const iframe of iframes) {
+                if (isIframeAccessible(iframe)) {
+                    const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+                    if (iframeDoc === ownerDoc) {
+                        // Found the iframe containing our element
+                        // Focus the element directly - browser will handle iframe activation
+                        el.focus();
+                        return;
+                    }
+                }
+            }
+        }
+
+        // Element is in main document
+        el.focus();
     }
 
     /**
@@ -957,6 +1094,16 @@
         return Date.now() - window.__INSPEKT_RECORD_START__;
     }
 
+    /**
+     * Check if an element is inside a synthetic dialog.
+     * Used to prevent recording user interactions inside dialogs
+     * (clicks, hovers, keypresses should not be recorded - only dialog results).
+     */
+    function isInsideSyntheticDialog(element) {
+        if (!element) return false;
+        return element.closest('[data-inspekt-dialog="true"]') !== null;
+    }
+
     // ==================== EVENT HANDLERS ====================
 
     // Click deduplication state - prevents recording both pointerdown and click
@@ -1063,6 +1210,8 @@
         if (event.button !== 0) return;
         // Use composedPath() to get actual target through Shadow DOM boundaries
         const realTarget = event.composedPath()[0] || event.target;
+        // Skip recording clicks inside synthetic dialogs (like native dialogs)
+        if (isInsideSyntheticDialog(realTarget)) return;
         recordClick(realTarget, event, 'click');
     }
 
@@ -1090,6 +1239,11 @@
         // Right click (button === 2)
         // Use composedPath() to get actual target through Shadow DOM boundaries
         const element = event.composedPath()[0] || event.target;
+
+        // Skip right-clicks inside synthetic dialogs (like native dialogs)
+        if (isInsideSyntheticDialog(element)) {
+            return;
+        }
 
         // Skip right-clicks on native control inputs
         if (isNativeControlInput(element)) {
@@ -1140,6 +1294,9 @@
         // Use composedPath() to get actual target through Shadow DOM boundaries
         const realTarget = event.composedPath()[0] || event.target;
 
+        // Skip pointer events inside synthetic dialogs (like native dialogs)
+        if (isInsideSyntheticDialog(realTarget)) return;
+
         // Flush any pending native control state when clicking on a DIFFERENT element
         // This must happen BEFORE we capture new initial value or process the click
         if (nativeControlState.isInteracting && nativeControlState.element !== realTarget) {
@@ -1165,6 +1322,9 @@
         if (event.button !== 0) return;
         // Use composedPath() to get actual target through Shadow DOM boundaries
         const realTarget = event.composedPath()[0] || event.target;
+
+        // Skip mouse events inside synthetic dialogs (like native dialogs)
+        if (isInsideSyntheticDialog(realTarget)) return;
 
         // Flush any pending native control state when clicking on a DIFFERENT element
         // This must happen BEFORE we capture new initial value or process the click
@@ -1240,6 +1400,11 @@
         const element = event.composedPath()[0] || event.target;
         const now = getTimestamp();
 
+        // Skip input events inside synthetic dialogs (like native dialogs)
+        if (isInsideSyntheticDialog(element)) {
+            return;
+        }
+
         // Only track text-like inputs with the typing buffer
         // Radio, checkbox, and select are handled by handleChange
         if (!isTextInput(element)) {
@@ -1271,10 +1436,8 @@
 
     /**
      * Handle file upload - reads file contents as base64 and records upload action.
-     * Small files (≤100KB) have content embedded; large files are marked for external storage.
+     * All files are saved externally by the CLI to avoid YAML parsing issues.
      */
-    const FILE_SIZE_THRESHOLD = 100 * 1024;  // 100KB
-
     function handleFileUpload(element, timestamp) {
         if (!element.files || element.files.length === 0) return;
 
@@ -1291,10 +1454,8 @@
                 const reader = new FileReader();
                 reader.onload = () => {
                     fileInfo.content = reader.result;
-                    // Mark large files for external storage (Python will save them separately)
-                    if (file.size > FILE_SIZE_THRESHOLD) {
-                        fileInfo.needs_external_storage = true;
-                    }
+                    // All files are saved externally by Python (no inline base64 in YAML)
+                    fileInfo.needs_external_storage = true;
                     resolve(fileInfo);
                 };
                 reader.onerror = () => {
@@ -1316,6 +1477,238 @@
         });
     }
 
+    // =======================================================================
+    // Download Monitoring Functions
+    // Listen for downloads via the extension bridge and record them
+    // =======================================================================
+
+    // Download security limits
+    const MAX_DOWNLOADS_PER_SESSION = 10;
+    const MAX_DOWNLOAD_SIZE_BYTES = 25 * 1024 * 1024;  // 25 MB
+
+    // Action rate limiting (prevents runaway recordings from held keys, loops, etc.)
+    // Default is 10 actions/second, can be configured via config.maxActionsPerSecond
+    let MAX_ACTIONS_PER_SECOND = 10;
+    const RATE_WINDOW_MS = 1000;  // 1 second sliding window
+    let actionTimestamps = [];    // Sliding window of recent action timestamps
+
+    /**
+     * Remove OS-added indices from filenames (e.g., "file (1).pdf" → "file.pdf").
+     * Chrome adds these when downloading the same file multiple times.
+     * @param {string} filename - The filename to clean
+     * @returns {string} - The cleaned filename
+     */
+    function cleanFilename(filename) {
+        if (!filename) return filename;
+        // Match pattern: " (N)" before file extension or at end of filename
+        return filename.replace(/\s*\(\d+\)(?=\.[^.]+$|$)/, '');
+    }
+
+    // Track download monitoring state
+    let downloadSessionId = null;
+    let downloadCount = 0;
+    const pendingDownloads = new Map();
+    const recordedDownloadIds = new Set();  // Prevent duplicate download recordings
+
+    /**
+     * Initialize download monitoring via the extension bridge.
+     * @param {string} recordingId - Unique recording session ID
+     */
+    function initDownloadMonitoring(recordingId) {
+        // Prevent duplicate initialization
+        if (window.__INSPEKT_DOWNLOAD_HANDLER__) {
+            console.log('[Inspekt Record] Download monitoring already initialized, skipping');
+            return;
+        }
+
+        downloadSessionId = recordingId + '-downloads';
+
+        // Request download monitoring from extension
+        const requestId = `dm-start-${Date.now()}`;
+        window.postMessage({
+            type: 'INSPEKT_START_DOWNLOAD_MONITORING',
+            source: 'inspekt-page',
+            sessionId: downloadSessionId,
+            requestId: requestId
+        }, location.origin);
+
+        // Listen for download events from extension
+        window.__INSPEKT_DOWNLOAD_HANDLER__ = handleDownloadMessage;
+        window.addEventListener('message', handleDownloadMessage);
+
+        console.log('[Inspekt Record] Download monitoring initialized');
+    }
+
+    /**
+     * Handle download messages from extension via Window Message Bridge.
+     */
+    function handleDownloadMessage(event) {
+        if (event.source !== window) return;
+        const message = event.data;
+
+        if (!message || message.source !== 'inspekt-extension') return;
+
+        // Handle download start - store pending download info
+        if (message.type === 'INSPEKT_DOWNLOAD_STARTED') {
+            const download = message.download;
+            if (!download) return;
+
+            // Check size limit (if size is known at start)
+            if (download.size && download.size > MAX_DOWNLOAD_SIZE_BYTES) {
+                const sizeMB = (download.size / (1024 * 1024)).toFixed(1);
+                const limitMB = (MAX_DOWNLOAD_SIZE_BYTES / (1024 * 1024)).toFixed(0);
+                const cleanedFilename = cleanFilename(download.filename) || 'unknown';
+                console.warn(`[Inspekt Record] Download exceeds size limit (${sizeMB}MB > ${limitMB}MB):`, cleanedFilename);
+
+                // Record a warning event instead
+                recordEvent({
+                    action: 'download',
+                    timestamp: getTimestamp(),
+                    download: {
+                        filename: cleanedFilename,
+                        size: download.size,
+                        skipped: true,
+                        skip_reason: `File size (${sizeMB}MB) exceeds ${limitMB}MB limit`
+                    }
+                });
+
+                // Mark as recorded to prevent further processing
+                recordedDownloadIds.add(download.id);
+                return;
+            }
+
+            // Record the timestamp when download started
+            pendingDownloads.set(download.id, {
+                ...download,
+                recordTimestamp: getTimestamp()
+            });
+
+            console.log('[Inspekt Record] Download started:', download.filename);
+        }
+
+        // Handle download complete - create download event
+        if (message.type === 'INSPEKT_DOWNLOAD_COMPLETE') {
+            const download = message.download;
+            if (!download) return;
+
+            // Prevent duplicate download recordings (defensive check)
+            if (recordedDownloadIds.has(download.id)) {
+                console.log('[Inspekt Record] Download already recorded, skipping duplicate:', download.id);
+                return;
+            }
+
+            const pending = pendingDownloads.get(download.id);
+            const timestamp = pending ? pending.recordTimestamp : getTimestamp();
+
+            // Only record successful downloads
+            if (download.state === 'complete') {
+                // Check size limit again (size might not be known at start for some downloads)
+                if (download.size && download.size > MAX_DOWNLOAD_SIZE_BYTES) {
+                    const sizeMB = (download.size / (1024 * 1024)).toFixed(1);
+                    const limitMB = (MAX_DOWNLOAD_SIZE_BYTES / (1024 * 1024)).toFixed(0);
+                    const cleanedFilename = cleanFilename(download.filename) || 'unknown';
+                    console.warn(`[Inspekt Record] Download exceeds size limit (${sizeMB}MB > ${limitMB}MB):`, cleanedFilename);
+
+                    recordedDownloadIds.add(download.id);
+                    recordEvent({
+                        action: 'download',
+                        timestamp: timestamp,
+                        download: {
+                            filename: cleanedFilename,
+                            size: download.size,
+                            skipped: true,
+                            skip_reason: `File size (${sizeMB}MB) exceeds ${limitMB}MB limit`
+                        }
+                    });
+                    pendingDownloads.delete(download.id);
+                    return;
+                }
+
+                // Check download count limit BEFORE recording
+                if (downloadCount >= MAX_DOWNLOADS_PER_SESSION) {
+                    const cleanedFilename = cleanFilename(download.filename) || 'unknown';
+                    console.warn('[Inspekt Record] Download limit reached, auto-stopping recording');
+
+                    // Record a final event indicating the limit was reached
+                    recordEvent({
+                        action: 'download',
+                        timestamp: timestamp,
+                        download: {
+                            filename: cleanedFilename,
+                            skipped: true,
+                            skip_reason: `Download limit (${MAX_DOWNLOADS_PER_SESSION}) reached - recording auto-stopped`
+                        }
+                    });
+
+                    // Trigger auto-stop via the stop flag (read by CLI during poll)
+                    window.__INSPEKT_STOP_REQUESTED__ = true;
+                    window.__INSPEKT_STOP_REASON__ = `download_limit:${MAX_DOWNLOADS_PER_SESSION}`;
+
+                    pendingDownloads.delete(download.id);
+                    return;
+                }
+
+                // Mark as recorded before processing
+                recordedDownloadIds.add(download.id);
+                downloadCount++;
+
+                // Clean filename to remove OS-added indices (e.g., "(1)", "(2)")
+                const cleanedFilename = cleanFilename(download.filename) || 'unknown';
+
+                const downloadEvent = {
+                    action: 'download',
+                    timestamp: timestamp,
+                    download: {
+                        url: download.url || '',
+                        filename: cleanedFilename,
+                        mime_type: download.mime_type || 'application/octet-stream',
+                        size: download.size || 0,
+                        download_start: download.download_start,
+                        download_end: download.download_end,
+                        referrer: download.referrer || location.href,
+                        download_id: download.id,
+                        full_path: download.fullPath || null  // Full filesystem path for copying
+                    }
+                };
+
+                recordEvent(downloadEvent);
+                console.log(`[Inspekt Record] Download recorded (${downloadCount}/${MAX_DOWNLOADS_PER_SESSION}):`, cleanedFilename);
+            } else {
+                console.log('[Inspekt Record] Download failed/interrupted:', download.filename, download.state);
+            }
+
+            pendingDownloads.delete(download.id);
+        }
+    }
+
+    /**
+     * Cleanup download monitoring.
+     */
+    function cleanupDownloadMonitoring() {
+        // Remove message listener
+        if (window.__INSPEKT_DOWNLOAD_HANDLER__) {
+            window.removeEventListener('message', window.__INSPEKT_DOWNLOAD_HANDLER__);
+            delete window.__INSPEKT_DOWNLOAD_HANDLER__;
+        }
+
+        // Request stop monitoring from extension
+        if (downloadSessionId) {
+            window.postMessage({
+                type: 'INSPEKT_STOP_DOWNLOAD_MONITORING',
+                source: 'inspekt-page',
+                sessionId: downloadSessionId
+            }, location.origin);
+            downloadSessionId = null;
+        }
+
+        // Clear pending downloads, recorded IDs, and reset counter
+        pendingDownloads.clear();
+        recordedDownloadIds.clear();
+        downloadCount = 0;
+
+        console.log('[Inspekt Record] Download monitoring stopped');
+    }
+
     /**
      * Handle change events for radio, checkbox, and select elements.
      * Uses composedPath() to get the actual target element inside Shadow DOM.
@@ -1323,6 +1716,12 @@
     function handleChange(event) {
         // Use composedPath to get actual target (works with Shadow DOM)
         const element = event.composedPath()[0] || event.target;
+
+        // Skip change events inside synthetic dialogs (like native dialogs)
+        if (isInsideSyntheticDialog(element)) {
+            return;
+        }
+
         const tag = element.tagName.toLowerCase();
         const now = getTimestamp();
 
@@ -1439,6 +1838,10 @@
             // Sound is played by Python cleanup (via __INSPEKT_VISUAL__.audio.playStop)
             return;
         }
+
+        // Skip recording keypresses inside synthetic dialogs (like native dialogs)
+        // Note: Recording control shortcuts above still work inside dialogs
+        if (isInsideSyntheticDialog(currentElement)) return;
 
         // =====================================================================
         // Native Control Interaction Keys (handled silently - NOT recorded)
@@ -1574,6 +1977,78 @@
                     }
                 }
 
+                // =====================================================================
+                // Focus Trap: Prevent Tab from leaving the page
+                // =====================================================================
+                // When Tab would move focus outside the page (to browser chrome),
+                // wrap around to the first/last focusable element instead.
+                // Includes elements inside same-origin iframes.
+
+                const focusable = getFocusableElements();
+                if (focusable.length > 0) {
+                    // Get the actual focused element (may be inside an iframe)
+                    let currentElement = document.activeElement;
+                    if (currentElement && currentElement.tagName === 'IFRAME' && isIframeAccessible(currentElement)) {
+                        // Focus is inside an iframe - get the actual focused element
+                        const iframeDoc = currentElement.contentDocument || currentElement.contentWindow.document;
+                        if (iframeDoc.activeElement && iframeDoc.activeElement !== iframeDoc.body) {
+                            currentElement = iframeDoc.activeElement;
+                        }
+                    }
+
+                    const currentIndex = focusable.indexOf(currentElement);
+                    const isAtEnd = currentIndex === focusable.length - 1;
+                    const isAtStart = currentIndex === 0 || currentIndex === -1;
+
+                    // Tab on last element → wrap to first
+                    if (!modifiers.includes('shift') && isAtEnd) {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        const firstEl = focusable[0];
+                        focusElement(firstEl);
+
+                        // Record the Tab with the wrapped target
+                        const selectors = generateSelectors(firstEl);
+                        const targetTag = firstEl.tagName.toLowerCase();
+                        keypressEvent.target = {
+                            selector: selectors[0],
+                            fallback_selectors: selectors.slice(1, 4),
+                            accessible_name: computeAccessibleName(firstEl) || null,
+                            tag: targetTag,
+                            role: firstEl.getAttribute('role') || null
+                        };
+                        if (targetTag === 'input' && firstEl.type) {
+                            keypressEvent.target.input_type = firstEl.type.toLowerCase();
+                        }
+                        recordEvent(keypressEvent);
+                        return;
+                    }
+
+                    // Shift+Tab on first element → wrap to last
+                    if (modifiers.includes('shift') && isAtStart) {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        const lastEl = focusable[focusable.length - 1];
+                        focusElement(lastEl);
+
+                        // Record the Tab with the wrapped target
+                        const selectors = generateSelectors(lastEl);
+                        const targetTag = lastEl.tagName.toLowerCase();
+                        keypressEvent.target = {
+                            selector: selectors[0],
+                            fallback_selectors: selectors.slice(1, 4),
+                            accessible_name: computeAccessibleName(lastEl) || null,
+                            tag: targetTag,
+                            role: lastEl.getAttribute('role') || null
+                        };
+                        if (targetTag === 'input' && lastEl.type) {
+                            keypressEvent.target.input_type = lastEl.type.toLowerCase();
+                        }
+                        recordEvent(keypressEvent);
+                        return;
+                    }
+                }
+
                 // Normal Tab handling (non-native-control elements)
                 requestAnimationFrame(() => {
                     const focusedElement = document.activeElement;
@@ -1613,6 +2088,11 @@
         // Use composedPath to get actual target (works with Shadow DOM)
         const element = event.composedPath()[0] || event.target;
         const config = window.__INSPEKT_RECORD_CONFIG__ || {};
+
+        // Skip hover inside synthetic dialogs (like native dialogs)
+        if (isInsideSyntheticDialog(element)) {
+            return;
+        }
 
         // Skip hover on native control inputs
         if (isNativeControlInput(element)) {
@@ -1847,6 +2327,74 @@
         };
     }
 
+    /**
+     * Detect potential JavaScript dialog usage on the page.
+     * Quick scan of inline scripts and event handlers only (not external files).
+     * Returns list of dialog types found (alert, confirm, prompt).
+     */
+    function detectJsDialogs() {
+        let found = { alert: false, confirm: false, prompt: false };
+
+        // Check inline <script> tags (not external files)
+        const scripts = document.querySelectorAll('script:not([src])');
+        for (const script of scripts) {
+            const content = script.textContent || '';
+            if (/\balert\s*\(/.test(content)) found.alert = true;
+            if (/\bconfirm\s*\(/.test(content)) found.confirm = true;
+            if (/\bprompt\s*\(/.test(content)) found.prompt = true;
+        }
+
+        // Check event handler attributes
+        const handlersToCheck = [
+            'onclick', 'onsubmit', 'onchange', 'onkeydown', 'onkeyup',
+            'onkeypress', 'onfocus', 'onblur', 'onmouseover', 'onmouseout'
+        ];
+        const selector = handlersToCheck.map(h => `[${h}]`).join(',');
+        const elementsWithHandlers = document.querySelectorAll(selector);
+
+        for (const el of elementsWithHandlers) {
+            for (const attr of handlersToCheck) {
+                const value = el.getAttribute(attr);
+                if (value) {
+                    if (/\balert\s*\(/.test(value)) found.alert = true;
+                    if (/\bconfirm\s*\(/.test(value)) found.confirm = true;
+                    if (/\bprompt\s*\(/.test(value)) found.prompt = true;
+                }
+            }
+        }
+
+        // Return null if nothing found
+        const types = Object.entries(found).filter(([_, v]) => v).map(([k, _]) => k);
+        if (types.length === 0) return null;
+
+        return { types };
+    }
+
+    /**
+     * Detect fullscreen/kiosk mode.
+     * Fullscreen: F11 or Fullscreen API (document.fullscreenElement)
+     * Kiosk: Viewport fills entire screen with no browser chrome (--kiosk flag)
+     * @returns {Object} mode info with mode, isFullscreenAPI, viewportEqualsScreen, outerEqualsScreen
+     */
+    function detectWindowMode() {
+        const isFullscreenAPI = !!(document.fullscreenElement ||
+                                   document.webkitFullscreenElement ||
+                                   document.mozFullScreenElement);
+        const viewportEqualsScreen = window.innerWidth === window.screen.width &&
+                                      window.innerHeight === window.screen.height;
+        const outerEqualsScreen = window.outerWidth === window.screen.width &&
+                                   window.outerHeight === window.screen.height;
+
+        let mode = 'normal';
+        if (isFullscreenAPI) {
+            mode = 'fullscreen';
+        } else if (viewportEqualsScreen && outerEqualsScreen) {
+            mode = 'kiosk';
+        }
+
+        return { mode, isFullscreenAPI, viewportEqualsScreen, outerEqualsScreen };
+    }
+
     if (action === 'start') {
         // Check if already recording
         if (window.__INSPEKT_RECORD_ACTIVE__) {
@@ -1863,6 +2411,11 @@
         window.__INSPEKT_RECORD_INDEX__ = 0;
         window.__INSPEKT_RECORD_CONFIG__ = config || {};
         window.__INSPEKT_RECORD_ID__ = recordingId;
+
+        // Apply configurable rate limit (default: 10 actions/second)
+        if (config.maxActionsPerSecond && typeof config.maxActionsPerSecond === 'number') {
+            MAX_ACTIONS_PER_SECOND = Math.max(1, Math.floor(config.maxActionsPerSecond));
+        }
 
         // Clear any old events from previous recordings
         EventDB.clearAll();
@@ -1915,6 +2468,19 @@
         };
 
         // =======================================================================
+        // Download Monitoring Support
+        // Start listening for downloads via the extension bridge
+        // =======================================================================
+
+        initDownloadMonitoring(recordingId);
+
+        // =======================================================================
+        // Cross-Origin Iframe Warning
+        // Alert if page has iframes that may trigger unrecordable dialogs
+        // =======================================================================
+        checkCrossOriginIframes();
+
+        // =======================================================================
         // Dialog Element Support
         // Intercept showModal(), show(), and close() methods to record dialog actions
         // =======================================================================
@@ -1959,6 +2525,461 @@
             show: originalShow,
             close: originalClose
         };
+
+        // =======================================================================
+        // JavaScript Dialog Support (alert, confirm, prompt)
+        // Two modes:
+        // 1. Native mode (default): Real dialogs, we capture return values
+        // 2. Synthetic mode (config.syntheticDialogs): Non-blocking HTML overlays
+        //    for automation scenarios (AI agents, browser automation tools)
+        // =======================================================================
+
+        const originalAlert = window.alert;
+        const originalConfirm = window.confirm;
+        const originalPrompt = window.prompt;
+        const useSyntheticDialogs = config.syntheticDialogs === true;
+
+        // Synthetic dialog styles - Chrome-style (shared with replay dialogs)
+        // This placeholder is replaced by Python with the shared CSS from dialog_styles.py
+        const syntheticDialogStyles = `DIALOG_STYLES_PLACEHOLDER`;
+
+        // Inject synthetic dialog styles
+        if (useSyntheticDialogs) {
+            const styleEl = document.createElement('style');
+            styleEl.id = 'inspekt-dialog-styles';
+            styleEl.textContent = syntheticDialogStyles;
+            document.head.appendChild(styleEl);
+        }
+
+        // ===================================================================
+        // Accessibility helpers for synthetic dialogs
+        // ===================================================================
+
+        // Store original scroll state for restoration
+        let __inspektOriginalOverflow = null;
+        let __inspektScrollHandler = null;
+
+        /**
+         * Make all page content inert while dialog is open
+         * This prevents interaction with background elements
+         * Also blocks scroll events on the page
+         */
+        function makePageInert(exceptElement) {
+            const children = Array.from(document.body.children);
+            children.forEach(child => {
+                if (child !== exceptElement && !child.hasAttribute('data-inspekt-dialog')) {
+                    // Store whether element was already inert
+                    child.dataset.inspektWasInert = child.hasAttribute('inert') ? 'true' : 'false';
+                    child.setAttribute('inert', '');
+                }
+            });
+
+            // Block scrolling on the page
+            __inspektOriginalOverflow = document.body.style.overflow;
+            document.body.style.overflow = 'hidden';
+
+            // Also block wheel events to prevent scrolling via mouse wheel
+            __inspektScrollHandler = (e) => {
+                // Only block if target is not within the dialog
+                if (!exceptElement.contains(e.target)) {
+                    e.preventDefault();
+                }
+            };
+            document.addEventListener('wheel', __inspektScrollHandler, { passive: false });
+        }
+
+        /**
+         * Restore page interactivity after dialog closes
+         */
+        function restorePageInteractivity() {
+            const children = Array.from(document.body.children);
+            children.forEach(child => {
+                if (child.dataset.inspektWasInert === 'false') {
+                    child.removeAttribute('inert');
+                }
+                delete child.dataset.inspektWasInert;
+            });
+
+            // Restore scroll
+            if (__inspektOriginalOverflow !== null) {
+                document.body.style.overflow = __inspektOriginalOverflow;
+                __inspektOriginalOverflow = null;
+            }
+
+            // Remove wheel event listener
+            if (__inspektScrollHandler) {
+                document.removeEventListener('wheel', __inspektScrollHandler);
+                __inspektScrollHandler = null;
+            }
+        }
+
+        /**
+         * Set up focus trap within dialog element
+         * Tab/Shift+Tab cycles only through focusable elements in the dialog
+         */
+        function setupFocusTrap(dialogElement) {
+            const focusableSelectors = [
+                'button:not([disabled])',
+                'input:not([disabled])',
+                '[tabindex]:not([tabindex="-1"])'
+            ].join(', ');
+
+            const focusables = Array.from(dialogElement.querySelectorAll(focusableSelectors));
+            if (focusables.length === 0) return;
+
+            // Always trap Tab within the dialog - don't let it escape
+            dialogElement.addEventListener('keydown', (e) => {
+                if (e.key !== 'Tab') return;
+
+                // Always prevent default to trap focus
+                e.preventDefault();
+
+                // Find current focus position in the focusables list
+                const currentIndex = focusables.indexOf(document.activeElement);
+
+                let nextIndex;
+                if (e.shiftKey) {
+                    // Shift+Tab: move backward, wrap to end if at start
+                    nextIndex = currentIndex <= 0 ? focusables.length - 1 : currentIndex - 1;
+                } else {
+                    // Tab: move forward, wrap to start if at end
+                    nextIndex = currentIndex >= focusables.length - 1 ? 0 : currentIndex + 1;
+                }
+
+                focusables[nextIndex].focus();
+            });
+        }
+
+        // Dialog queue for sequential display (like native dialogs)
+        const dialogQueue = [];
+        let isDialogShowing = false;
+
+        /**
+         * Process the next dialog in the queue
+         */
+        function processDialogQueue() {
+            if (dialogQueue.length === 0) {
+                isDialogShowing = false;
+                return;
+            }
+
+            isDialogShowing = true;
+            const { type, message, defaultValue, resolve } = dialogQueue.shift();
+            showDialogInternal(type, message, defaultValue, resolve);
+        }
+
+        /**
+         * Show a synthetic (non-blocking) dialog overlay
+         * Returns a Promise that resolves with the user's response
+         * Dialogs are queued to appear sequentially (like native dialogs)
+         */
+        function showSyntheticDialog(type, message, defaultValue) {
+            return new Promise((resolve) => {
+                // Queue the dialog
+                dialogQueue.push({ type, message, defaultValue, resolve });
+
+                // If no dialog is currently showing, process immediately
+                if (!isDialogShowing) {
+                    processDialogQueue();
+                }
+            });
+        }
+
+        /**
+         * Internal function to actually show the dialog
+         */
+        function showDialogInternal(type, message, defaultValue, resolve) {
+            // Store currently focused element to restore later
+            const previouslyFocusedElement = document.activeElement;
+
+            const backdrop = document.createElement('div');
+            backdrop.className = 'inspekt-dialog-backdrop';
+            backdrop.setAttribute('data-inspekt-dialog', 'true');
+
+            // Generate unique IDs for ARIA references
+            const dialogId = 'inspekt-dialog-' + Date.now();
+            const titleId = dialogId + '-title';
+            const messageId = dialogId + '-message';
+
+            // Get domain for heading (matches Chrome native dialog)
+            const domain = window.location.host || 'This page';
+
+            let buttonsHtml = '';
+            let inputHtml = '';
+
+            if (type === 'alert') {
+                buttonsHtml = `
+                    <button class="inspekt-dialog-btn inspekt-dialog-btn-primary" data-action="ok">OK</button>
+                `;
+            } else if (type === 'confirm') {
+                buttonsHtml = `
+                    <button class="inspekt-dialog-btn inspekt-dialog-btn-secondary" data-action="cancel">Cancel</button>
+                    <button class="inspekt-dialog-btn inspekt-dialog-btn-primary" data-action="ok">OK</button>
+                `;
+            } else if (type === 'prompt') {
+                inputHtml = `
+                    <input type="text" class="inspekt-dialog-input"
+                           value="${(defaultValue || '').replace(/"/g, '&quot;')}">
+                `;
+                buttonsHtml = `
+                    <button class="inspekt-dialog-btn inspekt-dialog-btn-secondary" data-action="cancel">Cancel</button>
+                    <button class="inspekt-dialog-btn inspekt-dialog-btn-primary" data-action="ok">OK</button>
+                `;
+            }
+
+            backdrop.innerHTML = `
+                <div class="inspekt-dialog"
+                     id="${dialogId}"
+                     role="alertdialog"
+                     aria-modal="true"
+                     aria-labelledby="${titleId}"
+                     aria-describedby="${messageId}">
+                    <div id="${titleId}" class="inspekt-dialog-heading">${escapeHtml(domain)} says</div>
+                    <div id="${messageId}" class="inspekt-dialog-message">${escapeHtml(message) || ''}</div>
+                    ${inputHtml}
+                    <div class="inspekt-dialog-buttons">
+                        ${buttonsHtml}
+                    </div>
+                    <div class="inspekt-dialog-note">
+                        Note: This dialog isn't native. Inspekt has replaced it with a synthetic, automation-friendly equivalent that behaves identically.
+                    </div>
+                </div>
+            `;
+
+            // Make page content inert before showing dialog
+            makePageInert(backdrop);
+
+            document.body.appendChild(backdrop);
+
+            const dialog = backdrop.querySelector('.inspekt-dialog');
+            const input = backdrop.querySelector('.inspekt-dialog-input');
+            const okBtn = backdrop.querySelector('[data-action="ok"]');
+            const cancelBtn = backdrop.querySelector('[data-action="cancel"]');
+
+            // Set up focus trap within dialog
+            setupFocusTrap(dialog);
+
+            // Focus input or OK button
+            if (input) {
+                input.focus();
+                input.select();
+            } else if (okBtn) {
+                okBtn.focus();
+            }
+
+            function cleanup() {
+                // Restore page interactivity (only if no more dialogs in queue)
+                if (dialogQueue.length === 0) {
+                    restorePageInteractivity();
+                }
+
+                // Remove the dialog
+                if (backdrop.parentNode) {
+                    backdrop.parentNode.removeChild(backdrop);
+                }
+
+                // Restore focus to previous element (only if no more dialogs)
+                if (dialogQueue.length === 0 && previouslyFocusedElement && typeof previouslyFocusedElement.focus === 'function') {
+                    try {
+                        previouslyFocusedElement.focus();
+                    } catch (e) {
+                        // Element may no longer be focusable, ignore
+                    }
+                }
+
+                // Process next dialog in queue
+                processDialogQueue();
+            }
+
+            function handleOk() {
+                cleanup();
+                if (type === 'alert') {
+                    resolve(true);
+                } else if (type === 'confirm') {
+                    resolve(true);
+                } else if (type === 'prompt') {
+                    resolve(input ? input.value : '');
+                }
+            }
+
+            function handleCancel() {
+                cleanup();
+                if (type === 'confirm') {
+                    resolve(false);
+                } else if (type === 'prompt') {
+                    resolve(null);
+                }
+            }
+
+            // Button click handlers
+            if (okBtn) {
+                okBtn.addEventListener('click', handleOk);
+            }
+            if (cancelBtn) {
+                cancelBtn.addEventListener('click', handleCancel);
+            }
+
+            // Enter key submits, Escape cancels
+            backdrop.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleOk();
+                } else if (e.key === 'Escape') {
+                    e.preventDefault();
+                    if (type === 'alert') {
+                        handleOk();
+                    } else {
+                        handleCancel();
+                    }
+                }
+            });
+
+            // Clicking backdrop cancels (except for alert)
+            backdrop.addEventListener('click', (e) => {
+                if (e.target === backdrop) {
+                    if (type === 'alert') {
+                        handleOk();
+                    } else {
+                        handleCancel();
+                    }
+                }
+            });
+        }
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;');
+        }
+
+        // Store pending synthetic dialog results for async handling
+        window.__INSPEKT_PENDING_DIALOGS__ = [];
+
+        window.alert = function(message) {
+            const timestampStart = getTimestamp();
+
+            if (useSyntheticDialogs) {
+                // Synthetic mode: show non-blocking overlay
+                // Return immediately, record when user interacts
+                const startTime = Date.now();
+                showSyntheticDialog('alert', message).then(() => {
+                    const duration = Date.now() - startTime;
+                    recordEvent({
+                        action: 'jsdialog',
+                        timestamp: timestampStart,
+                        dialog_type: 'alert',
+                        message: String(message || ''),
+                        result: true,
+                        duration: duration
+                    });
+                });
+                // alert() returns undefined
+                return;
+            }
+
+            // Native mode: show blocking dialog, measure how long user takes
+            const startTime = Date.now();
+            originalAlert.call(window, message);
+            const duration = Date.now() - startTime;
+            recordEvent({
+                action: 'jsdialog',
+                timestamp: timestampStart,
+                dialog_type: 'alert',
+                message: String(message || ''),
+                result: true,
+                duration: duration
+            });
+        };
+
+        window.confirm = function(message) {
+            const timestampStart = getTimestamp();
+
+            if (useSyntheticDialogs) {
+                // Synthetic mode: show non-blocking overlay
+                // IMPORTANT: We can't truly block, so we return true immediately
+                // and record the actual result when user interacts
+                // For automation, the default "true" allows the flow to continue
+                const startTime = Date.now();
+                showSyntheticDialog('confirm', message).then((result) => {
+                    const duration = Date.now() - startTime;
+                    recordEvent({
+                        action: 'jsdialog',
+                        timestamp: timestampStart,
+                        dialog_type: 'confirm',
+                        message: String(message || ''),
+                        result: result,
+                        duration: duration
+                    });
+                });
+                // Return true as default (automation-friendly)
+                // The actual recorded result may differ based on user interaction
+                return true;
+            }
+
+            // Native mode: show blocking dialog, measure how long user takes
+            const startTime = Date.now();
+            const result = originalConfirm.call(window, message);
+            const duration = Date.now() - startTime;
+            recordEvent({
+                action: 'jsdialog',
+                timestamp: timestampStart,
+                dialog_type: 'confirm',
+                message: String(message || ''),
+                result: result,
+                duration: duration
+            });
+            return result;
+        };
+
+        window.prompt = function(message, defaultValue) {
+            const timestampStart = getTimestamp();
+
+            if (useSyntheticDialogs) {
+                // Synthetic mode: show non-blocking overlay
+                // Return default value immediately for automation compatibility
+                const startTime = Date.now();
+                showSyntheticDialog('prompt', message, defaultValue).then((result) => {
+                    const duration = Date.now() - startTime;
+                    recordEvent({
+                        action: 'jsdialog',
+                        timestamp: timestampStart,
+                        dialog_type: 'prompt',
+                        message: String(message || ''),
+                        default_value: String(defaultValue || ''),
+                        result: result,
+                        duration: duration
+                    });
+                });
+                // Return default value for automation compatibility
+                return defaultValue || '';
+            }
+
+            // Native mode: show blocking dialog, measure how long user takes
+            const startTime = Date.now();
+            const result = originalPrompt.call(window, message, defaultValue);
+            const duration = Date.now() - startTime;
+            recordEvent({
+                action: 'jsdialog',
+                timestamp: timestampStart,
+                dialog_type: 'prompt',
+                message: String(message || ''),
+                default_value: String(defaultValue || ''),
+                result: result,
+                duration: duration
+            });
+            return result;
+        };
+
+        // Store originals for cleanup
+        window.__INSPEKT_RECORD_JSDIALOG_ORIGINALS__ = {
+            alert: originalAlert,
+            confirm: originalConfirm,
+            prompt: originalPrompt
+        };
+        window.__INSPEKT_SYNTHETIC_DIALOGS_ENABLED__ = useSyntheticDialogs;
 
         // =======================================================================
         // Shadow DOM Support for Non-Composed Events
@@ -2078,6 +3099,12 @@
         // Check for file inputs (cannot record file paths due to browser security)
         const fileInputs = detectFileInputs();
 
+        // Check for JavaScript dialogs (alert, confirm, prompt)
+        const jsDialogs = detectJsDialogs();
+
+        // Check for fullscreen/kiosk mode (viewport cannot be resized in these modes)
+        const windowMode = detectWindowMode();
+
         return {
             ok: true,
             message: 'Recording started',
@@ -2093,11 +3120,14 @@
                 y: window.scrollY || window.pageYOffset || 0
             },
             zoom: window.devicePixelRatio || 1,
+            browserZoomLevel: null,  // Filled by Python via separate API call
             userAgent: navigator.userAgent,
             closedShadowWarnings: closedShadowWarnings,
             mediaElements: mediaElements,
             nativeControlInputs: nativeControlInputs,
-            fileInputs: fileInputs
+            fileInputs: fileInputs,
+            jsDialogs: jsDialogs,
+            windowMode: windowMode
         };
 
     } else if (action === 'poll') {
@@ -2134,6 +3164,7 @@
             recordingActive: true,
             currentUrl: location.href,
             stopRequested: !!window.__INSPEKT_STOP_REQUESTED__,
+            stopReason: window.__INSPEKT_STOP_REASON__ || null,
             // Recording control signals (one-shot flags, consumed after reading)
             pauseToggled: consumeFlag('__INSPEKT_PAUSE_TOGGLED__'),
             isPaused: !!window.__INSPEKT_PAUSED__,
@@ -2188,10 +3219,37 @@
             }
         }
 
+        // Restore JavaScript dialog functions (alert, confirm, prompt)
+        const jsDialogOriginals = window.__INSPEKT_RECORD_JSDIALOG_ORIGINALS__;
+        if (jsDialogOriginals) {
+            if (jsDialogOriginals.alert) {
+                window.alert = jsDialogOriginals.alert;
+            }
+            if (jsDialogOriginals.confirm) {
+                window.confirm = jsDialogOriginals.confirm;
+            }
+            if (jsDialogOriginals.prompt) {
+                window.prompt = jsDialogOriginals.prompt;
+            }
+        }
+
+        // Remove synthetic dialog styles and any open dialogs
+        const syntheticStyles = document.getElementById('inspekt-dialog-styles');
+        if (syntheticStyles) {
+            syntheticStyles.remove();
+        }
+        const openDialogs = document.querySelectorAll('[data-inspekt-dialog="true"]');
+        openDialogs.forEach(d => d.remove());
+        delete window.__INSPEKT_SYNTHETIC_DIALOGS_ENABLED__;
+        delete window.__INSPEKT_PENDING_DIALOGS__;
+
         // Disconnect shadow DOM observer
         if (window.__INSPEKT_SHADOW_OBSERVER__) {
             window.__INSPEKT_SHADOW_OBSERVER__.disconnect();
         }
+
+        // Stop download monitoring
+        cleanupDownloadMonitoring();
 
         // Restore original attachShadow
         if (window.__INSPEKT_ORIGINAL_ATTACH_SHADOW__) {

@@ -20,6 +20,7 @@ from datetime import datetime
 import click
 import requests
 
+from inspekt.app.cli.icons import success, get_indicator
 from inspekt.services.domain_service import get_domain_service, normalize_domain
 
 # Bridge server defaults (same as in bridge_ws.py and client.py)
@@ -60,9 +61,9 @@ def domain_add(domain_name):
 
             # Show what was stored
             if result.get("original"):
-                click.echo(f"✓ Domain added: {stored_domain} (normalized from {domain_name})")
+                click.echo(success(f"Domain added: {stored_domain} (normalized from {domain_name})"))
             else:
-                click.echo(f"✓ Domain added: {stored_domain}")
+                click.echo(success(f"Domain added: {stored_domain}"))
 
             if result.get("already_exists"):
                 click.echo("  (Domain was already in the allow list)")
@@ -105,9 +106,9 @@ def domain_remove(domain_name):
             if result.get("deleted"):
                 # Show what was removed
                 if result.get("original"):
-                    click.echo(f"✓ Domain removed: {stored_domain} (normalized from {domain_name})")
+                    click.echo(success(f"Domain removed: {stored_domain} (normalized from {domain_name})"))
                 else:
-                    click.echo(f"✓ Domain removed: {stored_domain}")
+                    click.echo(success(f"Domain removed: {stored_domain}"))
 
                 # Auto-sync to browser extension
                 _sync_to_browser_silent()
@@ -238,7 +239,7 @@ def domain_csp(domain_name, enable, disable, status, list_all):
             if response.status_code == 200:
                 result = response.json()
                 if result.get("ok"):
-                    click.echo(f"✓ CSP bypass enabled for {domain_name}")
+                    click.echo(success(f"CSP bypass enabled for {domain_name}"))
                     click.echo("  Refresh the page for changes to take effect")
                 else:
                     click.echo(f"Error: {result.get('error', 'Unknown error')}", err=True)
@@ -257,7 +258,7 @@ def domain_csp(domain_name, enable, disable, status, list_all):
             if response.status_code == 200:
                 result = response.json()
                 if result.get("ok"):
-                    click.echo(f"✓ CSP bypass disabled for {domain_name}")
+                    click.echo(success(f"CSP bypass disabled for {domain_name}"))
                     click.echo("  Refresh the page for changes to take effect")
                 else:
                     click.echo(f"Error: {result.get('error', 'Unknown error')}", err=True)
@@ -327,13 +328,13 @@ def domain_bypass(duration):
             result = response.json()
             if result.get("ok"):
                 if result.get("enabled"):
-                    click.echo(f"✓ Temporary bypass enabled for {duration} minutes")
+                    click.echo(success(f"Temporary bypass enabled for {duration} minutes"))
                     expires_at = result.get("expiresAt")
                     if expires_at:
                         formatted_expires = _format_human_datetime(expires_at)
                         click.echo(f"  Expires at: {formatted_expires}")
                 else:
-                    click.echo("✓ Temporary bypass disabled")
+                    click.echo(success("Temporary bypass disabled"))
             else:
                 click.echo(f"Error: {result.get('error', 'Unknown error')}", err=True)
                 sys.exit(1)
@@ -465,6 +466,7 @@ def _format_human_datetime(iso_string):
 
 def _display_domains(domains, bypass_status=None):
     """Display domains in table format with auto-width columns and title bar."""
+    from inspekt.app.cli.icons import get_icon
     from inspekt.app.cli.table import Table
 
     headers = ["Domain", "Added"]
@@ -474,14 +476,16 @@ def _display_domains(domains, bypass_status=None):
     if bypass_status and bypass_status.get("enabled"):
         remaining_minutes = bypass_status.get("remainingMinutes", 0)
         if remaining_minutes > 0:
-            click.echo(click.style(f"⚡ Bypass active ({remaining_minutes} min remaining)", fg="yellow"))
+            bypass_icon = get_indicator("bypass") or "⚡"
+            click.echo(click.style(f"{bypass_icon} Bypass active ({remaining_minutes} min remaining)", fg="yellow"))
             click.echo()
 
     count = len(domains) if domains else 0
     title = f"Allowed Domains ({count})"
+    icon = get_icon("Domains")
 
     if not domains:
-        table = Table(headers, alignments=alignments, title=title)
+        table = Table(headers, alignments=alignments, title=title, icon=icon)
         table.set_data([])  # Empty data, widths based on headers
         table.print_empty_message("No allowed domains")
         return
@@ -497,7 +501,7 @@ def _display_domains(domains, bypass_status=None):
         rows.append([domain, formatted_date])
 
     # Create table with auto-width and title
-    table = Table(headers, alignments=alignments, title=title)
+    table = Table(headers, alignments=alignments, title=title, icon=icon)
     table.set_data(rows)
     table.print_header()
 
@@ -547,7 +551,7 @@ def yolo(disable, status):
         if disable:
             domain_service.disable_yolo_mode()
             browser_ok = _disable_browser_bypass()
-            click.echo("✓ YOLO mode disabled")
+            click.echo(success("YOLO mode disabled"))
             if not browser_ok:
                 click.echo("  (Browser bypass may need page refresh)", err=True)
             return
@@ -556,7 +560,7 @@ def yolo(disable, status):
         result = domain_service.enable_yolo_mode(duration_minutes=60)
 
         if result.get("ok"):
-            click.echo("✓ YOLO mode enabled for 1 hour")
+            click.echo(success("YOLO mode enabled for 1 hour"))
             click.echo("  All domain checks bypassed (CLI + browser)")
 
             # Also enable browser bypass and reload page

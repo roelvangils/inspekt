@@ -1,59 +1,100 @@
 # Inspekt Browser VM
 
-A self-contained Docker image that runs Chromium browser with the Inspekt extension, accessible via noVNC in a webpage. Perfect for automated testing, demos, and running Inspekt in isolated environments.
+A complete browser testing environment in Docker: Chromium with visual access via noVNC, remote Chrome DevTools debugging, and built-in accessibility testing tools.
+
+## What Makes This Unique
+
+| Feature | Inspekt VM | Chromote | BrowserStack | LambdaTest |
+|---------|-----------|----------|--------------|------------|
+| Visual browser (noVNC) | Yes | Yes | Yes | Yes |
+| Remote CDP to **local** DevTools | Yes | Yes | No | No |
+| Built-in accessibility testing | Yes | No | No | No |
+| MCP server for AI control | Yes | No | No | No |
+| Self-hosted | Yes | Yes | No | No |
+
+**The killer combination:** See the browser visually AND debug from your local DevTools, with accessibility testing and AI integration built in.
 
 ## Features
 
+- **Visual browser access**: View and control via any browser (noVNC)
+- **Remote DevTools debugging**: Connect your local Chrome DevTools via CDP (port 9222)
+- **Built-in accessibility testing**: axe-core audits, autocomplete checks, link extraction
+- **MCP server integration**: AI-assisted browser control via Claude
+- **Web terminal**: Access a terminal inside the VM
+- **Tab management**: Multiple tabs with thumbnails and auto-scan
 - **Self-contained**: Chromium + Inspekt extension + bridge server all in one container
 - **Fast boot**: ~3-5 seconds to full browser
-- **Web accessible**: View and control via any browser (noVNC)
-- **Native performance**: Real Chromium, not emulated
-- **Embeddable**: Works in iframes for web integration
-- **Configurable**: Resolution, password, home URL via env vars
+- **Configurable**: Resolution, theme, home URL via env vars
 
 ## Quick Start
 
+### Using the CLI (Recommended)
+
+The easiest way to use the Browser VM is through the `inspekt vm` commands:
+
 ```bash
-# Build the image
-cd docker/browser-vm
-docker build -t inspekt-browser .
+inspekt vm start    # Build (if needed) and start the VM
+inspekt vm open     # Open the control panel
+inspekt vm stop     # Stop the VM
+inspekt vm restart  # Restart the VM
+```
+
+When running from the Inspekt source repository, dev mode is **automatically enabled** - this mounts local source files so code changes are reflected immediately without rebuilding.
+
+```bash
+inspekt vm start           # Auto-detects dev environment
+inspekt vm start --no-dev  # Disable dev mode (use frozen image code)
+inspekt vm restart         # Same auto-detection on restart
+```
+
+### Using Docker Directly
+
+```bash
+# Build the image (from project root)
+docker build -t inspekt-browser-vm -f docker/browser-vm/Dockerfile .
 
 # Run with host networking (recommended for macOS/OrbStack)
-docker run -d --network host --shm-size=2g --name inspekt-browser-vm inspekt-browser
+docker run -d --network host --shm-size=2g --name inspekt-vm inspekt-browser-vm
 
-# Open in your browser
-open http://localhost:6080
+# Open the control panel
+open http://localhost:6080/control.html
 ```
 
-## Full Setup with Inspekt
+## Remote DevTools Debugging
 
-To run Inspekt inside the container (extension + bridge server):
+Connect your **local** Chrome DevTools to the VM browser. Click the **DevTools** button in the control panel for a setup guide, or follow these steps:
+
+### Option 1: Direct Connection (Local/Trusted Network)
+
+1. Open `chrome://inspect/#devices` in your local Chrome
+2. Click "Configure..." next to "Discover network targets"
+3. Add `localhost:9222` (or `<vm-host>:9222`)
+4. Click "inspect" on the VM browser target
+
+### Option 2: SSH Tunnel (Secure Remote Access)
 
 ```bash
-# 1. Start the container
-docker run -d --network host --shm-size=2g --name inspekt-browser-vm inspekt-browser
+# On your local machine
+ssh -L 9222:localhost:9222 user@your-server
 
-# 2. Install dependencies
-docker exec inspekt-browser-vm apt-get update -qq
-docker exec inspekt-browser-vm apt-get install -y -qq git python3-pip python3-venv
-
-# 3. Clone Inspekt
-docker exec inspekt-browser-vm git clone https://github.com/roelvangils/inspekt.git /opt/inspekt
-
-# 4. Install Python dependencies
-docker exec inspekt-browser-vm bash -c "cd /opt/inspekt && python3 -m venv .venv && . .venv/bin/activate && pip install -e . && pip install -r requirements.txt pillow aiofiles rich"
-
-# 5. Start the bridge server
-docker exec -d inspekt-browser-vm bash -c "cd /opt/inspekt && . .venv/bin/activate && python inspekt/bridge_ws.py"
-
-# 6. Restart Chromium with the extension
-docker exec inspekt-browser-vm pkill -f chromium || true
-docker exec -d -e DISPLAY=:0 inspekt-browser-vm /usr/bin/chromium \
-    --no-sandbox --disable-gpu --disable-dev-shm-usage \
-    --no-first-run --start-maximized \
-    --load-extension=/opt/inspekt/extensions/chrome \
-    https://example.com
+# Then in Chrome, add localhost:9222 as the target
 ```
+
+### Security Note
+
+CDP has no authentication. Only expose port 9222 on trusted networks or use SSH tunneling for remote access.
+
+## Control Panel Features
+
+The control panel at `http://localhost:6080/control.html` provides:
+
+- **Navigation**: Back, forward, reload, URL bar
+- **DevTools**: Setup guide for remote debugging
+- **Terminal**: Web-based terminal access
+- **Inspekt Commands**: Run accessibility audits, extract links, page outline, screenshots
+- **Tab Management**: Create, switch, close tabs with thumbnail previews
+- **Auto-scan**: Automatic accessibility scanning of tabs
+- **Theme Toggle**: Switch between dark and light modes
 
 ## Executing Commands in the VM
 
@@ -61,7 +102,7 @@ docker exec -d -e DISPLAY=:0 inspekt-browser-vm /usr/bin/chromium \
 
 ```bash
 # Install xterm (first time only)
-docker exec inspekt-browser-vm apt-get install -y -qq xterm
+docker exec inspekt-browser-vm apk add --no-cache xterm
 
 # Open terminal in the VM display
 docker exec -d -e DISPLAY=:0 inspekt-browser-vm xterm -fa 'Monospace' -fs 12
@@ -123,15 +164,24 @@ curl -X POST http://localhost:8765/run \
   -d '{"code": "window.location.href"}'
 ```
 
+## Ports
+
+| Port | Service | Description |
+|------|---------|-------------|
+| 6080 | noVNC | Visual browser access (control panel) |
+| 8888 | Control Server | REST API for browser control |
+| 8889 | Terminal | WebSocket terminal server |
+| 9222 | CDP | Chrome DevTools Protocol (remote debugging) |
+
 ## Environment Variables
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `VNC_PASSWORD` | *(empty)* | VNC password (optional) |
-| `VNC_RESOLUTION` | `1280x720` | Screen resolution |
+| `VNC_RESOLUTION` | `1920x1080` | Screen resolution |
 | `VNC_DEPTH` | `24` | Color depth |
-| `HOME_URL` | `about:blank` | Initial URL to load |
-| `NOVNC_PORT` | `6080` | noVNC web port |
+| `HOME_URL` | `http://inspekt/status` | Initial URL to load |
+| `VNC_PASSWORD` | *(empty)* | VNC password (optional) |
+| `INSPEKT_ISOLATED` | `1` | Enable isolated mode (safe in VM) |
 
 ## Usage Examples
 
@@ -206,7 +256,7 @@ docker run -d --network host --shm-size=2g \
                            │
                            ▼ WebSocket
 ┌─────────────────────────────────────────────────────────────┐
-│  Docker Container (Debian 12 "Bookworm")                    │
+│  Docker Container (Alpine Linux 3.20)                       │
 │                                                             │
 │  ┌───────────────────────────────────────────────────────┐  │
 │  │  noVNC + websockify (:6080)                           │  │
@@ -272,17 +322,14 @@ docker exec -it inspekt-browser-vm bash
 ## Installing Additional Software
 
 ```bash
-# Update package list
-docker exec inspekt-browser-vm apt-get update
-
-# Install packages
-docker exec inspekt-browser-vm apt-get install -y <package>
+# Install packages (Alpine uses apk, no need to update first)
+docker exec inspekt-browser-vm apk add --no-cache <package>
 
 # Examples:
-docker exec inspekt-browser-vm apt-get install -y vim
-docker exec inspekt-browser-vm apt-get install -y htop
-docker exec inspekt-browser-vm apt-get install -y pcmanfm  # file manager
-docker exec inspekt-browser-vm apt-get install -y xfce4-terminal  # nicer terminal
+docker exec inspekt-browser-vm apk add --no-cache vim
+docker exec inspekt-browser-vm apk add --no-cache htop
+docker exec inspekt-browser-vm apk add --no-cache pcmanfm  # file manager
+docker exec inspekt-browser-vm apk add --no-cache xfce4-terminal  # nicer terminal
 ```
 
 ## Deployment Options
@@ -431,14 +478,103 @@ docker exec inspekt-browser-vm curl -s http://localhost:8765/health
        https://example.com
    ```
 
+## Control Server API
+
+The control server (port 8888) provides a REST API for browser control:
+
+### Browser Navigation
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/back` | GET | Navigate back |
+| `/forward` | GET | Navigate forward |
+| `/reload-page` | GET | Reload current page |
+| `/navigate?url=...` | GET | Navigate to URL |
+| `/url` | GET | Get current URL |
+
+### Tab Management
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/tabs` | GET | List all tabs |
+| `/tabs/new?url=...` | GET | Create new tab |
+| `/tabs/{id}/activate` | GET | Switch to tab |
+| `/tabs/{id}/close` | GET | Close tab |
+| `/tabs/{id}/screenshot` | GET | Capture tab screenshot |
+
+### DevTools
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/devtools/toggle` | GET | Toggle DevTools in VM |
+| `/devtools/status` | GET | Get DevTools state |
+| `/devtools/connection-info` | GET | Get CDP connection details |
+
+### Inspekt Commands
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/inspekt/info` | GET | Page information |
+| `/inspekt/axe` | GET | Accessibility audit |
+| `/inspekt/links` | GET | Extract links |
+| `/inspekt/outline` | GET | Page outline |
+| `/inspekt/screenshot` | GET | Take screenshot |
+
+## Comparison to Alternatives
+
+### vs [Chromote](https://github.com/igolaizola/chromote)
+Chromote provides Chrome + noVNC + CDP, but without any testing tools. Inspekt VM adds accessibility testing, MCP integration, and a polished control panel.
+
+### vs BrowserStack / LambdaTest
+Cloud platforms offer DevTools *inside* their VM, but you can't connect your local DevTools to their browser. Inspekt VM exposes CDP so you can use your familiar local DevTools.
+
+### vs Docker Selenium
+Selenium containers use noVNC for debugging automated tests. Inspekt VM is designed for interactive testing and debugging, with accessibility tools built in.
+
+### vs Playwright / Puppeteer
+These are headless automation tools. Inspekt VM provides visual access - you can see what's happening and interact manually while also having programmatic control via CDP.
+
 ## Security Considerations
 
-- **Use VNC_PASSWORD** in production
-- **Use HTTPS** (terminate at reverse proxy)
+> **Warning**: The Inspekt VM is designed for local development and trusted networks only. It exposes multiple services without authentication. **Never expose the VM directly to the internet.**
+
+### Network Exposure
+
+When running with `--network host`, the following services are exposed to your local network:
+
+| Port | Service | Risk | Mitigation |
+|------|---------|------|------------|
+| 6080 | noVNC | Medium - Full browser control | Use VNC_PASSWORD |
+| 8767 | Bridge HTTP | Low - Browser automation API | Localhost only recommended |
+| 8889 | Terminal | **High** - Shell access | Localhost only (default) |
+| 9222 | CDP | **High** - Full browser control | SSH tunnel for remote access |
+
+### Best Practices
+
+- **Use VNC_PASSWORD** in production: `-e VNC_PASSWORD=mysecret`
+- **Use HTTPS** (terminate at reverse proxy like nginx/Caddy)
 - **Network isolation**: Don't expose to public internet without auth
 - **Resource limits**: Set memory/CPU limits to prevent abuse
 - **Chromium runs with --no-sandbox**: Required in containers but reduces security
+- **CDP has no auth**: Only expose port 9222 on trusted networks or use SSH tunneling
+- **API keys at runtime**: Pass sensitive keys via environment variables, not in Dockerfile:
+  ```bash
+  docker run -e THOTH_API_KEY=xxx -e OTHER_SECRET=yyy ...
+  ```
+
+### For Remote/Cloud Deployment
+
+If deploying to a remote server:
+
+1. **Use SSH tunneling** for all services:
+   ```bash
+   ssh -L 6080:localhost:6080 -L 9222:localhost:9222 user@server
+   ```
+
+2. **Use a reverse proxy** with authentication (nginx, Caddy, Traefik)
+
+3. **Firewall rules**: Block external access to ports 6080, 8767, 8889, 9222
 
 ## License
 
-MIT
+Part of the Inspekt project.

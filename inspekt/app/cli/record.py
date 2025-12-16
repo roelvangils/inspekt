@@ -41,6 +41,7 @@ from .formatting import (
     get_recordings_dir,
 )
 from .recording_utils import clean_filename, find_most_recent_recording, complete_recording_files
+from .util import open_or_download
 from inspekt.shared.dialog_styles import DIALOG_STYLES
 
 import requests
@@ -68,6 +69,44 @@ def check_csp_bypass_enabled() -> bool:
     return False
 
 
+def set_vm_terminal_hidden(hidden: bool) -> None:
+    """Signal the VM control panel to hide/show the terminal overlay.
+
+    In VM mode (INSPEKT_ISOLATED=1), the control panel has a web terminal overlay
+    that may cover the browser viewport. When recording starts, we hide it so
+    the user can immediately interact with the browser. When recording stops,
+    we show it again.
+
+    This function does nothing on macOS/normal mode where AppleScript handles
+    browser focus instead.
+
+    Args:
+        hidden: True to hide terminal, False to show it
+    """
+    from inspekt.config import is_isolated_mode
+    if not is_isolated_mode():
+        return  # Only in VM mode
+
+    import urllib.request
+
+    try:
+        # Control server runs on port 8888 in VM
+        req = urllib.request.Request(
+            'http://localhost:8888/ui/terminal-state',
+            data=json.dumps({'hidden': hidden}).encode(),
+            headers={'Content-Type': 'application/json'},
+            method='POST'
+        )
+        with urllib.request.urlopen(req, timeout=2) as resp:
+            pass  # We don't need the response
+
+        # Also focus Chrome when hiding terminal (recording starting)
+        if hidden:
+            urllib.request.urlopen('http://localhost:8888/chrome', timeout=2)
+    except Exception:
+        pass  # Terminal control is optional - don't fail recording
+
+
 # =============================================================================
 # Pre-recording hints and warnings
 # =============================================================================
@@ -88,7 +127,7 @@ def _format_closed_shadow_warning(warnings: list) -> str:
 
 def _format_media_hint(media_elements: dict) -> str:
     """Format hint message for media elements."""
-    from inspekt.app.cli.table import wrap_text
+    from inspekt.app.cli.table import wrap_text, _style_with_inline_code
 
     audio_count = media_elements.get("audioCount", 0)
     video_count = media_elements.get("videoCount", 0)
@@ -100,13 +139,15 @@ def _format_media_hint(media_elements: dict) -> str:
         parts.append("a video player" if video_count == 1 else f"{video_count} video players")
     element_desc = " and ".join(parts)
 
-    msg = f"This page contains {element_desc} with native controls. Media players are treated as a single Tab stop. Use Space/Enter to play/pause, Arrow keys for seek/volume."
-    return click.style("Hint: ", fg="blue", bold=True) + wrap_text(msg, indent="", subsequent_indent="       ")
+    msg = f"This page contains {element_desc} with native controls. Media players are treated as a single `Tab` stop. Use `Space`/`Enter` to play/pause, `Arrow keys` for seek/volume."
+    # Lightbulb icon: \uf400 (nf-oct-light_bulb)
+    wrapped = wrap_text(msg, indent="", subsequent_indent="  ")
+    return click.style("\uf400 ", fg="blue", bold=True) + _style_with_inline_code(wrapped, base_fg="blue")
 
 
 def _format_native_inputs_hint(native_inputs: dict) -> str:
     """Format hint message for native control inputs."""
-    from inspekt.app.cli.table import wrap_text
+    from inspekt.app.cli.table import wrap_text, _style_with_inline_code
 
     types = native_inputs.get("types", {})
     type_names = {
@@ -137,17 +178,20 @@ def _format_native_inputs_hint(native_inputs: dict) -> str:
     total_count = sum(types.values())
     pronoun = "its" if total_count == 1 else "their"
     msg = f"This page has {type_desc}. You can adjust {pronoun} values, but Inspekt intentionally does not record user interactions on native elements. The final selected value will be recorded once you leave the element."
-    return click.style("Hint: ", fg="blue", bold=True) + wrap_text(msg, indent="", subsequent_indent="       ")
+    # Lightbulb icon: \uf400 (nf-oct-light_bulb)
+    wrapped = wrap_text(msg, indent="", subsequent_indent="  ")
+    return click.style("\uf400 ", fg="blue", bold=True) + _style_with_inline_code(wrapped, base_fg="blue")
 
 
 def _format_file_inputs_warning(file_inputs: dict) -> str:
     """Format warning message for file inputs."""
-    from inspekt.app.cli.table import wrap_text
+    from inspekt.app.cli.table import wrap_text, _style_with_inline_code
 
     count = file_inputs.get("count", 0)
     count_str = "a file input" if count == 1 else f"{count} file inputs"
-    msg = f"This page has {count_str}. Inspekt cannot access the file picker or view files on your computer, but it will record file uploads and save the files for replay (maximum size: 10 MB). Do not upload sensitive files."
-    return click.style("⚠ Warning: ", fg="yellow", bold=True) + wrap_text(msg, indent="", subsequent_indent="           ")
+    msg = f"This page has {count_str}. Inspekt cannot access the file picker or view files on your computer, but it will record file uploads and save the files for replay (maximum size: `10 MB`). Do not upload sensitive files."
+    wrapped = wrap_text(msg, indent="", subsequent_indent="           ")
+    return click.style("⚠ Warning: ", fg="yellow", bold=True) + _style_with_inline_code(wrapped, base_fg="yellow")
 
 
 def _format_js_dialogs_hint(js_dialogs: dict) -> str:
@@ -162,7 +206,33 @@ def _format_js_dialogs_hint(js_dialogs: dict) -> str:
         "During playback, Inspekt always replaces these with synthetic "
         "dialogs that behave identically."
     )
-    return click.style("Hint: ", fg="blue", bold=True) + wrap_text(msg, indent="", subsequent_indent="       ")
+    # Lightbulb icon: \uf400 (nf-oct-light_bulb)
+    from inspekt.app.cli.table import _style_with_inline_code
+    wrapped = wrap_text(msg, indent="", subsequent_indent="  ")
+    return click.style("\uf400 ", fg="blue", bold=True) + _style_with_inline_code(wrapped, base_fg="blue")
+
+
+def _format_fullscreen_hint(window_mode: dict) -> str:
+    """Format hint message for fullscreen/kiosk mode recording."""
+    from inspekt.app.cli.table import wrap_text, _style_with_inline_code
+
+    mode = window_mode.get("mode", "fullscreen")
+    if mode == "kiosk":
+        msg = (
+            "Browser is in kiosk mode (viewport fills entire screen). "
+            "Window resizing is disabled. Recording will proceed with current dimensions. "
+            "Replay will require the same kiosk configuration or a matching viewport size."
+        )
+    else:
+        msg = (
+            "Browser is in fullscreen mode (`F11`). Window resizing is disabled. "
+            "Recording will proceed with current dimensions. "
+            "Exit fullscreen (press `F11` or `Esc`) if you need to resize the viewport."
+        )
+
+    # Lightbulb icon: \uf400 (nf-oct-light_bulb)
+    wrapped = wrap_text(msg, indent="", subsequent_indent="  ")
+    return click.style("\uf400 ", fg="blue", bold=True) + _style_with_inline_code(wrapped, base_fg="blue")
 
 
 def display_pre_recording_hints(response: dict, synthetic_dialogs: bool = False) -> None:
@@ -198,6 +268,10 @@ def display_pre_recording_hints(response: dict, synthetic_dialogs: bool = False)
     js_dialogs = response.get("jsDialogs")
     if js_dialogs and not synthetic_dialogs:
         messages.append(_format_js_dialogs_hint(js_dialogs))
+
+    window_mode = response.get("windowMode")
+    if window_mode and window_mode.get("mode") in ("fullscreen", "kiosk"):
+        messages.append(_format_fullscreen_hint(window_mode))
 
     # Display all messages
     for msg in messages:
@@ -1350,8 +1424,9 @@ def handle_existing_recording_file(output_path: Path) -> Optional[tuple[Path, bo
     timestamped_name = f"{timestamp}_{output_path.name}"
 
     # Show warning and options
+    from inspekt.app.cli.table import print_warning
     click.echo()
-    click.secho(f"⚠ File already exists: {output_path.name}", fg="yellow", bold=True)
+    print_warning(f"File already exists: `{output_path.name}`", bold=True)
     click.echo(existing_info)
     click.echo()
     click.echo("What would you like to do?")
@@ -1722,13 +1797,54 @@ def record(
     client = BridgeClient()
 
     if not client.is_alive():
-        click.echo(
-            "Error: Bridge server is not running. Start it with: inspekt start",
-            err=True,
-        )
+        from inspekt.app.cli.table import _style_with_inline_code
+        click.echo(_style_with_inline_code("Error: Bridge server is not running. Start it with `inspekt start`.", base_fg="red"), err=True)
         sys.exit(1)
 
+    # In VM mode, hide the terminal overlay so user can interact with browser immediately
+    # (this does nothing on macOS/normal mode where AppleScript handles focus)
+    set_vm_terminal_hidden(True)
+
     # Resize viewport if requested (before recording starts)
+    if parsed_viewport:
+        target_width, target_height = parsed_viewport
+
+        # Check for fullscreen/kiosk mode BEFORE attempting resize
+        # In these modes, the window cannot be resized
+        fullscreen_check_js = """(function(){
+            const isFullscreenAPI = !!(document.fullscreenElement ||
+                                       document.webkitFullscreenElement ||
+                                       document.mozFullScreenElement);
+            const viewportEqualsScreen = window.innerWidth === window.screen.width &&
+                                          window.innerHeight === window.screen.height;
+            const outerEqualsScreen = window.outerWidth === window.screen.width &&
+                                       window.outerHeight === window.screen.height;
+            return {
+                isFullscreen: isFullscreenAPI,
+                isKiosk: !isFullscreenAPI && viewportEqualsScreen && outerEqualsScreen,
+                mode: isFullscreenAPI ? 'fullscreen' :
+                      (viewportEqualsScreen && outerEqualsScreen ? 'kiosk' : 'normal')
+            };
+        })()"""
+
+        try:
+            fullscreen_result = client.execute(fullscreen_check_js, timeout=5.0)
+            if fullscreen_result.get("ok"):
+                fs_info = fullscreen_result.get("result", {})
+                if fs_info.get("isFullscreen") or fs_info.get("isKiosk"):
+                    mode_name = "fullscreen" if fs_info.get("isFullscreen") else "kiosk"
+                    click.secho(
+                        f"Warning: Browser is in {mode_name} mode. Viewport cannot be resized.\n"
+                        f"   The --viewport {target_viewport} option will be ignored.\n"
+                        f"   Exit {mode_name} mode (press F11 or Esc) to enable viewport resizing.",
+                        fg="yellow"
+                    )
+                    # Skip resize - set parsed_viewport to None
+                    parsed_viewport = None
+        except Exception:
+            pass  # Continue with resize attempt if detection fails
+
+    # Continue with resize if not in fullscreen mode
     if parsed_viewport:
         target_width, target_height = parsed_viewport
 
@@ -1935,13 +2051,19 @@ def record(
 
                 # Exact match required - no tolerance
                 if error_w == 0 and error_h == 0:
-                    # Note: adjustment is negative (error accumulation), but offset should be positive
-                    offset_w = -adjustment_w
-                    offset_h = -adjustment_h
+                    # Calculate viewport offsets (browser chrome compensation)
+                    # Typical case: adjustment is negative (we had to resize larger), so offset is positive
+                    # Edge case: if viewport matched immediately or was larger, adjustment could be 0 or positive
+                    offset_w = max(0, -adjustment_w)  # Clamp to non-negative
+                    offset_h = max(0, -adjustment_h)  # Clamp to non-negative
                     if save_viewport_offsets(offset_w, offset_h):
                         click.secho(f"✓ Viewport set to {actual_w}×{actual_h}, offsets saved.", fg="green")
                     else:
-                        click.secho(f"✓ Viewport set to {actual_w}×{actual_h} (offsets not saved).", fg="yellow")
+                        # Only show warning if offsets were non-zero (meaningful calibration)
+                        if offset_w > 0 or offset_h > 0:
+                            click.secho(f"✓ Viewport set to {actual_w}×{actual_h} (offsets not saved).", fg="yellow")
+                        else:
+                            click.secho(f"✓ Viewport set to {actual_w}×{actual_h}.", fg="green")
                     resize_achieved = True
                     break
 
@@ -1998,6 +2120,7 @@ def record(
         with _builtin_open(script_path) as f:
             script_template = f.read()
     except FileNotFoundError:
+        set_vm_terminal_hidden(False)  # Restore terminal on error
         click.echo(f"Error: Script not found: {script_path}", err=True)
         sys.exit(1)
 
@@ -2059,6 +2182,7 @@ def record(
                 click.echo(err=True)
                 click.echo(f"  Technical details: {error}", err=True)
             click.echo()
+            set_vm_terminal_hidden(False)  # Restore terminal on error
             sys.exit(1)
 
         response = result.get("result", {})
@@ -2068,6 +2192,10 @@ def record(
         initial_scroll = response.get("scroll", {"x": 0, "y": 0})
         zoom = response.get("zoom", 1.0)
         user_agent = response.get("userAgent", "")
+
+        # Extract window mode (fullscreen/kiosk/normal)
+        window_mode_info = response.get("windowMode", {})
+        window_mode = window_mode_info.get("mode") if window_mode_info else None
 
         # Fetch actual browser zoom level via Chrome extension API
         browser_zoom_level = 1.0
@@ -2148,12 +2276,17 @@ def record(
                 pass  # Audio is optional
 
         # Display recording header
-        from inspekt.config import is_nerdfont_enabled
+        from inspekt.config import is_nerdfont_enabled, is_isolated_mode
         record_icon = "\U000f044a " if is_nerdfont_enabled() else ""  # 󰑊 nf-md-record
         recording_label = click.style(f"{record_icon}Now recording", fg="red", bold=True)
         ctrl_c = click.style(" Ctrl+C ", fg="black", bg="bright_yellow")
         click.echo(f"\n{recording_label}: {start_url}")
         click.echo(f"Press {ctrl_c} to stop and save\n")
+
+        # In VM mode, emit escape sequence to auto-hide terminal
+        # This allows the user to immediately interact with the browser
+        if is_isolated_mode():
+            print('\033]1337;hide-terminal\007', end='', flush=True)
 
         # Prepare poll and stop codes
         poll_code = script_template.replace("ACTION_PLACEHOLDER", "poll")
@@ -2222,6 +2355,9 @@ def record(
         def do_cleanup(allow_retry: bool = True):
             nonlocal all_steps
 
+            # In VM mode, show the terminal overlay again (recording is stopping)
+            set_vm_terminal_hidden(False)
+
             click.echo("\nStopping recording… " + success_icon(""))
 
             # Play stop/completion sound (target the specific browser we're recording in)
@@ -2274,6 +2410,7 @@ def record(
                 ),
                 require_viewport_match=match_viewport,
                 require_zoom_match=match_zoom_level,
+                window_mode=window_mode,  # fullscreen/kiosk/normal
             )
 
             # Capture additional state if --capture-state flag was used
@@ -2526,7 +2663,7 @@ def record(
 
             # Open file if --open flag was set (or deprecated --edit)
             if should_open:
-                click.launch(str(output_path))
+                open_or_download(output_path)
 
             # Auto-replay if --replay flag was set
             if replay:
@@ -3471,11 +3608,11 @@ def list_recordings(limit: Optional[int], output_json: bool):
     # Show tip if no assertions exist
     if total_assertions == 0 and len(rows) > 0:
         click.echo()
-        tip_label = click.style("TIP:", fg="cyan", bold=True)
+        from inspekt.app.cli.table import print_hint, _style_with_inline_code
+        print_hint("Add assertions to your recordings to verify expected outcomes.")
         doc_link = click.style("http://localhost:8008/guide/recording-replay/#adding-assertions", fg="blue", underline=True)
-        click.echo(f"{tip_label} Add assertions to your recordings to verify expected outcomes.")
-        click.echo(f"     See {doc_link}")
-        click.echo(f"     (requires: inspekt start --docs)")
+        click.echo(f"  See {doc_link}")
+        click.echo(_style_with_inline_code("  (requires: `inspekt start --docs`)", base_fg="white"))
 
 
 @record.command("show")
@@ -3659,10 +3796,8 @@ def record_tutorial(speak: bool):
     client = BridgeClient()
 
     if not client.is_alive():
-        click.echo(
-            "Error: Bridge server is not running. Start it with: inspekt start",
-            err=True,
-        )
+        from inspekt.app.cli.table import _style_with_inline_code
+        click.echo(_style_with_inline_code("Error: Bridge server is not running. Start it with `inspekt start`.", base_fg="red"), err=True)
         sys.exit(1)
 
     # Introduction
@@ -3671,7 +3806,8 @@ def record_tutorial(speak: bool):
     click.echo()
     click.echo("  " + "─" * 50)
     click.echo()
-    click.echo("  `inspekt record` allows you to capture an exact")
+    from inspekt.app.cli.table import _style_with_inline_code
+    click.echo(_style_with_inline_code("  `inspekt record` allows you to capture an exact", base_fg="white"))
     click.echo("  browsing session from the terminal.")
     click.echo()
     click.echo("  It tracks:")

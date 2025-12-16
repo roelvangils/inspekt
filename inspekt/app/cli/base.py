@@ -98,9 +98,54 @@ class CustomGroup(click.Group):
     Commands are only imported when they are actually invoked.
     """
 
+    # Options that need helpful hints when missing arguments
+    _rule_options_hints = {
+        "--enable-rule": (
+            "Option '--enable-rule' requires a rule ID.\n\n"
+            "Examples:\n"
+            "  inspekt axe --enable-rule color-contrast\n"
+            "  inspekt axe --enable-rule color-contrast,label,link-name\n\n"
+            "Run 'inspekt axe --list-rules' to see all available rule IDs."
+        ),
+        "--disable-rule": (
+            "Option '--disable-rule' requires a rule ID.\n\n"
+            "Examples:\n"
+            "  inspekt axe --disable-rule color-contrast\n"
+            "  inspekt axe --disable-rule color-contrast,label,link-name\n\n"
+            "Run 'inspekt axe --list-rules' to see all available rule IDs."
+        ),
+    }
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._lazy_commands = {}
+
+    def main(self, *args, standalone_mode=True, **kwargs):
+        """Override main to provide helpful error messages for specific options."""
+        try:
+            return super().main(*args, standalone_mode=False, **kwargs)
+        except click.UsageError as e:
+            # Check if this is a "requires an argument" error for our special options
+            error_msg = str(e)
+            for opt, hint in self._rule_options_hints.items():
+                if f"'{opt}' requires an argument" in error_msg:
+                    e = click.UsageError(hint)
+                    break
+
+            if standalone_mode:
+                e.show()
+                raise SystemExit(e.exit_code)
+            raise
+        except click.ClickException as e:
+            if standalone_mode:
+                e.show()
+                raise SystemExit(e.exit_code)
+            raise
+        except click.Abort:
+            if standalone_mode:
+                click.echo("Aborted!", err=True)
+                raise SystemExit(1)
+            raise
 
     def add_lazy_command(self, name: str, module_path: str, attr: str):
         """

@@ -117,7 +117,93 @@ inspekt--help
 ```
 
 !!! success "Installation Complete"
-    The CLI tool is now installed! Next, we'll set up the browser connection.
+    The CLI tool is now installed! Next, we'll enable shell completion for a better experience.
+
+---
+
+## Step 1.5: Enable Shell Completion (Recommended)
+
+Shell completion enables tab-completion for all Inspekt commands, options, and arguments. This makes the CLI much faster and easier to use.
+
+### Quick Install
+
+The easiest way to enable completion is with the install command:
+
+```bash
+inspekt completion install
+```
+
+This auto-detects your shell (bash, zsh, or fish) and adds the completion script to your shell configuration file.
+
+Example output:
+
+```
+Detected shell: zsh
+Completion installed to /Users/you/.zshrc
+
+Reload with: source /Users/you/.zshrc
+```
+
+### Check Status
+
+To see if completion is already installed:
+
+```bash
+inspekt completion status
+```
+
+### Manual Installation
+
+If you prefer to install manually:
+
+=== "Bash"
+
+    ```bash
+    # Add to ~/.bashrc
+    inspekt completion bash >> ~/.bashrc
+    source ~/.bashrc
+    ```
+
+=== "Zsh"
+
+    ```bash
+    # Add to ~/.zshrc
+    inspekt completion zsh >> ~/.zshrc
+    source ~/.zshrc
+    ```
+
+=== "Fish"
+
+    ```bash
+    # Save to completions directory
+    inspekt completion fish > ~/.config/fish/completions/inspekt.fish
+    ```
+
+### Available Completion Commands
+
+| Command | Description |
+|---------|-------------|
+| `inspekt completion install` | Auto-detect shell and install completion |
+| `inspekt completion install -s zsh` | Install for specific shell |
+| `inspekt completion install --force` | Reinstall (overwrite existing) |
+| `inspekt completion status` | Check if completion is installed |
+| `inspekt completion uninstall` | Remove completion from config |
+| `inspekt completion bash` | Output bash completion script |
+| `inspekt completion zsh` | Output zsh completion script |
+| `inspekt completion fish` | Output fish completion script |
+
+### What Gets Completed?
+
+With shell completion enabled, you can tab-complete:
+
+- **Commands**: `inspekt rec<TAB>` → `inspekt record`
+- **Subcommands**: `inspekt record l<TAB>` → `inspekt record list`
+- **Options**: `inspekt replay --<TAB>` → shows all available options
+- **Recording files**: `inspekt replay rec<TAB>` → completes `recording_*.yaml` files
+- **Plugin names**: `inspekt plugin run <TAB>` → shows available plugins
+
+!!! tip "Restart Your Shell"
+    After installing completion, restart your terminal or run `source ~/.zshrc` (or equivalent) to activate it.
 
 ---
 

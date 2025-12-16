@@ -28,6 +28,7 @@ import requests
 from PIL import Image
 
 from inspekt.app.cli.base import builtin_open, get_ai_language
+from inspekt.app.cli.icons import success, error, cached as cached_icon, get_indicator
 from inspekt.client import BridgeClient
 from inspekt.services.action_cache import ActionCache
 from inspekt.services.action_matcher import ActionMatcher
@@ -99,12 +100,13 @@ def describe(language, debug, force_refresh):
     to understand what the page offers at a glance.
 
     Examples:
-        zen describe
+        inspekt describe
     """
     client = BridgeClient()
 
     if not client.is_alive():
-        click.echo("Error: Bridge server is not running. Start it with: inspekt start", err=True)
+        from inspekt.app.cli.table import _style_with_inline_code
+        click.echo(_style_with_inline_code("Error: Bridge server is not running. Start it with `inspekt start`.", base_fg="red"), err=True)
         sys.exit(1)
 
     # Load and execute the extraction script
@@ -169,7 +171,7 @@ def describe(language, debug, force_refresh):
                 else:
                     age_str = f"{age_seconds // 86400} days ago"
 
-                click.echo(click.style(f"✓ Using cached description (similarity: {similarity:.0%}, cached {age_str}) [CACHED]", fg="cyan", bold=True), err=True)
+                click.echo(click.style(cached_icon(f"Using cached description (similarity: {similarity:.0%}, cached {age_str})"), fg="cyan", bold=True), err=True)
                 click.echo()
                 click.echo(cached_result["output"])
                 return
@@ -196,7 +198,7 @@ def describe(language, debug, force_refresh):
         if content_cache.is_enabled("describe") and current_url:
             fingerprint = content_cache.create_describe_fingerprint(page_data)
             content_cache.store_content(current_url, "describe", fingerprint, output, target_lang or "auto")
-            click.echo(click.style("✓ Description cached for future use", fg="green"), err=True)
+            click.echo(click.style(success("Description cached for future use"), fg="green"), err=True)
             click.echo()
 
         click.echo(output)
@@ -260,7 +262,7 @@ def _execute_element_action(client: BridgeClient, action_id: str, element: dict)
     result = client.execute(inspect_script, timeout=10.0)
 
     if not result.get("ok"):
-        click.echo(click.style(f"✗ Failed to execute action: {result.get('error')}", fg="red"), err=True)
+        click.echo(click.style(error(f"Failed to execute action: {result.get('error')}"), fg="red"), err=True)
         sys.exit(1)
 
     action_result = result.get("result", {})
@@ -282,7 +284,7 @@ def _execute_element_action(client: BridgeClient, action_id: str, element: dict)
         client.execute(navigate_script, timeout=5.0)
 
         # Show navigation info
-        click.echo(click.style("✓ Action executed successfully!", fg="green", bold=True))
+        click.echo(click.style(success("Action executed successfully!"), fg="green", bold=True))
         path = element_info.get("path", "")
         is_external = element_info.get("isExternal", False)
 
@@ -307,7 +309,7 @@ def _execute_element_action(client: BridgeClient, action_id: str, element: dict)
         client.execute(click_script, timeout=5.0)
 
         # Show click info
-        click.echo(click.style("✓ Action executed successfully!", fg="green", bold=True))
+        click.echo(click.style(success("Action executed successfully!"), fg="green", bold=True))
         click.echo(f"  Clicked: <{element_info.get('tag')}>")
         if element_info.get('text'):
             click.echo(f"  Text: {element_info.get('text')}")
@@ -334,15 +336,16 @@ def do(instruction, debug, no_execute, force_ai):
     confirmation of what was clicked.
 
     Examples:
-        zen do "Go to the homepage"          # Auto-executes if high confidence
-        zen do "Click the login button"      # Asks for confirmation if lower confidence
-        zen do "Search for products"
-        zen do "Submit form" --no-execute    # Just show matches, don't execute
+        inspekt do "Go to the homepage"          # Auto-executes if high confidence
+        inspekt do "Click the login button"      # Asks for confirmation if lower confidence
+        inspekt do "Search for products"
+        inspekt do "Submit form" --no-execute    # Just show matches, don't execute
     """
     client = BridgeClient()
 
     if not client.is_alive():
-        click.echo("Error: Bridge server is not running. Start it with: inspekt start", err=True)
+        from inspekt.app.cli.table import _style_with_inline_code
+        click.echo(_style_with_inline_code("Error: Bridge server is not running. Start it with `inspekt start`.", base_fg="red"), err=True)
         sys.exit(1)
 
     # Load and execute the extraction script
@@ -422,7 +425,7 @@ def do(instruction, debug, no_execute, force_ai):
                             matched_element = el
                             match_method = "CACHED"
                             match_score = 1.0
-                            click.echo(click.style(f"✓ Found cached match (similarity: {cached_action['similarity']:.0%})", fg="cyan", bold=True), err=True)
+                            click.echo(click.style(cached_icon(f"Found cached match (similarity: {cached_action['similarity']:.0%})"), fg="cyan", bold=True), err=True)
                             break
 
             # 2. TRY LITERAL MATCHING
@@ -432,7 +435,7 @@ def do(instruction, debug, no_execute, force_ai):
                     matched_element = literal_match["element"]
                     match_method = "LITERAL"
                     match_score = literal_match["score"]
-                    click.echo(click.style(f"✓ Found literal match (score: {match_score:.0%})", fg="cyan", bold=True), err=True)
+                    click.echo(click.style(success(f"Found literal match (score: {match_score:.0%})"), fg="cyan", bold=True), err=True)
 
             # 3. TRY COMMON ACTIONS
             if not matched_element:
@@ -441,7 +444,7 @@ def do(instruction, debug, no_execute, force_ai):
                     matched_element = common_match["element"]
                     match_method = "COMMON"
                     match_score = common_match["score"]
-                    click.echo(click.style(f"✓ Found common action match (score: {match_score:.0%})", fg="cyan", bold=True), err=True)
+                    click.echo(click.style(success(f"Found common action match (score: {match_score:.0%})"), fg="cyan", bold=True), err=True)
 
             # 4. TRY ADVANCED MATCHING (Fuzzy + Synonyms)
             if not matched_element:
@@ -451,7 +454,7 @@ def do(instruction, debug, no_execute, force_ai):
                     matched_element = fuzzy_match["element"]
                     match_method = "FUZZY"
                     match_score = fuzzy_match["score"]
-                    click.echo(click.style(f"✓ Found fuzzy match (score: {match_score:.0%})", fg="cyan", bold=True), err=True)
+                    click.echo(click.style(success(f"Found fuzzy match (score: {match_score:.0%})"), fg="cyan", bold=True), err=True)
 
             if not matched_element:
                 # Try synonym matching
@@ -460,7 +463,7 @@ def do(instruction, debug, no_execute, force_ai):
                     matched_element = synonym_match["element"]
                     match_method = "SYNONYM"
                     match_score = synonym_match["score"]
-                    click.echo(click.style(f"✓ Found synonym match (score: {match_score:.0%})", fg="cyan", bold=True), err=True)
+                    click.echo(click.style(success(f"Found synonym match (score: {match_score:.0%})"), fg="cyan", bold=True), err=True)
 
         # If we found a match without AI, skip to execution
         if matched_element and not debug:
@@ -496,7 +499,7 @@ def do(instruction, debug, no_execute, force_ai):
                 # Store in cache for future use
                 if cache.is_enabled() and match_method != "CACHED":
                     cache.store_action(current_url, instruction, action_normalized, matched_element, page_data)
-                    click.echo(click.style("✓ Action cached for future use", fg="green"), err=True)
+                    click.echo(click.style(success("Action cached for future use"), fg="green"), err=True)
 
                 return  # Exit successfully without calling AI
 
@@ -656,10 +659,10 @@ def do(instruction, debug, no_execute, force_ai):
                         # Store in cache for future use [AI]
                         if cache.is_enabled():
                             cache.store_action(current_url, instruction, action_normalized, top_element, page_data)
-                            click.echo(click.style("✓ Action cached for future use [AI]", fg="green"), err=True)
+                            click.echo(click.style(success("Action cached for future use [AI]"), fg="green"), err=True)
 
                     except (ConnectionError, TimeoutError, RuntimeError) as e:
-                        click.echo(click.style(f"✗ Error executing action: {e}", fg="red"), err=True)
+                        click.echo(click.style(error(f"Error executing action: {e}"), fg="red"), err=True)
                         sys.exit(1)
 
             # Output as JSON for easy parsing
@@ -742,14 +745,15 @@ def outline(output_json, truncate):
     Indicates missing levels (red), duplicates (yellow), and ARIA headings (gray).
 
     Examples:
-        zen outline
-        zen outline --json
-        zen outline --truncate 80
+        inspekt outline
+        inspekt outline --json
+        inspekt outline --truncate 80
     """
     client = BridgeClient()
 
     if not client.is_alive():
-        click.echo("Error: Bridge server is not running. Start it with: inspekt start", err=True)
+        from inspekt.app.cli.table import _style_with_inline_code
+        click.echo(_style_with_inline_code("Error: Bridge server is not running. Start it with `inspekt start`.", base_fg="red"), err=True)
         sys.exit(1)
 
     # Load and execute the extract_outline script
@@ -1030,18 +1034,19 @@ def links(only_internal, only_external, alphabetically, only_urls, output_json, 
     Use filters to show only internal or external links.
 
     Examples:
-        zen links                           # All links with anchor text
-        zen links --only-internal           # Only links on same domain
-        zen links --only-external           # Only links to other domains
-        zen links --alphabetically          # Sort alphabetically
-        zen links --only-urls               # Show only URLs
-        zen links --only-external --only-urls  # External URLs only
-        zen links --enrich-external         # Add metadata for external links
+        inspekt links                           # All links with anchor text
+        inspekt links --only-internal           # Only links on same domain
+        inspekt links --only-external           # Only links to other domains
+        inspekt links --alphabetically          # Sort alphabetically
+        inspekt links --only-urls               # Show only URLs
+        inspekt links --only-external --only-urls  # External URLs only
+        inspekt links --enrich-external         # Add metadata for external links
     """
     client = BridgeClient()
 
     if not client.is_alive():
-        click.echo("Error: Bridge server is not running. Start it with: inspekt start", err=True)
+        from inspekt.app.cli.table import _style_with_inline_code
+        click.echo(_style_with_inline_code("Error: Bridge server is not running. Start it with `inspekt start`.", base_fg="red"), err=True)
         sys.exit(1)
 
     # Check for conflicting flags
@@ -1119,7 +1124,9 @@ def links(only_internal, only_external, alphabetically, only_urls, output_json, 
                 if len(text) > 60:
                     text = text[:57] + "..."
                 # Show type indicator
-                type_indicator = "↗" if link["type"] == "external" else "→"
+                ext_icon = get_indicator("external") or "↗"
+                int_icon = get_indicator("internal") or "→"
+                type_indicator = ext_icon if link["type"] == "external" else int_icon
                 click.echo(f"{type_indicator} {text}")
                 click.echo(f"  {href}")
 
@@ -1197,13 +1204,14 @@ def summarize(format, language, debug, force_refresh):
     a concise summary using the mods command.
 
     Examples:
-        zen summarize                    # Get AI summary
-        zen summarize --format full      # Show full extracted article
+        inspekt summarize                    # Get AI summary
+        inspekt summarize --format full      # Show full extracted article
     """
     client = BridgeClient()
 
     if not client.is_alive():
-        click.echo("Error: Bridge server is not running. Start it with: inspekt start", err=True)
+        from inspekt.app.cli.table import _style_with_inline_code
+        click.echo(_style_with_inline_code("Error: Bridge server is not running. Start it with `inspekt start`.", base_fg="red"), err=True)
         sys.exit(1)
 
     # Load and execute the extract_article script
@@ -1285,7 +1293,7 @@ def summarize(format, language, debug, force_refresh):
                 else:
                     age_str = f"{age_seconds // 86400} days ago"
 
-                click.echo(click.style(f"✓ Using cached summary (similarity: {similarity:.0%}, cached {age_str}) [CACHED]", fg="cyan", bold=True), err=True)
+                click.echo(click.style(cached_icon(f"Using cached summary (similarity: {similarity:.0%}, cached {age_str})"), fg="cyan", bold=True), err=True)
                 click.echo()
                 if byline:
                     click.echo(f"By: {byline}")
@@ -1315,7 +1323,7 @@ def summarize(format, language, debug, force_refresh):
         if content_cache.is_enabled("summarize") and current_url:
             fingerprint = content_cache.create_summarize_fingerprint(article_data)
             content_cache.store_content(current_url, "summarize", fingerprint, output, target_lang or "auto")
-            click.echo(click.style("✓ Summary cached for future use", fg="green"), err=True)
+            click.echo(click.style(success("Summary cached for future use"), fg="green"), err=True)
             click.echo()
 
         if byline:
@@ -1343,18 +1351,19 @@ def index(no_cache, output):
     - Interactive elements (links, buttons, form controls) with accessible names
     - Images with alt text
 
-    The indexed page is saved to cache and can be used by the 'zen ask' command
+    The indexed page is saved to cache and can be used by the 'inspekt ask' command
     to answer questions about the page content.
 
     Examples:
-        zen index                    # Index and cache current page
-        zen index --no-cache         # Index but don't cache
-        zen index -o page.md         # Save to specific file
+        inspekt index                    # Index and cache current page
+        inspekt index --no-cache         # Index but don't cache
+        inspekt index -o page.md         # Save to specific file
     """
     client = BridgeClient()
 
     if not client.is_alive():
-        click.echo("Error: Bridge server is not running. Start it with: inspekt start", err=True)
+        from inspekt.app.cli.table import _style_with_inline_code
+        click.echo(_style_with_inline_code("Error: Bridge server is not running. Start it with `inspekt start`.", base_fg="red"), err=True)
         sys.exit(1)
 
     # Load and execute the index_page script
@@ -1431,7 +1440,7 @@ def index(no_cache, output):
 
                         if pattern in indexed_content:
                             indexed_content = indexed_content.replace(pattern, replacement, 1)
-                            click.echo("✓ Vision description inserted", err=True)
+                            click.echo(success("Vision description inserted"), err=True)
                         else:
                             click.echo(f"Warning: Could not find image pattern in markdown: {pattern}", err=True)
                     else:
@@ -1442,7 +1451,7 @@ def index(no_cache, output):
                             header = parts[0] + '---\n\n'
                             content = parts[1]
                             indexed_content = header + f"![Largest image on page (no alt text)] ({img_width}x{img_height}px)\n\nVisual description of this image: \"{vision_description}\"\n\n" + content
-                            click.echo("✓ Vision description inserted (no alt text)", err=True)
+                            click.echo(success("Vision description inserted (no alt text)"), err=True)
                 else:
                     click.echo("Warning: No vision description received", err=True)
 
@@ -1460,7 +1469,7 @@ def index(no_cache, output):
             output_path.parent.mkdir(parents=True, exist_ok=True)
             with builtin_open(output_path, 'w', encoding='utf-8') as f:
                 f.write(indexed_content)
-            click.echo(f"\n✓ Saved to: {output_path}", err=True)
+            click.echo(f"\n{success(f'Saved to: {output_path}')}", err=True)
 
         elif not no_cache:
             # Save to cache directory
@@ -1488,7 +1497,7 @@ def index(no_cache, output):
             with builtin_open(cache_path, 'w', encoding='utf-8') as f:
                 f.write(indexed_content)
 
-            click.echo(f"\n✓ Cached to: {cache_path}", err=True)
+            click.echo(f"\n{success(f'Cached to: {cache_path}')}", err=True)
 
             # Also save a metadata file with URL and timestamp
             import time
@@ -1516,22 +1525,23 @@ def ask(question, debug, no_cache):
     Ask a question about the current page using AI.
 
     By default, this command uses the cached index of the current page
-    (created by 'zen index'). Use --no-cache to force re-indexing.
+    (created by 'inspekt index'). Use --no-cache to force re-indexing.
 
     The AI has access to the full semantic structure, all text content,
     interactive elements, accessible names, and vision AI descriptions.
 
     Examples:
-        zen index                              # First, index the page
-        zen ask "What is this page about?"     # Uses cache
-        zen ask "What's the nutriscore?"       # Uses cache
-        zen ask "What's in the image?"         # Vision description from cache
-        zen ask "Summarize" --no-cache         # Force re-index
+        inspekt index                              # First, index the page
+        inspekt ask "What is this page about?"     # Uses cache
+        inspekt ask "What's the nutriscore?"       # Uses cache
+        inspekt ask "What's in the image?"         # Vision description from cache
+        inspekt ask "Summarize" --no-cache         # Force re-index
     """
     client = BridgeClient()
 
     if not client.is_alive():
-        click.echo("Error: Bridge server is not running. Start it with: inspekt start", err=True)
+        from inspekt.app.cli.table import _style_with_inline_code
+        click.echo(_style_with_inline_code("Error: Bridge server is not running. Start it with `inspekt start`.", base_fg="red"), err=True)
         sys.exit(1)
 
     # Initialize content cache for AI response caching
@@ -1567,7 +1577,7 @@ def ask(question, debug, no_cache):
             else:
                 age_str = f"{age_minutes // 60}h ago"
 
-            click.echo(f"✓ Using cached AI response ({age_str})", err=True)
+            click.echo(cached_icon(f"Using cached AI response ({age_str})"), err=True)
             click.echo()
             click.echo(cached["output"])
             return
@@ -1590,7 +1600,7 @@ def ask(question, debug, no_cache):
                     cache_file = max(cache_files, key=lambda p: p.stat().st_mtime)
                     with builtin_open(cache_file, 'r', encoding='utf-8') as f:
                         indexed_content = f.read()
-                    click.echo(f"✓ Using cached index for current page", err=True)
+                    click.echo(cached_icon("Using cached index for current page"), err=True)
                 else:
                     click.echo("No cache found for current page, indexing...", err=True)
             else:

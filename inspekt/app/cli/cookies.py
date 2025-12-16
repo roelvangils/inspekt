@@ -26,14 +26,16 @@ import sys
 
 import click
 
+from inspekt.app.cli.icons import success, warning as warn_icon
 from inspekt.services.bridge_executor import get_executor
 from inspekt.services.script_loader import ScriptLoader
 
 
 def _show_deprecation_warning():
     """Show deprecation warning for cookies command group."""
+    deprecation_msg = "'inspekt cookies' is deprecated and will be removed in v2.0.0"
     click.echo(
-        "⚠ Warning: 'inspekt cookies' is deprecated and will be removed in v2.0.0\n"
+        f"{warn_icon(deprecation_msg)}\n"
         "   Use 'inspekt storage --cookies' instead\n"
         "   Example: inspekt cookies list → inspekt storage list --cookies\n",
         err=True
@@ -53,8 +55,8 @@ def cookies_list(output_json):
     List all cookies for the current page.
 
     Example:
-        zen cookies list
-        zen cookies list --json
+        inspekt cookies list
+        inspekt cookies list --json
     """
     _show_deprecation_warning()
     _execute_cookie_action("list", output_json=output_json)
@@ -68,8 +70,8 @@ def cookies_get(name, output_json):
     Get the value of a specific cookie.
 
     Example:
-        zen cookies get session_id
-        zen cookies get session_id --json
+        inspekt cookies get session_id
+        inspekt cookies get session_id --json
     """
     _show_deprecation_warning()
     _execute_cookie_action("get", cookie_name=name, output_json=output_json)
@@ -93,9 +95,9 @@ def cookies_set(name, value, max_age, expires, path, domain, secure, same_site):
     Set a cookie.
 
     Examples:
-        zen cookies set session_id abc123
-        zen cookies set token xyz --max-age 3600
-        zen cookies set user_pref dark --path / --secure
+        inspekt cookies set session_id abc123
+        inspekt cookies set token xyz --max-age 3600
+        inspekt cookies set user_pref dark --path / --secure
     """
     _show_deprecation_warning()
     options = {"path": path}
@@ -120,7 +122,7 @@ def cookies_delete(name):
     Delete a specific cookie.
 
     Example:
-        zen cookies delete session_id
+        inspekt cookies delete session_id
     """
     _show_deprecation_warning()
     _execute_cookie_action("delete", cookie_name=name)
@@ -132,7 +134,7 @@ def cookies_clear():
     Clear all cookies for the current page.
 
     Example:
-        zen cookies clear
+        inspekt cookies clear
     """
     _show_deprecation_warning()
     _execute_cookie_action("clear")
@@ -378,11 +380,11 @@ def _execute_cookie_action(action, cookie_name="", cookie_value="", options=None
             sys.exit(1)
 
     elif action == "set":
-        click.echo(f"✓ Cookie set: {response.get('name')} = {response.get('value')}")
+        click.echo(success(f"Cookie set: {response.get('name')} = {response.get('value')}"))
 
     elif action == "delete":
-        click.echo(f"✓ Cookie deleted: {response.get('name')}")
+        click.echo(success(f"Cookie deleted: {response.get('name')}"))
 
     elif action == "clear":
         deleted = response.get("deleted", 0)
-        click.echo(f"✓ Cleared {deleted} cookie(s)")
+        click.echo(success(f"Cleared {deleted} cookie(s)"))

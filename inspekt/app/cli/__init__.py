@@ -30,35 +30,227 @@ def cli(ctx, verbose):
         os.environ['INSPEKT_VERBOSE'] = '1'
 
 
-@cli.command()
-@click.argument('shell', type=click.Choice(['bash', 'zsh', 'fish']))
-def completion(shell: str):
-    """Generate shell completion script.
+@cli.group()
+def completion():
+    """Shell tab completion setup.
 
-    Install with:
-
-    \b
-      # Bash
-      inspekt completion bash >> ~/.bashrc
+    Generate completion scripts or install them automatically.
 
     \b
-      # Zsh
-      inspekt completion zsh >> ~/.zshrc
-
-    \b
-      # Fish
-      inspekt completion fish > ~/.config/fish/completions/inspekt.fish
-
-    Then restart your shell or source the file.
+    Examples:
+        inspekt completion install    # Auto-detect shell and install
+        inspekt completion status     # Check if installed
+        inspekt completion bash       # Output bash script
     """
+    pass
+
+
+def _get_completion_script(shell: str) -> str:
+    """Generate the completion script for a shell."""
     from click.shell_completion import get_completion_class
-
-    # Get the completion class for the requested shell
     completion_class = get_completion_class(shell)
-
-    # Create a completer instance and generate the source script
     completer = completion_class(cli, {}, "inspekt", "_INSPEKT_COMPLETE")
-    click.echo(completer.source())
+    return completer.source()
+
+
+def _detect_shell() -> str | None:
+    """Detect the current shell from environment."""
+    import os
+    from pathlib import Path
+    shell_path = os.environ.get("SHELL", "")
+    shell_name = Path(shell_path).name if shell_path else ""
+
+    if "zsh" in shell_name:
+        return "zsh"
+    elif "bash" in shell_name:
+        return "bash"
+    elif "fish" in shell_name:
+        return "fish"
+    return None
+
+
+def _get_rc_file(shell: str):
+    """Get the config file path for a shell."""
+    from pathlib import Path
+    if shell == "zsh":
+        return Path.home() / ".zshrc"
+    elif shell == "fish":
+        return Path.home() / ".config" / "fish" / "completions" / "inspekt.fish"
+    else:
+        return Path.home() / ".bashrc"
+
+
+def _is_completion_installed(rc_file) -> bool:
+    """Check if completion is already installed."""
+    if not rc_file.exists():
+        return False
+    content = rc_file.read_text()
+    return "# inspekt shell completion" in content or "_INSPEKT_COMPLETE" in content
+
+
+@completion.command("bash")
+def completion_bash():
+    """Output bash completion script.
+
+    \b
+    To install manually:
+        inspekt completion bash >> ~/.bashrc
+        source ~/.bashrc
+    """
+    click.echo(_get_completion_script("bash"))
+
+
+@completion.command("zsh")
+def completion_zsh():
+    """Output zsh completion script.
+
+    \b
+    To install manually:
+        inspekt completion zsh >> ~/.zshrc
+        source ~/.zshrc
+    """
+    click.echo(_get_completion_script("zsh"))
+
+
+@completion.command("fish")
+def completion_fish():
+    """Output fish completion script.
+
+    \b
+    To install manually:
+        inspekt completion fish > ~/.config/fish/completions/inspekt.fish
+    """
+    click.echo(_get_completion_script("fish"))
+
+
+@completion.command("install")
+@click.option("--shell", "-s", type=click.Choice(["bash", "zsh", "fish"]),
+              help="Shell to install for (auto-detected if not specified)")
+@click.option("--force", "-f", is_flag=True, help="Reinstall even if already installed")
+def completion_install(shell: str | None, force: bool):
+    """Install shell completion automatically.
+
+    Detects your shell and adds completion to your config file.
+
+    \b
+    Examples:
+        inspekt completion install           # Auto-detect
+        inspekt completion install -s zsh    # Specify shell
+        inspekt completion install --force   # Reinstall
+    """
+    import sys
+
+    # Auto-detect shell
+    if shell is None:
+        shell = _detect_shell()
+        if shell is None:
+            click.echo("Could not detect shell. Use --shell to specify.", err=True)
+            sys.exit(1)
+        click.echo(f"Detected shell: {shell}")
+
+    rc_file = _get_rc_file(shell)
+
+    # Check if already installed
+    if _is_completion_installed(rc_file) and not force:
+        click.secho(f"Completion already installed in {rc_file}", fg="green")
+        click.echo("Use --force to reinstall.")
+        return
+
+    # Generate script
+    script = _get_completion_script(shell)
+
+    # Install
+    try:
+        if shell == "fish":
+            rc_file.parent.mkdir(parents=True, exist_ok=True)
+            rc_file.write_text(script)
+        else:
+            with open(rc_file, "a") as f:
+                f.write(f"\n# inspekt shell completion\n{script}\n")
+
+        click.secho(f"Completion installed to {rc_file}", fg="green")
+        click.echo(f"\nReload with: source {rc_file}")
+
+    except PermissionError:
+        click.echo(f"Permission denied: {rc_file}", err=True)
+        sys.exit(1)
+    except Exception as e:
+        click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
+
+
+@completion.command("uninstall")
+@click.option("--shell", "-s", type=click.Choice(["bash", "zsh", "fish"]),
+              help="Shell to uninstall from (auto-detected if not specified)")
+def completion_uninstall(shell: str | None):
+    """Remove shell completion from config file.
+
+    \b
+    Examples:
+        inspekt completion uninstall
+        inspekt completion uninstall -s zsh
+    """
+    import sys
+
+    if shell is None:
+        shell = _detect_shell()
+        if shell is None:
+            click.echo("Could not detect shell. Use --shell to specify.", err=True)
+            sys.exit(1)
+
+    rc_file = _get_rc_file(shell)
+
+    if not _is_completion_installed(rc_file):
+        click.echo(f"Completion not found in {rc_file}")
+        return
+
+    # Remove completion lines
+    if shell == "fish":
+        # Fish uses separate file, just delete it
+        if rc_file.exists():
+            rc_file.unlink()
+            click.secho(f"Removed {rc_file}", fg="green")
+    else:
+        # Remove from bash/zsh rc file
+        lines = rc_file.read_text().splitlines()
+        new_lines = []
+        skip_block = False
+
+        for line in lines:
+            if "# inspekt shell completion" in line:
+                skip_block = True
+                continue
+            if skip_block and ("_INSPEKT_COMPLETE" in line or line.strip() == ""):
+                if "_INSPEKT_COMPLETE" in line:
+                    skip_block = False
+                continue
+            skip_block = False
+            new_lines.append(line)
+
+        rc_file.write_text("\n".join(new_lines) + "\n")
+        click.secho(f"Removed completion from {rc_file}", fg="green")
+
+    click.echo(f"Reload with: source {rc_file}")
+
+
+@completion.command("status")
+def completion_status():
+    """Check if shell completion is installed."""
+    shell = _detect_shell()
+    if shell is None:
+        click.echo("Could not detect shell.")
+        return
+
+    rc_file = _get_rc_file(shell)
+
+    click.echo(f"Shell:  {shell}")
+    click.echo(f"Config: {rc_file}")
+
+    if _is_completion_installed(rc_file):
+        click.secho("Status: installed", fg="green")
+    else:
+        click.secho("Status: not installed", fg="yellow")
+        click.echo("\nRun: inspekt completion install")
 
 
 @cli.command()
@@ -72,22 +264,9 @@ def setup(install_completion: bool):
 
     Run with --install-completion to automatically add completion to your shell config.
     """
-    import os
-    import subprocess
-    from pathlib import Path
-    from click.shell_completion import get_completion_class
-
     # Detect current shell
-    shell_path = os.environ.get('SHELL', '')
-    if 'zsh' in shell_path:
-        shell = 'zsh'
-        rc_file = Path.home() / '.zshrc'
-    elif 'fish' in shell_path:
-        shell = 'fish'
-        rc_file = Path.home() / '.config' / 'fish' / 'completions' / 'inspekt.fish'
-    else:
-        shell = 'bash'
-        rc_file = Path.home() / '.bashrc'
+    shell = _detect_shell() or "bash"
+    rc_file = _get_rc_file(shell)
 
     click.echo()
     click.secho("  Inspekt Setup Wizard", fg="cyan", bold=True)
@@ -103,51 +282,31 @@ def setup(install_completion: bool):
     click.secho("  Shell Completion", fg="yellow", bold=True)
     click.echo("  ----------------")
 
-    # Check if completion is already installed
-    completion_marker = "# inspekt shell completion" if shell != 'fish' else "_inspekt_completion"
-    already_installed = False
-
-    if rc_file.exists():
-        content = rc_file.read_text()
-        if completion_marker in content or "_inspekt_completion" in content:
-            already_installed = True
+    already_installed = _is_completion_installed(rc_file)
 
     if already_installed:
         click.secho("  Tab completion is already installed.", fg="green")
     elif install_completion:
-        # Auto-install completion
-        completion_class = get_completion_class(shell)
-        completer = completion_class(cli, {}, "inspekt", "_INSPEKT_COMPLETE")
-        script = completer.source()
+        # Auto-install completion using shared logic
+        script = _get_completion_script(shell)
 
         if shell == 'fish':
-            # Fish uses a separate file
             rc_file.parent.mkdir(parents=True, exist_ok=True)
             rc_file.write_text(script)
-            click.secho(f"  Completion installed to {rc_file}", fg="green")
         else:
-            # Bash/zsh append to rc file
             with open(rc_file, 'a') as f:
                 f.write(f"\n# inspekt shell completion\n{script}\n")
-            click.secho(f"  Completion added to {rc_file}", fg="green")
 
+        click.secho(f"  Completion installed to {rc_file}", fg="green")
         click.echo()
         click.secho("  Reload your shell or run:", fg="yellow")
-        if shell == 'fish':
-            click.echo(f"    source {rc_file}")
-        else:
-            click.echo(f"    source {rc_file}")
+        click.echo(f"    source {rc_file}")
     else:
         click.echo("  Tab completion is not installed.")
         click.echo()
-        click.echo("  To enable, run one of:")
+        click.echo("  To enable, run:")
         click.echo()
-        click.secho(f"    inspekt setup --install-completion", fg="green")
-        click.echo("    # or manually:")
-        if shell == 'fish':
-            click.echo(f"    inspekt completion {shell} > {rc_file}")
-        else:
-            click.echo(f"    inspekt completion {shell} >> {rc_file}")
+        click.secho("    inspekt completion install", fg="green")
 
     click.echo()
 
@@ -167,6 +326,34 @@ def setup(install_completion: bool):
     click.echo("  - Get help on any command:")
     click.echo("      inspekt <command> --help")
     click.echo()
+
+
+@cli.command()
+def config():
+    """Open the configuration file in your default editor.
+
+    If no config file exists, creates one at ~/.config/inspekt.json
+    with default settings.
+    """
+    import json
+    from pathlib import Path
+
+    from inspekt.config import find_config_file, DEFAULT_CONFIG
+    from inspekt.app.cli.util import open_or_download
+
+    config_path = find_config_file()
+
+    if config_path is None:
+        # Create default config at XDG location
+        config_path = Path.home() / ".config" / "inspekt.json"
+        config_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(config_path, "w") as f:
+            json.dump(DEFAULT_CONFIG, f, indent=2)
+        click.echo(f"Created new config file: {config_path}")
+
+    # Open in default editor (or download if in VM)
+    open_or_download(config_path)
+    click.echo(f"Opening: {config_path}")
 
 
 # ============================================================================
@@ -256,6 +443,9 @@ cli.add_lazy_command("record", "record", "record")
 
 # Replay commands (from replay.py)
 cli.add_lazy_command("replay", "replay", "replay")
+
+# Validation commands (from validation.py)
+cli.add_lazy_command("validate", "validation", "validate")
 
 # Info command group (from info.py)
 cli.add_lazy_command("info", "info", "info")

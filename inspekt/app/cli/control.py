@@ -5,6 +5,7 @@ both the bridge server and API server together.
 """
 
 import json
+import os
 import socket
 import subprocess
 import sys
@@ -12,8 +13,24 @@ import time
 
 import click
 
+from inspekt.app.cli.icons import success, error, info, progress
 from inspekt.client import BridgeClient
 from inspekt.services.axe_updater import get_axe_updater
+
+
+def _format_release_date(iso_date: str | None) -> str:
+    """Format ISO date string to human-readable format (e.g., 'October 9, 2025')."""
+    if not iso_date:
+        return ""
+    try:
+        from datetime import datetime
+        # Parse ISO date (e.g., "2025-10-09T16:39:18.813Z")
+        dt = datetime.fromisoformat(iso_date.replace("Z", "+00:00"))
+        # Use %d and strip leading zero manually for cross-platform compatibility
+        day = str(dt.day)  # No leading zero
+        return dt.strftime(f"%B {day}, %Y")  # "October 9, 2025"
+    except (ValueError, AttributeError):
+        return ""
 
 
 def _check_axe_updates():
@@ -22,20 +39,24 @@ def _check_axe_updates():
 
     try:
         # Check for updates (quick, non-blocking)
-        click.echo("  • Checking for axe-core updates…", err=True)
-        update_available, current, latest = updater.is_update_available()
+        click.echo(f"  {progress('Checking for axe-core updates…')}", err=True)
+        update_available, current, latest, release_date = updater.is_update_available()
 
         if not latest:
             # Network error or timeout - silently continue
             return
 
+        # Format release date for display
+        date_str = _format_release_date(release_date)
+        date_suffix = f" • {date_str}" if date_str else ""
+
         if not update_available:
             # Already on latest version
-            click.echo(f"  ✓ axe-core is up-to-date ({current})", err=True)
+            click.echo(f"  {success(f'axe-core is up-to-date ({current}{date_suffix})')}", err=True)
             return
 
         # Update available - prompt user
-        click.echo(f"  ✓ axe-core {latest} is available (current: {current})", err=True)
+        click.echo(f"  {success(f'axe-core {latest} is available{date_suffix} (current: {current})')}", err=True)
         click.echo("", err=True)
 
         # Ask user if they want to update
@@ -47,12 +68,13 @@ def _check_axe_updates():
                 click.echo(f"{msg}", err=True)
 
             # Perform update
-            success, message = updater.update_to_latest(progress_callback=show_progress)
+            update_success, message = updater.update_to_latest(progress_callback=show_progress)
 
-            if success:
-                click.echo(f"\n✓ {message}\n", err=True)
+            if update_success:
+                from inspekt.app.cli.icons import success as success_msg
+                click.echo(f"\n{success_msg(message)}\n", err=True)
             else:
-                click.echo(f"\n✗ Update failed: {message}", err=True)
+                click.echo(f"\n{error(f'Update failed: {message}')}", err=True)
                 click.echo("Continuing with current version.\n", err=True)
         else:
             click.echo("Skipping update.\n", err=True)
@@ -81,10 +103,10 @@ def _start_bridge_server(port=8765):
     bridge_client = BridgeClient(port=port)
 
     if bridge_client.is_alive():
-        click.echo(f"  • Bridge server is already running on ports {port} (HTTP) and {port + 1} (WebSocket)")
+        click.echo(f"  {info(f'Bridge server is already running on ports {port} (HTTP) and {port + 1} (WebSocket)')}")
         return True
 
-    click.echo("  • Starting bridge server…")
+    click.echo(f"  {progress('Starting bridge server…')}")
     subprocess.Popen(
         [sys.executable, "-m", "inspekt.bridge_ws"],
         stdout=subprocess.DEVNULL,
@@ -95,10 +117,10 @@ def _start_bridge_server(port=8765):
     # Wait for it to start
     time.sleep(1)
     if bridge_client.is_alive():
-        click.echo(f"  ✓ Bridge server started on ports {port} (HTTP) and {port + 1} (WebSocket)")
+        click.echo(f"  {success(f'Bridge server started on ports {port} (HTTP) and {port + 1} (WebSocket)')}")
         return True
     else:
-        click.echo("  ✗ Failed to start bridge server", err=True)
+        click.echo(f"  {error('Failed to start bridge server')}", err=True)
         return False
 
 
@@ -109,10 +131,10 @@ def _start_api_server(host="127.0.0.1", port=8000):
         bool: True if started successfully, False otherwise
     """
     if _is_port_open(host, port):
-        click.echo(f"  • API server is already running on {host}:{port}")
+        click.echo(f"  {info(f'API server is already running on {host}:{port}')}")
         return True
 
-    click.echo("  • Starting API server…")
+    click.echo(f"  {progress('Starting API server…')}")
     subprocess.Popen(
         [
             sys.executable, "-m", "uvicorn",
@@ -128,10 +150,10 @@ def _start_api_server(host="127.0.0.1", port=8000):
     # Wait for it to start
     time.sleep(1.5)
     if _is_port_open(host, port):
-        click.echo(f"  ✓ API server started on {host}:{port}")
+        click.echo(f"  {success(f'API server started on {host}:{port}')}")
         return True
     else:
-        click.echo("  ✗ Failed to start API server", err=True)
+        click.echo(f"  {error('Failed to start API server')}", err=True)
         return False
 
 
@@ -161,6 +183,84 @@ def _stop_api_server():
     return result.returncode == 0
 
 
+def _get_project_root():
+    """Get the Inspekt project root directory (where mkdocs.yml lives)."""
+    import inspekt
+    return os.path.dirname(os.path.dirname(inspekt.__file__))
+
+
+def _start_mkdocs_server(host="127.0.0.1", port=8008):
+    """Start the MkDocs documentation server in daemon mode.
+
+    Returns:
+        bool: True if started successfully, False otherwise
+    """
+    if _is_port_open(host, port):
+        click.echo(f"  {info(f'MkDocs server is already running on {host}:{port}')}")
+        return True
+
+    # MkDocs must run from the directory containing mkdocs.yml
+    project_root = _get_project_root()
+    mkdocs_config = os.path.join(project_root, "mkdocs.yml")
+
+    if not os.path.exists(mkdocs_config):
+        click.echo(f"  {error('mkdocs.yml not found - docs not available in this installation')}", err=True)
+        return False
+
+    click.echo(f"  {progress('Starting MkDocs server (building docs)…')}")
+    proc = subprocess.Popen(
+        [
+            sys.executable, "-m", "mkdocs",
+            "serve",
+            "--dev-addr", f"{host}:{port}",
+            "--quiet"
+        ],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        start_new_session=True,
+        cwd=project_root,  # Run from project root where mkdocs.yml lives
+    )
+
+    # Wait for it to start - MkDocs needs to build docs first
+    # Poll both the port AND the process status to fail fast if process dies
+    max_wait = 60  # generous timeout - large docs can take time
+    poll_interval = 0.5  # seconds
+    waited = 0
+    while waited < max_wait:
+        time.sleep(poll_interval)
+        waited += poll_interval
+
+        # Check if process is still running
+        if proc.poll() is not None:
+            # Process has exited - something went wrong
+            click.echo(f"  {error('MkDocs server exited unexpectedly')}", err=True)
+            click.echo(f"    Check that mkdocs is installed: pip install mkdocs mkdocs-material", err=True)
+            return False
+
+        # Check if port is now open
+        if _is_port_open(host, port):
+            click.echo(f"  {success(f'MkDocs server started on {host}:{port}')}")
+            return True
+
+    # Timeout - process is still running but port never opened
+    click.echo(f"  {error('MkDocs server timeout - docs may still be building')}", err=True)
+    click.echo(f"    Try opening http://{host}:{port} manually in a few seconds", err=True)
+    return False
+
+
+def _stop_mkdocs_server():
+    """Stop the MkDocs documentation server.
+
+    Returns:
+        bool: True if stopped, False if it wasn't running
+    """
+    result = subprocess.run(
+        ["pkill", "-f", "mkdocs serve"],
+        capture_output=True
+    )
+    return result.returncode == 0
+
+
 @click.command()
 @click.option("--bridge-only", is_flag=True, help="Start only the bridge server")
 @click.option("--api-only", is_flag=True, help="Start only the API server")
@@ -169,15 +269,19 @@ def _stop_api_server():
 @click.option("--api-port", type=int, default=8000, help="API server port (default: 8000)")
 @click.option("--bridge-port", type=int, default=8765, help="Bridge server port (default: 8765)")
 @click.option("--host", default="127.0.0.1", help="Host to bind to (default: 127.0.0.1)")
-def start(bridge_only, api_only, foreground, no_update_check, api_port, bridge_port, host):
+@click.option("--docs", is_flag=True, help="Start local MkDocs documentation server")
+@click.option("--docs-port", type=int, default=8008, help="MkDocs server port (default: 8008)")
+def start(bridge_only, api_only, foreground, no_update_check, api_port, bridge_port, host, docs, docs_port):
     """Start Inspekt servers (bridge + API) in daemon mode.
 
     By default, starts both bridge and API servers in background.
     Use --bridge-only or --api-only to start specific servers.
     Use --foreground for debugging (only works with single server).
+    Use --docs to also start a local MkDocs documentation server.
 
     Examples:
         inspekt start                      # Start both servers in background
+        inspekt start --docs               # Include local documentation server
         inspekt start --bridge-only        # Start only bridge server
         inspekt start --foreground         # Start both in foreground (interactive)
         inspekt start --no-update-check    # Skip axe-core update check
@@ -199,7 +303,7 @@ def start(bridge_only, api_only, foreground, no_update_check, api_port, bridge_p
     start_bridge = not api_only
     start_api = not bridge_only
 
-    success = True
+    start_success = True
 
     # Start bridge server
     if start_bridge:
@@ -220,7 +324,7 @@ def start(bridge_only, api_only, foreground, no_update_check, api_port, bridge_p
         else:
             # Start in daemon mode
             if not _start_bridge_server(port=bridge_port):
-                success = False
+                start_success = False
 
     # Start API server
     if start_api:
@@ -235,11 +339,11 @@ def start(bridge_only, api_only, foreground, no_update_check, api_port, bridge_p
             click.echo("Starting API server in foreground…")
             display_host = "localhost" if host == "127.0.0.1" else host
             click.echo(f"\nAPI server running at:")
-            click.echo(f"  • Status:        http://{display_host}:{api_port}/status")
-            click.echo(f"  • Swagger UI:    http://{display_host}:{api_port}/docs")
-            click.echo(f"  • ReDoc:         http://{display_host}:{api_port}/redoc")
-            click.echo(f"  • Health check:  http://{display_host}:{api_port}/health")
-            click.echo(f"  • API root:      http://{display_host}:{api_port}/")
+            click.echo(f"  {info(f'Status:        http://{display_host}:{api_port}/status')}")
+            click.echo(f"  {info(f'Swagger UI:    http://{display_host}:{api_port}/docs')}")
+            click.echo(f"  {info(f'ReDoc:         http://{display_host}:{api_port}/redoc')}")
+            click.echo(f"  {info(f'Health check:  http://{display_host}:{api_port}/health')}")
+            click.echo(f"  {info(f'API root:      http://{display_host}:{api_port}/')}")
             click.echo("\nPress Ctrl+C to stop the server\n")
 
             try:
@@ -255,30 +359,47 @@ def start(bridge_only, api_only, foreground, no_update_check, api_port, bridge_p
         else:
             # Start in daemon mode
             if not _start_api_server(host=host, port=api_port):
-                success = False
+                start_success = False
+
+    # Start MkDocs server if --docs flag is passed
+    if docs and start_success:
+        if not _start_mkdocs_server(host=host, port=docs_port):
+            start_success = False
 
     # Display summary
-    if success:
-        click.echo("\n✓ All servers started successfully\n")
+    if start_success:
+        click.echo(f"\n{success('All servers started successfully')}\n")
+
+        # Show docs first (most relevant when --docs is used)
+        if docs:
+            display_host = "localhost" if host == "127.0.0.1" else host
+            click.echo(f"Docs Server:")
+            click.echo(f"  {info(f'MkDocs:        http://{display_host}:{docs_port}')}")
+            click.echo(f"  {info(f'Swagger UI:    http://{display_host}:{api_port}/docs')}")
+            click.echo(f"  {info(f'ReDoc:         http://{display_host}:{api_port}/redoc')}")
 
         if start_bridge:
             click.echo(f"Bridge Server:")
-            click.echo(f"  • HTTP API:      http://127.0.0.1:{bridge_port}")
-            click.echo(f"  • WebSocket:     ws://127.0.0.1:{bridge_port + 1}")
+            click.echo(f"  {info(f'HTTP API:      http://127.0.0.1:{bridge_port}')}")
+            click.echo(f"  {info(f'WebSocket:     ws://127.0.0.1:{bridge_port + 1}')}")
 
         if start_api:
             display_host = "localhost" if host == "127.0.0.1" else host
             click.echo(f"\nAPI Server:")
-            click.echo(f"  • Status:        http://{display_host}:{api_port}/status")
-            click.echo(f"  • Swagger UI:    http://{display_host}:{api_port}/docs")
-            click.echo(f"  • ReDoc:         http://{display_host}:{api_port}/redoc")
-            click.echo(f"  • Health:        http://{display_host}:{api_port}/health")
+            click.echo(f"  {info(f'Status:        http://{display_host}:{api_port}/status')}")
+            click.echo(f"  {info(f'Health:        http://{display_host}:{api_port}/health')}")
 
         click.echo(f"\nWeb-based status: http://localhost:{api_port}/status")
         click.echo(f"View status: inspekt status")
         click.echo(f"Stop servers: inspekt stop")
+
+        # Show tip about --docs if not used
+        if not docs:
+            click.echo()
+            from inspekt.app.cli.table import print_hint
+            print_hint(f"Run with `--docs` to start a local documentation server at http://localhost:{docs_port}")
     else:
-        click.echo("\n✗ Failed to start one or more servers", err=True)
+        click.echo(f"\n{error('Failed to start one or more servers')}", err=True)
         sys.exit(1)
 
 
@@ -288,11 +409,11 @@ def start(bridge_only, api_only, foreground, no_update_check, api_port, bridge_p
 def stop(bridge_only, api_only):
     """Stop Inspekt servers.
 
-    By default, stops both bridge and API servers.
+    By default, stops all servers (bridge, API, and MkDocs if running).
     Use --bridge-only or --api-only to stop specific servers.
 
     Examples:
-        inspekt stop                # Stop both servers
+        inspekt stop                # Stop all servers
         inspekt stop --bridge-only  # Stop only bridge server
         inspekt stop --api-only     # Stop only API server
     """
@@ -304,30 +425,39 @@ def stop(bridge_only, api_only):
 
     bridge_stopped = False
     api_stopped = False
+    docs_stopped = False
 
-    # Stop API server first (depends on bridge)
+    # Stop MkDocs server first (if running)
+    click.echo(f"  {progress('Stopping MkDocs server…')}")
+    if _stop_mkdocs_server():
+        click.echo(f"    {success('MkDocs server stopped')}")
+        docs_stopped = True
+    else:
+        click.echo(f"    {info('MkDocs server was not running')}")
+
+    # Stop API server (depends on bridge)
     if stop_api:
-        click.echo("  • Stopping API server…")
+        click.echo(f"  {progress('Stopping API server…')}")
         if _stop_api_server():
-            click.echo("    ✓ API server stopped")
+            click.echo(f"    {success('API server stopped')}")
             api_stopped = True
         else:
-            click.echo("    • API server was not running")
+            click.echo(f"    {info('API server was not running')}")
 
     # Stop bridge server
     if stop_bridge:
-        click.echo("  • Stopping bridge server…")
+        click.echo(f"  {progress('Stopping bridge server…')}")
         if _stop_bridge_server():
-            click.echo("    ✓ Bridge server stopped")
+            click.echo(f"    {success('Bridge server stopped')}")
             bridge_stopped = True
         else:
-            click.echo("    • Bridge server was not running")
+            click.echo(f"    {info('Bridge server was not running')}")
 
     # Summary
-    if bridge_stopped or api_stopped:
-        click.echo("\n✓ Server(s) stopped successfully")
+    if bridge_stopped or api_stopped or docs_stopped:
+        click.echo(f"\n{success('Server(s) stopped successfully')}")
     else:
-        click.echo("\n• No servers were running")
+        click.echo(f"\n{info('No servers were running')}")
 
     # Note about foreground processes
     if stop_bridge or stop_api:
@@ -339,33 +469,44 @@ def stop(bridge_only, api_only):
 @click.option("--api-port", type=int, default=8000, help="API server port (default: 8000)")
 @click.option("--bridge-port", type=int, default=8765, help="Bridge server port (default: 8765)")
 @click.option("--host", default="127.0.0.1", help="Host to bind to (default: 127.0.0.1)")
-def restart(no_update_check, api_port, bridge_port, host):
-    """Restart both bridge and API servers.
+@click.option("--docs", is_flag=True, help="Start local MkDocs documentation server")
+@click.option("--docs-port", type=int, default=8008, help="MkDocs server port (default: 8008)")
+def restart(no_update_check, api_port, bridge_port, host, docs, docs_port):
+    """Restart bridge and API servers.
 
     This command stops any running servers, optionally checks for updates,
-    then starts both servers fresh in daemon mode.
+    then starts servers fresh in daemon mode.
+    Use --docs to also start a local MkDocs documentation server.
 
     Examples:
-        inspekt restart                   # Restart both servers
+        inspekt restart                   # Restart servers
+        inspekt restart --docs            # Include documentation server
         inspekt restart --no-update-check # Skip update check
         inspekt restart --api-port 3000   # Use custom API port
     """
     click.echo("Restarting Inspekt servers…\n")
 
-    # Stop both servers
-    click.echo("  • Stopping API server…")
+    # Stop all servers
+    click.echo(f"  {progress('Stopping MkDocs server…')}")
+    docs_stopped = _stop_mkdocs_server()
+    if docs_stopped:
+        click.echo(f"    {success('MkDocs server stopped')}")
+    else:
+        click.echo(f"    {info('MkDocs server was not running')}")
+
+    click.echo(f"  {progress('Stopping API server…')}")
     api_stopped = _stop_api_server()
     if api_stopped:
-        click.echo("    ✓ API server stopped")
+        click.echo(f"    {success('API server stopped')}")
     else:
-        click.echo("    • API server was not running")
+        click.echo(f"    {info('API server was not running')}")
 
-    click.echo("  • Stopping bridge server…")
+    click.echo(f"  {progress('Stopping bridge server…')}")
     bridge_stopped = _stop_bridge_server()
     if bridge_stopped:
-        click.echo("    ✓ Bridge server stopped")
+        click.echo(f"    {success('Bridge server stopped')}")
     else:
-        click.echo("    • Bridge server was not running")
+        click.echo(f"    {info('Bridge server was not running')}")
 
     # Wait for processes to fully stop
     time.sleep(0.5)
@@ -379,30 +520,46 @@ def restart(no_update_check, api_port, bridge_port, host):
     bridge_success = _start_bridge_server(port=bridge_port)
 
     if not bridge_success:
-        click.echo("\n✗ Failed to start bridge server", err=True)
+        click.echo(f"\n{error('Failed to start bridge server')}", err=True)
         sys.exit(1)
 
     api_success = _start_api_server(host=host, port=api_port)
 
     if not api_success:
-        click.echo("\n✗ Failed to start API server", err=True)
+        click.echo(f"\n{error('Failed to start API server')}", err=True)
         sys.exit(1)
 
+    # Start MkDocs server if --docs flag is passed
+    if docs:
+        if not _start_mkdocs_server(host=host, port=docs_port):
+            click.echo(f"\n{error('Failed to start MkDocs server')}", err=True)
+            sys.exit(1)
+
     # Display summary
-    click.echo("\n✓ All servers restarted successfully\n")
+    click.echo(f"\n{success('All servers restarted successfully')}\n")
 
     display_host = "localhost" if host == "127.0.0.1" else host
     click.echo(f"Bridge Server:")
-    click.echo(f"  • HTTP API:      http://127.0.0.1:{bridge_port}")
-    click.echo(f"  • WebSocket:     ws://127.0.0.1:{bridge_port + 1}")
+    click.echo(f"  {info(f'HTTP API:      http://127.0.0.1:{bridge_port}')}")
+    click.echo(f"  {info(f'WebSocket:     ws://127.0.0.1:{bridge_port + 1}')}")
 
     click.echo(f"\nAPI Server:")
-    click.echo(f"  • Status:        http://{display_host}:{api_port}/status")
-    click.echo(f"  • Swagger UI:    http://{display_host}:{api_port}/docs")
-    click.echo(f"  • ReDoc:         http://{display_host}:{api_port}/redoc")
-    click.echo(f"  • Health:        http://{display_host}:{api_port}/health")
+    click.echo(f"  {info(f'Status:        http://{display_host}:{api_port}/status')}")
+    click.echo(f"  {info(f'Health:        http://{display_host}:{api_port}/health')}")
+
+    if docs:
+        click.echo(f"\nDocs Server:")
+        click.echo(f"  {info(f'MkDocs:        http://{display_host}:{docs_port}')}")
+        click.echo(f"  {info(f'Swagger UI:    http://{display_host}:{api_port}/docs')}")
+        click.echo(f"  {info(f'ReDoc:         http://{display_host}:{api_port}/redoc')}")
 
     click.echo(f"\nWeb-based status: http://localhost:{api_port}/status")
+
+    # Show tip about --docs if not used
+    if not docs:
+        click.echo()
+        from inspekt.app.cli.table import print_hint
+        print_hint(f"Run with `--docs` to start a local documentation server at http://localhost:{docs_port}")
 
 
 @click.group(invoke_without_command=True)
@@ -547,9 +704,9 @@ def status(ctx, output_json):
                 click.echo("\nPerformance:")
                 click.echo(f"  Cached Scripts:    {len(cached)} ({', '.join(cached)})")
         elif bridge_running:
-            click.echo("\n✓ Running (status unavailable)")
+            click.echo(f"\n{success('Running (status unavailable)')}")
         else:
-            click.echo("\n✗ Not Running")
+            click.echo(f"\n{error('Not Running')}")
             click.echo("\nStart with: inspekt start")
 
         # API Server Section
@@ -558,14 +715,14 @@ def status(ctx, output_json):
         click.echo("=" * 60)
 
         if api_running:
-            click.echo("\n✓ Running")
+            click.echo(f"\n{success('Running')}")
             click.echo(f"  Port:              8000")
             click.echo(f"  URL:               http://localhost:8000")
             click.echo(f"  Swagger UI:        http://localhost:8000/docs")
             click.echo(f"  ReDoc:             http://localhost:8000/redoc")
             click.echo(f"  Health Check:      http://localhost:8000/health")
         else:
-            click.echo("\n✗ Not Running")
+            click.echo(f"\n{error('Not Running')}")
             click.echo("\nStart with: inspekt start")
 
         click.echo("\n" + "=" * 60)
@@ -597,7 +754,8 @@ def status_web(port):
     # Check if API server is running
     if not _is_port_open("127.0.0.1", port):
         click.echo(f"Error: API server is not running on port {port}", err=True)
-        click.echo("\nStart it with: inspekt start", err=True)
+        from inspekt.app.cli.table import _style_with_inline_code
+        click.echo(_style_with_inline_code("\nStart it with: `inspekt start`", base_fg="red"), err=True)
         sys.exit(1)
 
     click.echo(f"Opening {url} in your browser...")
@@ -674,9 +832,9 @@ def queue_status(output_json):
                 else:
                     age_str = f"{age:.1f}s"
 
-                click.echo(f"  • {req_id}... ({age_str}) - {req_type}")
+                click.echo(f"  {info(f'{req_id}... ({age_str}) - {req_type}')}")
         elif pending == 0:
-            click.echo("\n✓ No pending requests")
+            click.echo(f"\n{success('No pending requests')}")
 
     except http_requests.RequestException as e:
         click.echo(f"Error: Failed to get queue status: {e}", err=True)
@@ -751,7 +909,7 @@ def queue_clear(older_than, force):
         if result.get("ok"):
             cleared = result.get("cleared", 0)
             remaining = result.get("remaining", 0)
-            click.echo(f"✓ Cleared {cleared} pending request(s)")
+            click.echo(success(f"Cleared {cleared} pending request(s)"))
             if remaining > 0:
                 click.echo(f"  {remaining} request(s) remaining")
         else:

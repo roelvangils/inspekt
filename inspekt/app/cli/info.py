@@ -26,6 +26,7 @@ from urllib.parse import urlparse
 import click
 
 from inspekt.app.cli.base import builtin_open
+from inspekt.app.cli.icons import get_icon
 from inspekt.app.cli.table import Table
 from inspekt.client import BridgeClient
 
@@ -45,7 +46,9 @@ def _print_info_table(title: str, rows: list[tuple[str, str, str | None]]) -> No
     # Convert rows to list format for width calculation
     row_data = [[key, str(value)] for key, value, _ in rows]
 
-    table = Table(["Property", "Value"], alignments=["left", "left"], title=title)
+    # Get Nerdfont icon for the title (if enabled)
+    icon = get_icon(title)
+    table = Table(["Property", "Value"], alignments=["left", "left"], title=title, icon=icon)
     table.set_data(row_data)
     table.print_header()
 
@@ -72,7 +75,9 @@ def _print_list_table(
     click.echo()
 
     alignments = ["left"] * len(headers)
-    table = Table(headers, widths=widths, alignments=alignments, title=title)
+    # Get Nerdfont icon for the title (if enabled)
+    icon = get_icon(title)
+    table = Table(headers, widths=widths, alignments=alignments, title=title, icon=icon)
 
     # If no widths provided, calculate automatically
     if widths is None:
@@ -98,7 +103,8 @@ def _get_bridge_client() -> BridgeClient:
     """Get a BridgeClient instance and verify connection."""
     client = BridgeClient()
     if not client.is_alive():
-        click.echo("Error: Bridge server is not running. Start it with: inspekt start", err=True)
+        from inspekt.app.cli.table import _style_with_inline_code
+        click.echo(_style_with_inline_code("Error: Bridge server is not running. Start it with `inspekt start`.", base_fg="red"), err=True)
         sys.exit(1)
     return client
 
@@ -1265,7 +1271,8 @@ def _print_accessibility(data: dict) -> None:
 
     if issue_rows:
         _print_info_table("Accessibility Issues", issue_rows)
-        click.echo(click.style("  Hint: Run `inspekt axe` for detailed accessibility analysis.", fg="bright_black"))
+        from inspekt.app.cli.table import print_hint
+        print_hint("Run `inspekt axe` for detailed accessibility analysis.")
 
     # Forms
     forms = data.get("forms", [])
@@ -1304,7 +1311,8 @@ def _print_resources(data: dict) -> None:
     ]
 
     click.echo()
-    table = Table(["Resource", "Count"], alignments=["left", "right"], title="Resources")
+    resources_icon = get_icon("Resources")
+    table = Table(["Resource", "Count"], alignments=["left", "right"], title="Resources", icon=resources_icon)
     table.set_data(resource_rows)
     table.print_header()
     for row in resource_rows:

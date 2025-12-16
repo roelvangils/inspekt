@@ -153,13 +153,22 @@ def format_step_header(use_color: bool = True, indent: bool = False) -> str:
     Returns:
         Formatted header string with columns: STEP, TIME, COMMAND, DETAILS
     """
+    import shutil
+
     # Header aligned to match step format:
     # "{indent}{0001}   {00:00}   {icon  action      }   details"
     #          4ch     5ch       15ch (icon+2sp+12ch)
     prefix = "  " if indent else ""
     header = f"{prefix}STEP   TIME       COMMAND        DETAILS"
+
     if use_color:
-        return click.style(header, fg="bright_black")
+        # Pad to terminal width for full-width background
+        try:
+            terminal_width = shutil.get_terminal_size().columns
+        except Exception:
+            terminal_width = 80
+        padded_header = header.ljust(terminal_width)
+        return click.style(padded_header, fg="bright_white", bg="black")
     return header
 
 

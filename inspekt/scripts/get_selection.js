@@ -29,10 +29,30 @@
         const fragment = range.cloneContents();
         const div = document.createElement('div');
         div.appendChild(fragment);
+
+        // Remove empty elements (elements with no text content and no meaningful children)
+        const removeEmptyElements = (container) => {
+            const elements = container.querySelectorAll('*');
+            // Process in reverse order to handle nested empty elements
+            for (let i = elements.length - 1; i >= 0; i--) {
+                const el = elements[i];
+                // Check if element is empty (no text, no images, no inputs, etc.)
+                const hasText = el.textContent.trim().length > 0;
+                const hasMeaningfulContent = el.querySelector('img, input, textarea, video, audio, iframe, canvas, svg');
+                if (!hasText && !hasMeaningfulContent) {
+                    el.remove();
+                }
+            }
+        };
+        removeEmptyElements(div);
+
         html = div.innerHTML;
     } catch (e) {
         // HTML extraction failed, just use text
     }
+
+    // Trim trailing whitespace from text
+    const trimmedText = selectedText.replace(/\s+$/, '');
 
     // Get the element that contains the selection start
     const anchorNode = selection.anchorNode;
@@ -47,9 +67,9 @@
     return {
         ok: true,
         hasSelection: true,
-        text: selectedText,
+        text: trimmedText,
         html: html,
-        length: selectedText.length,
+        length: trimmedText.length,
         rangeCount: selection.rangeCount,
         isCollapsed: selection.isCollapsed,
         position: {

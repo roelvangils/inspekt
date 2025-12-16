@@ -19,6 +19,7 @@ from urllib.parse import urlparse
 import click
 import requests
 
+from inspekt.app.cli.icons import get_icon
 from inspekt.app.cli.table import Table, format_status_icon
 from inspekt.services.bridge_executor import get_executor
 
@@ -508,7 +509,8 @@ def _display_robots_txt(data: dict[str, Any], show_validation: bool = False):
                 separator_indices.append(len(rows))
 
         # Create table with auto-width and title
-        table = Table(headers, alignments=alignments, title=title)
+        icon = get_icon("Robots")
+        table = Table(headers, alignments=alignments, title=title, icon=icon)
         table.set_data(rows)
         table.print_header()
 
@@ -525,7 +527,8 @@ def _display_robots_txt(data: dict[str, Any], show_validation: bool = False):
     if sitemaps:
         # Single column table for sitemaps with auto-width and title bar
         sitemap_rows = [[sitemap] for sitemap in sitemaps]
-        sitemap_table = Table(["URL"], alignments=["left"], title=f"Sitemaps ({len(sitemaps)})")
+        sitemap_icon = get_icon("Sitemaps")
+        sitemap_table = Table(["URL"], alignments=["left"], title=f"Sitemaps ({len(sitemaps)})", icon=sitemap_icon)
         sitemap_table.set_data(sitemap_rows)
         sitemap_table.print_header()
 
@@ -555,7 +558,8 @@ def _display_robots_txt(data: dict[str, Any], show_validation: bool = False):
                 val_colors.append([None, "yellow", None])
 
             # Create validation table with auto-width and title bar
-            val_table = Table(["", "Type", "Message"], alignments=["left", "left", "left"], title=f"Validation ({total_issues} issues)")
+            val_icon = get_icon("Validation")
+            val_table = Table(["", "Type", "Message"], alignments=["left", "left", "left"], title=f"Validation ({total_issues} issues)", icon=val_icon)
             val_table.set_data(val_rows)
             val_table.print_header()
 

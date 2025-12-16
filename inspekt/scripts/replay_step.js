@@ -478,12 +478,32 @@
     }
 
     /**
+     * Check if an element is a native control input with closed Shadow DOM.
+     */
+    function isNativeControlInput(element) {
+        if (!element || element.tagName !== 'INPUT') return false;
+        const type = (element.type || '').toLowerCase();
+        return ['range', 'date', 'time', 'datetime-local', 'month', 'week', 'number', 'color'].includes(type);
+    }
+
+    /**
      * Type text into an element.
+     * For native control inputs (range, date, etc.), sets the value directly.
      */
     function simulateType(element, value) {
         // Focus the element
         if (element.focus) {
             element.focus();
+        }
+
+        // Special handling for native control inputs (range, date, time, color, etc.)
+        // These inputs use closed Shadow DOM, so we set the value directly via the API
+        // rather than typing character by character.
+        if (isNativeControlInput(element)) {
+            element.value = value;
+            element.dispatchEvent(new Event('input', { bubbles: true }));
+            element.dispatchEvent(new Event('change', { bubbles: true }));
+            return { ok: true, nativeControl: true };
         }
 
         // Clear existing value if it's an input/textarea
@@ -540,7 +560,9 @@
             'select:not([disabled])',
             'textarea:not([disabled])',
             '[tabindex]:not([tabindex="-1"])',
-            '[contenteditable="true"]'
+            '[contenteditable="true"]',
+            'audio[controls]',
+            'video[controls]'
         ].join(', ');
 
         const elements = Array.from(document.querySelectorAll(selector));
@@ -617,6 +639,53 @@
             const form = activeElement.closest('form');
             if (form && activeElement.tagName !== 'TEXTAREA') {
                 // Don't auto-submit, just dispatch the event
+            }
+        }
+
+        // Special handling for media elements (audio/video)
+        // Native media controls use closed Shadow DOM, so synthetic keyboard events
+        // don't trigger browser default behaviors. We use the HTMLMediaElement API directly.
+        const isMediaElement = activeElement.tagName === 'AUDIO' || activeElement.tagName === 'VIDEO';
+
+        if (isMediaElement) {
+            // Space or Enter toggles play/pause
+            if (key === ' ' || key === 'Space' || key === 'Enter') {
+                if (activeElement.paused) {
+                    activeElement.play().catch(() => {}); // Ignore autoplay restrictions
+                } else {
+                    activeElement.pause();
+                }
+                activeElement.dispatchEvent(new KeyboardEvent('keyup', eventInit));
+                return { ok: true, mediaAction: activeElement.paused ? 'paused' : 'playing' };
+            }
+
+            // Arrow keys for seek/volume
+            if (key === 'ArrowLeft') {
+                activeElement.currentTime = Math.max(0, activeElement.currentTime - 5);
+                activeElement.dispatchEvent(new KeyboardEvent('keyup', eventInit));
+                return { ok: true, mediaAction: 'seek-back' };
+            }
+            if (key === 'ArrowRight') {
+                activeElement.currentTime = Math.min(activeElement.duration || Infinity, activeElement.currentTime + 5);
+                activeElement.dispatchEvent(new KeyboardEvent('keyup', eventInit));
+                return { ok: true, mediaAction: 'seek-forward' };
+            }
+            if (key === 'ArrowUp') {
+                activeElement.volume = Math.min(1, activeElement.volume + 0.1);
+                activeElement.dispatchEvent(new KeyboardEvent('keyup', eventInit));
+                return { ok: true, mediaAction: 'volume-up' };
+            }
+            if (key === 'ArrowDown') {
+                activeElement.volume = Math.max(0, activeElement.volume - 0.1);
+                activeElement.dispatchEvent(new KeyboardEvent('keyup', eventInit));
+                return { ok: true, mediaAction: 'volume-down' };
+            }
+
+            // 'M' for mute toggle (common shortcut)
+            if (key === 'm' || key === 'M') {
+                activeElement.muted = !activeElement.muted;
+                activeElement.dispatchEvent(new KeyboardEvent('keyup', eventInit));
+                return { ok: true, mediaAction: activeElement.muted ? 'muted' : 'unmuted' };
             }
         }
 
@@ -830,11 +899,15 @@
 
         // Check visibility
         if (expect.visible) {
-            const el = document.querySelector(expect.visible);
-            if (!el) {
-                failures.push(`Expected element to be visible: ${expect.visible}`);
-            } else if (!isElementVisible(el)) {
-                failures.push(`Element exists but is not visible: ${expect.visible}`);
+            try {
+                const el = document.querySelector(expect.visible);
+                if (!el) {
+                    failures.push(`Expected element to be visible: ${expect.visible}`);
+                } else if (!isElementVisible(el)) {
+                    failures.push(`Element exists but is not visible: ${expect.visible}`);
+                }
+            } catch (e) {
+                failures.push(`Invalid selector: ${expect.visible} (${e.message})`);
             }
         }
 
@@ -855,7 +928,34 @@
 
         // Check text contains
         if (expect.text_contains) {
-            if (!document.body.textContent.includes(expect.text_contains)) {
+            // Get page text, excluding Inspekt overlay elements
+            let pageText = '';
+            const walker = document.createTreeWalker(
+                document.body,
+                NodeFilter.SHOW_TEXT,
+                {
+                    acceptNode: (node) => {
+                        // Skip text inside Inspekt overlays
+                        let parent = node.parentElement;
+                        while (parent) {
+                            if (parent.id?.startsWith('inspekt-') || parent.classList?.contains('inspekt-overlay')) {
+                                return NodeFilter.FILTER_REJECT;
+                            }
+                            parent = parent.parentElement;
+                        }
+                        return NodeFilter.FILTER_ACCEPT;
+                    }
+                }
+            );
+            while (walker.nextNode()) {
+                pageText += walker.currentNode.textContent;
+            }
+
+            const searchText = expect.text_contains;
+            const found = expect.ignore_case
+                ? pageText.toLowerCase().includes(searchText.toLowerCase())
+                : pageText.includes(searchText);
+            if (!found) {
                 failures.push(`Expected page to contain text: "${expect.text_contains}"`);
             }
         }
@@ -1123,6 +1223,11 @@
                 if (!element) {
                     result.error = error;
                     playErrorAudio();
+                } else if (element.type === 'file') {
+                    // Skip click for file inputs - the following 'upload' action
+                    // will inject the files programmatically without triggering the picker
+                    result.ok = true;
+                    result.skipped = 'file_input';
                 } else {
                     // Check if this click might cause navigation BEFORE clicking
                     const mayNavigate = mightCauseNavigation(element);
@@ -1169,6 +1274,11 @@
                 if (!element) {
                     result.error = error;
                     playErrorAudio();
+                } else if (element.type === 'file') {
+                    // Skip activation for file inputs - the following 'upload' action
+                    // will inject the files programmatically without triggering the picker
+                    result.ok = true;
+                    result.skipped = 'file_input';
                 } else {
                     await scrollToElement(element);
                     await showVisualBefore(action, element);
@@ -1204,6 +1314,194 @@
                         await showVisualAfter(action, true);
                     }
                 }
+
+            } else if (action === 'set') {
+                // Set value for native control inputs (range, date, time, color, etc.)
+                const { element, usedSelector, error } = findElement(step.target);
+                result.usedSelector = usedSelector;
+
+                if (!element) {
+                    result.error = error;
+                    playErrorAudio();
+                } else {
+                    await scrollToElement(element);
+                    await showVisualBefore(action, element);
+                    playAudio(action);
+
+                    // Set value directly (native controls use closed Shadow DOM)
+                    element.value = step.value || '';
+                    element.dispatchEvent(new Event('input', { bubbles: true }));
+                    element.dispatchEvent(new Event('change', { bubbles: true }));
+
+                    result.ok = true;
+                    await showVisualAfter(action, true);
+                }
+
+            } else if (action === 'toggle') {
+                // Toggle details/summary element
+                const { element, usedSelector, error } = findElement(step.target);
+                result.usedSelector = usedSelector;
+
+                if (!element) {
+                    result.error = error;
+                    playErrorAudio();
+                } else {
+                    await scrollToElement(element);
+                    await showVisualBefore(action, element);
+                    playAudio(action);
+
+                    // Find the details element (target is usually the summary)
+                    const details = element.closest('details') || element;
+                    if (details.tagName === 'DETAILS') {
+                        // Set open state based on recorded value
+                        const shouldBeOpen = step.value === 'open';
+                        if (details.open !== shouldBeOpen) {
+                            details.open = shouldBeOpen;
+                            details.dispatchEvent(new Event('toggle', { bubbles: true }));
+                        }
+                    } else {
+                        // If not a details element, just click it
+                        element.click();
+                    }
+
+                    result.ok = true;
+                    await showVisualAfter(action, true);
+                }
+
+            } else if (action === 'dialog') {
+                // Dialog open/close
+                const { element, usedSelector, error } = findElement(step.target);
+                result.usedSelector = usedSelector;
+
+                if (!element) {
+                    result.error = error;
+                    playErrorAudio();
+                } else if (element.tagName !== 'DIALOG') {
+                    result.error = 'Target is not a dialog element';
+                    playErrorAudio();
+                } else {
+                    await scrollToElement(element);
+                    await showVisualBefore(action, element);
+                    playAudio(action);
+
+                    const dialogValue = step.value || '';
+                    if (dialogValue === 'modal') {
+                        if (!element.open) {
+                            element.showModal();
+                        }
+                    } else if (dialogValue === 'modeless') {
+                        if (!element.open) {
+                            element.show();
+                        }
+                    } else if (dialogValue === 'close') {
+                        if (element.open) {
+                            element.close();
+                        }
+                    }
+
+                    result.ok = true;
+                    await showVisualAfter(action, true);
+                }
+
+            } else if (action === 'jsdialog') {
+                // JavaScript dialog (alert, confirm, prompt)
+                // The dialog was already intercepted by CDP when the triggering action ran
+                // This step waits for the overlay to finish (matching recorded duration)
+                const dialogType = step.dialog_type || 'alert';
+                const message = step.message || '';
+                const recordedResult = step.result;
+                const duration = step.duration || 1500;
+
+                // Don't play audio - CDP interception already showed the overlay
+                // Just wait for the recorded duration so the overlay stays visible
+                // Add 300ms buffer for fade animation
+                await new Promise(resolve => setTimeout(resolve, duration + 300));
+
+                // Include dialog info in result for CLI output
+                result.ok = true;
+                result.dialogType = dialogType;
+                result.message = message;
+                result.dialogResult = recordedResult;
+
+            } else if (action === 'upload') {
+                // File upload - recreate files using DataTransfer API
+                const { element, usedSelector, error } = findElement(step.target);
+                result.usedSelector = usedSelector;
+
+                if (!element) {
+                    result.error = error;
+                    playErrorAudio();
+                } else if (element.type !== 'file') {
+                    result.error = 'Target is not a file input';
+                    playErrorAudio();
+                } else {
+                    await scrollToElement(element);
+                    await showVisualBefore(action, element);
+                    playAudio(action);
+
+                    const fileInfos = step.files || [];
+                    const dataTransfer = new DataTransfer();
+                    let filesAdded = 0;
+
+                    for (const fileInfo of fileInfos) {
+                        let bytes = null;
+                        let base64Data = null;
+
+                        // Get content from either inline or external source
+                        if (fileInfo.content) {
+                            // Inline base64 content
+                            base64Data = fileInfo.content.split(',')[1];
+                        } else if (fileInfo.external_content) {
+                            // Content loaded from external file by Python
+                            base64Data = fileInfo.external_content.split(',')[1];
+                        }
+
+                        if (base64Data) {
+                            // Decode base64 to bytes
+                            const binary = atob(base64Data);
+                            bytes = new Uint8Array(binary.length);
+                            for (let i = 0; i < binary.length; i++) {
+                                bytes[i] = binary.charCodeAt(i);
+                            }
+
+                            // Create File object
+                            const file = new File([bytes], fileInfo.name, {
+                                type: fileInfo.type || 'application/octet-stream',
+                                lastModified: fileInfo.lastModified || Date.now()
+                            });
+
+                            dataTransfer.items.add(file);
+                            filesAdded++;
+                        } else {
+                            console.warn(`Missing content for file: ${fileInfo.name}`);
+                        }
+                    }
+
+                    if (filesAdded > 0) {
+                        element.files = dataTransfer.files;
+                        element.dispatchEvent(new Event('change', { bubbles: true }));
+                        element.dispatchEvent(new Event('input', { bubbles: true }));
+                        result.ok = true;
+                    } else {
+                        result.error = 'No files could be loaded';
+                    }
+
+                    await showVisualAfter(action, result.ok);
+                }
+
+            } else if (action === 'download') {
+                // Download step - this is a marker for a download that occurred during recording
+                // The actual download happened as a result of a previous action (like click)
+                // Assertions are handled by Python replay.py, not here
+                playAudio(action);
+
+                const downloadInfo = step.download || {};
+                const filename = downloadInfo.filename || 'unknown';
+                const size = downloadInfo.size || 0;
+
+                result.ok = true;
+                result.message = `Download: ${filename} (${size} bytes)`;
+                result.downloadInfo = downloadInfo;
 
             } else if (action === 'keypress') {
                 // Keyboard actions: just play audio and execute, no visual indicator
@@ -1259,6 +1557,23 @@
                     await showVisualAfter(action, true);
                 }
 
+            } else if (action === 'radio') {
+                // Radio button selection (radios can only be checked, not unchecked directly)
+                const { element, usedSelector, error } = findElement(step.target);
+                result.usedSelector = usedSelector;
+
+                if (!element) {
+                    result.error = error;
+                    playErrorAudio();
+                } else {
+                    await scrollToElement(element);
+                    await showVisualBefore(action, element);
+                    playAudio(action);
+                    simulateCheck(element);  // Radio uses same check simulation as checkbox
+                    result.ok = true;
+                    await showVisualAfter(action, true);
+                }
+
             } else if (action === 'select') {
                 const { element, usedSelector, error } = findElement(step.target);
                 result.usedSelector = usedSelector;
@@ -1285,6 +1600,7 @@
                 const visual = window.__INSPEKT_VISUAL__;
                 if (visual && visual.interactive) {
                     // Show the interactive overlay with step info
+                    // Note: Assertion overlay from previous step may still be visible
                     visual.interactive.show(
                         step.currentStep,      // Step data for current step
                         step.previousStep,     // Step data for previous step (may be null)
@@ -1295,8 +1611,14 @@
                     // Wait for user to press Enter, Space, or Escape
                     const choice = await visual.interactive.waitForInput();
 
-                    // Hide the overlay
-                    visual.interactive.hide();
+                    // Only hide main overlay on cancel (otherwise show() updates it for next step)
+                    if (choice === 'cancel') {
+                        visual.interactive.hide();
+                    }
+                    // Always hide assertion overlay (next step may not have assertions)
+                    if (visual.assertion) {
+                        visual.assertion.hide();
+                    }
 
                     result.ok = true;
                     result.choice = choice;  // 'next', 'skip', or 'cancel'
@@ -1311,8 +1633,21 @@
                 result.error = `Unknown action: ${action}`;
             }
 
-            // Run assertions if step succeeded and has expectations
-            if (result.ok && step.expect) {
+            // Run assertions if step succeeded and has expectations (unless skipTests is set)
+            if (result.ok && step.expect && !step.skipTests) {
+                // Get visual module for assertion overlay (if available)
+                const visual = window.__INSPEKT_VISUAL__;
+
+                // In interactive mode, show "checking" overlay before evaluating
+                // Wrap in try-catch so overlay errors don't break assertion evaluation
+                if (step.isInteractive && visual?.assertion) {
+                    try {
+                        visual.assertion.showChecking(step.expect);
+                    } catch (overlayErr) {
+                        console.warn('Assertion overlay showChecking failed:', overlayErr);
+                    }
+                }
+
                 // Pass target selector for focused check
                 const targetSelector = step.target?.selector || null;
                 const assertionResult = await runAssertions(step.expect, targetSelector);
@@ -1321,9 +1656,23 @@
                     result.assertionsFailed = true;
                     playErrorAudio();
                 }
+
+                // In interactive mode, show result overlay (stays until next step)
+                if (step.isInteractive && visual?.assertion) {
+                    try {
+                        visual.assertion.showResult(
+                            step.expect,
+                            assertionResult.ok,
+                            assertionResult.failures
+                        );
+                    } catch (overlayErr) {
+                        console.warn('Assertion overlay showResult failed:', overlayErr);
+                    }
+                }
             }
 
         } catch (e) {
+            result.ok = false;
             result.error = `Exception: ${e.message}`;
         }
 
