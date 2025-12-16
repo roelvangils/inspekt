@@ -20,6 +20,20 @@ let replayVisualScript = null;
 const devToolsConnections = new Map();
 const pendingHARRequests = new Map();
 
+// CDP Dialog Interception state
+// When enabled, intercepts alert/confirm/prompt via Chrome DevTools Protocol
+const dialogInterception = {
+    enabled: false,
+    tabId: null,
+    debuggerAttached: false,
+    queue: [],  // Array of { type: 'alert'|'confirm'|'prompt', message: string, result: any }
+    processing: false,  // Mutex to prevent race conditions with rapid dialogs
+};
+
+// Event queue for sequential CDP dialog processing
+let cdpDialogEventQueue = [];
+let processingCdpDialogEvents = false;
+
 // Listen for tab updates to inject into new pages
 chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
     if (changeInfo.status === 'complete') {
@@ -304,6 +318,110 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             hasScript: !!replayVisualScript
         });
         return false;
+    }
+
+    // ========== DOWNLOAD MONITORING ==========
+
+    if (message.type === 'START_DOWNLOAD_MONITORING') {
+        // Start monitoring downloads for a recording session
+        startDownloadMonitoring(sender.tab?.id || message.tabId, message.sessionId)
+            .then(sendResponse)
+            .catch(error => sendResponse({ ok: false, error: String(error) }));
+        return true; // Keep channel open for async response
+    }
+
+    if (message.type === 'STOP_DOWNLOAD_MONITORING') {
+        // Stop monitoring downloads for a session
+        const result = stopDownloadMonitoring(message.sessionId);
+        sendResponse(result);
+        return false;
+    }
+
+    if (message.type === 'GET_SESSION_DOWNLOADS') {
+        // Get list of downloads captured during a session
+        const result = getSessionDownloads(message.sessionId);
+        sendResponse(result);
+        return false;
+    }
+
+    if (message.type === 'GET_DOWNLOAD_FILE_CONTENT') {
+        // Get download file content as base64
+        getDownloadFileContent(message.downloadId)
+            .then(sendResponse)
+            .catch(error => sendResponse({ ok: false, error: String(error) }));
+        return true; // Keep channel open for async response
+    }
+
+    if (message.type === 'ENABLE_DIALOG_INTERCEPTION') {
+        // Enable CDP-level dialog interception for replay
+        // queue: Array of { type: 'alert'|'confirm'|'prompt', result: any }
+        enableDialogInterception(sender.tab.id, message.queue || [])
+            .then(sendResponse)
+            .catch(error => sendResponse({ ok: false, error: String(error) }));
+        return true; // Keep channel open for async response
+    }
+
+    if (message.type === 'DISABLE_DIALOG_INTERCEPTION') {
+        // Disable CDP dialog interception
+        disableDialogInterception()
+            .then(sendResponse)
+            .catch(error => sendResponse({ ok: false, error: String(error) }));
+        return true; // Keep channel open for async response
+    }
+
+    if (message.type === 'QUEUE_DIALOG_RESULT') {
+        // Add a dialog result to the queue (for dynamic queueing during replay)
+        if (dialogInterception.enabled) {
+            dialogInterception.queue.push({
+                type: message.dialogType,
+                result: message.result
+            });
+            sendResponse({ ok: true, queueLength: dialogInterception.queue.length });
+        } else {
+            sendResponse({ ok: false, error: 'Dialog interception not enabled' });
+        }
+        return false;
+    }
+
+    if (message.type === 'START_SCREENCAST') {
+        // Start CDP screencast for video recording
+        console.log('[Inspekt] START_SCREENCAST received, tabId:', sender.tab.id, 'settings:', message.settings);
+        startScreencast(sender.tab.id, message.settings, message.requestId)
+            .then(response => {
+                console.log('[Inspekt] START_SCREENCAST response:', response);
+                sendResponse(response);
+            })
+            .catch(error => {
+                console.error('[Inspekt] START_SCREENCAST error:', error);
+                sendResponse({ ok: false, error: String(error) });
+            });
+        return true; // Keep channel open for async response
+    }
+
+    if (message.type === 'STOP_SCREENCAST') {
+        // Stop CDP screencast
+        stopScreencast(sender.tab.id, message.requestId)
+            .then(sendResponse)
+            .catch(error => sendResponse({ ok: false, error: String(error) }));
+        return true; // Keep channel open for async response
+    }
+
+    // ========== ZOOM LEVEL CONTROL ==========
+
+    if (message.type === 'GET_ZOOM_LEVEL') {
+        // Get the actual browser zoom level for a tab
+        chrome.tabs.getZoom(sender.tab.id)
+            .then(zoomFactor => sendResponse({ ok: true, zoomFactor }))
+            .catch(error => sendResponse({ ok: false, error: String(error) }));
+        return true; // Keep channel open for async response
+    }
+
+    if (message.type === 'SET_ZOOM_LEVEL') {
+        // Set the browser zoom level for a tab
+        chrome.tabs.setZoom(sender.tab.id, message.zoomFactor)
+            .then(() => sendResponse({ ok: true }))
+            .catch(error => sendResponse({ ok: false, error: String(error) }));
+        return true; // Keep channel open for async response
     }
 });
 
@@ -1836,6 +1954,174 @@ function detachDebugger(tabId) {
 // Background script only handles the raw capture via chrome.tabs.captureVisibleTab
 
 // ============================================================================
+// SCREENCAST (VIDEO RECORDING) FUNCTIONS
+// ============================================================================
+
+// Screencast state
+let screencastState = {
+    active: false,
+    tabId: null,
+    debuggerAttached: false,
+    settings: {}
+};
+
+/**
+ * Start CDP screencast for video recording.
+ * Streams frames from the browser to be collected by the bridge server.
+ */
+async function startScreencast(tabId, settings = {}, requestId = null) {
+    const debuggerVersion = '1.3';
+
+    if (screencastState.active) {
+        return { ok: true, message: 'Screencast already active' };
+    }
+
+    try {
+        // First, try to detach any stale debugger from previous attempts
+        try {
+            await new Promise((resolve) => {
+                chrome.debugger.detach({ tabId }, () => {
+                    // Ignore errors - there may not be a debugger attached
+                    chrome.runtime.lastError; // Clear the error
+                    resolve();
+                });
+            });
+        } catch (e) {
+            // Ignore detach errors
+        }
+
+        // Small delay after detach
+        await new Promise(r => setTimeout(r, 100));
+
+        // Attach debugger
+        await new Promise((resolve, reject) => {
+            chrome.debugger.attach({ tabId }, debuggerVersion, () => {
+                if (chrome.runtime.lastError) {
+                    const error = chrome.runtime.lastError.message;
+                    if (error.includes('Another debugger')) {
+                        reject(new Error('Video recording requires closing DevTools (F12). Please close the browser developer tools and try again.'));
+                    } else {
+                        reject(new Error(error));
+                    }
+                } else {
+                    resolve();
+                }
+            });
+        });
+
+        screencastState.debuggerAttached = true;
+        console.log('[Inspekt] CDP debugger attached for screencast');
+
+        // Enable Page domain
+        await sendDebuggerCommand(tabId, 'Page.enable', {});
+
+        // Calculate frame interval from FPS
+        const fps = settings.fps || 10;
+        const quality = settings.quality || 80;
+        const format = settings.format || 'jpeg';
+
+        // Get actual viewport dimensions to match video output to viewport size
+        let maxWidth = settings.maxWidth || 4096;  // Default to high value if not specified
+        let maxHeight = settings.maxHeight || 4096;
+
+        try {
+            // Query the actual viewport dimensions from the tab
+            const [result] = await chrome.scripting.executeScript({
+                target: { tabId },
+                func: () => ({ width: window.innerWidth, height: window.innerHeight }),
+                world: 'MAIN'
+            });
+            if (result && result.result) {
+                maxWidth = result.result.width;
+                maxHeight = result.result.height;
+                console.log('[Inspekt] Screencast using viewport dimensions:', maxWidth, 'x', maxHeight);
+            }
+        } catch (e) {
+            console.log('[Inspekt] Could not get viewport dimensions, using defaults:', maxWidth, 'x', maxHeight);
+        }
+
+        // Start screencast
+        const screencastParams = {
+            format: format,
+            quality: quality,
+            maxWidth: maxWidth,
+            maxHeight: maxHeight,
+            everyNthFrame: Math.max(1, Math.round(60 / fps)) // Approximate frame interval
+        };
+
+        await sendDebuggerCommand(tabId, 'Page.startScreencast', screencastParams);
+
+        screencastState.active = true;
+        screencastState.tabId = tabId;
+        screencastState.settings = settings;
+
+        console.log('[Inspekt] Screencast started at ~' + fps + ' FPS');
+
+        return { ok: true, message: 'Screencast started' };
+
+    } catch (error) {
+        console.error('[Inspekt] Screencast start error:', error);
+
+        // Clean up on error
+        if (screencastState.debuggerAttached) {
+            try {
+                await detachDebugger(tabId);
+            } catch (e) {
+                console.error('[Inspekt] Failed to detach debugger:', e);
+            }
+        }
+        screencastState.active = false;
+        screencastState.debuggerAttached = false;
+
+        throw error;
+    }
+}
+
+/**
+ * Stop CDP screencast.
+ */
+async function stopScreencast(tabId, requestId = null) {
+    if (!screencastState.active) {
+        return { ok: true, message: 'Screencast not active' };
+    }
+
+    try {
+        // Stop screencast
+        await sendDebuggerCommand(screencastState.tabId, 'Page.stopScreencast', {});
+
+        console.log('[Inspekt] Screencast stopped');
+
+        // Detach debugger
+        if (screencastState.debuggerAttached) {
+            await detachDebugger(screencastState.tabId);
+            screencastState.debuggerAttached = false;
+        }
+
+        screencastState.active = false;
+        screencastState.tabId = null;
+
+        return { ok: true, message: 'Screencast stopped' };
+
+    } catch (error) {
+        console.error('[Inspekt] Screencast stop error:', error);
+
+        // Force clean up
+        screencastState.active = false;
+        if (screencastState.debuggerAttached) {
+            try {
+                await detachDebugger(screencastState.tabId);
+            } catch (e) {
+                // Ignore
+            }
+        }
+        screencastState.debuggerAttached = false;
+        screencastState.tabId = null;
+
+        throw error;
+    }
+}
+
+// ============================================================================
 // REPLAY MODE MANAGEMENT
 // ============================================================================
 
@@ -1953,6 +2239,565 @@ async function injectReplayVisualScript(tabId) {
         console.error('[Inspekt] Failed to inject visual script into tab:', tabId, error);
     }
 }
+
+// ============================================================================
+// DOWNLOAD MONITORING FOR RECORDINGS
+// ============================================================================
+
+// Track active download monitoring sessions
+const downloadListeners = new Map();
+
+// MIME type mapping for file extensions (used when Chrome doesn't provide MIME type)
+const EXTENSION_MIME_MAP = {
+    '.pdf': 'application/pdf',
+    '.txt': 'text/plain',
+    '.json': 'application/json',
+    '.csv': 'text/csv',
+    '.html': 'text/html',
+    '.htm': 'text/html',
+    '.xml': 'application/xml',
+    '.jpg': 'image/jpeg',
+    '.jpeg': 'image/jpeg',
+    '.png': 'image/png',
+    '.gif': 'image/gif',
+    '.svg': 'image/svg+xml',
+    '.webp': 'image/webp',
+    '.ico': 'image/x-icon',
+    '.mp4': 'video/mp4',
+    '.webm': 'video/webm',
+    '.mp3': 'audio/mpeg',
+    '.wav': 'audio/wav',
+    '.ogg': 'audio/ogg',
+    '.zip': 'application/zip',
+    '.gz': 'application/gzip',
+    '.tar': 'application/x-tar',
+    '.rar': 'application/vnd.rar',
+    '.7z': 'application/x-7z-compressed',
+    '.doc': 'application/msword',
+    '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    '.xls': 'application/vnd.ms-excel',
+    '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    '.ppt': 'application/vnd.ms-powerpoint',
+    '.pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    '.rtf': 'application/rtf',
+    '.js': 'application/javascript',
+    '.css': 'text/css',
+    '.md': 'text/markdown',
+    '.yaml': 'application/x-yaml',
+    '.yml': 'application/x-yaml',
+};
+
+/**
+ * Infer MIME type from filename if Chrome didn't provide one.
+ * Chrome's downloads API often returns undefined/null for MIME type,
+ * especially for PDFs and other document types.
+ * @param {string} filename - The filename to check
+ * @param {string|null|undefined} providedMime - MIME type from Chrome API
+ * @returns {string} The inferred or provided MIME type
+ */
+function inferMimeType(filename, providedMime) {
+    // If Chrome provided a valid MIME type (not the default), use it
+    if (providedMime && providedMime !== 'application/octet-stream') {
+        return providedMime;
+    }
+
+    // Try to infer from file extension
+    if (filename) {
+        const ext = filename.toLowerCase().match(/\.[^.]+$/)?.[0];
+        if (ext && EXTENSION_MIME_MAP[ext]) {
+            return EXTENSION_MIME_MAP[ext];
+        }
+    }
+
+    // Fall back to generic binary type
+    return 'application/octet-stream';
+}
+
+/**
+ * Start monitoring downloads for a recording session
+ * @param {number} tabId - Tab ID to monitor
+ * @param {string} sessionId - Unique session identifier
+ */
+async function startDownloadMonitoring(tabId, sessionId) {
+    // Check if already monitoring this session
+    if (downloadListeners.has(sessionId)) {
+        return { ok: true, sessionId, message: 'Already monitoring' };
+    }
+
+    // Create listener state for this session
+    const listener = {
+        tabId: tabId,
+        downloads: new Map(),  // downloadId -> download info
+        onCreated: null,
+        onChanged: null
+    };
+
+    // Listen for new downloads
+    listener.onCreated = (downloadItem) => {
+        // Track downloads from the recording tab or any tab (tabId -1 = unknown source)
+        // Filter by tab if needed: downloadItem.tabId !== tabId && downloadItem.tabId !== -1
+        console.log('[Inspekt] Download started:', downloadItem.id, downloadItem.filename, 'tab:', downloadItem.tabId);
+
+        // Extract filename first (needed for MIME type inference)
+        const filename = downloadItem.filename ? downloadItem.filename.split(/[\\/]/).pop() : 'unknown';
+
+        const downloadInfo = {
+            id: downloadItem.id,
+            url: downloadItem.url || downloadItem.finalUrl || '',
+            filename: filename,
+            fullPath: downloadItem.filename || '',
+            mime_type: inferMimeType(filename, downloadItem.mime),
+            size: downloadItem.fileSize || downloadItem.totalBytes || 0,
+            download_start: Date.now(),
+            download_end: null,
+            state: 'in_progress',
+            referrer: downloadItem.referrer || '',
+            tabId: downloadItem.tabId
+        };
+
+        listener.downloads.set(downloadItem.id, downloadInfo);
+
+        // Notify content script about download start
+        chrome.tabs.sendMessage(tabId, {
+            type: 'INSPEKT_DOWNLOAD_STARTED',
+            sessionId: sessionId,
+            download: downloadInfo
+        }).catch(() => {
+            // Tab may not be ready yet, that's ok
+        });
+    };
+
+    // Listen for download state changes
+    listener.onChanged = (delta) => {
+        const download = listener.downloads.get(delta.id);
+        if (!download) return;
+
+        // Update download info
+        if (delta.state) {
+            download.state = delta.state.current;
+            if (delta.state.current === 'complete') {
+                download.download_end = Date.now();
+            }
+        }
+
+        if (delta.filename) {
+            download.fullPath = delta.filename.current;
+            download.filename = delta.filename.current.split(/[\\/]/).pop();
+        }
+
+        if (delta.fileSize) {
+            download.size = delta.fileSize.current;
+        }
+
+        if (delta.totalBytes) {
+            download.size = delta.totalBytes.current;
+        }
+
+        if (delta.mime) {
+            // Apply inference in case Chrome's update is still generic
+            download.mime_type = inferMimeType(download.filename, delta.mime.current);
+        }
+
+        // Notify on completion or failure (only once per download)
+        if (delta.state?.current === 'complete' || delta.state?.current === 'interrupted') {
+            // Prevent duplicate completion messages
+            if (download.completionSent) {
+                console.log('[Inspekt] Download completion already sent, skipping:', delta.id);
+                return;
+            }
+            download.completionSent = true;
+
+            console.log('[Inspekt] Download finished:', delta.id, download.state, download.filename);
+
+            chrome.tabs.sendMessage(tabId, {
+                type: 'INSPEKT_DOWNLOAD_COMPLETE',
+                sessionId: sessionId,
+                download: download
+            }).catch(() => {
+                // Tab may have navigated, that's ok
+            });
+        }
+    };
+
+    // Register listeners
+    chrome.downloads.onCreated.addListener(listener.onCreated);
+    chrome.downloads.onChanged.addListener(listener.onChanged);
+
+    // Store listener state
+    downloadListeners.set(sessionId, listener);
+
+    console.log('[Inspekt] Download monitoring started for session:', sessionId, 'tab:', tabId);
+
+    return { ok: true, sessionId };
+}
+
+/**
+ * Stop monitoring downloads for a session
+ * @param {string} sessionId - Session identifier
+ */
+function stopDownloadMonitoring(sessionId) {
+    const listener = downloadListeners.get(sessionId);
+    if (listener) {
+        // Remove event listeners
+        if (listener.onCreated) {
+            chrome.downloads.onCreated.removeListener(listener.onCreated);
+        }
+        if (listener.onChanged) {
+            chrome.downloads.onChanged.removeListener(listener.onChanged);
+        }
+
+        downloadListeners.delete(sessionId);
+        console.log('[Inspekt] Download monitoring stopped for session:', sessionId);
+    }
+
+    return { ok: true, sessionId };
+}
+
+/**
+ * Get list of downloads captured during a session
+ * @param {string} sessionId - Session identifier
+ */
+function getSessionDownloads(sessionId) {
+    const listener = downloadListeners.get(sessionId);
+    if (!listener) {
+        return { ok: false, error: 'No monitoring session found' };
+    }
+
+    const downloads = Array.from(listener.downloads.values());
+    return { ok: true, downloads, count: downloads.length };
+}
+
+/**
+ * Read download file content as base64
+ * Note: This requires the file to exist at the download location
+ * @param {number} downloadId - Browser download ID
+ */
+async function getDownloadFileContent(downloadId) {
+    try {
+        // Search for the download
+        const [item] = await chrome.downloads.search({ id: downloadId });
+        if (!item) {
+            return { ok: false, error: 'Download not found' };
+        }
+
+        if (!item.filename || item.state !== 'complete') {
+            return { ok: false, error: 'Download not complete or no filename' };
+        }
+
+        // Read file using fetch with file:// URL
+        // Note: This works in extension context but may have security restrictions
+        try {
+            const response = await fetch(`file://${item.filename}`);
+            const blob = await response.blob();
+
+            return new Promise((resolve) => {
+                const reader = new FileReader();
+                reader.onload = () => {
+                    resolve({
+                        ok: true,
+                        content: reader.result,  // data:mime;base64,...
+                        filename: item.filename.split(/[\\/]/).pop(),
+                        fullPath: item.filename,
+                        mime_type: item.mime || blob.type,
+                        size: blob.size
+                    });
+                };
+                reader.onerror = () => {
+                    resolve({ ok: false, error: 'Failed to read file: ' + reader.error });
+                };
+                reader.readAsDataURL(blob);
+            });
+        } catch (fetchError) {
+            // file:// fetch may be blocked, return path info instead
+            return {
+                ok: true,
+                content: null,
+                filename: item.filename.split(/[\\/]/).pop(),
+                fullPath: item.filename,
+                mime_type: item.mime,
+                size: item.fileSize || item.totalBytes,
+                note: 'File content not accessible via fetch, use path to read externally'
+            };
+        }
+    } catch (error) {
+        return { ok: false, error: String(error) };
+    }
+}
+
+// ============================================================================
+// CDP DIALOG INTERCEPTION (for bullet-proof alert/confirm/prompt handling)
+// ============================================================================
+
+/**
+ * Enable CDP-level dialog interception
+ * Uses Chrome DevTools Protocol to intercept JavaScript dialogs before they block
+ * @param {number} tabId - Tab to intercept dialogs on
+ * @param {Array} queue - Pre-queued dialog results [{ type, result }, ...]
+ */
+async function enableDialogInterception(tabId, queue = []) {
+    const debuggerVersion = '1.3';
+
+    try {
+        // Disable any existing interception first
+        if (dialogInterception.enabled) {
+            await disableDialogInterception();
+        }
+
+        // Attach debugger to tab
+        await new Promise((resolve, reject) => {
+            chrome.debugger.attach({ tabId }, debuggerVersion, () => {
+                if (chrome.runtime.lastError) {
+                    const error = chrome.runtime.lastError.message;
+                    if (error.includes('Another debugger')) {
+                        reject(new Error('Cannot enable dialog interception: DevTools is open. Close DevTools or use the DevTools to handle dialogs.'));
+                    } else {
+                        reject(new Error(error));
+                    }
+                } else {
+                    resolve();
+                }
+            });
+        });
+
+        console.log('[Inspekt] CDP debugger attached for dialog interception on tab:', tabId);
+
+        // Enable Page domain to receive dialog events
+        await sendDebuggerCommand(tabId, 'Page.enable', {});
+
+        // Update state
+        dialogInterception.enabled = true;
+        dialogInterception.tabId = tabId;
+        dialogInterception.debuggerAttached = true;
+        dialogInterception.queue = queue;
+
+        console.log('[Inspekt] Dialog interception enabled with', queue.length, 'queued results');
+
+        return {
+            ok: true,
+            message: `Dialog interception enabled for tab ${tabId}`,
+            queueLength: queue.length
+        };
+
+    } catch (error) {
+        console.error('[Inspekt] Failed to enable dialog interception:', error);
+
+        // Clean up on failure
+        dialogInterception.enabled = false;
+        dialogInterception.tabId = null;
+        dialogInterception.debuggerAttached = false;
+        dialogInterception.queue = [];
+
+        throw error;
+    }
+}
+
+/**
+ * Disable CDP dialog interception and detach debugger
+ */
+async function disableDialogInterception() {
+    try {
+        if (dialogInterception.debuggerAttached && dialogInterception.tabId) {
+            await detachDebugger(dialogInterception.tabId);
+            console.log('[Inspekt] CDP debugger detached from dialog interception');
+        }
+    } catch (error) {
+        console.error('[Inspekt] Error detaching debugger:', error);
+    }
+
+    // Reset state
+    dialogInterception.enabled = false;
+    dialogInterception.tabId = null;
+    dialogInterception.debuggerAttached = false;
+    dialogInterception.queue = [];
+
+    return { ok: true, message: 'Dialog interception disabled' };
+}
+
+/**
+ * Handle CDP Page.javascriptDialogOpening event
+ * Called when alert/confirm/prompt is triggered BEFORE it blocks
+ */
+async function handleJavaScriptDialogOpening(tabId, params) {
+    // Mutex: Wait if another dialog is being processed (prevents race conditions)
+    while (dialogInterception.processing) {
+        await new Promise(r => setTimeout(r, 10));
+    }
+    dialogInterception.processing = true;
+
+    try {
+        const { type, message, defaultPrompt, hasBrowserHandler } = params;
+
+        console.log('[Inspekt] JavaScript dialog intercepted:', { type, message, defaultPrompt });
+
+        // Find matching result from queue (includes duration for replay timing)
+        let result;
+        let duration = 1500;  // Default 1.5 seconds
+
+        // Try to match by type AND message first (most accurate)
+        let queueIndex = dialogInterception.queue.findIndex(
+            q => q.type === type && q.message === message
+        );
+
+        // Fallback: match by type only if no exact match (backward compatibility)
+        const fallbackIndex = queueIndex === -1
+            ? dialogInterception.queue.findIndex(q => q.type === type)
+            : -1;
+
+        // Log mismatches for debugging
+        if (queueIndex === -1 && fallbackIndex !== -1) {
+            const expected = dialogInterception.queue[fallbackIndex];
+            console.warn(`[Inspekt] Dialog message mismatch - Expected: "${expected.message}", Actual: "${message}"`);
+            queueIndex = fallbackIndex;  // Use fallback
+        }
+
+        if (queueIndex === -1 && fallbackIndex === -1 && dialogInterception.queue.length > 0) {
+            console.error(`[Inspekt] Unexpected dialog appeared - Type: ${type}, Message: "${message}", No matching entry in queue.`);
+        }
+
+        if (queueIndex !== -1) {
+            const queuedItem = dialogInterception.queue[queueIndex];
+            result = queuedItem.result;
+            duration = queuedItem.duration || 1500;
+            dialogInterception.queue.splice(queueIndex, 1);  // Remove from queue
+            console.log('[Inspekt] Using queued result:', result, 'duration:', duration, '- remaining queue:', dialogInterception.queue.length);
+        } else {
+            // Default results if not in queue
+            if (type === 'alert') {
+                result = true;  // Alert just needs to be dismissed
+            } else if (type === 'confirm') {
+                result = true;  // Default to OK for confirm
+            } else if (type === 'prompt') {
+                result = defaultPrompt || '';  // Use default or empty string
+            }
+            console.log('[Inspekt] No queued result, using default:', result);
+        }
+
+        // Determine accept value (for confirm/prompt)
+        const accept = type === 'alert' ? true :
+                       type === 'confirm' ? (result === true) :
+                       type === 'prompt' ? (result !== null) : true;
+
+        // For prompt, the result is the text to enter
+        const promptText = type === 'prompt' && result !== null ? String(result) : undefined;
+
+        // Dismiss the dialog with our result
+        await sendDebuggerCommand(tabId, 'Page.handleJavaScriptDialog', {
+            accept: accept,
+            promptText: promptText
+        });
+
+        console.log('[Inspekt] Dialog handled:', { accept, promptText });
+
+        // Notify content script to show synthetic overlay for visual feedback
+        try {
+            await chrome.tabs.sendMessage(tabId, {
+                type: 'SHOW_DIALOG_OVERLAY',
+                dialogType: type,
+                message: message,
+                result: result,
+                duration: duration  // How long to show overlay (matches recorded duration)
+            });
+        } catch (e) {
+            // Content script may not be ready, that's OK
+            console.log('[Inspekt] Could not send overlay notification:', e.message);
+        }
+
+    } catch (error) {
+        console.error('[Inspekt] Failed to handle dialog:', error);
+    } finally {
+        // Release mutex
+        dialogInterception.processing = false;
+    }
+}
+
+/**
+ * Process CDP dialog events sequentially (prevents race conditions)
+ */
+async function processCdpDialogEventQueue() {
+    if (processingCdpDialogEvents) return;
+    processingCdpDialogEvents = true;
+
+    while (cdpDialogEventQueue.length > 0) {
+        const { tabId, params } = cdpDialogEventQueue.shift();
+        await handleJavaScriptDialogOpening(tabId, params);
+    }
+
+    processingCdpDialogEvents = false;
+}
+
+// Listen for CDP events (debugger events)
+// Uses event queue to ensure sequential processing (prevents race conditions with rapid dialogs)
+chrome.debugger.onEvent.addListener((source, method, params) => {
+    if (method === 'Page.javascriptDialogOpening') {
+        if (dialogInterception.enabled && source.tabId === dialogInterception.tabId) {
+            // Queue the event for sequential processing
+            cdpDialogEventQueue.push({ tabId: source.tabId, params });
+            processCdpDialogEventQueue();
+        }
+    }
+
+    // Handle screencast frames for video recording
+    if (method === 'Page.screencastFrame') {
+        if (screencastState.active && source.tabId === screencastState.tabId) {
+            // POST frame directly to bridge server (bypasses content script which gets lost on navigation)
+            fetch('http://127.0.0.1:8765/screencast/frame', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    timestamp: Date.now() / 1000,
+                    data: params.data
+                })
+            }).catch(() => {
+                // Ignore network errors - bridge might not be running
+            });
+
+            // Acknowledge the frame so Chrome sends the next one
+            sendDebuggerCommand(source.tabId, 'Page.screencastFrameAck', {
+                sessionId: params.sessionId
+            }).catch(() => {
+                // Ignore ack errors
+            });
+        }
+    }
+});
+
+// Clean up dialog interception when debugger is detached (e.g., user opens DevTools)
+chrome.debugger.onDetach.addListener((source, reason) => {
+    if (dialogInterception.enabled && source.tabId === dialogInterception.tabId) {
+        console.log('[Inspekt] Debugger detached from dialog interception tab, reason:', reason);
+        dialogInterception.enabled = false;
+        dialogInterception.tabId = null;
+        dialogInterception.debuggerAttached = false;
+        // Keep queue in case we re-enable
+    }
+
+    // Clean up screencast state if debugger is detached during recording
+    if (screencastState.active && source.tabId === screencastState.tabId) {
+        console.log('[Inspekt] Debugger detached during screencast, reason:', reason);
+
+        // Notify bridge server that recording was interrupted (user opened DevTools, tab closed, etc.)
+        const interruptReason = reason === 'target_closed' ? 'tab closed' :
+                                reason === 'canceled_by_user' ? 'user opened DevTools' :
+                                reason || 'unknown';
+
+        // Send notification to bridge server about the interruption
+        fetch(`http://127.0.0.1:8765/screencast/interrupted`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                reason: interruptReason,
+                tabId: source.tabId,
+                framesCaptured: screencastState.frameCount || 0
+            })
+        }).catch(err => {
+            console.log('[Inspekt] Could not notify bridge of screencast interruption:', err.message);
+        });
+
+        screencastState.active = false;
+        screencastState.tabId = null;
+        screencastState.debuggerAttached = false;
+    }
+});
 
 // Log extension initialization
 console.log('[Inspekt Extension] Version:', chrome.runtime.getManifest().version);
