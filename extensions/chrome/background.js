@@ -9,6 +9,17 @@
 
 console.log('[Inspekt Extension] Background service worker loaded');
 
+// VM detection: Check if running inside the Browser VM (Linux + Chromium)
+// In the VM, the bridge runs on port 8767 (HTTP) / 8768 (WebSocket) instead of 8765 / 8766
+const isVMEnvironment = navigator.userAgent.includes('Linux') &&
+                        (navigator.userAgent.includes('Chromium') || navigator.userAgent.includes('Chrome'));
+const BRIDGE_HTTP_PORT = isVMEnvironment ? 8767 : 8765;
+const BRIDGE_HTTP_URL = `http://127.0.0.1:${BRIDGE_HTTP_PORT}`;
+
+if (isVMEnvironment) {
+    console.log('[Inspekt Extension] VM environment detected - using bridge port', BRIDGE_HTTP_PORT);
+}
+
 // Track which tabs have Zen Bridge active
 const activeTabs = new Set();
 
@@ -629,7 +640,7 @@ async function injectMainWorldVars(tabId) {
                 if (typeof window.__ZEN_DEVTOOLS_MONITOR__ === 'undefined') {
                     window.__ZEN_DEVTOOLS_MONITOR__ = true;
 
-                    window.zenStore = function(element) {
+                    window.inspektStore = function(element) {
                         if (element && element.nodeType === 1) {
                             window.__ZEN_INSPECTED_ELEMENT__ = element;
                             const tag = element.tagName.toLowerCase();
@@ -638,10 +649,10 @@ async function injectMainWorldVars(tabId) {
                                 '.' + element.className.split(' ').filter(c => c).join('.') : '';
                             console.log('%c[Inspekt]%c ✓ Element stored: <' + tag + id + cls + '>',
                                 'color: #0066ff; font-weight: bold', 'color: #00aa00');
-                            console.log('[Inspekt] Run in terminal: zen inspected');
+                            console.log('[Inspekt] Run in terminal: inspekt inspected');
                             return 'Stored: <' + tag + id + cls + '>';
                         }
-                        console.error('[Inspekt] ✗ Invalid element. Usage: zenStore($0)');
+                        console.error('[Inspekt] ✗ Invalid element. Usage: inspektStore($0)');
                         return 'ERROR: Please provide a valid element';
                     };
 
@@ -1962,7 +1973,10 @@ let screencastState = {
     active: false,
     tabId: null,
     debuggerAttached: false,
-    settings: {}
+    settings: {},
+    firstFrameLogged: false,  // For debugging frame metadata
+    bannerHeight: 0,          // Height of automation banner (for cropping)
+    originalHeight: 0         // Original viewport height before debugger
 };
 
 /**
@@ -2015,14 +2029,27 @@ async function startScreencast(tabId, settings = {}, requestId = null) {
         // Enable Page domain
         await sendDebuggerCommand(tabId, 'Page.enable', {});
 
+        // Try to hide the automation banner via CDP (experimental)
+        // Note: Emulation domain is always available, no .enable() needed
+        try {
+            await sendDebuggerCommand(tabId, 'Emulation.setAutomationOverride', { enabled: false });
+            console.log('[Inspekt] Automation override disabled (banner may be hidden)');
+        } catch (e) {
+            // This is expected to fail on most Chrome versions - the method is experimental
+            console.log('[Inspekt] Automation override not available (expected):', e.message);
+        }
+
         // Calculate frame interval from FPS
         const fps = settings.fps || 10;
         const quality = settings.quality || 80;
         const format = settings.format || 'jpeg';
 
-        // Get actual viewport dimensions to match video output to viewport size
-        let maxWidth = settings.maxWidth || 4096;  // Default to high value if not specified
+        // Get viewport dimensions AFTER debugger is attached
+        // This captures the actual available space (accounting for any automation banner)
+        let maxWidth = settings.maxWidth || 4096;
         let maxHeight = settings.maxHeight || 4096;
+        let preDebuggerHeight = settings.preDebuggerHeight || null;  // Passed from Python
+        let bannerHeight = 0;
 
         try {
             // Query the actual viewport dimensions from the tab
@@ -2034,11 +2061,22 @@ async function startScreencast(tabId, settings = {}, requestId = null) {
             if (result && result.result) {
                 maxWidth = result.result.width;
                 maxHeight = result.result.height;
+
+                // Calculate banner height if we have pre-debugger height
+                if (preDebuggerHeight && preDebuggerHeight > maxHeight) {
+                    bannerHeight = preDebuggerHeight - maxHeight;
+                    console.log('[Inspekt] Detected automation banner height:', bannerHeight, 'px');
+                }
+
                 console.log('[Inspekt] Screencast using viewport dimensions:', maxWidth, 'x', maxHeight);
             }
         } catch (e) {
             console.log('[Inspekt] Could not get viewport dimensions, using defaults:', maxWidth, 'x', maxHeight);
         }
+
+        // Store banner height for later reporting
+        screencastState.bannerHeight = bannerHeight;
+        screencastState.originalHeight = preDebuggerHeight || maxHeight;
 
         // Start screencast
         const screencastParams = {
@@ -2049,15 +2087,25 @@ async function startScreencast(tabId, settings = {}, requestId = null) {
             everyNthFrame: Math.max(1, Math.round(60 / fps)) // Approximate frame interval
         };
 
-        await sendDebuggerCommand(tabId, 'Page.startScreencast', screencastParams);
-
+        // IMPORTANT: Set state BEFORE starting screencast to avoid race condition
+        // CDP may start sending frame events immediately after Page.startScreencast
         screencastState.active = true;
         screencastState.tabId = tabId;
         screencastState.settings = settings;
+        screencastState.firstFrameLogged = false;  // Reset for next session
 
-        console.log('[Inspekt] Screencast started at ~' + fps + ' FPS');
+        await sendDebuggerCommand(tabId, 'Page.startScreencast', screencastParams);
 
-        return { ok: true, message: 'Screencast started' };
+        console.log('[Inspekt] Screencast started at ~' + fps + ' FPS, target dimensions:', maxWidth, 'x', maxHeight);
+
+        return {
+            ok: true,
+            message: 'Screencast started',
+            width: maxWidth,
+            height: maxHeight,
+            bannerHeight: bannerHeight,
+            originalHeight: preDebuggerHeight || maxHeight
+        };
 
     } catch (error) {
         console.error('[Inspekt] Screencast start error:', error);
@@ -2738,17 +2786,31 @@ chrome.debugger.onEvent.addListener((source, method, params) => {
 
     // Handle screencast frames for video recording
     if (method === 'Page.screencastFrame') {
+        // Debug: Log every frame event received
+        console.log('[Inspekt] screencastFrame received, active:', screencastState.active,
+                    'sourceTab:', source.tabId, 'expectedTab:', screencastState.tabId);
+
         if (screencastState.active && source.tabId === screencastState.tabId) {
+            // Log first frame metadata for debugging video dimensions
+            if (!screencastState.firstFrameLogged && params.metadata) {
+                console.log('[Inspekt] First screencast frame metadata:', params.metadata);
+                screencastState.firstFrameLogged = true;
+            }
+
             // POST frame directly to bridge server (bypasses content script which gets lost on navigation)
-            fetch('http://127.0.0.1:8765/screencast/frame', {
+            // Include metadata for dimension tracking
+            fetch(`${BRIDGE_HTTP_URL}/screencast/frame`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     timestamp: Date.now() / 1000,
-                    data: params.data
+                    data: params.data,
+                    metadata: params.metadata  // Include CDP metadata (deviceWidth, deviceHeight, etc.)
                 })
-            }).catch(() => {
-                // Ignore network errors - bridge might not be running
+            }).then(resp => {
+                if (!resp.ok) console.log('[Inspekt] Frame POST failed:', resp.status);
+            }).catch(err => {
+                console.log('[Inspekt] Frame POST error:', err);
             });
 
             // Acknowledge the frame so Chrome sends the next one
@@ -2757,6 +2819,8 @@ chrome.debugger.onEvent.addListener((source, method, params) => {
             }).catch(() => {
                 // Ignore ack errors
             });
+        } else {
+            console.log('[Inspekt] Skipping frame - state mismatch');
         }
     }
 });
@@ -2781,7 +2845,7 @@ chrome.debugger.onDetach.addListener((source, reason) => {
                                 reason || 'unknown';
 
         // Send notification to bridge server about the interruption
-        fetch(`http://127.0.0.1:8765/screencast/interrupted`, {
+        fetch(`${BRIDGE_HTTP_URL}/screencast/interrupted`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
