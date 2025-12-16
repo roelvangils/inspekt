@@ -1107,7 +1107,7 @@ def replay(
     if recording_file is None:
         recent = find_most_recent_recording()
         if recent is None:
-            click.echo("Error: No recording file specified and no inspekt_*.yaml files found in current directory.", err=True)
+            click.echo("Error: No recording file specified and no recording_*.yaml files found in current directory.", err=True)
             sys.exit(1)
         recording_file = str(recent)
         auto_selected = True
@@ -2963,7 +2963,7 @@ def replay(
 
                     # Show video saved message
                     saved_elapsed = int((datetime.now() - result.start_time).total_seconds() * 1000)
-                    click.echo(format_system_message(f"Video saved: {clickable_name} ({file_size_mb:.1f} MB)", icon="video", elapsed_ms=saved_elapsed))
+                    click.echo(format_system_message(f"Video saved: {clickable_name} ({file_size_mb:.1f} MB)", icon="video", elapsed_ms=saved_elapsed, truncate=False))
 
                     # Open video file if --open flag was set
                     if open_after:

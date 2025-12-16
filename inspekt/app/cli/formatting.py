@@ -6,7 +6,7 @@ from pathlib import Path
 
 import click
 
-from inspekt.app.cli.icons import get_action_icon, get_keypress_icon, get_status_icon, get_step_mode_icon
+from inspekt.app.cli.icons import get_action_icon, get_keypress_icon, get_native_control_icon, get_status_icon, get_step_mode_icon
 
 
 def get_terminal_width() -> int:
@@ -16,6 +16,22 @@ def get_terminal_width() -> int:
         return shutil.get_terminal_size().columns
     except Exception:
         return 80
+
+
+def truncate_text(text: str, max_length: int, suffix: str = "…") -> str:
+    """Truncate text to max_length, adding suffix if truncated.
+
+    Args:
+        text: The text to truncate
+        max_length: Maximum length including suffix
+        suffix: String to append when truncated (default: ellipsis)
+
+    Returns:
+        Truncated text with suffix, or original if short enough
+    """
+    if len(text) <= max_length:
+        return text
+    return text[: max_length - len(suffix)] + suffix
 
 
 def strip_icon_font_chars(text: str) -> str:
@@ -127,21 +143,21 @@ def get_recordings_dir() -> Path:
     return recordings_dir
 
 
-def format_step_header(use_color: bool = True, indent: bool = True) -> str:
+def format_step_header(use_color: bool = True, indent: bool = False) -> str:
     """Format the header row for step display.
 
     Args:
         use_color: Whether to use ANSI colors
-        indent: Whether to include 2-space indent (False for recording mode)
+        indent: Whether to include 2-space indent
 
     Returns:
         Formatted header string with columns: STEP, TIME, COMMAND, DETAILS
     """
     # Header aligned to match step format:
-    # "{indent}{0001}   {00:00}   {icon  action   }   details"
-    #          4ch     5ch       12ch (icon+2sp+9ch)
+    # "{indent}{0001}   {00:00}   {icon  action      }   details"
+    #          4ch     5ch       15ch (icon+2sp+12ch)
     prefix = "  " if indent else ""
-    header = f"{prefix}STEP   TIME       COMMAND     DETAILS"
+    header = f"{prefix}STEP   TIME       COMMAND        DETAILS"
     if use_color:
         return click.style(header, fg="bright_black")
     return header
@@ -153,11 +169,11 @@ def format_step_for_display(
     elapsed_ms: int = 0,
     use_color: bool = True,
     reserve_suffix_width: int = 0,
-    indent: bool = True,
+    indent: bool = False,
 ) -> str:
     """Format a step for terminal display with colors.
 
-    Format:   0001   00:00   󰖟  navigate   details…
+    Format: 0001   00:00   󰖟  navigate   details…
 
     Args:
         step: Step dictionary with action, target, etc.
@@ -165,7 +181,7 @@ def format_step_for_display(
         elapsed_ms: Elapsed time in milliseconds
         use_color: Whether to use ANSI colors
         reserve_suffix_width: Reserve this many characters at the end (for status like " OK")
-        indent: Whether to include 2-space indent (False for recording mode)
+        indent: Whether to include 2-space indent
 
     Returns:
         Formatted string, truncated to fit terminal width
@@ -187,21 +203,43 @@ def format_step_for_display(
     # Format components (4 digits for step number, 3 spaces between columns)
     step_num_str = f"{step_num:04d}"
     elapsed = format_elapsed(elapsed_ms)
-    action_str = action.ljust(9)
+    action_str = action.ljust(12)
+
+    # For 'set' action, show "set <type>" like "set time", "set date", etc.
+    if action == "set":
+        input_type = target.get("input_type", "") if target else ""
+        # Use shorter display names for input types
+        type_display_names = {
+            "time": "time",
+            "date": "date",
+            "datetime-local": "date&time",
+            "month": "month",
+            "week": "week",
+            "range": "range",
+            "number": "number",
+            "color": "color",
+        }
+        type_name = type_display_names.get(input_type, input_type)
+        if type_name:
+            action_str = f"set {type_name}".ljust(12)
 
     # Get action icon (if nerdfont enabled)
     # For keypress, get the specific icon based on key and modifiers
+    # For set, get the native control-specific icon based on input type
     if action == "keypress" and use_color:
         key = step.get("key", "")
         modifiers = step.get("modifiers", [])
         action_icon = get_keypress_icon(key, modifiers)
+    elif action == "set" and use_color:
+        input_type = target.get("input_type", "") if target else ""
+        action_icon = get_native_control_icon(input_type) or get_action_icon(action)
     else:
         action_icon = get_action_icon(action) if use_color else None
 
     # Color scheme
     if use_color:
         step_num_colored = click.style(step_num_str, fg="cyan", bold=True)
-        elapsed_colored = click.style(elapsed, fg="bright_black")
+        elapsed_colored = elapsed  # White (default) for actual recorded steps
 
         # Action colors based on type
         action_colors = {
@@ -210,12 +248,19 @@ def format_step_for_display(
             "rightclick": "green",
             "activate": "bright_green",
             "type": "yellow",
+            "set": "yellow",
             "keypress": "magenta",
             "hover": "white",
             "scroll": "blue",
             "check": "green",
             "uncheck": "red",
+            "radio": "green",
             "select": "cyan",
+            "toggle": "cyan",
+            "dialog": "magenta",
+            "jsdialog": "yellow",
+            "upload": "yellow",
+            "download": "cyan",
             "inspekt": "cyan",
         }
         action_color = action_colors.get(action, "white")
@@ -269,6 +314,14 @@ def format_step_for_display(
             result = f"{prefix}   {sel_display} {chars_display}{type_display}"
         return truncate_to_width(result, term_width)
 
+    elif action == "set":
+        # Native control value set (range, date, time, number, color, etc.)
+        value = step.get("value", "")
+        sel_display = selector[:35] if len(selector) > 35 else selector
+        value_display = click.style(f"({value})", fg="yellow") if use_color else f"({value})"
+        result = f"{prefix}   {sel_display} {value_display}"
+        return truncate_to_width(result, term_width)
+
     elif action == "keypress":
         key = step.get("key", "")
         modifiers = step.get("modifiers", [])
@@ -278,10 +331,38 @@ def format_step_for_display(
             key_str = key
         key_display = click.style(key_str, fg="magenta", bold=True) if use_color else key_str
 
-        # For Tab/Shift-Tab, show the accessible name of the focused element
-        if key == "Tab" and accessible_name:
-            name_display = click.style(f"({accessible_name})", fg="bright_black") if use_color else f"({accessible_name})"
-            result = f"{prefix}   {key_display} {name_display}"
+        # For Tab/Shift-Tab, show context about the focused element
+        if key == "Tab":
+            # Special display for native controls (media elements and inputs with closed Shadow DOM)
+            if tag == "audio":
+                display_name = "Native Audio Player"
+            elif tag == "video":
+                display_name = "Native Video Player"
+            elif tag == "input":
+                # Check for native control input types with closed Shadow DOM
+                input_type = target.get("input_type", "") if target else ""
+                native_control_names = {
+                    "range": "Native Range Slider",
+                    "date": "Native Date Picker",
+                    "time": "Native Time Picker",
+                    "datetime-local": "Native Datetime Picker",
+                    "month": "Native Month Picker",
+                    "week": "Native Week Picker",
+                    "number": "Native Number Spinner",
+                    "color": "Native Color Picker"
+                }
+                if input_type in native_control_names:
+                    display_name = native_control_names[input_type]
+                else:
+                    display_name = accessible_name
+            else:
+                display_name = accessible_name
+
+            if display_name:
+                name_display = click.style(f"({display_name})", fg="bright_black") if use_color else f"({display_name})"
+                result = f"{prefix}   {key_display} {name_display}"
+            else:
+                result = f"{prefix}   {key_display}"
         else:
             result = f"{prefix}   {key_display}"
         return truncate_to_width(result, term_width)
@@ -320,6 +401,22 @@ def format_step_for_display(
         name_display = click.style(f'"{name}"', fg="red") if name and use_color else (f'"{name}"' if name else "")
         if name:
             result = f"{prefix}   {sel_display} {name_display}"
+        else:
+            result = f"{prefix}   {sel_display}"
+        return truncate_to_width(result, term_width)
+
+    elif action == "radio":
+        # Radio button selected
+        name = accessible_name or sanitize_display_name(target.get("text", "") if target else "")
+        sel_display = selector[:35] if len(selector) > 35 else selector
+        value = step.get("value", "")
+        # Show value for radio buttons (more meaningful than label)
+        value_display = click.style(f'"{value}"', fg="green") if value and use_color else (f'"{value}"' if value else "")
+        name_display = click.style(f'"{name}"', fg="green") if name and use_color else (f'"{name}"' if name else "")
+        # Prefer value over name for radio buttons
+        display = value_display if value else name_display
+        if display:
+            result = f"{prefix}   {sel_display} {display}"
         else:
             result = f"{prefix}   {sel_display}"
         return truncate_to_width(result, term_width)
@@ -366,6 +463,158 @@ def format_step_for_display(
             result = f"{prefix}   {direction} {amount}"
         return truncate_to_width(result, term_width)
 
+    elif action == "toggle":
+        # Details/summary toggle
+        value = step.get("value", "")  # "open" or "closed"
+        accessible_name = target.get("accessible_name", "") if target else ""
+
+        # Determine display based on state
+        state_display = value if value else "toggle"
+        arrow = "▼" if value == "open" else ("▶" if value == "closed" else "◆")
+
+        if use_color:
+            arrow_display = click.style(arrow, fg="cyan", bold=True)
+            state_styled = click.style(f"({state_display})", fg="bright_black")
+            if accessible_name:
+                name_display = click.style(f'"{truncate_text(accessible_name, 30)}"', fg="white")
+                result = f"{prefix}   {arrow_display} {name_display} {state_styled}"
+            else:
+                result = f"{prefix}   {arrow_display} {state_styled}"
+        else:
+            if accessible_name:
+                result = f'{prefix}   {arrow} "{truncate_text(accessible_name, 30)}" ({state_display})'
+            else:
+                result = f"{prefix}   {arrow} ({state_display})"
+        return truncate_to_width(result, term_width)
+
+    elif action == "dialog":
+        # Dialog open/close
+        value = step.get("value", "")  # "modal", "modeless", or "close"
+        selector = target.get("selector", "") if target else ""
+
+        # Determine display based on state
+        if value == "modal":
+            state_display = "open modal"
+            symbol = "◈"
+        elif value == "modeless":
+            state_display = "open"
+            symbol = "◇"
+        elif value == "close":
+            state_display = "close"
+            symbol = "◆"
+        else:
+            state_display = value or "dialog"
+            symbol = "◇"
+
+        if use_color:
+            symbol_display = click.style(symbol, fg="magenta", bold=True)
+            sel_display = click.style(truncate_text(selector, 30), fg="white")
+            state_styled = click.style(f"({state_display})", fg="bright_black")
+            result = f"{prefix}   {symbol_display} {sel_display} {state_styled}"
+        else:
+            result = f"{prefix}   {symbol} {truncate_text(selector, 30)} ({state_display})"
+        return truncate_to_width(result, term_width)
+
+    elif action == "jsdialog":
+        # JavaScript dialog (alert, confirm, prompt)
+        dialog_type = step.get("dialog_type", "alert")
+        message = step.get("message", "")
+        result_val = step.get("result")
+
+        # Determine result display based on dialog type
+        if dialog_type == "alert":
+            result_display = ""
+        elif dialog_type == "confirm":
+            result_display = "OK" if result_val else "Cancel"
+        elif dialog_type == "prompt":
+            if result_val is None:
+                result_display = "Cancel"
+            else:
+                result_display = f'"{truncate_text(str(result_val), 20)}"'
+        else:
+            result_display = str(result_val) if result_val is not None else ""
+
+        # Truncate message for display
+        msg_display = truncate_text(message, 30) if message else ""
+
+        if use_color:
+            type_styled = click.style(f"[{dialog_type}]", fg="yellow", bold=True)
+            msg_styled = click.style(f'"{msg_display}"', fg="white") if msg_display else ""
+            if result_display:
+                result_styled = click.style(f"→ {result_display}", fg="cyan")
+                result = f"{prefix}   {type_styled} {msg_styled} {result_styled}"
+            else:
+                result = f"{prefix}   {type_styled} {msg_styled}"
+        else:
+            if result_display:
+                result = f'{prefix}   [{dialog_type}] "{msg_display}" → {result_display}'
+            else:
+                result = f'{prefix}   [{dialog_type}] "{msg_display}"'
+        return truncate_to_width(result, term_width)
+
+    elif action == "upload":
+        # File upload action
+        files = step.get("files", [])
+        selector = target.get("selector", "") if target else ""
+
+        if len(files) == 0:
+            file_desc = "(no files)"
+        elif len(files) == 1:
+            file_info = files[0]
+            file_name = file_info.get("name", "unknown")
+            file_size = file_info.get("size", 0)
+            # Format size nicely
+            if file_size >= 1024 * 1024:
+                size_str = f"{file_size / (1024 * 1024):.1f}MB"
+            elif file_size >= 1024:
+                size_str = f"{file_size / 1024:.1f}KB"
+            else:
+                size_str = f"{file_size}B"
+            file_desc = f'"{truncate_text(file_name, 25)}" ({size_str})'
+        else:
+            total_size = sum(f.get("size", 0) for f in files)
+            if total_size >= 1024 * 1024:
+                size_str = f"{total_size / (1024 * 1024):.1f}MB"
+            elif total_size >= 1024:
+                size_str = f"{total_size / 1024:.1f}KB"
+            else:
+                size_str = f"{total_size}B"
+            file_desc = f"{len(files)} files ({size_str} total)"
+
+        if use_color:
+            sel_display = click.style(truncate_text(selector, 20), fg="white")
+            file_display = click.style(file_desc, fg="bright_black")
+            result = f"{prefix}   {sel_display} {file_display}"
+        else:
+            result = f"{prefix}   {truncate_text(selector, 20)} {file_desc}"
+        return truncate_to_width(result, term_width)
+
+    elif action == "download":
+        # File download action
+        download = step.get("download", {})
+        filename = download.get("filename", "unknown")
+        file_size = download.get("size", 0)
+        mime_type = download.get("mime_type", "")
+
+        # Format size nicely
+        if file_size >= 1024 * 1024:
+            size_str = f"{file_size / (1024 * 1024):.1f}MB"
+        elif file_size >= 1024:
+            size_str = f"{file_size / 1024:.1f}KB"
+        else:
+            size_str = f"{file_size}B"
+
+        file_desc = f'"{truncate_text(filename, 25)}" ({size_str})'
+
+        if use_color:
+            file_display = click.style(file_desc, fg="cyan")
+            mime_display = click.style(f"[{mime_type}]", fg="bright_black") if mime_type else ""
+            result = f"{prefix}   {file_display} {mime_display}"
+        else:
+            mime_suffix = f" [{mime_type}]" if mime_type else ""
+            result = f"{prefix}   {file_desc}{mime_suffix}"
+        return truncate_to_width(result, term_width)
+
     elif action == "inspekt":
         cmd = step.get("command", "")
         cmd_display = click.style(cmd, fg="cyan") if use_color else cmd
@@ -381,11 +630,11 @@ def format_skipped_step_for_display(
     step_num: int = 0,
     elapsed_ms: int = 0,
     use_color: bool = True,
-    indent: bool = True,
+    indent: bool = False,
 ) -> str:
     """Format a skipped step for terminal display with dimmed style.
 
-    Format:   0003   00:02   󰓓  skip       "Accept" button (skipped)
+    Format: 0003   00:02   󰓓  skip       "Accept" button (skipped)
 
     Args:
         step: Step dictionary with action, target, etc.
@@ -448,6 +697,9 @@ def format_skipped_step_for_display(
     elif action == "type":
         char_count = len(step.get("value", ""))
         details = f"({char_count} chars)"
+    elif action == "set":
+        value = step.get("value", "")
+        details = f"({value})"
     elif action == "keypress":
         key = step.get("key", "")
         modifiers = step.get("modifiers", [])
@@ -483,11 +735,11 @@ def format_paused_step_for_display(
     step_num: int = 0,
     elapsed_ms: int = 0,
     use_color: bool = True,
-    indent: bool = True,
+    indent: bool = False,
 ) -> str:
     """Format a paused step indicator for terminal display.
 
-    Format:   0003   00:02   ⏸  pause      "Submit" button
+    Format: 0003   00:02   ⏸  pause      "Submit" button
 
     Args:
         step: Step dictionary with action, target, etc.
@@ -550,6 +802,9 @@ def format_paused_step_for_display(
     elif action == "type":
         char_count = len(step.get("value", ""))
         details = f"({char_count} chars)"
+    elif action == "set":
+        value = step.get("value", "")
+        details = f"({value})"
     elif action == "keypress":
         key = step.get("key", "")
         modifiers = step.get("modifiers", [])
@@ -577,21 +832,36 @@ def format_paused_step_for_display(
     return truncate_to_width(result, term_width)
 
 
-def format_system_message(message: str, use_color: bool = True, icon: str | None = None) -> str:
-    """Format a system message with ----   --:-- prefix to align with step output.
+def format_system_message(
+    message: str,
+    use_color: bool = True,
+    icon: str | None = None,
+    elapsed_ms: int | None = None,
+    truncate: bool = True,
+) -> str:
+    """Format a system message with ----   xx:xx prefix to align with step output.
 
     Aligns with COMMAND column (3 spaces after time, then icon or placeholder, then message).
 
     Args:
         message: The message text to display
         use_color: Whether to use ANSI colors
-        icon: Optional icon to display (e.g., "resume" for play icon)
+        icon: Optional icon to display (e.g., "video" for video recording)
+        elapsed_ms: Optional elapsed time in milliseconds (shows actual time instead of --:--)
+        truncate: Whether to truncate long messages to terminal width (default True).
+                  Set to False for important messages like file paths that shouldn't be cut off.
     """
     from inspekt.app.cli.icons import get_indicator
 
     term_width = get_terminal_width()
-    # Use dashes and placeholder time to align with step columns (STEP   TIME)
-    prefix = click.style("----   --:--", fg="bright_black") if use_color else "----   --:--"
+
+    # Format time: either actual elapsed or placeholder
+    if elapsed_ms is not None:
+        time_str = format_elapsed(elapsed_ms)
+    else:
+        time_str = "--:--"
+
+    prefix = click.style(f"----   {time_str}", fg="bright_black") if use_color else f"----   {time_str}"
     msg = click.style(message, fg="bright_black", italic=True) if use_color else message
 
     # Get icon if specified
@@ -607,7 +877,9 @@ def format_system_message(message: str, use_color: bool = True, icon: str | None
     else:
         result = f"{prefix}      {msg}"  # 6 spaces when no icon
 
-    return truncate_to_width(result, term_width)
+    if truncate:
+        return truncate_to_width(result, term_width)
+    return result
 
 
 def format_status(status: str, use_color: bool = True) -> str:
