@@ -586,6 +586,27 @@ After encoding completes, Inspekt shows the video details:
 
 The file path is **clickable** in terminals that support OSC 8 hyperlinks (iTerm2, Windows Terminal, modern Linux terminals).
 
+### Video Dimensions
+
+The video dimensions **exactly match your browser's viewport size** at the time of recording. This ensures pixel-perfect output for visual testing and documentation.
+
+For example:
+- Viewport 1920×1080 → Video 1920×1080
+- Viewport 1000×500 → Video 1000×500
+- Viewport 375×667 (mobile) → Video 375×667
+
+**Tip:** Use `--match-viewport` to ensure consistent video dimensions across different machines:
+
+```bash
+# Record at exact viewport dimensions stored in the YAML
+inspekt replay responsive-test.yaml --match-viewport --video
+```
+
+This is especially useful for:
+- **Visual regression testing** - Compare videos frame-by-frame
+- **Documentation** - Consistent dimensions across team members
+- **Responsive testing** - Record at specific breakpoints (mobile, tablet, desktop)
+
 ### Visual Overlay
 
 Video recordings include Inspekt's visual feedback overlay:
