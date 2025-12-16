@@ -85,6 +85,18 @@ DEFAULT_CONFIG: dict[str, Any] = {
         "output": "cli",  # "cli" (Python/system audio) | "browser" (Web Audio) | "off"
         "volume": 0.5,  # 0.0 to 1.0
     },
+    "replay": {
+        "validate": True,  # Run preflight validation before replay
+    },
+    "video": {
+        "fps": 10,           # Frame rate for video recording (5-30)
+        "quality": 80,       # JPEG quality for frames (50-100)
+        "format": "mp4",     # Output format (mp4 or webm)
+    },
+    "record": {
+        "max-actions-per-second": 10,  # Rate limit to prevent runaway recordings
+        "synthetic-dialogs": False,  # Use non-blocking HTML overlays instead of native dialogs
+    },
     "nerdfont": False,  # Enable Nerdfont glyphs in terminal output
     "permissions": {
         "allow-local-files": True,  # Allow file:// URLs without adding to domain list
@@ -218,6 +230,18 @@ def load_config() -> dict[str, Any]:
                     config["paths"].update(user_config["paths"])
                 else:
                     config["paths"] = user_config["paths"]
+            elif key == "record" and isinstance(user_config["record"], dict):
+                # Nested record config - merge deeply
+                if isinstance(config.get("record"), dict):
+                    config["record"].update(user_config["record"])
+                else:
+                    config["record"] = user_config["record"]
+            elif key == "video" and isinstance(user_config["video"], dict):
+                # Nested video config - merge deeply
+                if isinstance(config.get("video"), dict):
+                    config["video"].update(user_config["video"])
+                else:
+                    config["video"] = user_config["video"]
             else:
                 # Root-level properties like ai-language - overwrite
                 config[key] = user_config[key]
@@ -617,3 +641,211 @@ def get_audio_config() -> dict[str, Any]:
         "output": output,
         "volume": volume,
     }
+
+
+def get_replay_config() -> dict[str, Any]:
+    """
+    Get replay configuration with validation.
+
+    Returns:
+        Replay configuration dictionary with validated values:
+        - validate: bool (whether to run preflight validation)
+    """
+    config = load_config()
+    replay_config = config.get("replay", {})
+
+    # Validate: must be boolean
+    validate = replay_config.get("validate", True)
+    if not isinstance(validate, bool):
+        validate = True
+
+    return {
+        "validate": validate,
+    }
+
+
+def get_record_config() -> dict[str, Any]:
+    """
+    Get record configuration with validation.
+
+    Returns:
+        Record configuration dictionary with validated values:
+        - max-actions-per-second: int (rate limit, minimum 1, default 10)
+        - synthetic-dialogs: bool (use non-blocking overlays for JS dialogs, default False)
+    """
+    config = load_config()
+    record_config = config.get("record", {})
+
+    # Validate max-actions-per-second: must be positive integer
+    max_actions = record_config.get("max-actions-per-second", 10)
+    try:
+        max_actions = max(1, int(max_actions))
+    except (ValueError, TypeError):
+        max_actions = 10
+
+    # Validate synthetic-dialogs: must be boolean
+    synthetic_dialogs = record_config.get("synthetic-dialogs", False)
+    synthetic_dialogs = bool(synthetic_dialogs)
+
+    return {
+        "max-actions-per-second": max_actions,
+        "synthetic-dialogs": synthetic_dialogs,
+    }
+
+
+def get_video_config() -> dict[str, Any]:
+    """
+    Get video recording configuration with validation.
+
+    Returns:
+        Video configuration dictionary with validated values:
+        - fps: int (frame rate, 5-30, default 10)
+        - quality: int (JPEG quality, 50-100, default 80)
+        - format: str (mp4 or webm, default mp4)
+    """
+    config = load_config()
+    video_config = config.get("video", {})
+
+    # Validate fps: must be between 5 and 30
+    fps = video_config.get("fps", 10)
+    try:
+        fps = max(5, min(30, int(fps)))
+    except (ValueError, TypeError):
+        fps = 10
+
+    # Validate quality: must be between 50 and 100
+    quality = video_config.get("quality", 80)
+    try:
+        quality = max(50, min(100, int(quality)))
+    except (ValueError, TypeError):
+        quality = 80
+
+    # Validate format: must be mp4 or webm
+    format_val = video_config.get("format", "mp4").lower()
+    if format_val not in ["mp4", "webm"]:
+        format_val = "mp4"
+
+    return {
+        "fps": fps,
+        "quality": quality,
+        "format": format_val,
+    }
+
+
+def get_viewport_offsets() -> dict[str, int] | None:
+    """
+    Get cached viewport offsets from config file.
+
+    Viewport offsets are the difference between window bounds and actual viewport
+    size due to browser chrome (toolbar, scrollbars). Once calibrated, these offsets
+    allow instant viewport resizing without trial-and-error.
+
+    Returns:
+        Dictionary with 'width' and 'height' offset values, or None if not calibrated.
+        Returns None if offsets are invalid (negative or > 1000px).
+    """
+    config = load_config()
+    offsets = config.get("viewport_offsets")
+
+    if offsets and isinstance(offsets, dict):
+        width = offsets.get("width")
+        height = offsets.get("height")
+
+        # Handle numeric types (int or float) - convert to int
+        if isinstance(width, (int, float)) and isinstance(height, (int, float)):
+            width = int(width)
+            height = int(height)
+
+            # Validate bounds: offsets must be 0-1000px (reasonable browser chrome range)
+            if 0 <= width <= 1000 and 0 <= height <= 1000:
+                return {"width": width, "height": height}
+
+    return None
+
+
+def save_viewport_offsets(width_offset: int, height_offset: int) -> bool:
+    """
+    Save viewport offsets to config file for future use.
+
+    These offsets represent the difference between requested window size and
+    actual viewport size (due to browser chrome). Storing them allows instant
+    viewport resizing on subsequent runs.
+
+    Args:
+        width_offset: Horizontal offset (window_width - viewport_width), must be 0-1000
+        height_offset: Vertical offset (window_height - viewport_height), must be 0-1000
+
+    Returns:
+        True if saved successfully, False otherwise (invalid values, permission error, etc.)
+    """
+    import shutil
+    import tempfile
+
+    # Type validation: convert to int if numeric
+    try:
+        width_offset = int(width_offset)
+        height_offset = int(height_offset)
+    except (ValueError, TypeError):
+        return False  # Non-numeric values
+
+    # Bounds validation: offsets must be 0-1000px (reasonable browser chrome range)
+    # Negative offsets are invalid (would mean viewport > window, impossible)
+    # Offsets > 1000px suggest corrupted data
+    if not (0 <= width_offset <= 1000) or not (0 <= height_offset <= 1000):
+        return False
+
+    # Find existing config file or determine where to create one
+    config_file = find_config_file()
+
+    if config_file is None:
+        # Create in XDG Base Directory standard location
+        config_file = Path.home() / ".config" / "inspekt.json"
+        try:
+            config_file.parent.mkdir(parents=True, exist_ok=True)
+        except OSError:
+            return False  # Cannot create directory
+
+    # Verify parent directory is writable
+    if not os.access(config_file.parent, os.W_OK):
+        return False
+
+    # Load existing config or start fresh
+    config: dict[str, Any] = {}
+    if config_file.exists():
+        try:
+            with open(config_file) as f:
+                config = json.load(f)
+        except (OSError, json.JSONDecodeError):
+            # If existing config is corrupted, start fresh but preserve what we can
+            config = {}
+
+    # Update viewport offsets
+    config["viewport_offsets"] = {
+        "width": width_offset,
+        "height": height_offset,
+    }
+
+    # Atomic write: write to temp file, then rename
+    # This prevents data loss if write is interrupted (disk full, crash, etc.)
+    try:
+        # Create temp file in same directory (required for atomic rename on same filesystem)
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            dir=config_file.parent,
+            suffix=".tmp",
+            delete=False,
+        ) as f:
+            json.dump(config, f, indent=2)
+            temp_path = Path(f.name)
+
+        # Atomic rename (on POSIX systems, this is guaranteed atomic)
+        shutil.move(str(temp_path), str(config_file))
+        return True
+    except OSError:
+        # Clean up temp file if it exists
+        try:
+            if temp_path.exists():
+                temp_path.unlink()
+        except (OSError, NameError):
+            pass
+        return False

@@ -1,7 +1,9 @@
 """Replay recorded browser interactions from a YAML file."""
 
 import json
+import os
 import platform
+import shutil
 import subprocess
 import sys
 import time
@@ -14,7 +16,7 @@ import yaml
 
 from inspekt.app.cli.icons import success, error
 from inspekt.client import BridgeClient
-from inspekt.config import get_audio_config
+from inspekt.config import get_audio_config, get_video_config
 from inspekt.domain.recording import Recording
 from inspekt.services.applescript_utils import activate_browser_tab
 from inspekt.services.audio import CLIAudio
@@ -29,6 +31,7 @@ from .formatting import (
     format_system_message,
     get_recordings_dir,
 )
+from .recording_utils import load_external_file_content
 
 import requests
 
@@ -36,45 +39,9 @@ import requests
 BRIDGE_HTTP_HOST = "127.0.0.1"
 BRIDGE_HTTP_PORT = 8765
 
-
-def complete_recording_files(ctx, param, incomplete):
-    """Shell completion for recording files.
-
-    Returns recording_*.yaml files in the current directory that match
-    the incomplete input.
-    """
-    cwd = Path.cwd()
-    recording_files = list(cwd.glob("recording_*.yaml"))
-
-    # Filter by incomplete prefix and return filenames
-    matches = []
-    for f in recording_files:
-        name = f.name
-        if name.startswith(incomplete) or incomplete in name:
-            matches.append(name)
-
-    return sorted(matches, key=lambda x: -cwd.joinpath(x).stat().st_mtime)
-
-
-def find_most_recent_recording() -> Optional[Path]:
-    """
-    Find the most recently modified recording file in the current directory.
-
-    Looks for files matching 'recording_*.yaml' and returns the one
-    with the most recent modification time.
-
-    Returns:
-        Path to the most recent recording file, or None if not found.
-    """
-    cwd = Path.cwd()
-    recording_files = list(cwd.glob("recording_*.yaml"))
-
-    if not recording_files:
-        return None
-
-    # Sort by modification time (most recent first)
-    recording_files.sort(key=lambda f: f.stat().st_mtime, reverse=True)
-    return recording_files[0]
+# Import shared utilities from recording_utils (moved there to avoid circular imports)
+from .recording_utils import clean_filename, complete_recording_files, find_most_recent_recording
+from inspekt.shared.dialog_styles import DIALOG_STYLES
 
 # Save built-in open before it gets shadowed
 _builtin_open = open
@@ -670,6 +637,203 @@ def check_inspekt_expectations(command: str, expect: dict, cmd_result: dict) -> 
     return failures
 
 
+# =============================================================================
+# Download Assertion Checking
+# =============================================================================
+
+# Shell command allowlist for download assertions
+# These are safe, read-only commands for file inspection
+DOWNLOAD_SHELL_ALLOWLIST: dict[str, list[str]] = {
+    "file": ["file", "-b"],  # MIME type detection
+    "pdfinfo": ["pdfinfo"],  # PDF metadata
+    "identify": ["identify", "-format", "%m %w %h"],  # ImageMagick
+    "exiftool": ["exiftool", "-j"],  # EXIF metadata
+    "wc": ["wc"],  # Word/line/byte count
+    "head": ["head"],  # First lines
+    "tail": ["tail"],  # Last lines
+    "grep": ["grep"],  # Pattern matching
+    "md5sum": ["md5sum"],  # MD5 checksum
+    "sha256sum": ["sha256sum"],  # SHA256 checksum
+    "stat": ["stat"],  # File stats
+    "strings": ["strings"],  # Extract printable strings
+}
+
+
+def check_download_assertions(
+    download_info: dict,
+    expect: dict,
+    downloaded_file_path: Path,
+) -> list[str]:
+    """Check download-specific assertions.
+
+    Args:
+        download_info: Download metadata from the step
+        expect: ExpectInfo dictionary with assertions
+        downloaded_file_path: Path to the downloaded file
+
+    Returns:
+        List of failure messages (empty if all passed)
+    """
+    import hashlib
+
+    failures = []
+
+    if not expect:
+        return failures
+
+    file_exists = downloaded_file_path.exists() if downloaded_file_path else False
+
+    # Check file exists
+    if expect.get("download_exists"):
+        if not file_exists:
+            failures.append(f"Downloaded file not found: {downloaded_file_path}")
+            return failures  # Can't check other assertions if file doesn't exist
+
+    # Check MIME type
+    if expect.get("download_mime_type"):
+        expected = expect["download_mime_type"]
+        actual = download_info.get("mime_type", "")
+        if actual != expected:
+            failures.append(f"Expected MIME type '{expected}', got '{actual}'")
+
+    if expect.get("download_mime_type_contains"):
+        expected = expect["download_mime_type_contains"]
+        actual = download_info.get("mime_type", "")
+        if expected not in actual:
+            failures.append(f"Expected MIME type to contain '{expected}', got '{actual}'")
+
+    # Check file size
+    if expect.get("download_size") is not None:
+        expected = expect["download_size"]
+        actual = download_info.get("size", 0)
+        if actual != expected:
+            failures.append(f"Expected size {expected} bytes, got {actual} bytes")
+
+    if expect.get("download_size_min") is not None:
+        minimum = expect["download_size_min"]
+        actual = download_info.get("size", 0)
+        if actual < minimum:
+            failures.append(f"File size {actual} bytes is below minimum {minimum} bytes")
+
+    if expect.get("download_size_max") is not None:
+        maximum = expect["download_size_max"]
+        actual = download_info.get("size", 0)
+        if actual > maximum:
+            failures.append(f"File size {actual} bytes exceeds maximum {maximum} bytes")
+
+    # Check filename
+    if expect.get("download_filename"):
+        expected = expect["download_filename"]
+        actual = download_info.get("filename", "")
+        if actual != expected:
+            failures.append(f"Expected filename '{expected}', got '{actual}'")
+
+    if expect.get("download_filename_contains"):
+        expected = expect["download_filename_contains"]
+        actual = download_info.get("filename", "")
+        if expected not in actual:
+            failures.append(f"Expected filename to contain '{expected}', got '{actual}'")
+
+    # Check text content (for text files)
+    if expect.get("download_content_contains") and file_exists:
+        expected_text = expect["download_content_contains"]
+        try:
+            content = downloaded_file_path.read_text(errors="ignore")
+            if expected_text not in content:
+                failures.append(f"Downloaded file does not contain: '{expected_text}'")
+        except Exception as e:
+            failures.append(f"Could not read file content: {e}")
+
+    # Check checksum
+    if expect.get("download_checksum") and file_exists:
+        checksum_spec = expect["download_checksum"]
+        if ":" in checksum_spec:
+            algo, expected_hash = checksum_spec.split(":", 1)
+        else:
+            algo, expected_hash = "md5", checksum_spec
+
+        try:
+            file_bytes = downloaded_file_path.read_bytes()
+
+            if algo.lower() == "md5":
+                actual_hash = hashlib.md5(file_bytes).hexdigest()
+            elif algo.lower() in ("sha256", "sha-256"):
+                actual_hash = hashlib.sha256(file_bytes).hexdigest()
+            else:
+                failures.append(f"Unknown checksum algorithm: {algo}")
+                return failures
+
+            if actual_hash.lower() != expected_hash.lower():
+                failures.append(f"Checksum mismatch: expected {expected_hash}, got {actual_hash}")
+        except Exception as e:
+            failures.append(f"Could not compute checksum: {e}")
+
+    # Run shell command
+    if expect.get("download_shell") and file_exists:
+        shell_result = run_download_shell_command(
+            expect["download_shell"],
+            downloaded_file_path,
+        )
+        if not shell_result.get("ok"):
+            failures.append(f"Shell command failed: {shell_result.get('error')}")
+
+    return failures
+
+
+def run_download_shell_command(command: str, file_path: Path) -> dict:
+    """Run an allowlisted shell command on a downloaded file.
+
+    Args:
+        command: Shell command name (must be in DOWNLOAD_SHELL_ALLOWLIST)
+        file_path: Path to the downloaded file
+
+    Returns:
+        dict with 'ok', 'stdout', 'stderr', 'returncode'
+    """
+    import subprocess
+
+    # Parse command (e.g., "file" or "grep pattern")
+    parts = command.strip().split(maxsplit=1)
+    cmd_name = parts[0]
+    cmd_args = parts[1] if len(parts) > 1 else ""
+
+    if cmd_name not in DOWNLOAD_SHELL_ALLOWLIST:
+        return {
+            "ok": False,
+            "error": f"Command '{cmd_name}' not in allowlist. Allowed: {list(DOWNLOAD_SHELL_ALLOWLIST.keys())}",
+        }
+
+    try:
+        base_cmd = DOWNLOAD_SHELL_ALLOWLIST[cmd_name].copy()
+
+        # Add any additional args
+        if cmd_args:
+            base_cmd.extend(cmd_args.split())
+
+        # Add file path as last argument
+        base_cmd.append(str(file_path))
+
+        result = subprocess.run(
+            base_cmd,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+
+        return {
+            "ok": result.returncode == 0,
+            "stdout": result.stdout,
+            "stderr": result.stderr,
+            "returncode": result.returncode,
+        }
+    except subprocess.TimeoutExpired:
+        return {"ok": False, "error": "Command timed out (30s)"}
+    except FileNotFoundError:
+        return {"ok": False, "error": f"Command '{cmd_name}' not found on system"}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
 @click.command()
 @click.argument("recording_file", type=click.Path(exists=True), required=False, default=None, shell_complete=complete_recording_files)
 @click.option(
@@ -764,7 +928,8 @@ def check_inspekt_expectations(command: str, expect: dict, cmd_result: dict) -> 
 @click.option(
     "--restore-viewport",
     is_flag=True,
-    help="Try to resize browser window to match recorded viewport dimensions",
+    hidden=True,  # Deprecated: use --match-viewport instead
+    help="[DEPRECATED] Use --match-viewport instead",
 )
 @click.option(
     "--interactive",
@@ -820,6 +985,43 @@ def check_inspekt_expectations(command: str, expect: dict, cmd_result: dict) -> 
     is_flag=True,
     help="Show compact progress bar instead of step-by-step output",
 )
+@click.option(
+    "--skip-validation",
+    is_flag=True,
+    help="Skip preflight validation checks",
+)
+@click.option(
+    "--video",
+    "video_output",
+    type=click.Path(),
+    default=None,
+    help="Record replay to video file (MP4/WebM). Use filename or --video for auto-naming.",
+    is_flag=False,
+    flag_value="__auto__",
+)
+@click.option(
+    "--fps",
+    "video_fps",
+    type=int,
+    default=None,
+    help="Video frame rate (5-30, uses config default: 10)",
+)
+@click.option(
+    "--open",
+    "open_after",
+    is_flag=True,
+    help="Open video file in default application after creation",
+)
+@click.option(
+    "--match-viewport",
+    is_flag=True,
+    help="Attempt to resize browser to match recorded viewport dimensions",
+)
+@click.option(
+    "--match-zoom-level",
+    is_flag=True,
+    help="Attempt to set browser zoom to match recorded zoom level",
+)
 def replay(
     recording_file: Optional[str],
     speed: float,
@@ -849,6 +1051,12 @@ def replay(
     strict_preconditions: bool,
     strict_checksum: bool,
     progress: bool,
+    skip_validation: bool,
+    video_output: Optional[str],
+    video_fps: Optional[int],
+    open_after: bool,
+    match_viewport: bool,
+    match_zoom_level: bool,
 ):
     """
     Replay a recorded browser interaction session.
@@ -874,6 +1082,12 @@ def replay(
                             Press Enter to execute, Space to skip, Escape to cancel
 
     \b
+    Video recording:
+        --video PATH    Record replay to video file (requires ffmpeg)
+        --video         Auto-name video file based on recording
+        --fps N         Custom frame rate (5-30, default: 10)
+
+    \b
     Examples:
         inspekt replay                             # Replay most recent recording
         inspekt replay login-flow.yaml             # Replay at normal speed
@@ -883,16 +1097,80 @@ def replay(
         inspekt replay login-flow.yaml --dry-run   # Preview steps
         inspekt replay login-flow.yaml --pause-on-fail # Debug failures
         inspekt replay login-flow.yaml -i          # Interactive step-through
+        inspekt replay login-flow.yaml --video     # Record to auto-named MP4
+        inspekt replay login-flow.yaml --video=journey.mp4  # Custom filename
+        inspekt replay login-flow.yaml --video --fps=15     # 15fps video
+        inspekt replay login-flow.yaml --video --open       # Record and open video
     """
     # If no recording file specified, find the most recent one
     auto_selected = False
     if recording_file is None:
         recent = find_most_recent_recording()
         if recent is None:
-            click.echo("Error: No recording file specified and no recording_*.yaml files found in current directory.", err=True)
+            click.echo("Error: No recording file specified and no inspekt_*.yaml files found in current directory.", err=True)
             sys.exit(1)
         recording_file = str(recent)
         auto_selected = True
+
+    # Handle video recording setup
+    screencast_capture = None
+    video_recording_enabled = False
+    resolved_video_path = None
+
+    if video_output is not None:
+        # Check if ffmpeg is installed
+        from inspekt.services.ffmpeg_utils import ensure_ffmpeg, get_ffmpeg_version
+
+        if not ensure_ffmpeg(auto_prompt=True):
+            click.echo("Error: ffmpeg is required for video recording.", err=True)
+            sys.exit(1)
+
+        # Show ffmpeg version if verbose
+        if verbose:
+            version = get_ffmpeg_version()
+            click.echo(format_system_message(f"Using ffmpeg {version}"))
+
+        # Get video config
+        video_config = get_video_config()
+
+        # Resolve video output path
+        if video_output == "__auto__":
+            # Auto-generate filename from recording file
+            rec_path = Path(recording_file)
+            video_filename = rec_path.stem + "_replay.mp4"
+            resolved_video_path = Path.cwd() / video_filename
+        else:
+            resolved_video_path = Path(video_output)
+            # Add .mp4 extension if missing
+            if not resolved_video_path.suffix:
+                resolved_video_path = resolved_video_path.with_suffix(".mp4")
+
+        # Get FPS from CLI or config
+        actual_fps = video_fps if video_fps is not None else video_config.get("fps", 10)
+        actual_quality = video_config.get("quality", 80)
+
+        # Clamp FPS to valid range
+        actual_fps = max(5, min(30, actual_fps))
+
+        video_recording_enabled = True
+
+        # Validate output path is writable before starting replay
+        # This prevents wasted time if the path is invalid
+        try:
+            output_parent = resolved_video_path.parent
+            if not output_parent.exists():
+                output_parent.mkdir(parents=True, exist_ok=True)
+            # Test write access with a temp file
+            test_file = output_parent / f".inspekt_write_test_{os.getpid()}"
+            test_file.touch()
+            test_file.unlink()
+        except (OSError, PermissionError) as e:
+            click.echo(f"Error: Cannot write to video output path: {resolved_video_path}", err=True)
+            click.echo(f"  Reason: {e}", err=True)
+            sys.exit(1)
+
+        if dry_run:
+            click.echo(f"\n[Video would be recorded to: {resolved_video_path}]")
 
     # Apply speed presets (priority: interactive > instant > very_slow > slow > speed)
     if interactive:
@@ -949,6 +1227,28 @@ def replay(
 
     # Load recording
     recording_path = Path(recording_file)
+
+    # Preflight validation (unless skipped via flag or config)
+    from inspekt.config import get_replay_config
+
+    replay_config = get_replay_config()
+    should_validate = replay_config.get("validate", True) and not skip_validation
+
+    if should_validate:
+        from inspekt.app.cli.validation import display_validation_results, validate_recording_file
+
+        validation_result = validate_recording_file(recording_path)
+
+        if not validation_result.valid:
+            display_validation_results(validation_result, recording_path)
+            sys.exit(1)
+
+        if validation_result.warnings:
+            display_validation_results(validation_result, recording_path)
+            click.echo()
+            if not click.confirm("Continue with replay?", default=True):
+                sys.exit(0)
+            click.echo()
 
     try:
         with _builtin_open(recording_path) as f:
@@ -1022,17 +1322,6 @@ def replay(
 
     if dry_run:
         click.echo("\n[DRY RUN - not executing]\n")
-    elif interactive:
-        click.echo()
-        click.secho("Interactive mode: ", fg="cyan", bold=True, nl=False)
-        click.echo("Press ", nl=False)
-        click.secho("Enter", fg="green", bold=True, nl=False)
-        click.echo(" to execute, ", nl=False)
-        click.secho("Space", fg="yellow", bold=True, nl=False)
-        click.echo(" to skip, ", nl=False)
-        click.secho("Escape", fg="red", bold=True, nl=False)
-        click.echo(" to cancel")
-        click.echo()
     else:
         click.echo()
 
@@ -1068,8 +1357,314 @@ def replay(
         # Focus the browser tab before starting replay (macOS only)
         focus_browser_tab(client, verbose=verbose)
 
-        # Restore viewport if requested
-        if restore_viewport and viewport:
+        # Issue 12: Handle deprecated --restore-viewport flag
+        if restore_viewport:
+            click.secho(
+                "⚠ --restore-viewport is deprecated. Use --match-viewport instead.",
+                fg="yellow",
+            )
+            match_viewport = True  # Treat as alias
+
+        # Issue 11: Enforce require_viewport_match and require_zoom_match from YAML
+        if recording.state:
+            if recording.state.require_viewport_match and not match_viewport:
+                click.secho(
+                    "⚠ This recording requires viewport matching (require_viewport_match: true).",
+                    fg="yellow",
+                )
+                click.echo("  Auto-enabling --match-viewport for faithful replay.")
+                match_viewport = True
+
+            if recording.state.require_zoom_match and not match_zoom_level:
+                click.secho(
+                    "⚠ This recording requires zoom matching (require_zoom_match: true).",
+                    fg="yellow",
+                )
+                click.echo("  Auto-enabling --match-zoom-level for faithful replay.")
+                match_zoom_level = True
+
+        # Get current viewport and zoom level for comparison
+        current_state_code = """
+        (async () => {
+            // Get current viewport
+            const currentViewport = {
+                width: window.innerWidth,
+                height: window.innerHeight
+            };
+
+            // Get current browser zoom level via message bridge
+            let browserZoomLevel = 1.0;
+            try {
+                browserZoomLevel = await new Promise((resolve) => {
+                    const requestId = 'zoom-check-' + Date.now();
+                    const handler = (event) => {
+                        if (event.data?.type === 'INSPEKT_ZOOM_LEVEL_RESPONSE' &&
+                            event.data?.requestId === requestId) {
+                            window.removeEventListener('message', handler);
+                            resolve(event.data.response?.zoomFactor || 1.0);
+                        }
+                    };
+                    window.addEventListener('message', handler);
+                    window.postMessage({
+                        type: 'INSPEKT_GET_ZOOM_LEVEL',
+                        source: 'inspekt-page',
+                        requestId: requestId
+                    }, '*');
+                    setTimeout(() => resolve(1.0), 2000);
+                });
+            } catch (e) {
+                browserZoomLevel = 1.0;
+            }
+
+            return {
+                viewport: currentViewport,
+                browserZoomLevel: browserZoomLevel,
+                devicePixelRatio: window.devicePixelRatio || 1
+            };
+        })()
+        """
+
+        current_state = {}
+        try:
+            state_result = client.execute(current_state_code, timeout=5.0)
+            if state_result.get("ok"):
+                current_state = state_result.get("result", {})
+        except Exception:
+            pass
+
+        current_viewport = current_state.get("viewport", {})
+        current_zoom = current_state.get("browserZoomLevel", 1.0)
+        current_width = current_viewport.get("width", 0)
+        current_height = current_viewport.get("height", 0)
+
+        # Get recorded viewport and zoom from state
+        recorded_viewport = recording.state.viewport if recording.state else None
+        recorded_zoom = recording.state.browser_zoom_level if recording.state else 1.0
+
+        # Check for viewport/zoom mismatch and show warning
+        viewport_mismatch = False
+        zoom_mismatch = False
+
+        if recorded_viewport and current_width > 0:
+            # Issue 21: Use exact matching (0px tolerance) instead of 10px
+            viewport_mismatch = (
+                current_width != recorded_viewport.width or
+                current_height != recorded_viewport.height
+            )
+        if current_zoom > 0:
+            zoom_mismatch = abs(current_zoom - recorded_zoom) > 0.05  # 5% tolerance
+
+        # Show warning if there's a mismatch and no matching flags were provided
+        if (viewport_mismatch or zoom_mismatch) and not match_viewport and not match_zoom_level:
+            click.echo()
+            click.secho(
+                "⚠ Your browser's current viewport and zoom level are different from the recording.",
+                fg="yellow",
+            )
+            click.echo("  This might be intentional. For a faithful replay, use:")
+            if viewport_mismatch:
+                click.echo(f"    inspekt replay --match-viewport  (recorded: {recorded_viewport.width}×{recorded_viewport.height}, current: {current_width}×{current_height})")
+            if zoom_mismatch:
+                click.echo(f"    inspekt replay --match-zoom-level  (recorded: {recorded_zoom:.0%}, current: {current_zoom:.0%})")
+            click.echo()
+
+        # Apply zoom matching if requested
+        if match_zoom_level and zoom_mismatch:
+            if verbose:
+                click.echo(format_system_message(f"Setting zoom level to {recorded_zoom:.0%}..."))
+
+            set_zoom_code = f"""
+            (async () => {{
+                return new Promise((resolve) => {{
+                    const requestId = 'set-zoom-' + Date.now();
+                    const handler = (event) => {{
+                        if (event.data?.type === 'INSPEKT_ZOOM_SET_RESPONSE' &&
+                            event.data?.requestId === requestId) {{
+                            window.removeEventListener('message', handler);
+                            resolve(event.data.response);
+                        }}
+                    }};
+                    window.addEventListener('message', handler);
+                    window.postMessage({{
+                        type: 'INSPEKT_SET_ZOOM_LEVEL',
+                        source: 'inspekt-page',
+                        requestId: requestId,
+                        zoomFactor: {recorded_zoom}
+                    }}, '*');
+                    setTimeout(() => resolve({{ ok: false }}), 2000);
+                }});
+            }})()
+            """
+
+            try:
+                zoom_result = client.execute(set_zoom_code, timeout=3.0)
+                if zoom_result.get("ok") and zoom_result.get("result", {}).get("ok"):
+                    if verbose:
+                        click.echo(format_system_message(f"Zoom level set to {recorded_zoom:.0%}"))
+                else:
+                    click.secho(f"⚠ Could not set zoom level to {recorded_zoom:.0%}", fg="yellow")
+            except Exception as e:
+                click.secho(f"⚠ Error setting zoom level: {e}", fg="yellow")
+
+        # Issue 4: Apply viewport matching with cached offsets (same logic as record.py)
+        if match_viewport and viewport_mismatch and recorded_viewport:
+            target_width = recorded_viewport.width
+            target_height = recorded_viewport.height
+
+            if verbose:
+                click.echo(format_system_message(f"Resizing viewport to {target_width}×{target_height}..."))
+
+            # Import config functions for caching
+            from inspekt.config import get_viewport_offsets, save_viewport_offsets
+
+            # Helper to get actual viewport
+            def get_actual_viewport() -> tuple[int | None, int | None]:
+                verify_js = "(function(){ return { width: window.innerWidth, height: window.innerHeight }; })()"
+                try:
+                    result = client.execute(verify_js, timeout=5.0)
+                    if result.get("ok"):
+                        dims = result.get("result", {})
+                        if isinstance(dims, dict):
+                            w = dims.get("width")
+                            h = dims.get("height")
+                            if isinstance(w, (int, float)) and isinstance(h, (int, float)):
+                                return int(w), int(h)
+                except Exception:
+                    pass
+                return None, None
+
+            # Helper to attempt resize
+            def attempt_resize(width: int, height: int) -> bool:
+                if sys.platform == "darwin":
+                    try:
+                        from inspekt.services.applescript_utils import resize_browser_window
+                        return resize_browser_window(width, height)
+                    except Exception:
+                        pass
+
+                # JavaScript fallback
+                js_resize = f"""(function(){{
+                    try {{
+                        const chromeWidth = window.outerWidth - window.innerWidth;
+                        const chromeHeight = window.outerHeight - window.innerHeight;
+                        window.resizeTo({width} + chromeWidth, {height} + chromeHeight);
+                        return true;
+                    }} catch (e) {{
+                        return false;
+                    }}
+                }})()"""
+                try:
+                    result = client.execute(js_resize, timeout=5.0)
+                    return result.get("ok", False) and result.get("result", False)
+                except Exception:
+                    return False
+
+            resize_success = False
+            cached_offsets = get_viewport_offsets()
+
+            if cached_offsets and cached_offsets["width"] >= 0 and cached_offsets["height"] >= 0:
+                # Use cached offsets - single resize attempt
+                # Offset is positive (how much larger window is than viewport)
+                # So we ADD offset to get the window size that yields target viewport
+                adjusted_w = target_width + cached_offsets["width"]
+                adjusted_h = target_height + cached_offsets["height"]
+                attempt_resize(adjusted_w, adjusted_h)
+                time.sleep(0.3)
+
+                actual_w, actual_h = get_actual_viewport()
+                # Exact match required
+                if actual_w == target_width and actual_h == target_height:
+                    if verbose:
+                        click.echo(format_system_message(f"Viewport set to {actual_w}×{actual_h}"))
+                    resize_success = True
+                elif actual_w is not None:
+                    if verbose:
+                        click.echo(format_system_message(f"Cached offsets outdated (got {actual_w}×{actual_h}), calibrating..."))
+                    cached_offsets = None  # Fall through to calibration
+
+            # Calibration loop if cached offsets didn't work
+            if not resize_success:
+                max_attempts = 20
+                adjustment_w, adjustment_h = 0, 0
+                viewport_history: list[tuple[int, int]] = []
+
+                for attempt in range(max_attempts):
+                    adjusted_w = target_width - adjustment_w
+                    adjusted_h = target_height - adjustment_h
+
+                    attempt_resize(adjusted_w, adjusted_h)
+                    time.sleep(0.3 * (1.1 ** attempt))  # Exponential backoff
+
+                    actual_w, actual_h = get_actual_viewport()
+                    if actual_w is None:
+                        time.sleep(0.5)
+                        actual_w, actual_h = get_actual_viewport()
+                        if actual_w is None:
+                            break
+
+                    error_w = actual_w - target_width
+                    error_h = actual_h - target_height
+
+                    # Track viewport for oscillation detection
+                    viewport_history.append((actual_w, actual_h))
+
+                    # Exact match required
+                    if error_w == 0 and error_h == 0:
+                        # Save offsets for future use
+                        # Note: adjustment is negative (error accumulation), but offset should be positive
+                        offset_w = -adjustment_w
+                        offset_h = -adjustment_h
+                        save_viewport_offsets(offset_w, offset_h)
+                        if verbose:
+                            click.echo(format_system_message(f"Viewport set to {actual_w}×{actual_h}"))
+                        resize_success = True
+                        break
+
+                    # Oscillation detection: if we see the same viewport twice in last 4 attempts
+                    if len(viewport_history) >= 4:
+                        recent = viewport_history[-4:]
+                        current = (actual_w, actual_h)
+                        if recent.count(current) >= 2:
+                            click.secho(
+                                f"⚠ Could not achieve the exact viewport (requested {target_width}×{target_height}, "
+                                f"achieved {actual_w}×{actual_h}).\n"
+                                f"   This issue is related to display scaling. Please try to use even values.",
+                                fg="yellow",
+                            )
+                            break
+
+                    # Adjust for next attempt
+                    adjustment_w += error_w
+                    adjustment_h += error_h
+
+            # Show error if resize failed and we didn't already show an oscillation message
+            if not resize_success:
+                # Check if we exited due to oscillation (message already shown)
+                oscillation_detected = False
+                if len(viewport_history) >= 4:
+                    recent = viewport_history[-4:]
+                    if viewport_history and recent.count(viewport_history[-1]) >= 2:
+                        oscillation_detected = True
+
+                if not oscillation_detected:
+                    if viewport_history:
+                        last_w, last_h = viewport_history[-1]
+                        click.secho(
+                            f"⚠ Could not resize viewport to {target_width}×{target_height} "
+                            f"(achieved {last_w}×{last_h}). Try manually resizing your browser window.",
+                            fg="yellow",
+                        )
+                    else:
+                        click.secho(
+                            f"⚠ Could not resize viewport to {target_width}×{target_height}. "
+                            "Try manually resizing your browser window.",
+                            fg="yellow",
+                        )
+
+        # Legacy restore_viewport is now handled above (converted to match_viewport)
+        # This block is kept for backwards compatibility but should not trigger
+        # since restore_viewport sets match_viewport = True
+        if restore_viewport and viewport and not match_viewport:
             target_width = viewport.width
             target_height = viewport.height
 
@@ -1349,6 +1944,15 @@ def replay(
             click.echo(f"Error: Script not found: {condition_script_path}", err=True)
             sys.exit(1)
 
+        # Load download monitoring script for replay
+        download_script_path = scripts_dir / "replay_download.js"
+        try:
+            with _builtin_open(download_script_path) as f:
+                download_script_template = f.read()
+        except FileNotFoundError:
+            click.echo(f"Error: Script not found: {download_script_path}", err=True)
+            sys.exit(1)
+
         # Inject visual feedback script if enabled (also needed for --lock)
         # We use "replay mode" which tells the extension to auto-inject the visual script
         # on every page load. This eliminates the need to poll and inject after navigation.
@@ -1358,6 +1962,9 @@ def replay(
             try:
                 with _builtin_open(visual_script_path) as f:
                     visual_script = f.read()
+
+                # Inject shared dialog styles
+                visual_script = visual_script.replace("DIALOG_STYLES_PLACEHOLDER", DIALOG_STYLES)
 
                 # Enable replay mode in the extension - this stores the script and
                 # auto-injects it on every page load
@@ -1414,8 +2021,15 @@ def replay(
             except FileNotFoundError:
                 click.echo(f"Warning: Visual script not found: {visual_script_path}", err=True)
 
-    # Print step header (unless in progress bar mode)
+    # Print interactive mode message and step header (unless in progress bar mode)
     if not progress:
+        if interactive:
+            click.secho(
+                "⚠ Interactive mode: press Enter to continue to the next step, Space to skip, or Escape to cancel. "
+                "Make sure the browser window is active.",
+                fg="yellow",
+            )
+            click.echo()
         click.echo(format_step_header())
 
     # Progress bar setup for --progress mode
@@ -1431,6 +2045,235 @@ def replay(
         )
         progress_bar.__enter__()
 
+    # Check if there are any download steps that need monitoring
+    has_download_steps = any(s.action == "download" for s in steps_to_run)
+    download_monitoring_active = False
+    download_session_id = None  # Store session ID for re-injection after navigation
+    replay_downloads_dir = None
+    replay_timestamp = None
+
+    # Start download monitoring if there are download steps
+    if has_download_steps and not dry_run:
+        # Create replay downloads directory under the recording's files folder
+        # Structure: {recording}_files/downloads/during-replay/{timestamp}/
+        replay_timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        recording_name = recording_path.stem
+        replay_downloads_dir = (
+            recording_path.parent
+            / f"{recording_name}_files"
+            / "downloads"
+            / "during-replay"
+            / replay_timestamp
+        )
+        replay_downloads_dir.mkdir(parents=True, exist_ok=True)
+
+        # Start download monitoring
+        download_session_id = f"replay-{int(time.time() * 1000)}"
+        download_config = json.dumps({
+            "action": "start",
+            "sessionId": download_session_id
+        })
+        download_script = download_script_template.replace(
+            "DOWNLOAD_CONFIG_PLACEHOLDER", download_config
+        )
+        start_result = client.execute(download_script, timeout=5.0)
+        if start_result.get("ok"):
+            download_monitoring_active = True
+            if verbose:
+                click.echo(format_system_message(f"download monitoring started, files will be saved to: {replay_downloads_dir}"))
+        else:
+            click.echo(f"Warning: Could not start download monitoring: {start_result.get('error')}", err=True)
+
+    # Collect jsdialog steps for CDP interception
+    # Store as list of (index, step) tuples so we can track which are remaining
+    jsdialog_steps_with_index = [
+        (i, s) for i, s in enumerate(steps_to_run) if s.action == "jsdialog"
+    ]
+    cdp_dialog_interception_enabled = False
+
+    def build_cdp_dialog_queue(from_index: int = 0) -> list:
+        """Build queue of dialog results for CDP interception (steps >= from_index)."""
+        queue = []
+        for step_idx, js_step in jsdialog_steps_with_index:
+            if step_idx < from_index:
+                continue  # Skip already-executed steps
+            dialog_type = js_step.dialog_type or "alert"
+            dialog_result = js_step.result
+            # Include duration for replay timing (default 1500ms if not recorded)
+            dialog_duration = js_step.duration or 1500
+            queue.append({"type": dialog_type, "result": dialog_result, "duration": dialog_duration})
+        return queue
+
+    def build_cdp_enable_code(queue: list) -> str:
+        """Build JS code to enable CDP dialog interception via extension bridge."""
+        queue_json = json.dumps(queue)
+        return f"""
+(function() {{
+    return new Promise((resolve) => {{
+        const requestId = 'dialog-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+
+        const handler = (event) => {{
+            if (event.data?.type === 'INSPEKT_DIALOG_INTERCEPTION_RESPONSE' &&
+                event.data?.source === 'inspekt-extension' &&
+                event.data?.requestId === requestId) {{
+                window.removeEventListener('message', handler);
+                resolve(event.data.response);
+            }}
+        }};
+
+        window.addEventListener('message', handler);
+
+        // Request CDP dialog interception from extension
+        window.postMessage({{
+            type: 'INSPEKT_ENABLE_DIALOG_INTERCEPTION',
+            source: 'inspekt-page',
+            requestId: requestId,
+            queue: {queue_json}
+        }}, '*');
+
+        // Timeout after 5 seconds
+        setTimeout(() => {{
+            window.removeEventListener('message', handler);
+            resolve({{ ok: false, error: 'Timeout waiting for extension response' }});
+        }}, 5000);
+    }});
+}})()
+"""
+
+    def build_cdp_disable_code() -> str:
+        """Build JS code to disable CDP dialog interception."""
+        return """
+(function() {
+    return new Promise((resolve) => {
+        const requestId = 'dialog-disable-' + Date.now();
+
+        const handler = (event) => {
+            if (event.data?.type === 'INSPEKT_DIALOG_INTERCEPTION_DISABLED' &&
+                event.data?.source === 'inspekt-extension' &&
+                event.data?.requestId === requestId) {
+                window.removeEventListener('message', handler);
+                resolve(event.data.response);
+            }
+        };
+
+        window.addEventListener('message', handler);
+
+        window.postMessage({
+            type: 'INSPEKT_DISABLE_DIALOG_INTERCEPTION',
+            source: 'inspekt-page',
+            requestId: requestId
+        }, '*');
+
+        setTimeout(() => {
+            window.removeEventListener('message', handler);
+            resolve({ ok: true });  // Don't fail on timeout for disable
+        }, 2000);
+    });
+})()
+"""
+
+    # Enable CDP dialog interception for replay (bullet-proof, intercepts at browser level)
+    # This prevents native alert/confirm/prompt from blocking and shows synthetic overlays
+    # ALWAYS enable when visual mode is on - pages may show dialogs even if not in recording
+    if not dry_run and client and (visual or lock):
+        try:
+            queue = build_cdp_dialog_queue(from_index=0)
+            enable_code = build_cdp_enable_code(queue)
+            intercept_result = client.execute(enable_code, timeout=10.0)
+
+            if intercept_result.get("ok"):
+                inner_result = intercept_result.get("result", {})
+                if inner_result.get("ok"):
+                    cdp_dialog_interception_enabled = True
+                    if verbose:
+                        if queue:
+                            click.echo(format_system_message(f"CDP dialog interception enabled ({len(queue)} dialog(s) queued)"))
+                        else:
+                            click.echo(format_system_message("CDP dialog interception enabled (no dialogs in recording)"))
+                else:
+                    # CDP failed (e.g., DevTools open) - JS fallback is enabled via visual script
+                    if verbose:
+                        error_msg = inner_result.get("error", "Unknown error")
+                        click.echo(format_system_message(f"CDP dialog interception unavailable: {error_msg} (using JS fallback)"))
+            else:
+                # Communication failure - JS fallback is enabled via visual script
+                if verbose:
+                    click.echo(format_system_message(f"CDP dialog interception failed: {intercept_result.get('error')} (using JS fallback)"))
+        except Exception as e:
+            # Setup exception - JS fallback is enabled via visual script
+            if verbose:
+                click.echo(format_system_message(f"CDP dialog interception error: {e} (using JS fallback)"))
+
+    # Start video recording if enabled (BEFORE first step to capture all frames)
+    if video_recording_enabled and not dry_run and client:
+        from inspekt.services.screencast import ScreencastCapture
+
+        screencast_capture = ScreencastCapture(
+            fps=actual_fps,
+            quality=actual_quality,
+        )
+
+        # Start screencast immediately via postMessage to extension
+        # This happens before the loop so first step frames are captured
+        time.sleep(0.3)  # Brief stabilization after visual script injection
+
+        screencast_js = f"""
+(function() {{
+    return new Promise((resolve) => {{
+        const requestId = 'screencast-' + Date.now();
+
+        const handler = (event) => {{
+            if (event.data?.type === 'INSPEKT_SCREENCAST_STARTED' &&
+                event.data?.source === 'inspekt-extension' &&
+                event.data?.requestId === requestId) {{
+                window.removeEventListener('message', handler);
+                resolve(event.data.response);
+            }}
+        }};
+
+        window.addEventListener('message', handler);
+
+        window.postMessage({{
+            type: 'INSPEKT_START_SCREENCAST',
+            source: 'inspekt-page',
+            requestId: requestId,
+            settings: {{ fps: {actual_fps}, quality: {actual_quality} }}
+        }}, '*');
+
+        // Timeout after 5 seconds
+        setTimeout(() => {{
+            window.removeEventListener('message', handler);
+            resolve({{ ok: false, error: 'Timeout waiting for screencast start' }});
+        }}, 5000);
+    }});
+}})()
+"""
+        try:
+            sc_result = client.execute(screencast_js, timeout=10.0)
+            if sc_result.get("ok") and sc_result.get("result", {}).get("ok"):
+                video_start_elapsed = int((datetime.now() - result.start_time).total_seconds() * 1000)
+                click.echo(format_system_message(f"Recording video at {actual_fps} frames per second…", icon="video", elapsed_ms=video_start_elapsed))
+                screencast_capture.set_capturing(True)  # Use public method instead of private attribute
+            else:
+                error_msg = sc_result.get("result", {}).get("error", sc_result.get("error", "Unknown error"))
+                click.secho(f"⚠ Could not start video recording: {error_msg}", fg="yellow")
+                # Send stop command to clean up extension state even on failure
+                try:
+                    client.execute("window.postMessage({type: 'INSPEKT_STOP_SCREENCAST', source: 'inspekt-page'}, '*')", timeout=2.0)
+                except Exception:
+                    pass
+                video_recording_enabled = False
+                screencast_capture = None
+        except Exception as e:
+            click.secho(f"⚠ Video recording error: {e}", fg="yellow")
+            # Send stop command to clean up extension state even on failure
+            try:
+                client.execute("window.postMessage({type: 'INSPEKT_STOP_SCREENCAST', source: 'inspekt-page'}, '*')", timeout=2.0)
+            except Exception:
+                pass
+            video_recording_enabled = False
+            screencast_capture = None
+
     # Execute steps
     previous_timestamp = steps_to_run[0].timestamp if steps_to_run else 0
     last_step_navigated = False  # Track if previous step caused navigation
@@ -1440,6 +2283,11 @@ def replay(
     for i, step in enumerate(steps_to_run):
         actual_index = start_idx + i
         step_dict = step.model_dump(exclude_none=True)
+
+        # Load external file content for upload steps
+        if step.action == "upload":
+            load_external_file_content(step_dict, recording_path.parent)
+
         step_timestamp = step.timestamp or 0  # Get timestamp from step for display
 
         # Check if Ctrl+C was pressed in browser (non-interactive mode)
@@ -1594,6 +2442,10 @@ def replay(
 
         # Interactive mode: show overlay and wait for user input
         if interactive and not dry_run:
+            # Pause video capture during interactive wait to avoid dead time in video
+            if screencast_capture and screencast_capture.is_capturing:
+                screencast_capture.set_capturing(False)
+
             # Build the interactive prompt step
             previous_step_dict = None
             if i > 0:
@@ -1633,6 +2485,9 @@ def replay(
                         result.add_skip(actual_index, step_dict, "Skipped by user (interactive mode)")
                         if verbose:
                             click.echo(format_system_message("skipped by user"))
+                        # Resume video capture before continuing
+                        if screencast_capture:
+                            screencast_capture.set_capturing(True)
                         continue
                     elif choice == "cancel":
                         # User pressed Escape - cancel the entire replay
@@ -1641,6 +2496,9 @@ def replay(
                         click.echo()
                         click.secho("Replay cancelled by user.", fg="yellow")
                         replay_cancelled = True
+                        # Resume video capture before breaking (for final frame capture)
+                        if screencast_capture:
+                            screencast_capture.set_capturing(True)
                         break
                     # choice == "next" - continue to execute the step
                 else:
@@ -1649,6 +2507,10 @@ def replay(
             except Exception as e:
                 if verbose:
                     click.echo(format_system_message(f"Interactive prompt error: {e}"))
+
+            # Resume video capture after interactive prompt (for "next" choice or errors)
+            if screencast_capture:
+                screencast_capture.set_capturing(True)
 
         if replay_cancelled:
             break
@@ -1686,6 +2548,34 @@ def replay(
                 result.add_failure(actual_index, step_dict, cmd_result.get("error", "Command failed"))
                 if verbose and not progress:
                     click.echo(format_system_message(f"Error: {cmd_result.get('error', 'Unknown')}"))
+
+        # Handle download steps - these are markers for downloads triggered by previous actions
+        # Downloads happen as side effects of clicks/keypresses, so we don't need to wait
+        elif step.action == "download" and step.download:
+            download_info = step.download.model_dump() if hasattr(step.download, "model_dump") else step.download
+            downloaded_file_path = None
+
+            # Get expectations
+            expect_dict = step.expect.model_dump(exclude_none=True) if step.expect else {}
+
+            # Check assertions (on the new file if captured, otherwise skip file-based assertions)
+            assertion_failures = check_download_assertions(
+                download_info,
+                expect_dict,
+                downloaded_file_path,
+            )
+
+            if assertion_failures:
+                if not progress:
+                    click.echo(format_status("FAIL"))
+                result.add_failure(actual_index, step_dict, "Download assertion failed", assertion_failures)
+                if verbose and not progress:
+                    for failure in assertion_failures:
+                        click.echo(format_system_message(f"⚠ {failure}"))
+            else:
+                if not progress:
+                    click.echo(format_status("OK"))
+                result.add_success(actual_index, step_dict)
 
         # Handle type actions with human-like typing
         elif step.action == "type" and step.value:
@@ -1891,8 +2781,27 @@ def replay(
                                                 client.execute("window.__INSPEKT_VISUAL__.audio.playNavigate()", timeout=5.0)
                                         except Exception:
                                             pass
+                                    # Note: CDP dialog interception persists across navigations
+                                    # (it's attached at the browser level via chrome.debugger)
                                 elif verbose:
                                     click.echo(format_system_message("Warning: visual script not ready after navigation"))
+
+                            # Re-inject download monitoring after navigation (it's lost on page change)
+                            if download_monitoring_active and download_session_id:
+                                download_config = json.dumps({
+                                    "action": "start",
+                                    "sessionId": download_session_id
+                                })
+                                download_script = download_script_template.replace(
+                                    "DOWNLOAD_CONFIG_PLACEHOLDER", download_config
+                                )
+                                reinject_result = client.execute(download_script, timeout=5.0)
+                                if reinject_result.get("ok"):
+                                    if verbose:
+                                        click.echo(format_system_message("download monitoring re-injected after navigation"))
+                                else:
+                                    if verbose:
+                                        click.echo(format_system_message(f"Warning: could not re-inject download monitoring: {reinject_result.get('error')}"))
 
                             # Mark that this step caused navigation
                             # Next navigate step can be skipped since navigation already happened
@@ -1945,6 +2854,22 @@ def replay(
                 replay_cancelled = True
                 break
 
+        # Collect pending video frames periodically to prevent buffer overflow
+        # The bridge server has a 10,000 frame buffer limit - long replays could exceed this
+        if screencast_capture and screencast_capture.is_capturing:
+            frames_collected = screencast_capture.collect_pending()
+            if verbose and frames_collected > 0:
+                click.echo(format_system_message(f"collected {frames_collected} video frames"))
+
+            # Check if recording was interrupted (e.g., user opened DevTools)
+            interrupt_info = screencast_capture.check_interrupted()
+            if interrupt_info:
+                reason = interrupt_info.get("reason", "unknown")
+                click.echo()
+                click.secho(f"⚠ Video recording interrupted: {reason}", fg="yellow")
+                click.secho("  Video will be saved with frames captured so far.", fg="yellow")
+                screencast_capture.set_capturing(False)  # Mark as no longer capturing
+
         # Additional fixed delay between steps (on top of real-time timing)
         # Only applies if --step-delay is explicitly set to a non-zero value
         if not dry_run and step_delay > 0 and i < len(steps_to_run) - 1:
@@ -1959,7 +2884,96 @@ def replay(
     if progress_bar:
         progress_bar.__exit__(None, None, None)
 
+    # Stop download monitoring if it was active
+    if download_monitoring_active:
+        try:
+            download_config = json.dumps({"action": "stop"})
+            stop_script = download_script_template.replace(
+                "DOWNLOAD_CONFIG_PLACEHOLDER", download_config
+            )
+            stop_result = client.execute(stop_script, timeout=5.0)
+            if verbose and stop_result.get("ok"):
+                stats = stop_result.get("result", {}).get("stats", {})
+                click.echo(format_system_message(f"download monitoring stopped (captured: {stats.get('completed', 0)})"))
+        except Exception as e:
+            if verbose:
+                click.echo(format_system_message(f"could not stop download monitoring: {e}"))
+
     result.end_time = datetime.now()
+
+    # Stop video recording and encode
+    video_saved_path = None
+    if video_recording_enabled and screencast_capture:
+        try:
+            # Stop capture and get frames
+            stop_elapsed = int((datetime.now() - result.start_time).total_seconds() * 1000)
+            click.echo(format_system_message("Stopping video capture…", icon="video", elapsed_ms=stop_elapsed))
+            frames = screencast_capture.stop()
+
+            if frames:
+                # Calculate actual FPS from frame timestamps for correct playback speed
+                # frames is list of (timestamp, bytes) tuples
+                if len(frames) >= 2:
+                    first_ts = frames[0][0]
+                    last_ts = frames[-1][0]
+                    actual_duration = last_ts - first_ts
+                    if actual_duration > 0:
+                        real_fps = len(frames) / actual_duration
+                        # Clamp to reasonable range (5-60 FPS)
+                        real_fps = max(5, min(60, real_fps))
+                    else:
+                        real_fps = actual_fps
+                else:
+                    real_fps = actual_fps
+                    actual_duration = len(frames) / actual_fps
+
+                encode_start_elapsed = int((datetime.now() - result.start_time).total_seconds() * 1000)
+                click.echo(format_system_message(f"Encoding {len(frames)} frames to video…", icon="video", elapsed_ms=encode_start_elapsed))
+
+                # Encode to video
+                from inspekt.services.video_encoder import encode_replay_video
+
+                # Determine format from extension
+                output_format = resolved_video_path.suffix.lstrip(".").lower()
+                if output_format not in ("mp4", "webm"):
+                    output_format = "mp4"
+
+                encode_start_time = time.time()
+                encode_result = encode_replay_video(
+                    frames=frames,
+                    output_path=str(resolved_video_path),
+                    fps=int(round(real_fps)),  # Use calculated FPS for correct playback
+                    format=output_format,
+                    progress_callback=None,  # No progress output
+                )
+                encode_duration = time.time() - encode_start_time
+
+                if encode_result.get("ok"):
+                    video_saved_path = resolved_video_path
+                    file_size = resolved_video_path.stat().st_size
+                    file_size_mb = file_size / (1024 * 1024)
+
+                    # Show encoding done message
+                    encode_done_elapsed = int((datetime.now() - result.start_time).total_seconds() * 1000)
+                    click.echo(format_system_message(f"Encoding done (took {encode_duration:.1f}s)", icon="video", elapsed_ms=encode_done_elapsed))
+
+                    # Create clickable filename using OSC 8
+                    file_uri = resolved_video_path.as_uri()
+                    clickable_name = f"\033]8;;{file_uri}\033\\{resolved_video_path.name}\033]8;;\033\\"
+
+                    # Show video saved message
+                    saved_elapsed = int((datetime.now() - result.start_time).total_seconds() * 1000)
+                    click.echo(format_system_message(f"Video saved: {clickable_name} ({file_size_mb:.1f} MB)", icon="video", elapsed_ms=saved_elapsed))
+
+                    # Open video file if --open flag was set
+                    if open_after:
+                        click.launch(str(resolved_video_path))
+                else:
+                    click.secho(f"⚠ Video encoding failed: {encode_result.get('error')}", fg="yellow")
+            else:
+                click.secho("⚠ No frames captured for video", fg="yellow")
+        except Exception as e:
+            click.secho(f"⚠ Video encoding error: {e}", fg="yellow")
 
     # Play completion sound and cleanup visual overlay
     if not dry_run and client and (visual or audio or lock):
@@ -1993,6 +3007,16 @@ def replay(
             disable_result = client.disable_replay_mode(timeout=5.0)
             if verbose and disable_result.get("ok"):
                 click.echo(format_system_message("replay mode disabled"))
+
+        # Disable CDP dialog interception if it was enabled
+        if cdp_dialog_interception_enabled:
+            try:
+                disable_code = build_cdp_disable_code()
+                client.execute(disable_code, timeout=5.0)
+                if verbose:
+                    click.echo(format_system_message("CDP dialog interception disabled"))
+            except Exception:
+                pass  # Best effort cleanup
 
     # Print summary
     click.echo()

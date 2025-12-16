@@ -16,9 +16,10 @@ import yaml
 
 from inspekt.app.cli.icons import success as success_icon, get_indicator
 from inspekt.client import BridgeClient
-from inspekt.config import get_audio_config
+from inspekt.config import get_audio_config, get_record_config
 from inspekt.services.audio import CLIAudio
 from inspekt.domain.recording import (
+    DownloadInfo,
     ExpectInfo,
     FileInfo,
     Recording,
@@ -39,7 +40,8 @@ from .formatting import (
     format_system_message,
     get_recordings_dir,
 )
-from .recording_utils import find_most_recent_recording, complete_recording_files
+from .recording_utils import clean_filename, find_most_recent_recording, complete_recording_files
+from inspekt.shared.dialog_styles import DIALOG_STYLES
 
 import requests
 
@@ -66,10 +68,147 @@ def check_csp_bypass_enabled() -> bool:
     return False
 
 
+# =============================================================================
+# Pre-recording hints and warnings
+# =============================================================================
+
+
+def _format_closed_shadow_warning(warnings: list) -> str:
+    """Format warning message for closed shadow DOM components."""
+    lines = []
+    lines.append(click.style("⚠ Warning: ", fg="yellow", bold=True) + "This page contains Web Components with closed shadow DOM.")
+    lines.append("  Interactions inside these components may not be recorded:")
+    for warning in warnings[:5]:
+        tag = warning.get("tagName", "unknown")
+        lines.append(f"    • {click.style(f'<{tag}>', fg='cyan')}")
+    if len(warnings) > 5:
+        lines.append(f"    ... and {len(warnings) - 5} more")
+    return "\n".join(lines)
+
+
+def _format_media_hint(media_elements: dict) -> str:
+    """Format hint message for media elements."""
+    from inspekt.app.cli.table import wrap_text
+
+    audio_count = media_elements.get("audioCount", 0)
+    video_count = media_elements.get("videoCount", 0)
+
+    parts = []
+    if audio_count > 0:
+        parts.append("an audio player" if audio_count == 1 else f"{audio_count} audio players")
+    if video_count > 0:
+        parts.append("a video player" if video_count == 1 else f"{video_count} video players")
+    element_desc = " and ".join(parts)
+
+    msg = f"This page contains {element_desc} with native controls. Media players are treated as a single Tab stop. Use Space/Enter to play/pause, Arrow keys for seek/volume."
+    return click.style("Hint: ", fg="blue", bold=True) + wrap_text(msg, indent="", subsequent_indent="       ")
+
+
+def _format_native_inputs_hint(native_inputs: dict) -> str:
+    """Format hint message for native control inputs."""
+    from inspekt.app.cli.table import wrap_text
+
+    types = native_inputs.get("types", {})
+    type_names = {
+        "range": "range slider",
+        "date": "date picker",
+        "time": "time picker",
+        "datetime-local": "datetime picker",
+        "month": "month picker",
+        "week": "week picker",
+        "number": "number spinner",
+        "color": "color picker"
+    }
+
+    type_parts = []
+    for input_type, input_count in sorted(types.items()):
+        name = type_names.get(input_type, input_type)
+        if input_count == 1:
+            article = "an" if name[0] in "aeiou" else "a"
+            type_parts.append(f"{article} {name}")
+        else:
+            type_parts.append(f"{input_count} {name}s")
+
+    if len(type_parts) <= 2:
+        type_desc = " and ".join(type_parts)
+    else:
+        type_desc = ", ".join(type_parts[:-1]) + " and " + type_parts[-1]
+
+    total_count = sum(types.values())
+    pronoun = "its" if total_count == 1 else "their"
+    msg = f"This page has {type_desc}. You can adjust {pronoun} values, but Inspekt intentionally does not record user interactions on native elements. The final selected value will be recorded once you leave the element."
+    return click.style("Hint: ", fg="blue", bold=True) + wrap_text(msg, indent="", subsequent_indent="       ")
+
+
+def _format_file_inputs_warning(file_inputs: dict) -> str:
+    """Format warning message for file inputs."""
+    from inspekt.app.cli.table import wrap_text
+
+    count = file_inputs.get("count", 0)
+    count_str = "a file input" if count == 1 else f"{count} file inputs"
+    msg = f"This page has {count_str}. Inspekt cannot access the file picker or view files on your computer, but it will record file uploads and save the files for replay (maximum size: 10 MB). Do not upload sensitive files."
+    return click.style("⚠ Warning: ", fg="yellow", bold=True) + wrap_text(msg, indent="", subsequent_indent="           ")
+
+
+def _format_js_dialogs_hint(js_dialogs: dict) -> str:
+    """Format hint message for JavaScript dialogs."""
+    from inspekt.app.cli.table import wrap_text
+
+    msg = (
+        "This page may display native JavaScript dialogs. "
+        "By default, native dialogs appear during recording. "
+        "To interact with synthetic dialogs while recording, use "
+        "`inspekt record --synthetic-dialogs`. "
+        "During playback, Inspekt always replaces these with synthetic "
+        "dialogs that behave identically."
+    )
+    return click.style("Hint: ", fg="blue", bold=True) + wrap_text(msg, indent="", subsequent_indent="       ")
+
+
+def display_pre_recording_hints(response: dict, synthetic_dialogs: bool = False) -> None:
+    """Display all pre-recording hints and warnings based on page analysis.
+
+    Shows warnings (yellow) for potential issues and hints (blue) for
+    informational messages about page features.
+
+    Args:
+        response: The start response from the recording script
+        synthetic_dialogs: Whether --synthetic-dialogs flag is enabled
+    """
+    messages = []
+
+    # Warnings (yellow) - potential issues
+    closed_shadow_warnings = response.get("closedShadowWarnings", [])
+    if closed_shadow_warnings:
+        messages.append(_format_closed_shadow_warning(closed_shadow_warnings))
+
+    file_inputs = response.get("fileInputs")
+    if file_inputs:
+        messages.append(_format_file_inputs_warning(file_inputs))
+
+    # Hints (blue) - informational
+    media_elements = response.get("mediaElements")
+    if media_elements:
+        messages.append(_format_media_hint(media_elements))
+
+    native_inputs = response.get("nativeControlInputs")
+    if native_inputs:
+        messages.append(_format_native_inputs_hint(native_inputs))
+
+    js_dialogs = response.get("jsDialogs")
+    if js_dialogs and not synthetic_dialogs:
+        messages.append(_format_js_dialogs_hint(js_dialogs))
+
+    # Display all messages
+    for msg in messages:
+        click.echo()
+        click.echo(msg)
+
+
 def generate_filename(url: str, timestamp: datetime) -> str:
     """Generate a descriptive filename from URL and timestamp.
 
-    Format: recording_{domain}_{path}_{timestamp}.yaml
+    Format: inspekt_{timestamp}_{domain}_{path}.yaml
     The timestamp is converted to local time for user-friendly filenames.
     """
     parsed = urlparse(url)
@@ -78,7 +217,30 @@ def generate_filename(url: str, timestamp: datetime) -> str:
     # Convert to local time for the filename
     local_timestamp = timestamp.astimezone()
     ts = local_timestamp.strftime("%Y%m%d_%H%M%S")
-    return f"recording_{domain}_{path}_{ts}.yaml"
+    return f"inspekt_{ts}_{domain}_{path}.yaml"
+
+
+def compute_file_checksum(file_path: Path) -> str | None:
+    """Compute SHA256 checksum of a file.
+
+    Uses chunked reading for memory efficiency with large files.
+
+    Args:
+        file_path: Path to the file to checksum
+
+    Returns:
+        SHA256 hex digest string, or None if file doesn't exist
+    """
+    import hashlib
+
+    if not file_path.exists():
+        return None
+
+    sha256 = hashlib.sha256()
+    with open(file_path, "rb") as f:
+        for chunk in iter(lambda: f.read(8192), b""):
+            sha256.update(chunk)
+    return sha256.hexdigest()
 
 
 def convert_js_event_to_step(event: dict) -> RecordingStep:
@@ -129,6 +291,32 @@ def convert_js_event_to_step(event: dict) -> RecordingStep:
             for f in event["files"]
         ]
 
+    # Build download info for download actions
+    download = None
+    if event.get("download"):
+        d = event["download"]
+        download = DownloadInfo(
+            filename=d.get("filename", "unknown"),
+            url=d.get("url", ""),
+            mime_type=d.get("mime_type", "application/octet-stream"),
+            size=d.get("size", 0),
+            download_start=d.get("download_start", 0),
+            download_end=d.get("download_end", 0),
+            full_path=d.get("full_path"),  # Chrome's download location for copying
+            content=d.get("content"),
+            external_path=d.get("external_path"),
+            referrer=d.get("referrer"),
+            download_id=d.get("download_id"),
+        )
+        # Pass through internal tracking fields (for checksum-based deduplication)
+        # These are not Pydantic fields but are accessed via __dict__ in process_download_files()
+        if d.get("_duplicate_of_step") is not None:
+            download.__dict__["_duplicate_of_step"] = d["_duplicate_of_step"]
+        if d.get("_differs_from_step") is not None:
+            download.__dict__["_differs_from_step"] = d["_differs_from_step"]
+        if d.get("_save_with_step_id") is not None:
+            download.__dict__["_save_with_step_id"] = d["_save_with_step_id"]
+
     return RecordingStep(
         timestamp=timestamp,
         action=action,
@@ -142,6 +330,13 @@ def convert_js_event_to_step(event: dict) -> RecordingStep:
         command=event.get("command"),
         click_at=click_at,
         files=files,
+        download=download,
+        # jsdialog fields (for alert, confirm, prompt)
+        dialog_type=event.get("dialog_type"),
+        message=event.get("message"),
+        default_value=event.get("default_value"),
+        result=event.get("result"),
+        duration=event.get("duration"),
         expect=None,  # User adds expectations manually
     )
 
@@ -169,7 +364,13 @@ RecordingYAMLDumper.add_representer(datetime, datetime_representer)
 
 
 def _truncate(text: str, max_len: int = 40) -> str:
-    """Truncate text with ellipsis if too long."""
+    """Truncate text with ellipsis if too long.
+
+    Also collapses whitespace (including newlines) to ensure
+    the result is safe for single-line YAML comments.
+    """
+    # Collapse all whitespace (including newlines) to single spaces
+    text = " ".join(text.split())
     if len(text) <= max_len:
         return text
     return text[: max_len - 1] + "…"
@@ -434,6 +635,31 @@ def construct_step_comment(step_num: int, step: dict, include_assertions: bool =
     elif action == "plugin":
         command = step.get("command", "")
         description = f"Run plugin: {command}"
+
+    elif action == "jsdialog":
+        dialog_type = step.get("dialog_type", "alert")
+        message = step.get("message", "")
+        result = step.get("result")
+
+        if dialog_type == "alert":
+            if message:
+                description = f"Alert: '{_truncate(message, 40)}'"
+            else:
+                description = "Alert dialog"
+        elif dialog_type == "confirm":
+            result_text = "OK" if result else "Cancel"
+            if message:
+                description = f"Confirm: '{_truncate(message, 35)}' → {result_text}"
+            else:
+                description = f"Confirm dialog → {result_text}"
+        elif dialog_type == "prompt":
+            result_text = f"'{_truncate(str(result), 20)}'" if result else "Cancel"
+            if message:
+                description = f"Prompt: '{_truncate(message, 30)}' → {result_text}"
+            else:
+                description = f"Prompt dialog → {result_text}"
+        else:
+            description = f"JavaScript dialog ({dialog_type})"
 
     else:
         description = f"{action}"
@@ -853,10 +1079,10 @@ import base64
 
 
 def process_upload_files(recording: Recording, filepath: Path) -> None:
-    """Process upload steps, saving large files (>100KB) externally.
+    """Process upload steps, saving all files externally.
 
-    Files with needs_external_storage=True have their content saved to a separate
-    directory and the YAML references them by path instead of embedding base64.
+    All files with content are saved to a separate directory and the YAML
+    references them by path. This avoids YAML parsing issues with embedded base64.
     """
     recording_name = filepath.stem
     recording_dir = filepath.parent
@@ -867,17 +1093,12 @@ def process_upload_files(recording: Recording, filepath: Path) -> None:
             continue
 
         for file_info in step.files:
-            # Check if this file needs external storage (marked by JS)
-            # We detect this by checking if content contains needs_external_storage marker
             content = file_info.content
             if not content:
                 continue
 
-            # Large files (>100KB) should be stored externally
-            # JS marks these, but we also check size as fallback
-            needs_external = file_info.size > 100 * 1024 if file_info.size else False
-
-            if needs_external and content:
+            # All files are saved externally (no inline base64 in YAML)
+            if content:
                 # Create files directory if needed
                 if files_dir is None:
                     files_dir = recording_dir / f"{recording_name}_files"
@@ -909,6 +1130,259 @@ def process_upload_files(recording: Recording, filepath: Path) -> None:
                 except Exception as e:
                     # If decoding fails, keep the inline content
                     click.echo(f"Warning: Could not save external file {file_info.name}: {e}", err=True)
+
+
+def process_download_files(recording: Recording, filepath: Path) -> None:
+    """Process download steps, saving downloaded files externally.
+
+    Downloaded files are saved to a 'downloads/during-recording/{timestamp}/'
+    subdirectory. The timestamp comes from the recording's creation time.
+
+    Supports checksum-based deduplication:
+    - Duplicate downloads (same checksum): reuse external_path from original, don't save again
+    - Changed downloads (different checksum): save with step ID suffix (e.g., file_0005.pdf)
+
+    File retrieval strategy (in order of preference):
+    1. Copy from full_path (Chrome's download location) - most reliable
+    2. Fall back to base64 content if full_path is unavailable or inaccessible
+       (e.g., Docker containers, remote sessions where Chrome's download folder
+       is not directly accessible from the host)
+
+    If neither method succeeds, the download is recorded without the file content.
+    """
+    import shutil
+
+    recording_name = filepath.stem
+    recording_dir = filepath.parent
+    downloads_dir = None
+
+    # Get timestamp from recording metadata for folder name
+    timestamp_str = recording.metadata.created_at.strftime("%Y%m%d_%H%M%S")
+
+    # Track saved external_paths by step number (1-based) for duplicate resolution
+    saved_paths: dict[int, str] = {}
+
+    for step_number, step in enumerate(recording.steps, start=1):
+        if step.action != "download" or not step.download:
+            continue
+
+        download_info = step.download
+        file_saved = False
+
+        # Check for duplicate flag - identical file already saved
+        duplicate_of = getattr(download_info, "_duplicate_of_step", None)
+        if duplicate_of is None and hasattr(download_info, "__dict__"):
+            duplicate_of = download_info.__dict__.get("_duplicate_of_step")
+
+        if duplicate_of is not None:
+            # Reuse external_path from the original download step
+            original_path = saved_paths.get(duplicate_of)
+            if original_path:
+                download_info.external_path = original_path
+            # Clear temporary fields
+            download_info.full_path = None
+            download_info.content = None
+            continue  # Skip saving - file already exists
+
+        # Create downloads directory if needed (with during-recording subfolder)
+        if downloads_dir is None:
+            downloads_dir = (
+                recording_dir
+                / f"{recording_name}_files"
+                / "downloads"
+                / "during-recording"
+                / timestamp_str
+            )
+            downloads_dir.mkdir(parents=True, exist_ok=True)
+
+        # Clean filename (remove OS-added indices like "(1)", "(2)")
+        cleaned_filename = clean_filename(download_info.filename)
+
+        # Check for rename flag - different content, save with step ID suffix
+        save_with_step_id = getattr(download_info, "_save_with_step_id", None)
+        if save_with_step_id is None and hasattr(download_info, "__dict__"):
+            save_with_step_id = download_info.__dict__.get("_save_with_step_id")
+
+        if save_with_step_id is not None:
+            # Rename file to include step ID: filename_0005.ext
+            stem = Path(cleaned_filename).stem
+            suffix = Path(cleaned_filename).suffix
+            cleaned_filename = f"{stem}_{save_with_step_id:04d}{suffix}"
+
+        # Destination path
+        dest_path = downloads_dir / cleaned_filename
+
+        # Strategy 1: Copy from Chrome's download location (most reliable)
+        if download_info.full_path:
+            source_path = Path(download_info.full_path)
+            if source_path.exists():
+                try:
+                    shutil.copy2(source_path, dest_path)
+                    file_saved = True
+                except Exception as e:
+                    click.echo(
+                        f"Warning: Could not copy download from {source_path}: {e}",
+                        err=True,
+                    )
+
+        # Strategy 2: Fall back to base64 content (for Docker/remote scenarios)
+        if not file_saved and download_info.content:
+            content = download_info.content
+            # Extract base64 data (remove data URL prefix)
+            if "," in content:
+                base64_data = content.split(",")[1]
+            else:
+                base64_data = content
+
+            try:
+                file_bytes = base64.b64decode(base64_data)
+                dest_path.write_bytes(file_bytes)
+                file_saved = True
+            except Exception as e:
+                click.echo(
+                    f"Warning: Could not decode base64 content for {download_info.filename}: {e}",
+                    err=True,
+                )
+
+        # Update download_info with new path structure
+        if file_saved:
+            download_info.external_path = (
+                f"{recording_name}_files/downloads/during-recording/{timestamp_str}/{dest_path.name}"
+            )
+            # Track for duplicate resolution
+            saved_paths[step_number] = download_info.external_path
+
+        # Always clear temporary fields before YAML save
+        download_info.full_path = None
+        download_info.content = None
+
+        # Truncate data URLs (they contain the full file content which is redundant)
+        if download_info.url and download_info.url.startswith("data:"):
+            # Extract just the MIME type from data URL, e.g., "data:application/json;base64,..."
+            # becomes "data:application/json (content saved to external_path)"
+            mime_part = download_info.url.split(",")[0] if "," in download_info.url else download_info.url
+            download_info.url = f"{mime_part} (content saved to external_path)"
+
+        if not file_saved:
+            click.echo(
+                f"Warning: Could not save download {download_info.filename} - "
+                f"file will need to be manually provided for replay",
+                err=True,
+            )
+
+
+# Patterns that may indicate sensitive data in dialog messages or responses
+SENSITIVE_PATTERNS = [
+    (r'api[_\-\s]?key', 'API key'),
+    (r'password', 'password'),
+    (r'secret', 'secret'),
+    (r'token', 'token'),
+    (r'ssn|social.?security', 'Social Security Number'),
+    (r'credit.?card', 'credit card'),
+    (r'cvv|cvc', 'CVV/CVC'),
+    (r'pin.?code|pin.?number', 'PIN'),
+]
+
+
+def check_sensitive_dialog_content(steps: list[RecordingStep]) -> list[str]:
+    """Check for potentially sensitive content in jsdialog steps.
+
+    Returns a list of warning messages for any sensitive patterns found.
+    """
+    warnings = []
+
+    for i, step in enumerate(steps):
+        if step.action != 'jsdialog':
+            continue
+
+        step_num = i + 1
+
+        # Check message
+        if step.message:
+            for pattern, label in SENSITIVE_PATTERNS:
+                if re.search(pattern, step.message, re.IGNORECASE):
+                    warnings.append(
+                        f"Step {step_num}: Dialog message may request {label}"
+                    )
+                    break  # One warning per step message
+
+        # Check result (user's response)
+        if step.result and isinstance(step.result, str):
+            for pattern, label in SENSITIVE_PATTERNS:
+                if re.search(pattern, str(step.result), re.IGNORECASE):
+                    warnings.append(
+                        f"Step {step_num}: Dialog response may contain {label}"
+                    )
+                    break  # One warning per step result
+
+    return warnings
+
+
+def handle_existing_recording_file(output_path: Path) -> Optional[tuple[Path, bool]]:
+    """
+    Handle the case where the recording output file already exists.
+    Called BEFORE recording starts.
+
+    Args:
+        output_path: The path to the existing file
+
+    Returns:
+        - (Path, append_mode) tuple where append_mode=True means append to existing
+        - None if user cancels
+    """
+    # Load existing recording to show info
+    step_count = 0
+    try:
+        with _builtin_open(output_path) as f:
+            data = yaml.safe_load(f)
+        existing = Recording(**data)
+        step_count = len(existing.steps)
+        existing_info = (
+            f"  Created: {existing.metadata.created_at.strftime('%Y-%m-%d %H:%M')}\n"
+            f"  Steps: {step_count}\n"
+            f"  URL: {existing.metadata.starting_url}"
+        )
+    except Exception:
+        existing_info = "  (Could not read existing file)"
+
+    # Generate timestamped filename for display
+    timestamp = datetime.now().strftime("%Y%m%d")
+    timestamped_name = f"{timestamp}_{output_path.name}"
+
+    # Show warning and options
+    click.echo()
+    click.secho(f"⚠ File already exists: {output_path.name}", fg="yellow", bold=True)
+    click.echo(existing_info)
+    click.echo()
+    click.echo("What would you like to do?")
+    click.echo()
+    click.echo(f"  [1] Create a new timestamped recording ({timestamped_name})")
+    step_word = "step" if step_count == 1 else "steps"
+    click.echo(f"  [2] Overwrite the existing recording (all {step_count} {step_word} will be lost)")
+    click.echo("  [3] Append steps to the existing recording (metadata will remain intact)")
+    click.echo("  [4] Cancel")
+    click.echo()
+
+    choice = click.prompt("Choose", type=click.Choice(["1", "2", "3", "4"]), default="1")
+
+    if choice == "1":
+        # Create timestamped copy (now the default)
+        new_path = output_path.parent / timestamped_name
+        click.echo(f"Will save as: {timestamped_name}")
+        return (new_path, False)
+
+    elif choice == "2":
+        # Override - return same path, will overwrite
+        click.echo("Will overwrite existing file.")
+        return (output_path, False)
+
+    elif choice == "3":
+        # Append mode - flag to merge later
+        click.echo("Will append to existing recording.")
+        return (output_path, True)
+
+    else:  # choice == '4'
+        return None  # Cancel
 
 
 def save_recording_to_yaml(recording: Recording, filepath: Path) -> None:
@@ -1047,6 +1521,7 @@ def get_recording_metadata(filepath: Path) -> Optional[dict]:
 
 
 @click.group(invoke_without_command=True)
+@click.argument("filename", required=False, default=None)
 @click.option(
     "-o", "--output",
     "output",
@@ -1075,10 +1550,18 @@ def get_recording_metadata(filepath: Path) -> Optional[dict]:
     help="Automatically replay the recording after saving to verify it works",
 )
 @click.option(
+    "--open",
+    "open_after",
+    is_flag=True,
+    help="Open the recording in default application after saving",
+)
+@click.option(
     "--edit",
     "-e",
+    "edit_after",
     is_flag=True,
-    help="Open the recording in your default editor after saving",
+    hidden=True,
+    help="Deprecated: use --open instead",
 )
 @click.option(
     "--no-audio",
@@ -1120,15 +1603,45 @@ def get_recording_metadata(filepath: Path) -> Optional[dict]:
     is_flag=True,
     help="Generate DOM structure checksum for state verification",
 )
+@click.option(
+    "--synthetic-dialogs",
+    is_flag=True,
+    help="Use non-blocking HTML overlays for alert/confirm/prompt (for automation)",
+)
+@click.option(
+    "--match-viewport",
+    is_flag=True,
+    help="Mark viewport size as a requirement for faithful replay",
+)
+@click.option(
+    "--match-zoom-level",
+    is_flag=True,
+    help="Mark zoom level as a requirement for faithful replay",
+)
+@click.option(
+    "--force",
+    "-f",
+    is_flag=True,
+    help="Override existing file without prompting",
+)
+@click.option(
+    "--viewport",
+    "target_viewport",
+    type=str,
+    default=None,
+    help="Resize browser to specific viewport before recording (e.g., 1024x768)",
+)
 @click.pass_context
 def record(
     ctx,
+    filename: Optional[str],
     output: Optional[str],
     include_hover: bool,
     mask_passwords: bool,
     min_hover_duration: int,
     replay: bool,
-    edit: bool,
+    open_after: bool,
+    edit_after: bool,
     no_audio: bool,
     no_visual: bool,
     no_feedback: bool,
@@ -1136,6 +1649,11 @@ def record(
     capture_state: bool,
     storage_keys: Optional[str],
     checksum: bool,
+    synthetic_dialogs: bool,
+    match_viewport: bool,
+    match_zoom_level: bool,
+    force: bool,
+    target_viewport: Optional[str],
 ):
     """
     Record browser interactions to a YAML file.
@@ -1149,16 +1667,56 @@ def record(
     \b
     Examples:
         inspekt record                    # Auto-generates filename
-        inspekt record -o login-flow.yaml # Specific filename
+        inspekt record my-flow.yaml       # Record to specific file
+        inspekt record -o login-flow.yaml # Same, using -o flag
         inspekt record --no-hover         # Skip hover events
-        inspekt record --edit             # Record and open in editor
+        inspekt record --open             # Record and open in default app
         inspekt record --replay           # Record and replay to verify
         inspekt record --replay -i        # Record and step through replay
-        inspekt record --edit --replay    # Edit, then replay to verify
+        inspekt record --open --replay    # Open, then replay to verify
     """
     # If a subcommand was invoked, don't run recording
     if ctx.invoked_subcommand is not None:
         return
+
+    # Merge filename argument with -o option (argument takes precedence)
+    if filename is not None:
+        output = filename
+
+    # Check for existing file BEFORE starting recording (only for user-specified filenames)
+    append_mode = False
+    if output and not force:
+        check_path = Path(output)
+        if not check_path.suffix:
+            check_path = check_path.with_suffix(".yaml")
+        if check_path.exists():
+            result = handle_existing_recording_file(check_path)
+            if result is None:
+                # User cancelled
+                click.echo("Recording cancelled.")
+                sys.exit(0)
+            check_path, append_mode = result
+            # Update output to potentially modified path
+            output = str(check_path)
+
+    # Parse --viewport argument (WIDTHxHEIGHT format)
+    parsed_viewport = None
+    if target_viewport:
+        try:
+            width_str, height_str = target_viewport.lower().split("x")
+            parsed_viewport = (int(width_str), int(height_str))
+        except ValueError:
+            raise click.ClickException(
+                f"Invalid viewport format: {target_viewport}. Use WIDTHxHEIGHT (e.g., 1024x768)"
+            )
+
+        # Issue 3: Validate dimensions are positive
+        vp_width, vp_height = parsed_viewport
+        if vp_width <= 0 or vp_height <= 0:
+            raise click.ClickException(
+                f"Invalid viewport dimensions: {vp_width}×{vp_height}. "
+                f"Width and height must be positive integers."
+            )
 
     # Original recording logic follows
     client = BridgeClient()
@@ -1170,14 +1728,267 @@ def record(
         )
         sys.exit(1)
 
-    # Check CSP bypass status and warn if disabled (especially important for --replay)
-    if replay and not check_csp_bypass_enabled():
-        click.echo()
-        click.secho("  ⚠  CSP bypass is disabled", fg="yellow", bold=True)
-        click.echo("     Some sites may not work correctly during replay.")
-        click.echo("     Enable it with: inspekt domain csp --enable")
-        click.echo("     Or toggle it in the Inspekt extension popup.")
-        click.echo()
+    # Resize viewport if requested (before recording starts)
+    if parsed_viewport:
+        target_width, target_height = parsed_viewport
+
+        # Import config functions for caching
+        from inspekt.config import get_viewport_offsets, save_viewport_offsets
+
+        # Helper to get screen dimensions via JavaScript
+        def get_screen_dimensions() -> tuple[int, int] | None:
+            """Get screen dimensions to validate viewport request."""
+            js = "(function(){ return { width: screen.width, height: screen.height }; })()"
+            try:
+                result = client.execute(js, timeout=5.0)
+                if result.get("ok"):
+                    dims = result.get("result", {})
+                    if isinstance(dims, dict):
+                        w = dims.get("width")
+                        h = dims.get("height")
+                        if isinstance(w, (int, float)) and isinstance(h, (int, float)):
+                            return int(w), int(h)
+            except Exception:
+                pass
+            return None
+
+        # Issue 3: Validate viewport doesn't exceed screen size
+        screen_dims = get_screen_dimensions()
+        if screen_dims:
+            screen_w, screen_h = screen_dims
+            if target_width > screen_w or target_height > screen_h:
+                raise click.ClickException(
+                    f"Viewport {target_width}×{target_height} exceeds screen size {screen_w}×{screen_h}.\n"
+                    f"The viewport cannot be larger than your display.\n"
+                    f"Consider using a smaller viewport (e.g., --viewport {min(target_width, screen_w)}x{min(target_height, screen_h)}) "
+                    f"or connecting a larger monitor."
+                )
+
+        click.echo(f"Resizing viewport to {target_width}×{target_height}…")
+
+        # Helper to verify actual viewport via JavaScript
+        def get_actual_viewport() -> tuple[int | None, int | None]:
+            verify_js = "(function(){ return { width: window.innerWidth, height: window.innerHeight }; })()"
+            try:
+                result = client.execute(verify_js, timeout=5.0)
+                if result.get("ok"):
+                    dims = result.get("result", {})
+                    if isinstance(dims, dict):
+                        w = dims.get("width")
+                        h = dims.get("height")
+                        if isinstance(w, (int, float)) and isinstance(h, (int, float)):
+                            return int(w), int(h)
+            except Exception:
+                pass
+            return None, None
+
+        # Helper to attempt resize with better error logging (Issue 7)
+        def attempt_resize(width: int, height: int) -> bool:
+            # macOS: Use AppleScript (most reliable, can resize any window)
+            if sys.platform == "darwin":
+                try:
+                    from inspekt.services.applescript_utils import resize_browser_window
+
+                    success = resize_browser_window(width, height)
+                    if not success:
+                        click.echo("  AppleScript resize returned failure", err=True)
+                    return success
+                except ImportError:
+                    click.echo("  AppleScript utils not available", err=True)
+                except Exception as e:
+                    click.echo(f"  AppleScript error: {e}", err=True)
+
+            # All platforms: Try JavaScript resize (often blocked by browsers for security)
+            js_resize = f"""(function(){{
+                try {{
+                    const chromeWidth = window.outerWidth - window.innerWidth;
+                    const chromeHeight = window.outerHeight - window.innerHeight;
+                    window.resizeTo({width} + chromeWidth, {height} + chromeHeight);
+                    return true;
+                }} catch (e) {{
+                    return false;
+                }}
+            }})()"""
+            try:
+                result = client.execute(js_resize, timeout=5.0)
+                return result.get("ok", False) and result.get("result", False)
+            except Exception:
+                return False
+
+        # Check for cached viewport offsets first
+        cached_offsets = get_viewport_offsets()
+        resize_achieved = False
+        need_calibration = False
+
+        if cached_offsets:
+            # Issue 9: Validate cached offsets are reasonable before using
+            if cached_offsets["width"] < 0 or cached_offsets["height"] < 0:
+                click.echo("  Cached offsets invalid (negative), recalibrating…")
+                need_calibration = True
+            else:
+                # Use cached offsets - single resize attempt
+                # Offset is positive (how much larger window is than viewport)
+                # So we ADD offset to get the window size that yields target viewport
+                adjusted_w = target_width + cached_offsets["width"]
+                adjusted_h = target_height + cached_offsets["height"]
+                attempt_resize(adjusted_w, adjusted_h)
+                time.sleep(0.3)
+
+                actual_w, actual_h = get_actual_viewport()
+                # Exact match required - no tolerance
+                if actual_w == target_width and actual_h == target_height:
+                    click.secho(f"✓ Viewport set to {actual_w}×{actual_h}", fg="green")
+                    resize_achieved = True
+                else:
+                    # Cached offsets are stale - recalibrate
+                    if actual_w is not None:
+                        click.echo(f"  Cached offsets outdated (got {actual_w}×{actual_h}), recalibrating…")
+                    else:
+                        click.echo("  Could not verify with cached offsets, recalibrating…")
+                    need_calibration = True
+        else:
+            need_calibration = True
+
+        if need_calibration and not resize_achieved:
+            import random
+
+            # Calibration loop with fun messages
+            # Pool of messages for in-between attempts (shuffled, no repeats until all used)
+            nudge_pool = [
+                "micro-adjusting…",
+                "settling into place…",
+                "locking it down…",
+                "calibrating…",
+                "re-calibrating…",
+                "nudging…",
+                "nudging some more…",
+                "compensating…",
+                "honing in…",
+                "trimming the edges…",
+            ]
+            random.shuffle(nudge_pool)
+            nudge_index = 0
+
+            def get_nudge_message(attempt_num: int, err_w: int, err_h: int) -> str:
+                nonlocal nudge_index, nudge_pool
+                # First attempt: always "dialing it in…"
+                if attempt_num == 0:
+                    return "dialing it in…"
+                # 1px off on either dimension: "shaving off that last pixel…"
+                if (abs(err_w) == 1 and err_h == 0) or (err_w == 0 and abs(err_h) == 1) or (abs(err_w) == 1 and abs(err_h) == 1):
+                    return "shaving off that last pixel…"
+                # In-between: use shuffled pool, cycle through without repeats
+                msg = nudge_pool[nudge_index % len(nudge_pool)]
+                nudge_index += 1
+                # Reshuffle when we've used all messages
+                if nudge_index >= len(nudge_pool):
+                    nudge_index = 0
+                    random.shuffle(nudge_pool)
+                return msg
+
+            max_attempts = 20
+            adjustment_w, adjustment_h = 0, 0
+            prev_error_w, prev_error_h = None, None
+            base_delay = 0.3
+
+            # Track viewport history for oscillation detection
+            viewport_history: list[tuple[int, int]] = []
+
+            for attempt in range(max_attempts):
+                adjusted_w = target_width - adjustment_w
+                adjusted_h = target_height - adjustment_h
+
+                # Attempt the resize
+                attempt_resize(adjusted_w, adjusted_h)
+
+                # Exponential backoff - increase delay on each attempt
+                delay = base_delay * (1.1 ** attempt)  # 0.3, 0.33, 0.36, 0.40...
+                time.sleep(min(delay, 1.5))  # Cap at 1.5 seconds
+
+                # Verify actual viewport (retry on failure)
+                actual_w, actual_h = get_actual_viewport()
+                if actual_w is None:
+                    # Retry once after brief delay
+                    time.sleep(0.5)
+                    actual_w, actual_h = get_actual_viewport()
+
+                if actual_w is None:
+                    # Can't verify - show platform-specific guidance
+                    if sys.platform == "darwin":
+                        click.secho(
+                            f"⚠ Could not verify viewport. Please manually resize to {target_width}×{target_height}",
+                            fg="yellow",
+                        )
+                    else:
+                        click.secho(
+                            f"⚠ Could not verify viewport. On {sys.platform}, please manually resize "
+                            f"your browser to {target_width}×{target_height}",
+                            fg="yellow",
+                        )
+                    break
+
+                error_w = actual_w - target_width
+                error_h = actual_h - target_height
+
+                # Track viewport for oscillation detection
+                viewport_history.append((actual_w, actual_h))
+
+                # Exact match required - no tolerance
+                if error_w == 0 and error_h == 0:
+                    # Note: adjustment is negative (error accumulation), but offset should be positive
+                    offset_w = -adjustment_w
+                    offset_h = -adjustment_h
+                    if save_viewport_offsets(offset_w, offset_h):
+                        click.secho(f"✓ Viewport set to {actual_w}×{actual_h}, offsets saved.", fg="green")
+                    else:
+                        click.secho(f"✓ Viewport set to {actual_w}×{actual_h} (offsets not saved).", fg="yellow")
+                    resize_achieved = True
+                    break
+
+                # Oscillation detection: check if we've seen this exact viewport before recently
+                # If we see the same value twice in the last 4 attempts, we're oscillating
+                if len(viewport_history) >= 4:
+                    recent = viewport_history[-4:]
+                    current = (actual_w, actual_h)
+                    # Count occurrences of current viewport in recent history
+                    if recent.count(current) >= 2:
+                        click.secho(
+                            f"⚠ Could not achieve the exact viewport (requested {target_width}×{target_height}, "
+                            f"achieved {actual_w}×{actual_h}).\n"
+                            f"   This issue is related to display scaling. Please try to use even values.",
+                            fg="yellow",
+                        )
+                        break
+
+                # Check if error magnitude is increasing (diverging)
+                if prev_error_w is not None:
+                    if abs(error_w) > abs(prev_error_w) + 5 or abs(error_h) > abs(prev_error_h) + 5:
+                        click.secho(
+                            f"⚠ Viewport diverging: requested {target_width}×{target_height}, "
+                            f"achieved {actual_w}×{actual_h}. Browser may not support this size.",
+                            fg="yellow",
+                        )
+                        break
+
+                prev_error_w, prev_error_h = error_w, error_h
+
+                if attempt < max_attempts - 1:
+                    # Adjust for next attempt with friendly message
+                    adjustment_w += error_w
+                    adjustment_h += error_h
+                    msg = get_nudge_message(attempt, error_w, error_h)
+                    click.echo(f"  Attempt {attempt + 1}: got {actual_w}×{actual_h}, {msg}")
+                else:
+                    # Max attempts reached - still couldn't hit exact size
+                    click.secho(
+                        f"⚠ Could not achieve exact viewport after {max_attempts} attempts: "
+                        f"requested {target_width}×{target_height}, achieved {actual_w}×{actual_h}.\n"
+                        f"   This may be a hardware/browser limitation.",
+                        fg="yellow",
+                    )
+
+        # Auto-enable viewport matching requirement since user explicitly specified dimensions
+        match_viewport = True
 
     # Load the recording script
     scripts_dir = Path(__file__).parent.parent.parent / "scripts"
@@ -1196,6 +2007,8 @@ def record(
     try:
         with _builtin_open(visual_script_path) as f:
             visual_script = f.read()
+        # Inject shared dialog styles
+        visual_script = visual_script.replace("DIALOG_STYLES_PLACEHOLDER", DIALOG_STYLES)
         # Inject the script
         client.execute(visual_script, timeout=10.0)
     except FileNotFoundError:
@@ -1205,25 +2018,47 @@ def record(
     # Generate a unique recording ID for IndexedDB persistence
     recording_id = f"rec_{int(time.time())}_{uuid.uuid4().hex[:8]}"
 
+    # Load record config for rate limiting and synthetic dialogs
+    record_config = get_record_config()
+    max_actions_per_second = record_config.get("max-actions-per-second", 10)
+    # CLI flag overrides config setting for synthetic dialogs
+    use_synthetic_dialogs = synthetic_dialogs or record_config.get("synthetic-dialogs", False)
+
     config = {
         "includeHover": include_hover,
         "maskPasswords": mask_passwords,
         "minHoverDuration": min_hover_duration,
         "audio": True,  # Always enable audio feedback during recording
         "recordingId": recording_id,
+        "maxActionsPerSecond": max_actions_per_second,
+        "syntheticDialogs": use_synthetic_dialogs,
     }
     config_json = json.dumps(config)
 
     # Prepare start code
     start_code = script_template.replace("ACTION_PLACEHOLDER", "start")
     start_code = start_code.replace("CONFIG_PLACEHOLDER", config_json)
+    start_code = start_code.replace("DIALOG_STYLES_PLACEHOLDER", DIALOG_STYLES)
 
     # Start recording
     try:
         result = client.execute(start_code, timeout=10.0)
 
         if not result.get("ok"):
-            click.echo(f"Error starting recording: {result.get('error')}", err=True)
+            error = result.get('error', 'unknown error')
+            click.echo()
+            click.secho("⚠ The recording could not be started", fg="yellow", bold=True, err=True)
+            click.echo(err=True)
+            click.echo("  * Ensure that the latest version of the Inspekt extension is installed", err=True)
+            click.echo("    and enabled in Firefox or Chrome.", err=True)
+            click.echo("  * Make sure that a JavaScript dialog is not blocking access to the page.", err=True)
+            click.echo("  * In some cases, you may need to disable CSP. You can do this by clicking", err=True)
+            click.echo("    the toggle in the Inspekt UI that appears when you click the icon in", err=True)
+            click.echo("    your toolbar.", err=True)
+            if error and error != "no_browser_connected":
+                click.echo(err=True)
+                click.echo(f"  Technical details: {error}", err=True)
+            click.echo()
             sys.exit(1)
 
         response = result.get("result", {})
@@ -1234,91 +2069,49 @@ def record(
         zoom = response.get("zoom", 1.0)
         user_agent = response.get("userAgent", "")
 
-        # Check for closed shadow DOM warnings
-        closed_shadow_warnings = response.get("closedShadowWarnings", [])
-        if closed_shadow_warnings:
+        # Fetch actual browser zoom level via Chrome extension API
+        browser_zoom_level = 1.0
+        try:
+            zoom_code = """
+            (async () => {
+                return new Promise((resolve) => {
+                    const requestId = 'zoom-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+                    const handler = (event) => {
+                        if (event.data?.type === 'INSPEKT_ZOOM_LEVEL_RESPONSE' &&
+                            event.data?.requestId === requestId) {
+                            window.removeEventListener('message', handler);
+                            resolve(event.data.response?.zoomFactor || 1.0);
+                        }
+                    };
+                    window.addEventListener('message', handler);
+                    window.postMessage({
+                        type: 'INSPEKT_GET_ZOOM_LEVEL',
+                        source: 'inspekt-page',
+                        requestId: requestId
+                    }, '*');
+                    // Timeout fallback
+                    setTimeout(() => resolve(1.0), 2000);
+                });
+            })()
+            """
+            zoom_result = client.execute(zoom_code, timeout=3.0)
+            if zoom_result.get("ok") and zoom_result.get("result"):
+                browser_zoom_level = float(zoom_result.get("result", 1.0))
+        except Exception:
+            pass  # Fall back to 1.0 if fetching fails
+
+        # Check CSP bypass status and warn if disabled (only shown after successful start)
+        # This is especially important for --replay since replay requires script injection
+        if replay and not check_csp_bypass_enabled():
             click.echo()
-            click.secho("⚠ Warning: ", fg="yellow", bold=True, nl=False)
-            click.echo("This page contains Web Components with closed shadow DOM.")
-            click.echo("  Interactions inside these components may not be recorded:")
-            for warning in closed_shadow_warnings[:5]:  # Limit to 5
-                tag = warning.get("tagName", "unknown")
-                click.echo(f"    • {click.style(f'<{tag}>', fg='cyan')}")
-            if len(closed_shadow_warnings) > 5:
-                click.echo(f"    ... and {len(closed_shadow_warnings) - 5} more")
+            click.secho("  ⚠  CSP bypass is disabled", fg="yellow", bold=True)
+            click.echo("     Some sites may not work correctly during replay.")
+            click.echo("     Enable it with: inspekt domain csp --enable")
+            click.echo("     Or toggle it in the Inspekt extension popup.")
             click.echo()
 
-        # Check for media elements (audio/video with controls)
-        media_elements = response.get("mediaElements")
-        if media_elements:
-            from inspekt.app.cli.table import wrap_text
-            audio_count = media_elements.get("audioCount", 0)
-            video_count = media_elements.get("videoCount", 0)
-
-            # Build description with natural language
-            parts = []
-            if audio_count > 0:
-                parts.append("an audio player" if audio_count == 1 else f"{audio_count} audio players")
-            if video_count > 0:
-                parts.append("a video player" if video_count == 1 else f"{video_count} video players")
-            element_desc = " and ".join(parts)
-
-            msg = f"This page contains {element_desc} with native controls. Media players are treated as a single Tab stop. Use Space/Enter to play/pause, Arrow keys for seek/volume."
-            click.echo()
-            click.secho("⚠ ", fg="yellow", bold=True, nl=False)
-            click.echo(wrap_text(msg, indent="", subsequent_indent="  "))
-
-        # Check for native control inputs (range, date, time, color, etc.)
-        native_inputs = response.get("nativeControlInputs")
-        if native_inputs:
-            from inspekt.app.cli.table import wrap_text
-            types = native_inputs.get("types", {})
-
-            # Build description of input types found with natural language
-            type_names = {
-                "range": "range slider",
-                "date": "date picker",
-                "time": "time picker",
-                "datetime-local": "datetime picker",
-                "month": "month picker",
-                "week": "week picker",
-                "number": "number spinner",
-                "color": "color picker"
-            }
-
-            type_parts = []
-            for input_type, input_count in sorted(types.items()):
-                name = type_names.get(input_type, input_type)
-                if input_count == 1:
-                    # Use "a" or "an" for singular
-                    article = "an" if name[0] in "aeiou" else "a"
-                    type_parts.append(f"{article} {name}")
-                else:
-                    type_parts.append(f"{input_count} {name}s")
-
-            if len(type_parts) <= 2:
-                type_desc = " and ".join(type_parts)
-            else:
-                type_desc = ", ".join(type_parts[:-1]) + " and " + type_parts[-1]
-
-            # Use "its" for singular, "their" for plural
-            total_count = sum(types.values())
-            pronoun = "its" if total_count == 1 else "their"
-            msg = f"This page has {type_desc}. You can adjust {pronoun} values, but Inspekt intentionally does not record user interactions on native elements. The final selected value will be recorded once you leave the element."
-            click.echo()
-            click.secho("⚠ ", fg="yellow", bold=True, nl=False)
-            click.echo(wrap_text(msg, indent="", subsequent_indent="  "))
-
-        # Check for file inputs (now supported!)
-        file_inputs = response.get("fileInputs")
-        if file_inputs:
-            from inspekt.app.cli.table import wrap_text
-            count = file_inputs.get("count", 0)
-            count_str = "a file input" if count == 1 else f"{count} file inputs"
-            msg = f"This page has {count_str}. Inspekt cannot access the file picker or view files on your computer, but it will record file uploads and save the files for replay (maximum size: 10 MB). Do not upload sensitive files."
-            click.echo()
-            click.secho("⚠ ", fg="yellow", bold=True, nl=False)
-            click.echo(wrap_text(msg, indent="", subsequent_indent="  "))
+        # Display pre-recording hints and warnings
+        display_pre_recording_hints(response, use_synthetic_dialogs)
 
         # Track which browser tab we started recording in
         # This prevents accidentally resuming in a different tab
@@ -1365,9 +2158,11 @@ def record(
         # Prepare poll and stop codes
         poll_code = script_template.replace("ACTION_PLACEHOLDER", "poll")
         poll_code = poll_code.replace("CONFIG_PLACEHOLDER", config_json)
+        poll_code = poll_code.replace("DIALOG_STYLES_PLACEHOLDER", DIALOG_STYLES)
 
         stop_code = script_template.replace("ACTION_PLACEHOLDER", "stop")
         stop_code = stop_code.replace("CONFIG_PLACEHOLDER", config_json)
+        stop_code = stop_code.replace("DIALOG_STYLES_PLACEHOLDER", DIALOG_STYLES)
 
         # Collected steps
         all_steps: list[RecordingStep] = []
@@ -1377,6 +2172,9 @@ def record(
 
         # Track seen event timestamps to prevent duplicates after resume
         seen_timestamps: set[int] = set()
+
+        # Track download checksums for deduplication: filename → {checksum, step_number}
+        download_checksums: dict[str, dict] = {}
 
         # Step counter for display
         step_count = 0
@@ -1407,6 +2205,7 @@ def record(
             }
             resume_code = script_template.replace("ACTION_PLACEHOLDER", "resume")
             resume_code = resume_code.replace("CONFIG_PLACEHOLDER", json.dumps(resume_config))
+            resume_code = resume_code.replace("DIALOG_STYLES_PLACEHOLDER", DIALOG_STYLES)
             return resume_code
 
         # Flag for clean shutdown (avoid doing I/O in signal handler)
@@ -1468,10 +2267,13 @@ def record(
                     height=viewport.get("height", 1080),
                 ),
                 zoom=zoom,
+                browser_zoom_level=browser_zoom_level,
                 scroll=ScrollPosition(
                     x=initial_scroll.get("x", 0),
                     y=initial_scroll.get("y", 0),
                 ),
+                require_viewport_match=match_viewport,
+                require_zoom_match=match_zoom_level,
             )
 
             # Capture additional state if --capture-state flag was used
@@ -1662,9 +2464,42 @@ def record(
             # Process upload files - save large files externally
             process_upload_files(recording, output_path)
 
+            # Process download files - save downloaded files externally
+            process_download_files(recording, output_path)
+
+            # Handle append mode - merge with existing recording
+            if append_mode:
+                try:
+                    with _builtin_open(output_path) as f:
+                        existing_data = yaml.safe_load(f)
+                    existing = Recording(**existing_data)
+                    original_step_count = len(existing.steps)
+                    # Prepend existing steps to new recording
+                    recording.steps = existing.steps + recording.steps
+                    # Keep existing metadata (created_at)
+                    recording.metadata.created_at = existing.metadata.created_at
+                    # Recalculate duration based on last step
+                    if recording.steps:
+                        recording.metadata.duration_ms = recording.steps[-1].timestamp or 0
+                    new_step_count = len(recording.steps) - original_step_count
+                    click.echo(f"Appended {new_step_count} new steps to existing {original_step_count} steps.")
+                except Exception as e:
+                    click.secho(f"Warning: Could not read existing file for append: {e}", fg="yellow")
+                    click.echo("Saving as new recording instead.")
+
             # Save recording
             try:
                 save_recording_to_yaml(recording, output_path)
+
+                # Check for potentially sensitive content in dialog steps
+                sensitive_warnings = check_sensitive_dialog_content(all_steps)
+                if sensitive_warnings:
+                    click.echo()
+                    click.secho("  ⚠️  Security Warning: Recording may contain sensitive data:", fg="yellow")
+                    for warning in sensitive_warnings:
+                        click.secho(f"      • {warning}", fg="yellow")
+                    click.secho("      Consider reviewing/redacting before sharing this file.", fg="yellow")
+                    click.echo()
 
                 # Count steps excluding hovers
                 non_hover_steps = sum(1 for s in all_steps if s.action != "hover")
@@ -1672,10 +2507,13 @@ def record(
                 # Display simplified recording saved info
                 click.echo(f"Recording saved to {click.style(output_path.name, bold=True)} ({format_duration(duration_ms)}, {non_hover_steps} actions) " + success_icon(""))
 
-                if edit and replay:
-                    click.echo(f"\nOpening in editor, then starting replay…")
-                elif edit:
-                    click.echo(f"\nOpening in editor…")
+                # Merge --open and --edit (backwards compat) flags
+                should_open = open_after or edit_after
+
+                if should_open and replay:
+                    click.echo(f"\nOpening file, then starting replay…")
+                elif should_open:
+                    click.echo(f"\nOpening file…")
                 elif replay:
                     click.echo(f"\nStarting verification replay…")
                 else:
@@ -1686,8 +2524,8 @@ def record(
                 click.echo(f"Error saving recording: {e}", err=True)
                 sys.exit(1)
 
-            # Open in editor if --edit flag was set
-            if edit:
+            # Open file if --open flag was set (or deprecated --edit)
+            if should_open:
                 click.launch(str(output_path))
 
             # Auto-replay if --replay flag was set
@@ -1728,6 +2566,8 @@ def record(
                 try:
                     with _builtin_open(countdown_visual_path) as f:
                         countdown_visual_script = f.read()
+                    # Inject shared dialog styles
+                    countdown_visual_script = countdown_visual_script.replace("DIALOG_STYLES_PLACEHOLDER", DIALOG_STYLES)
                     replay_client.execute(countdown_visual_script, timeout=10.0)
                 except Exception:
                     pass  # Continue without audio
@@ -1888,6 +2728,7 @@ def record(
                     pause_start_time = None
                     header_shown = False
                     seen_timestamps = set()
+                    download_checksums = {}
                     last_activity_time = time.time()
                     inactivity_warning_shown = False
                     start_time = datetime.now(timezone.utc)
@@ -1968,9 +2809,25 @@ def record(
 
                     debug_log(f"Response: recordingActive={response.get('recordingActive')}, currentUrl={response.get('currentUrl', 'N/A')[:50] if response.get('currentUrl') else 'N/A'}")
 
-                    # Check if stop was requested from browser (Ctrl+C in browser window)
+                    # Check if stop was requested from browser (Ctrl+C or limit reached)
                     if response.get("stopRequested"):
-                        debug_log("Stop requested from browser (Ctrl+C)")
+                        stop_reason = response.get("stopReason")
+                        if stop_reason and stop_reason.startswith("download_limit:"):
+                            limit = stop_reason.split(":")[1]
+                            click.echo(format_system_message(
+                                f"Download limit ({limit}) reached. Recording has been stopped as a precaution.",
+                                icon="tip"
+                            ))
+                            debug_log(f"Stop requested from browser (download limit: {limit})")
+                        elif stop_reason and stop_reason.startswith("action_rate_limit:"):
+                            limit = stop_reason.split(":")[1]
+                            click.echo(format_system_message(
+                                f"Action rate limit ({limit}/second) exceeded. Recording has been stopped as a precaution.",
+                                icon="tip"
+                            ))
+                            debug_log(f"Stop requested from browser (action rate limit: {limit}/sec)")
+                        else:
+                            debug_log("Stop requested from browser (Ctrl+C)")
                         result = do_cleanup()
                         if result == "retry":
                             # Reset state for retry (same as Ctrl+C from CLI)
@@ -1981,6 +2838,7 @@ def record(
                             pause_start_time = None
                             header_shown = False
                             seen_timestamps = set()
+                            download_checksums = {}
                             last_activity_time = time.time()
                             inactivity_warning_shown = False
                             start_time = datetime.now(timezone.utc)
@@ -2057,8 +2915,11 @@ def record(
                             # Remember the step number before decrementing
                             undone_step_num = step_count
                             step_count -= 1
-                            # Format: "----   00:15   󰕌  Undo #0005 keypress" (dark grey timestamp)
+                            # Format: "----   00:15   󰕌  Undo #0005 set color" (dark grey timestamp)
                             action = undone_step.action
+                            # For "set" actions, include the input type (e.g., "set color", "set range")
+                            if action == "set" and undone_step.target and undone_step.target.input_type:
+                                action = f"set {undone_step.target.input_type}"
                             prefix = click.style(f"----   {elapsed_str}", fg="bright_black")
                             undo_icon = get_indicator("undo") or ""
                             icon_str = f"{undo_icon}  " if undo_icon else ""
@@ -2081,8 +2942,11 @@ def record(
                             redone_step = undo_stack.pop()
                             all_steps.append(redone_step)
                             step_count += 1
-                            # Format: "----   00:15   󰑎  Redo #0005 keypress" (dark grey timestamp)
+                            # Format: "----   00:15   󰑎  Redo #0005 set color" (dark grey timestamp)
                             action = redone_step.action
+                            # For "set" actions, include the input type (e.g., "set color", "set range")
+                            if action == "set" and redone_step.target and redone_step.target.input_type:
+                                action = f"set {redone_step.target.input_type}"
                             prefix = click.style(f"----   {elapsed_str}", fg="bright_black")
                             redo_icon = get_indicator("redo") or ""
                             icon_str = f"{redo_icon}  " if redo_icon else ""
@@ -2214,9 +3078,60 @@ def record(
                             click.echo(format_step_header(indent=False))
                             header_shown = True
 
+                        # For upload events, strip the content field before displaying
+                        # (prevents large base64 data from interfering with output)
+                        display_event = event
+                        if event.get("action") == "upload" and event.get("files"):
+                            display_event = {**event}
+                            display_event["files"] = [
+                                {k: v for k, v in f.items() if k != "content"}
+                                for f in event["files"]
+                            ]
+
+                        # For download events, check for duplicates or changes
+                        if event.get("action") == "download" and event.get("download"):
+                            download_info = event["download"]
+                            filename = download_info.get("filename")  # Already cleaned by JS
+                            full_path = download_info.get("full_path")
+
+                            if filename and full_path:
+                                checksum = compute_file_checksum(Path(full_path))
+
+                                if checksum and filename in download_checksums:
+                                    prev = download_checksums[filename]
+                                    if checksum == prev["checksum"]:
+                                        # Identical file - mark for discard
+                                        download_info["_duplicate_of_step"] = prev["step_number"]
+                                    else:
+                                        # Different content - mark for rename with step ID
+                                        download_info["_differs_from_step"] = prev["step_number"]
+                                        download_info["_save_with_step_id"] = step_count
+                                elif checksum:
+                                    # First download of this filename
+                                    download_checksums[filename] = {
+                                        "checksum": checksum,
+                                        "step_number": step_count,
+                                    }
+
                         # Display real-time feedback with step number and elapsed time (no indent during recording)
-                        display = format_step_for_display(event, step_count, elapsed_ms, indent=False)
+                        display = format_step_for_display(display_event, step_count, elapsed_ms, indent=False)
                         click.echo(display)
+
+                        # Show informational message for download duplicates/changes (after the step display)
+                        if event.get("action") == "download" and event.get("download"):
+                            download_info = event["download"]
+                            if download_info.get("_duplicate_of_step"):
+                                orig_step = download_info["_duplicate_of_step"]
+                                click.echo(format_system_message(
+                                    f"This file is identical to the one we downloaded in step #{orig_step:04d}.",
+                                    icon="tip"
+                                ))
+                            elif download_info.get("_differs_from_step"):
+                                orig_step = download_info["_differs_from_step"]
+                                click.echo(format_system_message(
+                                    f"This file differs from the one we downloaded in step #{orig_step:04d}. A copy is saved.",
+                                    icon="tip"
+                                ))
 
                 else:
                     # Poll failed - might be due to navigation
@@ -2294,7 +3209,7 @@ def tidy(file: Optional[str], dry_run: bool, force: bool, no_comments: bool, no_
     if file is None:
         recent = find_most_recent_recording()
         if recent is None:
-            click.echo("Error: No file specified and no recording_*.yaml files found.", err=True)
+            click.echo("Error: No file specified and no inspekt_*.yaml files found.", err=True)
             sys.exit(1)
         filepath = recent
         click.echo(f"Using: {filepath.name} (last modified)\n")
@@ -2581,7 +3496,7 @@ def show_recording(recording_file: Optional[str]):
     if recording_file is None:
         recent = find_most_recent_recording()
         if recent is None:
-            click.echo("Error: No recording file specified and no recording_*.yaml files found.", err=True)
+            click.echo("Error: No recording file specified and no inspekt_*.yaml files found.", err=True)
             sys.exit(1)
         filepath = recent
         click.echo(f"Using: {filepath.name} (last modified)\n")
@@ -2663,7 +3578,7 @@ def delete_recording(recording_file: Optional[str], force: bool):
     if recording_file is None:
         recent = find_most_recent_recording()
         if recent is None:
-            click.echo("Error: No recording file specified and no recording_*.yaml files found.", err=True)
+            click.echo("Error: No recording file specified and no inspekt_*.yaml files found.", err=True)
             sys.exit(1)
         filepath = recent
         click.echo(f"Using: {filepath.name} (last modified)\n")
@@ -2704,7 +3619,7 @@ def edit_recording(recording_file: Optional[str]):
     if recording_file is None:
         recent = find_most_recent_recording()
         if recent is None:
-            click.echo("Error: No recording file specified and no recording_*.yaml files found.", err=True)
+            click.echo("Error: No recording file specified and no inspekt_*.yaml files found.", err=True)
             sys.exit(1)
         filepath = recent
         click.echo(f"Opening: {filepath.name} (last modified)")
@@ -2781,6 +3696,8 @@ def record_tutorial(speak: bool):
     try:
         with _builtin_open(visual_script_path) as f:
             visual_script = f.read()
+        # Inject shared dialog styles
+        visual_script = visual_script.replace("DIALOG_STYLES_PLACEHOLDER", DIALOG_STYLES)
     except Exception:
         visual_script = None
 
@@ -2976,6 +3893,12 @@ def record_tutorial(speak: bool):
                 "tag": "dialog",
             },
         },
+        "jsdialog": {
+            "action": "jsdialog",
+            "dialog_type": "confirm",
+            "message": "Are you sure you want to proceed?",
+            "result": True,
+        },
         "upload": {
             "action": "upload",
             "target": {
@@ -2989,6 +3912,17 @@ def record_tutorial(speak: bool):
                     "size": 45678,
                 }
             ],
+        },
+        "download": {
+            "action": "download",
+            "download": {
+                "url": "https://example.com/report.pdf",
+                "filename": "report.pdf",
+                "mime_type": "application/pdf",
+                "size": 1048576,
+                "download_start": 1700000000000,
+                "download_end": 1700000005000,
+            },
         },
         "inspekt": {
             "action": "inspekt",
@@ -3030,7 +3964,9 @@ def record_tutorial(speak: bool):
         "scroll": "Scroll the page",
         "toggle": "Toggle a details disclosure",
         "dialog": "Open or close a modal dialog",
+        "jsdialog": "JavaScript alert, confirm, or prompt dialog",
         "upload": "Upload a file",
+        "download": "File download completed",
         "plugin": "Run an Inspekt plugin",
         "inspekt": "Run an Inspekt command",
         "failure": "When an action fails",
