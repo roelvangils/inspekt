@@ -48,14 +48,24 @@ def find_most_recent_recording() -> Optional[Path]:
     """
     Find the most recently modified recording file in the current directory.
 
-    Looks for files matching 'recording_*.yaml' and returns the one
-    with the most recent modification time.
+    Search priority:
+    1. Files matching 'recording_*.yaml' (standard naming convention)
+    2. Any '*.yaml' file (for custom-named recordings)
+
+    The validation step will verify if the selected file is actually a valid
+    recording, so it's safe to be lenient here for better UX.
 
     Returns:
         Path to the most recent recording file, or None if not found.
     """
     cwd = Path.cwd()
+
+    # First, try standard naming convention
     recording_files = list(cwd.glob("recording_*.yaml"))
+
+    # Fall back to any YAML file if no recording_*.yaml found
+    if not recording_files:
+        recording_files = list(cwd.glob("*.yaml"))
 
     if not recording_files:
         return None

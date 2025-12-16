@@ -685,7 +685,7 @@ def validate(recording_file: Optional[str], strict: bool, json_output: bool):
             if json_output:
                 print(json.dumps({"valid": False, "error": "No recording file found"}))
             else:
-                click.echo("Error: No recording file specified and no recording_*.yaml files found.", err=True)
+                click.echo("Error: No recording file specified and no .yaml files found.", err=True)
             sys.exit(1)
         filepath = recent
         if not json_output:

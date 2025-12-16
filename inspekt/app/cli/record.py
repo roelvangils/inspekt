@@ -3209,7 +3209,7 @@ def tidy(file: Optional[str], dry_run: bool, force: bool, no_comments: bool, no_
     if file is None:
         recent = find_most_recent_recording()
         if recent is None:
-            click.echo("Error: No file specified and no recording_*.yaml files found.", err=True)
+            click.echo("Error: No file specified and no .yaml files found.", err=True)
             sys.exit(1)
         filepath = recent
         click.echo(f"Using: {filepath.name} (last modified)\n")
@@ -3496,7 +3496,7 @@ def show_recording(recording_file: Optional[str]):
     if recording_file is None:
         recent = find_most_recent_recording()
         if recent is None:
-            click.echo("Error: No recording file specified and no recording_*.yaml files found.", err=True)
+            click.echo("Error: No recording file specified and no .yaml files found.", err=True)
             sys.exit(1)
         filepath = recent
         click.echo(f"Using: {filepath.name} (last modified)\n")
@@ -3578,7 +3578,7 @@ def delete_recording(recording_file: Optional[str], force: bool):
     if recording_file is None:
         recent = find_most_recent_recording()
         if recent is None:
-            click.echo("Error: No recording file specified and no recording_*.yaml files found.", err=True)
+            click.echo("Error: No recording file specified and no .yaml files found.", err=True)
             sys.exit(1)
         filepath = recent
         click.echo(f"Using: {filepath.name} (last modified)\n")
@@ -3619,7 +3619,7 @@ def edit_recording(recording_file: Optional[str]):
     if recording_file is None:
         recent = find_most_recent_recording()
         if recent is None:
-            click.echo("Error: No recording file specified and no recording_*.yaml files found.", err=True)
+            click.echo("Error: No recording file specified and no .yaml files found.", err=True)
             sys.exit(1)
         filepath = recent
         click.echo(f"Opening: {filepath.name} (last modified)")

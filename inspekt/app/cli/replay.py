@@ -1107,7 +1107,7 @@ def replay(
     if recording_file is None:
         recent = find_most_recent_recording()
         if recent is None:
-            click.echo("Error: No recording file specified and no recording_*.yaml files found in current directory.", err=True)
+            click.echo("Error: No recording file specified and no .yaml files found in current directory.", err=True)
             sys.exit(1)
         recording_file = str(recent)
         auto_selected = True
