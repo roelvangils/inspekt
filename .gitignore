@@ -52,6 +52,47 @@ nohup.out
 
 # Cache databases
 action_cache.db
+data.db
 
 # Documentation
 site/
+
+# Node.js
+node_modules/
+bun.lock
+package-lock.json
+
+# Recordings and replays (generated test files)
+recording_*.yaml
+*_replay.mp4
+sensoa.yaml
+vdab.yaml
+zelfhulp.yaml
+
+# Screenshots and test outputs
+*.png
+!extensions/chrome/icons/*.png
+!extensions/firefox/icons/*.png
+!docs/**/*.png
+
+# Temporary/backup files
+*.bak
+*.tmp
+*.temp
+
+# Test sites and artifacts
+test-site/
+test-*.html
+mcp-test/
+
+# Downloaded HTML files
+*.html
+!docker/browser-vm/*.html
+!extensions/**/*.html
+!docs/**/*.html
+
+# Marketing materials (separate repo?)
+marketing/
+
+# Misc
+*.pdf

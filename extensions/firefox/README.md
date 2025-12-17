@@ -1,13 +1,15 @@
 # Inspekt - Firefox Extension
 
-The Chrome extension for Inspekt that **bypasses CSP restrictions** and works on **all websites** including GitHub, Gmail, banking sites, and more.
+> ⚠️ **Note:** The Firefox extension is currently **not actively maintained**. The Chrome extension has more features including VM support, replay mode, and screencast integration. We recommend using Chrome/Chromium for the best Inspekt experience. Firefox support may be revisited in a future release.
+
+The Firefox extension for Inspekt that **bypasses CSP restrictions** and works on **all websites** including GitHub, Gmail, banking sites, and more.
 
 ## Features
 
 ✨ **CSP Bypass** - Works on all websites, no restrictions
 🔒 **Explicit Opt-In** - You control which domains Zen can access
 🚀 **Automatic Connection** - Connects to localhost:8766 automatically
-🛠️ **DevTools Integration** - Use `zenStore($0)` in console
+🛠️ **DevTools Integration** - Use `inspektStore($0)` in console
 📊 **Status Panel** - Built-in settings panel with connection status and domain management
 🔄 **Auto-Reconnect** - Maintains connection across page reloads
 ⚡ **Manifest V2** - Uses latest Chrome extension architecture
@@ -163,7 +165,7 @@ The extension includes the same DevTools integration as the userscript:
 // In browser console:
 // 1. Inspect element (Right-click → Inspect)
 // 2. Store it:
-zenStore($0)
+inspektStore($0)
 
 // 3. In terminal:
 inspektinspected
