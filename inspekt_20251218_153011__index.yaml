@@ -1,0 +1,462 @@
+# Inspekt Recording v1.1
+# Generated: 2025-12-18T14:30:11.368004+00:00
+# Duration: 11.9s
+# URL: 
+#
+# Edit this file to:
+# - Add 'expect:' assertions to steps
+# - Insert 'inspekt' command steps for accessibility checks
+# - Remove unwanted steps
+#
+# Example assertion:
+#   expect:
+#     visible: ".success-message"
+#     url_contains: "/dashboard"
+
+steps:
+# Step 0001 · Navigate to https://www.bol.com/nl/fr/
+- timestamp: 0
+  action: navigate
+  url: https://www.bol.com/nl/fr/
+
+# Step 0002 · Press Tab (focus moves to 'Aller à la recherche')
+- timestamp: 6131
+  action: keypress
+  target:
+    selector: html > body > div > header > div > div > a
+    accessible_name: Aller à la recherche
+    tag: a
+    focus_styles:
+      backgroundColor: rgb(0, 0, 255)
+      borderRadius: 0px
+      bottom: -41.625px
+      boxShadow: none
+      clip: auto
+      clipPath: none
+      color: rgb(255, 255, 255)
+      display: block
+      fontSize: 15.75px
+      fontWeight: '400'
+      height: 41.625px
+      left: 0px
+      lineHeight: 23.625px
+      margin: 0px
+      opacity: '1'
+      outline: rgb(0, 95, 204) auto 1px
+      outlineOffset: 1px
+      overflow: visible
+      padding: 9px 13.5px
+      position: absolute
+      right: 971.883px
+      textDecoration: none
+      top: 0px
+      transform: none
+      visibility: visible
+      width: 169.117px
+      zIndex: '50'
+  key: Tab
+
+# Step 0003 · Press Tab (focus moves to 'Aller au contenu princip…')
+- timestamp: 6527
+  action: keypress
+  target:
+    selector: html > body > div > header > div > div:nth-of-type(2) > a
+    accessible_name: Aller au contenu principal
+    tag: a
+    focus_styles:
+      backgroundColor: rgb(0, 0, 255)
+      borderRadius: 0px
+      bottom: -41.625px
+      boxShadow: none
+      clip: auto
+      clipPath: none
+      color: rgb(255, 255, 255)
+      display: block
+      fontSize: 15.75px
+      fontWeight: '400'
+      height: 41.625px
+      left: 0px
+      lineHeight: 23.625px
+      margin: 0px
+      opacity: '1'
+      outline: rgb(0, 95, 204) auto 1px
+      outlineOffset: 1px
+      overflow: visible
+      padding: 9px 13.5px
+      position: absolute
+      right: 924.211px
+      textDecoration: none
+      top: 0px
+      transform: none
+      visibility: visible
+      width: 216.789px
+      zIndex: '50'
+  key: Tab
+
+# Step 0004 · Press Tab (focus moves to 'profitez du shopping san…')
+- timestamp: 6711
+  action: keypress
+  target:
+    selector: html > body > div > header > div:nth-of-type(2) > div > a
+    accessible_name: profitez du shopping sans soucis Livraison gratuite à partir de 25 € Livraison le jour-même, le soir
+      ou le week-end* Retours gratuit
+    tag: a
+  key: Tab
+
+# Step 0005 · Press Tab (focus moves to 'Select Découvrez mainten…')
+- timestamp: 6923
+  action: keypress
+  target:
+    selector: html > body > div > header > div:nth-of-type(2) > div > a:nth-of-type(2)
+    accessible_name: Select Découvrez maintenant les 4 avantages
+    tag: a
+  key: Tab
+
+# Step 0006 · Press Tab (focus moves to 'Bol.com homepage')
+- timestamp: 7263
+  action: keypress
+  target:
+    selector: '[aria-label="Bol\.com\ homepage"]'
+    fallback_selectors:
+    - html > body > div > header > div:nth-of-type(3) > div > a
+    accessible_name: Bol.com homepage
+    tag: a
+  key: Tab
+
+# Step 0007 · Press Tab (focus moves to 'Rechercher')
+- timestamp: 7429
+  action: keypress
+  target:
+    selector: '#searchfor'
+    fallback_selectors:
+    - '[data-test="search_input_trigger"]'
+    - '[aria-label="Rechercher"]'
+    - input[name="searchtext"]
+    accessible_name: Rechercher
+    tag: input
+    input_type: text
+  key: Tab
+
+# Step 0008 · Press Tab (focus moves to 'Rechercher')
+- timestamp: 7596
+  action: keypress
+  target:
+    selector: '[data-test="search-button"]'
+    fallback_selectors:
+    - '[aria-label="Rechercher"]'
+    - form#siteSearch > div > button
+    accessible_name: Rechercher
+    tag: button
+  key: Tab
+
+# Step 0009 · Press Tab (focus moves to 'Se connecter')
+- timestamp: 7751
+  action: keypress
+  target:
+    selector: html > body > div > header > div:nth-of-type(3) > div:nth-of-type(3) > div > div > a
+    accessible_name: Se connecter
+    tag: a
+  key: Tab
+
+# Step 0010 · Press Tab (focus moves to 'Vers mes listes de souha…')
+- timestamp: 7981
+  action: keypress
+  target:
+    selector: '[aria-label="Vers\ mes\ listes\ de\ souhaits"]'
+    fallback_selectors:
+    - html > body > div > header > div:nth-of-type(3) > div:nth-of-type(3) > div > div:nth-of-type(2) > a
+    accessible_name: Vers mes listes de souhaits
+    tag: a
+  key: Tab
+
+# Step 0011 · Press Tab (focus moves to 'Mon panier avec 0 articl…')
+- timestamp: 8151
+  action: keypress
+  target:
+    selector: '[aria-label="Mon\ panier\ avec\ 0\ articles"]'
+    fallback_selectors:
+    - html > body > div > header > div:nth-of-type(3) > div:nth-of-type(3) > div > div:nth-of-type(3) > a
+    accessible_name: Mon panier avec 0 articles
+    tag: a
+  key: Tab
+
+# Step 0012 · Press Tab (focus moves to 'Catégories')
+- timestamp: 8296
+  action: keypress
+  target:
+    selector: '#radix-_R_1hqr5_-trigger-categories'
+    fallback_selectors:
+    - button#radix-_R_1hqr5_-trigger-categories
+    accessible_name: Catégories
+    tag: button
+  key: Tab
+
+# Step 0013 · Press Tab (focus moves to 'Carte-cadeau')
+- timestamp: 8470
+  action: keypress
+  target:
+    selector: html > body > div > header > section > div > ul > li > a
+    accessible_name: Carte-cadeau
+    tag: a
+  key: Tab
+
+# Step 0014 · Press Tab (focus moves to 'Statut de la commande')
+- timestamp: 8626
+  action: keypress
+  target:
+    selector: html > body > div > header > section > div > ul > li:nth-of-type(2) > a
+    accessible_name: Statut de la commande
+    tag: a
+  key: Tab
+
+# Step 0015 · Press Tab (focus moves to 'Service client')
+- timestamp: 8789
+  action: keypress
+  target:
+    selector: html > body > div > header > section > div > ul > li:nth-of-type(3) > a
+    accessible_name: Service client
+    tag: a
+  key: Tab
+
+# Step 0016 · Press Tab (focus moves to 'Pays Pays-Bas Langue Fra…')
+- timestamp: 8981
+  action: keypress
+  target:
+    selector: html > body > div > header > section > div > ul > li:nth-of-type(4) > button
+    accessible_name: Pays Pays-Bas Langue Français
+    tag: button
+  key: Tab
+
+# Step 0017 · Press Tab (focus moves to 'Cadeaux de Noël et décor…')
+- timestamp: 9164
+  action: keypress
+  target:
+    selector: main#mainContent > div > section > div > div > div > a
+    accessible_name: Cadeaux de Noël et décoration pour un Noël inoubliable
+    tag: a
+  key: Tab
+
+# Step 0018 · Press Tab (focus moves to 'Passer ce carrousel')
+- timestamp: 9303
+  action: keypress
+  target:
+    selector: main#mainContent > div > div > section > div > div > a
+    accessible_name: Passer ce carrousel
+    tag: a
+    focus_styles:
+      backgroundColor: rgb(0, 0, 255)
+      borderRadius: 0px
+      bottom: -41.625px
+      boxShadow: none
+      clip: auto
+      clipPath: none
+      color: rgb(255, 255, 255)
+      display: block
+      fontSize: 15.75px
+      fontWeight: '400'
+      height: 41.625px
+      left: 0px
+      lineHeight: 23.625px
+      margin: 0px
+      opacity: '1'
+      outline: rgb(0, 95, 204) auto 1px
+      outlineOffset: 1px
+      overflow: visible
+      padding: 9px 13.5px
+      position: absolute
+      right: 971.664px
+      textDecoration: none
+      top: 0px
+      transform: none
+      visibility: visible
+      width: 169.336px
+      zIndex: '50'
+  key: Tab
+
+# Step 0019 · Press Tab (focus moves to 'Terminez l’année avec le…')
+- timestamp: 9461
+  action: keypress
+  target:
+    selector: main#mainContent > div > div > section > div > div:nth-of-type(2) > ul > li > div > a
+    accessible_name: Terminez l’année avec les meilleures offres
+    tag: a
+  key: Tab
+
+# Step 0020 · Press Tab (focus moves to 'Cadeaux de Noël avec des…')
+- timestamp: 9605
+  action: keypress
+  target:
+    selector: main#mainContent > div > div > section > div > div:nth-of-type(2) > ul > li:nth-of-type(2) > div > a
+    accessible_name: Cadeaux de Noël avec des offres festives
+    tag: a
+  key: Tab
+
+# Step 0021 · Press Tab (focus moves to 'Decorations pour un Noël…')
+- timestamp: 9817
+  action: keypress
+  target:
+    selector: main#mainContent > div > div > section > div > div:nth-of-type(2) > ul > li:nth-of-type(3) > div > a
+    accessible_name: Decorations pour un Noël magique
+    tag: a
+  key: Tab
+
+# Step 0022 · Press Tab (focus moves to 'Top 50 des cadeaux de No…')
+- timestamp: 9987
+  action: keypress
+  target:
+    selector: main#mainContent > div > div > section > div > div:nth-of-type(2) > ul > li:nth-of-type(4) > div > a
+    accessible_name: Top 50 des cadeaux de Noël
+    tag: a
+  key: Tab
+
+# Step 0023 · Press Tab (focus moves to 'Célébrez les fêtes avec …')
+- timestamp: 10136
+  action: keypress
+  target:
+    selector: main#mainContent > div > div > section > div > div:nth-of-type(2) > ul > li:nth-of-type(5) > div > a
+    accessible_name: Célébrez les fêtes avec style
+    tag: a
+  key: Tab
+
+# Step 0024 · Press Tab (focus moves to 'Beauty Holidays rayonnez…')
+- timestamp: 10307
+  action: keypress
+  target:
+    selector: main#mainContent > div > div > section > div > div:nth-of-type(2) > ul > li:nth-of-type(6) > div > a
+    accessible_name: Beauty Holidays rayonnez pendant les fêtes
+    tag: a
+  key: Tab
+
+# Step 0025 · Press Tab (focus moves to 'Passer ce carrousel')
+- timestamp: 10475
+  action: keypress
+  target:
+    selector: section#flexBannerCarousel > div > div > a
+    accessible_name: Passer ce carrousel
+    tag: a
+    focus_styles:
+      backgroundColor: rgb(0, 0, 255)
+      borderRadius: 0px
+      bottom: -41.625px
+      boxShadow: none
+      clip: auto
+      clipPath: none
+      color: rgb(255, 255, 255)
+      display: block
+      fontSize: 15.75px
+      fontWeight: '400'
+      height: 41.625px
+      left: 0px
+      lineHeight: 23.625px
+      margin: 0px
+      opacity: '1'
+      outline: rgb(0, 95, 204) auto 1px
+      outlineOffset: 1px
+      overflow: visible
+      padding: 9px 13.5px
+      position: absolute
+      right: 971.664px
+      textDecoration: none
+      top: 0px
+      transform: none
+      visibility: visible
+      width: 169.336px
+      zIndex: '50'
+  key: Tab
+
+# Step 0026 · Press Tab (focus moves to 'Réduction* sur les bougi…')
+- timestamp: 10625
+  action: keypress
+  target:
+    selector: section#flexBannerCarousel > div > div:nth-of-type(2) > ul > li > div > a
+    accessible_name: Réduction* sur les bougies et les bâtonnets parfumés *au prix le plus affiché
+    tag: a
+  key: Tab
+
+# Step 0027 · Press Tab (focus moves to 'Jusqu'à 20 % de réductio…')
+- timestamp: 10803
+  action: keypress
+  target:
+    selector: section#flexBannerCarousel > div > div:nth-of-type(2) > ul > li:nth-of-type(2) > div > a
+    accessible_name: Jusqu'à 20 % de réduction* sur funcook et livres de cuisine *au prix le plus affiché
+    tag: a
+  key: Tab
+
+# Step 0028 · Press Tab (focus moves to 'Jusqu'à 15 % de réductio…')
+- timestamp: 11018
+  action: keypress
+  target:
+    selector: section#flexBannerCarousel > div > div:nth-of-type(2) > ul > li:nth-of-type(3) > div > a
+    accessible_name: Jusqu'à 15 % de réduction* sur les coffrets cadeaux *au prix le plus affiché
+    tag: a
+  key: Tab
+
+# Step 0029 · Press Tab (focus moves to 'Jusqu'à 25 % de réductio…')
+- timestamp: 11143
+  action: keypress
+  target:
+    selector: section#flexBannerCarousel > div > div:nth-of-type(2) > ul > li:nth-of-type(4) > div > a
+    accessible_name: Jusqu'à 25 % de réduction* sur le café et le thé *au prix le plus affiché
+    tag: a
+  key: Tab
+
+# Step 0030 · Hover over link 'Réduction* sur les bougies et…'
+- timestamp: 9932
+  action: hover
+  target:
+    selector: section#flexBannerCarousel > div > div:nth-of-type(2) > ul > li > div > a
+    text: Réduction* sur les bougies et les bâtonnets parfumés*au prix le plus affiché
+    accessible_name: Réduction* sur les bougies et les bâtonnets parfumés *au prix le plus affiché
+    tag: a
+
+# Step 0031 · Press Tab (focus moves to 'Passer ce carrousel')
+- timestamp: 11303
+  action: keypress
+  target:
+    selector: section#recentlyViewedCategories > div > div:nth-of-type(2) > div > a
+    accessible_name: Passer ce carrousel
+    tag: a
+    focus_styles:
+      backgroundColor: rgb(0, 0, 255)
+      borderRadius: 0px
+      bottom: -41.625px
+      boxShadow: none
+      clip: auto
+      clipPath: none
+      color: rgb(255, 255, 255)
+      display: block
+      fontSize: 15.75px
+      fontWeight: '400'
+      height: 41.625px
+      left: 0px
+      lineHeight: 23.625px
+      margin: 0px
+      opacity: '1'
+      outline: rgb(0, 95, 204) auto 1px
+      outlineOffset: 1px
+      overflow: visible
+      padding: 9px 13.5px
+      position: absolute
+      right: 971.664px
+      textDecoration: none
+      top: 0px
+      transform: none
+      visibility: visible
+      width: 169.336px
+      zIndex: '50'
+  key: Tab
+
+metadata:
+  version: '1.1'
+  created_at: '2025-12-18T14:30:11.368004+00:00'
+  duration_ms: 11903
+  starting_url: ''
+state:
+  viewport:
+    width: 1920
+    height: 1080
+  zoom: 1.0
+  browser_zoom_level: 1.0
+  scroll:
+    x: 0
+    y: 0

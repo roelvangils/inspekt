@@ -1,0 +1,115 @@
+# Inspekt Recording v1.1
+# Generated: 2025-12-18T10:53:22.257056+00:00
+# Duration: 12.1s
+# URL: https://www.vdab.be/vindeenjob/vacatures?locatie=9000%20Gent&locatieCode=2521&sort=standaard
+#
+# Edit this file to:
+# - Add 'expect:' assertions to steps
+# - Insert 'inspekt' command steps for accessibility checks
+# - Remove unwanted steps
+#
+# Example assertion:
+#   expect:
+#     visible: ".success-message"
+#     url_contains: "/dashboard"
+
+steps:
+# Step 0001 · Navigate to https://www.vdab.be/vindeenjob/vacatures?locatie=9000%…
+- timestamp: 0
+  action: navigate
+  url: https://www.vdab.be/vindeenjob/vacatures?locatie=9000%20Gent&locatieCode=2521&sort=standaard
+
+# Step 0002 · Click on div 'Actieve filters (0) Functie, …'
+- timestamp: 10325
+  action: click
+  target:
+    selector: div#vindeenjob > div > app-root > div > vej-zoek-pagina > div:nth-of-type(2)
+    text: "Actieve filters (0)\n    \n  \n  \n    \n      \n        Functie, bedrijf of trefwoord\n        \n          "
+    tag: div
+  click_at:
+  - 36
+  - 4
+
+# Step 0003 · Press Tab (focus moves to 'Functie, bedrijf of tref…')
+- timestamp: 10643
+  action: keypress
+  target:
+    selector: '#functie'
+    fallback_selectors:
+    - '[aria-label="Functie\,\ bedrijf\ of\ trefwoord"]'
+    - input[name="Trefwoord"]
+    - input#functie
+    accessible_name: Functie, bedrijf of trefwoord
+    tag: input
+    role: combobox
+    input_type: text
+  key: Tab
+
+# Step 0004 · Press Tab (focus moves to 'Postcode, gemeente of pr…')
+- timestamp: 10837
+  action: keypress
+  target:
+    selector: '#vej-search-where'
+    fallback_selectors:
+    - '[aria-label="Postcode\,\ gemeente\ of\ provincie"]'
+    - vdab-typeahead#vej-search-where
+    accessible_name: Postcode, gemeente of provincie
+    tag: vdab-typeahead
+  key: Tab
+
+# Step 0005 · Press Tab (focus moves to 'Postcode, gemeente of pr…')
+- timestamp: 11055
+  action: keypress
+  target:
+    selector: '#vej-search-where'
+    fallback_selectors:
+    - '[aria-label="Postcode\,\ gemeente\ of\ provincie"]'
+    - vdab-typeahead#vej-search-where
+    accessible_name: Postcode, gemeente of provincie
+    tag: vdab-typeahead
+  key: Tab
+
+# Step 0006 · Press Tab (focus moves to 'Straal')
+- timestamp: 11157
+  action: keypress
+  target:
+    selector: '#search-radius'
+    fallback_selectors:
+    - '[aria-label="Straal"]'
+    - select[name="radius"]
+    - select#search-radius
+    accessible_name: Straal
+    tag: select
+  key: Tab
+
+# Step 0007 · Press Tab (focus moves to 'Zoek')
+- timestamp: 11277
+  action: keypress
+  target:
+    selector: '#VEJ-zoek'
+    fallback_selectors:
+    - button#VEJ-zoek
+    accessible_name: Zoek
+    tag: button
+  key: Tab
+
+metadata:
+  version: '1.1'
+  created_at: '2025-12-18T10:53:22.257056+00:00'
+  duration_ms: 12072
+  starting_url: https://www.vdab.be/vindeenjob/vacatures?locatie=9000%20Gent&locatieCode=2521&sort=standaard
+  user_agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36
+  recorded_on:
+    platform: darwin
+    browser: Chrome
+    browser_version: 143.0.0.0
+state:
+  viewport:
+    width: 1268
+    height: 1292
+  zoom: 1.7999999523162842
+  browser_zoom_level: 0.9
+  scroll:
+    x: 0
+    y: 0
+  window_mode: normal

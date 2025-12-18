@@ -30,12 +30,13 @@ def input():
     Press Ctrl+C to stop watching.
 
     Example:
-        zen watch input
+        inspekt watch input
     """
     client = BridgeClient()
 
     if not client.is_alive():
-        click.echo("Error: Bridge server is not running. Start it with: inspekt start", err=True)
+        from inspekt.app.cli.table import _style_with_inline_code
+        click.echo(_style_with_inline_code("Error: Bridge server is not running. Start it with `inspekt start`.", base_fg="red"), err=True)
         sys.exit(1)
 
     # Start watching keyboard
@@ -117,12 +118,13 @@ def all():
     Press Ctrl+C to stop watching.
 
     Example:
-        zen watch all
+        inspekt watch all
     """
     client = BridgeClient()
 
     if not client.is_alive():
-        click.echo("Error: Bridge server is not running. Start it with: inspekt start", err=True)
+        from inspekt.app.cli.table import _style_with_inline_code
+        click.echo(_style_with_inline_code("Error: Bridge server is not running. Start it with `inspekt start`.", base_fg="red"), err=True)
         sys.exit(1)
 
     # Load watch_all script
@@ -216,7 +218,7 @@ def control():
     Press Ctrl+D to exit control mode.
 
     Example:
-        zen control
+        inspekt control
     """
     import select
     import sys
@@ -226,7 +228,8 @@ def control():
     client = BridgeClient()
 
     if not client.is_alive():
-        click.echo("Error: Bridge server is not running. Start it with: inspekt start", err=True)
+        from inspekt.app.cli.table import _style_with_inline_code
+        click.echo(_style_with_inline_code("Error: Bridge server is not running. Start it with `inspekt start`.", base_fg="red"), err=True)
         sys.exit(1)
 
     # Load configuration

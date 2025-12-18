@@ -1,0 +1,220 @@
+# Inspekt Recording v1.1
+# Generated: 2025-12-18T10:08:25.080549+00:00
+# Duration: 25.0s
+# URL: https://www.vdab.be/
+#
+# Edit this file to:
+# - Add 'expect:' assertions to steps
+# - Insert 'inspekt' command steps for accessibility checks
+# - Remove unwanted steps
+#
+# Example assertion:
+#   expect:
+#     visible: ".success-message"
+#     url_contains: "/dashboard"
+
+steps:
+# Step 0001 · Navigate to https://www.vdab.be/
+- timestamp: 0
+  action: navigate
+  url: https://www.vdab.be/
+
+# Step 0002 · Press Tab
+- timestamp: 19969
+  action: keypress
+  target:
+    selector: '#usercentrics-cmp-ui'
+    fallback_selectors:
+    - aside#usercentrics-cmp-ui
+    tag: aside
+  key: Tab
+
+# Step 0003 · Press Tab
+- timestamp: 20179
+  action: keypress
+  target:
+    selector: '#usercentrics-cmp-ui'
+    fallback_selectors:
+    - aside#usercentrics-cmp-ui
+    tag: aside
+  key: Tab
+
+# Step 0004 · Press Tab
+- timestamp: 20301
+  action: keypress
+  target:
+    selector: '#usercentrics-cmp-ui'
+    fallback_selectors:
+    - aside#usercentrics-cmp-ui
+    tag: aside
+  key: Tab
+
+# Step 0005 · Press Tab
+- timestamp: 20403
+  action: keypress
+  target:
+    selector: '#usercentrics-cmp-ui'
+    fallback_selectors:
+    - aside#usercentrics-cmp-ui
+    tag: aside
+  key: Tab
+
+# Step 0006 · Press Tab
+- timestamp: 20554
+  action: keypress
+  target:
+    selector: '#usercentrics-cmp-ui'
+    fallback_selectors:
+    - aside#usercentrics-cmp-ui
+    tag: aside
+  key: Tab
+
+# Step 0007 · Press Tab
+- timestamp: 20702
+  action: keypress
+  target:
+    selector: '#usercentrics-cmp-ui'
+    fallback_selectors:
+    - aside#usercentrics-cmp-ui
+    tag: aside
+  key: Tab
+
+# Step 0008 · Press Tab
+- timestamp: 20880
+  action: keypress
+  target:
+    selector: '#usercentrics-cmp-ui'
+    fallback_selectors:
+    - aside#usercentrics-cmp-ui
+    tag: aside
+  key: Tab
+
+# Step 0009 · Press Tab
+- timestamp: 21281
+  action: keypress
+  target:
+    selector: '#usercentrics-cmp-ui'
+    fallback_selectors:
+    - aside#usercentrics-cmp-ui
+    tag: aside
+  key: Tab
+
+# Step 0010 · Press Tab
+- timestamp: 21424
+  action: keypress
+  target:
+    selector: '#usercentrics-cmp-ui'
+    fallback_selectors:
+    - aside#usercentrics-cmp-ui
+    tag: aside
+  key: Tab
+
+# Step 0011 · Press Tab
+- timestamp: 21883
+  action: keypress
+  target:
+    selector: '#usercentrics-cmp-ui'
+    fallback_selectors:
+    - aside#usercentrics-cmp-ui
+    tag: aside
+  key: Tab
+
+# Step 0012 · Press shift+Tab (focus moves to 'Co-Browse sessie starten')
+- timestamp: 22512
+  action: keypress
+  target:
+    selector: '#js--cobrowse-button'
+    fallback_selectors:
+    - button#js--cobrowse-button
+    accessible_name: Co-Browse sessie starten
+    tag: button
+    role: button
+  key: Tab
+  modifiers:
+  - shift
+
+# Step 0013 · Press shift+Tab (focus moves to 'Other languages')
+- timestamp: 23296
+  action: keypress
+  target:
+    selector: footer#indi-burger-footer > div:nth-of-type(2) > div > div > ul > li > a
+    accessible_name: Other languages
+    tag: a
+  key: Tab
+  modifiers:
+  - shift
+
+# Step 0014 · Scroll down 1515px
+- timestamp: 22535
+  action: scroll
+  scroll:
+    x: 0
+    y: 2741
+    deltaX: 0
+    deltaY: 1515
+
+# Step 0015 · Press shift+Tab (focus moves to 'Cookies')
+- timestamp: 23498
+  action: keypress
+  target:
+    selector: footer#indi-burger-footer > div:nth-of-type(2) > div > div > a:nth-of-type(4)
+    accessible_name: Cookies
+    tag: a
+  key: Tab
+  modifiers:
+  - shift
+
+# Step 0016 · Press shift+Tab (focus moves to 'Privacy')
+- timestamp: 23664
+  action: keypress
+  target:
+    selector: footer#indi-burger-footer > div:nth-of-type(2) > div > div > a:nth-of-type(3)
+    accessible_name: Privacy
+    tag: a
+  key: Tab
+  modifiers:
+  - shift
+
+# Step 0017 · Press Tab (focus moves to 'Cookies')
+- timestamp: 23949
+  action: keypress
+  target:
+    selector: footer#indi-burger-footer > div:nth-of-type(2) > div > div > a:nth-of-type(4)
+    accessible_name: Cookies
+    tag: a
+  key: Tab
+
+# Step 0018 · Press Tab (focus moves to 'Other languages')
+- timestamp: 24099
+  action: keypress
+  target:
+    selector: footer#indi-burger-footer > div:nth-of-type(2) > div > div > ul > li > a
+    accessible_name: Other languages
+    tag: a
+  key: Tab
+
+# Step 0019 · Press Tab
+- timestamp: 24295
+  action: keypress
+  key: Tab
+
+metadata:
+  version: '1.1'
+  created_at: '2025-12-18T10:08:25.080549+00:00'
+  duration_ms: 24951
+  starting_url: https://www.vdab.be/
+  user_agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36
+  recorded_on:
+    platform: darwin
+    browser: Chrome
+    browser_version: 143.0.0.0
+state:
+  viewport:
+    width: 1268
+    height: 1292
+  zoom: 1.7999999523162842
+  browser_zoom_level: 0.9
+  scroll:
+    x: 0
+    y: 1225
+  window_mode: normal

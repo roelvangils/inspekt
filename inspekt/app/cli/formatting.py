@@ -891,10 +891,18 @@ def format_system_message(
     return result
 
 
-def format_status(status: str, use_color: bool = True) -> str:
-    """Format a status indicator (OK, FAIL, SKIP) with appropriate color and icon."""
+def format_status(status: str, use_color: bool = True, suffix: str = "") -> str:
+    """Format a status indicator (OK, FAIL, SKIP) with appropriate color and icon.
+
+    Args:
+        status: The status string (OK, FAIL, SKIP)
+        use_color: Whether to use ANSI colors
+        suffix: Optional suffix to append (e.g., "(CDP)" for real key dispatch)
+    """
+    suffix_str = f" {suffix}" if suffix else ""
+
     if not use_color:
-        return f" {status}"
+        return f" {status}{suffix_str}"
 
     status_colors = {
         "OK": "green",
@@ -912,14 +920,17 @@ def format_status(status: str, use_color: bool = True) -> str:
     elif status == "SKIP":
         status_icon = get_status_icon("unknown")
 
+    # Format suffix in dimmed style
+    styled_suffix = click.style(suffix_str, fg="bright_black") if suffix_str else ""
+
     if status_icon:
         # For OK and FAIL, just show the icon without text
         if status == "OK":
-            return " " + click.style(status_icon, fg="green")
+            return " " + click.style(status_icon, fg="green") + styled_suffix
         elif status == "FAIL":
-            return " " + click.style(status_icon, fg="red")
-        return " " + click.style(f"{status_icon} {status}", fg=color)
-    return " " + click.style(status, fg=color)
+            return " " + click.style(status_icon, fg="red") + styled_suffix
+        return " " + click.style(f"{status_icon} {status}", fg=color) + styled_suffix
+    return " " + click.style(status, fg=color) + styled_suffix
 
 
 def format_assertion_result(message: str, passed: bool, use_color: bool = True) -> str:

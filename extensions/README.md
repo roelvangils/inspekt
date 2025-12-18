@@ -36,7 +36,7 @@ Both extensions now include **explicit opt-in per domain**:
 **Features:**
 - Works on all websites including GitHub, Gmail, banking sites
 - Built-in settings panel with connection status
-- DevTools integration with `zenStore($0)`
+- DevTools integration with `inspektStore($0)`
 - Auto-reconnect on page navigation
 - Version 4.0.0
 
@@ -56,7 +56,7 @@ Both extensions now include **explicit opt-in per domain**:
 **Features:**
 - Works on all websites including GitHub, Gmail, banking sites
 - Built-in settings panel with connection status
-- DevTools integration with `zenStore($0)`
+- DevTools integration with `inspektStore($0)`
 - Auto-reconnect on page navigation
 - Manifest V3 (future-proof)
 - Version 4.0.0
@@ -144,7 +144,7 @@ inspektdescribe
 
 # Store element from DevTools
 # 1. Right-click element → Inspect
-# 2. In console: zenStore($0)
+# 2. In console: inspektStore($0)
 # 3. In terminal: inspektinspected
 ```
 

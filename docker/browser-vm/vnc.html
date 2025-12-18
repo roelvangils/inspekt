@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="en" class="noVNC_loading">
+<head>
+    <title>Inspekt Browser VM</title>
+    <meta charset="utf-8">
+
+    <!-- Inspekt Favicon -->
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><defs><linearGradient id='g' x1='0%25' y1='0%25' x2='100%25' y2='100%25'><stop offset='0%25' stop-color='%23667eea'/><stop offset='100%25' stop-color='%23764ba2'/></linearGradient></defs><rect width='100' height='100' rx='20' fill='url(%23g)'/><text x='50' y='72' font-family='system-ui' font-size='60' font-weight='bold' fill='white' text-anchor='middle'>I</text></svg>">
+
+    <!-- Apple iOS Safari settings -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+    <!-- Original noVNC Stylesheets -->
+    <link rel="stylesheet" href="app/styles/base.css">
+
+    <!-- Images that will later appear via CSS -->
+    <link rel="preload" as="image" href="app/images/info.svg">
+    <link rel="preload" as="image" href="app/images/error.svg">
+    <link rel="preload" as="image" href="app/images/warning.svg">
+
+    <script src="app/error-handler.js"></script>
+    <script type="module" crossorigin="anonymous" src="app/ui.js"></script>
+
+    <!-- Inspekt Custom Theme -->
+    <style>
+        /* ----------------------------------------
+         * Inspekt Dark Theme for noVNC
+         * ---------------------------------------- */
+
+        body {
+            background-color: #0f0f1a !important;
+            background-image: none !important;
+        }
+
+        /* Control bar - dark theme */
+        #noVNC_control_bar {
+            background: linear-gradient(180deg, #1a1a2e 0%, #16213e 100%) !important;
+            border-color: #2a2a4a !important;
+        }
+
+        #noVNC_control_bar_handle {
+            background-color: #2a2a4a !important;
+        }
+
+        #noVNC_control_bar_handle div {
+            background-color: #667eea !important;
+        }
+
+        /* Logo in control bar */
+        .noVNC_logo {
+            font-size: 0 !important;
+        }
+
+        .noVNC_logo::after {
+            content: "Inspekt";
+            font-size: 20px !important;
+            font-weight: 600;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        /* Buttons */
+        .noVNC_button {
+            background: #2a2a4a !important;
+            border: 1px solid #3a3a5a !important;
+            border-radius: 6px !important;
+        }
+
+        .noVNC_button:hover {
+            background: #3a3a5a !important;
+            border-color: #4a4a6a !important;
+        }
+
+        .noVNC_button.noVNC_selected {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+            border-color: #667eea !important;
+        }
+
+        /* Panels */
+        .noVNC_panel {
+            background: #1a1a2e !important;
+            border: 1px solid #2a2a4a !important;
+            border-radius: 8px !important;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5) !important;
+        }
+
+        .noVNC_panel label {
+            color: #ccc !important;
+        }
+
+        .noVNC_panel input[type="text"],
+        .noVNC_panel input[type="password"],
+        .noVNC_panel input[type="number"],
+        .noVNC_panel select {
+            background: #2a2a4a !important;
+            border: 1px solid #3a3a5a !important;
+            color: #fff !important;
+            border-radius: 4px !important;
+        }
+
+        .noVNC_panel input:focus,
+        .noVNC_panel select:focus {
+            border-color: #667eea !important;
+            outline: none !important;
+        }
+
+        /* Status bar */
+        #noVNC_status {
+            background: linear-gradient(180deg, #1a1a2e 0%, #16213e 100%) !important;
+            border-color: #2a2a4a !important;
+            color: #ccc !important;
+        }
+
+        #noVNC_status.noVNC_open {
+            border-top-color: #667eea !important;
+        }
+
+        #noVNC_status.noVNC_status_normal {
+            background: linear-gradient(180deg, #1a3a2e 0%, #163e21 100%) !important;
+        }
+
+        #noVNC_status.noVNC_status_warn {
+            background: linear-gradient(180deg, #3a3a1a 0%, #3e3e16 100%) !important;
+        }
+
+        #noVNC_status.noVNC_status_error {
+            background: linear-gradient(180deg, #3a1a1a 0%, #3e1616 100%) !important;
+        }
+
+        /* Transition screen */
+        #noVNC_transition {
+            background: #0f0f1a !important;
+        }
+
+        #noVNC_transition_text {
+            color: #ccc !important;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+        }
+
+        /* Spinner */
+        .noVNC_spinner,
+        .noVNC_spinner::before,
+        .noVNC_spinner::after {
+            background: #667eea !important;
+        }
+
+        /* ----------------------------------------
+         * Connect Dialog - Custom Inspekt Branding
+         * ---------------------------------------- */
+
+        /* Connect layer background */
+        .noVNC_connect_layer {
+            background: #0f0f1a !important;
+        }
+
+        /* Connect dialog container */
+        #noVNC_connect_dlg {
+            background: transparent !important;
+            border: none !important;
+            box-shadow: none !important;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 24px;
+        }
+
+        /* Hide the original noVNC logo text */
+        #noVNC_connect_dlg .noVNC_logo {
+            font-size: 0 !important;
+            width: 80px;
+            height: 80px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 10px 40px rgba(102, 126, 234, 0.3);
+            animation: floatLogo 3s ease-in-out infinite;
+            position: relative;
+        }
+
+        #noVNC_connect_dlg .noVNC_logo::after {
+            content: "I";
+            font-size: 48px !important;
+            font-weight: 700;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+            background: none;
+            -webkit-background-clip: unset;
+            -webkit-text-fill-color: white;
+            background-clip: unset;
+        }
+
+        #noVNC_connect_dlg .noVNC_logo::before {
+            content: "Inspekt";
+            position: absolute;
+            top: calc(100% + 16px);
+            font-size: 28px !important;
+            font-weight: 600;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            white-space: nowrap;
+        }
+
+        @keyframes floatLogo {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+
+        /* Add "Browser VM" subtitle */
+        #noVNC_connect_dlg::before {
+            content: "Browser VM";
+            position: absolute;
+            top: calc(50% + 60px);
+            font-size: 14px;
+            font-weight: 500;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            color: rgba(255, 255, 255, 0.5);
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+
+        /* Connect button */
+        #noVNC_connect_button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+            border: none !important;
+            border-radius: 12px !important;
+            padding: 16px 48px !important;
+            cursor: pointer !important;
+            transition: all 0.3s ease !important;
+            box-shadow: 0 4px 20px rgba(102, 126, 234, 0.3) !important;
+            margin-top: 40px;
+        }
+
+        #noVNC_connect_button:hover {
+            transform: translateY(-2px) !important;
+            box-shadow: 0 6px 30px rgba(102, 126, 234, 0.4) !important;
+        }
+
+        #noVNC_connect_button > div {
+            color: white !important;
+            font-size: 16px !important;
+            font-weight: 600 !important;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        #noVNC_connect_button img {
+            filter: brightness(0) invert(1);
+        }
+
+        /* Credentials dialog */
+        #noVNC_credentials_dlg {
+            background: #1a1a2e !important;
+            border: 1px solid #2a2a4a !important;
+            border-radius: 12px !important;
+        }
+
+        #noVNC_credentials_dlg .noVNC_submit {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+            border: none !important;
+            color: #fff !important;
+            border-radius: 8px !important;
+            padding: 12px 24px !important;
+            cursor: pointer !important;
+            font-weight: 600 !important;
+        }
+
+        /* Cancel/reconnect button */
+        #noVNC_cancel_reconnect_button {
+            background: #2a2a4a !important;
+            border: 1px solid #3a3a5a !important;
+            color: #fff !important;
+            border-radius: 8px !important;
+            padding: 12px 24px !important;
+            cursor: pointer !important;
+        }
+
+        #noVNC_cancel_reconnect_button:hover {
+            background: #3a3a5a !important;
+        }
+
+        /* Fallback error styling */
+        #noVNC_fallback_error {
+            background: #1a1a2e !important;
+            color: #fff !important;
+            border-radius: 12px !important;
+            padding: 24px !important;
+        }
+
+        /* Scrollbar styling */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #1a1a2e;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #3a3a5a;
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #4a4a6a;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="noVNC_fallback_error" class="noVNC_center">
+        <div>
+            <div>noVNC encountered an error:</div>
+            <br>
+            <div id="noVNC_fallback_errormsg"></div>
+        </div>
+    </div>
+
+    <!-- noVNC Control Bar -->
+    <div id="noVNC_control_bar_anchor" class="noVNC_vcenter">
+
+        <div id="noVNC_control_bar">
+            <div id="noVNC_control_bar_handle" title="Hide/Show the control bar"><div></div></div>
+
+            <div class="noVNC_scroll">
+
+            <h1 class="noVNC_logo" translate="no"><span>no</span><br>VNC</h1>
+
+            <!-- Drag/Pan the viewport -->
+            <input type="image" alt="Drag" src="app/images/drag.svg"
+                id="noVNC_view_drag_button" class="noVNC_button noVNC_hidden"
+                title="Move/Drag Viewport">
+
+            <!--noVNC Touch Device only buttons-->
+            <div id="noVNC_mobile_buttons">
+                <input type="image" alt="Keyboard" src="app/images/keyboard.svg"
+                    id="noVNC_keyboard_button" class="noVNC_button" title="Show Keyboard">
+            </div>
+
+            <!-- Extra manual keys -->
+            <input type="image" alt="Extra keys" src="app/images/toggleextrakeys.svg"
+                id="noVNC_toggle_extra_keys_button" class="noVNC_button"
+                title="Show Extra Keys">
+            <div class="noVNC_vcenter">
+            <div id="noVNC_modifiers" class="noVNC_panel">
+                <input type="image" alt="Ctrl" src="app/images/ctrl.svg"
+                    id="noVNC_toggle_ctrl_button" class="noVNC_button"
+                    title="Toggle Ctrl">
+                <input type="image" alt="Alt" src="app/images/alt.svg"
+                    id="noVNC_toggle_alt_button" class="noVNC_button"
+                    title="Toggle Alt">
+                <input type="image" alt="Windows" src="app/images/windows.svg"
+                    id="noVNC_toggle_windows_button" class="noVNC_button"
+                    title="Toggle Windows">
+                <input type="image" alt="Tab" src="app/images/tab.svg"
+                    id="noVNC_send_tab_button" class="noVNC_button"
+                    title="Send Tab">
+                <input type="image" alt="Esc" src="app/images/esc.svg"
+                    id="noVNC_send_esc_button" class="noVNC_button"
+                    title="Send Escape">
+                <input type="image" alt="Ctrl+Alt+Del" src="app/images/ctrlaltdel.svg"
+                    id="noVNC_send_ctrl_alt_del_button" class="noVNC_button"
+                    title="Send Ctrl-Alt-Del">
+            </div>
+            </div>
+
+            <!-- Shutdown/Reboot -->
+            <input type="image" alt="Shutdown/Reboot" src="app/images/power.svg"
+                id="noVNC_xvp_button" class="noVNC_button"
+                title="Shutdown/Reboot...">
+            <div class="noVNC_vcenter">
+            <div id="noVNC_xvp" class="noVNC_panel">
+                <div class="noVNC_heading">
+                    <img alt="" src="app/images/power.svg"> Power
+                </div>
+                <input type="button" id="noVNC_xvp_shutdown_button" value="Shutdown">
+                <input type="button" id="noVNC_xvp_reboot_button" value="Reboot">
+                <input type="button" id="noVNC_xvp_reset_button" value="Reset">
+            </div>
+            </div>
+
+            <!-- Clipboard -->
+            <input type="image" alt="Clipboard" src="app/images/clipboard.svg"
+                id="noVNC_clipboard_button" class="noVNC_button"
+                title="Clipboard">
+            <div class="noVNC_vcenter">
+            <div id="noVNC_clipboard" class="noVNC_panel">
+                <div class="noVNC_heading">
+                    <img alt="" src="app/images/clipboard.svg"> Clipboard
+                </div>
+                <textarea id="noVNC_clipboard_text" rows=5></textarea>
+            </div>
+            </div>
+
+            <!-- Fullscreen -->
+            <input type="image" alt="Full Screen" src="app/images/fullscreen.svg"
+                id="noVNC_fullscreen_button" class="noVNC_button noVNC_hidden"
+                title="Full Screen">
+
+            <!-- Settings -->
+            <input type="image" alt="Settings" src="app/images/settings.svg"
+                id="noVNC_settings_button" class="noVNC_button"
+                title="Settings">
+            <div class="noVNC_vcenter">
+            <div id="noVNC_settings" class="noVNC_panel">
+                <ul>
+                    <li class="noVNC_heading">
+                        <img alt="" src="app/images/settings.svg"> Settings
+                    </li>
+                    <li>
+                        <label><input id="noVNC_setting_shared" type="checkbox"> Shared Mode</label>
+                    </li>
+                    <li>
+                        <label><input id="noVNC_setting_view_only" type="checkbox"> View Only</label>
+                    </li>
+                    <li><hr></li>
+                    <li>
+                        <label><input id="noVNC_setting_view_clip" type="checkbox"> Clip to Window</label>
+                    </li>
+                    <li>
+                        <label for="noVNC_setting_resize">Scaling Mode:</label>
+                        <select id="noVNC_setting_resize" name="vncResize">
+                            <option value="off">None</option>
+                            <option value="scale">Local Scaling</option>
+                            <option value="remote">Remote Resizing</option>
+                        </select>
+                    </li>
+                    <li><hr></li>
+                    <li>
+                        <div class="noVNC_expander">Advanced</div>
+                        <div><ul>
+                            <li>
+                                <label for="noVNC_setting_quality">Quality:</label>
+                                <input id="noVNC_setting_quality" type="range" min="0" max="9" value="6">
+                            </li>
+                            <li>
+                                <label for="noVNC_setting_compression">Compression level:</label>
+                                <input id="noVNC_setting_compression" type="range" min="0" max="9" value="2">
+                            </li>
+                            <li><hr></li>
+                            <li>
+                                <label for="noVNC_setting_repeaterID">Repeater ID:</label>
+                                <input id="noVNC_setting_repeaterID" type="text" value="">
+                            </li>
+                            <li>
+                                <label><input id="noVNC_setting_reconnect" type="checkbox"> Automatic Reconnect</label>
+                            </li>
+                            <li>
+                                <label for="noVNC_setting_reconnect_delay">Reconnect Delay (ms):</label>
+                                <input id="noVNC_setting_reconnect_delay" type="number" value="">
+                            </li>
+                            <li><hr></li>
+                            <li>
+                                <label><input id="noVNC_setting_show_dot" type="checkbox"> Show Dot when No Cursor</label>
+                            </li>
+                            <li><hr></li>
+                            <li>
+                                <label><input id="noVNC_setting_bell" type="checkbox"> Bell</label>
+                            </li>
+                            <li><hr></li>
+                            <li>
+                                <input type="button" id="noVNC_setting_logging" value="Logging:">
+                                <span id="noVNC_setting_logging_output"></span>
+                            </li>
+                        </ul></div>
+                    </li>
+                </ul>
+            </div>
+            </div>
+
+            <!-- Connection -->
+            <input type="image" alt="Disconnect" src="app/images/disconnect.svg"
+                id="noVNC_disconnect_button" class="noVNC_button"
+                title="Disconnect">
+
+            </div>
+        </div>
+
+    </div> <!-- End of noVNC_control_bar_anchor -->
+
+    <div class="noVNC_center noVNC_connect_layer">
+        <div id="noVNC_connect_dlg">
+            <div class="noVNC_logo" translate="no"><span>no</span>VNC</div>
+            <div id="noVNC_connect_button"><div>
+                <img alt="" src="app/images/connect.svg"> Connect
+            </div></div>
+        </div>
+    </div>
+
+    <!-- Password Dialog -->
+    <div class="noVNC_center noVNC_connect_layer">
+    <div id="noVNC_credentials_dlg" class="noVNC_panel"><form>
+        <ul>
+            <li id="noVNC_username_block">
+                <label>Username:</label>
+                <input id="noVNC_username_input">
+            </li>
+            <li id="noVNC_password_block">
+                <label>Password:</label>
+                <input id="noVNC_password_input" type="password">
+            </li>
+            <li>
+                <input id="noVNC_credentials_button" type="submit" value="Send Credentials" class="noVNC_submit">
+            </li>
+        </ul>
+    </form></div>
+    </div>
+
+    <!-- Transition Screens -->
+    <div id="noVNC_transition">
+        <div id="noVNC_transition_text"></div>
+        <div>
+        <input type="button" id="noVNC_cancel_reconnect_button" value="Cancel" class="noVNC_submit">
+        </div>
+        <div class="noVNC_spinner"></div>
+    </div>
+
+    <!-- This is where the RFB elements will attach -->
+    <div id="noVNC_container">
+        <textarea id="noVNC_keyboardinput" autocapitalize="off"
+            autocomplete="off" spellcheck="false" tabindex="-1"></textarea>
+    </div>
+
+    <audio id="noVNC_bell">
+        <source src="app/sounds/bell.oga" type="audio/ogg">
+        <source src="app/sounds/bell.mp3" type="audio/mpeg">
+    </audio>
+</body>
+</html>

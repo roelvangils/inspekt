@@ -792,7 +792,7 @@ inspekt inspected
 ```bash
 # From DevTools:
 # 1. Right-click element → Inspect
-# 2. In DevTools Console: zenStore()
+# 2. In DevTools Console: inspektStore()
 # 3. Run:
 inspekt inspected
 

@@ -1,0 +1,285 @@
+# Inspekt Recording v1.1
+# Generated: 2025-12-18T15:42:56.827896+00:00
+# Duration: 24.5s
+# URL: https://www.vlaanderen.be/
+#
+# Edit this file to:
+# - Add 'expect:' assertions to steps
+# - Insert 'inspekt' command steps for accessibility checks
+# - Remove unwanted steps
+#
+# Example assertion:
+#   expect:
+#     visible: ".success-message"
+#     url_contains: "/dashboard"
+
+steps:
+# Step 0001 · Navigate to https://www.vlaanderen.be/
+- timestamp: 0
+  action: navigate
+  url: https://www.vlaanderen.be/
+
+# Step 0002 · Hover over link 'Werken'
+- timestamp: 1186
+  action: hover
+  target:
+    selector: main#main > div > section:nth-of-type(2) > div > div > div > nav > div > div:nth-of-type(2) > ul > li:nth-of-type(2)
+      > a
+    text: Werken
+    accessible_name: Werken
+    tag: a
+
+# Step 0003 · Press Tab (focus moves to 'Overslaan en naar de inh…')
+- timestamp: 2196
+  action: keypress
+  target:
+    selector: div#__layout > div > div > a
+    text: Overslaan en naar de inhoud gaan
+    accessible_name: Overslaan en naar de inhoud gaan
+    tag: a
+  key: Tab
+
+# Step 0004 · Press Tab (focus moves to 'Vlaanderen')
+- timestamp: 2627
+  action: keypress
+  target:
+    selector: '[aria-label="Vlaanderen"]'
+    fallback_selectors:
+    - div > div > div > div > a
+    text: Vlaanderen
+    accessible_name: Vlaanderen
+    tag: a
+  key: Tab
+
+# Step 0005 · Press Tab (focus moves to 'Aanmelden')
+- timestamp: 2928
+  action: keypress
+  target:
+    selector: div > div > div > div:nth-of-type(2) > div > button
+    text: Aanmelden
+    accessible_name: Aanmelden
+    tag: button
+  key: Tab
+
+# Step 0006 · Press Tab (focus moves to 'Hulp nodig')
+- timestamp: 3302
+  action: keypress
+  target:
+    selector: div > div > div > div:nth-of-type(2) > div:nth-of-type(2) > div:nth-of-type(2) > button
+    text: Hulp nodig
+    accessible_name: Hulp nodig
+    tag: button
+  key: Tab
+
+# Step 0007 · Press Tab (focus moves to 'Zoekterm')
+- timestamp: 3640
+  action: keypress
+  target:
+    selector: '#global-search-global-header'
+    fallback_selectors:
+    - input[name="q\.LIKE"]
+    - input[type="search"][placeholder="Zoeken\ op\ De\ officiële\ website\ van\ Vlaanderen"]
+    - input#global-search-global-header
+    accessible_name: Zoekterm
+    tag: input
+    input_type: search
+  key: Tab
+
+# Step 0008 · Click on link 'Energieprestatiecertificaat (…'
+- timestamp: 5299
+  action: click
+  target:
+    selector: ul#search-results > div:nth-of-type(2) > div > li > a
+    text: Energieprestatiecertificaat (EPC) bij overdracht of verhuur van een wooneenheid
+    accessible_name: Energieprestatiecertificaat (EPC) bij overdracht of verhuur van een wooneenheid
+    tag: a
+  click_at:
+  - 33
+  - 61
+
+# Step 0009 · Hover over link 'Energieprestatiecertificaat (…'
+- timestamp: 4757
+  action: hover
+  target:
+    selector: ul#search-results > div:nth-of-type(2) > div > li > a
+    text: Energieprestatiecertificaat (EPC) bij overdracht of verhuur van een wooneenheid
+    tag: a
+
+# Step 0010 · Navigate to https://www.vlaanderen.be/energieprestatiecertificaat-…
+- timestamp: 6699
+  action: navigate
+  url: https://www.vlaanderen.be/energieprestatiecertificaat-epc-bij-overdracht-of-verhuur-van-een-wooneenheid
+
+# Step 0011 · Scroll down 545px
+- timestamp: 7540
+  action: scroll
+  scroll:
+    x: 0
+    y: 550
+    deltaX: 0
+    deltaY: 545
+
+# Step 0012 · Click on button 'Play, VEA EPC (kort)'
+- timestamp: 9480
+  action: click
+  target:
+    selector: '[aria-label="Play\,\ VEA\ EPC\ \(kort\)"]'
+    fallback_selectors:
+    - figure#sb-8b73045d-2a81-4e07-acad-8d17f64aaf10 > div > div > div > div > div > button
+    text: PausePlay
+    accessible_name: Play, VEA EPC (kort)
+    tag: button
+  click_at:
+  - 85
+  - 68
+
+# Step 0013 · Hover over button 'Pause'
+- timestamp: 9262
+  action: hover
+  target:
+    selector: '[aria-label="Pause"]'
+    fallback_selectors:
+    - figure#sb-8b73045d-2a81-4e07-acad-8d17f64aaf10 > div > div > div > div > div > button
+    text: PausePlay
+    accessible_name: Pause
+    tag: button
+
+# Step 0014 · Hover over button 'Pause'
+- timestamp: 11436
+  action: hover
+  target:
+    selector: '[aria-label="Pause"]'
+    fallback_selectors:
+    - figure#sb-8b73045d-2a81-4e07-acad-8d17f64aaf10 > div > div > div > div > div > button
+    text: PausePlay
+    accessible_name: Pause
+    tag: button
+
+# Step 0015 · Scroll up 248px
+- timestamp: 12014
+  action: scroll
+  scroll:
+    x: 0
+    y: 301
+    deltaX: 0
+    deltaY: -248
+
+# Step 0016 · Click on link 'Controle, boetes en klachten'
+- timestamp: 13340
+  action: click
+  target:
+    selector: main#main > div:nth-of-type(2) > section > div > div > div > aside > nav > div > ul > li:nth-of-type(6) > a
+    text: Controle, boetes en klachten
+    accessible_name: Controle, boetes en klachten
+    tag: a
+  click_at:
+  - 44
+  - 96
+
+# Step 0017 · Navigate to https://www.vlaanderen.be/energieprestatiecertificaat-…
+- timestamp: 14022
+  action: navigate
+  url: https://www.vlaanderen.be/energieprestatiecertificaat-epc-bij-overdracht-of-verhuur-van-een-wooneenheid#controle-boetes-en-klachten
+
+# Step 0018 · Hover over link 'Controle, boetes en klachten'
+- timestamp: 12809
+  action: hover
+  target:
+    selector: main#main > div:nth-of-type(2) > section > div > div > div > aside > nav > div > ul > li:nth-of-type(6) > a
+    text: Controle, boetes en klachten
+    accessible_name: Controle, boetes en klachten
+    tag: a
+
+# Step 0019 · Hover over link 'Veelgestelde vragen'
+- timestamp: 14191
+  action: hover
+  target:
+    selector: main#main > div:nth-of-type(2) > section > div > div > div > aside > nav > div > ul > li:nth-of-type(8) > a
+    text: Veelgestelde vragen
+    accessible_name: Veelgestelde vragen
+    tag: a
+
+# Step 0020 · Scroll down 3494px
+- timestamp: 14033
+  action: scroll
+  scroll:
+    x: 0
+    y: 3719
+    deltaX: 0
+    deltaY: 3494
+
+# Step 0021 · Scroll up 1106px
+- timestamp: 16516
+  action: scroll
+  scroll:
+    x: 0
+    y: 2612
+    deltaX: 0
+    deltaY: -1106
+
+# Step 0022 · Scroll up 359px
+- timestamp: 17162
+  action: scroll
+  scroll:
+    x: 0
+    y: 2254
+    deltaX: 0
+    deltaY: -359
+
+# Step 0023 · Scroll up 920px
+- timestamp: 17989
+  action: scroll
+  scroll:
+    x: 0
+    y: 1337
+    deltaX: 0
+    deltaY: -920
+
+# Step 0024 · Scroll down 238px
+- timestamp: 18682
+  action: scroll
+  scroll:
+    x: 0
+    y: 1578
+    deltaX: 0
+    deltaY: 238
+
+# Step 0025 · Scroll up 606px
+- timestamp: 19329
+  action: scroll
+  scroll:
+    x: 0
+    y: 971
+    deltaX: 0
+    deltaY: -606
+
+# Step 0026 · Click on 'div#sb-waarom-6e3d18a3-f1b0-44d2-9…'
+- timestamp: 20411
+  action: click
+  target:
+    selector: div#sb-waarom-6e3d18a3-f1b0-44d2-98bc-68679b9220c5 > div > div > div > figure > img
+    tag: img
+  click_at:
+  - 55
+  - 63
+
+metadata:
+  version: '1.1'
+  created_at: '2025-12-18T15:42:56.827896+00:00'
+  duration_ms: 24500
+  starting_url: https://www.vlaanderen.be/
+  user_agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36
+  recorded_on:
+    platform: darwin
+    browser: Chrome
+    browser_version: 143.0.0.0
+state:
+  viewport:
+    width: 1140
+    height: 1179
+  zoom: 2.0
+  browser_zoom_level: 1.0
+  scroll:
+    x: 0
+    y: 0
+  window_mode: normal
