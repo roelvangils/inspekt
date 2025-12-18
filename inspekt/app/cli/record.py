@@ -334,6 +334,7 @@ def convert_js_event_to_step(event: dict) -> RecordingStep:
             tag=t.get("tag"),
             role=t.get("role"),
             input_type=t.get("input_type"),
+            focus_styles=t.get("focus_styles"),  # Captured styles for sr-only elements
         )
 
     # Build scroll info if present
@@ -1460,13 +1461,26 @@ def handle_existing_recording_file(output_path: Path) -> Optional[tuple[Path, bo
         return None  # Cancel
 
 
-def save_recording_to_yaml(recording: Recording, filepath: Path) -> None:
+def save_recording_to_yaml(
+    recording: Recording,
+    filepath: Path,
+    cookie_consent_provider: str | None = None,
+) -> None:
     """Save recording to YAML file with human-readable formatting."""
+    # Build optional cookie consent note
+    cookie_consent_note = ""
+    if cookie_consent_provider:
+        cookie_consent_note = f"""#
+# Note: This recording includes Tab navigation inside a {cookie_consent_provider}.
+# Cookie consent dialogs manage focus internally, so accessible names may not
+# be captured for Tab steps inside the dialog. Replay will still work correctly.
+"""
+
     header = f"""# Inspekt Recording v{recording.metadata.version}
 # Generated: {recording.metadata.created_at.isoformat()}
 # Duration: {recording.metadata.duration_ms / 1000:.1f}s
 # URL: {recording.metadata.starting_url}
-#
+#{cookie_consent_note}
 # Edit this file to:
 # - Add 'expect:' assertions to steps
 # - Insert 'inspekt' command steps for accessibility checks
@@ -2319,6 +2333,10 @@ def record(
         # Header display flag (show header only after first action)
         header_shown = False
 
+        # Track cookie consent dialog interactions
+        cookie_consent_hint_shown = False
+        cookie_consent_provider: str | None = None  # Name of the provider (e.g., "Usercentrics")
+
         # Track recording start time for resume (milliseconds since epoch)
         recording_start_epoch_ms = int(start_time.timestamp() * 1000)
 
@@ -2626,7 +2644,7 @@ def record(
 
             # Save recording
             try:
-                save_recording_to_yaml(recording, output_path)
+                save_recording_to_yaml(recording, output_path, cookie_consent_provider=cookie_consent_provider)
 
                 # Check for potentially sensitive content in dialog steps
                 sensitive_warnings = check_sensitive_dialog_content(all_steps)
@@ -2864,6 +2882,8 @@ def record(
                     is_paused = False
                     pause_start_time = None
                     header_shown = False
+                    cookie_consent_hint_shown = False
+                    cookie_consent_provider = None
                     seen_timestamps = set()
                     download_checksums = {}
                     last_activity_time = time.time()
@@ -2974,6 +2994,8 @@ def record(
                             is_paused = False
                             pause_start_time = None
                             header_shown = False
+                            cookie_consent_hint_shown = False
+                            cookie_consent_provider = None
                             seen_timestamps = set()
                             download_checksums = {}
                             last_activity_time = time.time()
@@ -3269,6 +3291,18 @@ def record(
                                     f"This file differs from the one we downloaded in step #{orig_step:04d}. A copy is saved.",
                                     icon="tip"
                                 ))
+
+                        # Show one-time hint for cookie consent dialog Tab navigation
+                        if event.get("in_cookie_consent") and not cookie_consent_hint_shown:
+                            provider = event.get("cookie_consent_provider", "cookie consent dialog")
+                            cookie_consent_provider = provider  # Store for YAML comment
+                            cookie_consent_hint_shown = True
+                            click.echo(format_system_message(
+                                f"Tab landed in a {provider}. "
+                                "These dialogs manage focus internally—accessible names may not be captured. "
+                                "Replay will still work correctly.",
+                                icon="tip"
+                            ))
 
                 else:
                     # Poll failed - might be due to navigation

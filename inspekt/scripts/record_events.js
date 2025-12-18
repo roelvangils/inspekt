@@ -316,6 +316,19 @@
     }
 
     /**
+     * Get the deepest active element, drilling into Shadow DOM.
+     * When focus is inside a Shadow DOM, document.activeElement returns the host,
+     * not the actual focused element. This function recursively drills down.
+     */
+    function getDeepActiveElement() {
+        let active = document.activeElement;
+        while (active && active.shadowRoot && active.shadowRoot.activeElement) {
+            active = active.shadowRoot.activeElement;
+        }
+        return active;
+    }
+
+    /**
      * Generate multiple selectors for an element, ordered by reliability.
      */
     function generateSelectors(element) {
@@ -421,6 +434,73 @@
         }
 
         return text.trim();
+    }
+
+    /**
+     * Capture focus styles for sr-only/hidden elements that become visible on focus.
+     * This captures the computed styles WHILE the element is focused, so during replay
+     * we can apply the exact same styles to make the element visible.
+     *
+     * Returns an object with focus styles if the element appears to be sr-only,
+     * or null if the element doesn't need special focus styling.
+     */
+    function captureFocusStyles(el) {
+        if (!el || el.nodeType !== 1) return null;
+
+        const className = el.className || '';
+        const classStr = typeof className === 'string' ? className : className.toString();
+
+        // Check for common sr-only/hidden class patterns
+        const srOnlyPatterns = [
+            'sr-only', 'visually-hidden', 'visuallyhidden', 'screen-reader',
+            'screenreader', 'a11y', 'skip', 'offscreen', 'clip-hide'
+        ];
+
+        const isSrOnlyClass = srOnlyPatterns.some(pattern =>
+            classStr.toLowerCase().includes(pattern)
+        );
+
+        if (!isSrOnlyClass) return null;
+
+        // Element has sr-only pattern - capture its focus styles
+        // These are the styles that make it visible when focused
+        const cs = getComputedStyle(el);
+
+        return {
+            // Positioning & layout
+            position: cs.position,
+            left: cs.left,
+            top: cs.top,
+            right: cs.right,
+            bottom: cs.bottom,
+            margin: cs.margin,
+            padding: cs.padding,
+            width: cs.width,
+            height: cs.height,
+            // Visibility & clipping
+            clip: cs.clip,
+            clipPath: cs.clipPath,
+            overflow: cs.overflow,
+            opacity: cs.opacity,
+            visibility: cs.visibility,
+            display: cs.display,
+            // Stacking
+            zIndex: cs.zIndex,
+            // Visual appearance (needed for styled skip links)
+            backgroundColor: cs.backgroundColor,
+            color: cs.color,
+            borderRadius: cs.borderRadius,
+            boxShadow: cs.boxShadow,
+            outline: cs.outline,
+            outlineOffset: cs.outlineOffset,
+            // Text
+            fontSize: cs.fontSize,
+            fontWeight: cs.fontWeight,
+            lineHeight: cs.lineHeight,
+            textDecoration: cs.textDecoration,
+            // Transform
+            transform: cs.transform
+        };
     }
 
     /**
@@ -689,6 +769,63 @@
         } catch (e) {
             return [];
         }
+    }
+
+    /**
+     * Detect if an element is inside a cookie consent dialog.
+     * These dialogs use internal focus management, so we can't reliably
+     * capture accessible names for Tab stops inside them.
+     * Returns the consent dialog element or null.
+     */
+    function getContainingCookieConsent(element) {
+        if (!element) return null;
+
+        // Known cookie consent dialog selectors
+        const cookieConsentSelectors = [
+            '#usercentrics-cmp-ui',           // UserCentrics
+            '#onetrust-consent-sdk',           // OneTrust
+            '#CybotCookiebotDialog',           // Cookiebot
+            '.cmp-root',                       // Generic CMP
+            '[data-testid="uc-main-banner"]',  // UserCentrics variant
+            '#sp_message_container',           // SourcePoint
+            '.cc-window',                      // Cookie Consent by Insites
+            '#gdpr-consent-tool',              // Generic GDPR
+            '#cookie-notice',                  // Generic cookie notice
+        ];
+
+        // Check if element is inside any of these containers
+        for (const selector of cookieConsentSelectors) {
+            const consent = document.querySelector(selector);
+            if (consent) {
+                // Check if element is the consent container itself
+                if (element === consent) return consent;
+                // Check if element is inside (including Shadow DOM)
+                if (consent.contains(element)) return consent;
+                // Check if element is inside consent's Shadow DOM
+                if (consent.shadowRoot && consent.shadowRoot.contains(element)) return consent;
+                // Check if element is the shadow host's active element
+                if (consent.shadowRoot && element.getRootNode() === consent.shadowRoot) return consent;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Get the name of a cookie consent provider from its container element.
+     */
+    function getCookieConsentProvider(element) {
+        if (!element) return 'cookie consent dialog';
+        const id = element.id?.toLowerCase() || '';
+        const className = element.className?.toLowerCase?.() || '';
+
+        if (id.includes('usercentrics') || className.includes('usercentrics')) return 'Usercentrics';
+        if (id.includes('onetrust') || className.includes('onetrust')) return 'OneTrust';
+        if (id.includes('cookiebot') || className.includes('cookiebot')) return 'Cookiebot';
+        if (id.includes('sourcepoint') || className.includes('sp_')) return 'SourcePoint';
+        if (className.includes('cc-window')) return 'Cookie Consent';
+
+        return 'cookie consent dialog';
     }
 
     /**
@@ -1936,6 +2073,11 @@
                         if (targetTag === 'input' && nextElement.type) {
                             keypressEvent.target.input_type = nextElement.type.toLowerCase();
                         }
+                        // Capture focus styles for sr-only elements
+                        const focusStyles = captureFocusStyles(nextElement);
+                        if (focusStyles) {
+                            keypressEvent.target.focus_styles = focusStyles;
+                        }
                     }
                     recordEvent(keypressEvent);
                     return;
@@ -1971,6 +2113,11 @@
                         // Include input type for native control inputs
                         if (targetTag === 'input' && prevElement.type) {
                             keypressEvent.target.input_type = prevElement.type.toLowerCase();
+                        }
+                        // Capture focus styles for sr-only elements
+                        const focusStyles = captureFocusStyles(prevElement);
+                        if (focusStyles) {
+                            keypressEvent.target.focus_styles = focusStyles;
                         }
                         recordEvent(keypressEvent);
                         return;
@@ -2020,6 +2167,11 @@
                         if (targetTag === 'input' && firstEl.type) {
                             keypressEvent.target.input_type = firstEl.type.toLowerCase();
                         }
+                        // Capture focus styles for sr-only elements
+                        const focusStyles = captureFocusStyles(firstEl);
+                        if (focusStyles) {
+                            keypressEvent.target.focus_styles = focusStyles;
+                        }
                         recordEvent(keypressEvent);
                         return;
                     }
@@ -2044,6 +2196,11 @@
                         if (targetTag === 'input' && lastEl.type) {
                             keypressEvent.target.input_type = lastEl.type.toLowerCase();
                         }
+                        // Capture focus styles for sr-only elements
+                        const focusStyles = captureFocusStyles(lastEl);
+                        if (focusStyles) {
+                            keypressEvent.target.focus_styles = focusStyles;
+                        }
                         recordEvent(keypressEvent);
                         return;
                     }
@@ -2051,20 +2208,32 @@
 
                 // Normal Tab handling (non-native-control elements)
                 requestAnimationFrame(() => {
-                    const focusedElement = document.activeElement;
+                    // Use getDeepActiveElement to drill into Shadow DOM
+                    // document.activeElement returns the shadow host, not the inner focused element
+                    const focusedElement = getDeepActiveElement();
                     if (focusedElement && focusedElement !== document.body) {
-                        const selectors = generateSelectors(focusedElement);
-                        const targetTag = focusedElement.tagName.toLowerCase();
-                        keypressEvent.target = {
-                            selector: selectors[0],
-                            fallback_selectors: selectors.slice(1, 4),
-                            accessible_name: computeAccessibleName(focusedElement) || null,
-                            tag: targetTag,
-                            role: focusedElement.getAttribute('role') || null
-                        };
+                        // Use getTargetInfo which handles Shadow DOM (piercing selectors)
+                        keypressEvent.target = getTargetInfo(focusedElement);
+
                         // Include input type for input elements
+                        const targetTag = focusedElement.tagName.toLowerCase();
                         if (targetTag === 'input' && focusedElement.type) {
                             keypressEvent.target.input_type = focusedElement.type.toLowerCase();
+                        }
+
+                        // Capture focus styles for sr-only elements
+                        // This runs WHILE the element is focused, capturing its visible state
+                        const focusStyles = captureFocusStyles(focusedElement);
+                        if (focusStyles) {
+                            keypressEvent.target.focus_styles = focusStyles;
+                        }
+
+                        // Check if Tab landed in a cookie consent dialog
+                        // These dialogs manage focus internally, so accessible names may not be captured
+                        const cookieConsent = getContainingCookieConsent(focusedElement);
+                        if (cookieConsent) {
+                            keypressEvent.in_cookie_consent = true;
+                            keypressEvent.cookie_consent_provider = getCookieConsentProvider(cookieConsent);
                         }
                     }
                     // Record after capturing target (fixes race condition with rapid tabbing)

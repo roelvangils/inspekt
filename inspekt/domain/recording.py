@@ -118,6 +118,9 @@ class TargetInfo(BaseModel):
     piercing_selector: Optional[str] = None  # Full selector: "host >>> inner"
     # Native control input type (for set action)
     input_type: Optional[str] = None  # e.g., "range", "date", "time", "color"
+    # Focus styles captured during recording (for sr-only elements)
+    # These styles make hidden elements visible when focused
+    focus_styles: Optional[dict[str, str]] = None
 
 
 class ScrollInfo(BaseModel):

@@ -449,6 +449,21 @@ class InspektMCPServer:
                     result = await self.tool_provider.clear_console_logs()
                     return [types.TextContent(type="text", text=result.model_dump_json(indent=2))]
 
+                # Navigation tools
+                elif name == "navigate_to_url":
+                    params = schemas.NavigateToUrlParams(**arguments)
+                    result = await self.tool_provider.navigate_to_url(params)
+                    return [types.TextContent(type="text", text=result.model_dump_json(indent=2))]
+
+                elif name == "go_back":
+                    result = await self.tool_provider.go_back()
+                    return [types.TextContent(type="text", text=result.model_dump_json(indent=2))]
+
+                elif name == "reload_page":
+                    hard = arguments.get("hard", False)
+                    result = await self.tool_provider.reload_page(hard=hard)
+                    return [types.TextContent(type="text", text=result.model_dump_json(indent=2))]
+
                 # Handle dynamic plugin tools
                 elif name.startswith("unload_plugin_"):
                     plugin_id = name[14:]  # Remove "unload_plugin_" prefix

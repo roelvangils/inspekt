@@ -979,59 +979,99 @@
                 let usedFallbackOverlay = false;
 
                 if (focusedElement && focusedElement !== document.body) {
-                    // TIER 0: Force visibility for hidden elements (skip links, sr-only)
-                    // Many accessibility patterns hide elements until focused using techniques like:
-                    // - clip: rect(1px, 1px, 1px, 1px)
-                    // - position: absolute; left: -9999px
-                    // - width: 1px; height: 1px; overflow: hidden
-                    // - visibility: hidden; display: none; opacity: 0
-                    // We temporarily override these to make the element visible during replay.
-
-                    // Get computed styles to detect hiding techniques
-                    const computed = getComputedStyle(focusedElement);
-                    const rect = focusedElement.getBoundingClientRect();
-
-                    // Base styles that always help visibility
-                    const forceVisibleStyles = {
-                        'clip': 'auto',
-                        'clip-path': 'none',
-                        'width': 'auto',
-                        'height': 'auto',
-                        'overflow': 'visible',
-                        'opacity': '1',
-                        'visibility': 'visible',
-                        'transform': 'none'
-                    };
-
-                    // Only reset position/coordinates if element is positioned OFF-SCREEN
-                    // (negative left/top values like -9999px). If it has reasonable positioning,
-                    // keep it so the element appears in its intended location.
-                    const computedLeft = parseFloat(computed.left) || 0;
-                    const computedTop = parseFloat(computed.top) || 0;
-                    const isOffScreenLeft = computedLeft < -100 || rect.right < 0;
-                    const isOffScreenTop = computedTop < -100 || rect.bottom < 0;
-                    const isPositioned = computed.position === 'absolute' || computed.position === 'fixed';
-
-                    if (isPositioned && (isOffScreenLeft || isOffScreenTop)) {
-                        // Element is positioned off-screen - reset to bring it back
-                        forceVisibleStyles['position'] = 'relative';
-                        forceVisibleStyles['left'] = 'auto';
-                        forceVisibleStyles['top'] = 'auto';
-                        forceVisibleStyles['right'] = 'auto';
-                        forceVisibleStyles['bottom'] = 'auto';
-                        forceVisibleStyles['margin'] = '0';
-                    }
-
-                    // Handle display:none (but prefer inline-block only if currently none)
-                    if (computed.display === 'none') {
-                        forceVisibleStyles['display'] = 'inline-block';
-                    }
-
-                    // Save original inline styles and apply visibility overrides
+                    // Save original styles for cleanup
                     const originalStyles = {};
-                    for (const [prop, value] of Object.entries(forceVisibleStyles)) {
-                        originalStyles[prop] = focusedElement.style.getPropertyValue(prop);
-                        focusedElement.style.setProperty(prop, value, 'important');
+
+                    // Check if we have captured focus_styles from recording
+                    // If yes, use those EXCLUSIVELY (skip generic visibility fixes)
+                    const hasCapturedStyles = step.target?.focus_styles &&
+                        Object.keys(step.target.focus_styles).length > 0;
+
+                    if (hasCapturedStyles) {
+                        // CAPTURED STYLES PATH: Apply exact styles from recording
+                        // This ensures replay looks identical to the original recording
+                        const capturedStyles = step.target.focus_styles;
+                        for (const [prop, value] of Object.entries(capturedStyles)) {
+                            // Apply ALL captured values - don't filter!
+                            // Values like 'none', 'auto', 'visible' are often the KEY to making
+                            // hidden elements visible (e.g., clipPath: none removes clipping)
+                            if (value !== null && value !== undefined) {
+                                // Convert camelCase to kebab-case (e.g., clipPath → clip-path)
+                                const cssProp = prop.replace(/([A-Z])/g, '-$1').toLowerCase();
+                                originalStyles[cssProp] = focusedElement.style.getPropertyValue(cssProp);
+                                focusedElement.style.setProperty(cssProp, value, 'important');
+                            }
+                        }
+                    } else {
+                        // TIER 0: Force visibility for hidden elements (skip links, sr-only)
+                        // Fallback for recordings WITHOUT captured focus_styles
+                        // Many accessibility patterns hide elements until focused using techniques like:
+                        // - clip: rect(1px, 1px, 1px, 1px)
+                        // - position: absolute; left: -9999px
+                        // - width: 1px; height: 1px; overflow: hidden
+                        // - visibility: hidden; display: none; opacity: 0
+                        // We temporarily override these to make the element visible during replay.
+
+                        // Get computed styles to detect hiding techniques
+                        const computed = getComputedStyle(focusedElement);
+
+                        // Detect if element is actually hidden using sr-only patterns
+                        // Only apply visibility fixes if the element appears to be hidden
+                        const isLikelyHidden = (
+                            computed.display === 'none' ||
+                            computed.visibility === 'hidden' ||
+                            computed.opacity === '0' ||
+                            // sr-only patterns: tiny dimensions
+                            (parseFloat(computed.width) <= 1 && parseFloat(computed.height) <= 1) ||
+                            // clip-based hiding
+                            (computed.clip && computed.clip !== 'auto' && computed.clip.includes('rect')) ||
+                            computed.clipPath === 'inset(100%)' ||
+                            computed.clipPath === 'polygon(0 0, 0 0, 0 0)' ||
+                            // Off-screen positioning
+                            (computed.position === 'absolute' && (
+                                parseFloat(computed.left) < -9000 ||
+                                parseFloat(computed.top) < -9000
+                            ))
+                        );
+
+                        if (isLikelyHidden) {
+                            // VISIBILITY properties need !important to override hiding CSS
+                            // These properties are used to hide elements (sr-only, skip-link patterns)
+                            const forceVisibleStyles = {
+                                'clip': 'auto',
+                                'clip-path': 'none',
+                                'width': 'auto',
+                                'height': 'auto',
+                                'overflow': 'visible',
+                                'opacity': '1',
+                                'visibility': 'visible'
+                            };
+
+                            // Handle display:none (but prefer inline-block only if currently none)
+                            if (computed.display === 'none') {
+                                forceVisibleStyles['display'] = 'inline-block';
+                            }
+
+                            // IMPORTANT: We do NOT set layout properties (position, left, top, margin, etc.)
+                            // The CSS polyfill clones the site's :focus/:focus-visible rules which
+                            // typically include "position: static" to bring elements on-screen.
+                            // Setting inline styles would override the polyfill (inline > external CSS).
+                            //
+                            // The polyfill's attribute selector has higher specificity than the
+                            // original hiding CSS:
+                            //   .sr-only { position: absolute }        → specificity (0,1,0)
+                            //   .sr-only[data-inspekt-focus-visible] { position: static } → (0,2,0)
+                            //
+                            // So the polyfill will correctly override the hiding position.
+
+                            // Apply visibility overrides WITH !important
+                            for (const [prop, value] of Object.entries(forceVisibleStyles)) {
+                                originalStyles[prop] = focusedElement.style.getPropertyValue(prop);
+                                focusedElement.style.setProperty(prop, value, 'important');
+                            }
+                        }
+                        // For regular visible elements, we don't apply any visibility fixes
+                        // The polyfill will handle focus styling via [data-inspekt-focus-visible]
                     }
 
                     // Mark element so we can clean up later
@@ -1059,11 +1099,14 @@
                         visual?.focusRing?.hide();
                     } else {
                         // TIER 2: Try CSS attribute injection (shows site's cloned :focus-visible styles)
+                        // Note: If captured focus_styles were applied earlier, this adds the
+                        // data-inspekt-focus-visible attribute which may trigger additional styling
                         if (visual?.focusVisible) {
                             visual.focusVisible.show(focusedElement);
 
-                            // Wait for styles to compute and check again
+                            // Wait for styles to compute
                             await new Promise(r => setTimeout(r, 20));
+
                             const hasPolyfillFocus = visual.hasFocusStyling?.(focusedElement) || false;
 
                             if (hasPolyfillFocus) {

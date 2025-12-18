@@ -3197,6 +3197,44 @@
         const selectorText = rule.selectorText;
         if (selectorText && (selectorText.includes(':focus-visible') ||
             (selectorText.includes(':focus') && !selectorText.includes(':focus-within')))) {
+
+          // IMPORTANT: Skip rules that REMOVE focus styling (outline: none, box-shadow: none)
+          // These "reset" rules would override our fallback due to higher specificity
+          // We only want to clone rules that ADD visible focus indicators
+          const cssText = rule.style.cssText.toLowerCase();
+
+          // Check if this rule only removes focus styling (no visible indicator)
+          const hasOutline = rule.style.outline || rule.style.outlineWidth || rule.style.outlineStyle;
+          const hasBoxShadow = rule.style.boxShadow;
+          const hasBorder = rule.style.border || rule.style.borderColor || rule.style.borderWidth;
+
+          // Detect "removal" patterns
+          const isOutlineRemoval = hasOutline && (
+            cssText.includes('outline: none') ||
+            cssText.includes('outline: 0') ||
+            cssText.includes('outline-style: none') ||
+            cssText.includes('outline-width: 0')
+          );
+          const isBoxShadowRemoval = hasBoxShadow && (
+            cssText.includes('box-shadow: none') ||
+            cssText.includes('box-shadow: 0')
+          );
+
+          // Check if there are ANY visible focus indicators in the rule
+          const hasVisibleOutline = hasOutline && !isOutlineRemoval;
+          const hasVisibleBoxShadow = hasBoxShadow && !isBoxShadowRemoval;
+          const hasBackground = rule.style.background || rule.style.backgroundColor;
+          const hasTextDecoration = rule.style.textDecoration;
+          const hasTransform = rule.style.transform;
+          const hasFilter = rule.style.filter;
+
+          // Skip rules that only contain focus-hiding properties
+          if (!hasVisibleOutline && !hasVisibleBoxShadow && !hasBackground &&
+              !hasBorder && !hasTextDecoration && !hasTransform && !hasFilter) {
+            // This rule only hides focus indicators - skip it
+            return [];
+          }
+
           // Replace :focus-visible first (to avoid partial replacement of :focus)
           // Then replace remaining :focus (but not :focus-within)
           let newSelector = selectorText.replace(/:focus-visible/g, '[data-inspekt-focus-visible]');
