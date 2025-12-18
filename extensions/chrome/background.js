@@ -417,6 +417,29 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         return true; // Keep channel open for async response
     }
 
+    if (message.type === 'START_SMOOTH_CAPTURE') {
+        // Start timer-based smooth capture (constant FPS screenshots)
+        console.log('[Inspekt] START_SMOOTH_CAPTURE received, settings:', message.settings);
+        startSmoothCapture(sender.tab.id, message.settings)
+            .then(response => {
+                console.log('[Inspekt] START_SMOOTH_CAPTURE response:', response);
+                sendResponse(response);
+            })
+            .catch(error => {
+                console.error('[Inspekt] START_SMOOTH_CAPTURE error:', error);
+                sendResponse({ ok: false, error: String(error) });
+            });
+        return true; // Keep channel open for async response
+    }
+
+    if (message.type === 'STOP_SMOOTH_CAPTURE') {
+        // Stop timer-based smooth capture
+        stopSmoothCapture()
+            .then(sendResponse)
+            .catch(error => sendResponse({ ok: false, error: String(error) }));
+        return true; // Keep channel open for async response
+    }
+
     // ========== ZOOM LEVEL CONTROL ==========
 
     if (message.type === 'GET_ZOOM_LEVEL') {
@@ -2345,6 +2368,200 @@ async function stopScreencast(tabId, requestId = null) {
         }
         screencastState.debuggerAttached = false;
         screencastState.tabId = null;
+
+        throw error;
+    }
+}
+
+// ============================================================================
+// SMOOTH CAPTURE (TAB CAPTURE + MEDIARECORDER FOR VIDEO)
+// ============================================================================
+
+// Smooth capture state - uses tabCapture + MediaRecorder for proper video
+// This provides real video recording like tab sharing in video calls
+let smoothCaptureState = {
+    active: false,
+    tabId: null,
+    startTime: null
+};
+
+/**
+ * Ensure the offscreen document exists for video capture
+ */
+async function ensureOffscreenDocument() {
+    const existingContexts = await chrome.runtime.getContexts({
+        contextTypes: ['OFFSCREEN_DOCUMENT']
+    });
+
+    if (existingContexts.length > 0) {
+        console.log('[Inspekt] Offscreen document already exists');
+        return;
+    }
+
+    console.log('[Inspekt] Creating offscreen document for video capture');
+    await chrome.offscreen.createDocument({
+        url: 'offscreen.html',
+        reasons: ['USER_MEDIA'],
+        justification: 'Recording tab video for replay capture'
+    });
+}
+
+/**
+ * Start smooth video capture using tabCapture + MediaRecorder.
+ * This is the proper way to record browser tabs, like screen sharing.
+ */
+async function startSmoothCapture(tabId, settings = {}) {
+    if (smoothCaptureState.active) {
+        return { ok: true, message: 'Smooth capture already active' };
+    }
+
+    const fps = Math.max(5, Math.min(30, settings.fps || 15));
+    const quality = Math.max(50, Math.min(100, settings.quality || 80));
+
+    console.log(`[Inspekt] Starting smooth capture at ${fps} FPS, quality ${quality}, tabId: ${tabId}`);
+
+    try {
+        // Ensure offscreen document exists
+        console.log('[Inspekt] Creating offscreen document...');
+        await ensureOffscreenDocument();
+        console.log('[Inspekt] Offscreen document ready');
+
+        // Get a media stream ID for the tab
+        console.log('[Inspekt] Getting media stream ID for tab...');
+        const streamId = await new Promise((resolve, reject) => {
+            chrome.tabCapture.getMediaStreamId({ targetTabId: tabId }, (id) => {
+                if (chrome.runtime.lastError) {
+                    console.error('[Inspekt] tabCapture.getMediaStreamId error:', chrome.runtime.lastError.message);
+                    reject(new Error(chrome.runtime.lastError.message));
+                } else if (!id) {
+                    console.error('[Inspekt] tabCapture.getMediaStreamId returned empty ID');
+                    reject(new Error('No stream ID returned'));
+                } else {
+                    resolve(id);
+                }
+            });
+        });
+
+        console.log('[Inspekt] Got media stream ID:', streamId.substring(0, 30) + '...');
+
+        // Tell offscreen document to start recording
+        console.log('[Inspekt] Sending start message to offscreen document...');
+        const response = await chrome.runtime.sendMessage({
+            type: 'OFFSCREEN_START_VIDEO_CAPTURE',
+            target: 'offscreen',
+            streamId: streamId,
+            settings: { fps, quality }
+        });
+
+        console.log('[Inspekt] Offscreen response:', response);
+
+        if (!response?.success) {
+            throw new Error(response?.error || 'Failed to start video capture in offscreen document');
+        }
+
+        smoothCaptureState.active = true;
+        smoothCaptureState.tabId = tabId;
+        smoothCaptureState.startTime = Date.now();
+
+        console.log('[Inspekt] Smooth capture started successfully');
+
+        return {
+            ok: true,
+            message: 'Smooth capture started',
+            fps: fps,
+            quality: quality
+        };
+
+    } catch (error) {
+        console.error('[Inspekt] Failed to start smooth capture:', error);
+        // Return error instead of throwing to provide better feedback
+        return {
+            ok: false,
+            error: String(error.message || error)
+        };
+    }
+}
+
+/**
+ * Stop smooth video capture and return the video data.
+ */
+async function stopSmoothCapture() {
+    if (!smoothCaptureState.active) {
+        return { ok: true, message: 'Smooth capture not active' };
+    }
+
+    const duration = (Date.now() - smoothCaptureState.startTime) / 1000;
+    console.log(`[Inspekt] Stopping smooth capture after ${duration.toFixed(1)}s`);
+
+    try {
+        // Tell offscreen document to stop recording and get the video data
+        const response = await chrome.runtime.sendMessage({
+            type: 'OFFSCREEN_STOP_VIDEO_CAPTURE',
+            target: 'offscreen'
+        });
+
+        // Reset state
+        smoothCaptureState.active = false;
+        smoothCaptureState.tabId = null;
+        smoothCaptureState.startTime = null;
+
+        if (!response?.success) {
+            throw new Error(response?.error || 'Failed to stop video capture');
+        }
+
+        const videoData = response.videoData;
+        if (videoData) {
+            console.log(`[Inspekt] Smooth capture stopped: ${videoData.size} bytes, ${videoData.duration?.toFixed(1)}s`);
+            console.log(`[Inspekt] Video data base64 length: ${videoData.data?.length || 0}`);
+
+            // Post video data to bridge server
+            try {
+                console.log(`[Inspekt] Posting video to ${BRIDGE_HTTP_URL}/video/captured...`);
+                const postResponse = await fetch(`${BRIDGE_HTTP_URL}/video/captured`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        data: videoData.data,
+                        mimeType: videoData.mimeType,
+                        size: videoData.size,
+                        duration: videoData.duration
+                    })
+                });
+
+                if (!postResponse.ok) {
+                    console.error(`[Inspekt] Failed to post video: HTTP ${postResponse.status}`);
+                    const errorText = await postResponse.text();
+                    console.error(`[Inspekt] Error response: ${errorText}`);
+                } else {
+                    const postResult = await postResponse.json();
+                    console.log(`[Inspekt] Video posted successfully:`, postResult);
+                }
+            } catch (postError) {
+                console.error(`[Inspekt] Error posting video to bridge:`, postError);
+            }
+
+            return {
+                ok: true,
+                message: 'Smooth capture stopped',
+                duration: videoData.duration,
+                size: videoData.size
+            };
+        } else {
+            console.log('[Inspekt] Smooth capture stopped but no video data');
+            return {
+                ok: true,
+                message: 'Smooth capture stopped (no data)',
+                duration: duration
+            };
+        }
+
+    } catch (error) {
+        console.error('[Inspekt] Failed to stop smooth capture:', error);
+
+        // Reset state even on error
+        smoothCaptureState.active = false;
+        smoothCaptureState.tabId = null;
+        smoothCaptureState.startTime = null;
 
         throw error;
     }

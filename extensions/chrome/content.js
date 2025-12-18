@@ -310,6 +310,55 @@
             }
         }
 
+        // Handle START_SMOOTH_CAPTURE requests from MAIN world (timer-based video recording)
+        if (message && message.type === 'INSPEKT_START_SMOOTH_CAPTURE' && message.source === 'inspekt-page') {
+            try {
+                const response = await chrome.runtime.sendMessage({
+                    type: 'START_SMOOTH_CAPTURE',
+                    settings: message.settings,
+                    requestId: message.requestId
+                });
+
+                window.postMessage({
+                    type: 'INSPEKT_SMOOTH_CAPTURE_STARTED',
+                    source: 'inspekt-extension',
+                    requestId: message.requestId,
+                    response: response || { ok: true }
+                }, location.origin);
+            } catch (error) {
+                window.postMessage({
+                    type: 'INSPEKT_SMOOTH_CAPTURE_STARTED',
+                    source: 'inspekt-extension',
+                    requestId: message.requestId,
+                    response: { ok: false, error: String(error) }
+                }, location.origin);
+            }
+        }
+
+        // Handle STOP_SMOOTH_CAPTURE requests from MAIN world (timer-based video recording)
+        if (message && message.type === 'INSPEKT_STOP_SMOOTH_CAPTURE' && message.source === 'inspekt-page') {
+            try {
+                const response = await chrome.runtime.sendMessage({
+                    type: 'STOP_SMOOTH_CAPTURE',
+                    requestId: message.requestId
+                });
+
+                window.postMessage({
+                    type: 'INSPEKT_SMOOTH_CAPTURE_STOPPED',
+                    source: 'inspekt-extension',
+                    requestId: message.requestId,
+                    response: response || { ok: true }
+                }, location.origin);
+            } catch (error) {
+                window.postMessage({
+                    type: 'INSPEKT_SMOOTH_CAPTURE_STOPPED',
+                    source: 'inspekt-extension',
+                    requestId: message.requestId,
+                    response: { ok: false, error: String(error) }
+                }, location.origin);
+            }
+        }
+
         // Handle GET_DOWNLOAD_CONTENT requests from MAIN world
         if (message && message.type === 'INSPEKT_GET_DOWNLOAD_CONTENT' && message.source === 'inspekt-page') {
             try {
