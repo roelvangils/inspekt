@@ -2374,6 +2374,63 @@ async def handle_screencast_frame_post(request):
     return web.json_response({"ok": True, "frames_buffered": len(screencast_frames)})
 
 
+# Global storage for captured video (MediaRecorder output)
+captured_video_data = None
+
+
+async def handle_video_captured(request):
+    """HTTP endpoint: Receive captured video data from MediaRecorder.
+
+    This endpoint receives the complete WebM video data captured by the
+    offscreen document using tabCapture + MediaRecorder.
+    """
+    global captured_video_data
+
+    try:
+        data = await request.json()
+    except Exception:
+        return web.json_response({"ok": False, "error": "Invalid JSON"}, status=400)
+
+    captured_video_data = {
+        "data": data.get("data", ""),  # Base64 encoded video
+        "mimeType": data.get("mimeType", "video/webm"),
+        "size": data.get("size", 0),
+        "duration": data.get("duration", 0),
+        "timestamp": time.time()
+    }
+
+    print(f"[Bridge] Received captured video: {captured_video_data['size']} bytes, {captured_video_data['duration']:.1f}s")
+
+    return web.json_response({
+        "ok": True,
+        "size": captured_video_data["size"],
+        "duration": captured_video_data["duration"]
+    })
+
+
+async def handle_video_get(request):
+    """HTTP endpoint: Retrieve the captured video data.
+
+    Returns the video data captured by MediaRecorder and clears the buffer.
+    """
+    global captured_video_data
+
+    if not captured_video_data:
+        return web.json_response({"ok": False, "error": "No captured video available"}, status=404)
+
+    # Return and clear
+    data = captured_video_data
+    captured_video_data = None
+
+    return web.json_response({
+        "ok": True,
+        "data": data["data"],
+        "mimeType": data["mimeType"],
+        "size": data["size"],
+        "duration": data["duration"]
+    })
+
+
 def handle_screencast_frame(data: dict):
     """Handle incoming screencast frame from browser.
 
@@ -2517,7 +2574,8 @@ async def main():
     print("")
 
     # Setup aiohttp app with CORS middleware
-    app = web.Application(middlewares=[cors_middleware])
+    # Increase client_max_size to 100MB for large video uploads from MediaRecorder
+    app = web.Application(middlewares=[cors_middleware], client_max_size=100 * 1024 * 1024)
 
     # HTTP endpoints for CLI
     app.router.add_post("/run", handle_http_run)
@@ -2568,6 +2626,10 @@ async def main():
     app.router.add_get("/screencast/status", handle_screencast_status)
     app.router.add_post("/screencast/frame", handle_screencast_frame_post)  # Direct frame POST from background.js
     app.router.add_post("/screencast/interrupted", handle_screencast_interrupted)  # DevTools interrupt notification
+
+    # Video capture endpoints (MediaRecorder output from tabCapture)
+    app.router.add_post("/video/captured", handle_video_captured)  # Receive captured video from offscreen document
+    app.router.add_get("/video/get", handle_video_get)  # Retrieve captured video
 
     # Audio cue endpoints (for video audio effects)
     app.router.add_post("/audio/start", handle_audio_start)

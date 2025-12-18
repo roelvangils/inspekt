@@ -48,6 +48,54 @@ from inspekt.shared.dialog_styles import DIALOG_STYLES
 _builtin_open = open
 
 
+def _verify_video(video_path: Path) -> str | None:
+    """Verify video file and return info string (resolution, duration, fps, codec)."""
+    try:
+        result = subprocess.run(
+            [
+                "ffprobe", "-v", "quiet", "-print_format", "json",
+                "-show_format", "-show_streams", str(video_path)
+            ],
+            capture_output=True,
+            text=True,
+            timeout=10
+        )
+        if result.returncode != 0:
+            return None
+
+        probe = json.loads(result.stdout)
+        video_stream = next((s for s in probe.get("streams", []) if s.get("codec_type") == "video"), None)
+        if not video_stream:
+            return None
+
+        width = video_stream.get("width", 0)
+        height = video_stream.get("height", 0)
+        codec = video_stream.get("codec_name", "unknown")
+        duration = float(probe.get("format", {}).get("duration", 0))
+
+        # Calculate FPS from avg_frame_rate
+        fps = 0
+        avg_frame_rate = video_stream.get("avg_frame_rate", "0/1")
+        if "/" in avg_frame_rate:
+            num, den = avg_frame_rate.split("/")
+            if int(den) > 0:
+                fps = int(num) / int(den)
+
+        parts = []
+        if width and height:
+            parts.append(f"{width}×{height}")
+        if duration > 0:
+            parts.append(f"{duration:.1f}s")
+        if fps > 0:
+            parts.append(f"{fps:.0f} fps")
+        if codec != "unknown":
+            parts.append(codec)
+
+        return " · ".join(parts) if parts else None
+    except Exception:
+        return None
+
+
 def check_csp_bypass_enabled() -> bool:
     """Check if global CSP bypass is enabled in the browser extension."""
     try:
@@ -61,6 +109,80 @@ def check_csp_bypass_enabled() -> bool:
     except Exception:
         pass
     return False
+
+
+def capture_video_frame(client: BridgeClient, timestamp: float) -> tuple[float, bytes] | None:
+    """
+    Capture a viewport screenshot for video recording.
+
+    Uses the extension's INSPEKT_CAPTURE_SCREENSHOT via postMessage.
+    Returns a (timestamp, image_bytes) tuple or None if capture fails.
+
+    Args:
+        client: BridgeClient instance
+        timestamp: Timestamp for this frame (seconds since replay start)
+
+    Returns:
+        Tuple of (timestamp, image_bytes) or None on failure
+    """
+    import base64
+
+    capture_js = """
+(function() {
+    return new Promise((resolve) => {
+        const requestId = 'video-frame-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+
+        const handler = (event) => {
+            if (event.data?.type === 'INSPEKT_SCREENSHOT_RESPONSE' &&
+                event.data?.source === 'inspekt-extension' &&
+                event.data?.requestId === requestId) {
+                window.removeEventListener('message', handler);
+                resolve(event.data.response);
+            }
+        };
+
+        window.addEventListener('message', handler);
+
+        // Request viewport screenshot (JPEG for smaller file size)
+        // Scale by 1/DPR to get viewport-matching dimensions (not Retina 2x)
+        // captureVisibleTab captures at device pixel ratio, so we scale down
+        const dpr = window.devicePixelRatio || 1;
+        window.postMessage({
+            type: 'INSPEKT_CAPTURE_SCREENSHOT',
+            source: 'inspekt-page',
+            requestId: requestId,
+            mode: 'viewport',
+            options: {
+                format: 'jpeg',
+                quality: 0.85,
+                scale: 1 / dpr
+            }
+        }, '*');
+
+        // Timeout after 3 seconds
+        setTimeout(() => {
+            window.removeEventListener('message', handler);
+            resolve({ ok: false, error: 'Timeout waiting for screenshot' });
+        }, 3000);
+    });
+})()
+"""
+    try:
+        result = client.execute(capture_js, timeout=5.0)
+        if result.get("ok"):
+            response = result.get("result", {})
+            if response.get("ok") and response.get("dataUrl"):
+                # Extract base64 data from data URL
+                data_url = response["dataUrl"]
+                # Format: data:image/jpeg;base64,/9j/4AAQ...
+                if ";base64," in data_url:
+                    b64_data = data_url.split(";base64,")[1]
+                    image_bytes = base64.b64decode(b64_data)
+                    return (timestamp, image_bytes)
+    except Exception:
+        pass  # Ignore capture errors, video will have fewer frames
+
+    return None
 
 
 class ReplayResult:
@@ -1001,11 +1123,23 @@ def run_download_shell_command(command: str, file_path: Path) -> dict:
     flag_value="__auto__",
 )
 @click.option(
+    "--smooth",
+    is_flag=True,
+    default=False,
+    help="Record smooth video with continuous frames (larger file, captures animations)",
+)
+@click.option(
+    "--compact",
+    is_flag=True,
+    default=False,
+    help="Record compact video with 1 frame per action (smaller file, default)",
+)
+@click.option(
     "--fps",
     "video_fps",
     type=int,
     default=None,
-    help="Video frame rate (5-30, uses config default: 10)",
+    help="Video frame rate for --smooth mode (5-30, default: 10). Ignored in compact mode.",
 )
 @click.option(
     "--open",
@@ -1060,6 +1194,8 @@ def replay(
     progress: bool,
     skip_validation: bool,
     video_output: Optional[str],
+    smooth: bool,
+    compact: bool,
     video_fps: Optional[int],
     open_after: bool,
     include_effects: bool,
@@ -1121,9 +1257,18 @@ def replay(
         auto_selected = True
 
     # Handle video recording setup
-    screencast_capture = None
+    # Two modes: smooth (tabCapture + MediaRecorder) and compact (1 frame per action)
+    video_frames: list[tuple[float, bytes]] = []  # For compact mode (action screenshots)
     video_recording_enabled = False
     resolved_video_path = None
+
+    # Check for mutually exclusive options
+    if smooth and compact:
+        click.echo("Error: --smooth and --compact are mutually exclusive", err=True)
+        sys.exit(1)
+
+    # Determine video mode (compact is default)
+    video_mode = "smooth" if smooth else "compact"
 
     if video_output is not None:
         # Check if ffmpeg is installed
@@ -1159,6 +1304,11 @@ def replay(
 
         # Clamp FPS to valid range
         actual_fps = max(5, min(30, actual_fps))
+
+        # Warn if --fps is used with compact mode (where it's ignored)
+        if video_fps is not None and video_mode == "compact":
+            from inspekt.app.cli.table import print_hint
+            print_hint("`--fps` only applies to `--smooth` mode. Using compact mode (1 frame per action).")
 
         video_recording_enabled = True
 
@@ -2308,186 +2458,19 @@ def replay(
                 click.echo(format_system_message(f"CDP dialog interception error: {e} (using JS fallback)"))
 
     # Start video recording if enabled (BEFORE first step to capture all frames)
-    banner_crop_height = 0  # Height of automation banner to crop from video
-    banner_compensation_succeeded = False  # Track if we successfully resized to compensate
-    original_zoom_level = None  # Store original zoom to restore after video recording
     if video_recording_enabled and not dry_run and client:
-        from inspekt.services.screencast import ScreencastCapture
+        video_start_elapsed = int((datetime.now() - result.start_time).total_seconds() * 1000)
 
-        # ScreencastCapture auto-detects the correct port (8767 in VM, 8765 otherwise)
-        screencast_capture = ScreencastCapture(
-            fps=actual_fps,
-            quality=actual_quality,
-        )
-
-        # Reset browser zoom to 100% for consistent video dimensions
-        # Browser zoom affects how CDP screencast captures frames
-        try:
-            get_zoom_js = """
-            (async () => {
-                return new Promise((resolve) => {
-                    const requestId = 'zoom-video-' + Date.now();
-                    const handler = (event) => {
-                        if (event.data?.type === 'INSPEKT_ZOOM_LEVEL_RESPONSE' &&
-                            event.data?.requestId === requestId) {
-                            window.removeEventListener('message', handler);
-                            resolve(event.data.response?.zoomFactor || 1.0);
-                        }
-                    };
-                    window.addEventListener('message', handler);
-                    window.postMessage({
-                        type: 'INSPEKT_GET_ZOOM_LEVEL',
-                        source: 'inspekt-page',
-                        requestId: requestId
-                    }, '*');
-                    setTimeout(() => resolve(1.0), 2000);
-                });
-            })()
-            """
-            zoom_result = client.execute(get_zoom_js, timeout=3.0)
-            if zoom_result.get("ok"):
-                original_zoom_level = float(zoom_result.get("result", 1.0))
-
-                # Reset to 100% if zoom is different (>5% tolerance)
-                if abs(original_zoom_level - 1.0) > 0.05:
-                    set_zoom_js = """
-                    (async () => {
-                        return new Promise((resolve) => {
-                            const requestId = 'reset-zoom-' + Date.now();
-                            const handler = (event) => {
-                                if (event.data?.type === 'INSPEKT_ZOOM_SET_RESPONSE' &&
-                                    event.data?.requestId === requestId) {
-                                    window.removeEventListener('message', handler);
-                                    resolve(event.data.response);
-                                }
-                            };
-                            window.addEventListener('message', handler);
-                            window.postMessage({
-                                type: 'INSPEKT_SET_ZOOM_LEVEL',
-                                source: 'inspekt-page',
-                                requestId: requestId,
-                                zoomFactor: 1.0
-                            }, '*');
-                            setTimeout(() => resolve({ ok: false }), 2000);
-                        });
-                    })()
-                    """
-                    set_result = client.execute(set_zoom_js, timeout=3.0)
-                    if set_result.get("ok") and set_result.get("result", {}).get("ok"):
-                        click.echo(format_system_message(
-                            f"Reset zoom to 100% for video (was {original_zoom_level:.0%})",
-                            icon="video"
-                        ))
-                        time.sleep(0.2)  # Let browser settle after zoom change
-
-                        # Re-measure viewport height after zoom reset (dimensions may have changed)
-                        try:
-                            height_result = client.execute("window.innerHeight", timeout=2.0)
-                            if height_result.get("ok"):
-                                pre_debugger_viewport_height = height_result.get("result", pre_debugger_viewport_height)
-                        except Exception:
-                            pass
-        except Exception as e:
-            if verbose:
-                click.echo(format_system_message(f"Could not reset zoom: {e}", icon="video"))
-
-        # Detect and compensate for automation banner BEFORE starting screencast
-        # The banner appears when debugger is attached (e.g., for CDP dialog interception)
-        # We measured pre_debugger_viewport_height before any debugger attachment
-        # Skip banner compensation in fullscreen/kiosk mode (window cannot be expanded)
-        if pre_debugger_viewport_height > 0 and recorded_viewport and not in_fullscreen_mode:
-            try:
-                # Measure current viewport (after debugger may have been attached for dialog interception)
-                viewport_result = client.execute("({ height: window.innerHeight })", timeout=2.0)
-                if viewport_result.get("ok") and viewport_result.get("result"):
-                    current_height = viewport_result["result"].get("height", 0)
-
-                    if current_height < pre_debugger_viewport_height:
-                        # Banner detected - viewport shrank after debugger attached
-                        banner_height = pre_debugger_viewport_height - current_height
-                        target_height = recorded_viewport.height
-
-                        # Expand window to restore target viewport height
-                        expand_by = target_height - current_height
-                        if expand_by > 0:
-                            # Use AppleScript to directly expand window bounds
-                            # (JS resizeTo is blocked by browsers for security)
-                            import platform
-                            resize_success = False
-                            new_height = current_height
-
-                            if platform.system() == "Darwin":
-                                from inspekt.services.applescript_utils import AppleScriptExecutor
-                                executor = AppleScriptExecutor()
-
-                                # Iteratively expand until we reach target height
-                                # This handles display scaling issues (Retina displays)
-                                for attempt in range(5):
-                                    remaining = target_height - new_height
-                                    if remaining <= 2:  # Close enough
-                                        break
-
-                                    # Directly expand window height by the needed amount
-                                    expand_script = f'''
-tell application "Google Chrome"
-    set frontWindow to front window
-    set {{x1, y1, x2, y2}} to bounds of frontWindow
-    set bounds of frontWindow to {{x1, y1, x2, y2 + {remaining}}}
-end tell
-'''
-                                    as_result = executor.execute(expand_script, timeout=3.0)
-                                    if not as_result.ok:
-                                        break
-
-                                    time.sleep(0.15)  # Let resize settle
-
-                                    # Check new height
-                                    verify_result = client.execute("window.innerHeight", timeout=2.0)
-                                    new_height = verify_result.get("result", 0) if verify_result.get("ok") else 0
-
-                                resize_success = new_height >= target_height - 2
-
-                            if resize_success:
-                                banner_compensation_succeeded = True  # Don't apply fallback crop
-                                click.echo(format_system_message(
-                                    f"Compensated for automation banner (viewport now: {new_height}px)",
-                                    icon="video"
-                                ))
-                            else:
-                                if verbose:
-                                    click.echo(format_system_message(
-                                        f"Resize: viewport is {new_height}px (target: {target_height}px)",
-                                        icon="video"
-                                    ))
-                    else:
-                        if verbose:
-                            click.echo(format_system_message("No banner detected (viewport unchanged)", icon="video"))
-            except Exception as e:
-                click.echo(format_system_message(f"Could not compensate for banner: {e}", icon="video"))
-        else:
-            if verbose:
-                if in_fullscreen_mode:
-                    click.echo(format_system_message(
-                        f"Skipping banner compensation (browser in {current_window_mode} mode)",
-                        icon="video"
-                    ))
-                else:
-                    click.echo(format_system_message(
-                        f"Skipping banner check: pre_height={pre_debugger_viewport_height}, recorded={recorded_viewport is not None}",
-                        icon="video"
-                    ))
-
-        # Start screencast immediately via postMessage to extension
-        # This happens before the loop so first step frames are captured
-        time.sleep(0.3)  # Brief stabilization
-
-        screencast_js = f"""
+        if video_mode == "smooth":
+            # Smooth capture using tabCapture + MediaRecorder (like screen sharing)
+            # Video is recorded in the browser and posted to bridge when stopped
+            smooth_start_js = f"""
 (function() {{
     return new Promise((resolve) => {{
-        const requestId = 'screencast-' + Date.now();
+        const requestId = 'smooth-capture-' + Date.now();
 
         const handler = (event) => {{
-            if (event.data?.type === 'INSPEKT_SCREENCAST_STARTED' &&
+            if (event.data?.type === 'INSPEKT_SMOOTH_CAPTURE_STARTED' &&
                 event.data?.source === 'inspekt-extension' &&
                 event.data?.requestId === requestId) {{
                 window.removeEventListener('message', handler);
@@ -2498,122 +2481,86 @@ end tell
         window.addEventListener('message', handler);
 
         window.postMessage({{
-            type: 'INSPEKT_START_SCREENCAST',
+            type: 'INSPEKT_START_SMOOTH_CAPTURE',
             source: 'inspekt-page',
             requestId: requestId,
-            settings: {{ fps: {actual_fps}, quality: {actual_quality}, preDebuggerHeight: {pre_debugger_viewport_height} }}
+            settings: {{ fps: {actual_fps}, quality: {actual_quality} }}
         }}, '*');
 
-        // Timeout after 5 seconds
+        // Timeout after 10 seconds
         setTimeout(() => {{
             window.removeEventListener('message', handler);
-            resolve({{ ok: false, error: 'Timeout waiting for screencast start' }});
-        }}, 5000);
+            resolve({{ ok: false, error: 'Timeout waiting for smooth capture start' }});
+        }}, 10000);
     }});
 }})()
 """
-        try:
-            sc_result = client.execute(screencast_js, timeout=10.0)
-            if sc_result.get("ok") and sc_result.get("result", {}).get("ok"):
-                # Screencast started - debugger is now attached and banner may have appeared
-                # Check if banner appeared and try to compensate by expanding window
-                sc_response = sc_result.get("result", {})
-                reported_banner = sc_response.get("bannerHeight", 0)
-
-                if reported_banner > 0 and not banner_compensation_succeeded and not in_fullscreen_mode:
-                    # Banner appeared after debugger attached - try to expand window
-                    target_height = recorded_viewport.height if recorded_viewport else 0
-
-                    if target_height > 0:
-                        import platform
-                        if platform.system() == "Darwin":
-                            from inspekt.services.applescript_utils import AppleScriptExecutor
-                            executor = AppleScriptExecutor()
-
-                            # Get current viewport height
-                            current_h_result = client.execute("window.innerHeight", timeout=2.0)
-                            current_height = current_h_result.get("result", 0) if current_h_result.get("ok") else 0
-
-                            # Iteratively expand until we reach target height
-                            for attempt in range(5):
-                                remaining = target_height - current_height
-                                if remaining <= 2:  # Close enough
-                                    banner_compensation_succeeded = True
-                                    click.echo(format_system_message(
-                                        f"Compensated for automation banner (viewport now: {current_height}px)",
-                                        icon="video"
-                                    ))
-                                    break
-
-                                # Expand window height
-                                expand_script = f'''
-tell application "Google Chrome"
-    set frontWindow to front window
-    set {{x1, y1, x2, y2}} to bounds of frontWindow
-    set bounds of frontWindow to {{x1, y1, x2, y2 + {remaining}}}
-end tell
-'''
-                                as_result = executor.execute(expand_script, timeout=3.0)
-                                if not as_result.ok:
-                                    break
-
-                                time.sleep(0.15)  # Let resize settle
-
-                                # Check new height
-                                verify_result = client.execute("window.innerHeight", timeout=2.0)
-                                current_height = verify_result.get("result", 0) if verify_result.get("ok") else 0
-
-                            # Brief stabilization after compensation
-                            time.sleep(0.2)
-
-                    # Only use cropping as last resort if expansion failed
-                    if not banner_compensation_succeeded and banner_crop_height == 0:
-                        banner_crop_height = reported_banner
-
-                video_start_elapsed = int((datetime.now() - result.start_time).total_seconds() * 1000)
-                click.echo(format_system_message(f"Recording video at {actual_fps} frames per second…", icon="video", elapsed_ms=video_start_elapsed))
-                screencast_capture.set_capturing(True)  # Start collecting frames AFTER compensation
-
-                # Start audio cue recording if --include-effects is enabled
-                if include_effects:
-                    try:
-                        # Start audio recording in JavaScript (captures timestamps when sounds play)
-                        client.execute("window.__INSPEKT_REPLAY_VISUAL__.audio.startRecordingForVideo()", timeout=2.0)
-                        # Also notify bridge server to start collecting cues
-                        import requests
-                        requests.post("http://127.0.0.1:8765/audio/start", timeout=2.0)
-                        if verbose:
-                            click.echo(format_system_message("Recording audio cues for video…", icon="audio"))
-                    except Exception as e:
-                        if verbose:
-                            click.echo(format_system_message(f"Could not start audio cue recording: {e}", icon="warning"))
-            else:
-                error_msg = sc_result.get("result", {}).get("error", sc_result.get("error", "Unknown error"))
-                from inspekt.app.cli.table import print_warning
-                print_warning(f"Could not start video recording: {error_msg}")
-                # Send stop command to clean up extension state even on failure
-                try:
-                    client.execute("window.postMessage({type: 'INSPEKT_STOP_SCREENCAST', source: 'inspekt-page'}, '*')", timeout=2.0)
-                except Exception:
-                    pass
-                video_recording_enabled = False
-                screencast_capture = None
-        except Exception as e:
-            from inspekt.app.cli.table import print_warning
-            print_warning(f"Video recording error: {e}")
-            # Send stop command to clean up extension state even on failure
             try:
-                client.execute("window.postMessage({type: 'INSPEKT_STOP_SCREENCAST', source: 'inspekt-page'}, '*')", timeout=2.0)
-            except Exception:
-                pass
-            video_recording_enabled = False
-            screencast_capture = None
+                sc_result = client.execute(smooth_start_js, timeout=15.0)
+                if sc_result.get("ok") and sc_result.get("result", {}).get("ok"):
+                    click.echo(format_system_message(
+                        f"Recording smooth video at {actual_fps} fps…",
+                        icon="video",
+                        elapsed_ms=video_start_elapsed
+                    ))
+                    # Smooth capture is now active in browser (tabCapture + MediaRecorder)
+                else:
+                    error_msg = sc_result.get("result", {}).get("error", sc_result.get("error", "Unknown error"))
+                    from inspekt.app.cli.table import print_warning
+                    print_warning(f"Could not start smooth video recording: {error_msg}")
+                    print_warning("Falling back to compact mode (1 frame per action)")
+                    video_mode = "compact"
+                    click.echo(format_system_message(
+                        "Recording compact video (1 frame per action)…",
+                        icon="video",
+                        elapsed_ms=video_start_elapsed
+                    ))
+            except Exception as e:
+                from inspekt.app.cli.table import print_warning
+                print_warning(f"Smooth video recording error: {e}")
+                print_warning("Falling back to compact mode (1 frame per action)")
+                video_mode = "compact"
+                click.echo(format_system_message(
+                    "Recording compact video (1 frame per action)…",
+                    icon="video",
+                    elapsed_ms=video_start_elapsed
+                ))
+        else:
+            # Compact mode - 1 frame per action
+            click.echo(format_system_message(
+                "Recording compact video (1 frame per action)…",
+                icon="video",
+                elapsed_ms=video_start_elapsed
+            ))
+
+        # Start audio cue recording if --include-effects is enabled
+        if include_effects:
+            try:
+                # Start audio recording in JavaScript (captures timestamps when sounds play)
+                client.execute("window.__INSPEKT_REPLAY_VISUAL__.audio.startRecordingForVideo()", timeout=2.0)
+                # Also notify bridge server to start collecting cues
+                import requests
+                requests.post("http://127.0.0.1:8765/audio/start", timeout=2.0)
+                if verbose:
+                    click.echo(format_system_message("Recording audio cues for video…", icon="audio"))
+            except Exception as e:
+                if verbose:
+                    click.echo(format_system_message(f"Could not start audio cue recording: {e}", icon="warning"))
 
     # Execute steps
     previous_timestamp = steps_to_run[0].timestamp if steps_to_run else 0
     last_step_navigated = False  # Track if previous step caused navigation
     page_load_wait_ms = 0  # Time spent waiting for page load (subtract from next delay)
     replay_cancelled = False  # Track if user cancelled in interactive mode
+
+    # Capture initial frame before any actions (shows starting state)
+    # Only for compact mode - smooth mode captures continuously via CDP
+    if video_recording_enabled and video_mode == "compact" and client and not dry_run:
+        initial_frame = capture_video_frame(client, 0.0)
+        if initial_frame:
+            video_frames.append(initial_frame)
+            if verbose:
+                click.echo(format_system_message("captured initial video frame"))
 
     for i, step in enumerate(steps_to_run):
         actual_index = start_idx + i
@@ -2777,10 +2724,6 @@ end tell
 
         # Interactive mode: show overlay and wait for user input
         if interactive and not dry_run:
-            # Pause video capture during interactive wait to avoid dead time in video
-            if screencast_capture and screencast_capture.is_capturing:
-                screencast_capture.set_capturing(False)
-
             # Build the interactive prompt step
             previous_step_dict = None
             if i > 0:
@@ -2820,9 +2763,6 @@ end tell
                         result.add_skip(actual_index, step_dict, "Skipped by user (interactive mode)")
                         if verbose:
                             click.echo(format_system_message("skipped by user"))
-                        # Resume video capture before continuing
-                        if screencast_capture:
-                            screencast_capture.set_capturing(True)
                         continue
                     elif choice == "cancel":
                         # User pressed Escape - cancel the entire replay
@@ -2831,9 +2771,6 @@ end tell
                         click.echo()
                         click.secho("Replay cancelled by user.", fg="yellow")
                         replay_cancelled = True
-                        # Resume video capture before breaking (for final frame capture)
-                        if screencast_capture:
-                            screencast_capture.set_capturing(True)
                         break
                     # choice == "next" - continue to execute the step
                 else:
@@ -2842,10 +2779,6 @@ end tell
             except Exception as e:
                 if verbose:
                     click.echo(format_system_message(f"Interactive prompt error: {e}"))
-
-            # Resume video capture after interactive prompt (for "next" choice or errors)
-            if screencast_capture:
-                screencast_capture.set_capturing(True)
 
         if replay_cancelled:
             break
@@ -3197,24 +3130,16 @@ end tell
                 replay_cancelled = True
                 break
 
-        # Collect pending video frames periodically to prevent buffer overflow
-        # The bridge server has a 10,000 frame buffer limit - long replays could exceed this
-        if screencast_capture and screencast_capture.is_capturing:
-            frames_collected = screencast_capture.collect_pending()
-            if verbose and frames_collected > 0:
-                click.echo(format_system_message(f"collected {frames_collected} video frames"))
-
-            # Check if recording was interrupted (e.g., user opened DevTools)
-            interrupt_info = screencast_capture.check_interrupted()
-            if interrupt_info:
-                reason = interrupt_info.get("reason", "unknown")
-                # "tab closed" often happens during cross-origin navigation (Chrome site isolation)
-                # This is expected and doesn't prevent video capture - suppress misleading warning
-                if reason != "tab closed":
-                    click.echo()
-                    from inspekt.app.cli.table import print_warning
-                    print_warning(f"Video recording interrupted: {reason}. Video will be saved with frames captured so far.")
-                screencast_capture.set_capturing(False)  # Mark as no longer capturing
+        # Handle video frame capture for compact mode
+        # Smooth mode records continuously in browser via MediaRecorder, no frame collection needed
+        if video_recording_enabled and video_mode == "compact" and client and not dry_run:
+            # Compact mode: capture action-based frame after each step
+            frame_timestamp = (datetime.now() - result.start_time).total_seconds()
+            frame_data = capture_video_frame(client, frame_timestamp)
+            if frame_data:
+                video_frames.append(frame_data)
+                if verbose:
+                    click.echo(format_system_message(f"captured video frame at {frame_timestamp:.2f}s"))
 
         # Additional fixed delay between steps (on top of real-time timing)
         # Only applies if --step-delay is explicitly set to a non-zero value
@@ -3247,14 +3172,174 @@ end tell
 
     result.end_time = datetime.now()
 
-    # Stop video recording and encode
+    # Encode video from captured frames
     video_saved_path = None
-    if video_recording_enabled and screencast_capture:
+    if video_recording_enabled:
         try:
-            # Stop capture and get frames
-            stop_elapsed = int((datetime.now() - result.start_time).total_seconds() * 1000)
-            click.echo(format_system_message("Stopping video capture…", icon="video", elapsed_ms=stop_elapsed))
-            frames = screencast_capture.stop()
+            # Collect video based on mode
+            if video_mode == "smooth":
+                # Stop smooth capture via JavaScript postMessage
+                stop_elapsed = int((datetime.now() - result.start_time).total_seconds() * 1000)
+                click.echo(format_system_message("Stopping video capture…", icon="video", elapsed_ms=stop_elapsed))
+
+                # Send stop message via JS postMessage
+                smooth_stop_js = """
+(function() {
+    return new Promise((resolve) => {
+        const requestId = 'smooth-stop-' + Date.now();
+
+        const handler = (event) => {
+            if (event.data?.type === 'INSPEKT_SMOOTH_CAPTURE_STOPPED' &&
+                event.data?.source === 'inspekt-extension' &&
+                event.data?.requestId === requestId) {
+                window.removeEventListener('message', handler);
+                resolve(event.data.response);
+            }
+        };
+
+        window.addEventListener('message', handler);
+
+        window.postMessage({
+            type: 'INSPEKT_STOP_SMOOTH_CAPTURE',
+            source: 'inspekt-page',
+            requestId: requestId
+        }, '*');
+
+        // Timeout after 10 seconds (MediaRecorder needs time to finalize)
+        setTimeout(() => {
+            window.removeEventListener('message', handler);
+            resolve({ ok: true, message: 'Stop timeout' });
+        }, 10000);
+    });
+})()
+"""
+                try:
+                    stop_result = client.execute(smooth_stop_js, timeout=15.0)
+                    if verbose:
+                        click.echo(format_system_message(f"Stop result: {stop_result.get('result', {})}"))
+                except Exception as e:
+                    if verbose:
+                        click.echo(format_system_message(f"Stop message warning: {e}"))
+
+                # Wait for video to be processed and posted to bridge
+                # Larger videos need more time for base64 encoding and HTTP POST
+                time.sleep(3.0)
+
+                # Retrieve captured video from bridge server
+                import requests
+                from inspekt.config import get_bridge_port
+
+                try:
+                    video_response = requests.get(
+                        f"http://127.0.0.1:{get_bridge_port()}/video/get",
+                        timeout=30.0
+                    )
+                    if video_response.status_code == 200:
+                        video_data = video_response.json()
+                        if video_data.get("ok") and video_data.get("data"):
+                            # Decode base64 video data
+                            import base64
+                            video_bytes = base64.b64decode(video_data["data"])
+                            video_duration = video_data.get("duration", 0)
+
+                            save_elapsed = int((datetime.now() - result.start_time).total_seconds() * 1000)
+
+                            # Save the video (WebM format from MediaRecorder)
+                            # Always use ffmpeg to crop to viewport dimensions (removes black bars)
+                            output_format = resolved_video_path.suffix.lstrip(".").lower()
+
+                            import tempfile
+
+                            with tempfile.NamedTemporaryFile(suffix=".webm", delete=False) as tmp:
+                                tmp.write(video_bytes)
+                                tmp_path = tmp.name
+
+                            try:
+                                # Get viewport dimensions for cropping
+                                viewport = recording.state.viewport if recording.state else None
+                                if viewport:
+                                    target_w = viewport.width
+                                    target_h = viewport.height
+                                else:
+                                    # Fallback to full video (no cropping)
+                                    target_w = 0
+                                    target_h = 0
+
+                                click.echo(format_system_message(
+                                    f"Processing video…",
+                                    icon="video",
+                                    elapsed_ms=save_elapsed
+                                ))
+
+                                # Build ffmpeg command with viewport cropping
+                                if target_w > 0 and target_h > 0:
+                                    # Scale to viewport size, cropping to match aspect ratio
+                                    # This removes black bars by cropping to the content area
+                                    vf_filter = f"scale={target_w}:{target_h}:force_original_aspect_ratio=increase,crop={target_w}:{target_h}"
+                                else:
+                                    vf_filter = None
+
+                                if output_format == "webm":
+                                    # Re-encode WebM with cropping
+                                    ffmpeg_cmd = ["ffmpeg", "-y", "-i", tmp_path]
+                                    if vf_filter:
+                                        ffmpeg_cmd.extend(["-vf", vf_filter])
+                                    ffmpeg_cmd.extend(["-c:v", "libvpx-vp9", "-crf", "30", "-b:v", "0", str(resolved_video_path)])
+                                else:
+                                    # Convert to MP4 with cropping
+                                    ffmpeg_cmd = ["ffmpeg", "-y", "-i", tmp_path]
+                                    if vf_filter:
+                                        ffmpeg_cmd.extend(["-vf", vf_filter])
+                                    ffmpeg_cmd.extend(["-c:v", "libx264", "-preset", "fast", "-crf", "23", "-pix_fmt", "yuv420p", str(resolved_video_path)])
+
+                                subprocess.run(ffmpeg_cmd, check=True, capture_output=True)
+                                video_saved_path = resolved_video_path
+                            finally:
+                                Path(tmp_path).unlink(missing_ok=True)
+
+                            if video_saved_path:
+                                file_size = video_saved_path.stat().st_size
+                                if file_size < 1024 * 1024:
+                                    file_size_str = f"{file_size / 1024:.1f} KB"
+                                else:
+                                    file_size_str = f"{file_size / (1024 * 1024):.1f} MB"
+
+                                # Create clickable filename
+                                file_uri = video_saved_path.as_uri()
+                                clickable_name = f"\033]8;;{file_uri}\033\\{video_saved_path.name}\033]8;;\033\\"
+
+                                saved_elapsed = int((datetime.now() - result.start_time).total_seconds() * 1000)
+                                click.echo(format_system_message(
+                                    f"Video saved: {clickable_name} ({file_size_str})",
+                                    icon="video",
+                                    elapsed_ms=saved_elapsed,
+                                    truncate=False
+                                ))
+
+                                # Verify video
+                                verify_result = _verify_video(video_saved_path)
+                                if verify_result:
+                                    click.echo(format_system_message(
+                                        f"Video verified: {verify_result}",
+                                        icon="video",
+                                        elapsed_ms=saved_elapsed
+                                    ))
+                        else:
+                            from inspekt.app.cli.table import print_warning
+                            print_warning("No video data captured")
+                    else:
+                        from inspekt.app.cli.table import print_warning
+                        print_warning(f"Failed to retrieve video: HTTP {video_response.status_code}")
+
+                except requests.RequestException as e:
+                    from inspekt.app.cli.table import print_warning
+                    print_warning(f"Failed to retrieve video: {e}")
+
+                # Skip the frame-based encoding for smooth mode
+                frames = None
+            else:
+                # Use action-based frames for compact mode
+                frames = video_frames
 
             if frames:
                 # Calculate actual FPS from frame timestamps for correct playback speed
@@ -3285,13 +3370,17 @@ end tell
                     output_format = "mp4"
 
                 encode_start_time = time.time()
+                # Action-based screenshots (via captureVisibleTab) don't include the
+                # automation banner, so we don't need to crop. Only CDP screencast
+                # frames might have the banner, but action screenshots are the primary
+                # source now.
                 encode_result = encode_replay_video(
                     frames=frames,
                     output_path=str(resolved_video_path),
                     fps=int(round(real_fps)),  # Use calculated FPS for correct playback
                     format=output_format,
                     progress_callback=None,  # No progress output
-                    crop_top=banner_crop_height,  # Crop automation banner from top
+                    crop_top=0,  # Action screenshots don't include banner, no cropping needed
                 )
                 encode_duration = time.time() - encode_start_time
 
@@ -3425,44 +3514,13 @@ end tell
                 else:
                     from inspekt.app.cli.table import print_warning
                     print_warning(f"Video encoding failed: {encode_result.get('error')}")
-            else:
+            elif not video_saved_path:
+                # Only show warning if we don't already have a saved video (smooth mode saves directly)
                 from inspekt.app.cli.table import print_warning
                 print_warning("No frames captured for video")
         except Exception as e:
             from inspekt.app.cli.table import print_warning
             print_warning(f"Video encoding error: {e}")
-
-        # Restore original zoom level if we changed it
-        if original_zoom_level and abs(original_zoom_level - 1.0) > 0.05 and client:
-            try:
-                restore_zoom_js = f"""
-                (async () => {{
-                    return new Promise((resolve) => {{
-                        const requestId = 'restore-zoom-' + Date.now();
-                        const handler = (event) => {{
-                            if (event.data?.type === 'INSPEKT_ZOOM_SET_RESPONSE' &&
-                                event.data?.requestId === requestId) {{
-                                window.removeEventListener('message', handler);
-                                resolve(event.data.response);
-                            }}
-                        }};
-                        window.addEventListener('message', handler);
-                        window.postMessage({{
-                            type: 'INSPEKT_SET_ZOOM_LEVEL',
-                            source: 'inspekt-page',
-                            requestId: requestId,
-                            zoomFactor: {original_zoom_level}
-                        }}, '*');
-                        setTimeout(() => resolve({{ ok: false }}), 2000);
-                    }});
-                }})()
-                """
-                restore_result = client.execute(restore_zoom_js, timeout=3.0)
-                if restore_result.get("ok") and restore_result.get("result", {}).get("ok"):
-                    if verbose:
-                        click.echo(format_system_message(f"Restored zoom to {original_zoom_level:.0%}", icon="video"))
-            except Exception:
-                pass  # Best effort restoration
 
     # Play completion sound and cleanup visual overlay
     if not dry_run and client and (visual or audio or lock):
