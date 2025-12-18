@@ -550,9 +550,101 @@
     }
 
     /**
-     * Get all focusable elements on the page in tab order.
+     * Dispatch a key event via CDP Input.dispatchKeyEvent.
+     * This sends a "real" key event through the browser's input pipeline,
+     * triggering :focus-visible unlike synthetic JavaScript events.
+     *
+     * Same approach as Playwright and Puppeteer.
+     *
+     * @param {string} key - The key to dispatch (e.g., 'Tab', 'Enter')
+     * @param {string[]} modifiers - Modifier keys (e.g., ['shift'])
+     * @returns {Promise<{ok: boolean, error?: string}>}
      */
-    function getFocusableElements() {
+    async function dispatchKeyViaCDP(key, modifiers = []) {
+        const requestId = `cdp-key-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+        return new Promise((resolve) => {
+            const timeout = setTimeout(() => {
+                window.removeEventListener('message', handler);
+                resolve({ ok: false, error: 'CDP key dispatch timeout' });
+            }, 2000);
+
+            const handler = (event) => {
+                if (event.data?.type === 'INSPEKT_CDP_KEY_RESPONSE' &&
+                    event.data?.source === 'inspekt-extension' &&
+                    event.data?.requestId === requestId) {
+                    clearTimeout(timeout);
+                    window.removeEventListener('message', handler);
+                    resolve(event.data.response || { ok: false, error: 'No response' });
+                }
+            };
+
+            window.addEventListener('message', handler);
+
+            // Send request to extension via window message bridge
+            window.postMessage({
+                type: 'INSPEKT_DISPATCH_KEY_CDP',
+                source: 'inspekt-page',
+                requestId: requestId,
+                key: key,
+                modifiers: modifiers
+            }, '*');
+        });
+    }
+
+    /**
+     * Detect if there's an open modal dialog that should trap focus.
+     * Returns the modal container element or null.
+     */
+    function getActiveFocusTrap() {
+        // 1. Native <dialog> element with open attribute
+        const openDialog = document.querySelector('dialog[open]');
+        if (openDialog) return openDialog;
+
+        // 2. ARIA modal dialogs
+        const ariaModal = document.querySelector('[aria-modal="true"]:not([aria-hidden="true"])');
+        if (ariaModal) return ariaModal;
+
+        // 3. Common cookie consent dialogs (Shadow DOM containers)
+        // These use focus trapping internally - we should let them handle Tab
+        const cookieConsents = [
+            '#usercentrics-cmp-ui',           // UserCentrics
+            '#onetrust-consent-sdk',           // OneTrust
+            '#CybotCookiebotDialog',           // Cookiebot
+            '.cmp-root',                       // Generic CMP
+            '[data-testid="uc-main-banner"]',  // UserCentrics variant
+        ];
+        for (const selector of cookieConsents) {
+            const consent = document.querySelector(selector);
+            if (consent) {
+                // Check if it's actually visible (not dismissed)
+                const style = window.getComputedStyle(consent);
+                if (style.display !== 'none' && style.visibility !== 'hidden') {
+                    return consent;
+                }
+            }
+        }
+
+        // 4. Generic modal patterns (Bootstrap, etc.)
+        const genericModals = document.querySelectorAll(
+            '.modal.show, .modal.open, .modal--open, .modal[aria-hidden="false"], ' +
+            '[role="dialog"]:not([aria-hidden="true"])'
+        );
+        for (const modal of genericModals) {
+            const style = window.getComputedStyle(modal);
+            if (style.display !== 'none' && style.visibility !== 'hidden') {
+                return modal;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Get focusable elements, optionally constrained to a container.
+     * Also handles inert attribute and pierces Shadow DOM.
+     */
+    function getFocusableElements(container = document) {
         const selector = [
             'a[href]',
             'button:not([disabled])',
@@ -565,16 +657,42 @@
             'video[controls]'
         ].join(', ');
 
-        const elements = Array.from(document.querySelectorAll(selector));
+        // Collect elements from both light DOM and Shadow DOM
+        const elements = [];
 
-        // Filter out hidden elements and sort by tabindex
+        function collectFromNode(root) {
+            // Query this root
+            const found = root.querySelectorAll ? Array.from(root.querySelectorAll(selector)) : [];
+            elements.push(...found);
+
+            // Recurse into Shadow DOM
+            const allElements = root.querySelectorAll ? root.querySelectorAll('*') : [];
+            for (const el of allElements) {
+                if (el.shadowRoot) {
+                    collectFromNode(el.shadowRoot);
+                }
+            }
+        }
+
+        collectFromNode(container);
+
+        // Filter out hidden elements and elements inside inert containers
         return elements.filter(el => {
+            // Check if inside an inert container
+            if (el.closest('[inert]')) {
+                return false;
+            }
+            // Check if inside aria-hidden container (outside our target container)
+            const ariaHiddenAncestor = el.closest('[aria-hidden="true"]');
+            if (ariaHiddenAncestor && !container.contains(ariaHiddenAncestor)) {
+                return false;
+            }
             // Check if visible
             const style = window.getComputedStyle(el);
             if (style.display === 'none' || style.visibility === 'hidden') {
                 return false;
             }
-            // Check if element or ancestor is hidden
+            // Check if element or ancestor is hidden (offsetParent check)
             if (el.offsetParent === null && style.position !== 'fixed') {
                 return false;
             }
@@ -591,9 +709,97 @@
     }
 
     /**
+     * Duplicate :focus-visible styles to also apply to :focus.
+     * This makes programmatic focus look like keyboard navigation.
+     */
+    function ensureFocusStyles() {
+        const styleId = 'inspekt-replay-focus-styles';
+        if (document.getElementById(styleId)) return;
+
+        const duplicatedRules = [];
+
+        // Scan all stylesheets for :focus-visible rules
+        try {
+            for (const sheet of document.styleSheets) {
+                try {
+                    const rules = sheet.cssRules || sheet.rules;
+                    if (!rules) continue;
+
+                    for (const rule of rules) {
+                        if (rule.selectorText && rule.selectorText.includes(':focus-visible')) {
+                            // Create a duplicate rule with :focus instead of :focus-visible
+                            const newSelector = rule.selectorText.replace(/:focus-visible/g, ':focus');
+                            duplicatedRules.push(`${newSelector} { ${rule.style.cssText} }`);
+                        }
+                    }
+                } catch (e) {
+                    // Cross-origin stylesheets can't be read - skip them
+                }
+            }
+        } catch (e) {
+            // Stylesheet access failed
+        }
+
+        // Create and inject the duplicated styles
+        if (duplicatedRules.length > 0) {
+            const style = document.createElement('style');
+            style.id = styleId;
+            style.textContent = `/* Inspekt: Duplicated :focus-visible rules for replay */\n${duplicatedRules.join('\n')}`;
+            document.head.appendChild(style);
+        }
+
+        // Also process Shadow DOMs
+        document.querySelectorAll('*').forEach(el => {
+            if (el.shadowRoot) {
+                const shadowStyleId = styleId + '-shadow-' + (el.id || Math.random().toString(36).slice(2));
+                if (el.shadowRoot.getElementById(shadowStyleId)) return;
+
+                const shadowRules = [];
+                try {
+                    // Check for adopted stylesheets (modern Shadow DOM)
+                    if (el.shadowRoot.adoptedStyleSheets) {
+                        for (const sheet of el.shadowRoot.adoptedStyleSheets) {
+                            try {
+                                for (const rule of sheet.cssRules) {
+                                    if (rule.selectorText && rule.selectorText.includes(':focus-visible')) {
+                                        const newSelector = rule.selectorText.replace(/:focus-visible/g, ':focus');
+                                        shadowRules.push(`${newSelector} { ${rule.style.cssText} }`);
+                                    }
+                                }
+                            } catch (e) {}
+                        }
+                    }
+                    // Also check inline style elements
+                    const styleElements = el.shadowRoot.querySelectorAll('style');
+                    for (const styleEl of styleElements) {
+                        const sheet = styleEl.sheet;
+                        if (!sheet) continue;
+                        try {
+                            for (const rule of sheet.cssRules) {
+                                if (rule.selectorText && rule.selectorText.includes(':focus-visible')) {
+                                    const newSelector = rule.selectorText.replace(/:focus-visible/g, ':focus');
+                                    shadowRules.push(`${newSelector} { ${rule.style.cssText} }`);
+                                }
+                            }
+                        } catch (e) {}
+                    }
+                } catch (e) {}
+
+                if (shadowRules.length > 0) {
+                    const shadowStyle = document.createElement('style');
+                    shadowStyle.id = shadowStyleId;
+                    shadowStyle.textContent = shadowRules.join('\n');
+                    el.shadowRoot.appendChild(shadowStyle);
+                }
+            }
+        });
+    }
+
+    /**
      * Simulate a keypress.
      */
-    function simulateKeypress(key, modifiers) {
+    async function simulateKeypress(key, modifiers) {
+        console.log('%c[Inspekt replay_step.js]%c simulateKeypress called:', 'color: #ff6600; font-weight: bold', 'color: inherit', key);
         const activeElement = document.activeElement || document.body;
         const mods = modifiers || [];
 
@@ -608,16 +814,347 @@
             shiftKey: mods.includes('shift')
         };
 
-        activeElement.dispatchEvent(new KeyboardEvent('keydown', eventInit));
-
-        // Special handling for Tab key - manually move focus since synthetic events
-        // don't trigger browser default focus navigation
+        // Special handling for Tab key - use CDP to send real key events
+        // and show focus-visible styles via polyfill (since CDP can't trigger native :focus-visible)
         if (key === 'Tab') {
-            const focusable = getFocusableElements();
-            if (focusable.length > 0) {
-                const currentIndex = focusable.indexOf(activeElement);
-                let nextIndex;
+            // Inject focus-visible polyfill on first Tab (extracts site's :focus-visible CSS)
+            const visual = window.__INSPEKT_VISUAL__;
+            if (visual?.focusVisible && !visual.focusVisible.isInjected()) {
+                visual.focusVisible.inject();
+            }
 
+            // Clean up any previously force-visible elements (from previous Tab step)
+            // This restores their original styles before we make the new element visible
+            const prevForceVisible = document.querySelectorAll('[data-inspekt-force-visible]');
+            for (const el of prevForceVisible) {
+                if (el._inspektRestoreStyles) {
+                    el._inspektRestoreStyles();
+                }
+            }
+
+            // KEYBOARD MODALITY PRIMING:
+            // Chrome's :focus-visible heuristic triggers when "a focus event immediately
+            // follows a keydown event where the key pressed was Tab" (per MDN).
+            // CDP dispatch bypasses this heuristic, so we dispatch a synthetic Tab keydown
+            // BEFORE CDP to potentially prime Chrome's keyboard modality tracking.
+            const currentActive = document.activeElement || document.body;
+            currentActive.dispatchEvent(new KeyboardEvent('keydown', {
+                ...eventInit,
+                bubbles: true,
+                cancelable: true
+            }));
+
+            // Set up focus event listener BEFORE dispatching CDP key
+            // This captures the focus change that CDP triggers
+            let focusedElement = null;
+            let focusEventReceived = false;
+
+            const focusHandler = (event) => {
+                focusedElement = event.target;
+                focusEventReceived = true;
+            };
+            document.addEventListener('focusin', focusHandler, true);
+
+            // First, try CDP key dispatch for authentic focus behavior
+            const cdpResult = await dispatchKeyViaCDP(key, mods);
+
+            if (cdpResult.ok) {
+                // Wait a bit for the browser to process the focus change
+                await new Promise(resolve => setTimeout(resolve, 100));
+
+                // Remove listener
+                document.removeEventListener('focusin', focusHandler, true);
+
+                if (focusEventReceived) {
+                    // Focus captured via focusin event
+                } else {
+                    // CDP events don't trigger JavaScript focus events, and when the browser
+                    // tab is in the background, document.activeElement returns BODY and :focus
+                    // selectors don't match. Use the step's target as fallback - this is the
+                    // element that received focus during recording.
+                    focusedElement = document.querySelector(':focus');
+
+                    // If no :focus match, try the step's target selector (recorded destination)
+                    if (!focusedElement && step.target?.selector) {
+                        const findResult = findElement(step.target);
+                        if (findResult.element) {
+                            focusedElement = findResult.element;
+                        }
+                    }
+
+                    // Still nothing? Check Shadow DOMs
+                    if (!focusedElement) {
+                        const allElements = document.querySelectorAll('*');
+                        for (const el of allElements) {
+                            if (el.shadowRoot) {
+                                const shadowFocused = el.shadowRoot.querySelector(':focus');
+                                if (shadowFocused) {
+                                    focusedElement = shadowFocused;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Check if there's an active focus trap (modal, cookie consent, etc.)
+                // Focus traps often use internal JavaScript to manage which element appears focused.
+                // CDP moves browser focus but may not trigger their JS handlers, so we dispatch
+                // a synthetic keydown event to trigger their internal focus management.
+                const focusTrap = getActiveFocusTrap();
+                if (focusTrap) {
+                    // Dispatch synthetic keydown to trigger the focus trap's internal handlers
+                    focusTrap.dispatchEvent(new KeyboardEvent('keydown', { ...eventInit, bubbles: true }));
+                    // Also dispatch to any shadow root's active element
+                    if (focusTrap.shadowRoot?.activeElement) {
+                        focusTrap.shadowRoot.activeElement.dispatchEvent(
+                            new KeyboardEvent('keydown', { ...eventInit, bubbles: true })
+                        );
+                    }
+                    // Wait for internal focus management to complete
+                    await new Promise(resolve => setTimeout(resolve, 50));
+                }
+
+                // If we didn't capture focus via event, try document.activeElement
+                if (!focusedElement || focusedElement === document.body) {
+                    focusedElement = document.activeElement;
+                }
+
+                // Drill down through open Shadow DOMs AND regular DOM children
+                // The loop continues until we find the actual focused element
+                function getDeepestFocusedElement(element) {
+                    if (!element) return element;
+
+                    // Priority 1: If this element has a shadow root with a focused element, go deeper
+                    if (element.shadowRoot?.activeElement) {
+                        return getDeepestFocusedElement(element.shadowRoot.activeElement);
+                    }
+
+                    // Priority 2: Check for nested shadow hosts inside this element
+                    // (buttons or other elements might be custom elements with their own shadows)
+                    try {
+                        const descendants = element.querySelectorAll('*');
+                        for (const el of descendants) {
+                            if (el.shadowRoot?.activeElement) {
+                                return getDeepestFocusedElement(el.shadowRoot.activeElement);
+                            }
+                        }
+                    } catch (e) {
+                        // Ignore query errors
+                    }
+
+                    // Priority 3: Check if there's a focused descendant in regular DOM
+                    try {
+                        const focusedDescendant = element.querySelector(':focus');
+                        if (focusedDescendant && focusedDescendant !== element) {
+                            return getDeepestFocusedElement(focusedDescendant);
+                        }
+                    } catch (e) {
+                        // Ignore query errors
+                    }
+
+                    return element;
+                }
+
+                focusedElement = getDeepestFocusedElement(focusedElement);
+
+                // Dispatch synthetic keydown to the focused element to reinforce keyboard modality.
+                // This combined with the pre-CDP keydown should trigger :focus-visible in most cases.
+                if (focusedElement && focusedElement !== document.body) {
+                    focusedElement.dispatchEvent(new KeyboardEvent('keydown', {
+                        ...eventInit,
+                        bubbles: true,
+                        cancelable: true
+                    }));
+                    // Brief wait for keyboard modality to register
+                    await new Promise(r => setTimeout(r, 5));
+                }
+
+                // Tiered focus visibility approach:
+                // 1. Force element to be visible (skip links, sr-only elements)
+                // 2. Check if native :focus-visible is now showing (from keyboard modality priming)
+                // 3. Try CSS attribute injection as backup (shows site's cloned focus styles)
+                // 4. Fall back to overlay if nothing works
+
+                let usedFallbackOverlay = false;
+
+                if (focusedElement && focusedElement !== document.body) {
+                    // TIER 0: Force visibility for hidden elements (skip links, sr-only)
+                    // Many accessibility patterns hide elements until focused using techniques like:
+                    // - clip: rect(1px, 1px, 1px, 1px)
+                    // - position: absolute; left: -9999px
+                    // - width: 1px; height: 1px; overflow: hidden
+                    // - visibility: hidden; display: none; opacity: 0
+                    // We temporarily override these to make the element visible during replay.
+
+                    // Get computed styles to detect hiding techniques
+                    const computed = getComputedStyle(focusedElement);
+                    const rect = focusedElement.getBoundingClientRect();
+
+                    // Base styles that always help visibility
+                    const forceVisibleStyles = {
+                        'clip': 'auto',
+                        'clip-path': 'none',
+                        'width': 'auto',
+                        'height': 'auto',
+                        'overflow': 'visible',
+                        'opacity': '1',
+                        'visibility': 'visible',
+                        'transform': 'none'
+                    };
+
+                    // Only reset position/coordinates if element is positioned OFF-SCREEN
+                    // (negative left/top values like -9999px). If it has reasonable positioning,
+                    // keep it so the element appears in its intended location.
+                    const computedLeft = parseFloat(computed.left) || 0;
+                    const computedTop = parseFloat(computed.top) || 0;
+                    const isOffScreenLeft = computedLeft < -100 || rect.right < 0;
+                    const isOffScreenTop = computedTop < -100 || rect.bottom < 0;
+                    const isPositioned = computed.position === 'absolute' || computed.position === 'fixed';
+
+                    if (isPositioned && (isOffScreenLeft || isOffScreenTop)) {
+                        // Element is positioned off-screen - reset to bring it back
+                        forceVisibleStyles['position'] = 'relative';
+                        forceVisibleStyles['left'] = 'auto';
+                        forceVisibleStyles['top'] = 'auto';
+                        forceVisibleStyles['right'] = 'auto';
+                        forceVisibleStyles['bottom'] = 'auto';
+                        forceVisibleStyles['margin'] = '0';
+                    }
+
+                    // Handle display:none (but prefer inline-block only if currently none)
+                    if (computed.display === 'none') {
+                        forceVisibleStyles['display'] = 'inline-block';
+                    }
+
+                    // Save original inline styles and apply visibility overrides
+                    const originalStyles = {};
+                    for (const [prop, value] of Object.entries(forceVisibleStyles)) {
+                        originalStyles[prop] = focusedElement.style.getPropertyValue(prop);
+                        focusedElement.style.setProperty(prop, value, 'important');
+                    }
+
+                    // Mark element so we can clean up later
+                    focusedElement.setAttribute('data-inspekt-force-visible', '');
+
+                    // Store cleanup function on the element
+                    focusedElement._inspektRestoreStyles = () => {
+                        for (const [prop, value] of Object.entries(originalStyles)) {
+                            if (value) {
+                                focusedElement.style.setProperty(prop, value);
+                            } else {
+                                focusedElement.style.removeProperty(prop);
+                            }
+                        }
+                        focusedElement.removeAttribute('data-inspekt-force-visible');
+                        delete focusedElement._inspektRestoreStyles;
+                    };
+
+                    // First, check if native :focus-visible is already showing
+                    // (this would mean our keyboard modality priming worked)
+                    const hasNativeFocus = visual?.hasFocusStyling?.(focusedElement) || false;
+
+                    if (hasNativeFocus) {
+                        // Native :focus-visible is working - no polyfill needed
+                        visual?.focusRing?.hide();
+                    } else {
+                        // TIER 2: Try CSS attribute injection (shows site's cloned :focus-visible styles)
+                        if (visual?.focusVisible) {
+                            visual.focusVisible.show(focusedElement);
+
+                            // Wait for styles to compute and check again
+                            await new Promise(r => setTimeout(r, 20));
+                            const hasPolyfillFocus = visual.hasFocusStyling?.(focusedElement) || false;
+
+                            if (hasPolyfillFocus) {
+                                // CSS polyfill worked - ensure overlay is hidden
+                                visual.focusRing?.hide();
+                            } else {
+                                // TIER 3: Fallback to overlay (both native and polyfill failed)
+                                // Keep the CSS attribute set (might still be visible), but also show overlay
+                                visual.focusRing?.show(focusedElement);
+                                usedFallbackOverlay = true;
+                            }
+                        } else if (visual?.focusRing) {
+                            // No focusVisible module - use overlay directly
+                            visual.focusRing.show(focusedElement);
+                            usedFallbackOverlay = true;
+                        }
+                    }
+                }
+
+                const result = { ok: true, method: 'cdp', key: key };
+                if (usedFallbackOverlay) {
+                    result.focusNote = "Using fallback focus indicator (site's focus styles couldn't be applied to this Shadow DOM component)";
+                }
+                return result;
+            }
+
+            // CDP failed (probably DevTools is open) - fall back to synthetic events
+            // Clean up the focus listener we added before CDP dispatch
+            document.removeEventListener('focusin', focusHandler, true);
+            console.log('[Inspekt] CDP unavailable, using synthetic Tab navigation');
+
+            // Dispatch synthetic keydown
+            activeElement.dispatchEvent(new KeyboardEvent('keydown', eventInit));
+
+            // Check if there's an active focus trap (modal, dialog, cookie consent)
+            const focusTrap = getActiveFocusTrap();
+
+            // Check if focus trap has inaccessible Shadow DOM (closed mode)
+            // In this case, dispatch events to the trap and let it handle Tab internally
+            if (focusTrap && !focusTrap.shadowRoot && focusTrap.querySelector('*') === null) {
+                // Element has no children in light DOM - likely uses closed Shadow DOM
+                // Let the component handle Tab via its own event listeners
+                focusTrap.dispatchEvent(new KeyboardEvent('keydown', { ...eventInit, bubbles: true }));
+                focusTrap.dispatchEvent(new KeyboardEvent('keyup', { ...eventInit, bubbles: true }));
+                // Show focus-visible on whatever element gets focus (drill into shadow)
+                await new Promise(resolve => setTimeout(resolve, 50));
+                let focusedElement = document.activeElement;
+                while (focusedElement?.shadowRoot?.activeElement) {
+                    focusedElement = focusedElement.shadowRoot.activeElement;
+                }
+                // Apply tiered focus visibility
+                let usedFallbackOverlay = false;
+                if (focusedElement && focusedElement !== document.body) {
+                    if (visual?.focusVisible) {
+                        visual.focusVisible.show(focusedElement);
+                        await new Promise(r => setTimeout(r, 10));
+                        const hasVisibleFocus = visual.hasFocusStyling?.(focusedElement) || false;
+                        if (hasVisibleFocus) {
+                            visual.focusRing?.hide();
+                        } else {
+                            visual.focusVisible.hide();
+                            visual.focusRing?.show(focusedElement);
+                            usedFallbackOverlay = true;
+                        }
+                    } else if (visual?.focusRing) {
+                        visual.focusRing.show(focusedElement);
+                        usedFallbackOverlay = true;
+                    }
+                }
+                const result = { ok: true, delegatedToFocusTrap: true, method: 'synthetic' };
+                if (usedFallbackOverlay) {
+                    result.focusNote = "Using fallback focus indicator (site's focus styles couldn't be applied to this Shadow DOM component)";
+                }
+                return result;
+            }
+
+            // Get focusable elements - either from focus trap (including its Shadow DOM) or whole document
+            const container = focusTrap || document;
+            const focusable = getFocusableElements(container);
+
+            if (focusable.length > 0) {
+                // Find current position - check both the activeElement and if we're inside the trap
+                let currentIndex = focusable.indexOf(activeElement);
+
+                // If activeElement not in list, find first element in the trap
+                // (happens when focus is on the Shadow DOM host element, not inside it)
+                if (currentIndex === -1 && focusTrap) {
+                    currentIndex = -1; // Will become 0 or last depending on direction
+                }
+
+                let nextIndex;
                 if (mods.includes('shift')) {
                     // Shift+Tab: go backwards
                     nextIndex = currentIndex <= 0 ? focusable.length - 1 : currentIndex - 1;
@@ -627,11 +1164,41 @@
                 }
 
                 const nextElement = focusable[nextIndex];
+                let usedFallbackOverlay = false;
                 if (nextElement) {
                     nextElement.focus();
+                    // Apply tiered focus visibility
+                    if (visual?.focusVisible) {
+                        visual.focusVisible.show(nextElement);
+                        await new Promise(r => setTimeout(r, 10));
+                        const hasVisibleFocus = visual.hasFocusStyling?.(nextElement) || false;
+                        if (hasVisibleFocus) {
+                            visual.focusRing?.hide();
+                        } else {
+                            visual.focusVisible.hide();
+                            visual.focusRing?.show(nextElement);
+                            usedFallbackOverlay = true;
+                        }
+                    } else if (visual?.focusRing) {
+                        visual.focusRing.show(nextElement);
+                        usedFallbackOverlay = true;
+                    }
                 }
+
+                activeElement.dispatchEvent(new KeyboardEvent('keyup', eventInit));
+                const result = { ok: true, method: 'synthetic', key: key };
+                if (usedFallbackOverlay) {
+                    result.focusNote = "Using fallback focus indicator (site's focus styles couldn't be applied to this Shadow DOM component)";
+                }
+                return result;
             }
+
+            activeElement.dispatchEvent(new KeyboardEvent('keyup', eventInit));
+            return { ok: true, method: 'synthetic', key: key };
         }
+
+        // For non-Tab keys, dispatch synthetic events
+        activeElement.dispatchEvent(new KeyboardEvent('keydown', eventInit));
 
         // Special handling for Enter key
         if (key === 'Enter') {
@@ -1178,6 +1745,17 @@
         const result = { ok: false, action: action, error: null, failures: [], usedSelector: null };
 
         try {
+            // Hide focus indicators when performing non-Tab actions
+            // (Tab keypress will show them again on the newly focused element)
+            const visual = window.__INSPEKT_VISUAL__;
+            const isTabKeypress = action === 'keypress' && step.key === 'Tab';
+            if (!isTabKeypress) {
+                if (visual?.focusVisible?.isInjected()) {
+                    visual.focusVisible.hide();
+                }
+                visual?.focusRing?.hide();
+            }
+
             if (action === 'navigate') {
                 // Navigate to URL
                 const url = step.url;
@@ -1507,8 +2085,11 @@
                 // Keyboard actions: just play audio and execute, no visual indicator
                 // (the browser's focus ring provides visual feedback for Tab)
                 playAudio(action);
-                simulateKeypress(step.key, step.modifiers);
-                result.ok = true;
+                const keypressResult = await simulateKeypress(step.key, step.modifiers);
+                result.ok = keypressResult.ok !== false;
+                if (keypressResult.method) {
+                    result.method = keypressResult.method;  // 'cdp' or 'synthetic'
+                }
 
             } else if (action === 'hover') {
                 const { element, usedSelector, error } = findElement(step.target);

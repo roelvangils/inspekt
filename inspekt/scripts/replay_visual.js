@@ -221,6 +221,25 @@
       }
     }
 
+    /* Focus ring overlay (fallback for Tab navigation when CSS injection fails) */
+    #inspekt-focus-ring {
+      position: absolute;
+      pointer-events: none;
+      border: 2px solid #0066ff;
+      border-radius: 4px;
+      box-shadow: 0 0 0 2px rgba(0, 102, 255, 0.3);
+      opacity: 0;
+      transition: opacity 0.15s ease-out,
+                  left 0.15s ease-out,
+                  top 0.15s ease-out,
+                  width 0.15s ease-out,
+                  height 0.15s ease-out;
+    }
+
+    #inspekt-focus-ring.visible {
+      opacity: 1;
+    }
+
     /* Interactive replay overlay */
     #inspekt-interactive-overlay {
       /* CSS Variables for dark/light mode */
@@ -676,9 +695,14 @@
     typing.textContent = 'Typing';
     overlay.appendChild(typing);
 
+    // Create focus ring indicator (for Tab navigation fallback)
+    const focusRing = document.createElement('div');
+    focusRing.id = 'inspekt-focus-ring';
+    overlay.appendChild(focusRing);
+
     document.body.appendChild(overlay);
 
-    return { overlay, circle, typing };
+    return { overlay, circle, typing, focusRing };
   }
 
   // ==========================================================================
@@ -3103,6 +3127,462 @@
   };
 
   // ==========================================================================
+  // Focus Visible Polyfill
+  // ==========================================================================
+
+  /**
+   * Polyfill for :focus and :focus-visible during replay.
+   *
+   * Since CDP key events don't trigger Chrome's internal "keyboard mode" flag,
+   * :focus-visible styles never apply. Also, when document.hasFocus() is false
+   * (terminal has OS focus), :focus styles don't apply either. This module:
+   * 1. Scans stylesheets for :focus and :focus-visible rules
+   * 2. Creates cloned rules using [data-inspekt-focus-visible] attribute
+   * 3. Applies the attribute to focused elements during Tab replay
+   *
+   * This ensures replay shows the EXACT same focus styles as real keyboard navigation,
+   * including skip links that become visible on :focus.
+   */
+  const FocusVisible = {
+    injected: false,
+    rulesCount: 0,
+
+    /**
+     * Extract a CSS rule as text, handling nested rules (@media, @supports, etc.)
+     */
+    extractRuleText(rule, parentPrefix = '') {
+      // Handle @media rules
+      if (rule instanceof CSSMediaRule) {
+        const innerRules = [];
+        for (const innerRule of rule.cssRules) {
+          const extracted = this.extractFocusVisibleRules(innerRule);
+          innerRules.push(...extracted);
+        }
+        if (innerRules.length > 0) {
+          return [`@media ${rule.conditionText} {\n${innerRules.join('\n')}\n}`];
+        }
+        return [];
+      }
+
+      // Handle @supports rules
+      if (rule instanceof CSSSupportsRule) {
+        const innerRules = [];
+        for (const innerRule of rule.cssRules) {
+          const extracted = this.extractFocusVisibleRules(innerRule);
+          innerRules.push(...extracted);
+        }
+        if (innerRules.length > 0) {
+          return [`@supports ${rule.conditionText} {\n${innerRules.join('\n')}\n}`];
+        }
+        return [];
+      }
+
+      // Handle @layer rules (CSS Cascade Layers)
+      if (rule instanceof CSSLayerBlockRule) {
+        const innerRules = [];
+        for (const innerRule of rule.cssRules) {
+          const extracted = this.extractFocusVisibleRules(innerRule);
+          innerRules.push(...extracted);
+        }
+        if (innerRules.length > 0) {
+          const layerName = rule.name ? ` ${rule.name}` : '';
+          return [`@layer${layerName} {\n${innerRules.join('\n')}\n}`];
+        }
+        return [];
+      }
+
+      // Handle regular style rules
+      if (rule instanceof CSSStyleRule) {
+        // Check for :focus-visible or :focus (but not :focus-within which is different)
+        const selectorText = rule.selectorText;
+        if (selectorText && (selectorText.includes(':focus-visible') ||
+            (selectorText.includes(':focus') && !selectorText.includes(':focus-within')))) {
+          // Replace :focus-visible first (to avoid partial replacement of :focus)
+          // Then replace remaining :focus (but not :focus-within)
+          let newSelector = selectorText.replace(/:focus-visible/g, '[data-inspekt-focus-visible]');
+          // Replace :focus that's not part of :focus-visible or :focus-within
+          // Use negative lookahead to avoid matching :focus-visible or :focus-within
+          newSelector = newSelector.replace(/:focus(?!-visible)(?!-within)/g, '[data-inspekt-focus-visible]');
+          return [`${newSelector} { ${rule.style.cssText} }`];
+        }
+      }
+
+      return [];
+    },
+
+    /**
+     * Extract all :focus and :focus-visible rules from a CSSRule (recursive for nested rules)
+     */
+    extractFocusVisibleRules(rule) {
+      return this.extractRuleText(rule);
+    },
+
+    /**
+     * Scan a stylesheet and extract all :focus and :focus-visible rules
+     */
+    scanStylesheet(sheet) {
+      const rules = [];
+      try {
+        const cssRules = sheet.cssRules || sheet.rules;
+        if (!cssRules) return rules;
+
+        for (const rule of cssRules) {
+          const extracted = this.extractFocusVisibleRules(rule);
+          rules.push(...extracted);
+        }
+      } catch (e) {
+        // SecurityError for cross-origin stylesheets - skip silently
+        if (e.name !== 'SecurityError') {
+          console.debug('[Inspekt FocusVisible] Error scanning stylesheet:', e);
+        }
+      }
+      return rules;
+    },
+
+    /**
+     * Scan Shadow DOM for stylesheets
+     */
+    scanShadowRoot(shadowRoot, allRules) {
+      // Check adopted stylesheets (modern Shadow DOM pattern)
+      if (shadowRoot.adoptedStyleSheets) {
+        for (const sheet of shadowRoot.adoptedStyleSheets) {
+          const rules = this.scanStylesheet(sheet);
+          allRules.push(...rules);
+        }
+      }
+
+      // Check inline <style> elements in shadow root
+      const styleElements = shadowRoot.querySelectorAll('style');
+      for (const styleEl of styleElements) {
+        if (styleEl.sheet) {
+          const rules = this.scanStylesheet(styleEl.sheet);
+          allRules.push(...rules);
+        }
+      }
+
+      // Recurse into nested shadow roots
+      const elements = shadowRoot.querySelectorAll('*');
+      for (const el of elements) {
+        if (el.shadowRoot) {
+          this.scanShadowRoot(el.shadowRoot, allRules);
+        }
+      }
+    },
+
+    /**
+     * Inject :focus-visible polyfill styles into the document
+     * Scans all stylesheets and creates cloned rules with [data-inspekt-focus-visible]
+     */
+    inject() {
+      if (this.injected) {
+        return this.rulesCount;
+      }
+
+      const allRules = [];
+
+      // Scan document stylesheets
+      for (const sheet of document.styleSheets) {
+        const rules = this.scanStylesheet(sheet);
+        allRules.push(...rules);
+      }
+
+      // Scan Shadow DOMs
+      const allElements = document.querySelectorAll('*');
+      for (const el of allElements) {
+        if (el.shadowRoot) {
+          this.scanShadowRoot(el.shadowRoot, allRules);
+        }
+      }
+
+      // Always add a universal fallback rule for elements that don't match specific selectors
+      // This ensures focus is visible even when we land on container elements
+      allRules.push(`
+        [data-inspekt-focus-visible] {
+          outline: 2px solid #0066ff !important;
+          outline-offset: 2px !important;
+        }
+      `);
+
+      if (allRules.length === 1) {
+        // Only the fallback rule - no custom :focus rules found
+        console.log('[Inspekt FocusVisible] No custom :focus rules found, using browser default');
+      }
+
+      // Save collected rules for on-demand injection into shadow roots
+      this._collectedRules = allRules;
+
+      // Inject the cloned rules
+      const style = document.createElement('style');
+      style.id = 'inspekt-focus-visible-polyfill';
+      style.textContent = `/* Inspekt: Cloned :focus and :focus-visible rules for replay */\n${allRules.join('\n')}`;
+      document.head.appendChild(style);
+
+      // Also inject into Shadow DOMs that have :focus rules
+      this.injectIntoShadowRoots(allRules);
+
+      this.injected = true;
+      this.rulesCount = allRules.length;
+      console.log(`[Inspekt FocusVisible] Injected ${allRules.length} focus polyfill rules`);
+
+      return this.rulesCount;
+    },
+
+    /**
+     * Inject polyfill styles into Shadow DOMs
+     */
+    injectIntoShadowRoots(rules) {
+      const allElements = document.querySelectorAll('*');
+      for (const el of allElements) {
+        if (el.shadowRoot) {
+          this.injectIntoShadowRoot(el.shadowRoot, rules);
+        }
+      }
+    },
+
+    /**
+     * Inject polyfill into a single Shadow Root (recursive)
+     */
+    injectIntoShadowRoot(shadowRoot, rules) {
+      // Check if already injected
+      if (shadowRoot.getElementById('inspekt-focus-visible-polyfill')) {
+        return;
+      }
+
+      // Create style element for this shadow root
+      const style = document.createElement('style');
+      style.id = 'inspekt-focus-visible-polyfill';
+      style.textContent = rules.join('\n');
+      shadowRoot.appendChild(style);
+
+      // Recurse into nested shadow roots
+      const elements = shadowRoot.querySelectorAll('*');
+      for (const el of elements) {
+        if (el.shadowRoot) {
+          this.injectIntoShadowRoot(el.shadowRoot, rules);
+        }
+      }
+    },
+
+    /**
+     * Show focus-visible styles on an element
+     * Removes attribute from any previous element first
+     */
+    show(element) {
+      // Ensure polyfill is injected
+      if (!this.injected) {
+        this.inject();
+      }
+
+      // Remove from any previous elements (light DOM and shadow DOMs)
+      this.hide();
+
+      // Apply to the new element
+      if (element && element !== document.body && element !== document.documentElement) {
+        element.setAttribute('data-inspekt-focus-visible', '');
+
+        // Check if element is in Shadow DOM and ensure polyfill is injected there
+        const rootNode = element.getRootNode();
+
+        if (rootNode !== document && rootNode.host) {
+          // Check if polyfill styles exist in this shadow root
+          if (!rootNode.getElementById('inspekt-focus-visible-polyfill')) {
+            // Inject on-demand (element might be in a shadow root we didn't scan earlier)
+            const rules = this.getCollectedRules();
+            const polyfillStyle = document.createElement('style');
+            polyfillStyle.id = 'inspekt-focus-visible-polyfill';
+            polyfillStyle.textContent = rules.join('\n');
+            rootNode.appendChild(polyfillStyle);
+          }
+        }
+      }
+    },
+
+    /**
+     * Get collected rules (for on-demand injection into shadow roots)
+     */
+    getCollectedRules() {
+      // If we have collected rules, return them
+      if (this._collectedRules && this._collectedRules.length > 0) {
+        return this._collectedRules;
+      }
+      // Otherwise return the default focus style
+      return [`
+        [data-inspekt-focus-visible] {
+          outline: 2px solid #0066ff !important;
+          outline-offset: 2px !important;
+        }
+      `];
+    },
+
+    /**
+     * Hide focus-visible styles from all elements
+     */
+    hide() {
+      // Remove from light DOM
+      const elements = document.querySelectorAll('[data-inspekt-focus-visible]');
+      elements.forEach(el => el.removeAttribute('data-inspekt-focus-visible'));
+
+      // Remove from shadow DOMs
+      const allElements = document.querySelectorAll('*');
+      for (const el of allElements) {
+        if (el.shadowRoot) {
+          this.hideInShadowRoot(el.shadowRoot);
+        }
+      }
+    },
+
+    /**
+     * Hide focus-visible in a shadow root (recursive)
+     */
+    hideInShadowRoot(shadowRoot) {
+      const elements = shadowRoot.querySelectorAll('[data-inspekt-focus-visible]');
+      elements.forEach(el => el.removeAttribute('data-inspekt-focus-visible'));
+
+      // Recurse into nested shadow roots
+      const allElements = shadowRoot.querySelectorAll('*');
+      for (const el of allElements) {
+        if (el.shadowRoot) {
+          this.hideInShadowRoot(el.shadowRoot);
+        }
+      }
+    },
+
+    /**
+     * Clean up - remove injected styles
+     */
+    cleanup() {
+      // Remove from document
+      const style = document.getElementById('inspekt-focus-visible-polyfill');
+      if (style) {
+        style.remove();
+      }
+
+      // Remove from shadow DOMs
+      const allElements = document.querySelectorAll('*');
+      for (const el of allElements) {
+        if (el.shadowRoot) {
+          const shadowStyle = el.shadowRoot.getElementById('inspekt-focus-visible-polyfill');
+          if (shadowStyle) {
+            shadowStyle.remove();
+          }
+        }
+      }
+
+      // Remove attribute from all elements
+      this.hide();
+
+      this.injected = false;
+      this.rulesCount = 0;
+    }
+  };
+
+  // ==========================================================================
+  // Focus Ring Module (Coordinate-Based Overlay Fallback)
+  // ==========================================================================
+
+  /**
+   * FocusRing - Coordinate-based focus indicator overlay.
+   *
+   * This is a FALLBACK for when CSS injection doesn't work (closed Shadow DOM,
+   * deeply nested shadows, or sites without focus-visible styles).
+   *
+   * The CSS attribute injection (FocusVisible) is always tried first because
+   * it shows the site's actual focus styles. This overlay is only used when
+   * CSS injection fails to produce visible styling.
+   */
+  const FocusRing = {
+    element: null,
+    currentTarget: null,
+
+    init() {
+      this.element = document.getElementById('inspekt-focus-ring');
+    },
+
+    /**
+     * Show focus ring around an element using coordinates.
+     * Works regardless of Shadow DOM, CSS encapsulation, etc.
+     * @param {Element} targetElement - The element to show focus ring around
+     */
+    show(targetElement) {
+      if (!this.element) {
+        this.init();
+      }
+      if (!this.element) {
+        return; // Overlay not created yet
+      }
+
+      if (!targetElement || targetElement === document.body || targetElement === document.documentElement) {
+        this.hide();
+        return;
+      }
+
+      // Store reference for position updates
+      this.currentTarget = targetElement;
+
+      // Get element's bounding rect (works for any element, including Shadow DOM)
+      const rect = targetElement.getBoundingClientRect();
+
+      // Add padding around the element
+      const padding = 3;
+
+      // Position the focus ring overlay
+      this.element.style.left = `${rect.left - padding + window.scrollX}px`;
+      this.element.style.top = `${rect.top - padding + window.scrollY}px`;
+      this.element.style.width = `${rect.width + padding * 2}px`;
+      this.element.style.height = `${rect.height + padding * 2}px`;
+
+      // Show it
+      this.element.classList.add('visible');
+    },
+
+    /**
+     * Hide the focus ring
+     */
+    hide() {
+      if (!this.element) this.init();
+      this.element?.classList.remove('visible');
+      this.currentTarget = null;
+    },
+
+    /**
+     * Update position (for scrolling or resize)
+     */
+    updatePosition() {
+      if (this.element?.classList.contains('visible') && this.currentTarget) {
+        this.show(this.currentTarget);
+      }
+    }
+  };
+
+  /**
+   * Check if an element has visible focus styling.
+   * Used to determine if CSS injection worked or if we need the overlay fallback.
+   * @param {Element} element - The element to check
+   * @returns {boolean} - True if the element has visible focus styling
+   */
+  function hasFocusStyling(element) {
+    if (!element) return false;
+
+    const style = getComputedStyle(element);
+
+    // Check for outline (most common focus indicator)
+    if (style.outlineWidth !== '0px' && style.outlineStyle !== 'none') {
+      return true;
+    }
+
+    // Check for box-shadow (another common focus indicator)
+    if (style.boxShadow && style.boxShadow !== 'none') {
+      return true;
+    }
+
+    // Check for border changes (some sites use border for focus)
+    // We can't easily detect "changed" borders, but a solid colored border might indicate focus
+    // Skip this check as it's too unreliable
+
+    return false;
+  }
+
+  // ==========================================================================
   // Public API
   // ==========================================================================
 
@@ -3202,6 +3682,25 @@
       queueResult: (type, result) => JsDialogInterceptor.queueResult(type, result),
       isEnabled: () => JsDialogInterceptor.enabled
     },
+
+    // Focus visible polyfill (shows site's :focus-visible styles during Tab replay)
+    focusVisible: {
+      inject: () => FocusVisible.inject(),
+      show: (element) => FocusVisible.show(element),
+      hide: () => FocusVisible.hide(),
+      cleanup: () => FocusVisible.cleanup(),
+      isInjected: () => FocusVisible.injected
+    },
+
+    // Focus ring overlay (fallback when CSS injection fails)
+    focusRing: {
+      show: (element) => FocusRing.show(element),
+      hide: () => FocusRing.hide(),
+      updatePosition: () => FocusRing.updatePosition()
+    },
+
+    // Utility to check if element has visible focus styling
+    hasFocusStyling: (element) => hasFocusStyling(element),
 
     // Configuration
     config: CONFIG
