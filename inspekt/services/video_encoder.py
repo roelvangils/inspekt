@@ -238,7 +238,8 @@ class VideoEncoder:
         """
         Encode frames directly from memory (list of bytes).
 
-        This saves frames to a temp directory, encodes, then cleans up.
+        This saves frames to a temp directory with a concat demuxer file that
+        preserves the actual timestamps from CDP screencast, then encodes.
 
         Args:
             frames: List of (timestamp, image_bytes) tuples
@@ -250,6 +251,13 @@ class VideoEncoder:
         """
         if not frames:
             raise VideoEncoderError("No frames to encode")
+
+        # Ensure ffmpeg is available
+        if not ensure_ffmpeg(auto_prompt=True):
+            raise VideoEncoderError("ffmpeg is required for video encoding")
+
+        ffmpeg_path = get_ffmpeg_path()
+        output_path = Path(output_path)
 
         # Create temp directory for frames
         temp_dir = Path(tempfile.mkdtemp(prefix="inspekt_video_"))
@@ -263,15 +271,111 @@ class VideoEncoder:
                 frame_path = temp_dir / f"frame_{i:05d}.jpg"
                 frame_path.write_bytes(image_bytes)
 
-            # Encode
-            result = self.encode_frames(
-                frames_dir=temp_dir,
-                output_path=output_path,
-                frame_pattern="frame_%05d.jpg",
-                progress_callback=progress_callback,
-            )
+            # Create concat demuxer file with actual frame durations
+            # This tells FFmpeg exactly how long to display each frame
+            concat_file = temp_dir / "frames.txt"
+            with open(concat_file, "w") as f:
+                for i, (timestamp, _) in enumerate(frames):
+                    frame_path = temp_dir / f"frame_{i:05d}.jpg"
 
-            return result
+                    # Calculate duration until next frame (or use minimum for last frame)
+                    if i < len(frames) - 1:
+                        duration = frames[i + 1][0] - timestamp
+                        # Ensure reasonable duration (at least 1/60s, at most 10s)
+                        duration = max(0.0167, min(10.0, duration))
+                    else:
+                        # Last frame: hold for a reasonable duration
+                        # Use average of previous durations, or 0.5s if single frame
+                        if len(frames) > 1:
+                            avg_duration = (frames[-1][0] - frames[0][0]) / (len(frames) - 1)
+                            duration = max(0.1, min(2.0, avg_duration))
+                        else:
+                            duration = 0.5
+
+                    f.write(f"file '{frame_path}'\n")
+                    f.write(f"duration {duration:.6f}\n")
+
+                # FFmpeg concat demuxer requires the last file to be listed again
+                # without duration to properly handle the final frame
+                if frames:
+                    last_frame = temp_dir / f"frame_{len(frames)-1:05d}.jpg"
+                    f.write(f"file '{last_frame}'\n")
+
+            # Build video filter chain
+            filters = []
+            if self.crop_top > 0:
+                filters.append(f"crop=iw:ih-{self.crop_top}:0:{self.crop_top}")
+            filters.append("pad=ceil(iw/2)*2:ceil(ih/2)*2")
+            filter_str = ",".join(filters) if filters else "null"
+
+            # Build ffmpeg command using concat demuxer for timestamp-aware encoding
+            if self.output_format == "mp4":
+                cmd = [
+                    str(ffmpeg_path),
+                    "-y",
+                    "-f", "concat",
+                    "-safe", "0",
+                    "-i", str(concat_file),
+                    "-vf", filter_str,
+                    "-c:v", "libx264",
+                    "-preset", self.preset,
+                    "-crf", str(self.crf),
+                    "-pix_fmt", "yuv420p",
+                    "-movflags", "+faststart",
+                    str(output_path),
+                ]
+            else:
+                cmd = [
+                    str(ffmpeg_path),
+                    "-y",
+                    "-f", "concat",
+                    "-safe", "0",
+                    "-i", str(concat_file),
+                    "-vf", filter_str,
+                    "-c:v", "libvpx-vp9",
+                    "-crf", str(self.crf),
+                    "-b:v", "0",
+                    "-pix_fmt", "yuv420p",
+                    str(output_path),
+                ]
+
+            # Run ffmpeg
+            try:
+                result = subprocess.run(
+                    cmd,
+                    capture_output=True,
+                    text=True,
+                    check=True,
+                    timeout=300,
+                )
+            except subprocess.TimeoutExpired:
+                raise VideoEncoderError(f"ffmpeg encoding timed out after 5 minutes (frames: {len(frames)})")
+            except subprocess.CalledProcessError as e:
+                error_msg = e.stderr if e.stderr else str(e)
+                raise VideoEncoderError(f"ffmpeg encoding failed: {error_msg}")
+
+            # Get output file stats
+            if not output_path.exists():
+                raise VideoEncoderError("Output file was not created")
+
+            file_size = output_path.stat().st_size
+
+            # Calculate actual duration from timestamps
+            if len(frames) >= 2:
+                actual_duration = frames[-1][0] - frames[0][0]
+            else:
+                actual_duration = 0.5
+
+            return {
+                "ok": True,
+                "output_path": str(output_path),
+                "file_size_bytes": file_size,
+                "file_size_mb": round(file_size / (1024 * 1024), 2),
+                "duration_seconds": round(actual_duration, 2),
+                "frame_count": len(frames),
+                "fps": round(len(frames) / actual_duration, 1) if actual_duration > 0 else self.fps,
+                "format": self.output_format,
+            }
 
         finally:
             # Clean up temp directory
