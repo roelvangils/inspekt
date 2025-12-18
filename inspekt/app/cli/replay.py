@@ -2574,14 +2574,6 @@ end tell
                 click.echo(format_system_message(f"Recording video at {actual_fps} frames per second…", icon="video", elapsed_ms=video_start_elapsed))
                 screencast_capture.set_capturing(True)  # Start collecting frames AFTER compensation
 
-                # Start frame forcer to ensure consistent video frame rate
-                # CDP screencast only generates frames when compositor renders;
-                # this forces continuous repaints for static pages like Tab navigation
-                try:
-                    client.execute("window.__INSPEKT_REPLAY_VISUAL__?.frameForcer?.start()", timeout=2.0)
-                except Exception:
-                    pass  # Frame forcer is optional enhancement
-
                 # Start audio cue recording if --include-effects is enabled
                 if include_effects:
                     try:
@@ -3259,12 +3251,6 @@ end tell
     video_saved_path = None
     if video_recording_enabled and screencast_capture:
         try:
-            # Stop frame forcer before stopping capture
-            try:
-                client.execute("window.__INSPEKT_REPLAY_VISUAL__?.frameForcer?.stop()", timeout=2.0)
-            except Exception:
-                pass  # Frame forcer cleanup is optional
-
             # Stop capture and get frames
             stop_elapsed = int((datetime.now() - result.start_time).total_seconds() * 1000)
             click.echo(format_system_message("Stopping video capture…", icon="video", elapsed_ms=stop_elapsed))
