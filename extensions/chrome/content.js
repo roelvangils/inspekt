@@ -129,6 +129,33 @@
             }
         }
 
+        // Handle CDP KEY DISPATCH requests from MAIN world
+        // This allows replay_step.js to send "real" key events via CDP,
+        // which triggers :focus-visible unlike synthetic JavaScript events.
+        // Same approach as Playwright and Puppeteer.
+        if (message && message.type === 'INSPEKT_DISPATCH_KEY_CDP' && message.source === 'inspekt-page') {
+            try {
+                const response = await chrome.runtime.sendMessage({
+                    type: 'DISPATCH_KEY_CDP',
+                    key: message.key,
+                    modifiers: message.modifiers || []
+                });
+                window.postMessage({
+                    type: 'INSPEKT_CDP_KEY_RESPONSE',
+                    source: 'inspekt-extension',
+                    requestId: message.requestId,
+                    response: response
+                }, location.origin);
+            } catch (error) {
+                window.postMessage({
+                    type: 'INSPEKT_CDP_KEY_RESPONSE',
+                    source: 'inspekt-extension',
+                    requestId: message.requestId,
+                    response: { ok: false, error: String(error) }
+                }, location.origin);
+            }
+        }
+
         // Handle CAPTURE_SCREENSHOT requests from MAIN world
         if (message && message.type === 'INSPEKT_CAPTURE_SCREENSHOT' && message.source === 'inspekt-page') {
             try {

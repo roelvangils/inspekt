@@ -427,6 +427,18 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         return true; // Keep channel open for async response
     }
 
+    // ========== CDP KEY DISPATCH (for real keyboard events) ==========
+
+    if (message.type === 'DISPATCH_KEY_CDP') {
+        // Send a real key event via CDP Input.dispatchKeyEvent
+        // This triggers :focus-visible unlike synthetic JavaScript events
+        const { key, modifiers = [] } = message;
+        dispatchKeyViaCDP(sender.tab.id, key, modifiers)
+            .then(result => sendResponse({ ok: true, ...result }))
+            .catch(error => sendResponse({ ok: false, error: String(error) }));
+        return true; // Keep channel open for async response
+    }
+
     if (message.type === 'SET_ZOOM_LEVEL') {
         // Set the browser zoom level for a tab
         chrome.tabs.setZoom(sender.tab.id, message.zoomFactor)
@@ -1963,6 +1975,175 @@ function detachDebugger(tabId) {
 
 // Note: Screenshot processing is handled in content.js where DOM APIs are available
 // Background script only handles the raw capture via chrome.tabs.captureVisibleTab
+
+// ============================================================================
+// CDP KEY DISPATCH (for real keyboard events)
+// ============================================================================
+
+// CDP key session state - keeps debugger attached during replay for better performance
+let cdpKeySession = {
+    tabId: null,
+    attached: false,
+    detachTimeout: null,
+    DETACH_DELAY_MS: 10000  // Auto-detach after 10 seconds of inactivity
+};
+
+/**
+ * Dispatch a key event via CDP Input.dispatchKeyEvent
+ * This sends a "real" key event through the browser's input pipeline,
+ * triggering :focus-visible unlike synthetic JavaScript events.
+ *
+ * This is the same approach used by Playwright and Puppeteer.
+ *
+ * The debugger is kept attached during replay sessions for better performance,
+ * and auto-detaches after 10 seconds of inactivity.
+ */
+async function dispatchKeyViaCDP(tabId, key, modifiers = []) {
+    const debuggerVersion = '1.3';
+
+    // Build modifier flags: Alt=1, Ctrl=2, Meta=4, Shift=8
+    let modifierFlags = 0;
+    if (modifiers.includes('alt')) modifierFlags |= 1;
+    if (modifiers.includes('ctrl')) modifierFlags |= 2;
+    if (modifiers.includes('meta')) modifierFlags |= 4;
+    if (modifiers.includes('shift')) modifierFlags |= 8;
+
+    // Key code mappings for common keys
+    // windowsVirtualKeyCode is used cross-platform in CDP
+    // text: character produced by the key (empty for navigation keys)
+    // Navigation keys use 'rawKeyDown' type, text-producing keys use 'keyDown'
+    const keyMappings = {
+        'Tab': { windowsVirtualKeyCode: 9, code: 'Tab', text: '' },
+        'Enter': { windowsVirtualKeyCode: 13, code: 'Enter', text: '\r' },
+        'Escape': { windowsVirtualKeyCode: 27, code: 'Escape', text: '' },
+        'Space': { windowsVirtualKeyCode: 32, code: 'Space', text: ' ' },
+        ' ': { windowsVirtualKeyCode: 32, code: 'Space', text: ' ' },
+        'Backspace': { windowsVirtualKeyCode: 8, code: 'Backspace', text: '' },
+        'Delete': { windowsVirtualKeyCode: 46, code: 'Delete', text: '' },
+        'ArrowUp': { windowsVirtualKeyCode: 38, code: 'ArrowUp', text: '' },
+        'ArrowDown': { windowsVirtualKeyCode: 40, code: 'ArrowDown', text: '' },
+        'ArrowLeft': { windowsVirtualKeyCode: 37, code: 'ArrowLeft', text: '' },
+        'ArrowRight': { windowsVirtualKeyCode: 39, code: 'ArrowRight', text: '' },
+        'Home': { windowsVirtualKeyCode: 36, code: 'Home', text: '' },
+        'End': { windowsVirtualKeyCode: 35, code: 'End', text: '' },
+        'PageUp': { windowsVirtualKeyCode: 33, code: 'PageUp', text: '' },
+        'PageDown': { windowsVirtualKeyCode: 34, code: 'PageDown', text: '' },
+    };
+
+    const keyInfo = keyMappings[key] || { windowsVirtualKeyCode: 0, code: key, text: '' };
+
+    // CDP event type: 'rawKeyDown' for navigation keys (Tab, arrows, etc.)
+    // 'keyDown' for text-producing keys (letters, space, enter)
+    // rawKeyDown triggers native browser behavior like Tab focus navigation
+    const keyDownType = keyInfo.text ? 'keyDown' : 'rawKeyDown';
+
+    // Clear any pending auto-detach timeout
+    if (cdpKeySession.detachTimeout) {
+        clearTimeout(cdpKeySession.detachTimeout);
+        cdpKeySession.detachTimeout = null;
+    }
+
+    try {
+        // Check if we need to attach (different tab or not attached)
+        const needsAttach = !cdpKeySession.attached ||
+                           cdpKeySession.tabId !== tabId ||
+                           screencastState.active;  // Screencast manages its own debugger
+
+        if (needsAttach && !screencastState.active) {
+            // Attach debugger (if not already attached)
+            await new Promise((resolve, reject) => {
+                chrome.debugger.attach({ tabId }, debuggerVersion, () => {
+                    if (chrome.runtime.lastError) {
+                        const error = chrome.runtime.lastError.message;
+                        // If already attached (e.g., by screencast or previous session), that's fine
+                        if (error.includes('already attached')) {
+                            cdpKeySession.attached = true;
+                            cdpKeySession.tabId = tabId;
+                            resolve();
+                        } else if (error.includes('Another debugger')) {
+                            // DevTools is open - we can't use CDP
+                            reject(new Error('CDP unavailable: DevTools is open'));
+                        } else {
+                            reject(new Error(error));
+                        }
+                    } else {
+                        cdpKeySession.attached = true;
+                        cdpKeySession.tabId = tabId;
+                        console.log('[Inspekt] CDP debugger attached for key dispatch');
+                        resolve();
+                    }
+                });
+            });
+        }
+
+        // Send keyDown event (rawKeyDown for navigation keys, keyDown for text keys)
+        const keyDownParams = {
+            type: keyDownType,
+            key: key,
+            code: keyInfo.code,
+            windowsVirtualKeyCode: keyInfo.windowsVirtualKeyCode,
+            nativeVirtualKeyCode: keyInfo.windowsVirtualKeyCode,
+            modifiers: modifierFlags
+        };
+        // Add text parameter for keys that produce text (required for keyDown type)
+        if (keyInfo.text) {
+            keyDownParams.text = keyInfo.text;
+            keyDownParams.unmodifiedText = keyInfo.text;
+        }
+        await sendDebuggerCommand(tabId, 'Input.dispatchKeyEvent', keyDownParams);
+
+        // Small delay between keyDown and keyUp (mimics real typing)
+        await new Promise(r => setTimeout(r, 10));
+
+        // Send keyUp event
+        await sendDebuggerCommand(tabId, 'Input.dispatchKeyEvent', {
+            type: 'keyUp',
+            key: key,
+            code: keyInfo.code,
+            windowsVirtualKeyCode: keyInfo.windowsVirtualKeyCode,
+            nativeVirtualKeyCode: keyInfo.windowsVirtualKeyCode,
+            modifiers: modifierFlags
+        });
+
+        // Schedule auto-detach after inactivity (unless screencast is using debugger)
+        if (!screencastState.active) {
+            cdpKeySession.detachTimeout = setTimeout(async () => {
+                if (cdpKeySession.attached && !screencastState.active) {
+                    try {
+                        await detachDebugger(cdpKeySession.tabId);
+                        console.log('[Inspekt] CDP debugger auto-detached after inactivity');
+                    } catch (e) {
+                        // Ignore detach errors
+                    }
+                    cdpKeySession.attached = false;
+                    cdpKeySession.tabId = null;
+                }
+            }, cdpKeySession.DETACH_DELAY_MS);
+        }
+
+        console.log(`[Inspekt] CDP key dispatched: ${key}${modifiers.length ? ' + ' + modifiers.join('+') : ''}`);
+        return { dispatched: true, key, modifiers };
+
+    } catch (error) {
+        console.warn('[Inspekt] CDP key dispatch failed:', error.message);
+        // Mark session as not attached on error
+        cdpKeySession.attached = false;
+        cdpKeySession.tabId = null;
+        throw error;
+    }
+}
+
+// Clean up CDP key session when tab is closed or navigated
+chrome.tabs.onRemoved.addListener((tabId) => {
+    if (cdpKeySession.tabId === tabId) {
+        if (cdpKeySession.detachTimeout) {
+            clearTimeout(cdpKeySession.detachTimeout);
+        }
+        cdpKeySession.attached = false;
+        cdpKeySession.tabId = null;
+        cdpKeySession.detachTimeout = null;
+    }
+});
 
 // ============================================================================
 // SCREENCAST (VIDEO RECORDING) FUNCTIONS
