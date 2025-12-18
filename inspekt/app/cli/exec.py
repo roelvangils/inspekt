@@ -1,5 +1,5 @@
 """
-Execution commands for the Zen Browser Bridge CLI.
+Execution commands for the Inspekt Browser Bridge CLI.
 
 This module provides commands for executing JavaScript code in the browser:
 - eval: Execute JavaScript code from arguments, files, or stdin
@@ -185,7 +185,7 @@ def exec(filepath, timeout, format):
 
     Example:
 
-        zen exec script.js
+        inspekt exec script.js
     """
     executor = BridgeExecutor()
 

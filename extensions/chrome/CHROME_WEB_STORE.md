@@ -52,7 +52,7 @@ Before submission, thoroughly test the extension:
 # Test all features:
 - WebSocket connection
 - JavaScript execution
-- DevTools integration (zenStore)
+- DevTools integration (inspektStore)
 - Status panel
 - Auto-reconnect
 ```
@@ -163,7 +163,7 @@ Take 1280x800px or 640x400px screenshots showing:
 - Show command execution
 
 **Screenshot 4**: DevTools integration
-- Show `zenStore($0)` in console
+- Show `inspektStore($0)` in console
 - Demonstrate inspected element storage
 
 **Screenshot 5**: Various commands
@@ -243,7 +243,7 @@ Control your browser from the terminal with AI-powered automation. Execute JavaS
 
 🤖 **AI-Powered Automation** - Use natural language commands like "click login button" or "fill out the form"
 
-⚡ **DevTools Integration** - Store inspected elements with `zenStore($0)` and manipulate them from CLI
+⚡ **DevTools Integration** - Store inspected elements with `inspektStore($0)` and manipulate them from CLI
 
 🔒 **100% Local** - All communication stays between your browser and local CLI. No cloud, no tracking, complete privacy.
 
@@ -314,7 +314,7 @@ inspekteval "document.querySelector('h1').textContent"
 
 # Store element from DevTools
 # 1. Inspect element (Right-click → Inspect)
-# 2. In console: zenStore($0)
+# 2. In console: inspektStore($0)
 # 3. In terminal: inspektinspected
 ```
 

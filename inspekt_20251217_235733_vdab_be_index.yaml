@@ -1,0 +1,114 @@
+# Inspekt Recording v1.1
+# Generated: 2025-12-17T22:57:33.184358+00:00
+# Duration: 10.1s
+# URL: https://www.vdab.be/
+#
+# Edit this file to:
+# - Add 'expect:' assertions to steps
+# - Insert 'inspekt' command steps for accessibility checks
+# - Remove unwanted steps
+#
+# Example assertion:
+#   expect:
+#     visible: ".success-message"
+#     url_contains: "/dashboard"
+
+steps:
+# Step 0001 · Navigate to https://www.vdab.be/
+- timestamp: 0
+  action: navigate
+  url: https://www.vdab.be/
+
+# Step 0002 · Press Tab
+- timestamp: 4031
+  action: keypress
+  target:
+    selector: '#usercentrics-cmp-ui'
+    fallback_selectors:
+    - aside#usercentrics-cmp-ui
+    tag: aside
+  key: Tab
+
+# Step 0003 · Press Tab
+- timestamp: 4548
+  action: keypress
+  target:
+    selector: '#usercentrics-cmp-ui'
+    fallback_selectors:
+    - aside#usercentrics-cmp-ui
+    tag: aside
+  key: Tab
+
+# Step 0004 · Press Tab
+- timestamp: 4947
+  action: keypress
+  target:
+    selector: '#usercentrics-cmp-ui'
+    fallback_selectors:
+    - aside#usercentrics-cmp-ui
+    tag: aside
+  key: Tab
+
+# Step 0005 · Press Tab
+- timestamp: 5465
+  action: keypress
+  target:
+    selector: '#usercentrics-cmp-ui'
+    fallback_selectors:
+    - aside#usercentrics-cmp-ui
+    tag: aside
+  key: Tab
+
+# Step 0006 · Press Tab
+- timestamp: 5743
+  action: keypress
+  target:
+    selector: '#usercentrics-cmp-ui'
+    fallback_selectors:
+    - aside#usercentrics-cmp-ui
+    tag: aside
+  key: Tab
+
+# Step 0007 · Press shift+Tab (focus moves to 'Messenger')
+- timestamp: 7204
+  action: keypress
+  target:
+    selector: '#genesys-mxg-container-frame'
+    fallback_selectors:
+    - iframe[name="MessengerFrame"]
+    - iframe#genesys-mxg-container-frame
+    accessible_name: Messenger
+    tag: iframe
+  key: Tab
+  modifiers:
+  - shift
+
+# Step 0008 · Scroll down 2867px
+- timestamp: 8109
+  action: scroll
+  scroll:
+    x: 0
+    y: 2867
+    deltaX: 0
+    deltaY: 2867
+
+metadata:
+  version: '1.1'
+  created_at: '2025-12-17T22:57:33.184358+00:00'
+  duration_ms: 10053
+  starting_url: https://www.vdab.be/
+  user_agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36
+  recorded_on:
+    platform: darwin
+    browser: Chrome
+    browser_version: 143.0.0.0
+state:
+  viewport:
+    width: 1268
+    height: 1292
+  zoom: 1.7999999523162842
+  browser_zoom_level: 0.9
+  scroll:
+    x: 0
+    y: 0
+  window_mode: normal

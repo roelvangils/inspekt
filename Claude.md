@@ -207,6 +207,198 @@ If Inspekt tools aren't available:
 
 ---
 
+## Autonomous Browser Debugging (Console Commands)
+
+### Overview
+
+When debugging browser issues or investigating page behavior, **Claude should autonomously use the `inspekt console` commands** rather than asking the user to:
+- Copy/paste browser console output
+- Manually execute JavaScript expressions in DevTools
+- Describe what they see in the console
+
+This enables faster, more accurate debugging without context-switching.
+
+### Available Commands
+
+| Command | Purpose |
+|---------|---------|
+| `inspekt console list` | Retrieve captured console messages (log, error, warn, info, debug) |
+| `inspekt console list --json` | Get console output as JSON for programmatic analysis |
+| `inspekt console log EXPRESSION` | Evaluate a JavaScript expression and display the result |
+| `inspekt console clear` | Clear the console message buffer |
+
+### Command Reference
+
+#### `inspekt console list`
+
+Retrieve browser console messages captured since page load.
+
+```bash
+# Show all console messages
+inspekt console list
+
+# Filter by level (error, warn, log, info, debug)
+inspekt console list --level error
+
+# Show most recent messages first
+inspekt console list --tail
+
+# Limit number of messages
+inspekt console list --limit 50
+
+# JSON output for parsing
+inspekt console list --json
+```
+
+**Output includes:**
+- Timestamp (local time)
+- Log level with icon
+- Message content
+- Special formatting for `console.table()` output
+
+#### `inspekt console log EXPRESSION`
+
+Evaluate any JavaScript expression in the browser context and display the result.
+
+```bash
+# Get document title
+inspekt console log "document.title"
+
+# Check element existence
+inspekt console log "document.querySelector('#login-form') !== null"
+
+# Inspect object properties
+inspekt console log "window.location.href"
+
+# Evaluate expressions
+inspekt console log "5 + 5"
+
+# Array operations
+inspekt console log "[1,2,3].map(x => x*2)"
+
+# Access page state
+inspekt console log "document.readyState"
+
+# Check for JavaScript errors
+inspekt console log "window.onerror"
+```
+
+### CRITICAL: Autonomous Usage Guidelines
+
+**DO NOT** ask the user to:
+- "Can you check your browser console for errors?"
+- "Please run `document.title` in your browser console and tell me what you see"
+- "What does `window.location.href` return?"
+- "Copy the console output and paste it here"
+
+**INSTEAD**, autonomously run:
+```bash
+# Check for JavaScript errors
+inspekt console list --level error
+
+# Investigate page state
+inspekt console log "document.title"
+inspekt console log "window.location.href"
+inspekt console log "document.readyState"
+
+# Debug specific elements
+inspekt console log "document.querySelector('button.submit')?.disabled"
+```
+
+### Common Debugging Patterns
+
+#### Investigating Page Errors
+
+```bash
+# Get all error messages
+inspekt console list --level error --json
+
+# Check for uncaught exceptions
+inspekt console log "window.__inspekt_last_error || 'No errors'"
+```
+
+#### Checking Page State
+
+```bash
+# Document ready state
+inspekt console log "document.readyState"
+
+# Current URL
+inspekt console log "window.location.href"
+
+# Page title
+inspekt console log "document.title"
+
+# Viewport dimensions
+inspekt console log "({width: window.innerWidth, height: window.innerHeight})"
+```
+
+#### Debugging Form Issues
+
+```bash
+# Check if form exists
+inspekt console log "document.forms.length"
+
+# Get form field values
+inspekt console log "document.querySelector('input[name=email]')?.value"
+
+# Check disabled state
+inspekt console log "document.querySelector('button[type=submit]')?.disabled"
+```
+
+#### Debugging Element Visibility
+
+```bash
+# Check if element is in DOM
+inspekt console log "document.querySelector('#my-element') !== null"
+
+# Check computed visibility
+inspekt console log "getComputedStyle(document.querySelector('#my-element')).display"
+
+# Check element dimensions
+inspekt console log "document.querySelector('#my-element')?.getBoundingClientRect()"
+```
+
+### JSON Output for Analysis
+
+When you need to analyze console output programmatically:
+
+```bash
+inspekt console list --json
+```
+
+Returns:
+```json
+{
+  "ok": true,
+  "count": 5,
+  "entries": [
+    {
+      "level": "error",
+      "timestamp": "2025-01-15T10:30:00.000Z",
+      "message": "TypeError: Cannot read property 'foo' of undefined"
+    },
+    ...
+  ],
+  "hooked": true
+}
+```
+
+### Notes
+
+1. **Console hooks activate on page load**: Messages from initial page load may not be captured. If the user navigates to a new page, hooks are re-injected automatically.
+
+2. **Buffer limit**: The browser maintains a buffer of up to 1000 messages. Use `inspekt console clear` to reset.
+
+3. **Timeout**: The `log` command has a 10-second default timeout. Use `-t` to adjust:
+   ```bash
+   inspekt console log "slowOperation()" -t 30
+   ```
+
+4. **Works with authenticated sessions**: Because this runs in the user's browser, it has access to their logged-in state, cookies, and local storage.
+
+---
+
 ## Window Message Bridge Pattern
 
 ### Overview
@@ -998,5 +1190,5 @@ print_wrapped("Message text", fg="cyan", bold=True)
 
 ---
 
-**Last Updated**: 2025-12-16
+**Last Updated**: 2025-12-18
 **MCP Integration**: Fully supported via Claude Code MCP protocol

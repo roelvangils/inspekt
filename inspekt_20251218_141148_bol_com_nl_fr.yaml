@@ -1,0 +1,89 @@
+# Inspekt Recording v1.1
+# Generated: 2025-12-18T13:11:48.208901+00:00
+# Duration: 3.9s
+# URL: https://www.bol.com/nl/fr/
+#
+# Edit this file to:
+# - Add 'expect:' assertions to steps
+# - Insert 'inspekt' command steps for accessibility checks
+# - Remove unwanted steps
+#
+# Example assertion:
+#   expect:
+#     visible: ".success-message"
+#     url_contains: "/dashboard"
+
+steps:
+# Step 0001 · Navigate to https://www.bol.com/nl/fr/
+- timestamp: 0
+  action: navigate
+  url: https://www.bol.com/nl/fr/
+
+# Step 0002 · Press Tab (focus moves to 'Aller à la recherche')
+- timestamp: 1689
+  action: keypress
+  target:
+    selector: html > body > div > header > div > div > a
+    accessible_name: Aller à la recherche
+    tag: a
+  key: Tab
+
+# Step 0003 · Press Tab (focus moves to 'Aller au contenu princip…')
+- timestamp: 2151
+  action: keypress
+  target:
+    selector: html > body > div > header > div > div:nth-of-type(2) > a
+    accessible_name: Aller au contenu principal
+    tag: a
+  key: Tab
+
+# Step 0004 · Press Tab (focus moves to 'profitez du shopping san…')
+- timestamp: 2508
+  action: keypress
+  target:
+    selector: html > body > div > header > div:nth-of-type(2) > div > a
+    accessible_name: profitez du shopping sans soucis Livraison gratuite à partir de 25 € Livraison le jour-même, le soir
+      ou le week-end* Retours gratuit
+    tag: a
+  key: Tab
+
+# Step 0005 · Press Tab (focus moves to 'Select Découvrez mainten…')
+- timestamp: 2829
+  action: keypress
+  target:
+    selector: html > body > div > header > div:nth-of-type(2) > div > a:nth-of-type(2)
+    accessible_name: Select Découvrez maintenant les 4 avantages
+    tag: a
+  key: Tab
+
+# Step 0006 · Press Tab (focus moves to 'Bol.com homepage')
+- timestamp: 3297
+  action: keypress
+  target:
+    selector: '[aria-label="Bol\.com\ homepage"]'
+    fallback_selectors:
+    - html > body > div > header > div:nth-of-type(3) > div > a
+    accessible_name: Bol.com homepage
+    tag: a
+  key: Tab
+
+metadata:
+  version: '1.1'
+  created_at: '2025-12-18T13:11:48.208901+00:00'
+  duration_ms: 3918
+  starting_url: https://www.bol.com/nl/fr/
+  user_agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36
+  recorded_on:
+    platform: darwin
+    browser: Chrome
+    browser_version: 143.0.0.0
+state:
+  viewport:
+    width: 1141
+    height: 1163
+  zoom: 2.0
+  browser_zoom_level: 1.0
+  scroll:
+    x: 0
+    y: 0
+  window_mode: normal

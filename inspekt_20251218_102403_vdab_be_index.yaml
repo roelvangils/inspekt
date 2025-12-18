@@ -1,0 +1,51 @@
+# Inspekt Recording v1.1
+# Generated: 2025-12-18T09:24:03.392431+00:00
+# Duration: 3.4s
+# URL: https://www.vdab.be/
+#
+# Edit this file to:
+# - Add 'expect:' assertions to steps
+# - Insert 'inspekt' command steps for accessibility checks
+# - Remove unwanted steps
+#
+# Example assertion:
+#   expect:
+#     visible: ".success-message"
+#     url_contains: "/dashboard"
+
+steps:
+# Step 0001 · Navigate to https://www.vdab.be/
+- timestamp: 0
+  action: navigate
+  url: https://www.vdab.be/
+
+# Step 0002 · Press Tab
+- timestamp: 2081
+  action: keypress
+  target:
+    selector: '#usercentrics-cmp-ui'
+    fallback_selectors:
+    - aside#usercentrics-cmp-ui
+    tag: aside
+  key: Tab
+
+metadata:
+  version: '1.1'
+  created_at: '2025-12-18T09:24:03.392431+00:00'
+  duration_ms: 3447
+  starting_url: https://www.vdab.be/
+  user_agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36
+  recorded_on:
+    platform: darwin
+    browser: Chrome
+    browser_version: 143.0.0.0
+state:
+  viewport:
+    width: 1268
+    height: 1292
+  zoom: 1.7999999523162842
+  browser_zoom_level: 0.9
+  scroll:
+    x: 0
+    y: 0
+  window_mode: normal

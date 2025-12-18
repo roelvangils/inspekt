@@ -136,7 +136,7 @@ def get_inspected_element():
 
     To capture element from DevTools:
         1. Right-click element → Inspect
-        2. In DevTools Console: zenStore()
+        2. In DevTools Console: inspektStore()
         3. Call: GET /api/inspection/inspected
 
     Or select programmatically:

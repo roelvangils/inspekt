@@ -3027,8 +3027,12 @@ end tell
 
                     if response.get("ok"):
                         # Action succeeded - show OK for the step
+                        # For keypress actions, show (CDP) suffix if real key dispatch was used
+                        status_suffix = ""
+                        if step.action == "keypress" and response.get("method") == "cdp":
+                            status_suffix = "(CDP)"
                         if not progress:
-                            click.echo(format_status("OK"))
+                            click.echo(format_status("OK", suffix=status_suffix))
 
                         # Check for assertion failures (separate from action success)
                         assertion_failures = response.get("failures", [])
@@ -3052,6 +3056,10 @@ end tell
                                 assertion_msg = step.expect.message or _generate_assertion_description(step.expect)
                                 if assertion_msg:
                                     click.echo(format_assertion_result(assertion_msg, passed=True))
+
+                            # Show focus fallback note if CSS injection didn't work (Tab navigation)
+                            if response.get("focusNote") and not progress:
+                                click.echo(format_system_message(response.get("focusNote"), icon="info"))
 
                             if verbose and response.get("usedSelector"):
                                 used = response["usedSelector"]

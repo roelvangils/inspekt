@@ -1,0 +1,182 @@
+# Inspekt Recording v1.1
+# Generated: 2025-12-18T15:08:44.379684+00:00
+# Duration: 4.9s
+# URL: https://www.vlaanderen.be/
+#
+# Edit this file to:
+# - Add 'expect:' assertions to steps
+# - Insert 'inspekt' command steps for accessibility checks
+# - Remove unwanted steps
+#
+# Example assertion:
+#   expect:
+#     visible: ".success-message"
+#     url_contains: "/dashboard"
+
+steps:
+# Step 0001 · Navigate to https://www.vlaanderen.be/
+- timestamp: 0
+  action: navigate
+  url: https://www.vlaanderen.be/
+
+# Step 0002 · Press Tab (focus moves to 'Zoekterm')
+- timestamp: 1113
+  action: keypress
+  target:
+    selector: '#global-search-home'
+    fallback_selectors:
+    - input[name="q\.LIKE"]
+    - input[type="search"][placeholder="Waar\ zoekt\ u\ naar\?"]
+    - input#global-search-home
+    accessible_name: Zoekterm
+    tag: input
+    input_type: search
+  key: Tab
+
+# Step 0003 · Press Tab (focus moves to 'Zoeken')
+- timestamp: 1620
+  action: keypress
+  target:
+    selector: main#main > div > section > div > div > div > div > div > div > form > div > div > button
+    accessible_name: Zoeken
+    tag: button
+  key: Tab
+
+# Step 0004 · Press Tab (focus moves to 'Bouwen, wonen en energie')
+- timestamp: 2298
+  action: keypress
+  target:
+    selector: main#main > div > section:nth-of-type(2) > div > div > div > nav > div > div > ul > li > a
+    accessible_name: Bouwen, wonen en energie
+    tag: a
+  key: Tab
+
+# Step 0005 · Press shift+Tab (focus moves to 'Zoeken')
+- timestamp: 2776
+  action: keypress
+  target:
+    selector: main#main > div > section > div > div > div > div > div > div > form > div > div > button
+    accessible_name: Zoeken
+    tag: button
+  key: Tab
+  modifiers:
+  - shift
+
+# Step 0006 · Press shift+Tab (focus moves to 'Zoekterm')
+- timestamp: 2998
+  action: keypress
+  target:
+    selector: '#global-search-home'
+    fallback_selectors:
+    - input[name="q\.LIKE"]
+    - input[type="search"][placeholder="Waar\ zoekt\ u\ naar\?"]
+    - input#global-search-home
+    accessible_name: Zoekterm
+    tag: input
+    input_type: search
+  key: Tab
+  modifiers:
+  - shift
+
+# Step 0007 · Press shift+Tab (focus moves to 'Zoeken')
+- timestamp: 3116
+  action: keypress
+  target:
+    selector: header#wp-pt-global-header > div:nth-of-type(2) > div > div:nth-of-type(2) > form > div > div > button
+    accessible_name: Zoeken
+    tag: button
+  key: Tab
+  modifiers:
+  - shift
+
+# Step 0008 · Press shift+Tab (focus moves to 'Zoekterm')
+- timestamp: 3265
+  action: keypress
+  target:
+    selector: '#global-search-global-header'
+    fallback_selectors:
+    - input[name="q\.LIKE"]
+    - input[type="search"][placeholder="Zoeken\ op\ De\ officiële\ website\ van\ Vlaanderen"]
+    - input#global-search-global-header
+    accessible_name: Zoekterm
+    tag: input
+    input_type: search
+  key: Tab
+  modifiers:
+  - shift
+
+# Step 0009 · Press shift+Tab
+- timestamp: 3446
+  action: keypress
+  target:
+    selector: header#wp-pt-global-header > div > div
+    tag: div
+  key: Tab
+  modifiers:
+  - shift
+
+# Step 0010 · Press shift+Tab (focus moves to 'Meer over overheidsdiens…')
+- timestamp: 3565
+  action: keypress
+  target:
+    selector: main#main > div > section:nth-of-type(6) > div > div > div > div > div:nth-of-type(5) > div > div > div:nth-of-type(2)
+      > div > div > div > p:nth-of-type(2) > a
+    accessible_name: Meer over overheidsdiensten en gebouwen
+    tag: a
+  key: Tab
+  modifiers:
+  - shift
+
+# Step 0011 · Press shift+Tab (focus moves to 'Meer over de klachtenpro…')
+- timestamp: 3832
+  action: keypress
+  target:
+    selector: main#main > div > section:nth-of-type(6) > div > div > div > div > div:nth-of-type(3) > div > div > div:nth-of-type(2)
+      > div > div > div > p:nth-of-type(2) > a
+    accessible_name: Meer over de klachtenprocedure
+    tag: a
+  key: Tab
+  modifiers:
+  - shift
+
+# Step 0012 · Press shift+Tab (focus moves to 'Chat met ons')
+- timestamp: 4020
+  action: keypress
+  target:
+    selector: main#main > div > section:nth-of-type(6) > div > div > div > div > div > div > div > div:nth-of-type(2) > dl
+      > div > dd:nth-of-type(3) > p > button
+    accessible_name: Chat met ons
+    tag: button
+  key: Tab
+  modifiers:
+  - shift
+
+# Step 0013 · Scroll down 1932px
+- timestamp: 3579
+  action: scroll
+  scroll:
+    x: 0
+    y: 1933
+    deltaX: 0
+    deltaY: 1932
+
+metadata:
+  version: '1.1'
+  created_at: '2025-12-18T15:08:44.379684+00:00'
+  duration_ms: 4861
+  starting_url: https://www.vlaanderen.be/
+  user_agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36
+  recorded_on:
+    platform: darwin
+    browser: Chrome
+    browser_version: 143.0.0.0
+state:
+  viewport:
+    width: 1141
+    height: 1163
+  zoom: 2.0
+  browser_zoom_level: 1.0
+  scroll:
+    x: 0
+    y: 0
+  window_mode: normal

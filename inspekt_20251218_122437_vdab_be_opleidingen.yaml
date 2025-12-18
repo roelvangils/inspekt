@@ -1,0 +1,433 @@
+# Inspekt Recording v1.1
+# Generated: 2025-12-18T11:24:37.020754+00:00
+# Duration: 18.4s
+# URL: https://www.vdab.be/opleidingen
+#
+# Edit this file to:
+# - Add 'expect:' assertions to steps
+# - Insert 'inspekt' command steps for accessibility checks
+# - Remove unwanted steps
+#
+# Example assertion:
+#   expect:
+#     visible: ".success-message"
+#     url_contains: "/dashboard"
+
+steps:
+# Step 0001 · Navigate to https://www.vdab.be/opleidingen
+- timestamp: 0
+  action: navigate
+  url: https://www.vdab.be/opleidingen
+
+# Step 0002 · Press Tab (focus moves to 'Ga naar de inhoud')
+- timestamp: 6903
+  action: keypress
+  target:
+    selector: '#js--skip-links-menu-main-content'
+    fallback_selectors:
+    - a#js--skip-links-menu-main-content
+    accessible_name: Ga naar de inhoud
+    tag: a
+  key: Tab
+
+# Step 0003 · Press Tab (focus moves to 'Vind een job')
+- timestamp: 7586
+  action: keypress
+  target:
+    selector: header#indi-burger-header > nav > ul > li:nth-of-type(2) > a
+    accessible_name: Vind een job
+    tag: a
+  key: Tab
+
+# Step 0004 · Scroll up 1027px
+- timestamp: 6916
+  action: scroll
+  scroll:
+    x: 0
+    y: 0
+    deltaX: 0
+    deltaY: -1027
+
+# Step 0005 · Press Tab (focus moves to 'Vind een opleiding')
+- timestamp: 7995
+  action: keypress
+  target:
+    selector: header#indi-burger-header > nav > ul > li:nth-of-type(3) > a
+    accessible_name: Vind een opleiding
+    tag: a
+  key: Tab
+
+# Step 0006 · Press Tab (focus moves to 'Welke job past bij mij?')
+- timestamp: 8291
+  action: keypress
+  target:
+    selector: header#indi-burger-header > nav > ul > li:nth-of-type(4) > a
+    accessible_name: Welke job past bij mij?
+    tag: a
+  key: Tab
+
+# Step 0007 · Press Tab (focus moves to 'Terug naar home')
+- timestamp: 8495
+  action: keypress
+  target:
+    selector: header#indi-burger-header > nav > ul > li:nth-of-type(5) > a
+    accessible_name: Terug naar home
+    tag: a
+  key: Tab
+
+# Step 0008 · Press Tab (focus moves to 'Naar vlaanderen.be')
+- timestamp: 8666
+  action: keypress
+  target:
+    selector: header#indi-burger-header > nav:nth-of-type(2) > div > a
+    accessible_name: Naar vlaanderen.be
+    tag: a
+  key: Tab
+
+# Step 0009 · Press Tab (focus moves to 'Naar site werkgevers ')
+- timestamp: 8814
+  action: keypress
+  target:
+    selector: header#indi-burger-header > nav:nth-of-type(2) > div > ul > li > a
+    accessible_name: Naar site werkgevers 
+    tag: a
+  key: Tab
+
+# Step 0010 · Press Tab (focus moves to 'Naar site partners ')
+- timestamp: 8974
+  action: keypress
+  target:
+    selector: header#indi-burger-header > nav:nth-of-type(2) > div > ul > li:nth-of-type(2) > a
+    accessible_name: Naar site partners 
+    tag: a
+  key: Tab
+
+# Step 0011 · Press Tab (focus moves to ' Log in')
+- timestamp: 9134
+  action: keypress
+  target:
+    selector: header#indi-burger-header > nav:nth-of-type(2) > div > ul > li:nth-of-type(3) > a
+    accessible_name:  Log in
+    tag: a
+  key: Tab
+
+# Step 0012 · Press Tab (focus moves to 'VDAB home')
+- timestamp: 9368
+  action: keypress
+  target:
+    selector: header#indi-burger-header > nav:nth-of-type(3) > div > a
+    accessible_name: VDAB home
+    tag: a
+  key: Tab
+
+# Step 0013 · Press Tab (focus moves to ' Menu')
+- timestamp: 9536
+  action: keypress
+  target:
+    selector: '#menu'
+    fallback_selectors:
+    - a#menu
+    accessible_name:  Menu
+    tag: a
+  key: Tab
+
+# Step 0014 · Press Tab (focus moves to 'Zoek op vdab.be')
+- timestamp: 9923
+  action: keypress
+  target:
+    selector: '#search-main-vdab'
+    fallback_selectors:
+    - '[aria-label="Zoek\ op\ vdab\.be"]'
+    - input[type="text"][placeholder="Zoek\ op\ vdab\.be"]
+    - input#search-main-vdab
+    accessible_name: Zoek op vdab.be
+    tag: input
+    input_type: text
+  key: Tab
+
+# Step 0015 · Press Tab
+- timestamp: 10312
+  action: keypress
+  target:
+    selector: header#indi-burger-header > nav:nth-of-type(3) > div > form:nth-of-type(2) > div > span
+    tag: span
+  key: Tab
+
+# Step 0016 · Press Tab (focus moves to 'Hulp nodig?')
+- timestamp: 10488
+  action: keypress
+  target:
+    selector: div#js--help-widget-block > a
+    accessible_name: Hulp nodig?
+    tag: a
+    role: button
+  key: Tab
+
+# Step 0017 · Press Tab (focus moves to 'Opleiding of trefwoord')
+- timestamp: 10717
+  action: keypress
+  target:
+    selector: '#veo-search-opleiding-widget-what'
+    fallback_selectors:
+    - input[name="trefwoord"]
+    - input#veo-search-opleiding-widget-what
+    accessible_name: Opleiding of trefwoord
+    tag: input
+    input_type: text
+  key: Tab
+
+# Step 0018 · Press Tab (focus moves to 'Postcode of gemeente')
+- timestamp: 10921
+  action: keypress
+  target:
+    selector: '#veo-search-opleiding-widget-where'
+    fallback_selectors:
+    - input#veo-search-opleiding-widget-where
+    accessible_name: Postcode of gemeente
+    tag: input
+    input_type: text
+  key: Tab
+
+# Step 0019 · Press Tab (focus moves to ' Vind een opleiding')
+- timestamp: 11140
+  action: keypress
+  target:
+    selector: '#VEO-zoek'
+    fallback_selectors:
+    - button#VEO-zoek
+    accessible_name:  Vind een opleiding
+    tag: button
+  key: Tab
+
+# Step 0020 · Press Tab (focus moves to 'Administratie')
+- timestamp: 11411
+  action: keypress
+  target:
+    selector: div#c-verbolia-widget__content > ul > li > a
+    accessible_name: Administratie
+    tag: a
+  key: Tab
+
+# Step 0021 · Press Tab (focus moves to 'Boekhouding en recht')
+- timestamp: 11647
+  action: keypress
+  target:
+    selector: div#c-verbolia-widget__content > ul > li:nth-of-type(2) > a
+    accessible_name: Boekhouding en recht
+    tag: a
+  key: Tab
+
+# Step 0022 · Press Tab (focus moves to 'Bouw en hout')
+- timestamp: 12014
+  action: keypress
+  target:
+    selector: div#c-verbolia-widget__content > ul > li:nth-of-type(3) > a
+    accessible_name: Bouw en hout
+    tag: a
+  key: Tab
+
+# Step 0023 · Press Tab (focus moves to 'Commercieel')
+- timestamp: 12292
+  action: keypress
+  target:
+    selector: div#c-verbolia-widget__content > ul > li:nth-of-type(4) > a
+    accessible_name: Commercieel
+    tag: a
+  key: Tab
+
+# Step 0024 · Press Tab (focus moves to 'Communicatie en marketing')
+- timestamp: 12509
+  action: keypress
+  target:
+    selector: div#c-verbolia-widget__content > ul > li:nth-of-type(5) > a
+    accessible_name: Communicatie en marketing
+    tag: a
+  key: Tab
+
+# Step 0025 · Press Tab (focus moves to 'Grafisch')
+- timestamp: 12795
+  action: keypress
+  target:
+    selector: div#c-verbolia-widget__content > ul > li:nth-of-type(6) > a
+    accessible_name: Grafisch
+    tag: a
+  key: Tab
+
+# Step 0026 · Press Tab (focus moves to 'Horeca en toerisme')
+- timestamp: 13036
+  action: keypress
+  target:
+    selector: div#c-verbolia-widget__content > ul > li:nth-of-type(7) > a
+    accessible_name: Horeca en toerisme
+    tag: a
+  key: Tab
+
+# Step 0027 · Press Tab (focus moves to 'Human resources')
+- timestamp: 13264
+  action: keypress
+  target:
+    selector: div#c-verbolia-widget__content > ul > li:nth-of-type(8) > a
+    accessible_name: Human resources
+    tag: a
+  key: Tab
+
+# Step 0028 · Press Tab (focus moves to 'ICT')
+- timestamp: 13532
+  action: keypress
+  target:
+    selector: div#c-verbolia-widget__content > ul > li:nth-of-type(9) > a
+    accessible_name: ICT
+    tag: a
+  key: Tab
+
+# Step 0029 · Press Tab (focus moves to 'Management')
+- timestamp: 13809
+  action: keypress
+  target:
+    selector: div#c-verbolia-widget__content > ul > li:nth-of-type(10) > a
+    accessible_name: Management
+    tag: a
+  key: Tab
+
+# Step 0030 · Press Tab (focus moves to 'Onderhoud')
+- timestamp: 14071
+  action: keypress
+  target:
+    selector: div#c-verbolia-widget__content > ul > li:nth-of-type(11) > a
+    accessible_name: Onderhoud
+    tag: a
+  key: Tab
+
+# Step 0031 · Press Tab (focus moves to 'Onderwijs')
+- timestamp: 14344
+  action: keypress
+  target:
+    selector: div#c-verbolia-widget__content > ul > li:nth-of-type(12) > a
+    accessible_name: Onderwijs
+    tag: a
+  key: Tab
+
+# Step 0032 · Press Tab (focus moves to 'Productie')
+- timestamp: 14635
+  action: keypress
+  target:
+    selector: div#c-verbolia-widget__content > ul > li:nth-of-type(13) > a
+    accessible_name: Productie
+    tag: a
+  key: Tab
+
+# Step 0033 · Press Tab (focus moves to 'Soft skills')
+- timestamp: 14849
+  action: keypress
+  target:
+    selector: div#c-verbolia-widget__content > ul > li:nth-of-type(14) > a
+    accessible_name: Soft skills
+    tag: a
+  key: Tab
+
+# Step 0034 · Press Tab (focus moves to 'Talen')
+- timestamp: 15091
+  action: keypress
+  target:
+    selector: div#c-verbolia-widget__content > ul > li:nth-of-type(15) > a
+    accessible_name: Talen
+    tag: a
+  key: Tab
+
+# Step 0035 · Press shift+Tab (focus moves to 'Soft skills')
+- timestamp: 15729
+  action: keypress
+  target:
+    selector: div#c-verbolia-widget__content > ul > li:nth-of-type(14) > a
+    accessible_name: Soft skills
+    tag: a
+  key: Tab
+  modifiers:
+  - shift
+
+# Step 0036 · Press shift+Tab (focus moves to 'Productie')
+- timestamp: 15942
+  action: keypress
+  target:
+    selector: div#c-verbolia-widget__content > ul > li:nth-of-type(13) > a
+    accessible_name: Productie
+    tag: a
+  key: Tab
+  modifiers:
+  - shift
+
+# Step 0037 · Press shift+Tab (focus moves to 'Onderwijs')
+- timestamp: 16191
+  action: keypress
+  target:
+    selector: div#c-verbolia-widget__content > ul > li:nth-of-type(12) > a
+    accessible_name: Onderwijs
+    tag: a
+  key: Tab
+  modifiers:
+  - shift
+
+# Step 0038 · Press shift+Tab (focus moves to 'Onderhoud')
+- timestamp: 16448
+  action: keypress
+  target:
+    selector: div#c-verbolia-widget__content > ul > li:nth-of-type(11) > a
+    accessible_name: Onderhoud
+    tag: a
+  key: Tab
+  modifiers:
+  - shift
+
+# Step 0039 · Press shift+Tab (focus moves to 'Management')
+- timestamp: 16684
+  action: keypress
+  target:
+    selector: div#c-verbolia-widget__content > ul > li:nth-of-type(10) > a
+    accessible_name: Management
+    tag: a
+  key: Tab
+  modifiers:
+  - shift
+
+# Step 0040 · Press shift+Tab (focus moves to 'ICT')
+- timestamp: 16968
+  action: keypress
+  target:
+    selector: div#c-verbolia-widget__content > ul > li:nth-of-type(9) > a
+    accessible_name: ICT
+    tag: a
+  key: Tab
+  modifiers:
+  - shift
+
+# Step 0041 · Press shift+Tab (focus moves to 'Human resources')
+- timestamp: 17222
+  action: keypress
+  target:
+    selector: div#c-verbolia-widget__content > ul > li:nth-of-type(8) > a
+    accessible_name: Human resources
+    tag: a
+  key: Tab
+  modifiers:
+  - shift
+
+metadata:
+  version: '1.1'
+  created_at: '2025-12-18T11:24:37.020754+00:00'
+  duration_ms: 18383
+  starting_url: https://www.vdab.be/opleidingen
+  user_agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36
+  recorded_on:
+    platform: darwin
+    browser: Chrome
+    browser_version: 143.0.0.0
+state:
+  viewport:
+    width: 1268
+    height: 1292
+  zoom: 1.7999999523162842
+  browser_zoom_level: 0.9
+  scroll:
+    x: 0
+    y: 1028
+  window_mode: normal

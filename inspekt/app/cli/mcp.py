@@ -54,11 +54,12 @@ def start(bridge_port, cache_ttl):
     # Check if bridge server is running
     client = BridgeClient(port=bridge_port)
     if not client.is_alive():
+        from inspekt.app.cli.table import _style_with_inline_code
         click.echo(
-            "Warning: Bridge server is not running on port {}.".format(bridge_port),
+            _style_with_inline_code(f"Warning: Bridge server is not running on port {bridge_port}.", base_fg="yellow"),
             err=True,
         )
-        click.echo("Start it with: inspekt start --bridge-only", err=True)
+        click.echo(_style_with_inline_code("Start it with: `inspekt start --bridge-only`", base_fg="yellow"), err=True)
         click.echo("MCP server will start but tools will fail until bridge is running.\n", err=True)
 
     # Import and run MCP server
@@ -330,8 +331,9 @@ def test():
 
     click.echo("1. Checking bridge server...")
     if not client.is_alive():
+        from inspekt.app.cli.table import _style_with_inline_code
         click.echo("   ✗ Bridge server is NOT running", err=True)
-        click.echo("   Start it with: inspekt start --bridge-only", err=True)
+        click.echo(_style_with_inline_code("   Start it with: `inspekt start --bridge-only`", base_fg="red"), err=True)
         sys.exit(1)
     else:
         click.echo("   ✓ Bridge server is running")

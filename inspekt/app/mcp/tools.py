@@ -11,6 +11,7 @@ import logging
 from typing import Any
 
 from inspekt.app.mcp import schemas
+from inspekt.config import get_bridge_port
 from inspekt.services.bridge_executor import BridgeExecutor
 from inspekt.services.script_loader import ScriptLoader
 from inspekt.services.autocomplete_service import get_autocomplete_service
@@ -1129,8 +1130,9 @@ class ToolProvider:
 
         try:
             # Get HAR data from bridge server (which gets it from DevTools)
+            bridge_url = f"http://127.0.0.1:{get_bridge_port()}/network/har"
             response = http_requests.get(
-                "http://127.0.0.1:8765/network/har",
+                bridge_url,
                 timeout=20.0
             )
             data = response.json()
@@ -1256,8 +1258,9 @@ class ToolProvider:
 
         try:
             # Get console logs from bridge server
+            bridge_url = f"http://127.0.0.1:{get_bridge_port()}/console/logs"
             response = http_requests.get(
-                "http://127.0.0.1:8765/console/logs",
+                bridge_url,
                 timeout=15.0
             )
             data = response.json()
@@ -1347,8 +1350,9 @@ class ToolProvider:
 
         try:
             # Clear console logs via bridge server
+            bridge_url = f"http://127.0.0.1:{get_bridge_port()}/console/clear"
             response = http_requests.post(
-                "http://127.0.0.1:8765/console/clear",
+                bridge_url,
                 timeout=15.0
             )
             data = response.json()

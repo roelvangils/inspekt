@@ -1,0 +1,51 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+.venv
+venv
+*.egg-info
+.eggs
+dist
+build
+
+# Node
+node_modules
+npm-debug.log
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+
+# Test/Coverage
+.pytest_cache
+.coverage
+htmlcov
+coverage.xml
+
+# Docs (not needed in VM)
+docs
+mkdocs.yml
+site
+
+# Other
+*.md
+!README.md
+*.png
+*.jpg
+*.html
+!docker/browser-vm/*.html
+tests
+.claude
+Claude.md
+CLAUDE.md
+data.db
+bun.lock

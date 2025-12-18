@@ -70,8 +70,10 @@ class BridgeClient:
 
     def __init__(self, host: str = "127.0.0.1", port: int = None):
         # Allow override via environment variable (for VM isolation)
-        # INSPEKT_BRIDGE_URL takes precedence, then INSPEKT_BRIDGE_PORT, then default
+        # INSPEKT_BRIDGE_URL takes precedence, then INSPEKT_BRIDGE_PORT,
+        # then auto-detect based on environment (VM vs normal)
         import os
+        from inspekt.config import get_bridge_port
         env_url = os.environ.get("INSPEKT_BRIDGE_URL")
         env_port = os.environ.get("INSPEKT_BRIDGE_PORT")
 
@@ -81,10 +83,11 @@ class BridgeClient:
             from urllib.parse import urlparse
             parsed = urlparse(self.base_url)
             self.host = parsed.hostname or host
-            self.port = parsed.port or 8765
+            self.port = parsed.port or get_bridge_port()
         else:
             if port is None:
-                port = int(env_port) if env_port else 8765
+                # Use env var if set, otherwise auto-detect based on environment
+                port = int(env_port) if env_port else get_bridge_port()
             self.base_url = f"http://{host}:{port}"
             self.host = host
             self.port = port
