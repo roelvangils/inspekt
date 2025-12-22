@@ -1148,6 +1148,12 @@ def run_download_shell_command(command: str, file_path: Path) -> dict:
     help="Open video file in default application after creation",
 )
 @click.option(
+    "--reveal",
+    "reveal_after",
+    is_flag=True,
+    help="Reveal video file in file explorer after creation",
+)
+@click.option(
     "--include-effects/--no-effects",
     "include_effects",
     default=False,
@@ -1162,6 +1168,11 @@ def run_download_shell_command(command: str, file_path: Path) -> dict:
     "--match-zoom-level",
     is_flag=True,
     help="Attempt to set browser zoom to match recorded zoom level",
+)
+@click.option(
+    "--faithful",
+    is_flag=True,
+    help="Use captured focus styles for pixel-perfect keyboard navigation (if available)",
 )
 def replay(
     recording_file: Optional[str],
@@ -1198,9 +1209,11 @@ def replay(
     compact: bool,
     video_fps: Optional[int],
     open_after: bool,
+    reveal_after: bool,
     include_effects: bool,
     match_viewport: bool,
     match_zoom_level: bool,
+    faithful: bool,
 ):
     """
     Replay a recorded browser interaction session.
@@ -1481,6 +1494,15 @@ def replay(
     table.print_row(["Viewport", viewport_str])
     table.print_row(["Steps", steps_str])
     table.print_footer()
+
+    # Show hint if recording has faithful focus styles but --faithful not specified
+    if recording.metadata.faithful and not faithful:
+        from inspekt.app.cli.table import print_hint
+        click.echo()
+        print_hint(
+            "This recording has captured focus styles. "
+            "Use `--faithful` to apply them for pixel-perfect keyboard navigation."
+        )
 
     if dry_run:
         click.echo("\n[DRY RUN - not executing]\n")
@@ -2566,6 +2588,10 @@ def replay(
         actual_index = start_idx + i
         step_dict = step.model_dump(exclude_none=True)
 
+        # Add faithful flag to step data for replay_step.js
+        if faithful:
+            step_dict["useFaithfulFocusStyles"] = True
+
         # Load external file content for upload steps
         if step.action == "upload":
             load_external_file_content(step_dict, recording_path.parent)
@@ -3511,6 +3537,12 @@ def replay(
                     # Open video file if --open flag was set
                     if open_after:
                         open_or_download(resolved_video_path)
+
+                    # Reveal video file if --reveal flag was set
+                    if reveal_after:
+                        from inspekt.app.cli.util import reveal_or_download
+
+                        reveal_or_download(resolved_video_path)
                 else:
                     from inspekt.app.cli.table import print_warning
                     print_warning(f"Video encoding failed: {encode_result.get('error')}")

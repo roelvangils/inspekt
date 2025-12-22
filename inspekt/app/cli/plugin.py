@@ -411,7 +411,8 @@ def plugin_show(name_or_id, output_json):
 @click.option("--output", "-o", type=click.Path(), help="Output file path")
 @click.option("--ids", help="Comma-separated plugin IDs to export")
 @click.option("--open", "open_after", is_flag=True, help="Open exported file in default application")
-def plugin_export(output, ids, open_after):
+@click.option("--reveal", "reveal_after", is_flag=True, help="Reveal exported file in file explorer")
+def plugin_export(output, ids, open_after, reveal_after):
     """
     Export plugins to JSON file.
 
@@ -445,6 +446,12 @@ def plugin_export(output, ids, open_after):
             # Open file if --open flag was set
             if open_after:
                 open_or_download(output)
+
+            # Reveal file if --reveal flag was set
+            if reveal_after:
+                from inspekt.app.cli.util import reveal_or_download
+
+                reveal_or_download(output)
         else:
             click.echo(json_str)
 

@@ -20,7 +20,7 @@ from pathlib import Path
 import click
 
 from inspekt.app.cli.base import builtin_open
-from inspekt.app.cli.util import open_or_download
+from inspekt.app.cli.util import open_or_download, reveal_or_download
 from inspekt.client import BridgeClient
 
 
@@ -184,6 +184,12 @@ def generate_output_path(
     is_flag=True,
     help='Open saved file in default application'
 )
+@click.option(
+    '--reveal',
+    'reveal_after',
+    is_flag=True,
+    help='Reveal saved file in file explorer'
+)
 def save(
     output: str | None,
     output_dir: str | None,
@@ -198,6 +204,7 @@ def save(
     quiet: bool,
     output_json: bool,
     open_after: bool,
+    reveal_after: bool,
 ):
     """
     Save the current page as a single HTML file.
@@ -542,6 +549,10 @@ def save(
         # Open file if --open flag was set (skip for JSON/quiet modes as they're for piping)
         if open_after and not output_json and not quiet:
             open_or_download(output_path)
+
+        # Reveal file if --reveal flag was set (skip for JSON/quiet modes as they're for piping)
+        if reveal_after and not output_json and not quiet:
+            reveal_or_download(output_path)
 
     except FileNotFoundError as e:
         if progress_bar:

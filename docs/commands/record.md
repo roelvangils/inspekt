@@ -83,6 +83,7 @@ inspekt record [OPTIONS] [OUTPUT]
 | `--min-hover-duration INTEGER` | `200` | Minimum hover duration in ms to record |
 | `--replay` | `false` | Automatically replay the recording after saving |
 | `--open` | `false` | Open the recording in your default application after saving |
+| `--reveal` | `false` | Reveal the recording in file explorer after saving |
 | `-i, --interactive` | `false` | Step through replay manually (requires `--replay`) |
 | `--no-audio` | `false` | Disable audio feedback during replay |
 | `--no-visual` | `false` | Disable visual feedback during replay |
@@ -93,6 +94,7 @@ inspekt record [OPTIONS] [OUTPUT]
 | `--match-viewport` | `false` | Mark viewport size as a requirement for faithful replay |
 | `--match-zoom-level` | `false` | Mark zoom level as a requirement for faithful replay |
 | `--viewport WIDTHxHEIGHT` | `none` | Resize browser to specific viewport before recording (e.g., `1024x768`) |
+| `--faithful` | `false` | Capture focus styles for pixel-perfect keyboard navigation replay (experimental) |
 | `-f, --force` | `false` | Overwrite existing file without prompting |
 
 ### Examples
@@ -146,6 +148,9 @@ inspekt record --viewport 1024x768 tablet-flow.yaml
 
 # Record at mobile viewport
 inspekt record --viewport 375x667 mobile-flow.yaml
+
+# Capture focus styles for pixel-perfect keyboard navigation replay (experimental)
+inspekt record --faithful keyboard-a11y-test.yaml
 
 # Overwrite existing file without prompting (useful for automation)
 inspekt record --force checkout.yaml

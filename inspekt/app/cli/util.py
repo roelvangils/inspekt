@@ -39,6 +39,45 @@ def make_file_link(path: str | Path, display_text: str | None = None) -> str:
     return f"\033]8;;{file_url}\033\\{display}\033]8;;\033\\"
 
 
+def _handle_vm_download(path: Path) -> bool:
+    """
+    Handle file download in VM environment.
+
+    Emits an OSC 1337 escape sequence that the control panel's xterm.js
+    terminal intercepts to trigger a file download to the host browser.
+
+    This is a shared helper used by both open_or_download() and
+    reveal_or_download() since both operations fall back to downloading
+    in the VM environment where there's no desktop.
+
+    Args:
+        path: Resolved Path object to the file
+
+    Returns:
+        True (action always taken in VM context)
+    """
+    import os
+
+    in_control_panel = os.environ.get('INSPEKT_TERMINAL') == 'control-panel'
+
+    if in_control_panel:
+        # VM + control panel: emit escape sequence for download
+        # Format: OSC 1337 ; download=<path> BEL
+        # The control panel's xterm.js terminal intercepts this sequence
+        # and triggers a file download via the control server's /download endpoint
+        print(f'\033]1337;download={path}\007', end='')
+        print(f'↓ {path.name}')  # User feedback showing download icon
+    else:
+        # VM but not in control panel (e.g., docker exec)
+        # OSC 1337 won't work - inform user how to download
+        click.echo(f'📁 {path}')
+        click.secho(
+            'Tip: Use the control panel terminal (port 6080) for automatic downloads.',
+            fg='yellow', dim=True
+        )
+    return True
+
+
 def open_or_download(path: str | Path) -> bool:
     """
     Open a file in the default application, or download it if in VM.
@@ -58,7 +97,6 @@ def open_or_download(path: str | Path) -> bool:
     Returns:
         True if action was taken, False if file doesn't exist
     """
-    import os
     from inspekt.config import is_isolated_mode
 
     path = Path(path).resolve()
@@ -67,29 +105,198 @@ def open_or_download(path: str | Path) -> bool:
         return False
 
     if is_isolated_mode():
-        # Check if we're in the control panel terminal (supports OSC 1337)
-        in_control_panel = os.environ.get('INSPEKT_TERMINAL') == 'control-panel'
+        return _handle_vm_download(path)
 
-        if in_control_panel:
-            # VM + control panel: emit escape sequence for download
-            # Format: OSC 1337 ; download=<path> BEL
-            # The control panel's xterm.js terminal intercepts this sequence
-            # and triggers a file download via the control server's /download endpoint
-            print(f'\033]1337;download={path}\007', end='')
-            print(f'↓ {path.name}')  # User feedback showing download icon
+    # Normal environment: open with default application
+    click.launch(str(path))
+    return True
+
+
+def reveal_or_download(path: str | Path) -> bool:
+    """
+    Reveal a file in the system file explorer, or download it if in VM.
+
+    In the VM environment (INSPEKT_ISOLATED=1), files cannot be revealed
+    because there's no desktop environment. Instead, emit an OSC 1337
+    escape sequence that triggers a download (same behavior as open_or_download).
+
+    In normal environments:
+    - macOS: Opens Finder with the file selected (open -R)
+    - Windows: Opens Explorer with the file selected
+    - Linux: Opens the containing folder in the default file manager
+
+    Args:
+        path: Path to the file to reveal/download
+
+    Returns:
+        True if action was taken, False if file doesn't exist
+    """
+    import platform
+    import subprocess
+    from inspekt.config import is_isolated_mode
+
+    path = Path(path).resolve()
+
+    if not path.exists():
+        return False
+
+    if is_isolated_mode():
+        return _handle_vm_download(path)
+
+    # Normal environment: reveal in file explorer
+    system = platform.system()
+
+    try:
+        if system == 'Darwin':
+            # macOS: open -R reveals the file in Finder with the file selected
+            subprocess.run(['open', '-R', str(path)], check=True)
+        elif system == 'Windows':
+            # Windows: explorer /select,<path> reveals file in Explorer
+            # Note: Path must be joined with /select, (no space)
+            # Note: explorer.exe returns exit code 1 even on success, so don't use check=True
+            subprocess.run(['explorer', f'/select,{path}'])
         else:
-            # VM but not in control panel (e.g., docker exec)
-            # OSC 1337 won't work - inform user how to download
-            click.echo(f'📁 {path}')
-            click.secho(
-                'Tip: Use the control panel terminal (port 6080) for automatic downloads.',
-                fg='yellow', dim=True
+            # Linux: open the containing directory (can't select specific file easily)
+            # Use xdg-open to open parent directory in default file manager
+            subprocess.run(['xdg-open', str(path.parent)], check=True)
+        return True
+    except (subprocess.SubprocessError, FileNotFoundError):
+        # Fallback: just open the parent directory
+        try:
+            click.launch(str(path.parent))
+            return True
+        except Exception:
+            return False
+
+
+def copy_text_to_clipboard(text: str) -> bool:
+    """
+    Copy text to the system clipboard.
+
+    Works cross-platform:
+    - macOS: Uses pbcopy
+    - Linux: Uses xclip (must be installed)
+    - Windows: Uses clip
+
+    Args:
+        text: Text string to copy
+
+    Returns:
+        True if successful, False otherwise
+    """
+    import platform
+    import subprocess
+
+    system = platform.system()
+
+    try:
+        if system == "Darwin":  # macOS
+            subprocess.run(
+                ["pbcopy"],
+                input=text.encode("utf-8"),
+                check=True,
+                capture_output=True,
             )
-        return True
+            return True
+
+        elif system == "Linux":
+            try:
+                subprocess.run(
+                    ["xclip", "-selection", "clipboard"],
+                    input=text.encode("utf-8"),
+                    check=True,
+                    capture_output=True,
+                )
+                return True
+            except FileNotFoundError:
+                click.echo(
+                    "Error: xclip not installed. Install with: sudo apt install xclip",
+                    err=True,
+                )
+                return False
+
+        elif system == "Windows":
+            subprocess.run(
+                ["clip"],
+                input=text.encode("utf-16"),  # Windows clip expects UTF-16
+                check=True,
+                capture_output=True,
+            )
+            return True
+
+        else:
+            click.echo(f"Clipboard not supported on {system}", err=True)
+            return False
+
+    except subprocess.CalledProcessError as e:
+        click.echo(f"Error copying to clipboard: {e}", err=True)
+        return False
+    except Exception as e:
+        click.echo(f"Error: {e}", err=True)
+        return False
+
+
+def copy_image_to_clipboard(image_data: bytes, format: str = "png") -> bool:
+    """
+    Copy image data directly to the system clipboard.
+
+    Works cross-platform:
+    - macOS: Uses osascript with a temporary file
+    - Linux: Uses xclip (must be installed)
+
+    Args:
+        image_data: Raw image bytes (PNG recommended for best compatibility)
+        format: Image format ('png', 'jpg', 'webp')
+
+    Returns:
+        True if successful, False otherwise
+    """
+    import platform
+    import subprocess
+    import tempfile
+
+    system = platform.system()
+
+    if system == "Darwin":  # macOS
+        # osascript needs a file path, so use a temp file
+        with tempfile.NamedTemporaryFile(suffix=f".{format}", delete=False) as f:
+            f.write(image_data)
+            temp_path = f.name
+        try:
+            script = f'set the clipboard to (read (POSIX file "{temp_path}") as «class PNGf»)'
+            subprocess.run(["osascript", "-e", script], check=True, capture_output=True)
+            return True
+        except subprocess.CalledProcessError:
+            return False
+        finally:
+            Path(temp_path).unlink(missing_ok=True)
+
+    elif system == "Linux":
+        # xclip can read from stdin
+        mime_type = {"png": "image/png", "jpg": "image/jpeg", "webp": "image/webp"}.get(
+            format, "image/png"
+        )
+        try:
+            subprocess.run(
+                ["xclip", "-selection", "clipboard", "-t", mime_type],
+                input=image_data,
+                check=True,
+                capture_output=True,
+            )
+            return True
+        except FileNotFoundError:
+            # xclip not installed
+            click.echo(
+                "Error: xclip not installed. Install with: sudo apt install xclip",
+                err=True,
+            )
+            return False
+        except subprocess.CalledProcessError:
+            return False
+
     else:
-        # Normal environment: open with default application
-        click.launch(str(path))
-        return True
+        click.echo(f"Clipboard not supported on {system}", err=True)
+        return False
 
 
 @click.command()
@@ -192,7 +399,8 @@ def userscript():
 @click.option("--json", "output_json", is_flag=True, help="Output as JSON (requires --list)")
 @click.option("-t", "--timeout", type=float, default=30.0, help="Timeout in seconds (default: 30)")
 @click.option("--open", "open_after", is_flag=True, help="Open downloaded file in default application")
-def download(output, list_only, output_json, timeout, open_after):
+@click.option("--reveal", "reveal_after", is_flag=True, help="Reveal downloaded file in file explorer")
+def download(output, list_only, output_json, timeout, open_after, reveal_after):
     """
     Find and download files from the current page.
 
@@ -459,6 +667,15 @@ def download(output, list_only, output_json, timeout, open_after):
             else:
                 # Multiple files: open the downloads directory
                 open_or_download(downloads_dir)
+
+        # Reveal file or directory if --reveal flag was set
+        if reveal_after and success_count > 0:
+            if success_count == 1:
+                # Reveal the single downloaded file
+                reveal_or_download(output_path)
+            else:
+                # Multiple files: reveal the downloads directory
+                reveal_or_download(downloads_dir)
 
     except (ConnectionError, TimeoutError, RuntimeError) as e:
         click.echo(f"Error: {e}", err=True)

@@ -1645,6 +1645,12 @@ def get_recording_metadata(filepath: Path) -> Optional[dict]:
     help="Open the recording in default application after saving",
 )
 @click.option(
+    "--reveal",
+    "reveal_after",
+    is_flag=True,
+    help="Reveal the recording in file explorer after saving",
+)
+@click.option(
     "--edit",
     "-e",
     "edit_after",
@@ -1720,6 +1726,11 @@ def get_recording_metadata(filepath: Path) -> Optional[dict]:
     default=None,
     help="Resize browser to specific viewport before recording (e.g., 1024x768)",
 )
+@click.option(
+    "--faithful",
+    is_flag=True,
+    help="Capture focus styles for pixel-perfect keyboard navigation replay (experimental)",
+)
 @click.pass_context
 def record(
     ctx,
@@ -1730,6 +1741,7 @@ def record(
     min_hover_duration: int,
     replay: bool,
     open_after: bool,
+    reveal_after: bool,
     edit_after: bool,
     no_audio: bool,
     no_visual: bool,
@@ -1743,6 +1755,7 @@ def record(
     match_zoom_level: bool,
     force: bool,
     target_viewport: Optional[str],
+    faithful: bool,
 ):
     """
     Record browser interactions to a YAML file.
@@ -2169,6 +2182,7 @@ def record(
         "recordingId": recording_id,
         "maxActionsPerSecond": max_actions_per_second,
         "syntheticDialogs": use_synthetic_dialogs,
+        "captureFocusStyles": faithful,  # Capture focus styles for --faithful replay
     }
     config_json = json.dumps(config)
 
@@ -2564,6 +2578,7 @@ def record(
                     starting_url=start_url,
                     user_agent=user_agent or None,
                     recorded_on=recorded_on,
+                    faithful=faithful,
                 ),
                 state=state_info,
                 steps=all_steps,
@@ -2682,6 +2697,12 @@ def record(
             # Open file if --open flag was set (or deprecated --edit)
             if should_open:
                 open_or_download(output_path)
+
+            # Reveal file if --reveal flag was set
+            if reveal_after:
+                from inspekt.app.cli.util import reveal_or_download
+
+                reveal_or_download(output_path)
 
             # Auto-replay if --replay flag was set
             if replay:
