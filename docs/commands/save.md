@@ -66,6 +66,7 @@ inspekt save
 --output, -o <path>    Custom output filename
 --dir, -d <path>       Output directory
 --open                 Open saved file in default application
+--reveal               Reveal saved file in file explorer
 ```
 
 **Default behavior:**

@@ -336,66 +336,92 @@ diff page1.txt page2.txt
 
 ---
 
-## Selected Text
+## Selection & Inspected Content
 
-Get the currently selected text with metadata.
+Extract content from browser selections or inspected elements in multiple formats.
 
-### Basic Usage
+### Commands Overview
+
+| Command | Source | Use Case |
+|---------|--------|----------|
+| `inspekt selection` | Text selected in browser | Copy highlighted content |
+| `inspekt inspected` | Element from DevTools | Extract specific DOM elements |
+
+### Quick Examples
 
 ```bash
+# Get selected text
+inspekt selection text
+
+# Get selected HTML (formatted and clean)
+inspekt selection html --compact --pretty
+
+# Copy HTML to clipboard
+inspekt selection html --copy
+
+# Get inspected element's HTML
+inspekt inspected html --compact
+```
+
+### Output Formats
+
+Both commands support three output formats:
+
+```bash
+# Plain text
+inspekt selection text
+
+# HTML (with formatting options)
+inspekt selection html --pretty --compact
+
+# Markdown (converted from HTML)
+inspekt selection markdown
+```
+
+### Compact Mode
+
+The `--compact` flag creates documentation-friendly HTML by removing:
+
+- CSS classes and `data-*` attributes
+- Inline styles
+- SVG path data → `[PATH DATA]`
+- Base64 content → `[DATA]`
+- Long random strings → `[STRING]`
+- Empty comments
+- Long text (20+ words) → `...`
+
+**Example:**
+```bash
+inspekt selection html --compact --pretty
+```
+
+**Before:**
+```html
+<button class="btn btn-primary shadow-lg"
+        data-analytics="cta-click"
+        style="background: linear-gradient(...)">
+  Click here
+</button>
+```
+
+**After:**
+```html
+<button>Click here</button>
+```
+
+### Full Documentation
+
+For complete details on all options, see:
+**[Selection & Inspected Commands](../commands/selection.md)**
+
+### Legacy Command
+
+The `inspekt selected` command still works but is deprecated:
+
+```bash
+# Deprecated - use 'inspekt selection text' instead
 inspekt selected
-```
-
-**Output:**
-```
-Selected Text:
-"This is the selected text on the page."
-
-Position: 42-78 (36 characters)
-Container: DIV.content
-Parent: ARTICLE.post
-```
-
-Shows:
-- Selected text
-- Character position
-- Container element
-- Parent element
-
-### Raw Text Only
-
-```bash
 inspekt selected --raw
-```
-
-**Output:**
-```
-This is the selected text on the page.
-```
-
-Just the text, no metadata - perfect for piping.
-
-### Practical Uses
-
-**Copy to clipboard (macOS):**
-```bash
-inspekt selected --raw | pbcopy
-```
-
-**Save to file:**
-```bash
-inspekt selected --raw > selection.txt
-```
-
-**Process with other tools:**
-```bash
-inspekt selected --raw | wc -w  # Count words
-inspekt selected --raw | tr '[:upper:]' '[:lower:]'  # Lowercase
-```
-
-**Translate selection:**
-```bash
-inspekt selected --raw | translate-tool
 ```
 
 ---
@@ -1241,6 +1267,57 @@ The network commands are available as MCP tools for AI assistants:
 2. **Need status codes**: Open DevTools (F12), then use `inspekt network har`
 3. **CI/CD pipelines**: Use `inspekt network` (no DevTools needed)
 4. **Debugging errors**: Use `inspekt network har --errors`
+
+---
+
+## Post-Action Options: --open vs --reveal
+
+Many Inspekt commands that create files support two post-action options:
+
+### --open
+
+Opens the created file in your **default application** for that file type:
+- Screenshot → Preview, Photos, or image viewer
+- HTML → Web browser
+- YAML → Text editor
+- Video → Media player
+
+```bash
+# Open screenshot in image viewer after saving
+inspekt screenshot viewport -o preview.png --open
+
+# Open saved page in browser after saving
+inspekt save --open
+
+# Open video after recording replay
+inspekt replay login.yaml --video --open
+```
+
+**Use case**: When you want to immediately view or edit the content.
+
+### --reveal
+
+Opens your **file explorer** (Finder on macOS, Explorer on Windows) with the file selected:
+- macOS: Opens Finder with file highlighted
+- Windows: Opens Explorer with file highlighted
+- Linux: Opens the containing folder in default file manager
+
+```bash
+# Reveal screenshot in Finder after saving
+inspekt screenshot viewport -o preview.png --reveal
+
+# Reveal recording file in file explorer
+inspekt record --reveal
+
+# Reveal video in Finder
+inspekt replay login.yaml --video --reveal
+```
+
+**Use case**: When you want to copy, rename, move, or organize the file.
+
+### Inspekt VM Behavior
+
+When running inside the Inspekt VM (Docker container), both `--open` and `--reveal` will **download** the file to your host machine instead, since there's no desktop environment in the VM. The download is triggered automatically in the control panel terminal.
 
 ---
 

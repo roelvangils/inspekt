@@ -166,8 +166,10 @@ inspekt replay [OPTIONS] [RECORDING_FILE]
 | `--video [PATH]` | `none` | Record replay to video file (MP4/WebM). Use `--video` for auto-naming. |
 | `--fps INTEGER` | `10` | Video frame rate (5-30), also configurable in config.json |
 | `--open` | `false` | Open video file in default application after creation |
+| `--reveal` | `false` | Reveal video file in file explorer after creation |
 | `--match-viewport` | `false` | Resize browser to match recorded viewport dimensions |
 | `--match-zoom-level` | `false` | Set browser zoom to match recorded zoom level |
+| `--faithful` | `false` | Use captured focus styles for pixel-perfect keyboard navigation (if available) |
 
 ### Examples
 
