@@ -49,12 +49,26 @@ CATEGORY_ICONS: dict[str, str] = {
     "Form": "\uf0ca",                  #  nf-fa-list_ul
     "User-agent": "\U000f06a9",        # 󰚩 nf-md-robot
     "Plugins": "\U000f0a66",           # 󰩦 nf-md-puzzle
+    # Server status tables
+    "Bridge Server": "\U000f0200",     # 󰈀 nf-md-ethernet
+    "API Server": "\uf121",            #  nf-fa-code
+    "Connected Browsers": "\uf268",    #  nf-fa-chrome
+    "Request Statistics": "\uf0ae",    #  nf-fa-tasks
+    # MCP tool categories
+    "Navigation": "\uf0ac",            #  nf-fa-globe
+    "Execution": "\uf121",             #  nf-fa-code
+    "Extraction": "\uf019",            #  nf-fa-download
+    "Interaction": "\uf245",           #  nf-fa-mouse_pointer
+    "Inspection": "\uf002",            #  nf-fa-search
+    "Selection": "\uf246",             #  nf-fa-i_cursor
+    "Plugin": "\uf1e6",                #  nf-fa-plug
 }
 
 # Status icons - Nerdfont equivalents for ✓/✗/○/•
 STATUS_ICONS: dict[str, str] = {
     "pass": "\U000f012c",              # 󰄬 nf-md-check
     "fail": "\U000f0156",              # 󰅖 nf-md-close (simple cross)
+    "review": "\U000f0208",            # 󰈈 nf-md-eye (needs review)
     "warning": "\uf071",               #  nf-fa-warning
     "unknown": "\uf059",               #  nf-fa-question_circle
     "info": "\uf05a",                  #  nf-fa-info_circle
@@ -64,7 +78,7 @@ STATUS_ICONS: dict[str, str] = {
 # Special indicator icons
 INDICATOR_ICONS: dict[str, str] = {
     "waiting": "\uf251",               #  nf-fa-hourglass_half
-    "cached": "\U000f0193",            # 󰆓 nf-md-cached
+    "cached": "\uf49b",                #  nf-oct-cache
     "ai": "\U000f06a9",                # 󰚩 nf-md-robot
     "external": "\uf08e",              #  nf-fa-external_link
     "internal": "\uf061",              #  nf-fa-arrow_right
@@ -78,6 +92,40 @@ INDICATOR_ICONS: dict[str, str] = {
     "tip": "\uf400",                   #  nf-oct-light_bulb (informational tip)
     "video": "\U000f022b",             # 󰈫 nf-md-filmstrip (video recording)
     "audio": "\U000f057e",             # 󰕾 nf-md-volume_high (audio effects)
+    "analyze": "\U000f1276",           # 󱉶 nf-md-text_search (page analysis)
+    "generate": "\uec10",              #  nf-cod-sparkle (AI generation)
+    "screenshot": "\ueada",             #  nf-cod-device_camera (screenshot capture)
+    "clipboard": "\U000f08a8",         # 󰢨 nf-md-clipboard_check (copied to clipboard)
+    # Screenshot workflow icons
+    "scroll_up": "\U000f0dbc",         # 󰶼 nf-md-arrow_up_box (scroll up)
+    "scroll_down": "\U000f0db9",       # 󰶹 nf-md-arrow_down_box (scroll down)
+    "scroll_left": "\U000f0dba",       # 󰶺 nf-md-arrow_left_box (scroll left)
+    "scroll_right": "\U000f0dbb",      # 󰶻 nf-md-arrow_right_box (scroll right)
+    "restore_scroll": "\U000f0c8e",    # 󰲎 nf-md-arrow_collapse (restore position)
+    "save": "\uf058",                  #  nf-fa-check_circle (save complete)
+    "dimensions": "\U000f0cc2",        # 󰳂 nf-md-image_size_select_actual (image size)
+    "optimizing": "\uf066",            #  nf-fa-compress (compressing)
+    "optimized": "\U000f0e2d",         # 󰸭 nf-md-content_save_check (optimization complete)
+    # Additional indicators for CLI commands
+    "info_circle": "\uf05a",           #  nf-fa-info_circle (setup/info wizard)
+    "terminal": "\uf120",              #  nf-fa-terminal (shell/completion)
+    "globe": "\uf0ac",                 #  nf-fa-globe (URLs/web access)
+    "docker": "\U000f0322",            # 󰌢 nf-md-docker (VM/container)
+    "file": "\uf15b",                  #  nf-fa-file (resources/files)
+    "metadata": "\uf02b",              #  nf-fa-tag (metadata/properties)
+    # Screenshot workflow icons (new)
+    "shield_check": "\U000f0483",      # 󰒃 nf-md-shield_check (security scan passed)
+    "camera": "\U000f0100",            # 󰄀 nf-md-camera (capture action)
+    "chrome": "\U000f0193",            # 󰆓 nf-md-google_chrome (Chrome browser)
+    "arrow_hook": "\u21aa",            # ↪ rightwards arrow with hook (indented summary)
+    # Selection screenshot icons
+    "crosshair": "\U000f0c70",         # 󰱰 nf-md-crosshairs (selection mode)
+    "snap": "\U000f0232",              # 󰈲 nf-md-magnet (snapped to elements)
+    # Accessibility audit progress icons
+    "celebrate": "\U000f1056",         # 󱁖 nf-md-party_popper (no violations found)
+    "stopwatch": "\uf520",             #  nf-md-timer (time elapsed)
+    "alert": "\uf40b",                 #  nf-oct-accessibility (found violations)
+    "bug": "\uf188",                   #  nf-fa-bug (known issue)
 }
 
 # Recording action icons - used in record and replay commands
@@ -200,6 +248,8 @@ def get_status_icon(status: str | bool | None) -> str | None:
         return STATUS_ICONS["pass"]
     elif status is False or status in ("fail", "failed", "error", "no", "invalid"):
         return STATUS_ICONS["fail"]
+    elif status in ("review", "incomplete", "manual", "needs_review"):
+        return STATUS_ICONS["review"]
     elif status in ("warn", "warning"):
         return STATUS_ICONS["warning"]
     else:
@@ -386,7 +436,7 @@ def warning(message: str) -> str:
     from inspekt.config import is_nerdfont_enabled
 
     icon = STATUS_ICONS["warning"] if is_nerdfont_enabled() else "\u26a0"
-    return f"{icon} {message}"
+    return f"{icon}  {message}"
 
 
 def info(message: str) -> str:
@@ -401,8 +451,9 @@ def info(message: str) -> str:
     """
     from inspekt.config import is_nerdfont_enabled
 
-    icon = STATUS_ICONS["info"] if is_nerdfont_enabled() else "\u2022"
-    return f"{icon} {message}"
+    # Use the standard info icon \uea74 with two spaces
+    icon = "\uea74" if is_nerdfont_enabled() else "\u2022"
+    return f"{icon}  {message}"
 
 
 def progress(message: str) -> str:
@@ -451,3 +502,381 @@ def cached(message: str) -> str:
 
     icon = INDICATOR_ICONS["cached"] if is_nerdfont_enabled() else "\U0001f4be"
     return f"{icon} {message}"
+
+
+def analyze(message: str) -> str:
+    """
+    Format an analysis/processing message with appropriate icon.
+
+    Args:
+        message: The analysis message text
+
+    Returns:
+        Message prefixed with 󱲛 (nerdfont) or 🔍 (fallback)
+    """
+    from inspekt.config import is_nerdfont_enabled
+
+    icon = INDICATOR_ICONS["analyze"] if is_nerdfont_enabled() else "\U0001f50d"
+    return f"{icon} {message}"
+
+
+def generate(message: str) -> str:
+    """
+    Format an AI generation message with appropriate icon.
+
+    Args:
+        message: The generation message text
+
+    Returns:
+        Message prefixed with  (nerdfont) or ✨ (fallback)
+    """
+    from inspekt.config import is_nerdfont_enabled
+
+    icon = INDICATOR_ICONS["generate"] if is_nerdfont_enabled() else "\u2728"
+    return f"{icon} {message}"
+
+
+def screenshot(message: str) -> str:
+    """
+    Format a screenshot capture message with appropriate icon.
+
+    Args:
+        message: The screenshot message text
+
+    Returns:
+        Message prefixed with  (nerdfont) or 📷 (fallback)
+    """
+    from inspekt.config import is_nerdfont_enabled
+
+    # Use the standard info icon \uea74 with two spaces
+    icon = "\uea74" if is_nerdfont_enabled() else "\U0001f4f7"
+    return f"{icon}  {message}"
+
+
+def clipboard(message: str) -> str:
+    """
+    Format a clipboard copy message with appropriate icon.
+
+    Args:
+        message: The clipboard message text
+
+    Returns:
+        Message prefixed with 󰢨 (nerdfont) or 📋 (fallback)
+    """
+    from inspekt.config import is_nerdfont_enabled
+
+    icon = INDICATOR_ICONS["clipboard"] if is_nerdfont_enabled() else "\U0001f4cb"
+    return f"{icon}  {message}"
+
+
+def get_scroll_direction_icon(direction: str) -> str | None:
+    """
+    Get icon for a scroll direction.
+
+    Args:
+        direction: Scroll direction ("up", "down", "left", "right")
+
+    Returns:
+        The Nerdfont glyph if nerdfont is enabled, None otherwise
+    """
+    from inspekt.config import is_nerdfont_enabled
+
+    if not is_nerdfont_enabled():
+        return None
+
+    direction_map = {
+        "up": INDICATOR_ICONS["scroll_up"],
+        "down": INDICATOR_ICONS["scroll_down"],
+        "left": INDICATOR_ICONS["scroll_left"],
+        "right": INDICATOR_ICONS["scroll_right"],
+    }
+    return direction_map.get(direction.lower())
+
+
+def save(message: str) -> str:
+    """
+    Format a file save message with appropriate icon.
+
+    Args:
+        message: The save message text
+
+    Returns:
+        Message prefixed with  (nerdfont check-circle) or ✓ (fallback)
+    """
+    from inspekt.config import is_nerdfont_enabled
+
+    icon = INDICATOR_ICONS["save"] if is_nerdfont_enabled() else "\u2713"
+    return f"{icon}  {message}"
+
+
+def dimensions(message: str) -> str:
+    """
+    Format a dimensions/size message with appropriate icon.
+
+    Args:
+        message: The dimensions message text
+
+    Returns:
+        Message prefixed with 󰳂 (nerdfont) or 📐 (fallback)
+    """
+    from inspekt.config import is_nerdfont_enabled
+
+    icon = INDICATOR_ICONS["dimensions"] if is_nerdfont_enabled() else "\U0001f4d0"
+    return f"{icon}  {message}"
+
+
+def optimizing(message: str) -> str:
+    """
+    Format an optimizing/processing message with appropriate icon.
+
+    Args:
+        message: The optimizing message text
+
+    Returns:
+        Message prefixed with  (nerdfont) or ⏳ (fallback)
+    """
+    from inspekt.config import is_nerdfont_enabled
+
+    icon = INDICATOR_ICONS["optimizing"] if is_nerdfont_enabled() else "\u23f3"
+    return f"{icon}  {message}"
+
+
+def optimized(message: str) -> str:
+    """
+    Format an optimization complete message with appropriate icon.
+
+    Args:
+        message: The optimization result text
+
+    Returns:
+        Message prefixed with 󰸭 (nerdfont) or ✓ (fallback)
+    """
+    from inspekt.config import is_nerdfont_enabled
+
+    icon = INDICATOR_ICONS["optimized"] if is_nerdfont_enabled() else "\u2713"
+    return f"{icon}  {message}"
+
+
+def scroll_action(direction: str, message: str) -> str:
+    """
+    Format a scroll action message with directional icon.
+
+    Args:
+        direction: Scroll direction ("up", "down", "left", "right")
+        message: The scroll action message text
+
+    Returns:
+        Message prefixed with directional arrow icon
+    """
+    from inspekt.config import is_nerdfont_enabled
+
+    if is_nerdfont_enabled():
+        icon = get_scroll_direction_icon(direction) or INDICATOR_ICONS["scroll_down"]
+    else:
+        fallback_map = {"up": "↑", "down": "↓", "left": "←", "right": "→"}
+        icon = fallback_map.get(direction.lower(), "↓")
+    return f"{icon}  {message}"
+
+
+def restore_scroll(message: str) -> str:
+    """
+    Format a scroll position restore message with appropriate icon.
+
+    Args:
+        message: The restore scroll message text
+
+    Returns:
+        Message prefixed with 󰲎 (nerdfont) or ↩ (fallback)
+    """
+    from inspekt.config import is_nerdfont_enabled
+
+    icon = INDICATOR_ICONS["restore_scroll"] if is_nerdfont_enabled() else "\u21a9"
+    return f"{icon}  {message}"
+
+
+def metadata(message: str) -> str:
+    """
+    Format a metadata/properties message with appropriate icon.
+
+    Args:
+        message: The metadata message text
+
+    Returns:
+        Message prefixed with  (nerdfont tag) or • (fallback)
+    """
+    from inspekt.config import is_nerdfont_enabled
+
+    icon = INDICATOR_ICONS["metadata"] if is_nerdfont_enabled() else "\u2022"
+    return f"{icon}  {message}"
+
+
+def shield_check(message: str) -> str:
+    """
+    Format a security check passed message with appropriate icon.
+
+    Args:
+        message: The security check message text
+
+    Returns:
+        Message prefixed with 󰒃 (nerdfont shield-check) or ✓ (fallback)
+    """
+    from inspekt.config import is_nerdfont_enabled
+
+    icon = INDICATOR_ICONS["shield_check"] if is_nerdfont_enabled() else "\u2713"
+    return f"{icon}  {message}"
+
+
+def camera(message: str) -> str:
+    """
+    Format a capture/camera action message with appropriate icon.
+
+    Args:
+        message: The capture action message text
+
+    Returns:
+        Message prefixed with 󰄀 (nerdfont camera) or 📷 (fallback)
+    """
+    from inspekt.config import is_nerdfont_enabled
+
+    icon = INDICATOR_ICONS["camera"] if is_nerdfont_enabled() else "\U0001f4f7"
+    return f"{icon}  {message}"
+
+
+def chrome_received(message: str) -> str:
+    """
+    Format a "received from Chrome" message with appropriate icon.
+
+    Args:
+        message: The received message text
+
+    Returns:
+        Message prefixed with 󰆓 (nerdfont Chrome logo) or ⬇ (fallback)
+    """
+    from inspekt.config import is_nerdfont_enabled
+
+    icon = INDICATOR_ICONS["chrome"] if is_nerdfont_enabled() else "\u2b07"
+    return f"{icon}  {message}"
+
+
+def optimized_summary(message: str) -> str:
+    """
+    Format an optimization summary message with appropriate icon (indented).
+
+    Args:
+        message: The optimization summary text
+
+    Returns:
+        Indented message prefixed with ↪ or ↓ (fallback)
+    """
+    icon = INDICATOR_ICONS["arrow_hook"]
+    return f"   {icon} {message}"
+
+
+def source_url(message: str) -> str:
+    """
+    Format a source URL message with appropriate icon (indented).
+
+    Args:
+        message: The source URL text
+
+    Returns:
+        Indented message prefixed with ↪ or 🔗 (fallback)
+    """
+    icon = INDICATOR_ICONS["arrow_hook"]
+    return f"   {icon} {message}"
+
+
+def crosshair(message: str) -> str:
+    """
+    Format a selection mode message with crosshair icon.
+
+    Args:
+        message: The selection mode message text
+
+    Returns:
+        Message prefixed with 󰱰 (nerdfont crosshairs) or + (fallback)
+    """
+    from inspekt.config import is_nerdfont_enabled
+
+    icon = INDICATOR_ICONS["crosshair"] if is_nerdfont_enabled() else "+"
+    return f"{icon}  {message}"
+
+
+def snap(message: str) -> str:
+    """
+    Format a snap action message with magnet icon.
+
+    Args:
+        message: The snap action message text
+
+    Returns:
+        Message prefixed with 󰈲 (nerdfont magnet) or ⊕ (fallback)
+    """
+    from inspekt.config import is_nerdfont_enabled
+
+    icon = INDICATOR_ICONS["snap"] if is_nerdfont_enabled() else "\u2295"
+    return f"{icon}  {message}"
+
+
+def celebrate(message: str) -> str:
+    """
+    Format a celebration/success message with party popper icon.
+
+    Args:
+        message: The celebration message text
+
+    Returns:
+        Message prefixed with 󱁖 (nerdfont party-popper) or 🎉 (fallback)
+    """
+    from inspekt.config import is_nerdfont_enabled
+
+    icon = INDICATOR_ICONS["celebrate"] if is_nerdfont_enabled() else "\U0001f389"
+    return f"{icon}  {message}"
+
+
+def stopwatch(message: str) -> str:
+    """
+    Format a time elapsed message with stopwatch icon.
+
+    Args:
+        message: The time elapsed message text
+
+    Returns:
+        Message prefixed with  (nerdfont timer) or ⏱ (fallback)
+    """
+    from inspekt.config import is_nerdfont_enabled
+
+    icon = INDICATOR_ICONS["stopwatch"] if is_nerdfont_enabled() else "\u23f1"
+    return f"{icon}  {message}"
+
+
+def alert(message: str) -> str:
+    """
+    Format an alert/warning message with exclamation icon.
+
+    Args:
+        message: The alert message text
+
+    Returns:
+        Message prefixed with  (nerdfont warning) or ⚠ (fallback)
+    """
+    from inspekt.config import is_nerdfont_enabled
+
+    icon = INDICATOR_ICONS["alert"] if is_nerdfont_enabled() else "\u26a0"
+    return f"{icon}  {message}"
+
+
+def bug(message: str) -> str:
+    """
+    Format a known issue message with bug icon.
+
+    Args:
+        message: The issue message text
+
+    Returns:
+        Message prefixed with  (nerdfont bug) or 🐛 (fallback)
+    """
+    from inspekt.config import is_nerdfont_enabled
+
+    icon = INDICATOR_ICONS["bug"] if is_nerdfont_enabled() else "\U0001f41b"
+    return f"{icon}  {message}"
