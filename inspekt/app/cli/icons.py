@@ -195,6 +195,13 @@ LOG_LEVEL_ICONS: dict[str, str] = {
     "clear": "\uf12d",                 #  nf-fa-eraser
 }
 
+# Platform icons - used to indicate native OS-level operations
+PLATFORM_ICONS: dict[str, str] = {
+    "Darwin": "\ue711",                #  nf-dev-apple (macOS)
+    "Windows": "\ue70f",               #  nf-dev-windows (Windows)
+    "Linux": "\ue712",                 #  nf-dev-linux (Linux)
+}
+
 # Section header icons
 SECTION_ICONS: dict[str, str] = {
     "summary": "\U000f02fd",           # 󰋽 nf-md-information_outline
@@ -384,6 +391,25 @@ def get_step_mode_icon(mode: str) -> str | None:
     if not is_nerdfont_enabled():
         return None
     return STEP_MODE_ICONS.get(mode.lower())
+
+
+def get_platform_icon() -> str | None:
+    """
+    Get icon for the current platform (macOS/Windows/Linux).
+
+    Used to indicate native OS-level operations like AppleScript keyboard events.
+
+    Returns:
+        The Nerdfont glyph for the current platform if nerdfont is enabled,
+        None otherwise
+    """
+    import platform
+
+    from inspekt.config import is_nerdfont_enabled
+
+    if not is_nerdfont_enabled():
+        return None
+    return PLATFORM_ICONS.get(platform.system())
 
 
 # =============================================================================
