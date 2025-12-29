@@ -11,10 +11,18 @@ from pathlib import Path
 from typing import Optional
 from urllib.parse import urlparse
 
+# Terminal control for suppressing keyboard echo during recording (Unix-only)
+try:
+    import termios
+    import tty
+    HAS_TERMIOS = True
+except ImportError:
+    HAS_TERMIOS = False
+
 import click
 import yaml
 
-from inspekt.app.cli.icons import success as success_icon, get_indicator
+from inspekt.app.cli.icons import success as success_icon, get_indicator, get_action_icon
 from inspekt.app.cli.interaction import _focus_browser_if_requested
 from inspekt.client import BridgeClient
 from inspekt.config import get_audio_config, get_record_config
@@ -38,14 +46,66 @@ from .formatting import (
     format_elapsed,
     format_step_for_display,
     format_step_header,
+    format_steps_preview,
     format_system_message,
     get_recordings_dir,
 )
+from .table import Table
 from .recording_utils import clean_filename, find_most_recent_recording, complete_recording_files
 from inspekt.app.cli.output import OutputHandler
 from inspekt.shared.dialog_styles import DIALOG_STYLES
 
 import requests
+
+
+class SubcommandAwareGroup(click.Group):
+    """
+    Custom Click Group that handles optional positional arguments alongside subcommands.
+
+    When the first positional argument matches a subcommand name (without .yaml/.yml extension),
+    treat it as a subcommand invocation rather than consuming it as the 'filename' argument.
+
+    This allows both:
+    - `inspekt record tutorial` → runs tutorial subcommand
+    - `inspekt record tutorial.yaml` → records to file tutorial.yaml
+    - `inspekt record show file.yaml` → runs show subcommand with file.yaml arg
+    """
+
+    def make_context(self, info_name, args, parent=None, **extra):
+        """
+        Override to detect subcommand names before the optional filename argument consumes them.
+
+        We check if the first non-option arg matches a subcommand. If so, we temporarily remove
+        the filename parameter to prevent it from consuming the subcommand name.
+        """
+        # Find first non-option argument
+        first_positional_idx = None
+        for i, arg in enumerate(args):
+            if not arg.startswith('-'):
+                first_positional_idx = i
+                break
+
+        if first_positional_idx is not None:
+            first_arg = args[first_positional_idx]
+            first_arg_lower = first_arg.lower()
+            has_yaml_ext = first_arg_lower.endswith('.yaml') or first_arg_lower.endswith('.yml')
+
+            # If matches a subcommand and doesn't have yaml extension, skip filename param
+            if not has_yaml_ext and first_arg in self.commands:
+                # Temporarily remove the 'filename' parameter so it doesn't consume this arg
+                original_params = self.params
+                self.params = [p for p in self.params if p.name != 'filename']
+                try:
+                    ctx = super().make_context(info_name, args, parent=parent, **extra)
+                    # Set filename to None in the context params
+                    ctx.params['filename'] = None
+                    return ctx
+                finally:
+                    # Restore original params
+                    self.params = original_params
+
+        return super().make_context(info_name, args, parent=parent, **extra)
+
 
 # Bridge server constants
 BRIDGE_HTTP_HOST = "127.0.0.1"
@@ -106,6 +166,57 @@ def set_vm_terminal_hidden(hidden: bool) -> None:
             urllib.request.urlopen('http://localhost:8888/chrome', timeout=2)
     except Exception:
         pass  # Terminal control is optional - don't fail recording
+
+
+class TerminalEchoSuppressor:
+    """Suppress keyboard echo in the terminal during recording.
+
+    This prevents escape sequences (like ^[[Z for Shift+Tab) from appearing
+    in the terminal when the user accidentally types while the terminal
+    is focused instead of the browser.
+
+    Only Ctrl+C (handled by signal) will still work to stop recording.
+    """
+
+    def __init__(self):
+        self.original_settings = None
+        self.fd = None
+
+    def suppress(self) -> bool:
+        """Start suppressing keyboard echo. Returns True if successful."""
+        if not HAS_TERMIOS:
+            return False
+
+        try:
+            # Check if stdin is a TTY (won't work in pipes/redirects)
+            if not sys.stdin.isatty():
+                return False
+
+            self.fd = sys.stdin.fileno()
+            self.original_settings = termios.tcgetattr(self.fd)
+
+            # Set terminal to cbreak mode (no echo, char-by-char input)
+            # But we don't actually read input - we just prevent echo
+            new_settings = termios.tcgetattr(self.fd)
+            # Disable echo (ECHO) and canonical mode (ICANON)
+            new_settings[3] = new_settings[3] & ~(termios.ECHO | termios.ICANON)
+            # Set minimum chars to 0 and timeout to 0 (non-blocking)
+            new_settings[6][termios.VMIN] = 0
+            new_settings[6][termios.VTIME] = 0
+            termios.tcsetattr(self.fd, termios.TCSANOW, new_settings)
+            return True
+        except Exception:
+            self.original_settings = None
+            return False
+
+    def restore(self):
+        """Restore original terminal settings."""
+        if self.original_settings is not None and self.fd is not None:
+            try:
+                termios.tcsetattr(self.fd, termios.TCSANOW, self.original_settings)
+            except Exception:
+                pass
+            self.original_settings = None
 
 
 # =============================================================================
@@ -1610,7 +1721,7 @@ def get_recording_metadata(filepath: Path) -> Optional[dict]:
         return None
 
 
-@click.group(invoke_without_command=True)
+@click.group(cls=SubcommandAwareGroup, invoke_without_command=True)
 @click.argument("filename", required=False, default=None)
 @click.option(
     "-o", "--output",
@@ -1782,6 +1893,15 @@ def record(
     to add assertions for automated testing.
 
     \b
+    Subcommands:
+        inspekt record tutorial           # Interactive tutorial
+        inspekt record list               # List saved recordings
+        inspekt record info <file>        # Show recording details
+        inspekt record edit <file>        # Open recording in editor
+        inspekt record tidy <file>        # Clean up recording file
+        inspekt record delete <file>      # Delete a recording
+
+    \b
     Examples:
         inspekt record                    # Auto-generates filename
         inspekt record my-flow.yaml       # Record to specific file
@@ -1791,6 +1911,11 @@ def record(
         inspekt record --replay           # Record and replay to verify
         inspekt record --replay -i        # Record and step through replay
         inspekt record --open --replay    # Open, then replay to verify
+
+    \b
+    Note:
+        If a filename matches a subcommand name (e.g., 'list'), use the
+        .yaml extension to disambiguate: 'inspekt record list.yaml'
     """
     # If a subcommand was invoked, don't run recording
     if ctx.invoked_subcommand is not None:
@@ -2376,6 +2501,10 @@ def record(
         # Flag for clean shutdown (avoid doing I/O in signal handler)
         stop_requested = False
 
+        # Terminal echo suppressor - prevents escape sequences from appearing
+        # when user accidentally types in terminal instead of browser
+        terminal_suppressor = TerminalEchoSuppressor()
+
         # Signal handler for Ctrl+C - just sets a flag
         def stop_recording(sig, frame):
             nonlocal stop_requested
@@ -2386,6 +2515,9 @@ def record(
         # Cleanup function called from main loop when stop is requested
         def do_cleanup(allow_retry: bool = True):
             nonlocal all_steps
+
+            # Restore terminal settings first (so echo works for prompts/output)
+            terminal_suppressor.restore()
 
             # In VM mode, show the terminal overlay again (recording is stopping)
             set_vm_terminal_hidden(False)
@@ -2608,6 +2740,8 @@ def record(
                             click.echo("Refreshing page… " + success_icon(""))
                             client.execute("location.reload()", timeout=5.0, browser_index=recording_browser_index)
                             time.sleep(1.5)  # Wait for page reload
+                            # Re-focus the browser so user can continue interacting
+                            _focus_browser_if_requested(focus=True, silent=True)
                             return "retry"  # Signal to retry
                         except Exception as e:
                             click.echo(f"Error refreshing page: {e}", err=True)
@@ -2907,6 +3041,11 @@ def record(
             if debug_mode:
                 click.echo(f"  [DEBUG] {msg}", err=True)
 
+        # Start suppressing terminal keyboard echo
+        # This prevents escape sequences (^[[Z etc) from appearing when user
+        # accidentally types in the terminal instead of the browser
+        terminal_suppressor.suppress()
+
         # Main polling loop
         while True:
             # Check if stop was requested (Ctrl+C)
@@ -2950,6 +3089,9 @@ def record(
                         except Exception:
                             pass
 
+                    # Re-enable terminal echo suppression for new recording
+                    terminal_suppressor.suppress()
+
                     continue  # Continue polling loop
                 break
 
@@ -2978,6 +3120,10 @@ def record(
                 icon_str = f"{hourglass}  "
                 msg = click.style("No activity for 30 seconds. Recording will stop in 30 seconds…", fg="bright_black", italic=True)
                 click.echo(f"{prefix}   {icon_str}{msg}")
+                # Add hint about Ctrl+C (same style as recording start message)
+                ctrl_c_styled = click.style(" Ctrl+C ", fg="black", bg="bright_yellow")
+                hint = click.style("Press ", fg="bright_black") + ctrl_c_styled + click.style(" to stop and save", fg="bright_black")
+                click.echo(f"                  {hint}")
                 inactivity_warning_shown = True
 
             try:
@@ -3688,7 +3834,7 @@ def list_recordings(limit: Optional[int], output_json: bool):
         click.echo(_style_with_inline_code("  (requires: `inspekt start --docs`)", base_fg="white"))
 
 
-@record.command("show")
+@record.command("info")
 @click.argument("recording_file", type=click.Path(exists=True), required=False, shell_complete=complete_recording_files)
 def show_recording(recording_file: Optional[str]):
     """
@@ -3699,8 +3845,8 @@ def show_recording(recording_file: Optional[str]):
 
     \b
     Examples:
-        inspekt record show                # Show last modified recording
-        inspekt record show login-flow.yaml
+        inspekt record info                # Show last modified recording
+        inspekt record info login-flow.yaml
     """
     # Use last modified file if none specified
     if recording_file is None:
@@ -3727,44 +3873,61 @@ def show_recording(recording_file: Optional[str]):
     meta = data["metadata"]
     steps = data.get("steps", [])
 
-    click.echo(f"\nRecording: {filepath.name}")
-    click.echo("─" * 60)
-    click.echo(f"URL:      {meta.get('starting_url', 'N/A')}")
-
     # Format created date
     created = meta.get("created_at")
     if hasattr(created, "strftime"):
-        click.echo(f"Created:  {created.strftime('%Y-%m-%d %H:%M:%S')}")
+        created_str = created.strftime("%Y-%m-%d %H:%M:%S")
     else:
-        click.echo(f"Created:  {created}")
-
-    click.echo(f"Duration: {format_duration(meta.get('duration_ms', 0))}")
-    click.echo(f"Steps:    {len(steps)}")
+        created_str = str(created) if created else "N/A"
 
     # Viewport info
     viewport = meta.get("viewport", {})
-    if viewport:
-        click.echo(f"Viewport: {viewport.get('width')}x{viewport.get('height')}")
+    viewport_str = f"{viewport.get('width')}x{viewport.get('height')}" if viewport else None
 
-    # Step summary by type
-    action_counts = {}
+    # Build metadata rows
+    meta_rows = [
+        ["File", filepath.name],
+        ["URL", meta.get("starting_url", "N/A")],
+        ["Created", created_str],
+        ["Duration", format_duration(meta.get("duration_ms", 0))],
+        ["Steps", str(len(steps))],
+    ]
+    if viewport_str:
+        meta_rows.append(["Viewport", viewport_str])
+
+    # Recording metadata table (no column headers)
+    click.echo()
+    meta_table = Table(["Field", "Value"], title="Recording", icon="󰐂")
+    meta_table.set_data(meta_rows)
+    meta_table.print_header(skip_column_headers=True)
+    for row in meta_rows:
+        meta_table.print_row(row)
+    meta_table.print_footer()
+
+    # Step summary by action type
+    action_counts: dict[str, int] = {}
     for step in steps:
         action = step.get("action", "unknown")
         action_counts[action] = action_counts.get(action, 0) + 1
 
     if action_counts:
-        click.echo(f"\nActions:  {', '.join(f'{k}: {v}' for k, v in sorted(action_counts.items()))}")
+        # Actions table with icons
+        click.echo()
+        action_rows = []
+        for action, count in sorted(action_counts.items()):
+            icon = get_action_icon(action) or ""
+            action_rows.append([icon, action, str(count)])
 
-    # Show first few steps
-    click.echo("\n─" * 60)
-    click.echo("Steps preview:\n")
+        action_table = Table(["", "Action", "Count"], title="Actions", icon="󰐊")
+        action_table.set_data(action_rows)
+        action_table.print_header(skip_column_headers=True)
+        for row in action_rows:
+            action_table.print_row(row)
+        action_table.print_footer()
 
-    for i, step in enumerate(steps[:10]):
-        display = format_step_for_display(step, i + 1, step.get("timestamp", 0))
-        click.echo(display)
-
-    if len(steps) > 10:
-        click.echo(f"\n  ... and {len(steps) - 10} more steps")
+    # Steps preview using shared formatting
+    click.echo()
+    format_steps_preview(steps, max_steps=10, show_header=True, show_remaining_count=True)
 
     click.echo(f"\nReplay with: inspekt replay {filepath}")
 
