@@ -157,10 +157,12 @@ def format_step_header(use_color: bool = True, indent: bool = False) -> str:
     import shutil
 
     # Header aligned to match step format:
-    # "{indent}{0001}   {00:00}   {icon  action      }   details"
-    #          4ch     5ch       15ch (icon+2sp+12ch)
+    # "{indent}{0001}   {00:00}   {icon action      }   details"
+    #          4ch     5ch       ~15ch (icon+sp+12ch)  3sp
+    # Columns: step(4) + gap(3) + time(5) + gap(3) + action(~15) + gap(3) + details
+    # Header:  STEP(4) + gap(3) + TIME(4) + gap(4) + COMMAND(7) + gap(11) + DETAILS
     prefix = "  " if indent else ""
-    header = f"{prefix}STEP   TIME       COMMAND        DETAILS"
+    header = f"{prefix}STEP   TIME    COMMAND           DETAILS"
 
     if use_color:
         # Pad to terminal width for full-width background
@@ -182,6 +184,7 @@ def format_step_for_display(
     indent: bool = False,
     is_native: bool = False,
     native_mode: bool = False,
+    dimmed_icon: bool = False,
 ) -> str:
     """Format a step for terminal display with colors.
 
@@ -196,6 +199,7 @@ def format_step_for_display(
         indent: Whether to include 2-space indent
         is_native: Whether this action was executed natively (shows platform icon in yellow)
         native_mode: Whether we're in --native replay mode (shows JS icon for non-native steps)
+        dimmed_icon: Whether to show platform/JS icon in dark gray (for skipped/merged steps)
 
     Returns:
         Formatted string, truncated to fit terminal width
@@ -281,18 +285,20 @@ def format_step_for_display(
 
         # Add icon before action if available
         # In native mode: show platform icon (yellow) for native steps, JS icon for non-native steps
+        # When dimmed_icon=True, show icons in dark gray (for skipped/merged steps)
         js_icon = "\ue60c"  # nf-seti-javascript
+        icon_color = "bright_black" if dimmed_icon else "yellow"
         if is_native:
             from inspekt.app.cli.icons import get_platform_icon
             platform_icon = get_platform_icon() or ""
-            # Platform icon in yellow, reduce padding by 1 to make room
-            action_str_native = action.ljust(10) + click.style(platform_icon, fg="yellow")
+            # Platform icon (yellow normally, dark gray when dimmed)
+            action_str_native = action.ljust(10) + click.style(platform_icon, fg=icon_color)
             if action_icon:
                 action_display = f"{action_icon} {action_str_native}"
             else:
                 action_display = f"  {action_str_native}"
         elif native_mode:
-            # Non-native step in native mode - show JS icon
+            # Non-native step in native mode - show JS icon (always bright_black)
             action_str_js = action.ljust(10) + click.style(js_icon, fg="bright_black")
             if action_icon:
                 action_display = f"{action_icon} {action_str_js}"
@@ -897,10 +903,10 @@ def format_system_message(
 
 
 def format_status(status: str, use_color: bool = True, suffix: str = "") -> str:
-    """Format a status indicator (OK, FAIL, SKIP) with appropriate color and icon.
+    """Format a status indicator (OK, FAIL, SKIP, MERGED) with appropriate color and icon.
 
     Args:
-        status: The status string (OK, FAIL, SKIP)
+        status: The status string (OK, FAIL, SKIP, MERGED)
         use_color: Whether to use ANSI colors
         suffix: Optional suffix to append (e.g., "(CDP)" for real key dispatch)
     """
@@ -912,7 +918,8 @@ def format_status(status: str, use_color: bool = True, suffix: str = "") -> str:
     status_colors = {
         "OK": "green",
         "FAIL": "red",
-        "SKIP": "cyan",
+        "SKIP": "yellow",
+        "MERGED": "yellow",
     }
     color = status_colors.get(status, "white")
 
@@ -922,8 +929,8 @@ def format_status(status: str, use_color: bool = True, suffix: str = "") -> str:
         status_icon = get_status_icon("pass")
     elif status == "FAIL":
         status_icon = get_status_icon("fail")
-    elif status == "SKIP":
-        status_icon = get_status_icon("unknown")
+    elif status in ("SKIP", "MERGED"):
+        status_icon = get_status_icon("skip")
 
     # Format suffix in dimmed style
     styled_suffix = click.style(suffix_str, fg="bright_black") if suffix_str else ""
@@ -934,6 +941,11 @@ def format_status(status: str, use_color: bool = True, suffix: str = "") -> str:
             return " " + click.style(status_icon, fg="green") + styled_suffix
         elif status == "FAIL":
             return " " + click.style(status_icon, fg="red") + styled_suffix
+        # For SKIP and MERGED, show icon + descriptive text
+        elif status == "SKIP":
+            return " " + click.style(f"{status_icon} Skipped", fg=color) + styled_suffix
+        elif status == "MERGED":
+            return " " + click.style(f"{status_icon} Merged", fg=color) + styled_suffix
         return " " + click.style(f"{status_icon} {status}", fg=color) + styled_suffix
     return " " + click.style(status, fg=color) + styled_suffix
 
@@ -980,3 +992,33 @@ def format_assertion_result(message: str, passed: bool, use_color: bool = True) 
         result = f"{indent}{message_styled} {status_styled}"
 
     return truncate_to_width(result, term_width)
+
+
+def format_steps_preview(
+    steps: list[dict],
+    max_steps: int = 10,
+    show_header: bool = True,
+    show_remaining_count: bool = True,
+) -> None:
+    """
+    Display a preview of recording steps using replay formatting.
+
+    Used by both `inspekt record info` and `inspekt replay --dry-run`.
+
+    Args:
+        steps: List of step dictionaries from a recording
+        max_steps: Maximum number of steps to display (default: 10)
+        show_header: Whether to show the column header (default: True)
+        show_remaining_count: Whether to show "…and X more steps" (default: True)
+    """
+    if show_header:
+        click.echo(format_step_header())
+
+    for i, step in enumerate(steps[:max_steps]):
+        timestamp = step.get("timestamp", 0)
+        display = format_step_for_display(step, i + 1, timestamp)
+        click.echo(display)
+
+    if show_remaining_count and len(steps) > max_steps:
+        remaining = len(steps) - max_steps
+        click.echo(f"\n  …and {remaining} more steps")
