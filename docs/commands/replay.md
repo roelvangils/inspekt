@@ -170,6 +170,8 @@ inspekt replay [OPTIONS] [RECORDING_FILE]
 | `--match-viewport` | `false` | Resize browser to match recorded viewport dimensions |
 | `--match-zoom-level` | `false` | Set browser zoom to match recorded zoom level |
 | `--faithful` | `false` | Use captured focus styles for pixel-perfect keyboard navigation (if available) |
+| `--native` | `false` | Use native OS keyboard events (AppleScript on macOS) instead of JavaScript |
+| `--typing-speed` | `normal` | Typing speed for native mode: `instant`, `fast`, `normal`, `slow` |
 
 ### Examples
 
@@ -1257,6 +1259,161 @@ else
     echo "Tests failed!"
     exit 1
 fi
+```
+
+## Native Keyboard Mode (macOS)
+
+The `--native` flag uses real OS-level keyboard events via AppleScript instead of JavaScript. This is the most authentic way to replay keyboard interactions.
+
+### Why Use Native Mode?
+
+| JavaScript Events | Native Events |
+|-------------------|---------------|
+| Synthetic `KeyboardEvent` objects | Real OS keyboard events |
+| Can be blocked by `preventDefault()` | Cannot be intercepted by JavaScript |
+| `:focus-visible` may not trigger correctly | Triggers authentic `:focus-visible` |
+| Page JavaScript can detect automation | Indistinguishable from real typing |
+
+**Native mode is ideal for:**
+
+- **Accessibility testing** - See real `:focus-visible` focus rings as users would
+- **Testing keyboard traps** - JavaScript can't block native key events
+- **Sites with aggressive event handling** - Bypass `preventDefault()` and `stopPropagation()`
+- **Pixel-perfect focus testing** - Native events trigger browser's authentic focus behavior
+
+### Basic Usage
+
+```bash
+# Native keyboard replay
+inspekt replay recording.yaml --native
+
+# Control typing speed for type actions
+inspekt replay recording.yaml --native --typing-speed=slow
+```
+
+### Typing Speed Options
+
+| Speed | Description | Use Case |
+|-------|-------------|----------|
+| `instant` | All text at once | Fast testing |
+| `fast` | Quick typing | Normal testing |
+| `normal` | Natural speed (default) | Realistic replay |
+| `slow` | Deliberate typing | Debugging, demos |
+
+### How It Works
+
+Native mode intercepts keyboard actions (`keypress`, `type`, `activate`) and executes them via AppleScript System Events instead of JavaScript:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  JavaScript Mode (default)                                   │
+│  ─────────────────────────────────────────────────────────  │
+│  Inspekt → JavaScript KeyboardEvent → Page                   │
+│  ✗ Can be blocked by preventDefault()                        │
+│  ✗ May not trigger :focus-visible                            │
+└─────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────┐
+│  Native Mode (--native)                                      │
+│  ─────────────────────────────────────────────────────────  │
+│  Inspekt → AppleScript → macOS → Chrome → Page               │
+│  ✓ Real OS keyboard events                                   │
+│  ✓ Authentic :focus-visible behavior                         │
+│  ✓ Cannot be intercepted by page JavaScript                  │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Visual Indicators
+
+In native mode, the CLI output shows platform-specific icons to indicate which actions used native execution:
+
+```
+STEP   TIME       COMMAND        DETAILS
+0001   00:00   󰖟 navigate     https://example.com 󰄬
+0002   00:02   󰌒 keypress    Tab (Skip to content) 󰄬
+0003   00:02   󰌒 keypress    Tab (Home) 󰄬
+0004   00:03   󰌑 keypress    Enter 󰄬
+0005   00:03   󰖟 navigate     https://example.com/home 󰄬
+```
+
+- **** (Apple icon, yellow) - Native keyboard action via AppleScript
+- **** (JS icon, gray) - JavaScript action (navigate, click, etc.)
+
+### Important: InputLock Disabled
+
+When using `--native` mode, the input lock feature is automatically disabled. This is necessary because:
+
+1. **AppleScript sends real key events** to Chrome at the OS level
+2. **Chrome creates JavaScript events** from those key presses
+3. **InputLock would call `preventDefault()`** on those events
+4. **`preventDefault()` tells Chrome not to act on the key**
+
+Without disabling InputLock, native keyboard events would be sent to Chrome but Chrome wouldn't respond to them (the browser receives the key but JavaScript blocks its default behavior).
+
+**Trade-off:** With InputLock disabled, users can interact with the page during replay. The cursor remains visible and mouse/keyboard events are not blocked.
+
+### Requirements
+
+- **macOS only** - AppleScript System Events require macOS
+- **Accessibility permissions** - System Preferences → Security & Privacy → Privacy → Accessibility
+- **Chrome must be frontmost** - The browser window must be focused
+
+### Combining with Other Options
+
+```bash
+# Native mode with faithful focus styles
+inspekt replay keyboard-test.yaml --native --faithful
+
+# Native mode with video recording
+inspekt replay a11y-test.yaml --native --video
+
+# Native mode with instant playback
+inspekt replay quick-test.yaml --native --instant
+
+# Native mode with interactive stepping
+inspekt replay debug.yaml --native --interactive
+```
+
+### Example: Accessibility Keyboard Testing
+
+```yaml
+# keyboard-accessibility-test.yaml
+metadata:
+  version: '1.1'
+  starting_url: https://example.com
+
+steps:
+  - action: navigate
+    url: https://example.com
+
+  # Test skip link visibility (native Tab triggers real :focus-visible)
+  - action: keypress
+    key: Tab
+    expect:
+      visible: ".skip-link"
+
+  # Continue tabbing through navigation
+  - action: keypress
+    key: Tab
+  - action: keypress
+    key: Tab
+
+  # Test Enter key activates link
+  - action: keypress
+    key: Enter
+    expect:
+      url_contains: "/home"
+
+  # Run accessibility audit
+  - action: inspekt
+    command: "axe --level 2aa"
+    expect:
+      violations: 0
+```
+
+```bash
+# Run with native keyboard events
+inspekt replay keyboard-accessibility-test.yaml --native --faithful
 ```
 
 ## Limitations

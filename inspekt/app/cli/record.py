@@ -15,6 +15,7 @@ import click
 import yaml
 
 from inspekt.app.cli.icons import success as success_icon, get_indicator
+from inspekt.app.cli.interaction import _focus_browser_if_requested
 from inspekt.client import BridgeClient
 from inspekt.config import get_audio_config, get_record_config
 from inspekt.services.audio import CLIAudio
@@ -41,7 +42,7 @@ from .formatting import (
     get_recordings_dir,
 )
 from .recording_utils import clean_filename, find_most_recent_recording, complete_recording_files
-from .util import open_or_download
+from inspekt.app.cli.output import OutputHandler
 from inspekt.shared.dialog_styles import DIALOG_STYLES
 
 import requests
@@ -1683,6 +1684,18 @@ def get_recording_metadata(filepath: Path) -> Optional[dict]:
     help="Step through replay manually (requires --replay)",
 )
 @click.option(
+    "--native",
+    "-n",
+    is_flag=True,
+    help="Use native OS keyboard events during replay (macOS only, requires --replay)",
+)
+@click.option(
+    "--typing-speed",
+    type=click.Choice(["instant", "fast", "normal", "slow"]),
+    default="normal",
+    help="Typing speed for native replay mode (requires --replay --native)",
+)
+@click.option(
     "--capture-state",
     is_flag=True,
     help="Capture cookies, localStorage, and scroll position for replay",
@@ -1747,6 +1760,8 @@ def record(
     no_visual: bool,
     no_feedback: bool,
     interactive: bool,
+    native: bool,
+    typing_speed: str,
     capture_state: bool,
     storage_keys: Optional[str],
     checksum: bool,
@@ -2275,25 +2290,8 @@ def record(
 
         # Focus the browser window (macOS only)
         # This helps the user start recording immediately
-        import platform
-        if platform.system() == "Darwin":
-            try:
-                from inspekt.services.applescript_utils import focus_browser_window
-
-                # Detect browser from user agent
-                browser_name = "Chrome"  # Default
-                if "Firefox" in user_agent:
-                    browser_name = "Firefox"
-                elif "Edg" in user_agent:
-                    browser_name = "Edge"
-                elif "Brave" in user_agent:
-                    browser_name = "Brave"
-                elif "Safari" in user_agent and "Chrome" not in user_agent:
-                    browser_name = "Safari"
-
-                focus_browser_window(browser_name)
-            except Exception:
-                pass  # Focus is optional - don't fail recording if it doesn't work
+        # Use silent=True since focus is automatic for record (not a user-requested option)
+        _focus_browser_if_requested(focus=True, silent=True)
 
         # Play start sound (target the specific browser we're recording in)
         if visual_script:
@@ -2307,9 +2305,11 @@ def record(
         from inspekt.config import is_nerdfont_enabled, is_isolated_mode
         record_icon = "\U000f044a " if is_nerdfont_enabled() else ""  # 󰑊 nf-md-record
         recording_label = click.style(f"{record_icon}Now recording", fg="red", bold=True)
+        browser_active = click.style("(browser is now active)", fg="bright_black")
         ctrl_c = click.style(" Ctrl+C ", fg="black", bg="bright_yellow")
-        click.echo(f"\n{recording_label}: {start_url}")
-        click.echo(f"Press {ctrl_c} to stop and save\n")
+        stop_location = click.style("(here or in your browser)", fg="bright_black")
+        click.echo(f"\n{recording_label}: {start_url} {browser_active}")
+        click.echo(f"Press {ctrl_c} {stop_location} to stop and save\n")
 
         # In VM mode, emit escape sequence to auto-hide terminal
         # This allows the user to immediately interact with the browser
@@ -2696,13 +2696,11 @@ def record(
 
             # Open file if --open flag was set (or deprecated --edit)
             if should_open:
-                open_or_download(output_path)
+                OutputHandler.open_file(output_path)
 
             # Reveal file if --reveal flag was set
             if reveal_after:
-                from inspekt.app.cli.util import reveal_or_download
-
-                reveal_or_download(output_path)
+                OutputHandler.reveal_file(output_path)
 
             # Auto-replay if --replay flag was set
             if replay:
@@ -2721,7 +2719,6 @@ def record(
                 replay_client = BridgeClient()
 
                 # Refresh the page before replay to reset state (focus, scroll position, etc.)
-                click.echo()
                 click.echo("Refreshing page before replay…")
                 try:
                     replay_client.execute("location.reload()", timeout=5.0)
@@ -2772,7 +2769,6 @@ def record(
                 })()
                 """
 
-                click.echo()
                 frequencies = {3: 440, 2: 523, 1: 659}  # A4, C5, E5 - ascending
                 for i in range(3, 0, -1):
                     click.echo(f"\rStarting replay in {i}…", nl=False)
@@ -2860,6 +2856,28 @@ def record(
                         lock=False,
                         restore_viewport=False,
                         interactive=interactive,
+                        stop_on_error=False,
+                        skip_tests=False,
+                        restore_state=False,
+                        restore_cookies=False,
+                        restore_storage=False,
+                        verify_checksum=False,
+                        strict_preconditions=False,
+                        strict_checksum=False,
+                        progress=False,
+                        skip_validation=False,
+                        video_output=None,
+                        smooth=False,
+                        compact=False,
+                        video_fps=None,
+                        open_after=False,
+                        reveal_after=False,
+                        include_effects=False,
+                        match_viewport=match_viewport,
+                        match_zoom_level=match_zoom_level,
+                        faithful=faithful,
+                        native=native,
+                        typing_speed=typing_speed,
                     )
                 except SystemExit as e:
                     # Replay exits with code 1 on failure

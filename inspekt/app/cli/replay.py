@@ -20,6 +20,7 @@ from inspekt.config import get_audio_config, get_video_config
 from inspekt.domain.recording import Recording
 from inspekt.services.applescript_utils import activate_browser_tab
 from inspekt.services.audio import CLIAudio
+from inspekt.services.formatting_utils import format_filesize
 from .formatting import (
     format_assertion_result,
     format_duration,
@@ -32,7 +33,7 @@ from .formatting import (
     get_recordings_dir,
 )
 from .recording_utils import load_external_file_content
-from .util import open_or_download
+from inspekt.app.cli.output import OutputHandler
 
 import requests
 
@@ -109,6 +110,195 @@ def check_csp_bypass_enabled() -> bool:
     except Exception:
         pass
     return False
+
+
+# =============================================================================
+# NATIVE KEYBOARD ACTIONS (macOS only)
+# =============================================================================
+#
+# These functions handle keyboard actions (keypress, type, activate) using
+# native AppleScript System Events instead of JavaScript. This provides:
+# - Authentic :focus-visible triggers
+# - Cannot be blocked by preventDefault()
+# - Real OS-level keyboard behavior
+
+
+def _ensure_page_focus(client) -> bool:
+    """
+    Ensure the page content has focus (not the debug banner or address bar).
+
+    This is critical for native keyboard events because AppleScript sends
+    keys to the frontmost application, but they won't reach the page if
+    Chrome's debug banner or address bar has focus.
+
+    Returns:
+        True if focus was ensured successfully, False otherwise
+    """
+    # Click on the current activeElement or body to ensure page focus
+    # This transfers focus from the debug banner to the page content
+    focus_script = """
+    (function() {
+        // If there's already a focused element in the page, click it to confirm focus
+        // Otherwise, click on the body
+        const target = document.activeElement && document.activeElement !== document.body
+            ? document.activeElement
+            : document.body;
+
+        // Use a synthetic click to transfer focus to the page
+        // This ensures the page content area has keyboard focus
+        if (target) {
+            target.focus();
+        }
+
+        // Also ensure the window itself is focused (helps with some edge cases)
+        window.focus();
+
+        return { ok: true, element: target.tagName };
+    })()
+    """
+    try:
+        result = client.execute(focus_script, timeout=2.0)
+        return result.get("ok", False)
+    except Exception:
+        return False
+
+
+def _execute_native_keypress(step) -> dict:
+    """
+    Execute a keypress action natively via AppleScript.
+
+    Args:
+        step: RecordedStep with action='keypress', key, and modifiers
+
+    Returns:
+        dict with 'ok', 'error', and optionally 'native' keys
+    """
+    from inspekt.services.key_parser import KeySpec
+    from inspekt.services.applescript_utils import send_native_key_sequence
+
+    # Build KeySpec from recorded step
+    # modifiers can be a list of strings ['shift', 'ctrl'] or a dict {'shift': True}
+    modifiers = step.modifiers or []
+    if isinstance(modifiers, dict):
+        # Dict format: {'shift': True, 'ctrl': False}
+        ctrl = modifiers.get('ctrl', False)
+        alt = modifiers.get('alt', False)
+        shift = modifiers.get('shift', False)
+        meta = modifiers.get('meta', False)
+    else:
+        # List format: ['shift', 'ctrl']
+        ctrl = 'ctrl' in modifiers
+        alt = 'alt' in modifiers
+        shift = 'shift' in modifiers
+        meta = 'meta' in modifiers
+
+    spec = KeySpec(
+        type='key',
+        key=step.key,
+        code=step.key,  # Will be mapped by keycode_map
+        ctrl=ctrl,
+        alt=alt,
+        shift=shift,
+        meta=meta,
+    )
+
+    results = send_native_key_sequence([spec], delay_config=None)
+
+    if results and results[0].ok:
+        return {'ok': True, 'native': True, 'method': 'applescript'}
+    else:
+        error_msg = results[0].error if results else 'Unknown error'
+        return {'ok': False, 'error': error_msg}
+
+
+def _execute_native_type(step, typing_speed: str) -> dict:
+    """
+    Execute a type action natively via AppleScript.
+
+    Args:
+        step: RecordedStep with action='type' and value
+        typing_speed: One of 'instant', 'fast', 'normal', 'slow'
+
+    Returns:
+        dict with 'ok', 'error', and optionally 'native' keys
+    """
+    from inspekt.services.applescript_utils import send_native_text
+
+    text = step.value or ""
+    if not text:
+        return {'ok': True, 'native': True, 'method': 'applescript'}
+
+    result = send_native_text(
+        text=text,
+        typing_speed=typing_speed,
+        char_by_char=(typing_speed != 'instant')
+    )
+
+    if result.ok:
+        return {'ok': True, 'native': True, 'method': 'applescript', 'chars': len(text)}
+    else:
+        return {'ok': False, 'error': result.error}
+
+
+def _execute_native_activate(step) -> dict:
+    """
+    Execute an activate action natively (Enter or Space key).
+
+    Activate is pressing Enter or Space on the focused element to "click" it.
+
+    Args:
+        step: RecordedStep with action='activate'
+
+    Returns:
+        dict with 'ok', 'error', and optionally 'native' keys
+    """
+    from inspekt.services.key_parser import KeySpec
+    from inspekt.services.applescript_utils import send_native_key_sequence
+
+    # Activate typically uses Enter, but could be Space for buttons
+    # Check if step has a hint about which key was used
+    key = 'Enter'  # Default to Enter
+    if hasattr(step, 'key') and step.key:
+        key = step.key
+
+    spec = KeySpec(type='key', key=key, code=key)
+    results = send_native_key_sequence([spec], delay_config=None)
+
+    if results and results[0].ok:
+        return {'ok': True, 'native': True, 'method': 'applescript'}
+    else:
+        error_msg = results[0].error if results else 'Unknown error'
+        return {'ok': False, 'error': error_msg}
+
+
+def _execute_native_keyboard_action(step, typing_speed: str, client=None) -> dict | None:
+    """
+    Execute a keyboard action natively via AppleScript if applicable.
+
+    This is the main entry point for native keyboard handling during replay.
+    Returns None if the action is not a keyboard action.
+
+    Args:
+        step: RecordedStep object
+        typing_speed: Typing speed for type actions
+        client: BridgeClient for ensuring page focus (optional but recommended)
+
+    Returns:
+        dict with result if action was handled, None if not a keyboard action
+    """
+    # Ensure page content has focus before sending native keyboard events
+    # This is critical because the Chrome debug banner can steal focus
+    if client:
+        _ensure_page_focus(client)
+
+    if step.action == 'keypress':
+        return _execute_native_keypress(step)
+    elif step.action == 'type':
+        return _execute_native_type(step, typing_speed)
+    elif step.action == 'activate':
+        return _execute_native_activate(step)
+    else:
+        return None  # Not a keyboard action
 
 
 def capture_video_frame(client: BridgeClient, timestamp: float) -> tuple[float, bytes] | None:
@@ -1174,6 +1364,18 @@ def run_download_shell_command(command: str, file_path: Path) -> dict:
     is_flag=True,
     help="Use captured focus styles for pixel-perfect keyboard navigation (if available)",
 )
+@click.option(
+    "--native",
+    "-n",
+    is_flag=True,
+    help="Use native OS keyboard events via AppleScript for keyboard actions (macOS only)",
+)
+@click.option(
+    "--typing-speed",
+    type=click.Choice(["instant", "fast", "normal", "slow"]),
+    default="normal",
+    help="Typing speed for native mode: instant, fast, normal (default), slow",
+)
 def replay(
     recording_file: Optional[str],
     speed: float,
@@ -1214,6 +1416,8 @@ def replay(
     match_viewport: bool,
     match_zoom_level: bool,
     faithful: bool,
+    native: bool,
+    typing_speed: str,
 ):
     """
     Replay a recorded browser interaction session.
@@ -1268,6 +1472,22 @@ def replay(
             sys.exit(1)
         recording_file = str(recent)
         auto_selected = True
+
+    # Handle --native mode: platform check and permissions
+    if native:
+        import platform as platform_module
+        from inspekt.app.cli.table import print_error, print_hint
+
+        if platform_module.system() != "Darwin":
+            print_error("--native is only available on macOS")
+            print_hint("Native keyboard events use AppleScript System Events, which is macOS-only")
+            sys.exit(1)
+
+        from inspekt.services.applescript_utils import check_accessibility_permissions
+        if not check_accessibility_permissions():
+            print_error("Accessibility permissions required for --native mode")
+            print_hint("Grant permission in System Settings > Privacy & Security > Accessibility")
+            sys.exit(1)
 
     # Handle video recording setup
     # Two modes: smooth (tabCapture + MediaRecorder) and compact (1 frame per action)
@@ -1370,7 +1590,10 @@ def replay(
 
     # Enable input lock by default when visual feedback is enabled
     # This prevents user interaction during replay (hiding cursor, blocking keyboard/mouse)
-    if visual:
+    # BUT NOT when using --native mode, because native keyboard events need to pass through
+    # JavaScript to the page (even though they originate from AppleScript, Chrome still
+    # creates JS events that InputLock would block with preventDefault())
+    if visual and not native:
         lock = True
 
     # Get audio config to determine output method
@@ -1466,10 +1689,13 @@ def replay(
     viewport = recording.state.viewport if recording.state else getattr(recording.metadata, 'viewport', None)
     viewport_str = f"{viewport.width}×{viewport.height}" if viewport else "unknown"
 
-    # Build steps string
-    steps_str = f"{len(steps_to_run)} of {total_steps}"
-    if start_step > 1 or end_step:
-        steps_str += f" (steps {start_idx + 1}-{end_idx})"
+    # Build steps string - only show "X of Y" when subset is being replayed
+    if len(steps_to_run) == total_steps and start_step == 1 and not end_step:
+        steps_str = str(total_steps)
+    else:
+        steps_str = f"{len(steps_to_run)} of {total_steps}"
+        if start_step > 1 or end_step:
+            steps_str += f" (steps {start_idx + 1}-{end_idx})"
 
     # Display metadata in a table
     from inspekt.app.cli.table import Table
@@ -2654,7 +2880,8 @@ def replay(
         last_step_navigated = False
 
         # Display step (skip in progress mode)
-        summary = format_step_for_display(step_dict, actual_index + 1, step_timestamp, reserve_suffix_width=5) if not progress else ""
+        # Pass native_mode=True when in --native mode to show JS icon for non-native steps
+        summary = format_step_for_display(step_dict, actual_index + 1, step_timestamp, reserve_suffix_width=5, native_mode=native) if not progress else ""
 
         if dry_run:
             click.echo(summary)
@@ -2809,12 +3036,52 @@ def replay(
         if replay_cancelled:
             break
 
+        # Check if this will be a native action (before printing summary)
+        is_native_action = native and step.action in ('keypress', 'type', 'activate')
+
         if not progress:
+            # Format with is_native=True if this will be executed natively
+            if is_native_action:
+                summary = format_step_for_display(step_dict, actual_index + 1, step_timestamp, reserve_suffix_width=5, is_native=True, native_mode=True)
             click.echo(summary, nl=False)
 
         # Play action sound via CLI audio (if enabled)
         if cli_audio and step.action:
             cli_audio.play_for_action(step.action)
+
+        # Play browser audio for native actions (browser audio is normally played by replay_step.js,
+        # but native mode skips JS execution, so we need to play it explicitly)
+        if is_native_action and use_browser_audio:
+            try:
+                client.execute(f"window.__INSPEKT_VISUAL__?.audio?.playForAction('{step.action}')", timeout=2.0)
+            except Exception:
+                pass  # Audio is optional, don't fail the step
+
+        # Handle keyboard actions natively if --native mode is enabled
+        # This intercepts keypress, type, and activate actions before JavaScript execution
+        if is_native_action:
+            native_result = _execute_native_keyboard_action(step, typing_speed, client=client)
+            if native_result is not None:
+                if native_result.get('ok'):
+                    # Platform icon is now shown next to the command name, not in status
+                    if not progress:
+                        click.echo(format_status("OK"))
+                    result.add_success(actual_index, step_dict)
+                    if verbose and not progress:
+                        method = native_result.get('method', 'applescript')
+                        if step.action == 'type':
+                            chars = native_result.get('chars', 0)
+                            click.echo(format_system_message(f"native {method}: typed {chars} chars"))
+                        else:
+                            click.echo(format_system_message(f"native {method}: {step.action}"))
+                else:
+                    if not progress:
+                        click.echo(format_status("FAIL"))
+                    error_msg = native_result.get('error', 'Native keyboard action failed')
+                    result.add_failure(actual_index, step_dict, error_msg)
+                    if verbose and not progress:
+                        click.echo(format_system_message(f"native error: {error_msg}"))
+                continue  # Skip to next step - don't fall through to JavaScript execution
 
         # Handle inspekt commands separately
         if step.action == "inspekt" and step.command:
@@ -3325,10 +3592,7 @@ def replay(
 
                             if video_saved_path:
                                 file_size = video_saved_path.stat().st_size
-                                if file_size < 1024 * 1024:
-                                    file_size_str = f"{file_size / 1024:.1f} KB"
-                                else:
-                                    file_size_str = f"{file_size / (1024 * 1024):.1f} MB"
+                                file_size_str = format_filesize(file_size)
 
                                 # Create clickable filename
                                 file_uri = video_saved_path.as_uri()
@@ -3413,12 +3677,7 @@ def replay(
                 if encode_result.get("ok"):
                     video_saved_path = resolved_video_path
                     file_size = resolved_video_path.stat().st_size
-
-                    # Format file size appropriately (KB for small files, MB for larger)
-                    if file_size < 1024 * 1024:  # Less than 1 MB
-                        file_size_str = f"{file_size / 1024:.1f} KB"
-                    else:
-                        file_size_str = f"{file_size / (1024 * 1024):.1f} MB"
+                    file_size_str = format_filesize(file_size)
 
                     # Show encoding done message
                     encode_done_elapsed = int((datetime.now() - result.start_time).total_seconds() * 1000)
@@ -3488,10 +3747,7 @@ def replay(
 
                                         # Update file size display
                                         new_file_size = resolved_video_path.stat().st_size
-                                        if new_file_size < 1024 * 1024:
-                                            file_size_str = f"{new_file_size / 1024:.1f} KB"
-                                        else:
-                                            file_size_str = f"{new_file_size / (1024 * 1024):.1f} MB"
+                                        file_size_str = format_filesize(new_file_size)
                                     else:
                                         if verbose:
                                             click.echo(format_system_message(f"Could not merge audio: {merge_result.get('error')}", icon="warning"))
@@ -3536,13 +3792,11 @@ def replay(
 
                     # Open video file if --open flag was set
                     if open_after:
-                        open_or_download(resolved_video_path)
+                        OutputHandler.open_file(resolved_video_path)
 
                     # Reveal video file if --reveal flag was set
                     if reveal_after:
-                        from inspekt.app.cli.util import reveal_or_download
-
-                        reveal_or_download(resolved_video_path)
+                        OutputHandler.reveal_file(resolved_video_path)
                 else:
                     from inspekt.app.cli.table import print_warning
                     print_warning(f"Video encoding failed: {encode_result.get('error')}")

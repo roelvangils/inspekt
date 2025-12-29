@@ -407,6 +407,74 @@ For debugging, you can check the browser console for:
 
 ---
 
+## Native Mode: The Ultimate Solution
+
+For the most authentic keyboard replay experience, Inspekt offers **native mode** (`--native`), which bypasses JavaScript entirely and uses OS-level keyboard events via AppleScript (macOS only).
+
+### Why Native Mode?
+
+While Inspekt's multi-tier approach (CDP + CSS polyfill) works well for most cases, some situations require real OS-level keyboard events:
+
+| Scenario | Multi-Tier Approach | Native Mode |
+|----------|---------------------|-------------|
+| `:focus-visible` triggers | Polyfilled | **Authentic** |
+| Sites blocking `preventDefault()` | May fail | **Works** |
+| InputLock interference | Complex workarounds | **No interference** |
+| Browser debug banner focus | Requires JS workarounds | **Direct to Chrome** |
+
+### How Native Mode Works
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  Multi-Tier Approach (default)                               │
+│  ─────────────────────────────────────────────────────────  │
+│  CDP Key → JS Event → CSS Polyfill → Focus Visible           │
+│  5 tiers of fallbacks for complex edge cases                 │
+└─────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────┐
+│  Native Mode (--native)                                      │
+│  ─────────────────────────────────────────────────────────  │
+│  AppleScript → macOS System Events → Chrome → Real Focus     │
+│  OS-level keyboard events, authentic browser response        │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Usage
+
+```bash
+# Use native keyboard events for replay
+inspekt replay keyboard-test.yaml --native
+
+# Combine with faithful mode for captured focus styles
+inspekt replay keyboard-test.yaml --native --faithful
+```
+
+### InputLock and Native Mode
+
+An important technical detail: when using `--native` mode, InputLock is automatically disabled. Here's why:
+
+1. AppleScript sends a real Tab key to Chrome at the OS level
+2. Chrome receives the key and creates a JavaScript `keydown` event
+3. InputLock (if enabled) intercepts this event and calls `preventDefault()`
+4. `preventDefault()` tells Chrome: "Don't move focus"
+5. Result: The key reaches Chrome but nothing happens
+
+By disabling InputLock in native mode, the keyboard events flow through naturally.
+
+### When to Use Each Approach
+
+| Use Case | Recommended Mode |
+|----------|------------------|
+| General replay | Default (multi-tier) |
+| Accessibility audits | `--native` |
+| Testing `:focus-visible` styles | `--native --faithful` |
+| Sites with aggressive JS | `--native` |
+| Cross-platform testing | Default (CDP) |
+| macOS-specific testing | `--native` |
+
+---
+
 ## Summary
 
 Inspekt's keyboard focus replay is built on the principle of **faithful reproduction**. Every technique we use is designed to make replay look exactly like real keyboard navigation:
@@ -417,5 +485,6 @@ Inspekt's keyboard focus replay is built on the principle of **faithful reproduc
 4. **CSS rule cloning** for site-native focus styles
 5. **Shadow DOM injection** for web components
 6. **Overlay fallback** as last resort
+7. **Native mode** for OS-level keyboard events (macOS)
 
 This makes Inspekt the only browser automation tool that can accurately test keyboard accessibility by showing exactly what a keyboard user would see.

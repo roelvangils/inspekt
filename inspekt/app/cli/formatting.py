@@ -7,6 +7,7 @@ from pathlib import Path
 import click
 
 from inspekt.app.cli.icons import get_action_icon, get_keypress_icon, get_native_control_icon, get_status_icon, get_step_mode_icon
+from inspekt.services.formatting_utils import format_filesize
 
 
 def get_terminal_width() -> int:
@@ -179,6 +180,8 @@ def format_step_for_display(
     use_color: bool = True,
     reserve_suffix_width: int = 0,
     indent: bool = False,
+    is_native: bool = False,
+    native_mode: bool = False,
 ) -> str:
     """Format a step for terminal display with colors.
 
@@ -191,6 +194,8 @@ def format_step_for_display(
         use_color: Whether to use ANSI colors
         reserve_suffix_width: Reserve this many characters at the end (for status like " OK")
         indent: Whether to include 2-space indent
+        is_native: Whether this action was executed natively (shows platform icon in yellow)
+        native_mode: Whether we're in --native replay mode (shows JS icon for non-native steps)
 
     Returns:
         Formatted string, truncated to fit terminal width
@@ -274,11 +279,29 @@ def format_step_for_display(
         }
         action_color = action_colors.get(action, "white")
 
-        # Add icon before action if available (with extra space for readability)
-        if action_icon:
-            action_display = f"{action_icon}  {action_str}"
+        # Add icon before action if available
+        # In native mode: show platform icon (yellow) for native steps, JS icon for non-native steps
+        js_icon = "\ue60c"  # nf-seti-javascript
+        if is_native:
+            from inspekt.app.cli.icons import get_platform_icon
+            platform_icon = get_platform_icon() or ""
+            # Platform icon in yellow, reduce padding by 1 to make room
+            action_str_native = action.ljust(10) + click.style(platform_icon, fg="yellow")
+            if action_icon:
+                action_display = f"{action_icon} {action_str_native}"
+            else:
+                action_display = f"  {action_str_native}"
+        elif native_mode:
+            # Non-native step in native mode - show JS icon
+            action_str_js = action.ljust(10) + click.style(js_icon, fg="bright_black")
+            if action_icon:
+                action_display = f"{action_icon} {action_str_js}"
+            else:
+                action_display = f"  {action_str_js}"
+        elif action_icon:
+            action_display = f"{action_icon} {action_str}"
         else:
-            action_display = f"   {action_str}"  # Align with icon width
+            action_display = f"  {action_str}"  # Align with icon width
         action_colored = click.style(action_display, fg=action_color)
     else:
         step_num_colored = step_num_str
@@ -572,22 +595,11 @@ def format_step_for_display(
             file_info = files[0]
             file_name = file_info.get("name", "unknown")
             file_size = file_info.get("size", 0)
-            # Format size nicely
-            if file_size >= 1024 * 1024:
-                size_str = f"{file_size / (1024 * 1024):.1f}MB"
-            elif file_size >= 1024:
-                size_str = f"{file_size / 1024:.1f}KB"
-            else:
-                size_str = f"{file_size}B"
+            size_str = format_filesize(file_size)
             file_desc = f'"{truncate_text(file_name, 25)}" ({size_str})'
         else:
             total_size = sum(f.get("size", 0) for f in files)
-            if total_size >= 1024 * 1024:
-                size_str = f"{total_size / (1024 * 1024):.1f}MB"
-            elif total_size >= 1024:
-                size_str = f"{total_size / 1024:.1f}KB"
-            else:
-                size_str = f"{total_size}B"
+            size_str = format_filesize(total_size)
             file_desc = f"{len(files)} files ({size_str} total)"
 
         if use_color:
@@ -605,14 +617,7 @@ def format_step_for_display(
         file_size = download.get("size", 0)
         mime_type = download.get("mime_type", "")
 
-        # Format size nicely
-        if file_size >= 1024 * 1024:
-            size_str = f"{file_size / (1024 * 1024):.1f}MB"
-        elif file_size >= 1024:
-            size_str = f"{file_size / 1024:.1f}KB"
-        else:
-            size_str = f"{file_size}B"
-
+        size_str = format_filesize(file_size)
         file_desc = f'"{truncate_text(filename, 25)}" ({size_str})'
 
         if use_color:
