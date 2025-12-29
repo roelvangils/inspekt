@@ -6,10 +6,69 @@ This module exists to avoid circular imports between record.py and replay.py.
 
 import base64
 import re
+import sys
 from pathlib import Path
 from typing import Optional
 
 import click
+
+# Terminal control for suppressing keyboard echo during recording/replay (Unix-only)
+try:
+    import termios
+    HAS_TERMIOS = True
+except ImportError:
+    HAS_TERMIOS = False
+
+
+class TerminalEchoSuppressor:
+    """Suppress keyboard echo in the terminal during recording/replay.
+
+    This prevents escape sequences (like ^[[Z for Shift+Tab) from appearing
+    in the terminal when the user accidentally types while the terminal
+    is focused instead of the browser.
+
+    Only Ctrl+C (handled by signal) will still work to stop the operation.
+    """
+
+    def __init__(self):
+        self.original_settings = None
+        self.fd = None
+
+    def suppress(self) -> bool:
+        """Start suppressing keyboard echo. Returns True if successful."""
+        if not HAS_TERMIOS:
+            return False
+
+        try:
+            # Check if stdin is a TTY (won't work in pipes/redirects)
+            if not sys.stdin.isatty():
+                return False
+
+            self.fd = sys.stdin.fileno()
+            self.original_settings = termios.tcgetattr(self.fd)
+
+            # Set terminal to cbreak mode (no echo, char-by-char input)
+            # But we don't actually read input - we just prevent echo
+            new_settings = termios.tcgetattr(self.fd)
+            # Disable echo (ECHO) and canonical mode (ICANON)
+            new_settings[3] = new_settings[3] & ~(termios.ECHO | termios.ICANON)
+            # Set minimum chars to 0 and timeout to 0 (non-blocking)
+            new_settings[6][termios.VMIN] = 0
+            new_settings[6][termios.VTIME] = 0
+            termios.tcsetattr(self.fd, termios.TCSANOW, new_settings)
+            return True
+        except Exception:
+            self.original_settings = None
+            return False
+
+    def restore(self):
+        """Restore original terminal settings."""
+        if self.original_settings is not None and self.fd is not None:
+            try:
+                termios.tcsetattr(self.fd, termios.TCSANOW, self.original_settings)
+            except Exception:
+                pass
+            self.original_settings = None
 
 
 def clean_filename(filename: str) -> str:
@@ -48,22 +107,23 @@ def find_most_recent_recording() -> Optional[Path]:
     """
     Find the most recently modified recording file in the current directory.
 
-    Search priority:
-    1. Files matching 'recording_*.yaml' (standard naming convention)
-    2. Any '*.yaml' file (for custom-named recordings)
+    Searches for files matching standard naming conventions:
+    - 'inspekt_*.yaml' (current naming convention)
+    - 'recording_*.yaml' (legacy naming convention)
 
-    The validation step will verify if the selected file is actually a valid
-    recording, so it's safe to be lenient here for better UX.
+    Falls back to any '*.yaml' file if none of the above are found.
+    Returns the most recently modified file across all matching patterns.
 
     Returns:
         Path to the most recent recording file, or None if not found.
     """
     cwd = Path.cwd()
 
-    # First, try standard naming convention
-    recording_files = list(cwd.glob("recording_*.yaml"))
+    # Collect files from both naming conventions
+    recording_files = list(cwd.glob("inspekt_*.yaml"))
+    recording_files.extend(cwd.glob("recording_*.yaml"))
 
-    # Fall back to any YAML file if no recording_*.yaml found
+    # Fall back to any YAML file if no standard-named files found
     if not recording_files:
         recording_files = list(cwd.glob("*.yaml"))
 

@@ -11,13 +11,6 @@ from pathlib import Path
 from typing import Optional
 from urllib.parse import urlparse
 
-# Terminal control for suppressing keyboard echo during recording (Unix-only)
-try:
-    import termios
-    import tty
-    HAS_TERMIOS = True
-except ImportError:
-    HAS_TERMIOS = False
 
 import click
 import yaml
@@ -51,7 +44,7 @@ from .formatting import (
     get_recordings_dir,
 )
 from .table import Table
-from .recording_utils import clean_filename, find_most_recent_recording, complete_recording_files
+from .recording_utils import clean_filename, find_most_recent_recording, complete_recording_files, TerminalEchoSuppressor
 from inspekt.app.cli.output import OutputHandler
 from inspekt.shared.dialog_styles import DIALOG_STYLES
 
@@ -166,57 +159,6 @@ def set_vm_terminal_hidden(hidden: bool) -> None:
             urllib.request.urlopen('http://localhost:8888/chrome', timeout=2)
     except Exception:
         pass  # Terminal control is optional - don't fail recording
-
-
-class TerminalEchoSuppressor:
-    """Suppress keyboard echo in the terminal during recording.
-
-    This prevents escape sequences (like ^[[Z for Shift+Tab) from appearing
-    in the terminal when the user accidentally types while the terminal
-    is focused instead of the browser.
-
-    Only Ctrl+C (handled by signal) will still work to stop recording.
-    """
-
-    def __init__(self):
-        self.original_settings = None
-        self.fd = None
-
-    def suppress(self) -> bool:
-        """Start suppressing keyboard echo. Returns True if successful."""
-        if not HAS_TERMIOS:
-            return False
-
-        try:
-            # Check if stdin is a TTY (won't work in pipes/redirects)
-            if not sys.stdin.isatty():
-                return False
-
-            self.fd = sys.stdin.fileno()
-            self.original_settings = termios.tcgetattr(self.fd)
-
-            # Set terminal to cbreak mode (no echo, char-by-char input)
-            # But we don't actually read input - we just prevent echo
-            new_settings = termios.tcgetattr(self.fd)
-            # Disable echo (ECHO) and canonical mode (ICANON)
-            new_settings[3] = new_settings[3] & ~(termios.ECHO | termios.ICANON)
-            # Set minimum chars to 0 and timeout to 0 (non-blocking)
-            new_settings[6][termios.VMIN] = 0
-            new_settings[6][termios.VTIME] = 0
-            termios.tcsetattr(self.fd, termios.TCSANOW, new_settings)
-            return True
-        except Exception:
-            self.original_settings = None
-            return False
-
-    def restore(self):
-        """Restore original terminal settings."""
-        if self.original_settings is not None and self.fd is not None:
-            try:
-                termios.tcsetattr(self.fd, termios.TCSANOW, self.original_settings)
-            except Exception:
-                pass
-            self.original_settings = None
 
 
 # =============================================================================

@@ -42,7 +42,7 @@ BRIDGE_HTTP_HOST = "127.0.0.1"
 BRIDGE_HTTP_PORT = 8765
 
 # Import shared utilities from recording_utils (moved there to avoid circular imports)
-from .recording_utils import clean_filename, complete_recording_files, find_most_recent_recording
+from .recording_utils import clean_filename, complete_recording_files, find_most_recent_recording, TerminalEchoSuppressor
 from inspekt.shared.dialog_styles import DIALOG_STYLES
 
 # Save built-in open before it gets shadowed
@@ -2520,6 +2520,15 @@ def replay(
             )
             click.echo()
 
+        # Show warning for native mode (before header)
+        if native:
+            from inspekt.app.cli.table import print_warning
+            print_warning(
+                "Native mode: Keep the browser window focused during replay. "
+                "Manual keypresses can interfere with playback."
+            )
+            click.echo()  # Add blank line after warning
+
         click.echo(format_step_header())
 
     # Progress bar setup for --progress mode
@@ -2795,6 +2804,14 @@ def replay(
                 if verbose:
                     click.echo(format_system_message(f"Could not start audio cue recording: {e}", icon="warning"))
 
+    # Terminal echo suppressor - prevents escape sequences from appearing when user
+    # accidentally types in the terminal instead of the browser during replay
+    terminal_suppressor = TerminalEchoSuppressor()
+    if not dry_run and not interactive:
+        # Don't suppress in dry-run mode (no browser interaction)
+        # Don't suppress in interactive mode (user needs to press Enter/Space/Escape)
+        terminal_suppressor.suppress()
+
     # Execute steps
     previous_timestamp = steps_to_run[0].timestamp if steps_to_run else 0
     last_step_navigated = False  # Track if previous step caused navigation
@@ -2809,6 +2826,9 @@ def replay(
             video_frames.append(initial_frame)
             if verbose:
                 click.echo(format_system_message("captured initial video frame"))
+
+    # Track previous step for detecting redundant activate actions in native mode
+    previous_step: RecordedStep | None = None
 
     for i, step in enumerate(steps_to_run):
         actual_index = start_idx + i
@@ -2855,25 +2875,37 @@ def replay(
         # Check if this action type should be skipped
         if step.action in skip_actions:
             if not progress:
-                summary = format_step_for_display(step_dict, actual_index + 1, step_timestamp, reserve_suffix_width=5)
+                # Determine if this would be a native action (for icon display)
+                would_be_native = native and step.action in ('keypress', 'type', 'activate')
+                summary = format_step_for_display(
+                    step_dict, actual_index + 1, step_timestamp,
+                    reserve_suffix_width=12, native_mode=native,
+                    is_native=would_be_native, dimmed_icon=True
+                )
                 click.echo(summary, nl=False)
                 click.echo(format_status("SKIP"))
             result.add_skip(actual_index, step_dict, f"Skipped by --skip {step.action}")
             if verbose and not progress:
                 click.echo(format_system_message(f"skipped: {step.action} in skip list"))
+            previous_step = step
             continue
 
         # Skip navigate steps that follow a click that already caused navigation
         # The click already triggered the navigation, so this step is redundant
         if step.action == "navigate" and last_step_navigated and i > 0:
             if not progress:
-                summary = format_step_for_display(step_dict, actual_index + 1, step_timestamp, reserve_suffix_width=5)
+                # Navigate is not a native action, so is_native=False
+                summary = format_step_for_display(
+                    step_dict, actual_index + 1, step_timestamp,
+                    reserve_suffix_width=12, native_mode=native, dimmed_icon=True
+                )
                 click.echo(summary, nl=False)
-                click.echo(format_status("OK"))
+                click.echo(format_status("MERGED"))
             result.add_success(actual_index, step_dict)  # Count as success since navigation happened
             if verbose and not progress:
                 click.echo(format_system_message("navigation already occurred from previous click"))
             last_step_navigated = False  # Reset the flag
+            previous_step = step
             continue
 
         # Reset navigation flag at start of each step (will be set if this step navigates)
@@ -2896,6 +2928,7 @@ def replay(
             if step.expect:
                 expect_dict = step.expect.model_dump(exclude_none=True)
                 click.echo(format_system_message(f"expect: {expect_dict}"))
+            previous_step = step
             continue
 
         # Check step mode (skip, pause, continue)
@@ -2907,6 +2940,7 @@ def replay(
             if not progress:
                 click.echo(skipped_summary)
             result.add_skip(actual_index, step_dict, "mode: skip")
+            previous_step = step
             continue
 
         if step_mode == "pause" and not interactive:
@@ -2943,6 +2977,7 @@ def replay(
                 result.add_skip(actual_index, step_dict, f"skip_if: {skip_result.get('reason', 'condition met')}")
                 if verbose and not progress:
                     click.echo(format_system_message(f"skipped: {skip_result.get('reason', '')}"))
+                previous_step = step
                 continue
 
         # Check wait_for condition before executing
@@ -2969,8 +3004,11 @@ def replay(
                     step_dict,
                     f"wait_for timed out after {timeout_ms}ms: {wait_result.get('reason', '')}",
                 )
+                if cli_audio:
+                    cli_audio.play_failure()
                 if verbose and not progress:
                     click.echo(format_system_message(f"timeout: {wait_result.get('reason', '')}"))
+                previous_step = step
                 continue
             elif verbose and not progress:
                 click.echo(format_system_message(f"condition met: {wait_result.get('reason', '')}"))
@@ -3016,6 +3054,7 @@ def replay(
                         result.add_skip(actual_index, step_dict, "Skipped by user (interactive mode)")
                         if verbose:
                             click.echo(format_system_message("skipped by user"))
+                        previous_step = step
                         continue
                     elif choice == "cancel":
                         # User pressed Escape - cancel the entire replay
@@ -3039,11 +3078,50 @@ def replay(
         # Check if this will be a native action (before printing summary)
         is_native_action = native and step.action in ('keypress', 'type', 'activate')
 
+        # Check for redundant actions that will be merged (before printing step)
+        # In native mode, actions like 'activate' following keypress Enter/Space are redundant
+        # because the real keyboard event already triggered the DOM action
+        is_merged_action = False
+        if is_native_action:
+            redundant_actions = {'activate', 'check', 'uncheck', 'radio', 'toggle', 'select'}
+            timestamp_tolerance_ms = 100
+            step_ts = step.timestamp or 0
+            prev_ts = (previous_step.timestamp or 0) if previous_step else 0
+            timestamps_match = abs(step_ts - prev_ts) <= timestamp_tolerance_ms
+
+            is_merged_action = (
+                step.action in redundant_actions
+                and previous_step
+                and previous_step.action == 'keypress'
+                and previous_step.key in ('Enter', 'Space', 'enter', 'space')
+                and timestamps_match
+            )
+
         if not progress:
-            # Format with is_native=True if this will be executed natively
-            if is_native_action:
-                summary = format_step_for_display(step_dict, actual_index + 1, step_timestamp, reserve_suffix_width=5, is_native=True, native_mode=True)
+            # Format step with appropriate icon styling
+            if is_merged_action:
+                # Merged action: show dimmed platform icon
+                summary = format_step_for_display(
+                    step_dict, actual_index + 1, step_timestamp,
+                    reserve_suffix_width=12, is_native=True, native_mode=True, dimmed_icon=True
+                )
+            elif is_native_action:
+                # Normal native action: show yellow platform icon
+                summary = format_step_for_display(
+                    step_dict, actual_index + 1, step_timestamp,
+                    reserve_suffix_width=5, is_native=True, native_mode=True
+                )
             click.echo(summary, nl=False)
+
+        # Handle merged actions early (before audio and execution)
+        if is_merged_action:
+            if verbose and not progress:
+                click.echo(format_system_message(f"merged {step.action} (keypress already triggered)"))
+            if not progress:
+                click.echo(format_status("MERGED"))
+            result.add_success(actual_index, step_dict)
+            previous_step = step
+            continue
 
         # Play action sound via CLI audio (if enabled)
         if cli_audio and step.action:
@@ -3060,6 +3138,7 @@ def replay(
         # Handle keyboard actions natively if --native mode is enabled
         # This intercepts keypress, type, and activate actions before JavaScript execution
         if is_native_action:
+
             native_result = _execute_native_keyboard_action(step, typing_speed, client=client)
             if native_result is not None:
                 if native_result.get('ok'):
@@ -3079,8 +3158,12 @@ def replay(
                         click.echo(format_status("FAIL"))
                     error_msg = native_result.get('error', 'Native keyboard action failed')
                     result.add_failure(actual_index, step_dict, error_msg)
+                    if cli_audio:
+                        cli_audio.play_failure()
                     if verbose and not progress:
                         click.echo(format_system_message(f"native error: {error_msg}"))
+                # Update previous_step before continue (for redundant action detection)
+                previous_step = step
                 continue  # Skip to next step - don't fall through to JavaScript execution
 
         # Handle inspekt commands separately
@@ -3096,6 +3179,8 @@ def replay(
                     if not progress:
                         click.echo(format_status("FAIL"))
                     result.add_failure(actual_index, step_dict, "Assertion failed", assertion_failures)
+                    if cli_audio:
+                        cli_audio.play_failure()
                     if verbose and not progress:
                         for failure in assertion_failures:
                             click.echo(format_system_message(f"⚠ {failure}"))
@@ -3107,6 +3192,8 @@ def replay(
                 if not progress:
                     click.echo(format_status("FAIL"))
                 result.add_failure(actual_index, step_dict, cmd_result.get("error", "Command failed"))
+                if cli_audio:
+                    cli_audio.play_failure()
                 if verbose and not progress:
                     click.echo(format_system_message(f"Error: {cmd_result.get('error', 'Unknown')}"))
 
@@ -3130,6 +3217,8 @@ def replay(
                 if not progress:
                     click.echo(format_status("FAIL"))
                 result.add_failure(actual_index, step_dict, "Download assertion failed", assertion_failures)
+                if cli_audio:
+                    cli_audio.play_failure()
                 if verbose and not progress:
                     for failure in assertion_failures:
                         click.echo(format_system_message(f"⚠ {failure}"))
@@ -3147,6 +3236,8 @@ def replay(
                 if not progress:
                     click.echo(format_status("FAIL"))
                 result.add_failure(actual_index, step_dict, "No selector for type action")
+                if cli_audio:
+                    cli_audio.play_failure()
             else:
                 # Use fallback selectors if primary fails
                 selectors_to_try = [selector]
@@ -3173,6 +3264,8 @@ def replay(
                     if not progress:
                         click.echo(format_status("FAIL"))
                     result.add_failure(actual_index, step_dict, type_result.get("error", "Typing failed"))
+                    if cli_audio:
+                        cli_audio.play_failure()
                     if verbose and not progress:
                         click.echo(format_system_message(f"Error: {type_result.get('error', 'Unknown')}"))
 
@@ -3184,6 +3277,10 @@ def replay(
                 step_data["skipTests"] = True
             if interactive:
                 step_data["isInteractive"] = True
+            # Tell JS to skip browser audio if we're using CLI audio
+            # (CLI audio plays from Python, so JS should not also play browser audio)
+            if cli_audio and not use_browser_audio:
+                step_data["skipBrowserAudio"] = True
             step_json = json.dumps(step_data)
             code = script_template.replace("STEP_DATA_PLACEHOLDER", step_json)
 
@@ -3266,6 +3363,8 @@ def replay(
                         if assertion_failures or response.get("assertionsFailed"):
                             # Action succeeded but assertion failed
                             result.add_failure(actual_index, step_dict, "Assertion failed", assertion_failures)
+                            if cli_audio:
+                                cli_audio.play_failure()
                             # Show assertion message with failure indicator
                             if step.expect:
                                 assertion_msg = step.expect.message or _generate_assertion_description(step.expect)
@@ -3388,6 +3487,8 @@ def replay(
                         err_msg = response.get("error", "Unknown error")
                         click.echo(format_status("FAIL"))
                         result.add_failure(actual_index, step_dict, err_msg)
+                        if cli_audio:
+                            cli_audio.play_failure()
                         if verbose:
                             click.echo(format_system_message(f"Error: {err_msg}"))
 
@@ -3395,12 +3496,16 @@ def replay(
                     err_msg = exec_result.get("error", "Execution failed")
                     click.echo(format_status("FAIL"))
                     result.add_failure(actual_index, step_dict, err_msg)
+                    if cli_audio:
+                        cli_audio.play_failure()
                     if verbose:
                         click.echo(format_system_message(f"Error: {err_msg}"))
 
             except Exception as e:
                 click.echo(format_status("FAIL"))
                 result.add_failure(actual_index, step_dict, str(e))
+                if cli_audio:
+                    cli_audio.play_failure()
                 if verbose:
                     click.echo(format_system_message(f"Exception: {e}"))
 
@@ -3439,6 +3544,9 @@ def replay(
         if not dry_run and step_delay > 0 and i < len(steps_to_run) - 1:
             delay = step_delay / 1000.0
             time.sleep(delay)
+
+        # Update previous step for native mode redundant action detection
+        previous_step = step
 
         # Update progress bar after each step
         if progress_bar:
@@ -3807,6 +3915,9 @@ def replay(
         except Exception as e:
             from inspekt.app.cli.table import print_warning
             print_warning(f"Video encoding error: {e}")
+
+    # Restore terminal settings first (so output works for prompts/summary)
+    terminal_suppressor.restore()
 
     # Play completion sound and cleanup visual overlay
     if not dry_run and client and (visual or audio or lock):
