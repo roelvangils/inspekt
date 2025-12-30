@@ -32,7 +32,7 @@ from .formatting import (
     format_system_message,
     get_recordings_dir,
 )
-from .table import print_warning, wrap_text, _style_with_inline_code
+from .table import print_warning, print_hint, print_error, wrap_text, _style_with_inline_code, Table
 from .recording_utils import load_external_file_content
 from inspekt.app.cli.output import OutputHandler
 
@@ -1989,7 +1989,6 @@ def replay(
     # Handle --native mode: platform check and permissions
     if native:
         import platform as platform_module
-        from inspekt.app.cli.table import print_error, print_hint
 
         if platform_module.system() != "Darwin":
             print_error("--native is only available on macOS")
@@ -2053,7 +2052,6 @@ def replay(
 
         # Warn if --fps is used with compact mode (where it's ignored)
         if video_fps is not None and video_mode == "compact":
-            from inspekt.app.cli.table import print_hint
             print_hint("`--fps` only applies to `--smooth` mode. Using compact mode (1 frame per action).")
 
         video_recording_enabled = True
@@ -2263,7 +2261,6 @@ def replay(
         steps_str += f" ({', '.join(special_parts)})"
 
     # Display metadata in a table
-    from inspekt.app.cli.table import Table
 
     # Build rows for width calculation
     rows = [
@@ -2292,7 +2289,6 @@ def replay(
 
     # Show hint if recording has faithful focus styles but --faithful not specified
     if recording.metadata.faithful and not faithful:
-        from inspekt.app.cli.table import print_hint
         click.echo()
         print_hint(
             "This recording has captured focus styles. "
@@ -2318,7 +2314,6 @@ def replay(
         client = BridgeClient()
 
         if not client.is_alive():
-            from inspekt.app.cli.table import _style_with_inline_code
             click.echo(_style_with_inline_code("Error: Bridge server is not running. Start it with `inspekt start`.", base_fg="red"), err=True)
             sys.exit(1)
 
@@ -2479,7 +2474,6 @@ def replay(
 
         # Show warning if there's a mismatch and no matching flags were provided
         if (viewport_width_mismatch or zoom_mismatch) and not match_viewport and not match_zoom_level:
-            from inspekt.app.cli.table import _style_with_inline_code
             click.echo()
             click.secho(
                 "⚠ Your browser's current viewport width or zoom level differs from the",
@@ -2757,7 +2751,6 @@ def replay(
                         f"recorded {target_width}x{target_height}",
                         fg="yellow",
                     )
-                    from inspekt.app.cli.table import print_hint
                     print_hint("Manually resize your browser window for best results.")
                 elif verbose:
                     click.echo(format_system_message(f"Viewport set to {current_width}x{current_height}"))
@@ -2834,7 +2827,6 @@ def replay(
                         if not result_data.get("found"):
                             desc = precondition.description or precondition.selector
                             if strict_preconditions:
-                                from inspekt.app.cli.table import print_error, print_hint
                                 print_error(f"Precondition failed: {desc}")
                                 print_hint("Use `--no-strict-preconditions` to continue anyway.")
                                 sys.exit(1)
@@ -2867,9 +2859,7 @@ def replay(
 
                     if current_hash != recording.state.checksum:
                         if strict_checksum:
-                            from inspekt.app.cli.table import print_error
                             print_error("DOM checksum mismatch - page structure has changed")
-                            from inspekt.app.cli.table import print_hint
                             print_hint("Use `--no-strict-checksum` to continue anyway.")
                             sys.exit(1)
                         else:
@@ -4669,7 +4659,6 @@ def replay(
         # Show tips about replay modes (only if not already using them)
         if not interactive or not native:
             click.echo()
-            from inspekt.app.cli.table import print_hint
             if not interactive:
                 print_hint("Use `--interactive` to step through manually.")
             if not native:
@@ -4707,7 +4696,6 @@ def replay(
             click.echo("  • Content Security Policy (CSP) is blocking the connection")
             click.echo()
             click.echo("Troubleshooting:")
-            from inspekt.app.cli.table import _style_with_inline_code
             click.echo(_style_with_inline_code("  • Open browser console (`F12`) and check for Inspekt messages", base_fg="white"))
             click.echo("  • Look for CSP warnings in red/orange")
             click.echo(_style_with_inline_code("  • Verify connection: `inspekt status`", base_fg="white"))
@@ -4715,7 +4703,6 @@ def replay(
 
         # Show tip for slow pages
         click.echo()
-        from inspekt.app.cli.table import print_hint
         print_hint("If pages load slowly, try `--slow` or `--very-slow` for more reliable playback.")
 
         sys.exit(1)
