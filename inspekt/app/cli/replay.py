@@ -32,7 +32,7 @@ from .formatting import (
     format_system_message,
     get_recordings_dir,
 )
-from .table import print_warning
+from .table import print_warning, wrap_text, _style_with_inline_code
 from .recording_utils import load_external_file_content
 from inspekt.app.cli.output import OutputHandler
 
@@ -3110,12 +3110,18 @@ def replay(
                 platform_fallbacks = {"Darwin": "M", "Windows": "W", "Linux": "L"}
                 platform_icon = platform_fallbacks.get(platform_system, "?")
 
-            print_warning(
-                f"Keep the browser focused! "
-                f"In this replay session, {native_action_count} native (OS-level) keyboard actions will be sent. "
-                f"To the browser, these actions are indistinguishable from real key presses. "
+            # Title line
+            click.secho("⚠ Keep the browser focused!", fg="yellow")
+
+            # Body text with 2-space indent and proper wrapping
+            body = (
+                f"In this replay session, {native_action_count} native (OS-level) keyboard actions will be sent to the browser. "
+                f"These actions are indistinguishable from real key presses. "
                 f"In the output below, they are represented by `{platform_icon}`, which corresponds to your platform ({platform_name})."
             )
+            wrapped = wrap_text(body, indent="  ", subsequent_indent="  ")
+            styled = _style_with_inline_code(wrapped, base_fg="yellow")
+            click.echo(styled)
             click.echo()
 
         click.echo(format_step_header(show_milliseconds=show_milliseconds))
