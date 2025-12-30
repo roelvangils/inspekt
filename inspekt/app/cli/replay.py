@@ -3521,25 +3521,36 @@ def replay(
 
         # Detect side-effect scroll (scroll triggered by Tab or anchor click)
         # These scrolls are browser-initiated (scrollIntoView) and shouldn't be replayed
+        # Note: Scroll events may be captured out of order due to async processing,
+        # so we check recent steps by timestamp, not just the immediately previous step
         is_side_effect_scroll = False
-        if step.action == "scroll" and previous_step:
-            prev_ts = previous_step.timestamp or 0
+        if step.action == "scroll":
             step_ts = step.timestamp or 0
-            time_delta = abs(step_ts - prev_ts)
 
-            # Case 1: Tab/Shift+Tab followed by scroll within 500ms
-            if (previous_step.action == "keypress" and
-                previous_step.key and
-                previous_step.key.lower() == "tab" and
-                time_delta <= 500):
-                is_side_effect_scroll = True
+            # Look at recent steps (up to 5 back) to find a Tab or anchor click
+            # that might have triggered this scroll
+            # Example: Tab at 8507ms, scroll captured at 8533ms but recorded after a Tab at 9221ms
+            lookback_count = min(5, actual_index)
+            for i in range(actual_index - lookback_count, actual_index):
+                recent_step = steps[i]
+                recent_ts = recent_step.timestamp or 0
+                time_delta = abs(step_ts - recent_ts)
 
-            # Case 2: Click on anchor link followed by scroll within 500ms
-            if (previous_step.action == "click" and
-                previous_step.target and
-                previous_step.target.tag == "a" and
-                time_delta <= 500):
-                is_side_effect_scroll = True
+                # Case 1: Tab/Shift+Tab followed by scroll within 500ms
+                if (recent_step.action == "keypress" and
+                    recent_step.key and
+                    recent_step.key.lower() == "tab" and
+                    time_delta <= 500):
+                    is_side_effect_scroll = True
+                    break
+
+                # Case 2: Click on anchor link followed by scroll within 500ms
+                if (recent_step.action == "click" and
+                    recent_step.target and
+                    recent_step.target.tag == "a" and
+                    time_delta <= 500):
+                    is_side_effect_scroll = True
+                    break
 
         if not progress:
             # Format step with appropriate icon styling
