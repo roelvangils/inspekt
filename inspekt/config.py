@@ -85,6 +85,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
         "pretty": True,
         "colors": True,
         "theme": "monokai",  # Pygments theme: monokai, vim, github-dark, etc.
+        "indent": 2,  # Number of spaces for indentation
     },
     "control": {
         "auto-refocus": "only-spa",
@@ -109,12 +110,17 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "axe": {
         "show-badges": True,
     },
+    "a11y": {
+        "show-compliance-warning": True,  # Show warning about automated checker limitations
+    },
     "audio": {
         "output": "cli",  # "cli" (Python/system audio) | "browser" (Web Audio) | "off"
         "volume": 0.5,  # 0.0 to 1.0
     },
     "replay": {
         "validate": True,  # Run preflight validation before replay
+        "skip-ahead": True,  # Show skip-ahead prompt for long delays
+        "skip-threshold": 5,  # Seconds before showing skip prompt
     },
     "video": {
         "fps": 10,           # Frame rate for video recording (5-30)
@@ -128,6 +134,13 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "nerdfont": False,  # Enable Nerdfont glyphs in terminal output
     "permissions": {
         "allow-local-files": True,  # Allow file:// URLs without adding to domain list
+    },
+    "do": {
+        "synonyms-file": None,  # Custom path to synonyms YAML file (default: built-in)
+        "literal-match-threshold": 0.8,  # Minimum score for literal text matching
+        "substring-match-threshold": 0.5,  # Minimum score for substring matching
+        "use-fuzzy-matching": True,  # Enable typo-tolerant fuzzy matching
+        "max-fuzzy-distance": 2,  # Maximum Levenshtein distance for fuzzy matches
     },
     "mcp": {
         "enabled": True,
@@ -270,6 +283,18 @@ def load_config() -> dict[str, Any]:
                     config["video"].update(user_config["video"])
                 else:
                     config["video"] = user_config["video"]
+            elif key == "a11y" and isinstance(user_config["a11y"], dict):
+                # Nested a11y config - merge deeply
+                if isinstance(config.get("a11y"), dict):
+                    config["a11y"].update(user_config["a11y"])
+                else:
+                    config["a11y"] = user_config["a11y"]
+            elif key == "do" and isinstance(user_config["do"], dict):
+                # Nested do config - merge deeply
+                if isinstance(config.get("do"), dict):
+                    config["do"].update(user_config["do"])
+                else:
+                    config["do"] = user_config["do"]
             else:
                 # Root-level properties like ai-language - overwrite
                 config[key] = user_config[key]
@@ -406,6 +431,22 @@ def validate_ai_config(config: dict[str, Any]) -> dict[str, Any]:
     """
     Validate and normalize AI configuration.
 
+    Supports both legacy flat config and new multi-provider config:
+
+    Legacy (still supported):
+        ai:
+          endpoint: https://thoth.elevenways.be/v1/chat/completions
+          text-model: gpt-4o-mini
+
+    New multi-provider:
+        ai:
+          default-provider: thoth
+          command-defaults:
+            summarize: {provider: anthropic, model: claude-3-5-haiku-20241022}
+          providers:
+            anthropic: {enabled: true, default-text-model: claude-3-5-haiku-20241022}
+          fallback-chain: [thoth, openai, anthropic, ollama]
+
     Args:
         config: Configuration dictionary
 
@@ -415,7 +456,9 @@ def validate_ai_config(config: dict[str, Any]) -> dict[str, Any]:
     ai_config = config.get("ai", {})
     validated = {}
 
-    # endpoint: URL string
+    # === Legacy config (for backward compatibility with Thoth) ===
+
+    # endpoint: URL string (Thoth endpoint)
     validated["endpoint"] = str(
         ai_config.get("endpoint", "https://thoth.elevenways.be/v1/chat/completions")
     )
@@ -444,6 +487,26 @@ def validate_ai_config(config: dict[str, Any]) -> dict[str, Any]:
 
     # api-key: from environment variable THOTH_API_KEY
     validated["api-key"] = os.environ.get("THOTH_API_KEY", "")
+
+    # === New multi-provider config ===
+
+    # default-provider: which provider to use by default
+    validated["default-provider"] = str(ai_config.get("default-provider", "thoth"))
+
+    # command-defaults: per-command provider/model overrides
+    # Example: {"summarize": {"provider": "anthropic", "model": "claude-3-5-haiku"}}
+    validated["command-defaults"] = ai_config.get("command-defaults", {})
+
+    # providers: per-provider configuration
+    # Example: {"anthropic": {"enabled": true, "default-text-model": "..."}}
+    validated["providers"] = ai_config.get("providers", {})
+
+    # fallback-chain: order to try providers if primary is unavailable
+    fallback = ai_config.get("fallback-chain", ["thoth", "openai", "anthropic", "ollama"])
+    if isinstance(fallback, list):
+        validated["fallback-chain"] = [str(p) for p in fallback]
+    else:
+        validated["fallback-chain"] = ["thoth", "openai", "anthropic", "ollama"]
 
     return validated
 
@@ -542,7 +605,7 @@ def get_html_selection_config() -> dict[str, Any]:
     Get HTML selection configuration with validation.
 
     Returns:
-        HTML selection configuration dictionary with validated boolean values
+        HTML selection configuration dictionary with validated values
     """
     config = load_config()
     html_selection_config = config.get("html_selection", {})
@@ -559,15 +622,29 @@ def get_html_selection_config() -> dict[str, Any]:
     colors = html_selection_config.get("colors", True)
     colors = bool(colors)
 
-    # Validate theme: string
+    # Validate theme: string (validate against Pygments styles if available)
     theme = html_selection_config.get("theme", "monokai")
     theme = str(theme) if theme else "monokai"
+    try:
+        from pygments.styles import get_style_by_name
+        get_style_by_name(theme)
+    except Exception:
+        # Invalid theme, fall back to monokai
+        theme = "monokai"
+
+    # Validate indent: integer between 1-8 spaces (default: 2)
+    indent = html_selection_config.get("indent", 2)
+    try:
+        indent = max(1, min(8, int(indent)))  # Clamp to 1-8
+    except (ValueError, TypeError):
+        indent = 2
 
     return {
         "compact": compact,
         "pretty": pretty,
         "colors": colors,
         "theme": theme,
+        "indent": indent,
     }
 
 
@@ -678,6 +755,8 @@ def get_replay_config() -> dict[str, Any]:
     Returns:
         Replay configuration dictionary with validated values:
         - validate: bool (whether to run preflight validation)
+        - skip-ahead: bool (show skip-ahead prompt for long delays)
+        - skip-threshold: int/float (seconds before showing skip prompt)
     """
     config = load_config()
     replay_config = config.get("replay", {})
@@ -687,8 +766,20 @@ def get_replay_config() -> dict[str, Any]:
     if not isinstance(validate, bool):
         validate = True
 
+    # Skip-ahead: must be boolean
+    skip_ahead = replay_config.get("skip-ahead", True)
+    if not isinstance(skip_ahead, bool):
+        skip_ahead = True
+
+    # Skip-threshold: must be positive number
+    skip_threshold = replay_config.get("skip-threshold", 5)
+    if not isinstance(skip_threshold, (int, float)) or skip_threshold < 1:
+        skip_threshold = 5
+
     return {
         "validate": validate,
+        "skip-ahead": skip_ahead,
+        "skip-threshold": skip_threshold,
     }
 
 
@@ -757,6 +848,26 @@ def get_video_config() -> dict[str, Any]:
         "fps": fps,
         "quality": quality,
         "format": format_val,
+    }
+
+
+def get_a11y_config() -> dict[str, Any]:
+    """
+    Get accessibility testing configuration with validation.
+
+    Returns:
+        A11y configuration dictionary with validated values:
+        - show-compliance-warning: bool (show warning about automated checker limitations)
+    """
+    config = load_config()
+    a11y_config = config.get("a11y", {})
+
+    # Validate show-compliance-warning: must be boolean (default True)
+    show_warning = a11y_config.get("show-compliance-warning", True)
+    show_warning = bool(show_warning)
+
+    return {
+        "show-compliance-warning": show_warning,
     }
 
 
@@ -877,3 +988,58 @@ def save_viewport_offsets(width_offset: int, height_offset: int) -> bool:
         except (OSError, NameError):
             pass
         return False
+
+
+def get_do_config() -> dict[str, Any]:
+    """
+    Get `inspekt do` command configuration with validation.
+
+    Returns:
+        Do command configuration dictionary with validated values:
+        - synonyms-file: Optional path to custom synonyms YAML file
+        - literal-match-threshold: float (0.0-1.0, default 0.8)
+        - substring-match-threshold: float (0.0-1.0, default 0.5)
+        - use-fuzzy-matching: bool (default True)
+        - max-fuzzy-distance: int (default 2)
+    """
+    config = load_config()
+    do_config = config.get("do", {})
+
+    # synonyms-file: optional path string
+    synonyms_file = do_config.get("synonyms-file")
+    if synonyms_file is not None:
+        # Expand ~ and resolve path
+        synonyms_file = str(Path(synonyms_file).expanduser())
+
+    # literal-match-threshold: float between 0 and 1
+    literal_threshold = do_config.get("literal-match-threshold", 0.8)
+    try:
+        literal_threshold = max(0.0, min(1.0, float(literal_threshold)))
+    except (ValueError, TypeError):
+        literal_threshold = 0.8
+
+    # substring-match-threshold: float between 0 and 1
+    substring_threshold = do_config.get("substring-match-threshold", 0.5)
+    try:
+        substring_threshold = max(0.0, min(1.0, float(substring_threshold)))
+    except (ValueError, TypeError):
+        substring_threshold = 0.5
+
+    # use-fuzzy-matching: boolean
+    use_fuzzy = do_config.get("use-fuzzy-matching", True)
+    use_fuzzy = bool(use_fuzzy)
+
+    # max-fuzzy-distance: positive integer
+    max_distance = do_config.get("max-fuzzy-distance", 2)
+    try:
+        max_distance = max(1, int(max_distance))
+    except (ValueError, TypeError):
+        max_distance = 2
+
+    return {
+        "synonyms-file": synonyms_file,
+        "literal-match-threshold": literal_threshold,
+        "substring-match-threshold": substring_threshold,
+        "use-fuzzy-matching": use_fuzzy,
+        "max-fuzzy-distance": max_distance,
+    }

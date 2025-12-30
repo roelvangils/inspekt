@@ -931,6 +931,61 @@ def wait_for_reconnection(
     return False
 
 
+def _interruptible_wait(seconds: float, action_name: str) -> bool:
+    """
+    Wait with live countdown, skippable by Enter.
+
+    Shows a message like:
+        Next action (click) is in 12 seconds. Press  ENTER  to 󰈑 skip ahead.
+
+    The countdown updates every second. User can press Enter to skip.
+
+    Args:
+        seconds: Total time to wait
+        action_name: Name of the next action (e.g., "click", "keypress")
+
+    Returns:
+        True if user skipped, False if waited full duration
+    """
+    import select
+    import sys
+
+    skip_icon = "\uf209"  # 󰈑 nf-md-skip_forward
+    remaining = int(seconds)
+
+    # Only show countdown for meaningful waits
+    if remaining < 1:
+        time.sleep(seconds)
+        return False
+
+    while remaining > 0:
+        # Format message with styled ENTER key
+        enter_key = click.style(" ENTER ", fg="black", bg="white", bold=True)
+        skip_text = click.style(f"{skip_icon} skip ahead", fg="bright_black")
+        seconds_text = "second" if remaining == 1 else "seconds"
+        msg = f"\rNext action ({action_name}) is in {remaining} {seconds_text}. Press {enter_key} to {skip_text}"
+
+        # Print without newline, with padding to clear previous text
+        click.echo(msg + " " * 5, nl=False)
+        sys.stdout.flush()
+
+        # Wait 1 second, checking for Enter key (Unix select)
+        try:
+            if sys.stdin in select.select([sys.stdin], [], [], 1.0)[0]:
+                sys.stdin.readline()  # Consume the Enter
+                click.echo("\r" + " " * 100 + "\r", nl=False)  # Clear line
+                return True  # User skipped
+        except (OSError, TypeError):
+            # select doesn't work (e.g., Windows or not a TTY)
+            time.sleep(1.0)
+
+        remaining -= 1
+
+    # Clear the countdown line
+    click.echo("\r" + " " * 100 + "\r", nl=False)
+    return False  # Waited full duration
+
+
 def wait_for_page_ready(
     client: BridgeClient,
     timeout_sec: float = 15.0,
@@ -1705,6 +1760,17 @@ def run_download_shell_command(command: str, file_path: Path) -> dict:
     help="Skip preflight validation checks",
 )
 @click.option(
+    "--skip-ahead/--no-skip-ahead",
+    default=None,
+    help="Show skip prompt for long delays (default: from config, true)",
+)
+@click.option(
+    "--skip-threshold",
+    type=float,
+    default=None,
+    help="Seconds before showing skip prompt (default: from config, 5)",
+)
+@click.option(
     "--video",
     "video_output",
     type=click.Path(),
@@ -1807,6 +1873,8 @@ def replay(
     strict_checksum: bool,
     progress: bool,
     skip_validation: bool,
+    skip_ahead: Optional[bool],
+    skip_threshold: Optional[float],
     video_output: Optional[str],
     smooth: bool,
     compact: bool,
@@ -2032,6 +2100,10 @@ def replay(
 
     replay_config = get_replay_config()
     should_validate = replay_config.get("validate", True) and not skip_validation
+
+    # Skip-ahead settings (CLI overrides config)
+    skip_ahead_enabled = skip_ahead if skip_ahead is not None else replay_config.get("skip-ahead", True)
+    skip_threshold_sec = skip_threshold if skip_threshold is not None else replay_config.get("skip-threshold", 5)
 
     if should_validate:
         from inspekt.app.cli.validation import display_validation_results, validate_recording_file
@@ -3285,7 +3357,14 @@ def replay(
                 # Cap maximum delay to avoid excessively long waits (e.g., 30 seconds max)
                 delay_sec = min(delay_sec, 30.0)
                 if delay_sec > 0.05:  # Only sleep if delay is meaningful (>50ms)
-                    time.sleep(delay_sec)
+                    # For long delays, offer skip-ahead option (if enabled and interactive)
+                    if (skip_ahead_enabled and
+                        delay_sec > skip_threshold_sec and
+                        not progress and
+                        sys.stdin.isatty()):
+                        _interruptible_wait(delay_sec, step.action or "action")
+                    else:
+                        time.sleep(delay_sec)
         page_load_wait_ms = 0  # Reset after applying
         previous_timestamp = step_timestamp
 
