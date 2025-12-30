@@ -3555,10 +3555,10 @@ def replay(
         if not progress:
             # Format step with appropriate icon styling
             if is_side_effect_scroll:
-                # Side-effect scroll: show dimmed scroll icon
+                # Side-effect scroll: show dimmed icon (with platform icon in native mode)
                 summary = format_step_for_display(
                     step_dict, actual_index + 1, step_timestamp,
-                    reserve_suffix_width=12, dimmed_icon=True
+                    reserve_suffix_width=12, native_mode=native_mode, dimmed_icon=True
                 )
             elif is_merged_action:
                 # Merged action: show dimmed platform icon
