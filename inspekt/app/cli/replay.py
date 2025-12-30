@@ -989,18 +989,19 @@ def _interruptible_wait(seconds: float, action_name: str, elapsed_ms: int = 0, s
         seconds_text = "second" if remaining == 1 else "seconds"
 
         # Match the step line format: step_num   elapsed   icon message
-        msg = f"\r{step_placeholder}   {elapsed_str}   {hourglass} Next action ({action_name}) is in {remaining} {seconds_text}. Wait or press {enter_key} to {skip_text}"
+        msg = f"{step_placeholder}   {elapsed_str}   {hourglass} Next action ({action_name}) is in {remaining} {seconds_text}. Wait or press {enter_key} to {skip_text}"
 
-        # Print without newline, with padding to clear previous text
-        click.echo(msg + " " * 5, nl=False)
+        # Use sys.stdout.write for reliable carriage return handling
+        # Clear line first, then write message
+        sys.stdout.write("\r" + " " * term_width + "\r" + msg)
         sys.stdout.flush()
 
         # Wait 1 second, checking for Enter key (Unix select)
         try:
             if sys.stdin in select.select([sys.stdin], [], [], 1.0)[0]:
                 sys.stdin.readline()  # Consume the Enter
-                # Clear the entire line properly
-                click.echo("\r" + " " * term_width + "\r", nl=False)
+                # Clear the entire line
+                sys.stdout.write("\r" + " " * term_width + "\r")
                 sys.stdout.flush()
                 return True  # User skipped
         except (OSError, TypeError):
@@ -1009,8 +1010,8 @@ def _interruptible_wait(seconds: float, action_name: str, elapsed_ms: int = 0, s
 
         remaining -= 1
 
-    # Clear the countdown line properly
-    click.echo("\r" + " " * term_width + "\r", nl=False)
+    # Clear the countdown line
+    sys.stdout.write("\r" + " " * term_width + "\r")
     sys.stdout.flush()
     return False  # Waited full duration
 
