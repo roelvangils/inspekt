@@ -2319,10 +2319,10 @@ def replay(
 
         # Check CSP bypass status and warn if disabled
         if not check_csp_bypass_enabled():
-            click.echo()
             click.secho("⚠ CSP bypass is disabled (or no web page is loaded)", fg="yellow")
-            click.secho("  Some sites may not work correctly during replay.", fg="bright_black")
-            click.secho("  Enable it with: inspekt domain csp --enable.", fg="bright_black")
+            click.secho("  Some sites may not work correctly during replay.", fg="yellow")
+            click.secho("  Enable it with: `inspekt domain csp --enable`.", fg="yellow")
+            click.echo()
 
         # Focus the browser tab before starting replay (macOS only)
         focus_browser_tab(client, verbose=verbose)
