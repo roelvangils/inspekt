@@ -544,14 +544,16 @@ def check_warnings(data: dict) -> list[ValidationIssue]:
     if not steps:
         return issues
 
-    # Check if first step is navigate
+    # Check if first step is navigate (only warn if there's no start_url in metadata)
     first_step = steps[0] if steps else {}
-    if isinstance(first_step, dict) and first_step.get("action") != "navigate":
+    metadata = data.get("metadata", {})
+    has_start_url = metadata.get("start_url") if isinstance(metadata, dict) else None
+    if isinstance(first_step, dict) and first_step.get("action") != "navigate" and not has_start_url:
         issues.append(
             ValidationIssue(
                 severity=Severity.WARNING,
                 message="Recording doesn't start with 'navigate'",
-                tip="Consider adding an initial URL for reliable replay.",
+                tip="Consider adding an initial URL for reliable replay",
             )
         )
 
@@ -770,18 +772,18 @@ def display_validation_results(result: ValidationResult, filepath: Path) -> None
 
         if issue.tip:
             click.echo()
-            click.secho("  💡 ", fg="yellow", nl=False)
-            click.echo(issue.tip)
+            from inspekt.app.cli.table import print_hint
+            print_hint(issue.tip)
 
     # Show warnings
     for issue in result.warnings:
         click.echo()
-        click.secho("⚠ Warning: ", fg="yellow", nl=False)
+        click.secho("⚠ ", fg="yellow", nl=False)
         click.echo(issue.message)
 
         if issue.tip:
-            click.secho("  💡 ", fg="bright_black", nl=False)
-            click.echo(issue.tip)
+            from inspekt.app.cli.table import print_hint
+            print_hint(issue.tip)
 
     # Summary
     click.echo()

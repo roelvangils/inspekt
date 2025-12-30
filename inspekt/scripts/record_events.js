@@ -122,8 +122,19 @@
             if (!this.ensureReady()) return;
             this.playTone(400, 0.08, 'sine', 0.25, 0);
             this.playTone(600, 0.1, 'sine', 0.25, 0.06);
+        },
+
+        // Error sound - dissonant buzz (minor second interval)
+        playError() {
+            if (!this.ensureReady()) return;
+            // Two dissonant tones played together (minor second = harsh)
+            this.playTone(220, 0.15, 'sawtooth', 0.2, 0);  // A3
+            this.playTone(233, 0.15, 'sawtooth', 0.2, 0);  // Bb3 (minor second above)
         }
     };
+
+    // Expose RecordAudio globally so Python can call playError() for failed undo/redo
+    window.__INSPEKT_RECORD_AUDIO__ = RecordAudio;
 
     // ==================== INDEXEDDB MODULE ====================
     // Persists events to survive page navigation
@@ -437,37 +448,41 @@
     }
 
     /**
-     * Capture focus styles for sr-only/hidden elements that become visible on focus.
+     * Capture focus styles for elements during Tab navigation.
      * This captures the computed styles WHILE the element is focused, so during replay
-     * we can apply the exact same styles to make the element visible.
+     * we can apply the exact same styles to make the focus appear identical.
      *
-     * Returns an object with focus styles if the element appears to be sr-only,
-     * or null if the element doesn't need special focus styling.
+     * Captures ALL relevant styles including:
+     * - Focus indicator styles (outline, box-shadow, border)
+     * - Positioning styles (position, left, top, etc.) - needed for skip links
+     * - Visibility styles (clip, opacity, visibility, display)
+     *
+     * Returns an object with focus styles, or null if element is invalid.
      */
     function captureFocusStyles(el) {
         if (!el || el.nodeType !== 1) return null;
 
-        const className = el.className || '';
-        const classStr = typeof className === 'string' ? className : className.toString();
-
-        // Check for common sr-only/hidden class patterns
-        const srOnlyPatterns = [
-            'sr-only', 'visually-hidden', 'visuallyhidden', 'screen-reader',
-            'screenreader', 'a11y', 'skip', 'offscreen', 'clip-hide'
-        ];
-
-        const isSrOnlyClass = srOnlyPatterns.some(pattern =>
-            classStr.toLowerCase().includes(pattern)
-        );
-
-        if (!isSrOnlyClass) return null;
-
-        // Element has sr-only pattern - capture its focus styles
-        // These are the styles that make it visible when focused
         const cs = getComputedStyle(el);
 
+        // Capture ALL styles needed to replicate focus appearance
+        // This includes positioning because skip links are often off-screen
+        // until focused, and we need to bring them on-screen during replay
         return {
-            // Positioning & layout
+            // Focus ring properties
+            outline: cs.outline,
+            outlineColor: cs.outlineColor,
+            outlineStyle: cs.outlineStyle,
+            outlineWidth: cs.outlineWidth,
+            outlineOffset: cs.outlineOffset,
+            // Box shadow (many sites use this for focus instead of outline)
+            boxShadow: cs.boxShadow,
+            // Border (some sites change border on focus)
+            border: cs.border,
+            borderColor: cs.borderColor,
+            borderWidth: cs.borderWidth,
+            borderStyle: cs.borderStyle,
+            borderRadius: cs.borderRadius,
+            // Positioning & layout - CRITICAL for skip links that move on focus
             position: cs.position,
             left: cs.left,
             top: cs.top,
@@ -486,13 +501,9 @@
             display: cs.display,
             // Stacking
             zIndex: cs.zIndex,
-            // Visual appearance (needed for styled skip links)
+            // Visual appearance
             backgroundColor: cs.backgroundColor,
             color: cs.color,
-            borderRadius: cs.borderRadius,
-            boxShadow: cs.boxShadow,
-            outline: cs.outline,
-            outlineOffset: cs.outlineOffset,
             // Text
             fontSize: cs.fontSize,
             fontWeight: cs.fontWeight,
@@ -2073,10 +2084,12 @@
                         if (targetTag === 'input' && nextElement.type) {
                             keypressEvent.target.input_type = nextElement.type.toLowerCase();
                         }
-                        // Capture focus styles for sr-only elements
-                        const focusStyles = captureFocusStyles(nextElement);
-                        if (focusStyles) {
-                            keypressEvent.target.focus_styles = focusStyles;
+                        // Capture focus styles for sr-only elements (only with --faithful flag)
+                        if (config.captureFocusStyles) {
+                            const focusStyles = captureFocusStyles(nextElement);
+                            if (focusStyles) {
+                                keypressEvent.target.focus_styles = focusStyles;
+                            }
                         }
                     }
                     recordEvent(keypressEvent);
@@ -2114,10 +2127,12 @@
                         if (targetTag === 'input' && prevElement.type) {
                             keypressEvent.target.input_type = prevElement.type.toLowerCase();
                         }
-                        // Capture focus styles for sr-only elements
-                        const focusStyles = captureFocusStyles(prevElement);
-                        if (focusStyles) {
-                            keypressEvent.target.focus_styles = focusStyles;
+                        // Capture focus styles for sr-only elements (only with --faithful flag)
+                        if (config.captureFocusStyles) {
+                            const focusStyles = captureFocusStyles(prevElement);
+                            if (focusStyles) {
+                                keypressEvent.target.focus_styles = focusStyles;
+                            }
                         }
                         recordEvent(keypressEvent);
                         return;
@@ -2167,10 +2182,12 @@
                         if (targetTag === 'input' && firstEl.type) {
                             keypressEvent.target.input_type = firstEl.type.toLowerCase();
                         }
-                        // Capture focus styles for sr-only elements
-                        const focusStyles = captureFocusStyles(firstEl);
-                        if (focusStyles) {
-                            keypressEvent.target.focus_styles = focusStyles;
+                        // Capture focus styles for sr-only elements (only with --faithful flag)
+                        if (config.captureFocusStyles) {
+                            const focusStyles = captureFocusStyles(firstEl);
+                            if (focusStyles) {
+                                keypressEvent.target.focus_styles = focusStyles;
+                            }
                         }
                         recordEvent(keypressEvent);
                         return;
@@ -2196,10 +2213,12 @@
                         if (targetTag === 'input' && lastEl.type) {
                             keypressEvent.target.input_type = lastEl.type.toLowerCase();
                         }
-                        // Capture focus styles for sr-only elements
-                        const focusStyles = captureFocusStyles(lastEl);
-                        if (focusStyles) {
-                            keypressEvent.target.focus_styles = focusStyles;
+                        // Capture focus styles for sr-only elements (only with --faithful flag)
+                        if (config.captureFocusStyles) {
+                            const focusStyles = captureFocusStyles(lastEl);
+                            if (focusStyles) {
+                                keypressEvent.target.focus_styles = focusStyles;
+                            }
                         }
                         recordEvent(keypressEvent);
                         return;
@@ -2221,11 +2240,13 @@
                             keypressEvent.target.input_type = focusedElement.type.toLowerCase();
                         }
 
-                        // Capture focus styles for sr-only elements
+                        // Capture focus styles for sr-only elements (only with --faithful flag)
                         // This runs WHILE the element is focused, capturing its visible state
-                        const focusStyles = captureFocusStyles(focusedElement);
-                        if (focusStyles) {
-                            keypressEvent.target.focus_styles = focusStyles;
+                        if (config.captureFocusStyles) {
+                            const focusStyles = captureFocusStyles(focusedElement);
+                            if (focusStyles) {
+                                keypressEvent.target.focus_styles = focusStyles;
+                            }
                         }
 
                         // Check if Tab landed in a cookie consent dialog

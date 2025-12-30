@@ -15,6 +15,7 @@ from urllib.parse import urlparse
 import click
 import yaml
 
+from inspekt.app.cli.formatting import style_primary_key, style_secondary_key
 from inspekt.app.cli.icons import success as success_icon, get_indicator, get_action_icon
 from inspekt.app.cli.interaction import _focus_browser_if_requested
 from inspekt.client import BridgeClient
@@ -2373,10 +2374,18 @@ def record(
         record_icon = "\U000f044a " if is_nerdfont_enabled() else ""  # 󰑊 nf-md-record
         recording_label = click.style(f"{record_icon}Now recording", fg="red", bold=True)
         browser_active = click.style("(browser is now active)", fg="bright_black")
-        ctrl_c = click.style(" Ctrl+C ", fg="black", bg="bright_yellow")
-        stop_location = click.style("(here or in your browser)", fg="bright_black")
-        click.echo(f"\n{recording_label}: {start_url} {browser_active}")
-        click.echo(f"Press {ctrl_c} {stop_location} to stop and save\n")
+        ctrl_c = style_primary_key("Ctrl+C")
+        ctrl_shift_z = style_secondary_key("Ctrl+Shift+Z")
+        ctrl_shift_y = style_secondary_key("Ctrl+Shift+Y")
+        stop_location = click.style("(here or in browser)", fg="bright_black")
+        in_browser = click.style("(in browser)", fg="bright_black")
+        # Undo/redo icons (Nerd Font)
+        undo_icon = "\U000f054c " if is_nerdfont_enabled() else ""  # 󰕌 nf-md-undo
+        redo_icon = "\U000f044e " if is_nerdfont_enabled() else ""  # 󰑎 nf-md-redo
+        click.echo(f"\n{recording_label}: {start_url} {browser_active}\n")
+        click.echo(f"Press {ctrl_c} {stop_location} to stop and save")
+        click.echo(f"      {ctrl_shift_z} {in_browser} to {undo_icon}remove step(s) from the recording")
+        click.echo(f"      {ctrl_shift_y} {in_browser} to {redo_icon}re-add (steps won't re-run)\n")
 
         # In VM mode, emit escape sequence to auto-hide terminal
         # This allows the user to immediately interact with the browser
@@ -3059,13 +3068,11 @@ def record(
                 elapsed_str = format_elapsed(elapsed_ms)
                 prefix = click.style(f"----   {elapsed_str}", fg="bright_black")
                 hourglass = "\uf252"  # nf-fa-hourglass_end
-                icon_str = f"{hourglass}  "
                 msg = click.style("No activity for 30 seconds. Recording will stop in 30 seconds…", fg="bright_black", italic=True)
-                click.echo(f"{prefix}   {icon_str}{msg}")
-                # Add hint about Ctrl+C (same style as recording start message)
-                ctrl_c_styled = click.style(" Ctrl+C ", fg="black", bg="bright_yellow")
-                hint = click.style("Press ", fg="bright_black") + ctrl_c_styled + click.style(" to stop and save", fg="bright_black")
-                click.echo(f"                  {hint}")
+                click.echo(f"{prefix}   {hourglass} {msg}")
+                # Add hint about Ctrl+C (aligned with message)
+                hint = click.style("Press ", fg="bright_black") + style_primary_key("Ctrl+C") + click.style(" to stop and save", fg="bright_black")
+                click.echo(f"                 {hint}")
                 inactivity_warning_shown = True
 
             try:
@@ -3201,23 +3208,29 @@ def record(
                             # Remember the step number before decrementing
                             undone_step_num = step_count
                             step_count -= 1
-                            # Format: "----   00:15   󰕌  Undo #0005 set color" (dark grey timestamp)
+                            # Format: "----   00:15   󰕌 Step #0003 (keypress) removed from the recording"
                             action = undone_step.action
                             # For "set" actions, include the input type (e.g., "set color", "set range")
                             if action == "set" and undone_step.target and undone_step.target.input_type:
                                 action = f"set {undone_step.target.input_type}"
                             prefix = click.style(f"----   {elapsed_str}", fg="bright_black")
                             undo_icon = get_indicator("undo") or ""
-                            icon_str = f"{undo_icon}  " if undo_icon else ""
-                            msg = click.style(f"Undo #{undone_step_num:04d} {action}", fg="bright_black", italic=True)
+                            icon_str = f"{undo_icon} " if undo_icon else ""
+                            msg = click.style(f"Step #{undone_step_num:04d} ({action}) removed from the recording", fg="bright_black", italic=True)
                             click.echo(f"{prefix}   {icon_str}{msg}")
+                            # Sound already played by JavaScript
                         else:
-                            # Show red icon for "Nothing to undo" (dark grey timestamp)
+                            # Show red icon and play error sound when nothing to undo
                             icon_glyph = get_indicator("undo") or ""
                             prefix = click.style(f"----   {elapsed_str}", fg="bright_black")
-                            icon_str = click.style(f"{icon_glyph}  ", fg="red") if icon_glyph else ""
-                            msg = click.style("Nothing to undo", fg="red")
+                            icon_str = click.style(f"{icon_glyph} ", fg="red") if icon_glyph else ""
+                            msg = click.style("No more steps to remove", fg="red")
                             click.echo(f"{prefix}   {icon_str}{msg}")
+                            # Play error sound in browser (after the undo sound already played)
+                            try:
+                                client.execute("window.__INSPEKT_RECORD_AUDIO__.playError()", timeout=0.5, browser_index=recording_browser_index)
+                            except Exception:
+                                pass
 
                     # Handle redo request (Ctrl+Shift+Y in browser)
                     if response.get("redoRequested"):
@@ -3228,23 +3241,29 @@ def record(
                             redone_step = undo_stack.pop()
                             all_steps.append(redone_step)
                             step_count += 1
-                            # Format: "----   00:15   󰑎  Redo #0005 set color" (dark grey timestamp)
+                            # Format: "----   00:15   󰑎 Step #0003 (keypress) re-added to the recording"
                             action = redone_step.action
                             # For "set" actions, include the input type (e.g., "set color", "set range")
                             if action == "set" and redone_step.target and redone_step.target.input_type:
                                 action = f"set {redone_step.target.input_type}"
                             prefix = click.style(f"----   {elapsed_str}", fg="bright_black")
                             redo_icon = get_indicator("redo") or ""
-                            icon_str = f"{redo_icon}  " if redo_icon else ""
-                            msg = click.style(f"Redo #{step_count:04d} {action}", fg="bright_black", italic=True)
+                            icon_str = f"{redo_icon} " if redo_icon else ""
+                            msg = click.style(f"Step #{step_count:04d} ({action}) re-added to the recording", fg="bright_black", italic=True)
                             click.echo(f"{prefix}   {icon_str}{msg}")
+                            # Sound already played by JavaScript
                         else:
-                            # Show red icon for "Nothing to redo" (dark grey timestamp)
+                            # Show red icon and play error sound when nothing to redo
                             icon_glyph = get_indicator("redo") or ""
                             prefix = click.style(f"----   {elapsed_str}", fg="bright_black")
-                            icon_str = click.style(f"{icon_glyph}  ", fg="red") if icon_glyph else ""
-                            msg = click.style("Nothing to redo", fg="red")
+                            icon_str = click.style(f"{icon_glyph} ", fg="red") if icon_glyph else ""
+                            msg = click.style("No more steps to re-add", fg="red")
                             click.echo(f"{prefix}   {icon_str}{msg}")
+                            # Play error sound in browser (after the redo sound already played)
+                            try:
+                                client.execute("window.__INSPEKT_RECORD_AUDIO__.playError()", timeout=0.5, browser_index=recording_browser_index)
+                            except Exception:
+                                pass
 
                     # Check if recording is still active
                     recording_active = response.get("recordingActive", True)
