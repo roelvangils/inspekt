@@ -552,7 +552,7 @@ def check_warnings(data: dict) -> list[ValidationIssue]:
         issues.append(
             ValidationIssue(
                 severity=Severity.WARNING,
-                message="Recording doesn't start with 'navigate'",
+                message="Recording doesn't start with a `navigate` command",
                 tip="Consider adding an initial URL for reliable replay",
             )
         )
@@ -778,8 +778,9 @@ def display_validation_results(result: ValidationResult, filepath: Path) -> None
     # Show warnings
     for issue in result.warnings:
         click.echo()
+        from inspekt.app.cli.table import _style_with_inline_code
         click.secho("⚠ ", fg="yellow", nl=False)
-        click.echo(issue.message)
+        click.echo(_style_with_inline_code(issue.message, base_fg="white"))
 
         if issue.tip:
             from inspekt.app.cli.table import print_hint
