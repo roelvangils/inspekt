@@ -75,6 +75,22 @@ def sanitize_display_name(text: str, max_length: int = 25) -> str:
     return text[:max_length] if len(text) > max_length else text
 
 
+def style_primary_key(key: str) -> str:
+    """Style a keyboard key for primary actions (e.g., Ctrl+C to stop).
+
+    Uses bright yellow background with black text for high visibility.
+    """
+    return click.style(f" {key} ", fg="black", bg="bright_yellow")
+
+
+def style_secondary_key(key: str) -> str:
+    """Style a keyboard key for secondary actions (e.g., undo/redo).
+
+    Uses dark gray background with white text for subtle visibility.
+    """
+    return click.style(f" {key} ", fg="white", bg="bright_black")
+
+
 def truncate_to_width(text: str, max_width: int, suffix: str = "…") -> str:
     """Truncate text to fit within max_width, accounting for ANSI escape codes."""
     # Remove ANSI escape codes to get actual visible length
@@ -158,11 +174,11 @@ def format_step_header(use_color: bool = True, indent: bool = False) -> str:
 
     # Header aligned to match step format:
     # "{indent}{0001}   {00:00}   {icon action      }   details"
-    #          4ch     5ch       ~15ch (icon+sp+12ch)  3sp
-    # Columns: step(4) + gap(3) + time(5) + gap(3) + action(~15) + gap(3) + details
-    # Header:  STEP(4) + gap(3) + TIME(4) + gap(4) + COMMAND(7) + gap(11) + DETAILS
+    #          4ch     5ch       ~13ch (icon+sp+10ch)  3sp
+    # Columns: step(4) + gap(3) + time(5) + gap(3) + action(~13) + gap(3) + details
+    # Header:  STEP(4) + gap(3) + TIME(4) + gap(4) + COMMAND(7) + gap(9) + DETAILS
     prefix = "  " if indent else ""
-    header = f"{prefix}STEP   TIME    COMMAND           DETAILS"
+    header = f"{prefix}STEP   TIME    COMMAND         DETAILS"
 
     if use_color:
         # Pad to terminal width for full-width background

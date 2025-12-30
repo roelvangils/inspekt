@@ -271,17 +271,402 @@ def _execute_native_activate(step) -> dict:
         return {'ok': False, 'error': error_msg}
 
 
-def _execute_native_keyboard_action(step, typing_speed: str, client=None) -> dict | None:
+def _get_modifiers_from_step(step) -> dict:
+    """
+    Extract modifier keys from a step as a dict for KeyWatcher.
+
+    Args:
+        step: RecordedStep object
+
+    Returns:
+        dict with ctrl, alt, shift, meta booleans
+    """
+    return {
+        'ctrl': getattr(step, 'ctrl', False) or False,
+        'alt': getattr(step, 'alt', False) or False,
+        'shift': getattr(step, 'shift', False) or False,
+        'meta': getattr(step, 'meta', False) or False,
+    }
+
+
+def _print_retry_failure_message():
+    """Print a friendly error message when all retry attempts have failed."""
+    click.secho("⚠ Could not complete the replay", fg="red")
+    click.echo()
+    click.secho("  Something went wrong while trying to send keyboard", fg="bright_black")
+    click.secho("  events to the browser. This can happen when:", fg="bright_black")
+    click.echo()
+    click.secho("  • The browser was closed or crashed", fg="bright_black")
+    click.secho("  • The connection to the browser was lost", fg="bright_black")
+    click.secho("  • Another application took focus", fg="bright_black")
+    click.echo()
+    click.secho("  Tips:", fg="white")
+    click.secho("  • Make sure Chrome is running and focused", fg="bright_black")
+    click.secho("  • Restart Inspekt with `inspekt start`", fg="bright_black")
+    click.secho("  • Try running the replay again", fg="bright_black")
+    click.echo()
+
+
+def _handle_missed_native_key(step, client, typing_speed: str, attempt: int = 1, step_num: int = 0, total_steps: int = 0) -> dict:
+    """
+    Handle case where native keyboard event didn't reach the browser.
+
+    Shows a warning and prompts the user to retry or abort.
+    Maximum 3 retry attempts before aborting.
+
+    Args:
+        step: RecordedStep object (keypress action)
+        client: BridgeClient for JS execution
+        typing_speed: Typing speed setting
+        attempt: Current attempt number (1-3)
+        step_num: Current step number (1-based)
+        total_steps: Total number of steps in recording
+
+    Returns:
+        dict with 'ok' and optionally 'error' keys
+    """
+    import sys
+
+    MAX_RETRIES = 3
+
+    # Show failure status
+    from inspekt.app.cli.formatting import format_status, style_secondary_key
+    click.echo(format_status("FAIL"))
+    click.echo()
+
+    # Friendly warning message
+    click.secho("⚠ The last keyboard event did not reach the page", fg="yellow")
+    click.secho("  The browser tab must remain focused for native", fg="bright_black")
+    click.secho("  keyboard events to work.", fg="bright_black")
+    click.echo()
+
+    # Instructions with highlighted keys
+    click.echo("Press ", nl=False)
+    click.secho(" Enter ", fg="black", bg="cyan", nl=False)
+    click.echo(f" to refocus and try again (attempt {attempt}/{MAX_RETRIES})")
+    click.echo(f"Press {style_secondary_key('Ctrl+C')} ", nl=False)
+    click.secho("twice", bold=True, nl=False)
+    click.echo(" to stop the replay")
+    click.echo()
+
+    # Check if we have a real TTY for interactive input
+    # isatty() alone isn't enough - we need to verify raw terminal mode is available
+    can_get_input = False
+    if sys.stdin.isatty():
+        try:
+            import termios
+            # Try to get terminal settings - this will fail if not a real terminal
+            termios.tcgetattr(sys.stdin.fileno())
+            can_get_input = True
+        except Exception:
+            pass
+
+    if not can_get_input:
+        # Non-interactive mode - abort immediately
+        return {'ok': False, 'error': 'Native key not received (non-interactive mode, cannot retry)'}
+
+    while True:
+        try:
+            user_input = click.getchar()
+        except KeyboardInterrupt:
+            # Ctrl+C pressed - abort gracefully
+            click.echo()
+            return {'ok': False, 'error': 'Aborted by user (Ctrl+C)'}
+        except Exception:
+            # If getchar fails, abort
+            return {'ok': False, 'error': 'Native key not received (input error)'}
+
+        if user_input in ('\r', '\n'):
+            # Retry - restore browser focus first using AppleScript
+            # Build progress message with re-run icon
+            rerun_icon = "\ueb2c"  # nf-cod-debug_restart
+            if step_num > 0 and total_steps > 0:
+                remaining = total_steps - step_num
+                click.echo(f"{rerun_icon} Re-running step {step_num} of {total_steps} ({remaining} steps remaining)… ", nl=False)
+            else:
+                click.echo(f"{rerun_icon} Retrying… ", nl=False)
+
+            try:
+                # Use timeout for all retry operations (browser might be gone)
+                import signal
+
+                def timeout_handler(signum, frame):
+                    raise TimeoutError("Operation timed out")
+
+                # Set 10 second timeout
+                old_handler = signal.signal(signal.SIGALRM, timeout_handler)
+                signal.alarm(10)
+
+                try:
+                    if client:
+                        # Use AppleScript to activate the browser tab (more reliable than JS focus)
+                        focus_browser_tab(client, verbose=False)
+                        # Also ensure page content has focus
+                        _ensure_page_focus(client)
+                        # Small delay to let focus settle
+                        time.sleep(0.1)
+
+                    # Re-try with appropriate detection based on key type
+                    key = step.key.lower() if hasattr(step, 'key') and step.key else ''
+                    is_tab = key == 'tab'
+
+                    if is_tab:
+                        result = _try_native_tab_with_focus_detection(step, client, typing_speed, attempt + 1)
+                        error_type = 'focus_not_changed'
+                    else:
+                        result = _try_native_keypress_with_detection(step, client, attempt + 1)
+                        error_type = 'key_not_received'
+                finally:
+                    # Always cancel the alarm and restore handler
+                    signal.alarm(0)
+                    signal.signal(signal.SIGALRM, old_handler)
+
+                if not result.get('ok') and result.get('error') == error_type:
+                    if attempt >= MAX_RETRIES:
+                        click.echo(format_status("FAIL"))
+                        click.echo()
+                        _print_retry_failure_message()
+                        return {'ok': False, 'error': f'Native key not received after {MAX_RETRIES} attempts', 'status_printed': True}
+                    # Recursively handle next retry (will print its own FAIL status)
+                    return _handle_missed_native_key(step, client, typing_speed, attempt + 1, step_num, total_steps)
+
+                # Success! Print the check mark on same line, then blank line before next step
+                click.echo(format_status("OK"))
+                click.echo()
+                # Flag to tell main loop not to print status again
+                result['status_printed'] = True
+                return result
+
+            except (TimeoutError, Exception) as e:
+                # Operation timed out or failed (browser closed, connection lost, etc.)
+                click.echo(format_status("FAIL"))
+
+                if attempt >= MAX_RETRIES:
+                    click.echo()
+                    _print_retry_failure_message()
+                    return {'ok': False, 'error': f'Retry failed: {e}', 'status_printed': True}
+
+                # Try again
+                click.echo()
+                click.secho(f"  Connection issue, will retry ({attempt}/{MAX_RETRIES})…", fg="bright_black")
+                click.echo()
+                return _handle_missed_native_key(step, client, typing_speed, attempt + 1, step_num, total_steps)
+
+        # Ignore other keys, keep waiting for Enter
+
+
+def _try_native_tab_with_focus_detection(step, client, typing_speed: str, attempt: int = 1) -> dict:
+    """
+    Execute a native Tab keypress with focus-change detection.
+
+    Instead of listening for keydown events (which don't reliably fire for Tab),
+    this checks if document.activeElement changed after sending the Tab.
+
+    Args:
+        step: RecordedStep with action='keypress' and key='Tab'
+        client: BridgeClient for JS execution
+        typing_speed: Typing speed setting (for retry handler)
+        attempt: Current attempt number
+
+    Returns:
+        dict with 'ok' and optionally 'error' keys
+    """
+    # Get current focused element before Tab (handles Shadow DOM)
+    before_script = """
+    (function() {
+        // Recursively find the deepest focused element (through Shadow DOM)
+        function getDeepActiveElement() {
+            let el = document.activeElement;
+            while (el && el.shadowRoot && el.shadowRoot.activeElement) {
+                el = el.shadowRoot.activeElement;
+            }
+            return el;
+        }
+
+        const el = getDeepActiveElement();
+        // Use multiple attributes for a unique fingerprint
+        const rect = el?.getBoundingClientRect();
+        return {
+            tagName: el?.tagName || 'none',
+            id: el?.id || '',
+            className: (el?.className || '').toString().slice(0, 50),
+            textContent: (el?.textContent || '').trim().slice(0, 30),
+            // Include position for elements without good identifiers
+            top: rect ? Math.round(rect.top) : 0,
+            left: rect ? Math.round(rect.left) : 0,
+            // Create a unique identifier for comparison
+            uid: el ? (el.tagName + '#' + el.id + '@' + (rect ? Math.round(rect.top) + ',' + Math.round(rect.left) : '0,0')) : 'none'
+        };
+    })()
+    """
+
+    try:
+        before_result = client.execute(before_script, timeout=2.0)
+        if not before_result.get('ok'):
+            # Can't communicate with browser - likely closed or crashed
+            return {'ok': False, 'error': 'focus_not_changed', 'reason': 'browser_not_responding'}
+
+        before_focus = before_result.get('result', {})
+        before_uid = before_focus.get('uid', 'none')
+
+        # Send the native Tab key
+        native_result = _execute_native_keypress(step)
+
+        if not native_result.get('ok'):
+            return native_result
+
+        # Small delay for focus to change
+        time.sleep(0.15)
+
+        # Check if focus changed
+        after_result = client.execute(before_script, timeout=2.0)
+        if not after_result.get('ok'):
+            # Can't communicate with browser after Tab - likely closed or crashed
+            return {'ok': False, 'error': 'focus_not_changed', 'reason': 'browser_not_responding'}
+
+        after_focus = after_result.get('result', {})
+        after_uid = after_focus.get('uid', 'none')
+
+        # Focus should have changed (different element)
+        focus_changed = before_uid != after_uid
+
+        if not focus_changed:
+            # Focus didn't change - Tab might not have reached Chrome
+            # But this could also be legitimate (e.g., last focusable element)
+            # Only warn if we're on attempt 1 and it looks suspicious
+            if attempt == 1:
+                # Check if there are more focusable elements
+                check_script = """
+                (function() {
+                    const focusable = document.querySelectorAll(
+                        'a[href], button, input, select, textarea, [tabindex]:not([tabindex="-1"])'
+                    );
+                    const current = document.activeElement;
+                    const currentIndex = Array.from(focusable).indexOf(current);
+                    return {
+                        totalFocusable: focusable.length,
+                        currentIndex: currentIndex,
+                        isLast: currentIndex === focusable.length - 1
+                    };
+                })()
+                """
+                check_result = client.execute(check_script, timeout=2.0)
+                focus_info = check_result.get('result', {}) if check_result.get('ok') else {}
+
+                # If not the last focusable element, this is suspicious
+                if not focus_info.get('isLast', False):
+                    return {'ok': False, 'error': 'focus_not_changed'}
+
+        return native_result
+
+    except Exception:
+        # If detection fails (timeout, connection error), browser likely not responding
+        return {'ok': False, 'error': 'focus_not_changed', 'reason': 'browser_not_responding'}
+
+
+def _try_native_keypress_with_detection(step, client, attempt: int = 1) -> dict:
+    """
+    Execute a native keypress with detection of whether it reached the browser.
+
+    Uses the KeyWatcher module in the browser to verify the key arrived.
+
+    Args:
+        step: RecordedStep with action='keypress'
+        client: BridgeClient for JS execution
+        attempt: Current attempt number
+
+    Returns:
+        dict with 'ok' and optionally 'error' or 'key_not_received' keys
+    """
+    key = step.key
+    modifiers = _get_modifiers_from_step(step)
+
+    # Tell JS to expect this key and get the current timestamp
+    modifiers_json = json.dumps(modifiers)
+    expect_script = f"""
+    (function() {{
+        const kw = window.__INSPEKT_VISUAL__?.keyWatcher;
+        if (!kw) {{
+            return {{ ok: false, error: 'KeyWatcher not found' }};
+        }}
+        if (!kw.isInitialized || !kw.isInitialized()) {{
+            // Try to initialize it now
+            kw.init();
+        }}
+        kw.expectKey('{key}', {modifiers_json});
+        return {{ ok: true, timestamp: Date.now(), initialized: kw.isInitialized() }};
+    }})()
+    """
+
+    try:
+        expect_result = client.execute(expect_script, timeout=2.0)
+        if not expect_result.get('ok') or not expect_result.get('result', {}).get('ok'):
+            # KeyWatcher not available, fall back to sending without detection
+            return _execute_native_keypress(step)
+
+        expected_time = expect_result.get('result', {}).get('timestamp', 0)
+
+        # Send the native key
+        native_result = _execute_native_keypress(step)
+
+        if not native_result.get('ok'):
+            # AppleScript failed, clear watcher and return error
+            client.execute("window.__INSPEKT_VISUAL__?.keyWatcher?.clear()", timeout=1.0)
+            return native_result
+
+        # Delay to allow event to propagate through browser and reach JS
+        # 250ms accounts for: AppleScript->OS->Chrome->JS event dispatch
+        time.sleep(0.25)
+
+        # Check if key arrived
+        check_script = f"""
+        (function() {{
+            const kw = window.__INSPEKT_VISUAL__?.keyWatcher;
+            if (!kw) return {{ received: false, error: 'no kw' }};
+            const state = kw.getState ? kw.getState() : {{}};
+            const received = kw.checkKeyReceived({expected_time}, 500);
+            kw.clear();
+            return {{
+                received: received,
+                state: state
+            }};
+        }})()
+        """
+        check_result = client.execute(check_script, timeout=2.0)
+        debug_info = check_result.get('result', {})
+        key_received = check_result.get('ok') and debug_info.get('received', False)
+
+        # Debug output
+        if not key_received:
+            click.echo(f"    DEBUG: {debug_info}", err=True)
+
+        if not key_received:
+            # Event didn't arrive
+            return {'ok': False, 'error': 'key_not_received'}
+
+        return native_result
+
+    except Exception as e:
+        # If anything goes wrong with detection, fall back to normal execution
+        return _execute_native_keypress(step)
+
+
+def _execute_native_keyboard_action(step, typing_speed: str, client=None, step_num: int = 0, total_steps: int = 0) -> dict | None:
     """
     Execute a keyboard action natively via AppleScript if applicable.
 
     This is the main entry point for native keyboard handling during replay.
     Returns None if the action is not a keyboard action.
 
+    For keypress actions, uses KeyWatcher to detect if the event reached Chrome.
+    If not, prompts the user to retry (max 3 attempts).
+
     Args:
         step: RecordedStep object
         typing_speed: Typing speed for type actions
-        client: BridgeClient for ensuring page focus (optional but recommended)
+        client: BridgeClient for ensuring page focus and key detection
+        step_num: Current step number (1-based) for progress display
+        total_steps: Total number of steps for progress display
 
     Returns:
         dict with result if action was handled, None if not a keyboard action
@@ -292,10 +677,26 @@ def _execute_native_keyboard_action(step, typing_speed: str, client=None) -> dic
         _ensure_page_focus(client)
 
     if step.action == 'keypress':
-        return _execute_native_keypress(step)
+        # For Tab/Shift+Tab, use focus-change detection instead of keydown detection
+        # (Tab keydown events don't reliably reach document-level listeners)
+        key = step.key.lower() if step.key else ''
+        is_tab = key == 'tab'
+
+        if is_tab and client:
+            result = _try_native_tab_with_focus_detection(step, client, typing_speed)
+            if not result.get('ok') and result.get('error') == 'focus_not_changed':
+                # Focus didn't change - offer retry
+                return _handle_missed_native_key(step, client, typing_speed, attempt=1, step_num=step_num, total_steps=total_steps)
+            return result
+        else:
+            # For non-Tab keys, just execute without detection for now
+            # TODO: Could add keydown detection for Enter, Space, etc.
+            return _execute_native_keypress(step)
     elif step.action == 'type':
+        # Type actions don't use detection (too slow for character-by-character)
         return _execute_native_type(step, typing_speed)
     elif step.action == 'activate':
+        # TODO: Key detection temporarily disabled (same as keypress above)
         return _execute_native_activate(step)
     else:
         return None  # Not a keyboard action
@@ -1756,11 +2157,9 @@ def replay(
         # Check CSP bypass status and warn if disabled
         if not check_csp_bypass_enabled():
             click.echo()
-            click.secho("  ⚠  CSP bypass is disabled", fg="yellow", bold=True)
-            click.echo("     Some sites may not work correctly during replay.")
-            click.echo("     Enable it with: inspekt domain csp --enable")
-            click.echo("     Or toggle it in the Inspekt extension popup.")
-            click.echo()
+            click.secho("⚠ CSP bypass is disabled (or no web page is loaded)", fg="yellow")
+            click.secho("  Some sites may not work correctly during replay.", fg="bright_black")
+            click.secho("  Enable it with: inspekt domain csp --enable.", fg="bright_black")
 
         # Focus the browser tab before starting replay (macOS only)
         focus_browser_tab(client, verbose=verbose)
@@ -1897,37 +2296,39 @@ def replay(
                     # Recording was normal, replay is in fullscreen
                     click.echo()
                     click.secho(
-                        f"Warning: Recording was made in normal window mode, "
-                        f"but replay is in {current_window_mode} mode.",
+                        f"⚠ Recording was made in normal window mode, but replay is in {current_window_mode} mode",
                         fg="yellow",
                     )
-                    click.echo(f"   Exit {current_window_mode} mode (press F11 or Esc) if viewport dimensions need to match.")
+                    click.secho(f"  Exit {current_window_mode} mode (press F11 or Esc) if viewport dimensions need to match.", fg="bright_black")
 
         # Check for viewport/zoom mismatch and show warning
-        viewport_mismatch = False
+        # Only check WIDTH - height can vary due to debug banner
+        viewport_width_mismatch = False
         zoom_mismatch = False
 
         if recorded_viewport and current_width > 0:
-            # Issue 21: Use exact matching (0px tolerance) instead of 10px
-            viewport_mismatch = (
-                current_width != recorded_viewport.width or
-                current_height != recorded_viewport.height
-            )
+            viewport_width_mismatch = current_width != recorded_viewport.width
         if current_zoom > 0:
             zoom_mismatch = abs(current_zoom - recorded_zoom) > 0.05  # 5% tolerance
 
         # Show warning if there's a mismatch and no matching flags were provided
-        if (viewport_mismatch or zoom_mismatch) and not match_viewport and not match_zoom_level:
+        if (viewport_width_mismatch or zoom_mismatch) and not match_viewport and not match_zoom_level:
+            from inspekt.app.cli.table import _style_with_inline_code
             click.echo()
             click.secho(
-                "⚠ Your browser's current viewport and zoom level are different from the recording.",
+                "⚠ Your browser's current viewport width or zoom level differs from the",
                 fg="yellow",
             )
-            click.echo("  This might be intentional. For a faithful replay, use:")
-            if viewport_mismatch:
-                click.echo(f"    inspekt replay --match-viewport  (recorded: {recorded_viewport.width}×{recorded_viewport.height}, current: {current_width}×{current_height})")
+            click.secho(
+                "  recording. This may be intentional. For an accurate replay, use this",
+                fg="yellow",
+            )
+            if viewport_width_mismatch:
+                msg = f"  command: `inspekt replay --match-viewport` (recorded at {recorded_viewport.width}×{recorded_viewport.height})"
+                click.echo(_style_with_inline_code(msg, base_fg="yellow"))
             if zoom_mismatch:
-                click.echo(f"    inspekt replay --match-zoom-level  (recorded: {recorded_zoom:.0%}, current: {current_zoom:.0%})")
+                msg = f"  command: `inspekt replay --match-zoom-level` (recorded at {recorded_zoom:.0%})"
+                click.echo(_style_with_inline_code(msg, base_fg="yellow"))
             click.echo()
 
         # Apply zoom matching if requested
@@ -1972,21 +2373,21 @@ def replay(
 
         # Issue 4: Apply viewport matching with cached offsets (same logic as record.py)
         # Skip viewport matching in fullscreen/kiosk mode (window cannot be resized)
-        if match_viewport and viewport_mismatch and recorded_viewport and in_fullscreen_mode:
+        if match_viewport and viewport_width_mismatch and recorded_viewport and in_fullscreen_mode:
             # Cannot resize in fullscreen/kiosk mode - show warning and skip
             click.echo()
             click.secho(
-                f"Warning: Browser is in {current_window_mode} mode. Cannot resize viewport.",
+                f"⚠ Browser is in {current_window_mode} mode. Cannot resize viewport.",
                 fg="yellow",
             )
-            click.echo(f"   Recorded viewport: {recorded_viewport.width}×{recorded_viewport.height}")
-            click.echo(f"   Current viewport: {current_width}×{current_height}")
-            click.echo(f"   Exit {current_window_mode} mode (press F11 or Esc) to enable viewport matching.")
+            click.secho(f"  Recorded viewport: {recorded_viewport.width}×{recorded_viewport.height}", fg="bright_black")
+            click.secho(f"  Current viewport: {current_width}×{current_height}", fg="bright_black")
+            click.secho(f"  Exit {current_window_mode} mode (press F11 or Esc) to enable viewport matching.", fg="bright_black")
             click.echo()
             # Disable viewport matching for this run
             match_viewport = False
 
-        if match_viewport and viewport_mismatch and recorded_viewport:
+        if match_viewport and viewport_width_mismatch and recorded_viewport:
             target_width = recorded_viewport.width
             target_height = recorded_viewport.height
 
@@ -2468,7 +2869,7 @@ def replay(
                         click.echo(format_system_message("replay mode not available, using direct injection"))
                     inject_result = client.execute(visual_script, timeout=10.0)
                     if not inject_result.get("ok"):
-                        click.echo(f"Warning: Could not inject visual script: {inject_result.get('error')}", err=True)
+                        click.secho(f"⚠ Could not inject visual script: {inject_result.get('error')}", fg="yellow", err=True)
                     elif verbose:
                         click.echo(format_system_message("visual feedback script injected"))
 
@@ -2481,6 +2882,11 @@ def replay(
                         client.execute("window.__INSPEKT_VISUAL__.inputLock.enable()", timeout=5.0)
                         if verbose:
                             click.echo(format_system_message("input locked"))
+                    # Initialize key watcher for native mode (detects if keypresses reach browser)
+                    if native:
+                        client.execute("window.__INSPEKT_VISUAL__.keyWatcher.init()", timeout=2.0)
+                        if verbose:
+                            click.echo(format_system_message("key watcher initialized"))
                     # Clear any previous stop request flag (from previous replay)
                     client.execute("window.__INSPEKT_VISUAL__.clearStopRequest()", timeout=1.0)
                     # Play start sound
@@ -2504,11 +2910,11 @@ def replay(
                         client.execute("window.__INSPEKT_VISUAL__.audio.playStartPlayback()", timeout=5.0)
                         time.sleep(0.5)  # Wait for start sound to complete
                 else:
-                    click.echo("Warning: Visual script injected but __INSPEKT_VISUAL__ not created", err=True)
+                    click.secho("⚠ Visual script injected but __INSPEKT_VISUAL__ not created", fg="yellow", err=True)
                     if verbose:
                         click.echo(format_system_message(f"verify result: {verify_result}"))
             except FileNotFoundError:
-                click.echo(f"Warning: Visual script not found: {visual_script_path}", err=True)
+                click.secho(f"⚠ Visual script not found: {visual_script_path}", fg="yellow", err=True)
 
     # Print interactive mode message and step header (unless in progress bar mode)
     if not progress:
@@ -2521,13 +2927,24 @@ def replay(
             click.echo()
 
         # Show warning for native mode (before header)
-        if native:
-            from inspekt.app.cli.table import print_warning
-            print_warning(
-                "Native mode: Keep the browser window focused during replay. "
-                "Manual keypresses can interfere with playback."
-            )
-            click.echo()  # Add blank line after warning
+        # Count native actions (considering per-step overrides)
+        native_action_count = 0
+        keyboard_actions = ('keypress', 'type', 'activate')
+        for s in steps_to_run:
+            step_native = getattr(s, 'native', None)
+            if step_native is True and s.action in keyboard_actions:
+                # Explicitly marked as native
+                native_action_count += 1
+            elif step_native is None and native and s.action in keyboard_actions:
+                # Uses global --native flag
+                native_action_count += 1
+            # step_native is False means explicitly NOT native, so skip
+
+        if native_action_count > 0:
+            click.secho("⚠ Keep the browser focused", fg="yellow")
+            click.secho(f"  This replay will simulate {native_action_count} native (OS-level) key", fg="bright_black")
+            click.secho("  presses. The browser must be focused for this.", fg="bright_black")
+            click.echo()
 
         click.echo(format_step_header())
 
@@ -2581,7 +2998,7 @@ def replay(
             if verbose:
                 click.echo(format_system_message(f"download monitoring started, files will be saved to: {replay_downloads_dir}"))
         else:
-            click.echo(f"Warning: Could not start download monitoring: {start_result.get('error')}", err=True)
+            click.secho(f"⚠ Could not start download monitoring: {start_result.get('error')}", fg="yellow", err=True)
 
     # Measure viewport height BEFORE any debugger attachment
     # This is needed to detect the automation banner height for video cropping
@@ -3076,7 +3493,12 @@ def replay(
             break
 
         # Check if this will be a native action (before printing summary)
-        is_native_action = native and step.action in ('keypress', 'type', 'activate')
+        # Per-step native override takes precedence over global --native flag
+        step_native = getattr(step, 'native', None)
+        if step_native is not None:
+            is_native_action = step_native and step.action in ('keypress', 'type', 'activate')
+        else:
+            is_native_action = native and step.action in ('keypress', 'type', 'activate')
 
         # Check for redundant actions that will be merged (before printing step)
         # In native mode, actions like 'activate' following keypress Enter/Space are redundant
@@ -3139,11 +3561,12 @@ def replay(
         # This intercepts keypress, type, and activate actions before JavaScript execution
         if is_native_action:
 
-            native_result = _execute_native_keyboard_action(step, typing_speed, client=client)
+            native_result = _execute_native_keyboard_action(step, typing_speed, client=client, step_num=actual_index + 1, total_steps=len(steps_to_run))
             if native_result is not None:
                 if native_result.get('ok'):
                     # Platform icon is now shown next to the command name, not in status
-                    if not progress:
+                    # Skip if status was already printed (e.g., after native retry)
+                    if not progress and not native_result.get('status_printed'):
                         click.echo(format_status("OK"))
                     result.add_success(actual_index, step_dict)
                     if verbose and not progress:
@@ -3154,7 +3577,8 @@ def replay(
                         else:
                             click.echo(format_system_message(f"native {method}: {step.action}"))
                 else:
-                    if not progress:
+                    # Skip if status was already printed (e.g., after native retry failure)
+                    if not progress and not native_result.get('status_printed'):
                         click.echo(format_status("FAIL"))
                     error_msg = native_result.get('error', 'Native keyboard action failed')
                     result.add_failure(actual_index, step_dict, error_msg)
@@ -3350,12 +3774,14 @@ def replay(
 
                     if response.get("ok"):
                         # Action succeeded - show OK for the step
-                        # For keypress actions, show (CDP) suffix if real key dispatch was used
-                        status_suffix = ""
-                        if step.action == "keypress" and response.get("method") == "cdp":
-                            status_suffix = "(CDP)"
-                        if not progress:
-                            click.echo(format_status("OK", suffix=status_suffix))
+                        # Skip if status was already printed (e.g., after native retry)
+                        if not response.get("status_printed"):
+                            # For keypress actions, show (CDP) suffix if real key dispatch was used
+                            status_suffix = ""
+                            if step.action == "keypress" and response.get("method") == "cdp":
+                                status_suffix = "(CDP)"
+                            if not progress:
+                                click.echo(format_status("OK", suffix=status_suffix))
 
                         # Check for assertion failures (separate from action success)
                         assertion_failures = response.get("failures", [])
@@ -3420,7 +3846,7 @@ def replay(
 
                             if not page_ready.get("success") and navigated:
                                 if verbose:
-                                    click.echo(format_system_message("Warning: Page load incomplete"))
+                                    click.echo(format_system_message("page load incomplete"))
                                 # Continue anyway - next step execution will fail if truly problematic
 
                             # Re-inject visual script after navigation (it's lost on page change)
@@ -3449,10 +3875,16 @@ def replay(
                                                 client.execute("window.__INSPEKT_VISUAL__.audio.playNavigate()", timeout=5.0)
                                         except Exception:
                                             pass
+                                    # Re-initialize key watcher for native mode (lost on navigation)
+                                    if native:
+                                        try:
+                                            client.execute("window.__INSPEKT_VISUAL__.keyWatcher.init()", timeout=2.0)
+                                        except Exception:
+                                            pass
                                     # Note: CDP dialog interception persists across navigations
                                     # (it's attached at the browser level via chrome.debugger)
                                 elif verbose:
-                                    click.echo(format_system_message("Warning: visual script not ready after navigation"))
+                                    click.echo(format_system_message("visual script not ready after navigation"))
 
                             # Re-inject download monitoring after navigation (it's lost on page change)
                             if download_monitoring_active and download_session_id:
@@ -3469,7 +3901,7 @@ def replay(
                                         click.echo(format_system_message("download monitoring re-injected after navigation"))
                                 else:
                                     if verbose:
-                                        click.echo(format_system_message(f"Warning: could not re-inject download monitoring: {reinject_result.get('error')}"))
+                                        click.echo(format_system_message(f"could not re-inject download monitoring: {reinject_result.get('error')}"))
 
                             # Mark that this step caused navigation
                             # Next navigate step can be skipped since navigation already happened
@@ -3983,11 +4415,15 @@ def replay(
     if result.all_passed:
         click.secho(success(f"All {result.passed_steps} steps passed"), fg="green", bold=True)
         click.echo(f"  Duration: {duration}")
-        # Show tip about interactive mode (only if not already using it)
-        if not interactive:
+        # Show tips about replay modes (only if not already using them)
+        if not interactive or not native:
             click.echo()
             from inspekt.app.cli.table import print_hint
-            print_hint("Use `--interactive` or `-i` to step through manually.")
+            if not interactive:
+                print_hint("Use `--interactive` to step through manually.")
+            if not native:
+                print_hint("Use `--native` to simulate OS-level key events instead of synthetic ones.")
+                click.secho("   Works well for accessibility testing. Use with caution.", fg="bright_black")
     else:
         click.secho(error(f"{result.failed_steps} of {result.total_steps} steps failed"), fg="red", bold=True)
         click.echo(f"  Passed: {result.passed_steps} | Failed: {result.failed_steps} | Skipped: {result.skipped_steps}")
