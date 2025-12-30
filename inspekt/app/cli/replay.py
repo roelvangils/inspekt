@@ -931,18 +931,19 @@ def wait_for_reconnection(
     return False
 
 
-def _interruptible_wait(seconds: float, action_name: str) -> bool:
+def _interruptible_wait(seconds: float, action_name: str, elapsed_ms: int = 0) -> bool:
     """
     Wait with live countdown, skippable by Enter.
 
-    Shows a message like:
-        Next action (click) is in 12 seconds. Press  ENTER  to 󰈑 skip ahead.
+    Shows a message matching the replay step format:
+        ----   00:53    Next action (keypress) is in X seconds. Wait or press  ENTER  to 󰈑 skip ahead…
 
     The countdown updates every second. User can press Enter to skip.
 
     Args:
         seconds: Total time to wait
         action_name: Name of the next action (e.g., "click", "keypress")
+        elapsed_ms: Current elapsed time in milliseconds (for display)
 
     Returns:
         True if user skipped, False if waited full duration
@@ -950,7 +951,8 @@ def _interruptible_wait(seconds: float, action_name: str) -> bool:
     import select
     import sys
 
-    skip_icon = "\uf209"  # 󰈑 nf-md-skip_forward
+    hourglass_icon = "\uf251"  #  nf-fa-hourglass_half
+    skip_icon = "\U000f0211"  # 󰈑 nf-md-skip_forward
     remaining = int(seconds)
 
     # Only show countdown for meaningful waits
@@ -959,11 +961,22 @@ def _interruptible_wait(seconds: float, action_name: str) -> bool:
         return False
 
     while remaining > 0:
-        # Format message with styled ENTER key
+        # Format elapsed time as MM:SS (updates each second)
+        current_elapsed = elapsed_ms + (int(seconds) - remaining) * 1000
+        mins, secs = divmod(current_elapsed // 1000, 60)
+        elapsed_str = click.style(f"{mins:02d}:{secs:02d}", fg="bright_black")
+
+        # Step number placeholder (dimmed dashes)
+        step_placeholder = click.style("----", fg="bright_black")
+
+        # Format message with styled ENTER key and icons
+        hourglass = click.style(hourglass_icon, fg="bright_black")
         enter_key = click.style(" ENTER ", fg="black", bg="white", bold=True)
-        skip_text = click.style(f"{skip_icon} skip ahead", fg="bright_black")
+        skip_text = click.style(f"{skip_icon} skip ahead…", fg="bright_black")
         seconds_text = "second" if remaining == 1 else "seconds"
-        msg = f"\rNext action ({action_name}) is in {remaining} {seconds_text}. Press {enter_key} to {skip_text}"
+
+        # Match the step line format: step_num   elapsed   icon message
+        msg = f"\r{step_placeholder}   {elapsed_str}   {hourglass} Next action ({action_name}) is in {remaining} {seconds_text}. Wait or press {enter_key} to {skip_text}"
 
         # Print without newline, with padding to clear previous text
         click.echo(msg + " " * 5, nl=False)
@@ -973,7 +986,7 @@ def _interruptible_wait(seconds: float, action_name: str) -> bool:
         try:
             if sys.stdin in select.select([sys.stdin], [], [], 1.0)[0]:
                 sys.stdin.readline()  # Consume the Enter
-                click.echo("\r" + " " * 100 + "\r", nl=False)  # Clear line
+                click.echo("\r" + " " * 120 + "\r", nl=False)  # Clear line
                 return True  # User skipped
         except (OSError, TypeError):
             # select doesn't work (e.g., Windows or not a TTY)
@@ -982,7 +995,7 @@ def _interruptible_wait(seconds: float, action_name: str) -> bool:
         remaining -= 1
 
     # Clear the countdown line
-    click.echo("\r" + " " * 100 + "\r", nl=False)
+    click.echo("\r" + " " * 120 + "\r", nl=False)
     return False  # Waited full duration
 
 
@@ -1843,6 +1856,12 @@ def run_download_shell_command(command: str, file_path: Path) -> dict:
     default="normal",
     help="Typing speed for native mode: instant, fast, normal (default), slow",
 )
+@click.option(
+    "--no-milliseconds",
+    is_flag=True,
+    default=False,
+    help="Hide milliseconds in timestamps (default: show milliseconds)",
+)
 def replay(
     recording_file: Optional[str],
     speed: float,
@@ -1887,6 +1906,7 @@ def replay(
     faithful: bool,
     native: bool,
     typing_speed: str,
+    no_milliseconds: bool,
 ):
     """
     Replay a recorded browser interaction session.
@@ -1932,6 +1952,12 @@ def replay(
         inspekt replay login-flow.yaml --video --fps=15     # 15fps video
         inspekt replay login-flow.yaml --video --open       # Record and open video
     """
+    # Determine whether to show milliseconds in timestamps
+    # CLI flag takes precedence over config setting
+    from inspekt.config import load_config
+    config_data = load_config()
+    show_milliseconds = not no_milliseconds and config_data.get("show-milliseconds", True)
+
     # If no recording file specified, find the most recent one
     auto_selected = False
     if recording_file is None:
@@ -3018,7 +3044,7 @@ def replay(
             click.secho("  presses. The browser must be focused for this.", fg="bright_black")
             click.echo()
 
-        click.echo(format_step_header())
+        click.echo(format_step_header(show_milliseconds=show_milliseconds))
 
     # Progress bar setup for --progress mode
     progress_bar = None
@@ -3362,7 +3388,7 @@ def replay(
                         delay_sec > skip_threshold_sec and
                         not progress and
                         sys.stdin.isatty()):
-                        _interruptible_wait(delay_sec, step.action or "action")
+                        _interruptible_wait(delay_sec, step.action or "action", step_timestamp)
                     else:
                         time.sleep(delay_sec)
         page_load_wait_ms = 0  # Reset after applying
@@ -3376,13 +3402,14 @@ def replay(
                 summary = format_step_for_display(
                     step_dict, actual_index + 1, step_timestamp,
                     reserve_suffix_width=12, native_mode=native,
-                    is_native=would_be_native, dimmed_icon=True
+                    is_native=would_be_native, dimmed_icon=True,
+                    show_milliseconds=show_milliseconds
                 )
                 click.echo(summary, nl=False)
                 click.echo(format_status("SKIP"))
             result.add_skip(actual_index, step_dict, f"Skipped by --skip {step.action}")
             if verbose and not progress:
-                click.echo(format_system_message(f"skipped: {step.action} in skip list"))
+                click.echo(format_system_message(f"skipped: {step.action} in skip list", show_milliseconds=show_milliseconds))
             previous_step = step
             continue
 
@@ -3393,13 +3420,14 @@ def replay(
                 # Navigate is not a native action, so is_native=False
                 summary = format_step_for_display(
                     step_dict, actual_index + 1, step_timestamp,
-                    reserve_suffix_width=12, native_mode=native, dimmed_icon=True
+                    reserve_suffix_width=12, native_mode=native, dimmed_icon=True,
+                    show_milliseconds=show_milliseconds
                 )
                 click.echo(summary, nl=False)
                 click.echo(format_status("MERGED"))
             result.add_success(actual_index, step_dict)  # Count as success since navigation happened
             if verbose and not progress:
-                click.echo(format_system_message("navigation already occurred from previous click"))
+                click.echo(format_system_message("navigation already occurred from previous click", show_milliseconds=show_milliseconds))
             last_step_navigated = False  # Reset the flag
             previous_step = step
             continue
@@ -3409,7 +3437,7 @@ def replay(
 
         # Display step (skip in progress mode)
         # Pass native_mode=True when in --native mode to show JS icon for non-native steps
-        summary = format_step_for_display(step_dict, actual_index + 1, step_timestamp, reserve_suffix_width=5, native_mode=native) if not progress else ""
+        summary = format_step_for_display(step_dict, actual_index + 1, step_timestamp, reserve_suffix_width=5, native_mode=native, show_milliseconds=show_milliseconds) if not progress else ""
 
         if dry_run:
             click.echo(summary)
@@ -3432,7 +3460,7 @@ def replay(
 
         if step_mode == "skip":
             # Unconditional skip - mode: skip takes precedence over skip_if
-            skipped_summary = format_skipped_step_for_display(step_dict, actual_index + 1, step_timestamp)
+            skipped_summary = format_skipped_step_for_display(step_dict, actual_index + 1, step_timestamp, show_milliseconds=show_milliseconds)
             if not progress:
                 click.echo(skipped_summary)
             result.add_skip(actual_index, step_dict, "mode: skip")
@@ -3443,7 +3471,7 @@ def replay(
             # Pause mode - wait for user to press Enter (but not in interactive mode)
             # Show the paused step indicator
             if not progress:
-                paused_summary = format_paused_step_for_display(step_dict, actual_index + 1, step_timestamp)
+                paused_summary = format_paused_step_for_display(step_dict, actual_index + 1, step_timestamp, show_milliseconds=show_milliseconds)
                 click.echo(paused_summary)
 
             # Display pause prompt and wait for Enter
@@ -3658,26 +3686,29 @@ def replay(
                 # Side-effect scroll: show dimmed icon (with platform icon in native mode)
                 summary = format_step_for_display(
                     step_dict, actual_index + 1, step_timestamp,
-                    reserve_suffix_width=12, native_mode=native_mode, dimmed_icon=True
+                    reserve_suffix_width=12, native_mode=native_mode, dimmed_icon=True,
+                    show_milliseconds=show_milliseconds
                 )
             elif is_merged_action:
                 # Merged action: show dimmed platform icon
                 summary = format_step_for_display(
                     step_dict, actual_index + 1, step_timestamp,
-                    reserve_suffix_width=12, is_native=True, native_mode=True, dimmed_icon=True
+                    reserve_suffix_width=12, is_native=True, native_mode=True, dimmed_icon=True,
+                    show_milliseconds=show_milliseconds
                 )
             elif is_native_action:
                 # Normal native action: show yellow platform icon
                 summary = format_step_for_display(
                     step_dict, actual_index + 1, step_timestamp,
-                    reserve_suffix_width=5, is_native=True, native_mode=True
+                    reserve_suffix_width=5, is_native=True, native_mode=True,
+                    show_milliseconds=show_milliseconds
                 )
             click.echo(summary, nl=False)
 
         # Handle merged actions early (before audio and execution)
         if is_merged_action:
             if verbose and not progress:
-                click.echo(format_system_message(f"merged {step.action} (keypress already triggered)"))
+                click.echo(format_system_message(f"merged {step.action} (keypress already triggered)", show_milliseconds=show_milliseconds))
             if not progress:
                 click.echo(format_status("MERGED"))
             result.add_success(actual_index, step_dict)

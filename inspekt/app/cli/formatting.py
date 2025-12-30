@@ -75,6 +75,37 @@ def sanitize_display_name(text: str, max_length: int = 25) -> str:
     return text[:max_length] if len(text) > max_length else text
 
 
+def unescape_css_selector(selector: str) -> str:
+    r"""Unescape CSS selector escape sequences for display.
+
+    CSS.escape() in JavaScript escapes special characters with backslashes:
+    - Spaces become backslash-space: `Open\ deze`
+    - Colons, dots, etc.: `\:`, `\.`
+
+    This function reverses those escapes for human-readable display.
+    """
+    if not selector:
+        return selector
+
+    # Pattern matches backslash followed by any character
+    # CSS escape: \X where X is any character (including space)
+    return re.sub(r'\\(.)', r'\1', selector)
+
+
+def format_selector_display(selector: str, max_length: int = 35) -> str:
+    """Format a CSS selector for display: unescape and truncate.
+
+    Args:
+        selector: Raw CSS selector (may contain escape sequences)
+        max_length: Maximum display length (default: 35)
+
+    Returns:
+        Human-readable, truncated selector
+    """
+    unescaped = unescape_css_selector(selector)
+    return unescaped[:max_length] if len(unescaped) > max_length else unescaped
+
+
 def style_primary_key(key: str) -> str:
     """Style a keyboard key for primary actions (e.g., Ctrl+C to stop).
 
@@ -121,15 +152,30 @@ def truncate_to_width(text: str, max_width: int, suffix: str = "…") -> str:
     return text[:cut_index] + click.style(suffix, fg="bright_black")
 
 
-def format_elapsed(ms: int) -> str:
-    """Format milliseconds as MM:SS or HH:MM:SS."""
+def format_elapsed(ms: int, show_milliseconds: bool = True, use_color: bool = True) -> str:
+    """Format milliseconds as MM:SS or MM:SS.mmm.
+
+    Args:
+        ms: Elapsed time in milliseconds
+        show_milliseconds: Whether to show .mmm suffix (default: True)
+        use_color: Whether to style milliseconds in dark gray (default: True)
+
+    Returns:
+        Formatted time string, e.g. "01:23" or "01:23.456"
+    """
     total_seconds = ms // 1000
-    hours = total_seconds // 3600
-    minutes = (total_seconds % 3600) // 60
+    millis = ms % 1000
+    minutes = total_seconds // 60
     seconds = total_seconds % 60
-    if hours > 0:
-        return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
-    return f"{minutes:02d}:{seconds:02d}"
+
+    base = f"{minutes:02d}:{seconds:02d}"
+
+    if show_milliseconds:
+        ms_str = f".{millis:03d}"
+        if use_color:
+            return base + click.style(ms_str, fg="bright_black")
+        return base + ms_str
+    return base
 
 
 def format_duration(ms: int) -> str:
@@ -160,25 +206,30 @@ def get_recordings_dir() -> Path:
     return recordings_dir
 
 
-def format_step_header(use_color: bool = True, indent: bool = False) -> str:
+def format_step_header(use_color: bool = True, indent: bool = False, show_milliseconds: bool = True) -> str:
     """Format the header row for step display.
 
     Args:
         use_color: Whether to use ANSI colors
         indent: Whether to include 2-space indent
+        show_milliseconds: Whether to account for milliseconds column width (default: True)
 
     Returns:
-        Formatted header string with columns: STEP, TIME, COMMAND, DETAILS
+        Formatted header string with columns: STEP, START, COMMAND, DETAILS
     """
     import shutil
 
     # Header aligned to match step format:
-    # "{indent}{0001}   {00:00}   {icon action      }   details"
-    #          4ch     5ch       ~13ch (icon+sp+10ch)  3sp
-    # Columns: step(4) + gap(3) + time(5) + gap(3) + action(~13) + gap(3) + details
-    # Header:  STEP(4) + gap(3) + TIME(4) + gap(4) + COMMAND(7) + gap(9) + DETAILS
+    # Without milliseconds: "{indent}{0001}   {00:00}   {icon action      }   details"
+    # With milliseconds:    "{indent}{0001}   {00:00.000}   {icon action      }   details"
+    #                                4ch     5ch/9ch       ~13ch (icon+sp+10ch)  3sp
     prefix = "  " if indent else ""
-    header = f"{prefix}STEP   TIME    COMMAND         DETAILS"
+    if show_milliseconds:
+        # START column: 9 chars (00:00.000), header padded to match
+        header = f"{prefix}STEP   START        COMMAND          DETAILS"
+    else:
+        # START column: 5 chars (00:00)
+        header = f"{prefix}STEP   START   COMMAND          DETAILS"
 
     if use_color:
         # Pad to terminal width for full-width background
@@ -201,10 +252,11 @@ def format_step_for_display(
     is_native: bool = False,
     native_mode: bool = False,
     dimmed_icon: bool = False,
+    show_milliseconds: bool = True,
 ) -> str:
     """Format a step for terminal display with colors.
 
-    Format: 0001   00:00   󰖟  navigate   details…
+    Format: 0001   00:00.000   󰖟  navigate   details…
 
     Args:
         step: Step dictionary with action, target, etc.
@@ -216,6 +268,7 @@ def format_step_for_display(
         is_native: Whether this action was executed natively (shows platform icon in yellow)
         native_mode: Whether we're in --native replay mode (shows JS icon for non-native steps)
         dimmed_icon: Whether to show platform/JS icon in dark gray (for skipped/merged steps)
+        show_milliseconds: Whether to show milliseconds in timestamp (default: True)
 
     Returns:
         Formatted string, truncated to fit terminal width
@@ -236,7 +289,7 @@ def format_step_for_display(
 
     # Format components (4 digits for step number, 3 spaces between columns)
     step_num_str = f"{step_num:04d}"
-    elapsed = format_elapsed(elapsed_ms)
+    elapsed = format_elapsed(elapsed_ms, show_milliseconds=show_milliseconds, use_color=use_color)
     action_str = action.ljust(12)
 
     # For 'set' action, show "set <type>" like "set time", "set date", etc.
@@ -346,20 +399,21 @@ def format_step_for_display(
 
     elif action in ("click", "rightclick", "activate"):
         name = accessible_name or sanitize_display_name(target.get("text", "") if target else "")
-        sel_display = selector[:35] if len(selector) > 35 else selector
+        sel_display = format_selector_display(selector)
         tag_display = click.style(f" ({tag})", fg="bright_black") if tag and use_color else (f" ({tag})" if tag else "")
         # Use bright_green for activate to distinguish from mouse click
         name_color = "bright_green" if action == "activate" else "green"
         name_display = click.style(f'"{name}"', fg=name_color) if name and use_color else (f'"{name}"' if name else "")
         if name:
-            result = f"{prefix}   {sel_display} {name_display}{tag_display}"
+            # When we have an accessible name, skip the selector (it's redundant)
+            result = f"{prefix}   {name_display}{tag_display}"
         else:
             result = f"{prefix}   {sel_display}{tag_display}"
         return truncate_to_width(result, term_width)
 
     elif action == "type":
         value = step.get("value", "")
-        sel_display = selector[:35] if len(selector) > 35 else selector
+        sel_display = format_selector_display(selector)
         # Get input type if available
         input_type = target.get("attributes", {}).get("type", "") if target else ""
         type_display = click.style(f" [{input_type}]", fg="bright_black") if input_type and input_type != "text" and use_color else (f" [{input_type}]" if input_type and input_type != "text" else "")
@@ -375,7 +429,7 @@ def format_step_for_display(
     elif action == "set":
         # Native control value set (range, date, time, number, color, etc.)
         value = step.get("value", "")
-        sel_display = selector[:35] if len(selector) > 35 else selector
+        sel_display = format_selector_display(selector)
         value_display = click.style(f"({value})", fg="yellow") if use_color else f"({value})"
         result = f"{prefix}   {sel_display} {value_display}"
         return truncate_to_width(result, term_width)
@@ -427,11 +481,12 @@ def format_step_for_display(
 
     elif action == "hover":
         name = accessible_name or sanitize_display_name(target.get("text", "") if target else "")
-        sel_display = selector[:35] if len(selector) > 35 else selector
+        sel_display = format_selector_display(selector)
         tag_display = click.style(f" ({tag})", fg="bright_black") if tag and use_color else (f" ({tag})" if tag else "")
         name_display = click.style(f'"{name}"', fg="white") if name and use_color else (f'"{name}"' if name else "")
         if name:
-            result = f"{prefix}   {sel_display} {name_display}{tag_display}"
+            # When we have an accessible name, skip the selector (it's redundant)
+            result = f"{prefix}   {name_display}{tag_display}"
         else:
             result = f"{prefix}   {sel_display}{tag_display}"
         return truncate_to_width(result, term_width)
@@ -439,7 +494,7 @@ def format_step_for_display(
     elif action == "check":
         # Checkbox or radio button checked
         name = accessible_name or sanitize_display_name(target.get("text", "") if target else "")
-        sel_display = selector[:35] if len(selector) > 35 else selector
+        sel_display = format_selector_display(selector)
         value = step.get("value", "")
         # Show value if available (for radio buttons especially)
         value_display = click.style(f'"{value}"', fg="green") if value and use_color else (f'"{value}"' if value else "")
@@ -447,7 +502,8 @@ def format_step_for_display(
         # Prefer value over name for radio buttons
         display = value_display if value else name_display
         if display:
-            result = f"{prefix}   {sel_display} {display}"
+            # When we have a display name, skip the selector (it's redundant)
+            result = f"{prefix}   {display}"
         else:
             result = f"{prefix}   {sel_display}"
         return truncate_to_width(result, term_width)
@@ -455,10 +511,11 @@ def format_step_for_display(
     elif action == "uncheck":
         # Checkbox unchecked
         name = accessible_name or sanitize_display_name(target.get("text", "") if target else "")
-        sel_display = selector[:35] if len(selector) > 35 else selector
+        sel_display = format_selector_display(selector)
         name_display = click.style(f'"{name}"', fg="red") if name and use_color else (f'"{name}"' if name else "")
         if name:
-            result = f"{prefix}   {sel_display} {name_display}"
+            # When we have an accessible name, skip the selector (it's redundant)
+            result = f"{prefix}   {name_display}"
         else:
             result = f"{prefix}   {sel_display}"
         return truncate_to_width(result, term_width)
@@ -466,7 +523,7 @@ def format_step_for_display(
     elif action == "radio":
         # Radio button selected
         name = accessible_name or sanitize_display_name(target.get("text", "") if target else "")
-        sel_display = selector[:35] if len(selector) > 35 else selector
+        sel_display = format_selector_display(selector)
         value = step.get("value", "")
         # Show value for radio buttons (more meaningful than label)
         value_display = click.style(f'"{value}"', fg="green") if value and use_color else (f'"{value}"' if value else "")
@@ -474,14 +531,15 @@ def format_step_for_display(
         # Prefer value over name for radio buttons
         display = value_display if value else name_display
         if display:
-            result = f"{prefix}   {sel_display} {display}"
+            # When we have a display name, skip the selector (it's redundant)
+            result = f"{prefix}   {display}"
         else:
             result = f"{prefix}   {sel_display}"
         return truncate_to_width(result, term_width)
 
     elif action == "select":
         # Dropdown/select element
-        sel_display = selector[:35] if len(selector) > 35 else selector
+        sel_display = format_selector_display(selector)
         option_text = step.get("option_text", "")
         value = step.get("value", "")
         # Prefer showing option text over raw value
@@ -566,11 +624,11 @@ def format_step_for_display(
 
         if use_color:
             symbol_display = click.style(symbol, fg="magenta", bold=True)
-            sel_display = click.style(truncate_text(selector, 30), fg="white")
+            sel_display = click.style(format_selector_display(selector, 30), fg="white")
             state_styled = click.style(f"({state_display})", fg="bright_black")
             result = f"{prefix}   {symbol_display} {sel_display} {state_styled}"
         else:
-            result = f"{prefix}   {symbol} {truncate_text(selector, 30)} ({state_display})"
+            result = f"{prefix}   {symbol} {format_selector_display(selector, 30)} ({state_display})"
         return truncate_to_width(result, term_width)
 
     elif action == "jsdialog":
@@ -629,11 +687,11 @@ def format_step_for_display(
             file_desc = f"{len(files)} files ({size_str} total)"
 
         if use_color:
-            sel_display = click.style(truncate_text(selector, 20), fg="white")
+            sel_display = click.style(format_selector_display(selector, 20), fg="white")
             file_display = click.style(file_desc, fg="bright_black")
             result = f"{prefix}   {sel_display} {file_display}"
         else:
-            result = f"{prefix}   {truncate_text(selector, 20)} {file_desc}"
+            result = f"{prefix}   {format_selector_display(selector, 20)} {file_desc}"
         return truncate_to_width(result, term_width)
 
     elif action == "download":
@@ -671,10 +729,11 @@ def format_skipped_step_for_display(
     elapsed_ms: int = 0,
     use_color: bool = True,
     indent: bool = False,
+    show_milliseconds: bool = True,
 ) -> str:
     """Format a skipped step for terminal display with dimmed style.
 
-    Format: 0003   00:02   󰓓  skip       "Accept" button (skipped)
+    Format: 0003   00:02.000   󰓓  skip       "Accept" button (skipped)
 
     Args:
         step: Step dictionary with action, target, etc.
@@ -682,6 +741,7 @@ def format_skipped_step_for_display(
         elapsed_ms: Elapsed time in milliseconds
         use_color: Whether to use ANSI colors
         indent: Whether to include 2-space indent
+        show_milliseconds: Whether to show milliseconds in timestamp (default: True)
 
     Returns:
         Formatted string in dimmed style indicating the step was skipped
@@ -701,7 +761,8 @@ def format_skipped_step_for_display(
 
     # Format components
     step_num_str = f"{step_num:04d}"
-    elapsed = format_elapsed(elapsed_ms)
+    # For skipped steps, get plain elapsed (no color) since we apply dimming to entire line
+    elapsed = format_elapsed(elapsed_ms, show_milliseconds=show_milliseconds, use_color=False)
 
     # Get skip icon
     skip_icon = get_step_mode_icon("skip") if use_color else None
@@ -776,10 +837,11 @@ def format_paused_step_for_display(
     elapsed_ms: int = 0,
     use_color: bool = True,
     indent: bool = False,
+    show_milliseconds: bool = True,
 ) -> str:
     """Format a paused step indicator for terminal display.
 
-    Format: 0003   00:02   ⏸  pause      "Submit" button
+    Format: 0003   00:02.000   ⏸  pause      "Submit" button
 
     Args:
         step: Step dictionary with action, target, etc.
@@ -787,6 +849,7 @@ def format_paused_step_for_display(
         elapsed_ms: Elapsed time in milliseconds
         use_color: Whether to use ANSI colors
         indent: Whether to include 2-space indent
+        show_milliseconds: Whether to show milliseconds in timestamp (default: True)
 
     Returns:
         Formatted string showing the step is paused (before execution)
@@ -806,7 +869,8 @@ def format_paused_step_for_display(
 
     # Format components
     step_num_str = f"{step_num:04d}"
-    elapsed = format_elapsed(elapsed_ms)
+    # For paused steps, get plain elapsed (no color) since we apply custom styling
+    elapsed = format_elapsed(elapsed_ms, show_milliseconds=show_milliseconds, use_color=False)
 
     # Get pause icon
     pause_icon = get_step_mode_icon("pause") if use_color else None
@@ -878,8 +942,9 @@ def format_system_message(
     icon: str | None = None,
     elapsed_ms: int | None = None,
     truncate: bool = True,
+    show_milliseconds: bool = True,
 ) -> str:
-    """Format a system message with ----   xx:xx prefix to align with step output.
+    """Format a system message with ----   xx:xx[.xxx] prefix to align with step output.
 
     Aligns with COMMAND column (3 spaces after time, then icon or placeholder, then message).
 
@@ -890,6 +955,7 @@ def format_system_message(
         elapsed_ms: Optional elapsed time in milliseconds (shows actual time instead of --:--)
         truncate: Whether to truncate long messages to terminal width (default True).
                   Set to False for important messages like file paths that shouldn't be cut off.
+        show_milliseconds: Whether to show milliseconds in timestamps (default: True)
     """
     from inspekt.app.cli.icons import get_indicator
 
@@ -897,9 +963,13 @@ def format_system_message(
 
     # Format time: either actual elapsed or placeholder
     if elapsed_ms is not None:
-        time_str = format_elapsed(elapsed_ms)
+        time_str = format_elapsed(elapsed_ms, show_milliseconds=show_milliseconds, use_color=use_color)
     else:
-        time_str = "--:--"
+        # Placeholder: --:-- or --:--.--- depending on milliseconds setting
+        time_str = "--:--.---" if show_milliseconds else "--:--"
+        if use_color and show_milliseconds:
+            # Style the .--- part in dark gray to match format_elapsed styling
+            time_str = "--:--" + click.style(".---", fg="bright_black")
 
     prefix = click.style(f"----   {time_str}", fg="bright_black") if use_color else f"----   {time_str}"
     msg = click.style(message, fg="bright_black", italic=True) if use_color else message
@@ -911,11 +981,11 @@ def format_system_message(
         if icon_glyph:
             icon_str = f"{icon_glyph}  "  # icon + 2 spaces after (like other actions)
 
-    # Format: prefix + 3 spaces (separator) + icon + 2 spaces + message
+    # Format: prefix + 3 spaces (separator) + icon/indent + message
     if icon_str:
         result = f"{prefix}   {icon_str}{msg}"  # 3 spaces before icon
     else:
-        result = f"{prefix}      {msg}"  # 6 spaces when no icon
+        result = f"{prefix}    {msg}"  # 4 spaces when no icon (3 + 1 indent)
 
     if truncate:
         return truncate_to_width(result, term_width)

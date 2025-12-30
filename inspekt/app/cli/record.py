@@ -1855,6 +1855,12 @@ def get_recording_metadata(filepath: Path) -> Optional[dict]:
     is_flag=True,
     help="Capture focus styles for pixel-perfect keyboard navigation replay (experimental)",
 )
+@click.option(
+    "--no-milliseconds",
+    is_flag=True,
+    default=False,
+    help="Hide milliseconds in timestamps (default: show milliseconds)",
+)
 @click.pass_context
 def record(
     ctx,
@@ -1882,6 +1888,7 @@ def record(
     force: bool,
     target_viewport: Optional[str],
     faithful: bool,
+    no_milliseconds: bool,
 ):
     """
     Record browser interactions to a YAML file.
@@ -1959,6 +1966,12 @@ def record(
                 f"Invalid viewport dimensions: {vp_width}×{vp_height}. "
                 f"Width and height must be positive integers."
             )
+
+    # Determine whether to show milliseconds in timestamps
+    # CLI flag takes precedence over config setting
+    from inspekt.config import load_config
+    config_data = load_config()
+    show_milliseconds = not no_milliseconds and config_data.get("show-milliseconds", True)
 
     # Original recording logic follows
     client = BridgeClient()
@@ -3131,8 +3144,9 @@ def record(
 
             if inactive_seconds >= INACTIVITY_STOP_SECONDS:
                 # Auto-stop due to inactivity - custom format with stop icon
+                # Note: Inactivity messages show seconds only (no milliseconds)
                 elapsed_ms = int((datetime.now(timezone.utc) - start_time).total_seconds() * 1000)
-                elapsed_str = format_elapsed(elapsed_ms)
+                elapsed_str = format_elapsed(elapsed_ms, show_milliseconds=False)
                 prefix = click.style(f"----   {elapsed_str}", fg="bright_black")
                 stop_icon = get_indicator("stop") or ""
                 icon_str = f"{stop_icon} " if stop_icon else ""
@@ -3145,8 +3159,9 @@ def record(
 
             if inactive_seconds >= INACTIVITY_WARNING_SECONDS and not inactivity_warning_shown:
                 # Custom format with hourglass icon, timestamp, and ellipsis
+                # Note: Inactivity messages show seconds only (no milliseconds)
                 elapsed_ms = int((datetime.now(timezone.utc) - start_time).total_seconds() * 1000)
-                elapsed_str = format_elapsed(elapsed_ms)
+                elapsed_str = format_elapsed(elapsed_ms, show_milliseconds=False)
                 prefix = click.style(f"----   {elapsed_str}", fg="bright_black")
                 hourglass = "\uf252"  # nf-fa-hourglass_end
                 msg = click.style("No activity for 30 seconds. Recording will stop in 30 seconds…", fg="bright_black", italic=True)
@@ -3255,7 +3270,7 @@ def record(
                             pause_start_time = time.time()
                             # Show pause message with timestamp
                             elapsed_ms = int((datetime.now(timezone.utc) - start_time).total_seconds() * 1000)
-                            elapsed_str = format_elapsed(elapsed_ms)
+                            elapsed_str = format_elapsed(elapsed_ms, show_milliseconds=show_milliseconds)
                             prefix = click.style(f"----   {elapsed_str}", fg="bright_black")
                             pause_icon = get_indicator("pause") or ""
                             icon_str = f"{pause_icon}  " if pause_icon else ""
@@ -3264,7 +3279,7 @@ def record(
                         else:
                             # Calculate pause duration and elapsed time
                             elapsed_ms = int((datetime.now(timezone.utc) - start_time).total_seconds() * 1000)
-                            elapsed_str = format_elapsed(elapsed_ms)
+                            elapsed_str = format_elapsed(elapsed_ms, show_milliseconds=show_milliseconds)
                             pause_duration_sec = int(time.time() - pause_start_time) if pause_start_time else 0
                             pause_start_time = None
                             # Format: "0001   00:56   󰐊  Recording resumed after 45 seconds"
@@ -3285,7 +3300,7 @@ def record(
                     if response.get("undoRequested"):
                         # Calculate elapsed time for timestamp
                         elapsed_ms = int((datetime.now(timezone.utc) - start_time).total_seconds() * 1000)
-                        elapsed_str = format_elapsed(elapsed_ms)
+                        elapsed_str = format_elapsed(elapsed_ms, show_milliseconds=show_milliseconds)
                         if all_steps:
                             undone_step = all_steps.pop()
                             undo_stack.append(undone_step)
@@ -3320,7 +3335,7 @@ def record(
                     if response.get("redoRequested"):
                         # Calculate elapsed time for timestamp
                         elapsed_ms = int((datetime.now(timezone.utc) - start_time).total_seconds() * 1000)
-                        elapsed_str = format_elapsed(elapsed_ms)
+                        elapsed_str = format_elapsed(elapsed_ms, show_milliseconds=show_milliseconds)
                         if undo_stack:
                             redone_step = undo_stack.pop()
                             all_steps.append(redone_step)
@@ -3374,7 +3389,7 @@ def record(
 
                             # Display navigation (no indent during recording)
                             nav_event = {"action": "navigate", "url": new_url}
-                            display = format_step_for_display(nav_event, step_count, elapsed_ms, indent=False)
+                            display = format_step_for_display(nav_event, step_count, elapsed_ms, indent=False, show_milliseconds=show_milliseconds)
                             click.echo(display)
 
                             last_known_url = new_url
@@ -3464,7 +3479,7 @@ def record(
 
                         # Display table header before first step
                         if not header_shown:
-                            click.echo(format_step_header(indent=False))
+                            click.echo(format_step_header(indent=False, show_milliseconds=show_milliseconds))
                             header_shown = True
 
                         # For upload events, strip the content field before displaying
@@ -3503,7 +3518,7 @@ def record(
                                     }
 
                         # Display real-time feedback with step number and elapsed time (no indent during recording)
-                        display = format_step_for_display(display_event, step_count, elapsed_ms, indent=False)
+                        display = format_step_for_display(display_event, step_count, elapsed_ms, indent=False, show_milliseconds=show_milliseconds)
                         click.echo(display)
 
                         # Show informational message for download duplicates/changes (after the step display)
@@ -4081,6 +4096,11 @@ def record_tutorial(speak: bool):
         click.echo(_style_with_inline_code("Error: Bridge server is not running. Start it with `inspekt start`.", base_fg="red"), err=True)
         sys.exit(1)
 
+    # Load config for milliseconds setting
+    from inspekt.config import load_config
+    config_data = load_config()
+    show_milliseconds = config_data.get("show-milliseconds", True)
+
     # Introduction
     click.echo()
     click.secho("  INSPEKT RECORD TUTORIAL", fg="cyan", bold=True)
@@ -4425,7 +4445,7 @@ def record_tutorial(speak: bool):
         step_data = sample_steps.get(action, {"action": action})
 
         # Format and display using the shared formatting function
-        display = format_step_for_display(step_data, step_num, elapsed_ms)
+        display = format_step_for_display(step_data, step_num, elapsed_ms, show_milliseconds=show_milliseconds)
         click.echo(display)
 
         # Get description for this action
