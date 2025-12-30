@@ -344,7 +344,7 @@ def _handle_missed_native_key(step, client, typing_speed: str, attempt: int = 1,
     click.echo("Press ", nl=False)
     click.secho(" Enter ", fg="black", bg="cyan", nl=False)
     click.echo(f" to refocus and try again (attempt {attempt}/{MAX_RETRIES})")
-    click.echo(f"Press {style_secondary_key('Ctrl+C')} ", nl=False)
+    click.echo(f"      {style_secondary_key('Ctrl+C')} ", nl=False)
     click.secho("twice", bold=True, nl=False)
     click.echo(" to stop the replay")
     click.echo()

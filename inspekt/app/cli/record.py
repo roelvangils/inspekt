@@ -63,6 +63,7 @@ class SubcommandAwareGroup(click.Group):
     - `inspekt record tutorial` → runs tutorial subcommand
     - `inspekt record tutorial.yaml` → records to file tutorial.yaml
     - `inspekt record show file.yaml` → runs show subcommand with file.yaml arg
+    - `inspekt record test.yaml --replay` → records to test.yaml with --replay flag
     """
 
     def make_context(self, info_name, args, parent=None, **extra):
@@ -71,8 +72,14 @@ class SubcommandAwareGroup(click.Group):
 
         We check if the first non-option arg matches a subcommand. If so, we temporarily remove
         the filename parameter to prevent it from consuming the subcommand name.
+
+        Also handles options appearing after the filename by reordering arguments.
         """
-        # Find first non-option argument
+        # Convert args to a mutable list
+        args = list(args)
+
+        # Reorder arguments: move options appearing after a filename to before it
+        # This allows `inspekt record test.yaml --replay` to work like `inspekt record --replay test.yaml`
         first_positional_idx = None
         for i, arg in enumerate(args):
             if not arg.startswith('-'):
@@ -84,8 +91,41 @@ class SubcommandAwareGroup(click.Group):
             first_arg_lower = first_arg.lower()
             has_yaml_ext = first_arg_lower.endswith('.yaml') or first_arg_lower.endswith('.yml')
 
+            # If this looks like a filename (has .yaml/.yml extension), collect trailing options
+            # and move them before the filename so Click parses them as group options
+            if has_yaml_ext:
+                # Collect options and their values after the filename
+                trailing_options = []
+                remaining_args = []
+                i = first_positional_idx + 1
+                while i < len(args):
+                    arg = args[i]
+                    if arg.startswith('-'):
+                        trailing_options.append(arg)
+                        # Check if this option takes a value (next arg doesn't start with -)
+                        if i + 1 < len(args) and not args[i + 1].startswith('-'):
+                            # Could be an option value, but we need to be careful
+                            # For flags like --replay, there's no value
+                            # For options like -o/--output, there is a value
+                            # Check if this is a known option that takes a value
+                            if arg in ('-o', '--output', '-b', '--browser', '--wait', '--inactivity-timeout'):
+                                i += 1
+                                trailing_options.append(args[i])
+                    else:
+                        remaining_args.append(arg)
+                    i += 1
+
+                if trailing_options:
+                    # Rebuild args: options before filename, then filename, then remaining
+                    args = (
+                        args[:first_positional_idx] +  # Options before filename
+                        trailing_options +              # Trailing options moved here
+                        [first_arg] +                   # The filename
+                        remaining_args                  # Any remaining positional args
+                    )
+
             # If matches a subcommand and doesn't have yaml extension, skip filename param
-            if not has_yaml_ext and first_arg in self.commands:
+            elif first_arg in self.commands:
                 # Temporarily remove the 'filename' parameter so it doesn't consume this arg
                 original_params = self.params
                 self.params = [p for p in self.params if p.name != 'filename']
@@ -1165,15 +1205,28 @@ def tidy_recording(
     if not dry_run:
         # Build header
         metadata = data.get("metadata", {})
-        header = f"""# Inspekt Recording v{metadata.get('version', '1.1')}
-# Generated: {metadata.get('created_at', 'unknown')}
+        # Format date nicely (e.g., "December 30, 2025 at 11:06")
+        created_at = metadata.get('created_at', 'unknown')
+        if created_at != 'unknown':
+            try:
+                from datetime import datetime
+                dt = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+                formatted_date = dt.strftime("%B %d, %Y at %H:%M")
+            except Exception:
+                formatted_date = created_at
+        else:
+            formatted_date = created_at
+        header = f"""# Inspekt Recording (File format v{metadata.get('version', '1.1')})
+# Generated: {formatted_date}
 # Duration: {metadata.get('duration_ms', 0) / 1000:.1f}s
 # URL: {metadata.get('starting_url', 'unknown')}
 #
 # Edit this file to:
-# - Add 'expect:' assertions to steps
-# - Insert 'inspekt' command steps for accessibility checks
-# - Remove unwanted steps
+# * Add `expect:` assertions to steps
+# * Insert `inspekt` command steps for accessibility testing
+# * Remove (or comment out) unwanted steps
+# * Force native (OS-level) key presses with `native: true`
+# * Update metadata (located at the very end of the file)
 #
 # Example assertion:
 #   expect:
@@ -1531,15 +1584,19 @@ def save_recording_to_yaml(
 # be captured for Tab steps inside the dialog. Replay will still work correctly.
 """
 
-    header = f"""# Inspekt Recording v{recording.metadata.version}
-# Generated: {recording.metadata.created_at.isoformat()}
+    # Format date nicely (e.g., "December 30, 2025 at 11:06")
+    formatted_date = recording.metadata.created_at.strftime("%B %d, %Y at %H:%M")
+    header = f"""# Inspekt Recording (File format v{recording.metadata.version})
+# Generated: {formatted_date}
 # Duration: {recording.metadata.duration_ms / 1000:.1f}s
 # URL: {recording.metadata.starting_url}
 #{cookie_consent_note}
 # Edit this file to:
-# - Add 'expect:' assertions to steps
-# - Insert 'inspekt' command steps for accessibility checks
-# - Remove unwanted steps
+# * Add `expect:` assertions to steps
+# * Insert `inspekt` command steps for accessibility testing
+# * Remove (or comment out) unwanted steps
+# * Force native (OS-level) key presses with `native: true`
+# * Update metadata (located at the very end of the file)
 #
 # Example assertion:
 #   expect:
@@ -2653,12 +2710,14 @@ def record(
                 )
 
             # Build recording
+            from inspekt.services.image_metadata import get_username
             recording = Recording(
                 metadata=RecordingMetadata(
                     version="1.1",
                     created_at=start_time,
                     duration_ms=duration_ms,
                     starting_url=start_url,
+                    created_by=get_username(),
                     user_agent=user_agent or None,
                     recorded_on=recorded_on,
                     faithful=faithful,
@@ -2676,30 +2735,33 @@ def record(
             if is_failed_recording:
                 # Recording failed - likely due to leftover JS from previous recording
                 click.echo()
-                click.secho("Attention: ", fg="yellow", bold=True, nl=False)
-                click.echo("Recording failed. Only the initial page load was captured.")
-                click.echo()
-                click.echo("This usually happens when a previous recording's JavaScript")
-                click.echo("is still active on the page.")
+                click.secho("⚠ Recording failed", fg="yellow", bold=True)
+                click.echo("  This typically happens when the last recording was interrupted.")
                 click.echo()
 
                 if allow_retry:
-                    # Offer to refresh and retry
-                    if click.confirm("Refresh the page and try again?", default=True):
+                    # Show Enter/Ctrl+C options with styled keys
+                    enter_key = style_primary_key("Enter")
+                    ctrl_c_key = style_secondary_key("Ctrl+C")
+                    click.echo(f"  Press {enter_key} to try again (Inspekt will refresh the page for you)")
+                    click.echo(f"        {ctrl_c_key} to cancel and discard\n")
+
+                    try:
+                        # Wait for Enter (Ctrl+C will raise KeyboardInterrupt)
+                        click.pause(info="")
                         # Refresh the page
-                        try:
-                            click.echo("Refreshing page… " + success_icon(""))
-                            client.execute("location.reload()", timeout=5.0, browser_index=recording_browser_index)
-                            time.sleep(1.5)  # Wait for page reload
-                            # Re-focus the browser so user can continue interacting
-                            _focus_browser_if_requested(focus=True, silent=True)
-                            return "retry"  # Signal to retry
-                        except Exception as e:
-                            click.echo(f"Error refreshing page: {e}", err=True)
-                            sys.exit(1)
-                    else:
-                        click.echo("Recording discarded.")
+                        click.echo("Refreshing page… " + success_icon(""))
+                        client.execute("location.reload()", timeout=5.0, browser_index=recording_browser_index)
+                        time.sleep(1.5)  # Wait for page reload
+                        # Re-focus the browser so user can continue interacting
+                        _focus_browser_if_requested(focus=True, silent=True)
+                        return "retry"  # Signal to retry
+                    except KeyboardInterrupt:
+                        click.echo("\nRecording discarded.")
                         sys.exit(0)
+                    except Exception as e:
+                        click.echo(f"Error refreshing page: {e}", err=True)
+                        sys.exit(1)
                 else:
                     # No retry for inactivity timeout
                     click.echo("Recording discarded.")
@@ -2770,7 +2832,7 @@ def record(
                 elif should_open:
                     click.echo(f"\nOpening file…")
                 elif replay:
-                    click.echo(f"\nStarting verification replay…")
+                    click.echo(f"\nVerifying recording… " + success_icon(""))
                 else:
                     click.echo(f"\nWhat you can do next:")
                     click.echo(f" - Edit:   inspekt record edit {output_path.name}")
@@ -2804,7 +2866,7 @@ def record(
                 replay_client = BridgeClient()
 
                 # Refresh the page before replay to reset state (focus, scroll position, etc.)
-                click.echo("Refreshing page before replay…")
+                click.echo("Refreshing page before replay… ", nl=False)
                 try:
                     replay_client.execute("location.reload()", timeout=5.0)
                     # Wait for page to start reloading
@@ -2815,7 +2877,9 @@ def record(
                         if result.get("ok") and result.get("result") == "complete":
                             break
                         time.sleep(0.5)
+                    click.echo(success_icon(""))
                 except Exception:
+                    click.echo("")  # Finish the line
                     pass  # Continue anyway
 
                 # Inject audio for countdown sounds
@@ -3019,8 +3083,8 @@ def record(
                     inactivity_warning_shown = False
                     start_time = datetime.now(timezone.utc)
 
-                    # Re-inject recording script
-                    retry_result = client.execute(start_code, timeout=10.0)
+                    # Re-inject recording script (must target the same browser tab)
+                    retry_result = client.execute(start_code, timeout=10.0, browser_index=recording_browser_index)
                     if not retry_result.get("ok"):
                         click.echo(f"Error restarting recording: {retry_result.get('error')}", err=True)
                         sys.exit(1)
@@ -3136,8 +3200,8 @@ def record(
                             inactivity_warning_shown = False
                             start_time = datetime.now(timezone.utc)
 
-                            # Re-inject recording script
-                            retry_result = client.execute(start_code, timeout=10.0)
+                            # Re-inject recording script (must target the same browser tab)
+                            retry_result = client.execute(start_code, timeout=10.0, browser_index=recording_browser_index)
                             if not retry_result.get("ok"):
                                 click.echo(f"Error restarting recording: {retry_result.get('error')}", err=True)
                                 sys.exit(1)
@@ -3156,6 +3220,9 @@ def record(
                                     time.sleep(0.4)
                                 except Exception:
                                     pass
+
+                            # Re-enable terminal echo suppression for new recording
+                            terminal_suppressor.suppress()
 
                             continue  # Continue polling loop
                         break

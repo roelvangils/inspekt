@@ -99,8 +99,10 @@ class RecordingMetadata(BaseModel):
     created_at: datetime
     duration_ms: int
     starting_url: str
+    created_by: Optional[str] = None
     user_agent: Optional[str] = None
     recorded_on: Optional[RecordedOn] = None
+    faithful: bool = False  # True if focus_styles were captured (experimental)
 
 
 class TargetInfo(BaseModel):
@@ -294,6 +296,10 @@ class RecordingStep(BaseModel):
 
     # Step execution mode (continue=default, skip, pause)
     mode: Optional[StepMode] = None
+
+    # Native keyboard mode override (per-step)
+    # True = force native (AppleScript), False = force CDP, None = use global --native flag
+    native: Optional[bool] = None
 
 
 class Recording(BaseModel):
