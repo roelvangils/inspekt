@@ -3536,19 +3536,19 @@ def replay(
                 recent_ts = recent_step.timestamp or 0
                 time_delta = abs(step_ts - recent_ts)
 
-                # Case 1: Tab/Shift+Tab followed by scroll within 500ms
+                # Case 1: Tab/Shift+Tab followed by scroll within 300ms
                 if (recent_step.action == "keypress" and
                     recent_step.key and
                     recent_step.key.lower() == "tab" and
-                    time_delta <= 500):
+                    time_delta <= 300):
                     is_side_effect_scroll = True
                     break
 
-                # Case 2: Click on anchor link followed by scroll within 500ms
+                # Case 2: Click on anchor link followed by scroll within 300ms
                 if (recent_step.action == "click" and
                     recent_step.target and
                     recent_step.target.tag == "a" and
-                    time_delta <= 500):
+                    time_delta <= 300):
                     is_side_effect_scroll = True
                     break
 
