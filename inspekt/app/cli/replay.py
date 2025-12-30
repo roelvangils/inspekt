@@ -3519,9 +3519,37 @@ def replay(
                 and timestamps_match
             )
 
+        # Detect side-effect scroll (scroll triggered by Tab or anchor click)
+        # These scrolls are browser-initiated (scrollIntoView) and shouldn't be replayed
+        is_side_effect_scroll = False
+        if step.action == "scroll" and previous_step:
+            prev_ts = previous_step.timestamp or 0
+            step_ts = step.timestamp or 0
+            time_delta = abs(step_ts - prev_ts)
+
+            # Case 1: Tab/Shift+Tab followed by scroll within 500ms
+            if (previous_step.action == "keypress" and
+                previous_step.key and
+                previous_step.key.lower() == "tab" and
+                time_delta <= 500):
+                is_side_effect_scroll = True
+
+            # Case 2: Click on anchor link followed by scroll within 500ms
+            if (previous_step.action == "click" and
+                previous_step.target and
+                previous_step.target.tag == "a" and
+                time_delta <= 500):
+                is_side_effect_scroll = True
+
         if not progress:
             # Format step with appropriate icon styling
-            if is_merged_action:
+            if is_side_effect_scroll:
+                # Side-effect scroll: show dimmed scroll icon
+                summary = format_step_for_display(
+                    step_dict, actual_index + 1, step_timestamp,
+                    reserve_suffix_width=12, dimmed_icon=True
+                )
+            elif is_merged_action:
                 # Merged action: show dimmed platform icon
                 summary = format_step_for_display(
                     step_dict, actual_index + 1, step_timestamp,
@@ -3539,6 +3567,16 @@ def replay(
         if is_merged_action:
             if verbose and not progress:
                 click.echo(format_system_message(f"merged {step.action} (keypress already triggered)"))
+            if not progress:
+                click.echo(format_status("MERGED"))
+            result.add_success(actual_index, step_dict)
+            previous_step = step
+            continue
+
+        # Handle side-effect scrolls (skip execution, the primary action triggers scroll naturally)
+        if is_side_effect_scroll:
+            if verbose and not progress:
+                click.echo(format_system_message("auto-scroll from previous action"))
             if not progress:
                 click.echo(format_status("MERGED"))
             result.add_success(actual_index, step_dict)
