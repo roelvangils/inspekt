@@ -14,7 +14,7 @@ from typing import Optional
 import click
 import yaml
 
-from inspekt.app.cli.icons import success, error
+from inspekt.app.cli.icons import success, error, get_platform_icon
 from inspekt.client import BridgeClient
 from inspekt.config import get_audio_config, get_video_config
 from inspekt.domain.recording import Recording
@@ -32,6 +32,7 @@ from .formatting import (
     format_system_message,
     get_recordings_dir,
 )
+from .table import print_warning
 from .recording_utils import load_external_file_content
 from inspekt.app.cli.output import OutputHandler
 
@@ -3056,9 +3057,23 @@ def replay(
             # step_native is False means explicitly NOT native, so skip
 
         if native_action_count > 0:
-            click.secho("⚠ Keep the browser focused", fg="yellow")
-            click.secho(f"  This replay will simulate {native_action_count} native (OS-level) key", fg="bright_black")
-            click.secho("  presses. The browser must be focused for this.", fg="bright_black")
+            # Get platform icon and name for the message
+            platform_icon = get_platform_icon()
+            platform_system = platform.system()
+            platform_names = {"Darwin": "macOS", "Windows": "Windows", "Linux": "Linux"}
+            platform_name = platform_names.get(platform_system, platform_system)
+
+            # Fallback letters when nerdfonts are not available
+            if not platform_icon:
+                platform_fallbacks = {"Darwin": "M", "Windows": "W", "Linux": "L"}
+                platform_icon = platform_fallbacks.get(platform_system, "?")
+
+            print_warning(
+                f"Keep the browser focused! "
+                f"In this replay session, {native_action_count} native (OS-level) keyboard actions will be sent. "
+                f"To the browser, these actions are indistinguishable from real key presses. "
+                f"In the output below, they are represented by `{platform_icon}`, which corresponds to your platform ({platform_name})."
+            )
             click.echo()
 
         click.echo(format_step_header(show_milliseconds=show_milliseconds))
