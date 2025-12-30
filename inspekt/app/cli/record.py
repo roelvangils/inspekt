@@ -2303,6 +2303,10 @@ def record(
         client.execute(visual_script, timeout=10.0)
     except FileNotFoundError:
         pass  # Visual script is optional for recording
+    except Exception as e:
+        # Visual script is optional - if injection fails (connection timeout, etc.), continue without audio
+        debug_log(f"Visual script injection failed: {e}")
+        visual_script = None  # Prevent later attempts to play sounds
 
     # Configuration for the browser script
     # Generate a unique recording ID for IndexedDB persistence
@@ -2340,10 +2344,10 @@ def record(
             click.echo()
             click.secho("⚠ The recording could not be started", fg="yellow", bold=True, err=True)
             click.echo(err=True)
-            click.echo("  * Ensure that the latest version of the Inspekt extension is installed", err=True)
+            click.echo("  • Ensure that the latest version of the Inspekt extension is installed", err=True)
             click.echo("    and enabled in Firefox or Chrome.", err=True)
-            click.echo("  * Make sure that a JavaScript dialog is not blocking access to the page.", err=True)
-            click.echo("  * In some cases, you may need to disable CSP. You can do this by clicking", err=True)
+            click.echo("  • Make sure that a JavaScript dialog is not blocking access to the page.", err=True)
+            click.echo("  • In some cases, you may need to disable CSP. You can do this by clicking", err=True)
             click.echo("    the toggle in the Inspekt UI that appears when you click the icon in", err=True)
             click.echo("    your toolbar.", err=True)
             if error and error != "no_browser_connected":
@@ -2521,7 +2525,7 @@ def record(
         signal.signal(signal.SIGINT, stop_recording)
 
         # Cleanup function called from main loop when stop is requested
-        def do_cleanup(allow_retry: bool = True):
+        def do_cleanup(allow_retry: bool = True, silent: bool = False):
             nonlocal all_steps
 
             # Restore terminal settings first (so echo works for prompts/output)
@@ -2530,7 +2534,8 @@ def record(
             # In VM mode, show the terminal overlay again (recording is stopping)
             set_vm_terminal_hidden(False)
 
-            click.echo("\nStopping recording… " + success_icon(""))
+            if not silent:
+                click.echo("\nStopping recording… " + success_icon(""))
 
             # Play stop/completion sound (target the specific browser we're recording in)
             if visual_script:
@@ -2734,9 +2739,12 @@ def record(
 
             if is_failed_recording:
                 # Recording failed - likely due to leftover JS from previous recording
+                if silent:
+                    # Finish the "Stopping recording…" line with checkmark
+                    click.echo(success_icon(""))
                 click.echo()
                 click.secho("⚠ Recording failed", fg="yellow", bold=True)
-                click.echo("  This typically happens when the last recording was interrupted.")
+                click.echo("  This typically happens when the last recording session was interrupted or the current session was abandoned.")
                 click.echo()
 
                 if allow_retry:
@@ -2763,8 +2771,8 @@ def record(
                         click.echo(f"Error refreshing page: {e}", err=True)
                         sys.exit(1)
                 else:
-                    # No retry for inactivity timeout
-                    click.echo("Recording discarded.")
+                    # No retry for inactivity timeout - just exit silently
+                    # (the "Recording failed" message above is sufficient)
                     sys.exit(0)
 
             # Determine output path
@@ -2821,6 +2829,11 @@ def record(
                 # Count steps excluding hovers
                 non_hover_steps = sum(1 for s in all_steps if s.action != "hover")
 
+                # If silent mode (inactivity timeout), finish the "Stopping recording…" line
+                if silent:
+                    click.echo(success_icon(""))  # Checkmark + newline
+                    click.echo()  # Blank line before "Recording saved"
+
                 # Display simplified recording saved info
                 click.echo(f"Recording saved to {click.style(output_path.name, bold=True)} ({format_duration(duration_ms)}, {non_hover_steps} actions) " + success_icon(""))
 
@@ -2835,8 +2848,11 @@ def record(
                     click.echo(f"\nVerifying recording… " + success_icon(""))
                 else:
                     click.echo(f"\nWhat you can do next:")
-                    click.echo(f" - Edit:   inspekt record edit {output_path.name}")
-                    click.echo(f" - Replay: inspekt replay {output_path.name} --interactive")
+                    click.echo(f"  Edit with `inspekt record edit {output_path.name}`")
+                    click.echo(f"  Replay with `inspekt replay {output_path.name}`")
+                    click.echo()
+                    from inspekt.app.cli.table import print_hint
+                    print_hint("For more replay options, type `inspekt replay --help`")
             except Exception as e:
                 click.echo(f"Error saving recording: {e}", err=True)
                 sys.exit(1)
@@ -3119,11 +3135,12 @@ def record(
                 elapsed_str = format_elapsed(elapsed_ms)
                 prefix = click.style(f"----   {elapsed_str}", fg="bright_black")
                 stop_icon = get_indicator("stop") or ""
-                icon_str = f"{stop_icon}  " if stop_icon else ""
-                msg = click.style("No activity for 60 seconds. Recording stopped.", fg="bright_black", italic=True)
-                click.echo(f"{prefix}   {icon_str}{msg}")
+                icon_str = f"{stop_icon} " if stop_icon else ""
+                msg = click.style("No activity for 60 seconds. Stopping recording… ", fg="bright_black", italic=True)
+                click.echo(f"{prefix}   {icon_str}{msg}", nl=False)
                 # For inactivity timeout, don't offer retry - just discard if failed
-                do_cleanup(allow_retry=False)
+                # Note: do_cleanup handles the checkmark + blank line for silent mode
+                do_cleanup(allow_retry=False, silent=True)
                 break
 
             if inactive_seconds >= INACTIVITY_WARNING_SECONDS and not inactivity_warning_shown:

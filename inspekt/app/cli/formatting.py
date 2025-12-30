@@ -299,6 +299,10 @@ def format_step_for_display(
         }
         action_color = action_colors.get(action, "white")
 
+        # When dimmed, use gray for the entire action (icon + text)
+        if dimmed_icon:
+            action_color = "bright_black"
+
         # Add icon before action if available
         # In native mode: show platform icon (yellow) for native steps, JS icon for non-native steps
         # When dimmed_icon=True, show icons in dark gray (for skipped/merged steps)
