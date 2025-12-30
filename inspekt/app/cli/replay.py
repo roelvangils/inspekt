@@ -931,12 +931,12 @@ def wait_for_reconnection(
     return False
 
 
-def _interruptible_wait(seconds: float, action_name: str, elapsed_ms: int = 0) -> bool:
+def _interruptible_wait(seconds: float, action_name: str, elapsed_ms: int = 0, show_milliseconds: bool = True) -> bool:
     """
     Wait with live countdown, skippable by Enter.
 
     Shows a message matching the replay step format:
-        ----   00:53    Next action (keypress) is in X seconds. Wait or press  ENTER  to 󰈑 skip ahead…
+        ----   00:53.000   󰁪 Next action (keypress) is in X seconds. Wait or press  ENTER  to 󰈑 skip ahead…
 
     The countdown updates every second. User can press Enter to skip.
 
@@ -944,16 +944,24 @@ def _interruptible_wait(seconds: float, action_name: str, elapsed_ms: int = 0) -
         seconds: Total time to wait
         action_name: Name of the next action (e.g., "click", "keypress")
         elapsed_ms: Current elapsed time in milliseconds (for display)
+        show_milliseconds: Whether to show milliseconds in the timestamp (default: True)
 
     Returns:
         True if user skipped, False if waited full duration
     """
     import select
+    import shutil
     import sys
 
     hourglass_icon = "\uf251"  #  nf-fa-hourglass_half
     skip_icon = "\U000f0211"  # 󰈑 nf-md-skip_forward
     remaining = int(seconds)
+
+    # Get terminal width for proper line clearing
+    try:
+        term_width = shutil.get_terminal_size().columns
+    except Exception:
+        term_width = 120
 
     # Only show countdown for meaningful waits
     if remaining < 1:
@@ -961,10 +969,15 @@ def _interruptible_wait(seconds: float, action_name: str, elapsed_ms: int = 0) -
         return False
 
     while remaining > 0:
-        # Format elapsed time as MM:SS (updates each second)
+        # Format elapsed time as MM:SS or MM:SS.mmm (updates each second)
         current_elapsed = elapsed_ms + (int(seconds) - remaining) * 1000
         mins, secs = divmod(current_elapsed // 1000, 60)
-        elapsed_str = click.style(f"{mins:02d}:{secs:02d}", fg="bright_black")
+        millis = current_elapsed % 1000
+        if show_milliseconds:
+            # Style milliseconds in dark gray to match step output
+            elapsed_str = click.style(f"{mins:02d}:{secs:02d}", fg="bright_black") + click.style(f".{millis:03d}", fg="bright_black")
+        else:
+            elapsed_str = click.style(f"{mins:02d}:{secs:02d}", fg="bright_black")
 
         # Step number placeholder (dimmed dashes)
         step_placeholder = click.style("----", fg="bright_black")
@@ -986,7 +999,9 @@ def _interruptible_wait(seconds: float, action_name: str, elapsed_ms: int = 0) -
         try:
             if sys.stdin in select.select([sys.stdin], [], [], 1.0)[0]:
                 sys.stdin.readline()  # Consume the Enter
-                click.echo("\r" + " " * 120 + "\r", nl=False)  # Clear line
+                # Clear the entire line properly
+                click.echo("\r" + " " * term_width + "\r", nl=False)
+                sys.stdout.flush()
                 return True  # User skipped
         except (OSError, TypeError):
             # select doesn't work (e.g., Windows or not a TTY)
@@ -994,8 +1009,9 @@ def _interruptible_wait(seconds: float, action_name: str, elapsed_ms: int = 0) -
 
         remaining -= 1
 
-    # Clear the countdown line
-    click.echo("\r" + " " * 120 + "\r", nl=False)
+    # Clear the countdown line properly
+    click.echo("\r" + " " * term_width + "\r", nl=False)
+    sys.stdout.flush()
     return False  # Waited full duration
 
 
@@ -3388,7 +3404,7 @@ def replay(
                         delay_sec > skip_threshold_sec and
                         not progress and
                         sys.stdin.isatty()):
-                        _interruptible_wait(delay_sec, step.action or "action", step_timestamp)
+                        _interruptible_wait(delay_sec, step.action or "action", step_timestamp, show_milliseconds)
                     else:
                         time.sleep(delay_sec)
         page_load_wait_ms = 0  # Reset after applying
