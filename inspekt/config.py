@@ -128,10 +128,11 @@ DEFAULT_CONFIG: dict[str, Any] = {
         "format": "mp4",     # Output format (mp4 or webm)
     },
     "record": {
-        "max-actions-per-second": 10,  # Rate limit to prevent runaway recordings
+        "max-actions-per-second": 15,  # Rate limit to prevent runaway recordings
         "synthetic-dialogs": False,  # Use non-blocking HTML overlays instead of native dialogs
     },
     "nerdfont": False,  # Enable Nerdfont glyphs in terminal output
+    "show-milliseconds": True,  # Show milliseconds in record/replay timestamps
     "permissions": {
         "allow-local-files": True,  # Allow file:// URLs without adding to domain list
     },
@@ -789,18 +790,18 @@ def get_record_config() -> dict[str, Any]:
 
     Returns:
         Record configuration dictionary with validated values:
-        - max-actions-per-second: int (rate limit, minimum 1, default 10)
+        - max-actions-per-second: int (rate limit, minimum 1, default 15)
         - synthetic-dialogs: bool (use non-blocking overlays for JS dialogs, default False)
     """
     config = load_config()
     record_config = config.get("record", {})
 
     # Validate max-actions-per-second: must be positive integer
-    max_actions = record_config.get("max-actions-per-second", 10)
+    max_actions = record_config.get("max-actions-per-second", 15)
     try:
         max_actions = max(1, int(max_actions))
     except (ValueError, TypeError):
-        max_actions = 10
+        max_actions = 15
 
     # Validate synthetic-dialogs: must be boolean
     synthetic_dialogs = record_config.get("synthetic-dialogs", False)
