@@ -3179,7 +3179,13 @@ def record(
 
                 # Reset error count on successful communication
                 if consecutive_errors > 0 and waiting_for_reconnect:
-                    click.echo(format_system_message("Reconnected", icon="resume"))
+                    elapsed_ms = int((datetime.now(timezone.utc) - start_time).total_seconds() * 1000)
+                    click.echo(format_system_message(
+                        "Reconnected",
+                        icon="resume",
+                        elapsed_ms=elapsed_ms,
+                        show_milliseconds=show_milliseconds
+                    ))
                 consecutive_errors = 0
                 waiting_for_reconnect = False
 
@@ -3414,22 +3420,28 @@ def record(
                         if resume_result.get("ok"):
                             # Recording resumed successfully
                             debug_log("Recording resumed successfully")
-                            # Extract domain from URL for display
-                            from urllib.parse import urlparse
                             resumed_url = new_url or last_known_url
-                            try:
-                                parsed = urlparse(resumed_url)
-                                domain = parsed.netloc or resumed_url
-                            except Exception:
-                                domain = resumed_url
-                            click.echo(format_system_message(f"Recording resumed on {domain}", icon="resume"))
+                            # Calculate elapsed time for timestamp display
+                            elapsed_ms = int((datetime.now(timezone.utc) - start_time).total_seconds() * 1000)
+                            click.echo(format_system_message(
+                                f"Recording resumed on {resumed_url}",
+                                icon="resume",
+                                elapsed_ms=elapsed_ms,
+                                show_milliseconds=show_milliseconds,
+                                truncate=False  # Don't truncate URLs
+                            ))
                             # Reset inactivity tracking
                             last_activity_time = time.time()
                             inactivity_warning_shown = False
                         else:
                             # Failed to resume - might be on a restricted page
                             debug_log(f"Resume failed: {resume_result.get('error')}")
-                            click.echo(format_system_message("Recording paused - waiting for supported page"))
+                            elapsed_ms = int((datetime.now(timezone.utc) - start_time).total_seconds() * 1000)
+                            click.echo(format_system_message(
+                                "Recording paused - waiting for supported page",
+                                elapsed_ms=elapsed_ms,
+                                show_milliseconds=show_milliseconds
+                            ))
 
                         continue  # Skip to next poll iteration
 
