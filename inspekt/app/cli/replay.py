@@ -2191,12 +2191,24 @@ def replay(
     end_idx = min(total_steps, end_step) if end_step else total_steps
     steps_to_run = steps[start_idx:end_idx]
 
-    # Format the recording date nicely
-    recorded_date = recording.metadata.created_at.strftime("%B %d, %Y at %H:%M")
+    # Format the recording date nicely (convert UTC to local time)
+    created_at_utc = recording.metadata.created_at
+    if created_at_utc.tzinfo is not None:
+        # Convert UTC to local time
+        created_at_local = created_at_utc.astimezone()
+    else:
+        # If no timezone info, assume it's already local (legacy files)
+        created_at_local = created_at_utc
+    recorded_date = created_at_local.strftime("%B %d, %Y at %H:%M")
 
     # Get file's last modified time from filesystem
     file_mtime = datetime.fromtimestamp(recording_path.stat().st_mtime)
     last_modified = file_mtime.strftime("%B %d, %Y at %H:%M")
+
+    # Only show Last Modified if different from Recorded (compare at minute level)
+    show_last_modified = (
+        created_at_local.strftime("%Y-%m-%d %H:%M") != file_mtime.strftime("%Y-%m-%d %H:%M")
+    )
 
     # Build title with optional (last modified) suffix
     title_suffix = " (last modified)" if auto_selected else ""
@@ -2206,7 +2218,31 @@ def replay(
     viewport = recording.state.viewport if recording.state else getattr(recording.metadata, 'viewport', None)
     viewport_str = f"{viewport.width}×{viewport.height}" if viewport else "unknown"
 
-    # Build steps string - only show "X of Y" when subset is being replayed
+    # Count special step types for intelligent steps display
+    keyboard_actions = ('keypress', 'type', 'activate')
+    native_count = 0
+    skipped_count = 0
+    merged_count = 0
+
+    for i, s in enumerate(steps_to_run):
+        # Count native steps
+        step_native = getattr(s, 'native', None)
+        if step_native is True and s.action in keyboard_actions:
+            native_count += 1
+        elif step_native is None and native and s.action in keyboard_actions:
+            native_count += 1
+
+        # Count skipped steps
+        if getattr(s, 'skip', False):
+            skipped_count += 1
+
+        # Count merged scroll steps (scroll that will be merged with previous)
+        if s.action == 'scroll' and i > 0:
+            prev = steps_to_run[i - 1]
+            if prev.action == 'scroll':
+                merged_count += 1
+
+    # Build steps string
     if len(steps_to_run) == total_steps and start_step == 1 and not end_step:
         steps_str = str(total_steps)
     else:
@@ -2214,17 +2250,32 @@ def replay(
         if start_step > 1 or end_step:
             steps_str += f" (steps {start_idx + 1}-{end_idx})"
 
+    # Add special counts if any
+    special_parts = []
+    if native_count > 0:
+        special_parts.append(f"{native_count} {'is' if native_count == 1 else 'are'} native")
+    if skipped_count > 0:
+        special_parts.append(f"{skipped_count} will be skipped")
+    if merged_count > 0:
+        special_parts.append(f"{merged_count} will be merged")
+
+    if special_parts:
+        steps_str += f" ({', '.join(special_parts)})"
+
     # Display metadata in a table
     from inspekt.app.cli.table import Table
 
     # Build rows for width calculation
     rows = [
         ["Recorded", recorded_date],
-        ["Last Modified", last_modified],
+    ]
+    if show_last_modified:
+        rows.append(["Last Modified", last_modified])
+    rows.extend([
         ["URL", recording.metadata.starting_url],
         ["Viewport", viewport_str],
         ["Steps", steps_str],
-    ]
+    ])
 
     table = Table(["Key", "Value"], title=title, icon="󰨛")
     table.set_data(rows)
@@ -2232,7 +2283,8 @@ def replay(
     click.echo()
     table.print_header(skip_column_headers=True)
     table.print_row(["Recorded", recorded_date])
-    table.print_row(["Last Modified", last_modified])
+    if show_last_modified:
+        table.print_row(["Last Modified", last_modified])
     table.print_row(["URL", click.style(recording.metadata.starting_url, fg="blue", underline=True)])
     table.print_row(["Viewport", viewport_str])
     table.print_row(["Steps", steps_str])
@@ -2291,7 +2343,6 @@ def replay(
         # Issue 11: Enforce require_viewport_match and require_zoom_match from YAML
         if recording.state:
             if recording.state.require_viewport_match and not match_viewport:
-                from inspekt.app.cli.table import print_warning
                 print_warning(
                     "This recording requires viewport matching (`require_viewport_match: true`). "
                     "Auto-enabling `--match-viewport` for faithful replay."
@@ -2300,7 +2351,6 @@ def replay(
                 match_viewport = True
 
             if recording.state.require_zoom_match and not match_zoom_level:
-                from inspekt.app.cli.table import print_warning
                 print_warning(
                     "This recording requires zoom matching (`require_zoom_match: true`). "
                     "Auto-enabling `--match-zoom-level` for faithful replay."
@@ -2481,10 +2531,8 @@ def replay(
                     if verbose:
                         click.echo(format_system_message(f"Zoom level set to {recorded_zoom:.0%}"))
                 else:
-                    from inspekt.app.cli.table import print_warning
                     print_warning(f"Could not set zoom level to {recorded_zoom:.0%}")
             except Exception as e:
-                from inspekt.app.cli.table import print_warning
                 print_warning(f"Error setting zoom level: {e}")
 
         # Issue 4: Apply viewport matching with cached offsets (same logic as record.py)
@@ -2791,7 +2839,6 @@ def replay(
                                 print_hint("Use `--no-strict-preconditions` to continue anyway.")
                                 sys.exit(1)
                             else:
-                                from inspekt.app.cli.table import print_warning
                                 print_warning(f"Precondition not met: {desc}")
                         elif verbose:
                             desc = precondition.description or precondition.selector
@@ -2826,7 +2873,6 @@ def replay(
                             print_hint("Use `--no-strict-checksum` to continue anyway.")
                             sys.exit(1)
                         else:
-                            from inspekt.app.cli.table import print_warning
                             print_warning("DOM checksum mismatch - page structure differs from recording")
                     elif verbose:
                         click.echo(format_system_message("✓ DOM checksum matches"))
@@ -2870,10 +2916,8 @@ def replay(
                         if result.get("ok"):
                             click.echo(format_system_message(f"✓ Restored {len(cookies_list)} cookies"))
                         else:
-                            from inspekt.app.cli.table import print_warning
                             print_warning("Failed to restore cookies")
                 except Exception as e:
-                    from inspekt.app.cli.table import print_warning
                     print_warning(f"Cookie restoration failed: {e}")
 
             # Restore localStorage/sessionStorage if requested
@@ -2896,7 +2940,6 @@ def replay(
                             count = result.get("result", {}).get("restored", 0)
                             click.echo(format_system_message(f"✓ Restored {count} localStorage keys"))
                     except Exception as e:
-                        from inspekt.app.cli.table import print_warning
                         print_warning(f"`localStorage` restoration failed: {e}")
 
                 if recording.state.session_storage:
@@ -2916,7 +2959,6 @@ def replay(
                             count = result.get("result", {}).get("restored", 0)
                             click.echo(format_system_message(f"✓ Restored {count} sessionStorage keys"))
                     except Exception as e:
-                        from inspekt.app.cli.table import print_warning
                         print_warning(f"`sessionStorage` restoration failed: {e}")
 
             # Restore scroll position if state has scroll data
@@ -3310,7 +3352,6 @@ def replay(
                     # Smooth capture is now active in browser (tabCapture + MediaRecorder)
                 else:
                     error_msg = sc_result.get("result", {}).get("error", sc_result.get("error", "Unknown error"))
-                    from inspekt.app.cli.table import print_warning
                     print_warning(f"Could not start smooth video recording: {error_msg}")
                     print_warning("Falling back to compact mode (1 frame per action)")
                     video_mode = "compact"
@@ -3320,7 +3361,6 @@ def replay(
                         elapsed_ms=video_start_elapsed
                     ))
             except Exception as e:
-                from inspekt.app.cli.table import print_warning
                 print_warning(f"Smooth video recording error: {e}")
                 print_warning("Falling back to compact mode (1 frame per action)")
                 video_mode = "compact"
@@ -4367,14 +4407,11 @@ def replay(
                                         elapsed_ms=saved_elapsed
                                     ))
                         else:
-                            from inspekt.app.cli.table import print_warning
                             print_warning("No video data captured")
                     else:
-                        from inspekt.app.cli.table import print_warning
                         print_warning(f"Failed to retrieve video: HTTP {video_response.status_code}")
 
                 except requests.RequestException as e:
-                    from inspekt.app.cli.table import print_warning
                     print_warning(f"Failed to retrieve video: {e}")
 
                 # Skip the frame-based encoding for smooth mode
@@ -4550,14 +4587,11 @@ def replay(
                     if reveal_after:
                         OutputHandler.reveal_file(resolved_video_path)
                 else:
-                    from inspekt.app.cli.table import print_warning
                     print_warning(f"Video encoding failed: {encode_result.get('error')}")
             elif not video_saved_path:
                 # Only show warning if we don't already have a saved video (smooth mode saves directly)
-                from inspekt.app.cli.table import print_warning
                 print_warning("No frames captured for video")
         except Exception as e:
-            from inspekt.app.cli.table import print_warning
             print_warning(f"Video encoding error: {e}")
 
     # Restore terminal settings first (so output works for prompts/summary)
