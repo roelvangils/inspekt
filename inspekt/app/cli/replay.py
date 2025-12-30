@@ -2319,9 +2319,9 @@ def replay(
 
         # Check CSP bypass status and warn if disabled
         if not check_csp_bypass_enabled():
-            click.secho("⚠ CSP bypass is disabled (or no web page is loaded)", fg="yellow")
-            click.secho("  Some sites may not work correctly during replay.", fg="yellow")
-            click.secho("  Enable it with: `inspekt domain csp --enable`.", fg="yellow")
+            click.secho("⚠ CSP bypass is disabled (or no web page is loaded)", fg="yellow", bold=True)
+            click.secho("  Some sites may not work correctly during replay.", fg="bright_black")
+            click.secho("  Enable it with: `inspekt domain csp --enable`.", fg="bright_black")
             click.echo()
 
         # Focus the browser tab before starting replay (macOS only)
@@ -3100,17 +3100,17 @@ def replay(
                 platform_fallbacks = {"Darwin": "M", "Windows": "W", "Linux": "L"}
                 platform_icon = platform_fallbacks.get(platform_system, "?")
 
-            # Title line
-            click.secho("⚠ Keep the browser focused!", fg="yellow")
+            # Title line (yellow + bold)
+            click.secho("⚠ Keep the browser focused!", fg="yellow", bold=True)
 
-            # Body text with 2-space indent and proper wrapping
+            # Body text with 2-space indent and proper wrapping (bright_black)
             body = (
                 f"In this replay session, {native_action_count} native (OS-level) keyboard actions will be sent to the browser. "
                 f"These actions are indistinguishable from real key presses. "
                 f"In the output below, they are represented by `{platform_icon}`, which corresponds to your platform ({platform_name})."
             )
             wrapped = wrap_text(body, indent="  ", subsequent_indent="  ")
-            styled = _style_with_inline_code(wrapped, base_fg="yellow")
+            styled = _style_with_inline_code(wrapped, base_fg="bright_black")
             click.echo(styled)
             click.echo()
 
