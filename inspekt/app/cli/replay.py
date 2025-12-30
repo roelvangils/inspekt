@@ -4665,8 +4665,7 @@ def replay(
     duration = format_duration(result.duration_ms)
 
     if result.all_passed:
-        click.secho(success(f"All {result.passed_steps} steps passed"), fg="green", bold=True)
-        click.echo(f"  Duration: {duration}")
+        click.secho(success(f"All {result.passed_steps} steps completed in {duration}"), fg="green", bold=True)
         # Show tips about replay modes (only if not already using them)
         if not interactive or not native:
             click.echo()
