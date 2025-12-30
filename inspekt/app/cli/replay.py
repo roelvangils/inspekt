@@ -3519,15 +3519,22 @@ def replay(
                 and timestamps_match
             )
 
-        # Detect side-effect scroll (scroll triggered by Tab or anchor click)
-        # These scrolls are browser-initiated (scrollIntoView) and shouldn't be replayed
+        # Detect side-effect scroll (scroll triggered by keypresses or anchor clicks)
+        # These scrolls are browser-initiated and shouldn't be replayed separately
         # Note: Scroll events may be captured out of order due to async processing,
         # so we check recent steps by timestamp, not just the immediately previous step
         is_side_effect_scroll = False
         if step.action == "scroll":
             step_ts = step.timestamp or 0
 
-            # Look at recent steps (up to 5 back) to find a Tab or anchor click
+            # Keys that directly cause scrolling (the scroll is redundant)
+            scroll_keys = {'pageup', 'pagedown', 'home', 'end', 'arrowup', 'arrowdown'}
+            # Keys that move focus and may trigger scrollIntoView
+            focus_keys = {'tab'}
+            # Space scrolls when not on interactive elements
+            space_key = {'space', ' '}
+
+            # Look at recent steps (up to 5 back) to find a keypress or anchor click
             # that might have triggered this scroll
             # Example: Tab at 8507ms, scroll captured at 8533ms but recorded after a Tab at 9221ms
             lookback_count = min(5, actual_index)
@@ -3536,15 +3543,29 @@ def replay(
                 recent_ts = recent_step.timestamp or 0
                 time_delta = abs(step_ts - recent_ts)
 
-                # Case 1: Tab/Shift+Tab followed by scroll within 300ms
-                if (recent_step.action == "keypress" and
-                    recent_step.key and
-                    recent_step.key.lower() == "tab" and
-                    time_delta <= 300):
-                    is_side_effect_scroll = True
-                    break
+                if recent_step.action == "keypress" and recent_step.key and time_delta <= 300:
+                    key_lower = recent_step.key.lower()
 
-                # Case 2: Click on anchor link followed by scroll within 300ms
+                    # Case 1: Tab/Shift+Tab triggers scrollIntoView
+                    if key_lower in focus_keys:
+                        is_side_effect_scroll = True
+                        break
+
+                    # Case 2: Page navigation keys directly cause scrolling
+                    if key_lower in scroll_keys:
+                        is_side_effect_scroll = True
+                        break
+
+                    # Case 3: Space scrolls when not on a button/link
+                    if key_lower in space_key:
+                        target = recent_step.target
+                        # Space on buttons/links activates them, not scroll
+                        # But on other elements (body, div, etc.) it scrolls
+                        if not target or target.tag not in ('button', 'a', 'input', 'select'):
+                            is_side_effect_scroll = True
+                            break
+
+                # Case 4: Click on anchor link followed by scroll
                 if (recent_step.action == "click" and
                     recent_step.target and
                     recent_step.target.tag == "a" and
