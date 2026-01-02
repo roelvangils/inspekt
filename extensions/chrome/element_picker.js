@@ -29,10 +29,47 @@
             height: 100%;
             z-index: 2147483646;
             cursor: crosshair;
-            background: transparent;
+            background: rgba(0, 102, 255, 0.03);
             pointer-events: auto;
+            box-shadow: inset 0 0 0 3px rgba(0, 102, 255, 0.5);
         `;
         document.body.appendChild(overlay);
+
+        // Add a visible "picker active" indicator in the corner
+        const indicator = document.createElement('div');
+        indicator.id = '__inspekt_picker_indicator__';
+        indicator.style.cssText = `
+            position: fixed;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 10px 20px;
+            background: #0066ff;
+            color: white;
+            border-radius: 8px;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            font-size: 13px;
+            font-weight: 500;
+            z-index: 2147483647;
+            pointer-events: none;
+            box-shadow: 0 2px 10px rgba(0, 102, 255, 0.4);
+            animation: inspekt-pulse 1.5s ease-in-out infinite;
+            text-align: center;
+            line-height: 1.5;
+        `;
+        indicator.innerHTML = 'Click page to start · Hover to highlight · Click or Enter to capture<br><span style="opacity: 0.7; font-size: 12px;">Press ESC to cancel</span>';
+
+        // Add pulse animation
+        const style = document.createElement('style');
+        style.id = '__inspekt_picker_style__';
+        style.textContent = `
+            @keyframes inspekt-pulse {
+                0%, 100% { opacity: 1; transform: translateX(-50%) scale(1); }
+                50% { opacity: 0.85; transform: translateX(-50%) scale(0.98); }
+            }
+        `;
+        document.head.appendChild(style);
+        document.body.appendChild(indicator);
 
         // Create animated highlight box
         highlightBox = document.createElement('div');
@@ -165,12 +202,35 @@
         }
     }
 
-    // Handle escape key
+    // Handle keyboard shortcuts
     function handleKeyDown(e) {
         if (e.key === 'Escape') {
             console.log('%c[Inspekt]%c Picker cancelled',
                 'color: #0066ff; font-weight: bold',
                 'color: inherit');
+            cleanup();
+        } else if (e.key === 'Enter' && currentHighlight) {
+            // Enter confirms the currently highlighted element
+            e.preventDefault();
+            e.stopPropagation();
+
+            // Store the selected element
+            window.__INSPEKT_INSPECTED_ELEMENT__ = currentHighlight;
+
+            // Track selection source and timestamp
+            window.__INSPEKT_SELECTION_SOURCE__ = 'panel';
+            window.__INSPEKT_SELECTION_TIME__ = Date.now();
+
+            // Show confirmation
+            console.log(
+                '%c[Inspekt]%c ✓ Element selected: %c' + getElementLabel(currentHighlight) + '%c (Inspekt panel)',
+                'color: #0066ff; font-weight: bold',
+                'color: inherit',
+                'color: #00aa00; font-weight: bold',
+                'color: #666; font-style: italic'
+            );
+
+            // Clean up and exit picker mode
             cleanup();
         }
     }
@@ -185,6 +245,16 @@
         }
         if (tooltip && tooltip.parentNode) {
             tooltip.parentNode.removeChild(tooltip);
+        }
+
+        // Remove picker indicator and style
+        const indicator = document.getElementById('__inspekt_picker_indicator__');
+        if (indicator && indicator.parentNode) {
+            indicator.parentNode.removeChild(indicator);
+        }
+        const pickerStyle = document.getElementById('__inspekt_picker_style__');
+        if (pickerStyle && pickerStyle.parentNode) {
+            pickerStyle.parentNode.removeChild(pickerStyle);
         }
 
         // Keep highlightBox for navigation - just hide it initially

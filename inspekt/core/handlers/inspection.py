@@ -7,6 +7,7 @@ Implements: get_page_info, take_screenshot
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 from typing import TYPE_CHECKING
 
@@ -120,24 +121,65 @@ async def take_screenshot(params: TakeScreenshotParams) -> TakeScreenshotRespons
                 message="Screenshot script not available",
             )
 
+        # Apply redaction if enabled (default: True)
+        redact_enabled = params.redact if params.redact is not None else True
+        if redact_enabled:
+            try:
+                redact_script = await script_loader.load_script_async("screenshot_redact.js")
+                redact_options = {
+                    "style": params.redact_style or "bar",
+                    "scope": params.selector if params.target == "node" else None,
+                }
+                redact_code = redact_script.replace("OPTIONS_PLACEHOLDER", json.dumps(redact_options))
+                await asyncio.to_thread(executor.execute, redact_code, 10.0)
+            except FileNotFoundError:
+                pass  # Redaction script not available, continue without it
+            except Exception as e:
+                logger.warning(f"Redaction failed, continuing without it: {e}")
+
+        # Build options object for the script
+        options = {
+            "selector": params.selector or "",
+            "format": params.format or "png",
+            "quality": params.quality or 90,
+            "margin": params.margin or 0,
+            "isolate": params.isolate or False,
+        }
+
         # Substitute placeholders
-        script = script_loader.substitute_placeholders(
-            script,
-            {
-                "TARGET": params.target or "viewport",
-                "SELECTOR": params.selector or "",
-                "FORMAT": params.format or "png",
-                "QUALITY": params.quality or 90,
-            },
-        )
+        # MODE_PLACEHOLDER is a string literal in quotes
+        # OPTIONS_PLACEHOLDER is a JSON object (no quotes)
+        mode = params.target or "viewport"
+        script = script.replace("'MODE_PLACEHOLDER'", f"'{mode}'")
+        script = script.replace("OPTIONS_PLACEHOLDER", json.dumps(options))
 
         result = await asyncio.to_thread(executor.execute, script, 30.0)
 
         if result.get("ok"):
             data = result.get("result", {})
+            # Note: The screenshot script returns 'dataUrl' not 'data'
+            # Extract just the base64 part, removing the data URI prefix if present
+            data_url = data.get("dataUrl") or data.get("data")
+            if data_url and data_url.startswith("data:"):
+                # Strip the "data:image/png;base64," prefix to get raw base64
+                data_url = data_url.split(",", 1)[1] if "," in data_url else data_url
+
+            # If we got ok=True but no actual data, something went wrong
+            # (e.g., element picker was cancelled or timed out)
+            if not data_url:
+                error_msg = data.get("error") or data.get("message") or "No screenshot data returned"
+                return TakeScreenshotResponse(
+                    success=False,
+                    data=None,
+                    format=params.format or "png",
+                    width=0,
+                    height=0,
+                    message=error_msg,
+                )
+
             return TakeScreenshotResponse(
                 success=True,
-                data=data.get("data"),
+                data=data_url,
                 format=data.get("format", params.format or "png"),
                 width=data.get("width", 0),
                 height=data.get("height", 0),
