@@ -170,8 +170,32 @@
                         type: 'CAPTURE_FULL_PAGE',
                         options: options
                     });
+                } else if (mode === 'node-cdp') {
+                    // Node screenshot with CDP fallback for oversized elements
+                    // Uses chrome.debugger to capture beyond viewport bounds
+                    result = await chrome.runtime.sendMessage({
+                        type: 'CAPTURE_ELEMENT_CDP',
+                        options: options
+                    });
+                } else if (mode === 'selection-cdp') {
+                    // Selection screenshot with CDP for precise clip region
+                    // Uses chrome.debugger to capture a user-selected region
+                    result = await chrome.runtime.sendMessage({
+                        type: 'CAPTURE_ELEMENT_CDP',
+                        options: options
+                    });
                 } else {
                     // Node and viewport modes use CAPTURE_VISIBLE_TAB + processing
+
+                    // Try to hide DevTools inspector overlay before capture
+                    // This uses CDP Overlay.hideHighlight - works when DevTools is closed
+                    // When DevTools is open, the overlay can't be hidden programmatically
+                    try {
+                        await chrome.runtime.sendMessage({ type: 'HIDE_INSPECTOR_OVERLAY' });
+                    } catch (e) {
+                        // CDP unavailable - DevTools has debugger attached, overlay will be visible
+                    }
+
                     const captureResponse = await chrome.runtime.sendMessage({
                         type: 'CAPTURE_VISIBLE_TAB'
                     });
@@ -201,6 +225,110 @@
                 // Send error back to MAIN world
                 window.postMessage({
                     type: 'INSPEKT_SCREENSHOT_RESPONSE',
+                    source: 'inspekt-extension',
+                    requestId: message.requestId,
+                    response: {
+                        ok: false,
+                        error: String(error)
+                    }
+                }, location.origin);
+            }
+        }
+
+        // ========== ELEMENT PICKER BRIDGE ==========
+
+        // Handle ACTIVATE_PICKER requests from MAIN world
+        // This allows page scripts to trigger the element picker without DevTools
+        if (message && message.type === 'INSPEKT_ACTIVATE_PICKER' && message.source === 'inspekt-page') {
+            try {
+                // Inject the element picker script using src attribute (CSP-safe)
+                // Using script.src instead of script.textContent avoids CSP inline-script blocks
+                // The file must be listed in web_accessible_resources in manifest.json
+                const script = document.createElement('script');
+                const requestId = message.requestId;
+
+                script.onload = () => {
+                    // Script loaded and executed successfully
+                    window.postMessage({
+                        type: 'INSPEKT_PICKER_RESPONSE',
+                        source: 'inspekt-extension',
+                        requestId: requestId,
+                        response: { ok: true, message: 'Picker activated' }
+                    }, location.origin);
+                    // Remove script tag after execution to keep DOM clean
+                    script.remove();
+                };
+
+                script.onerror = (err) => {
+                    // Script failed to load
+                    window.postMessage({
+                        type: 'INSPEKT_PICKER_RESPONSE',
+                        source: 'inspekt-extension',
+                        requestId: requestId,
+                        response: { ok: false, error: 'Failed to load element picker script' }
+                    }, location.origin);
+                };
+
+                // Add cache-busting query param to force browser to re-execute script each time
+                // Without this, browsers cache external scripts and won't re-run on subsequent activations
+                script.src = chrome.runtime.getURL('element_picker.js') + '?t=' + Date.now();
+                (document.head || document.documentElement).appendChild(script);
+            } catch (error) {
+                window.postMessage({
+                    type: 'INSPEKT_PICKER_RESPONSE',
+                    source: 'inspekt-extension',
+                    requestId: message.requestId,
+                    response: { ok: false, error: String(error) }
+                }, location.origin);
+            }
+        }
+
+        // ========== PSEUDO-STATE FORCING BRIDGE ==========
+
+        // Handle FORCE_PSEUDO_STATE requests from MAIN world
+        if (message && message.type === 'INSPEKT_FORCE_PSEUDO_STATE' && message.source === 'inspekt-page') {
+            try {
+                const response = await chrome.runtime.sendMessage({
+                    type: 'FORCE_PSEUDO_STATE',
+                    state: message.state,
+                    selector: message.selector
+                });
+
+                window.postMessage({
+                    type: 'INSPEKT_PSEUDO_STATE_RESPONSE',
+                    source: 'inspekt-extension',
+                    requestId: message.requestId,
+                    response: response
+                }, location.origin);
+            } catch (error) {
+                window.postMessage({
+                    type: 'INSPEKT_PSEUDO_STATE_RESPONSE',
+                    source: 'inspekt-extension',
+                    requestId: message.requestId,
+                    response: {
+                        ok: false,
+                        error: String(error)
+                    }
+                }, location.origin);
+            }
+        }
+
+        // Handle CLEAR_PSEUDO_STATE requests from MAIN world
+        if (message && message.type === 'INSPEKT_CLEAR_PSEUDO_STATE' && message.source === 'inspekt-page') {
+            try {
+                const response = await chrome.runtime.sendMessage({
+                    type: 'CLEAR_PSEUDO_STATE'
+                });
+
+                window.postMessage({
+                    type: 'INSPEKT_CLEAR_PSEUDO_STATE_RESPONSE',
+                    source: 'inspekt-extension',
+                    requestId: message.requestId,
+                    response: response
+                }, location.origin);
+            } catch (error) {
+                window.postMessage({
+                    type: 'INSPEKT_CLEAR_PSEUDO_STATE_RESPONSE',
                     source: 'inspekt-extension',
                     requestId: message.requestId,
                     response: {
@@ -627,7 +755,7 @@
                     browserName: detectedBrowser,
                     url: window.location.href,
                     title: document.title,
-                    extensionVersion: window.__INSPEKT_BRIDGE_VERSION__ || window.__ZEN_BRIDGE_VERSION__ || null,
+                    extensionVersion: window.__INSPEKT_BRIDGE_VERSION__ || null,
                     visible: document.visibilityState === 'visible'
                 };
                 ws.send(JSON.stringify(browserInfo));
@@ -977,7 +1105,7 @@
                         // Enable/disable permanent bypass (for isolated/VM environments)
                         try {
                             const enabled = message.enabled !== false;
-                            await ZenPermissions.setPermanentBypass(enabled);
+                            await InspektPermissions.setPermanentBypass(enabled);
 
                             ws.send(JSON.stringify({
                                 type: 'response',
@@ -1184,7 +1312,7 @@
         if (isVisible && window === window.top) {
             // Tab became visible - connect if needed and domain is allowed
             if (!ws || ws.readyState !== WebSocket.OPEN) {
-                const allowed = await ZenPermissions.isAllowed();
+                const allowed = await InspektPermissions.isAllowed();
                 if (allowed) {
                     connect();
                 }
@@ -1224,7 +1352,7 @@
     // This enables commands to work immediately after adding a domain - no page refresh needed
     async function handlePermissionChange() {
         if (isFrontTab()) {
-            const allowed = await ZenPermissions.isAllowed();
+            const allowed = await InspektPermissions.isAllowed();
             if (allowed && (!ws || ws.readyState !== WebSocket.OPEN)) {
                 console.log('[Inspekt] Permissions changed - domain now allowed, reconnecting...');
                 connect();
