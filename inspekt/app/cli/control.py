@@ -4,6 +4,7 @@ This module provides unified start/stop/restart/status commands that manage
 both the bridge server and API server together.
 """
 
+import asyncio
 import json
 import os
 import socket
@@ -16,6 +17,8 @@ import click
 from inspekt.app.cli.icons import success, error, info, progress
 from inspekt.client import BridgeClient
 from inspekt.services.axe_updater import get_axe_updater
+from inspekt.services.ibm_updater import get_ibm_updater
+from inspekt.services.engines import get_all_engines
 
 
 def _format_release_date(iso_date: str | None) -> str:
@@ -33,8 +36,114 @@ def _format_release_date(iso_date: str | None) -> str:
         return ""
 
 
+def _check_engine_updates():
+    """Check for updates for all accessibility engines using the unified engine system."""
+    engines = get_all_engines()
+
+    click.echo(" Checking for engine updates…", err=True)
+
+    for engine in engines:
+        # Format engine display: "Axe-core (Deque Systems)"
+        provider_suffix = f" ({engine.provider})" if engine.provider else ""
+        engine_display = f"{engine.engine_name}{provider_suffix}"
+
+        try:
+            update_available, current, latest, release_date = engine.is_update_available()
+
+            if not latest:
+                # Network error - show concise error status
+                click.echo(f"  {engine_display}: {click.style('check failed', fg='yellow')}", err=True)
+                continue
+
+            if not current:
+                # Not installed - install it
+                click.echo(f"  {engine_display}: {click.style('not installed', fg='yellow')} → installing {latest}", err=True)
+
+                def show_progress(msg):
+                    click.echo(f"    {msg}", err=True)
+
+                install_success, message = engine.update_to_latest(progress_callback=show_progress)
+
+                if install_success:
+                    click.echo(f"    {click.style('installed', fg='green')}", err=True)
+                else:
+                    click.echo(f"    {click.style(f'failed: {message}', fg='red')}", err=True)
+                continue
+
+            if not update_available:
+                click.echo(f"  {engine_display}: {click.style('up to date', fg='green')} ({current})", err=True)
+                continue
+
+            # Update available - show status and prompt user
+            click.echo(f"  {engine_display}: {click.style('update available', fg='cyan')} ({current} → {latest})", err=True)
+
+            if click.confirm(f"    Update to {engine.engine_name} {latest}?", default=True):
+                def show_progress(msg):
+                    click.echo(f"    {msg}", err=True)
+
+                update_success, message = engine.update_to_latest(progress_callback=show_progress)
+
+                if update_success:
+                    click.echo(f"    {click.style('updated', fg='green')}", err=True)
+                else:
+                    click.echo(f"    {click.style(f'failed: {message}', fg='red')}", err=True)
+            else:
+                click.echo(f"    {click.style('skipped', fg='yellow')}", err=True)
+
+        except Exception:
+            # Show concise error status
+            click.echo(f"  {engine_display}: {click.style('check failed', fg='yellow')}", err=True)
+
+    click.echo("", err=True)  # Blank line after engine checks
+
+
+def _check_readability_updates():
+    """Check for Mozilla Readability updates and show status.
+
+    Unlike accessibility engines, Readability is not auto-updated.
+    This just shows the current version and whether an update is available.
+    """
+    from inspekt.services.readability_updater import get_readability_updater
+
+    updater = get_readability_updater()
+
+    try:
+        update_available, current, latest, release_date = updater.is_update_available()
+
+        if not latest:
+            # Network error - silently skip
+            return
+
+        # Format release date for display
+        date_str = _format_release_date(release_date)
+        date_suffix = f" • {date_str}" if date_str else ""
+
+        if not current:
+            # Not installed - this shouldn't happen normally but handle it
+            click.echo(f"  @mozilla/readability: {click.style('not installed', fg='yellow')}", err=True)
+            click.echo(f"    Run `inspekt update readability` to install", err=True)
+            return
+
+        if not update_available:
+            # Up to date - show briefly
+            click.echo(f"  @mozilla/readability: {click.style('up to date', fg='green')} ({current})", err=True)
+            return
+
+        # Update available - show without auto-updating
+        click.echo(f"  @mozilla/readability: {click.style('update available', fg='cyan')} ({current} → {latest}{date_suffix})", err=True)
+        click.echo(f"    Run `inspekt update readability` to update", err=True)
+
+    except Exception:
+        # Silently skip on errors
+        pass
+
+
 def _check_axe_updates():
-    """Check for axe-core updates and prompt user to update."""
+    """Check for axe-core updates and prompt user to update.
+
+    DEPRECATED: Use _check_engine_updates() instead for unified engine management.
+    This function is kept for backwards compatibility.
+    """
     updater = get_axe_updater()
 
     try:
@@ -68,6 +177,76 @@ def _check_axe_updates():
                 click.echo(f"{msg}", err=True)
 
             # Perform update
+            update_success, message = updater.update_to_latest(progress_callback=show_progress)
+
+            if update_success:
+                from inspekt.app.cli.icons import success as success_msg
+                click.echo(f"\n{success_msg(message)}\n", err=True)
+            else:
+                click.echo(f"\n{error(f'Update failed: {message}')}", err=True)
+                click.echo("Continuing with current version.\n", err=True)
+        else:
+            click.echo("Skipping update.\n", err=True)
+
+    except Exception:
+        # Silently continue on any error - don't block server start
+        pass
+
+
+def _check_ibm_updates():
+    """Check for IBM Equal Access updates and prompt user to update.
+
+    DEPRECATED: Use _check_engine_updates() instead for unified engine management.
+    This function is kept for backwards compatibility.
+    """
+    updater = get_ibm_updater()
+
+    try:
+        # Check for updates (quick, non-blocking)
+        click.echo(f"  {progress('Checking for IBM Equal Access updates…')}", err=True)
+        update_available, current, latest, release_date = updater.is_update_available()
+
+        if not latest:
+            # Network error or timeout - silently continue
+            return
+
+        # Format release date for display
+        date_str = _format_release_date(release_date)
+        date_suffix = f" • {date_str}" if date_str else ""
+
+        if not current:
+            # Not installed yet - install it
+            click.echo(f"  {info(f'IBM Equal Access {latest} will be installed{date_suffix}')}", err=True)
+            click.echo("", err=True)
+
+            def show_progress(msg):
+                click.echo(f"{msg}", err=True)
+
+            install_success, message = updater.update_to_latest(progress_callback=show_progress)
+
+            if install_success:
+                from inspekt.app.cli.icons import success as success_msg
+                click.echo(f"\n{success_msg(message)}\n", err=True)
+            else:
+                click.echo(f"\n{error(f'Installation failed: {message}')}", err=True)
+            return
+
+        if not update_available:
+            # Already on latest version
+            click.echo(f"  {success(f'IBM Equal Access is up-to-date ({current}{date_suffix})')}", err=True)
+            return
+
+        # Update available - prompt user
+        click.echo(f"  {success(f'IBM Equal Access {latest} is available{date_suffix} (current: {current})')}", err=True)
+        click.echo("", err=True)
+
+        # Ask user if they want to update
+        if click.confirm(f"Update to IBM Equal Access {latest}?", default=True):
+            click.echo("", err=True)
+
+            def show_progress(msg):
+                click.echo(f"{msg}", err=True)
+
             update_success, message = updater.update_to_latest(progress_callback=show_progress)
 
             if update_success:
@@ -261,105 +440,156 @@ def _stop_mkdocs_server():
     return result.returncode == 0
 
 
+async def _start_foreground(
+    bridge: bool,
+    api: bool,
+    docs: bool,
+    bridge_port: int,
+    api_port: int,
+    docs_port: int,
+    host: str,
+) -> None:
+    """Run servers in foreground with unified, color-coded output.
+
+    Uses ProcessManager to run all requested servers as async subprocesses,
+    multiplexing their output with colored prefixes.
+    """
+    from inspekt.services.process_manager import ProcessManager
+
+    manager = ProcessManager()
+    manager.setup_signal_handlers()
+
+    click.echo("Running in foreground mode (Ctrl+C to stop)\n")
+
+    # Start requested servers
+    startup_tasks = []
+
+    if bridge:
+        click.echo(f"  {progress(f'Starting bridge on ports {bridge_port}/{bridge_port + 1}…')}")
+        managed = await manager.start_bridge(port=bridge_port)
+        startup_tasks.append(managed)
+
+    if api:
+        click.echo(f"  {progress(f'Starting API on {host}:{api_port}…')}")
+        managed = await manager.start_api(host=host, port=api_port)
+        startup_tasks.append(managed)
+
+    if docs:
+        project_root = _get_project_root()
+        click.echo(f"  {progress(f'Starting docs on {host}:{docs_port}…')}")
+        managed = await manager.start_docs(
+            host=host, port=docs_port, project_root=project_root
+        )
+        startup_tasks.append(managed)
+
+    click.echo()
+
+    # Wait for all servers to become healthy
+    all_healthy = True
+    for managed in startup_tasks:
+        healthy = await manager.wait_for_health(managed)
+        prefix = click.style(managed.server_type.prefix, fg=managed.server_type.color, bold=True)
+        if healthy:
+            click.echo(f"  {prefix} {success('ready')}")
+        else:
+            click.echo(f"  {prefix} {error(managed.error_message or 'failed to start')}")
+            all_healthy = False
+
+    if not all_healthy:
+        click.echo(f"\n{error('Some servers failed to start')}")
+        # Still run if at least one server is healthy (per user requirement)
+        healthy_count = sum(1 for m in startup_tasks if m.healthy)
+        if healthy_count == 0:
+            await manager.shutdown_all()
+            sys.exit(1)
+        click.echo(f"Continuing with {healthy_count} healthy server(s)...\n")
+    else:
+        click.echo(f"\n{success('All servers ready')}")
+
+    click.echo("─" * 60)
+    click.echo()
+
+    # Start process monitor and wait for shutdown
+    monitor_task = asyncio.create_task(manager.monitor_processes())
+
+    # Wait for shutdown event
+    await manager.shutdown_event.wait()
+
+    # Clean up
+    monitor_task.cancel()
+    try:
+        await monitor_task
+    except asyncio.CancelledError:
+        pass
+
+    await manager.shutdown_all()
+
+
 @click.command()
 @click.option("--bridge-only", is_flag=True, help="Start only the bridge server")
 @click.option("--api-only", is_flag=True, help="Start only the API server")
 @click.option("--foreground", is_flag=True, help="Run in foreground (for debugging)")
-@click.option("--no-update-check", is_flag=True, help="Skip axe-core update check")
 @click.option("--api-port", type=int, default=8000, help="API server port (default: 8000)")
 @click.option("--bridge-port", type=int, default=8765, help="Bridge server port (default: 8765)")
 @click.option("--host", default="127.0.0.1", help="Host to bind to (default: 127.0.0.1)")
 @click.option("--docs", is_flag=True, help="Start local MkDocs documentation server")
 @click.option("--docs-port", type=int, default=8008, help="MkDocs server port (default: 8008)")
-def start(bridge_only, api_only, foreground, no_update_check, api_port, bridge_port, host, docs, docs_port):
-    """Start Inspekt servers (bridge + API) in daemon mode.
+def start(bridge_only, api_only, foreground, api_port, bridge_port, host, docs, docs_port):
+    """Start Inspekt servers (bridge + API).
 
-    By default, starts both bridge and API servers in background.
+    By default, starts both bridge and API servers in background (daemon mode).
+    Automatically checks for accessibility engine updates before starting.
     Use --bridge-only or --api-only to start specific servers.
-    Use --foreground for debugging (only works with single server).
+    Use --foreground to run all servers with unified, color-coded output.
     Use --docs to also start a local MkDocs documentation server.
 
     Examples:
         inspekt start                      # Start both servers in background
         inspekt start --docs               # Include local documentation server
         inspekt start --bridge-only        # Start only bridge server
-        inspekt start --foreground         # Start both in foreground (interactive)
-        inspekt start --no-update-check    # Skip axe-core update check
+        inspekt start --foreground         # Run all servers with unified output
+        inspekt start --foreground --docs  # Include docs in foreground mode
         inspekt start --api-port 3000      # Use custom API port
     """
-    # Check for updates unless disabled
-    if not no_update_check:
-        _check_axe_updates()
+    # Check for engine and library updates automatically
+    _check_engine_updates()
+    _check_readability_updates()
 
-    click.echo("\nStarting Inspekt servers…\n")
-
-    # Validate foreground mode
-    if foreground and not (bridge_only or api_only):
-        click.echo("Error: --foreground requires --bridge-only or --api-only", err=True)
-        click.echo("(Cannot run multiple servers in foreground simultaneously)", err=True)
-        sys.exit(1)
+    click.echo("Starting Inspekt servers...\n")
 
     # Determine what to start
     start_bridge = not api_only
     start_api = not bridge_only
 
+    # Foreground mode: run all requested servers with unified output
+    if foreground:
+        import asyncio
+
+        asyncio.run(
+            _start_foreground(
+                bridge=start_bridge,
+                api=start_api,
+                docs=docs,
+                bridge_port=bridge_port,
+                api_port=api_port,
+                docs_port=docs_port,
+                host=host,
+            )
+        )
+        return
+
+    # Daemon mode: start servers in background
     start_success = True
 
     # Start bridge server
     if start_bridge:
-        if foreground:
-            # Run bridge in foreground
-            from inspekt.bridge_ws import main as start_ws_server
-
-            click.echo("Starting bridge server in foreground…")
-            click.echo(f"Ports: {bridge_port} (HTTP), {bridge_port + 1} (WebSocket)\n")
-            click.echo("Press Ctrl+C to stop\n")
-
-            try:
-                import asyncio
-                asyncio.run(start_ws_server())
-            except KeyboardInterrupt:
-                click.echo("\nBridge server stopped")
-            return
-        else:
-            # Start in daemon mode
-            if not _start_bridge_server(port=bridge_port):
-                start_success = False
+        if not _start_bridge_server(port=bridge_port):
+            start_success = False
 
     # Start API server
     if start_api:
-        if foreground:
-            # Run API in foreground
-            bridge_client = BridgeClient(port=bridge_port)
-            if not bridge_client.is_alive():
-                click.echo("Error: Bridge server must be running to start API server", err=True)
-                click.echo("Start it first with: inspekt start --bridge-only", err=True)
-                sys.exit(1)
-
-            click.echo("Starting API server in foreground…")
-            display_host = "localhost" if host == "127.0.0.1" else host
-            click.echo(f"\nAPI server running at:")
-            click.echo(f"  {info(f'Status:        http://{display_host}:{api_port}/status')}")
-            click.echo(f"  {info(f'Swagger UI:    http://{display_host}:{api_port}/docs')}")
-            click.echo(f"  {info(f'ReDoc:         http://{display_host}:{api_port}/redoc')}")
-            click.echo(f"  {info(f'Health check:  http://{display_host}:{api_port}/health')}")
-            click.echo(f"  {info(f'API root:      http://{display_host}:{api_port}/')}")
-            click.echo("\nPress Ctrl+C to stop the server\n")
-
-            try:
-                subprocess.run([
-                    sys.executable, "-m", "uvicorn",
-                    "inspekt.app.api.server:app",
-                    "--host", host,
-                    "--port", str(api_port)
-                ])
-            except KeyboardInterrupt:
-                click.echo("\nAPI server stopped")
-            return
-        else:
-            # Start in daemon mode
-            if not _start_api_server(host=host, port=api_port):
-                start_success = False
+        if not _start_api_server(host=host, port=api_port):
+            start_success = False
 
     # Start MkDocs server if --docs flag is passed
     if docs and start_success:
@@ -398,6 +628,12 @@ def start(bridge_only, api_only, foreground, no_update_check, api_port, bridge_p
             click.echo()
             from inspekt.app.cli.table import print_hint
             print_hint(f"Run with `--docs` to start a local documentation server at http://localhost:{docs_port}")
+
+        # Show dev mode reminder about syncing extensions
+        from inspekt.config import is_dev_mode
+        if is_dev_mode():
+            from inspekt.app.cli.table import print_hint
+            print_hint("Dev mode: If you changed shared extension code, run `make sync-extensions`")
     else:
         click.echo(f"\n{error('Failed to start one or more servers')}", err=True)
         sys.exit(1)
@@ -465,24 +701,25 @@ def stop(bridge_only, api_only):
 
 
 @click.command()
-@click.option("--no-update-check", is_flag=True, help="Skip axe-core update check")
+@click.option("--foreground", is_flag=True, help="Run in foreground with unified output")
 @click.option("--api-port", type=int, default=8000, help="API server port (default: 8000)")
 @click.option("--bridge-port", type=int, default=8765, help="Bridge server port (default: 8765)")
 @click.option("--host", default="127.0.0.1", help="Host to bind to (default: 127.0.0.1)")
 @click.option("--docs", is_flag=True, help="Start local MkDocs documentation server")
 @click.option("--docs-port", type=int, default=8008, help="MkDocs server port (default: 8008)")
-def restart(no_update_check, api_port, bridge_port, host, docs, docs_port):
+def restart(foreground, api_port, bridge_port, host, docs, docs_port):
     """Restart bridge and API servers.
 
-    This command stops any running servers, optionally checks for updates,
-    then starts servers fresh in daemon mode.
+    This command stops any running servers, checks for accessibility engine
+    updates, then starts servers fresh.
+    Use --foreground to run with unified, color-coded output.
     Use --docs to also start a local MkDocs documentation server.
 
     Examples:
-        inspekt restart                   # Restart servers
+        inspekt restart                   # Restart servers in background
+        inspekt restart --foreground      # Restart with unified output
         inspekt restart --docs            # Include documentation server
-        inspekt restart --no-update-check # Skip update check
-        inspekt restart --api-port 3000   # Use custom API port
+        inspekt restart --foreground --docs  # All servers with unified output
     """
     click.echo("Restarting Inspekt servers…\n")
 
@@ -513,9 +750,28 @@ def restart(no_update_check, api_port, bridge_port, host, docs, docs_port):
 
     click.echo()
 
-    # Check for updates unless disabled
-    if not no_update_check:
-        _check_axe_updates()
+    # Check for engine and library updates automatically
+    _check_engine_updates()
+    _check_readability_updates()
+
+    # Foreground mode: run all servers with unified output
+    if foreground:
+        click.echo("Starting Inspekt servers...\n")
+        asyncio.run(
+            _start_foreground(
+                bridge=True,
+                api=True,
+                docs=docs,
+                bridge_port=bridge_port,
+                api_port=api_port,
+                docs_port=docs_port,
+                host=host,
+            )
+        )
+        return
+
+    # Daemon mode: start servers in background
+    click.echo("Starting Inspekt servers...\n")
 
     bridge_success = _start_bridge_server(port=bridge_port)
 
@@ -627,108 +883,165 @@ def status(ctx, output_json):
         }
         click.echo(json.dumps(output_data, indent=2))
     else:
-        # Human-readable output
-        click.echo("Inspekt Server Status\n")
+        # Human-readable output using Table formatting
+        from inspekt.app.cli.table import Table, format_status_icon
+        from inspekt.app.cli.icons import get_icon
 
-        # Bridge Server Section
-        click.echo("=" * 60)
-        click.echo("BRIDGE SERVER")
-        click.echo("=" * 60)
+        click.echo()  # Initial spacing
+
+        # ═══════════════════════════════════════════════════════════════════
+        # BRIDGE SERVER TABLE
+        # ═══════════════════════════════════════════════════════════════════
+        bridge_icon = get_icon("Bridge Server") or ""
+        bridge_data = []
 
         if bridge_running and bridge_status:
-            # Server Information
-            click.echo("\nServer Information:")
-            click.echo(f"  Version:           {bridge_status.get('server_version', 'Unknown')}")
+            status_text = click.style("Running", fg="green")
+            bridge_data.append(["Status", f"{format_status_icon('pass')} {status_text}"])
+            bridge_data.append(["Version", bridge_status.get('server_version', 'Unknown')])
             uptime = bridge_status.get('uptime_seconds', 0)
-            click.echo(f"  Uptime:            {format_duration(uptime)}")
+            bridge_data.append(["Uptime", format_duration(uptime)])
             host = bridge_status.get('host', '127.0.0.1')
             port = bridge_status.get('port', 8765)
             ws_port = bridge_status.get('websocket_port', 8766)
-            click.echo(f"  HTTP API:          http://{host}:{port}")
-            click.echo(f"  WebSocket:         ws://{host}:{ws_port}")
+            bridge_data.append(["HTTP API", f"http://{host}:{port}"])
+            bridge_data.append(["WebSocket", f"ws://{host}:{ws_port}"])
+        elif bridge_running:
+            status_text = click.style("Running (status unavailable)", fg="yellow")
+            bridge_data.append(["Status", f"{format_status_icon('warning')} {status_text}"])
+        else:
+            status_text = click.style("Not Running", fg="red")
+            bridge_data.append(["Status", f"{format_status_icon('fail')} {status_text}"])
+            bridge_data.append(["", click.style("Start with: inspekt start", fg="bright_black")])
 
-            # Connected Browser Instances
-            click.echo("\nConnected Browser Instances:")
+        bridge_table = Table(["Property", "Value"], title="Bridge Server", icon=bridge_icon)
+        bridge_table.set_data(bridge_data)
+        bridge_table.print_header(skip_column_headers=True)
+        for row in bridge_data:
+            bridge_table.print_row(row)
+        bridge_table.print_footer()
+
+        # ═══════════════════════════════════════════════════════════════════
+        # CONNECTED BROWSERS TABLE (only if bridge is running)
+        # ═══════════════════════════════════════════════════════════════════
+        if bridge_running and bridge_status:
             browser_count = bridge_status.get('connected_browsers', 0)
             browsers = bridge_status.get('browsers', [])
 
-            if browser_count == 0:
-                click.echo("  No browsers connected")
-            else:
-                click.echo(f"  Total:             {browser_count} active connection{'s' if browser_count != 1 else ''}")
+            click.echo()  # Spacing between tables
+            browser_icon = get_icon("Connected Browsers") or ""
 
+            if browser_count == 0:
+                browser_data = [["", click.style("No browsers connected", fg="bright_black")]]
+            else:
+                browser_data = []
                 for i, browser in enumerate(browsers, 1):
-                    # Display browser name with version
+                    # Browser name with version
                     browser_name = browser['browser_name']
                     browser_version = browser.get('browser_version', '')
                     if browser_version:
                         browser_display = f"{browser_name} {browser_version}"
                     else:
                         browser_display = browser_name
+                    if browser['is_most_recent']:
+                        browser_display = click.style(browser_display, bold=True)
 
-                    click.echo(f"\n  [{i}] {browser_display}{' (last active)' if browser['is_most_recent'] else ''}")
-                    if browser.get('extension_version'):
-                        click.echo(f"      Extension:     v{browser['extension_version']}")
+                    # Build info parts
+                    info_parts = []
                     url = browser.get('url', '')
                     if url:
-                        # Truncate long URLs
-                        display_url = url if len(url) <= 60 else url[:57] + '...'
-                        click.echo(f"      Page:          {display_url}")
+                        display_url = url if len(url) <= 45 else url[:42] + '...'
+                        info_parts.append(display_url)
                     title = browser.get('title', '')
                     if title:
-                        # Truncate long titles
-                        display_title = title if len(title) <= 60 else title[:57] + '...'
-                        click.echo(f"      Title:         {display_title}")
-                    duration = browser.get('connected_duration', 0)
-                    click.echo(f"      Connected:     {format_duration(duration)}")
+                        display_title = title if len(title) <= 45 else title[:42] + '...'
+                        info_parts.append(click.style(display_title, fg="bright_black"))
 
-            # Request Statistics
-            click.echo("\nRequest Statistics:")
-            click.echo(f"  Pending:           {bridge_status.get('pending', 0)}")
+                    # Extension version and connection duration
+                    meta_parts = []
+                    if browser.get('extension_version'):
+                        meta_parts.append(f"v{browser['extension_version']}")
+                    duration = browser.get('connected_duration', 0)
+                    meta_parts.append(format_duration(duration))
+                    meta_line = click.style(" • ".join(meta_parts), fg="bright_black")
+
+                    # First row: browser name + URL
+                    browser_data.append([f"[{i}] {browser_display}", info_parts[0] if info_parts else ""])
+                    # Second row: title (if exists)
+                    if len(info_parts) > 1:
+                        browser_data.append(["", info_parts[1]])
+                    # Third row: meta info
+                    browser_data.append(["", meta_line])
+
+            browser_table = Table(["Browser", "Details"], title="Connected Browsers", icon=browser_icon)
+            browser_table.set_data(browser_data)
+            browser_table.print_header(skip_column_headers=True)
+            for row in browser_data:
+                browser_table.print_row(row)
+            browser_table.print_footer()
+
+            # ═══════════════════════════════════════════════════════════════════
+            # REQUEST STATISTICS TABLE
+            # ═══════════════════════════════════════════════════════════════════
+            click.echo()  # Spacing
+            stats_icon = get_icon("Request Statistics") or ""
+
             total = bridge_status.get('total_processed', 0)
             succeeded = bridge_status.get('total_succeeded', 0)
             failed = bridge_status.get('total_failed', 0)
-            click.echo(f"  Total Processed:   {total} (since startup)")
-            click.echo(f"  Succeeded:         {succeeded}")
-            click.echo(f"  Failed:            {failed}")
-            if total > 0:
-                success_rate = (succeeded / total) * 100
-                click.echo(f"  Success Rate:      {success_rate:.1f}%")
+            pending = bridge_status.get('pending', 0)
+            success_rate = f"{(succeeded / total) * 100:.1f}%" if total > 0 else "-"
             last_activity = bridge_status.get('last_activity')
-            if last_activity:
-                click.echo(f"  Last Activity:     {format_time_ago(last_activity)}")
+            last_activity_str = format_time_ago(last_activity) if last_activity else "-"
 
-            # Performance
-            cached = bridge_status.get('cached_scripts', [])
-            if cached:
-                click.echo("\nPerformance:")
-                click.echo(f"  Cached Scripts:    {len(cached)} ({', '.join(cached)})")
-        elif bridge_running:
-            click.echo(f"\n{success('Running (status unavailable)')}")
-        else:
-            click.echo(f"\n{error('Not Running')}")
-            click.echo("\nStart with: inspekt start")
+            stats_data = [
+                ["Pending", str(pending)],
+                ["Processed", f"{total} (since startup)"],
+                ["Succeeded", click.style(str(succeeded), fg="green") if succeeded > 0 else str(succeeded)],
+                ["Failed", click.style(str(failed), fg="red") if failed > 0 else str(failed)],
+                ["Success Rate", success_rate],
+                ["Last Activity", last_activity_str],
+            ]
 
-        # API Server Section
-        click.echo("\n" + "=" * 60)
-        click.echo("API SERVER")
-        click.echo("=" * 60)
+            stats_table = Table(["Metric", "Value"], title="Request Statistics", icon=stats_icon)
+            stats_table.set_data(stats_data)
+            stats_table.print_header(skip_column_headers=True)
+            for row in stats_data:
+                stats_table.print_row(row)
+            stats_table.print_footer()
 
-        if api_running:
-            click.echo(f"\n{success('Running')}")
-            click.echo(f"  Port:              8000")
-            click.echo(f"  URL:               http://localhost:8000")
-            click.echo(f"  Swagger UI:        http://localhost:8000/docs")
-            click.echo(f"  ReDoc:             http://localhost:8000/redoc")
-            click.echo(f"  Health Check:      http://localhost:8000/health")
-        else:
-            click.echo(f"\n{error('Not Running')}")
-            click.echo("\nStart with: inspekt start")
-
-        click.echo("\n" + "=" * 60)
+        # ═══════════════════════════════════════════════════════════════════
+        # API SERVER TABLE
+        # ═══════════════════════════════════════════════════════════════════
+        click.echo()  # Spacing
+        api_icon = get_icon("API Server") or ""
+        api_data = []
 
         if api_running:
-            click.echo(f"\nWeb-based status: http://localhost:8000/status")
+            status_text = click.style("Running", fg="green")
+            api_data.append(["Status", f"{format_status_icon('pass')} {status_text}"])
+            api_data.append(["Port", "8000"])
+            api_data.append(["URL", "http://localhost:8000"])
+            api_data.append(["Swagger UI", "http://localhost:8000/docs"])
+            api_data.append(["ReDoc", "http://localhost:8000/redoc"])
+            api_data.append(["Health Check", "http://localhost:8000/health"])
+        else:
+            status_text = click.style("Not Running", fg="red")
+            api_data.append(["Status", f"{format_status_icon('fail')} {status_text}"])
+            api_data.append(["", click.style("Start with: inspekt start", fg="bright_black")])
+
+        api_table = Table(["Property", "Value"], title="API Server", icon=api_icon)
+        api_table.set_data(api_data)
+        api_table.print_header(skip_column_headers=True)
+        for row in api_data:
+            api_table.print_row(row)
+        api_table.print_footer()
+
+        # Footer hint
+        if api_running:
+            click.echo()
+            from inspekt.app.cli.table import print_hint
+            print_hint("Web-based status: http://localhost:8000/status")
 
     # Exit with error if either server is not running
     if not (bridge_running and api_running):
