@@ -72,6 +72,17 @@ class ProcessManager:
         self.shutdown_event = asyncio.Event()
         self._prompt_active = False
 
+    def _is_port_in_use(self, host: str, port: int) -> bool:
+        """Check if a port is already in use."""
+        try:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.settimeout(1)
+            result = sock.connect_ex((host, port))
+            sock.close()
+            return result == 0  # 0 means connection succeeded = port in use
+        except Exception:
+            return False
+
     async def start_bridge(self, port: int = 8765) -> ManagedProcess:
         """Start the bridge server as an async subprocess."""
         managed = ManagedProcess(
@@ -80,6 +91,11 @@ class ProcessManager:
             port=port,
         )
         self.processes[ServerType.BRIDGE] = managed
+
+        # Pre-flight check: is port already in use?
+        if self._is_port_in_use("127.0.0.1", port):
+            managed.error_message = f"Port {port} already in use. Run: inspekt stop"
+            return managed
 
         try:
             proc = await asyncio.create_subprocess_exec(
@@ -118,6 +134,11 @@ class ProcessManager:
             port=port,
         )
         self.processes[ServerType.API] = managed
+
+        # Pre-flight check: is port already in use?
+        if self._is_port_in_use(host, port):
+            managed.error_message = f"Port {port} already in use. Run: inspekt stop"
+            return managed
 
         try:
             proc = await asyncio.create_subprocess_exec(
@@ -180,6 +201,11 @@ class ProcessManager:
             managed.error_message = (
                 "mkdocs.yml not found - docs not available in this installation"
             )
+            return managed
+
+        # Pre-flight check: is port already in use?
+        if self._is_port_in_use(host, port):
+            managed.error_message = f"Port {port} already in use"
             return managed
 
         try:
