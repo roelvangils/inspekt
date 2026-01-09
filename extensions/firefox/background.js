@@ -9,6 +9,15 @@
 
 console.log('[Inspekt Extension] Background script loaded');
 
+// VM detection: Check if running inside the Browser VM (Linux + Firefox)
+const isVMEnvironment = navigator.userAgent.includes('Linux') &&
+                        navigator.userAgent.includes('Firefox');
+const BRIDGE_HTTP_PORT = isVMEnvironment ? 8767 : 8765;
+
+if (isVMEnvironment) {
+    console.log('[Inspekt Extension] VM environment detected - using bridge port', BRIDGE_HTTP_PORT);
+}
+
 // Track which tabs have Inspekt active
 const activeTabs = new Set();
 
@@ -103,6 +112,11 @@ browser.runtime.onMessage.addListener((message, sender) => {
         });
     }
 
+    if (message.type === 'CHECK_SERVER_RUNNING') {
+        // Proxy health check from popup (popups have restricted network access in Firefox)
+        return checkServerRunning();
+    }
+
     if (message.type === 'GET_COOKIES_ENHANCED') {
         // Retrieve detailed cookie information using browser.cookies API
         return getCookiesEnhanced(sender.tab.url);
@@ -134,6 +148,64 @@ browser.runtime.onMessage.addListener((message, sender) => {
 
     if (message.type === 'CLEAR_CONSOLE_LOGS') {
         return clearConsoleLogs(sender.tab.id);
+    }
+
+    if (message.type === 'NAVIGATE') {
+        console.log('[Inspekt] NAVIGATE message received:', {
+            url: message.url,
+            requestId: message.requestId,
+            useCallback: message.useCallback,
+            timeout: message.timeout,
+            bridgePort: message.bridgePort,
+            senderTabId: sender.tab?.id
+        });
+
+        // =============================================================================
+        // FIREFOX NAVIGATION - CRITICAL DESIGN DECISIONS
+        // =============================================================================
+        //
+        // WHY WE ALWAYS USE CALLBACK MODE:
+        // The content script (websocket-client.js) that sends this message will be
+        // DESTROYED during page navigation. If we tried to return a response to it,
+        // there would be nothing listening. Instead, we use "callback mode" where the
+        // background script directly POSTs the navigation result to the bridge server.
+        //
+        // WHY WE GENERATE requestId IF NOT PROVIDED:
+        // The content script sets requestId in websocket-client.js, but in some Firefox
+        // versions (including Zen browser), the message properties can arrive as
+        // undefined even when explicitly set. By generating a fallback requestId here,
+        // we ensure navigation always works.
+        //
+        // WHY WE USE setTimeout():
+        // Firefox can terminate async operations when the message handler returns.
+        // Wrapping in setTimeout(fn, 0) ensures the async navigation runs independently
+        // of the message handler lifecycle.
+        //
+        // See also: handleNavigation() for why we use polling instead of events.
+        // =============================================================================
+
+        // Always use callback mode for navigation (content script gets destroyed during navigation)
+        // Generate requestId if not provided
+        const tabId = sender.tab?.id;
+        const navUrl = message.url;
+        const waitFor = message.waitFor;
+        const timeout = message.timeout || 30;
+        const requestId = message.requestId || `nav-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        const bridgePort = message.bridgePort || BRIDGE_HTTP_PORT;
+
+        console.log('[Inspekt] Using callback mode for navigation:', { requestId, timeout, bridgePort });
+
+        // Use setTimeout to ensure the async operation runs independently
+        // of the message handler lifecycle (some browsers kill async tasks when handler returns)
+        setTimeout(() => {
+            console.log('[Inspekt] Starting navigation via setTimeout');
+            handleNavigationWithCallback(tabId, navUrl, waitFor, timeout, requestId, bridgePort)
+                .then(result => console.log('[Inspekt] Navigation callback completed:', result))
+                .catch(err => console.error('[Inspekt] Navigation callback error:', err));
+        }, 0);
+
+        // Respond immediately - the actual result will be sent via HTTP callback
+        return Promise.resolve({ ok: true, pending: true, message: 'Navigation started, result will be sent via callback' });
     }
 });
 
@@ -951,6 +1023,266 @@ async function setConnectingIcon(tabId) {
  */
 async function setDefaultIcon(tabId) {
     await browser.browserAction.setBadgeText({ tabId, text: '' });
+}
+
+// ============================================================================
+// NAVIGATION HANDLING
+// ============================================================================
+//
+// CRITICAL: Why we use POLLING instead of EVENTS in Firefox
+// ==========================================================
+//
+// In Chrome, browser.tabs.onUpdated events fire reliably even when registered
+// inside a message handler. In Firefox (and Firefox-based browsers like Zen),
+// these events often DON'T FIRE when the listener is added during message handling.
+//
+// This is likely due to:
+// 1. Firefox's event loop differs from Chrome's
+// 2. The listener registration may not complete before navigation starts
+// 3. Firefox may garbage-collect listeners registered in certain contexts
+//
+// Our solution: Poll browser.tabs.get() every 250ms to check tab.status and tab.url.
+// This is slightly less efficient but 100% reliable.
+//
+// IMPORTANT: Do NOT refactor this to use event listeners without testing on both
+// Firefox and Zen browser. The polling approach was adopted after extensive debugging
+// revealed that event-based detection fails intermittently in Firefox-based browsers.
+//
+// ============================================================================
+
+/**
+ * Navigate to a URL using browser.tabs.update()
+ * Uses polling-based detection via browser.tabs.get() for reliable completion detection.
+ * Note: Firefox's browser.tabs.onUpdated event is unreliable when registered from
+ * message handlers, so we use polling instead.
+ *
+ * @param {number} tabId - The tab ID to navigate (or null for active tab)
+ * @param {string} url - The URL to navigate to
+ * @param {string|null} waitFor - Wait condition: 'load' or 'networkidle'
+ * @param {number} timeout - Timeout in seconds (default 30)
+ * @returns {Promise<{ok: boolean, url?: string, title?: string, error?: string}>}
+ */
+async function handleNavigation(tabId, url, waitFor, timeout = 30) {
+    try {
+        // Validate URL
+        if (!url || (!url.startsWith('http://') && !url.startsWith('https://'))) {
+            return {
+                ok: false,
+                error: 'URL must start with http:// or https://'
+            };
+        }
+
+        // Get the tab to navigate (use active tab if not specified)
+        let targetTabId = tabId;
+        if (!targetTabId) {
+            const [activeTab] = await browser.tabs.query({ active: true, currentWindow: true });
+            if (!activeTab) {
+                return { ok: false, error: 'No active tab found' };
+            }
+            targetTabId = activeTab.id;
+        }
+
+        // Get current URL before navigation (for same-origin detection)
+        const initialTab = await browser.tabs.get(targetTabId);
+        const initialUrl = initialTab.url;
+        const targetUrl = new URL(url);
+
+        console.log('[Inspekt] Starting navigation:', { from: initialUrl, to: url, timeout });
+
+        return new Promise((resolve) => {
+            const timeoutMs = timeout * 1000;
+            const pollInterval = 250; // Check every 250ms
+            let resolved = false;
+            let timeoutId;
+            let pollId;
+
+            const cleanup = () => {
+                if (timeoutId) clearTimeout(timeoutId);
+                if (pollId) clearInterval(pollId);
+            };
+
+            const finish = (result) => {
+                if (resolved) return;
+                resolved = true;
+                cleanup();
+                resolve(result);
+            };
+
+            // Helper to normalize hostname (strip www.)
+            // REASON: Many sites redirect www.example.com → example.com or vice versa.
+            // Without normalization, github.com navigation would fail because it redirects
+            // from www.github.com to github.com, causing a hostname mismatch.
+            const normalizeHost = (host) => host.replace(/^www\./, '');
+            const targetHost = normalizeHost(targetUrl.hostname);
+
+            // Polling-based detection (more reliable in Firefox than onUpdated events)
+            pollId = setInterval(async () => {
+                try {
+                    const tab = await browser.tabs.get(targetTabId);
+
+                    // Debug log every few polls
+                    console.log('[Inspekt] Poll check:', {
+                        status: tab.status,
+                        url: tab.url,
+                        changed: tab.url !== initialUrl
+                    });
+
+                    // Check if navigation is complete and URL has changed
+                    if (tab.status === 'complete' && tab.url !== initialUrl) {
+                        try {
+                            const currentUrl = new URL(tab.url);
+                            const currentHost = normalizeHost(currentUrl.hostname);
+
+                            // Success conditions:
+                            // 1. Exact URL match, OR
+                            // 2. Hostname matches target (with www normalization)
+                            const exactMatch = tab.url === url;
+                            const hostsMatch = currentHost === targetHost;
+
+                            console.log('[Inspekt] URL check:', {
+                                exactMatch,
+                                hostsMatch,
+                                currentHost,
+                                targetHost
+                            });
+
+                            if (exactMatch || hostsMatch) {
+                                // Handle networkidle wait
+                                if (waitFor === 'networkidle') {
+                                    console.log('[Inspekt] Waiting for network idle...');
+                                    await new Promise(r => setTimeout(r, 500));
+                                }
+
+                                console.log('[Inspekt] Navigation complete (polling):', {
+                                    targetUrl: url,
+                                    finalUrl: tab.url,
+                                    title: tab.title
+                                });
+
+                                finish({ ok: true, url: tab.url, title: tab.title });
+                            }
+                        } catch (e) {
+                            // URL parse error - but page has changed, consider it success
+                            console.log('[Inspekt] URL parse issue but page changed, considering success');
+                            finish({ ok: true, url: tab.url, title: tab.title || '' });
+                        }
+                    }
+                } catch (e) {
+                    // Tab may not exist anymore, will be caught by timeout
+                    console.log('[Inspekt] Tab query error during polling:', e.message);
+                }
+            }, pollInterval);
+
+            // Timeout handler
+            timeoutId = setTimeout(async () => {
+                try {
+                    const finalTab = await browser.tabs.get(targetTabId);
+                    console.error('[Inspekt] Navigation timeout after', timeout, 's. Final URL:', finalTab.url);
+                    finish({
+                        ok: false,
+                        error: `Navigation timed out after ${timeout}s. Tab is at: ${finalTab.url}`,
+                        url: finalTab.url,
+                        title: finalTab.title
+                    });
+                } catch (e) {
+                    finish({
+                        ok: false,
+                        error: `Navigation timed out after ${timeout}s`
+                    });
+                }
+            }, timeoutMs);
+
+            // Start navigation
+            browser.tabs.update(targetTabId, { url: url }).catch(err => {
+                console.error('[Inspekt] browser.tabs.update failed:', err);
+                finish({ ok: false, error: `browser.tabs.update failed: ${err.message}` });
+            });
+        });
+
+    } catch (error) {
+        console.error('[Inspekt] Navigation error:', error);
+        return {
+            ok: false,
+            error: String(error.message || error)
+        };
+    }
+}
+
+/**
+ * Handle navigation with direct HTTP callback to bridge server.
+ * This bypasses the content script which gets destroyed during navigation.
+ *
+ * @param {number} tabId - The tab ID to navigate
+ * @param {string} url - The URL to navigate to
+ * @param {string|null} waitFor - Wait condition
+ * @param {number} timeout - Timeout in seconds
+ * @param {string} requestId - Request ID for the callback
+ * @param {number} bridgePort - Bridge server port (uses BRIDGE_HTTP_PORT constant by default)
+ */
+async function handleNavigationWithCallback(tabId, url, waitFor, timeout, requestId, bridgePort = BRIDGE_HTTP_PORT) {
+    console.log('[Inspekt] handleNavigationWithCallback:', { url, timeout, requestId, bridgePort });
+
+    try {
+        // Perform the navigation with timeout parameter
+        const result = await handleNavigation(tabId, url, waitFor, timeout);
+
+        // POST result directly to bridge server (bypasses destroyed content script)
+        console.log('[Inspekt] POSTing callback to bridge:', `http://127.0.0.1:${bridgePort}/navigate/callback`);
+        await fetch(`http://127.0.0.1:${bridgePort}/navigate/callback`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                requestId: requestId,
+                response: result
+            })
+        });
+
+        return result;
+    } catch (error) {
+        console.error('[Inspekt] Navigation with callback error:', error);
+
+        // Try to notify bridge of failure
+        try {
+            await fetch(`http://127.0.0.1:${bridgePort}/navigate/callback`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    requestId: requestId,
+                    response: { ok: false, error: String(error.message || error) }
+                })
+            });
+        } catch (e) {
+            console.error('[Inspekt] Failed to POST error callback:', e);
+        }
+
+        return { ok: false, error: String(error.message || error) };
+    }
+}
+
+// ============================================================================
+// SERVER HEALTH CHECK (for popup status display)
+// ============================================================================
+
+/**
+ * Check if the Inspekt API server is running
+ * This runs in the background script which has full network access
+ */
+async function checkServerRunning() {
+    try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 2000);
+
+        const response = await fetch('http://127.0.0.1:8000/health', {
+            method: 'GET',
+            signal: controller.signal
+        });
+
+        clearTimeout(timeoutId);
+        return { running: response.ok };
+    } catch (e) {
+        // Network error, timeout, or server not running
+        return { running: false };
+    }
 }
 
 // Log extension initialization
