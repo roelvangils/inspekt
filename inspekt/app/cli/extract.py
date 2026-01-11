@@ -1337,8 +1337,8 @@ def images(
             if file_path.suffix.lower() == ".svg":
                 try:
                     content = file_path.read_text(encoding="utf-8")
-                    # Only embed if under 5000 characters to avoid bloating HTML
-                    if len(content) <= 5000:
+                    # Only embed if under 10KB to avoid bloating HTML
+                    if len(content) <= 10000:
                         # Pretty-print SVG with proper indentation
                         try:
                             from bs4 import BeautifulSoup
