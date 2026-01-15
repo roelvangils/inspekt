@@ -922,7 +922,7 @@ def status(ctx, output_json):
         bridge_table.print_footer()
 
         # ═══════════════════════════════════════════════════════════════════
-        # CONNECTED BROWSERS TABLE (only if bridge is running)
+        # CONNECTED INSTANCES TABLE (only if bridge is running)
         # ═══════════════════════════════════════════════════════════════════
         if bridge_running and bridge_status:
             browser_count = bridge_status.get('connected_browsers', 0)
@@ -935,7 +935,11 @@ def status(ctx, output_json):
                 browser_data = [["", click.style("No browsers connected", fg="bright_black")]]
             else:
                 browser_data = []
-                for i, browser in enumerate(browsers, 1):
+                for browser in browsers:
+                    # Instance ID and alias
+                    instance_id = browser.get('instance_id', '?')
+                    alias = browser.get('alias')
+
                     # Browser name with version
                     browser_name = browser['browser_name']
                     browser_version = browser.get('browser_version', '')
@@ -943,8 +947,19 @@ def status(ctx, output_json):
                         browser_display = f"{browser_name} {browser_version}"
                     else:
                         browser_display = browser_name
+
+                    # Format instance identifier: [ID] or [ID:alias]
+                    if alias:
+                        instance_label = click.style(f"[{instance_id}:{alias}]", fg="cyan", bold=True)
+                    else:
+                        instance_label = click.style(f"[{instance_id}]", fg="cyan", bold=True)
+
+                    # Mark active instance
                     if browser['is_most_recent']:
                         browser_display = click.style(browser_display, bold=True)
+                        active_marker = click.style(" ● ACTIVE", fg="green")
+                    else:
+                        active_marker = ""
 
                     # Build info parts
                     info_parts = []
@@ -965,15 +980,15 @@ def status(ctx, output_json):
                     meta_parts.append(format_duration(duration))
                     meta_line = click.style(" • ".join(meta_parts), fg="bright_black")
 
-                    # First row: browser name + URL
-                    browser_data.append([f"[{i}] {browser_display}", info_parts[0] if info_parts else ""])
+                    # First row: instance ID + browser name + URL
+                    browser_data.append([f"{instance_label} {browser_display}{active_marker}", info_parts[0] if info_parts else ""])
                     # Second row: title (if exists)
                     if len(info_parts) > 1:
                         browser_data.append(["", info_parts[1]])
                     # Third row: meta info
                     browser_data.append(["", meta_line])
 
-            browser_table = Table(["Browser", "Details"], title="Connected Browsers", icon=browser_icon)
+            browser_table = Table(["Instance", "Details"], title="Connected Instances", icon=browser_icon)
             browser_table.set_data(browser_data)
             browser_table.print_header(skip_column_headers=True)
             for row in browser_data:

@@ -19,15 +19,22 @@ from inspekt.app.cli.base import CustomGroup
 @click.group(cls=CustomGroup)
 @click.version_option(version=__version__)
 @click.option('--verbose', '-v', is_flag=True, help='Enable verbose output (timing, requests, state changes)')
+@click.option('--instance', '-i', 'instance_id', default=None, metavar='ID',
+              help='Target specific browser instance by ID, alias, or index (e.g., "b7x2", "homepage", "0")')
 @click.pass_context
-def cli(ctx, verbose):
+def cli(ctx, verbose, instance_id):
     """Inspekt - Browser automation and inspection from the command line."""
+    import os
+
     ctx.ensure_object(dict)
     ctx.obj['verbose'] = verbose
+    ctx.obj['instance_id'] = instance_id
 
     if verbose:
-        import os
         os.environ['INSPEKT_VERBOSE'] = '1'
+
+    if instance_id:
+        os.environ['INSPEKT_INSTANCE'] = instance_id
 
 
 @cli.group()
@@ -236,21 +243,39 @@ def completion_uninstall(shell: str | None):
 @completion.command("status")
 def completion_status():
     """Check if shell completion is installed."""
+    from inspekt.app.cli.icons import get_indicator
+    from inspekt.app.cli.table import Table, format_status_icon
+
     shell = _detect_shell()
     if shell is None:
         click.echo("Could not detect shell.")
         return
 
     rc_file = _get_rc_file(shell)
+    installed = _is_completion_installed(rc_file)
 
-    click.echo(f"Shell:  {shell}")
-    click.echo(f"Config: {rc_file}")
+    click.echo()
+    table = Table(["Property", "Value"], title="Shell Completion", icon=get_indicator("terminal"))
 
-    if _is_completion_installed(rc_file):
-        click.secho("Status: installed", fg="green")
+    if installed:
+        status_text = f"{format_status_icon('pass')} " + click.style("Installed", fg="green")
     else:
-        click.secho("Status: not installed", fg="yellow")
-        click.echo("\nRun: inspekt completion install")
+        status_text = f"{format_status_icon('warning')} " + click.style("Not installed", fg="yellow")
+
+    data = [
+        ["Shell", shell],
+        ["Config", str(rc_file)],
+        ["Status", status_text],
+    ]
+    table.set_data(data)
+    table.print_header(skip_column_headers=True)
+    for row in data:
+        table.print_row(row)
+    table.print_footer()
+
+    if not installed:
+        click.echo()
+        click.echo(f"  To install, run: " + click.style("inspekt completion install", fg="cyan"))
 
 
 @cli.command()
@@ -264,68 +289,89 @@ def setup(install_completion: bool):
 
     Run with --install-completion to automatically add completion to your shell config.
     """
+    from inspekt.app.cli.icons import get_icon, get_indicator, get_status_icon
+    from inspekt.app.cli.table import Table, format_status_icon
+
     # Detect current shell
     shell = _detect_shell() or "bash"
     rc_file = _get_rc_file(shell)
-
-    click.echo()
-    click.secho("  Inspekt Setup Wizard", fg="cyan", bold=True)
-    click.secho("  " + "=" * 20, fg="cyan")
-    click.echo()
-
-    # Show version
-    click.echo(f"  Version: {__version__}")
-    click.echo(f"  Shell:   {shell}")
-    click.echo()
-
-    # Shell completion
-    click.secho("  Shell Completion", fg="yellow", bold=True)
-    click.echo("  ----------------")
-
     already_installed = _is_completion_installed(rc_file)
 
+    click.echo()
+
+    # === System Info Table ===
+    info_table = Table(["Property", "Value"], title="Inspekt Setup", icon=get_indicator("info_circle"))
+    info_data = [
+        ["Version", __version__],
+        ["Shell", shell],
+        ["Config", str(rc_file)],
+    ]
+    info_table.set_data(info_data)
+    info_table.print_header(skip_column_headers=True)
+    for row in info_data:
+        info_table.print_row(row)
+    info_table.print_footer()
+
+    click.echo()
+
+    # === Shell Completion Table ===
+    completion_table = Table(["Setting", "Status"], title="Shell Completion", icon=get_indicator("terminal"))
+
     if already_installed:
-        click.secho("  Tab completion is already installed.", fg="green")
-    elif install_completion:
-        # Auto-install completion using shared logic
-        script = _get_completion_script(shell)
-
-        if shell == 'fish':
-            rc_file.parent.mkdir(parents=True, exist_ok=True)
-            rc_file.write_text(script)
-        else:
-            with open(rc_file, 'a') as f:
-                f.write(f"\n# inspekt shell completion\n{script}\n")
-
-        click.secho(f"  Completion installed to {rc_file}", fg="green")
-        click.echo()
-        click.secho("  Reload your shell or run:", fg="yellow")
-        click.echo(f"    source {rc_file}")
+        status_text = f"{format_status_icon('pass')} " + click.style("Installed", fg="green")
     else:
-        click.echo("  Tab completion is not installed.")
-        click.echo()
-        click.echo("  To enable, run:")
-        click.echo()
-        click.secho("    inspekt completion install", fg="green")
+        status_text = f"{format_status_icon('warning')} " + click.style("Not installed", fg="yellow")
+
+    completion_data = [
+        ["Tab completion", status_text],
+    ]
+    completion_table.set_data(completion_data)
+    completion_table.print_header(skip_column_headers=True)
+    for row in completion_data:
+        completion_table.print_row(row)
+    completion_table.print_footer()
+
+    # Handle completion installation
+    if not already_installed:
+        if install_completion:
+            # Auto-install completion using shared logic
+            script = _get_completion_script(shell)
+
+            if shell == 'fish':
+                rc_file.parent.mkdir(parents=True, exist_ok=True)
+                rc_file.write_text(script)
+            else:
+                with open(rc_file, 'a') as f:
+                    f.write(f"\n# inspekt shell completion\n{script}\n")
+
+            click.echo()
+            click.secho(f"{get_status_icon('pass')} Completion installed to {rc_file}", fg="green")
+            click.echo(f"  Reload your shell or run: source {rc_file}")
+        else:
+            click.echo()
+            click.echo(f"  To enable tab completion, run:")
+            click.secho("  inspekt completion install", fg="cyan")
 
     click.echo()
 
-    # Quick tips
-    click.secho("  Quick Tips", fg="yellow", bold=True)
-    click.echo("  ----------")
-    click.echo("  - Mistype a command? Inspekt suggests corrections:")
-    click.secho("      $ inspekt screenshit", fg="white", dim=True)
-    click.secho("      Error: Did you mean: 'screenshot'?", fg="white", dim=True)
+    # === Quick Tips Table ===
+    tips_table = Table(["Command", "Description"], title="Quick Start", icon=get_indicator("tip"))
+    tips_data = [
+        [click.style("inspekt start", fg="cyan"), "Start the bridge server"],
+        [click.style("inspekt status", fg="cyan"), "Check connection status"],
+        [click.style("inspekt record", fg="cyan"), "Record browser interactions"],
+        [click.style("inspekt replay", fg="cyan"), "Replay a recording"],
+        [click.style("inspekt --help", fg="cyan"), "Show all commands"],
+    ]
+    tips_table.set_data(tips_data)
+    tips_table.print_header(skip_column_headers=True)
+    for row in tips_data:
+        tips_table.print_row(row)
+    tips_table.print_footer()
+
     click.echo()
-    click.echo("  - Start the bridge server:")
-    click.echo("      inspekt start")
-    click.echo()
-    click.echo("  - Check connection status:")
-    click.echo("      inspekt status")
-    click.echo()
-    click.echo("  - Get help on any command:")
-    click.echo("      inspekt <command> --help")
-    click.echo()
+    from inspekt.app.cli.table import print_hint
+    print_hint("Mistype a command? Inspekt suggests corrections! Try `inspekt screenshit` → Did you mean 'screenshot'?")
 
 
 @cli.command()
@@ -339,7 +385,7 @@ def config():
     from pathlib import Path
 
     from inspekt.config import find_config_file, DEFAULT_CONFIG
-    from inspekt.app.cli.util import open_or_download
+    from inspekt.app.cli.output import OutputHandler
 
     config_path = find_config_file()
 
@@ -352,7 +398,7 @@ def config():
         click.echo(f"Created new config file: {config_path}")
 
     # Open in default editor (or download if in VM)
-    open_or_download(config_path)
+    OutputHandler.open_file(config_path)
     click.echo(f"Opening: {config_path}")
 
 
@@ -382,10 +428,8 @@ cli.add_lazy_command("pgdown", "navigation", "pgdown")
 cli.add_lazy_command("home", "navigation", "home")
 cli.add_lazy_command("end", "navigation", "end")
 
-# Cookie management commands (from cookies.py)
-cli.add_lazy_command("cookies", "cookies", "cookies")
-
 # Storage management commands (from storage.py)
+# Note: Use 'inspekt storage --cookies' for cookie operations
 cli.add_lazy_command("storage", "storage", "storage")
 
 # Domain management commands (from domain.py)
@@ -394,6 +438,7 @@ cli.add_lazy_command("domain", "domain", "domain")
 # Interaction commands (from interaction.py)
 cli.add_lazy_command("type", "interaction", "type_text")
 cli.add_lazy_command("paste", "interaction", "paste")
+cli.add_lazy_command("press", "interaction", "press")
 cli.add_lazy_command("send", "interaction", "send")
 cli.add_lazy_command("click", "interaction", "click_element")
 cli.add_lazy_command("double-click", "interaction", "double_click")
@@ -405,10 +450,14 @@ cli.add_lazy_command("wait", "interaction", "wait")
 # Inspection commands (from inspection.py)
 cli.add_lazy_command("inspect", "inspection", "inspect")
 cli.add_lazy_command("inspected", "inspection", "inspected")
+cli.add_lazy_command("focused", "inspection", "focused")
 cli.add_lazy_command("screenshot", "inspection", "screenshot")
 
 # Accessibility commands (from accessibility.py)
 cli.add_lazy_command("axe", "accessibility", "axe")
+cli.add_lazy_command("ibm", "accessibility", "ibm")
+cli.add_lazy_command("a11y", "accessibility", "a11y")
+cli.add_lazy_command("a11y-reset", "accessibility", "a11y_reset")
 cli.add_lazy_command("autocomplete", "accessibility", "autocomplete")
 
 # Selection commands (from selection.py)
@@ -422,6 +471,9 @@ cli.add_lazy_command("restart", "control", "restart")
 cli.add_lazy_command("status", "control", "status")
 cli.add_lazy_command("queue", "control", "queue")
 
+# Browser instance management commands (from instances.py)
+cli.add_lazy_command("instances", "instances", "instances")
+
 # MCP server management commands (from mcp.py)
 cli.add_lazy_command("mcp", "mcp", "mcp")
 
@@ -433,6 +485,9 @@ cli.add_lazy_command("links", "extraction", "links")
 cli.add_lazy_command("summarize", "extraction", "summarize")
 cli.add_lazy_command("index", "extraction", "index")
 cli.add_lazy_command("ask", "extraction", "ask")
+
+# Extract command group (from extract.py)
+cli.add_lazy_command("extract", "extract", "extract")
 
 # Watch commands (from watch.py)
 cli.add_lazy_command("watch", "watch", "watch")

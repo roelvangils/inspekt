@@ -1,14 +1,28 @@
 """
 Client library for communicating with the Inspekt server.
+
+Supports two transport mechanisms:
+- Unix socket (default on macOS/Linux) - faster, more reliable
+- HTTP (fallback, required for external access)
+
+Transport selection is automatic based on platform, but can be
+overridden via environment variable INSPEKT_TRANSPORT.
 """
 
 import os
-import re
 import time
-from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 import requests
+
+from inspekt.transport import (
+    ConnectionError as TransportConnectionError,
+    Request,
+    SyncUnixSocketTransport,
+    TimeoutError as TransportTimeoutError,
+    get_socket_path,
+    is_server_available,
+)
 
 
 def _verbose_log(message: str, data: Any = None) -> None:
@@ -25,54 +39,160 @@ def _verbose_log(message: str, data: Any = None) -> None:
         print(f"[{timestamp}] {message}", file=sys.stderr)
 
 
-def get_expected_userscript_version() -> str | None:
+def _use_socket_transport() -> bool:
+    """Check if socket transport should be used.
+
+    Returns True if:
+    - INSPEKT_TRANSPORT is "unix" or "auto" (default)
+    - Platform is not Windows
+    - Socket file exists (server is running with socket enabled)
     """
-    Read the expected userscript version from userscript_ws.js file.
+    import platform
 
-    Returns:
-        Version string (e.g., '3.2') or None if file not found
+    transport = os.environ.get("INSPEKT_TRANSPORT", "auto")
+
+    if transport == "http":
+        return False
+
+    if platform.system() == "Windows":
+        return False
+
+    # Check if socket exists (server running with socket enabled)
+    socket_path = get_socket_path()
+    return socket_path.exists()
+
+
+class SocketClientMixin:
+    """Mixin that adds socket transport support to BridgeClient.
+
+    Provides socket-based implementations of core methods that can
+    be used instead of HTTP when available.
     """
-    # Try to find userscript_ws.js in the project directory
-    # Look in common locations relative to this file
-    current_dir = Path(__file__).parent.parent  # Go up from zen/ to project root
-    userscript_path = current_dir / "userscript_ws.js"
 
-    if not userscript_path.exists():
-        # Try current working directory
-        userscript_path = Path.cwd() / "userscript_ws.js"
+    _socket_transport: Optional[SyncUnixSocketTransport] = None
 
-    if not userscript_path.exists():
-        return None
+    def _get_socket_transport(self) -> SyncUnixSocketTransport:
+        """Get or create socket transport (lazy initialization)."""
+        if self._socket_transport is None:
+            self._socket_transport = SyncUnixSocketTransport()
+        return self._socket_transport
 
-    try:
-        with open(userscript_path) as f:
-            content = f.read()
-            # Look for @version or window.__ZEN_BRIDGE_VERSION__
-            # Try @version first (from userscript header)
-            version_match = re.search(r"@version\s+(\S+)", content)
-            if version_match:
-                return version_match.group(1)
+    def _close_socket_transport(self) -> None:
+        """Close the socket transport if open."""
+        if self._socket_transport is not None:
+            self._socket_transport.disconnect()
+            self._socket_transport = None
 
-            # Try window.__ZEN_BRIDGE_VERSION__ as fallback
-            version_match = re.search(
-                r'window\.__ZEN_BRIDGE_VERSION__\s*=\s*[\'"]([^\'"]+)[\'"]', content
-            )
-            if version_match:
-                return version_match.group(1)
-    except Exception:
-        pass
+    def _socket_health(self) -> dict[str, Any] | None:
+        """Check server health via socket transport.
 
-    return None
+        Returns health data dict or None if unavailable.
+        """
+        try:
+            transport = self._get_socket_transport()
+            if not transport.is_connected():
+                transport.connect()
+
+            response = transport.send(Request(method="health", params={}), timeout=5.0)
+
+            if response.success:
+                return response.data
+            return None
+        except (TransportConnectionError, TransportTimeoutError):
+            return None
+
+    def _socket_run(self, code: str, timeout: float = 10.0, browser_index: int = None, instance: str = None) -> dict[str, Any]:
+        """Execute code via socket transport.
+
+        Args:
+            code: JavaScript code to execute
+            timeout: Timeout in seconds
+            browser_index: Legacy numeric index (0-based)
+            instance: Instance identifier (ID, alias, or index string)
+
+        Returns:
+            Dict with {"ok": bool, "request_id": str} on success
+
+        Raises:
+            ConnectionError: If socket connection fails
+            RuntimeError: If server returns error
+        """
+        transport = self._get_socket_transport()
+        if not transport.is_connected():
+            transport.connect()
+
+        params = {"code": code}
+        if instance is not None:
+            # New instance parameter takes precedence
+            params["instance"] = instance
+        elif browser_index is not None:
+            params["browser_index"] = browser_index
+
+        response = transport.send(Request(method="run", params=params), timeout=timeout + 5)
+
+        if not response.success:
+            error = response.error or "unknown error"
+            if error == "no_browser_connected":
+                raise RuntimeError(
+                    "No browser connected.\n\n"
+                    "Make sure:\n"
+                    "  • A browser with the Inspekt extension is open\n"
+                    "  • The extension is enabled on the current page\n"
+                    "  • The bridge server is running (`inspekt start`)"
+                )
+            elif error == "browser_not_responding":
+                raise RuntimeError(
+                    "Browser tab not responding.\n\n"
+                    "The browser tab may be frozen or in the background.\n\n"
+                    "Try:\n"
+                    "  • Click on the browser tab to wake it up\n"
+                    "  • Refresh the page\n"
+                    "  • Check that the Inspekt extension is enabled"
+                )
+            elif error == "instance_not_found":
+                message = response.data.get("message", f"Instance '{instance}' not found") if response.data else f"Instance '{instance}' not found"
+                raise RuntimeError(
+                    f"{message}\n\n"
+                    "The specified browser instance could not be found.\n\n"
+                    "Use `inspekt instances` to list available browser instances."
+                )
+            else:
+                raise RuntimeError(f"Failed to submit code: {error}")
+
+        return response.data
+
+    def _socket_result(self, request_id: str, timeout: float = 30.0) -> dict[str, Any]:
+        """Get execution result via socket transport.
+
+        Returns:
+            The result dict from the browser
+
+        Raises:
+            ConnectionError: If socket connection fails
+            TimeoutError: If result not received in time
+        """
+        transport = self._get_socket_transport()
+        if not transport.is_connected():
+            transport.connect()
+
+        response = transport.send(
+            Request(method="result", params={"request_id": request_id, "timeout": timeout}),
+            timeout=timeout + 5
+        )
+
+        if response.success:
+            return response.data
+
+        raise RuntimeError(response.error or "Failed to get result")
 
 
-class BridgeClient:
+class BridgeClient(SocketClientMixin):
     """Client for communicating with Inspekt server."""
 
     def __init__(self, host: str = "127.0.0.1", port: int = None):
         # Allow override via environment variable (for VM isolation)
         # INSPEKT_BRIDGE_URL takes precedence, then INSPEKT_BRIDGE_PORT,
         # then auto-detect based on environment (VM vs normal)
-        import os
         from inspekt.config import get_bridge_port
         env_url = os.environ.get("INSPEKT_BRIDGE_URL")
         env_port = os.environ.get("INSPEKT_BRIDGE_PORT")
@@ -92,11 +212,14 @@ class BridgeClient:
             self.host = host
             self.port = port
         self.timeout = 5
-        self._version_checked = False  # Track if we've already shown version warning
-        self._cached_version = None  # Cache the version to avoid multiple requests
         self._last_retry_result = None  # Store retry result for domain prompt flow
+        self.quiet = False  # When True, suppress all warnings (for JSON output mode)
         # Use a session for connection pooling (prevents port exhaustion on long operations)
         self._session = requests.Session()
+
+        # Track if socket transport should be used (auto-detected)
+        self._use_socket = _use_socket_transport()
+        _verbose_log("BridgeClient initialized", f"use_socket={self._use_socket}, base_url={self.base_url}")
 
     def _extract_domain(self, url: str) -> str | None:
         """Extract domain from URL."""
@@ -173,11 +296,16 @@ class BridgeClient:
                 click.echo("✓ Synced to browser")
             else:
                 click.echo("⚠ Browser sync pending (will retry)", err=True)
+                # Give browser time to process the sync message
+                # (sync message was sent but response timed out - browser may still be processing)
+                time.sleep(1.0)
 
             click.echo("")
 
-            # Retry execution (no sleep needed - sync confirmation means browser has updated)
-            self._last_retry_result = self.execute(code, timeout=timeout, _skip_domain_check=True)
+            # Retry execution
+            # Use shorter timeout for retry since we just synced and browser should respond quickly
+            retry_timeout = min(timeout, 15.0)
+            self._last_retry_result = self.execute(code, timeout=retry_timeout, _skip_domain_check=True, _fast_poll=True)
             return self._last_retry_result.get("ok", False)
 
         except Exception as e:
@@ -216,7 +344,22 @@ class BridgeClient:
             return False
 
     def is_alive(self) -> bool:
-        """Check if bridge server is running."""
+        """Check if bridge server is running.
+
+        Uses socket transport when available, falls back to HTTP.
+        """
+        # Try socket first if available
+        if self._use_socket:
+            try:
+                health = self._socket_health()
+                if health is not None:
+                    return True
+            except Exception:
+                pass
+            # Socket failed, fall back to HTTP
+            _verbose_log("Socket health check failed, trying HTTP")
+
+        # HTTP fallback
         try:
             response = self._session.get(f"{self.base_url}/health", timeout=self.timeout)
             return response.status_code == 200
@@ -224,7 +367,21 @@ class BridgeClient:
             return False
 
     def get_status(self) -> dict[str, Any] | None:
-        """Get bridge server status."""
+        """Get bridge server status.
+
+        Uses socket transport when available, falls back to HTTP.
+        """
+        # Try socket first if available
+        if self._use_socket:
+            try:
+                health = self._socket_health()
+                if health is not None:
+                    return health
+            except Exception:
+                pass
+            _verbose_log("Socket status check failed, trying HTTP")
+
+        # HTTP fallback
         try:
             response = self._session.get(f"{self.base_url}/health", timeout=self.timeout)
             if response.status_code == 200:
@@ -257,115 +414,7 @@ class BridgeClient:
             return 0
         return status.get("connected_browsers", 0)
 
-    def get_userscript_version(self) -> str | None:
-        """Get installed userscript version from browser."""
-        # Return cached version if available
-        if self._cached_version:
-            return self._cached_version
-
-        try:
-            # Support both new (INSPEKT) and legacy (ZEN) variable names
-            result = self.execute("window.__INSPEKT_BRIDGE_VERSION__ || window.__ZEN_BRIDGE_VERSION__ || 'unknown'", timeout=2.0)
-            if result.get("ok"):
-                self._cached_version = result.get("result")
-                return self._cached_version
-        except Exception:
-            pass
-        return None
-
-    def check_userscript_version(self, show_warning: bool = True) -> str | None:
-        """
-        Check if browser userscript/extension version matches expected version.
-
-        Args:
-            show_warning: If True, print warning to stderr when versions don't match
-
-        Returns:
-            Warning message if versions don't match, None if they match or check fails
-        """
-        if self._version_checked:
-            return None  # Already checked this session
-
-        self._version_checked = True
-
-        try:
-            expected_version = get_expected_userscript_version()
-            if not expected_version:
-                return None  # Can't find userscript file, skip check
-
-            # Get installed version and check if using extension
-            # Support both new (INSPEKT) and legacy (ZEN) variable names
-            try:
-                response = self._session.post(
-                    f"{self.base_url}/run",
-                    json={"code": "(window.__INSPEKT_BRIDGE_VERSION__ || window.__ZEN_BRIDGE_VERSION__ || 'unknown') + '|' + ((window.__INSPEKT_BRIDGE_EXTENSION__ || window.__ZEN_BRIDGE_EXTENSION__) ? 'ext' : 'user')"},
-                    timeout=self.timeout,
-                )
-                response.raise_for_status()
-                data = response.json()
-                request_id = data.get("request_id")
-
-                # Poll for result (short timeout)
-                for _ in range(10):  # Max 1 second
-                    result_response = self._session.get(
-                        f"{self.base_url}/result",
-                        params={"request_id": request_id},
-                        timeout=self.timeout,
-                    )
-                    if result_response.status_code == 200:
-                        result = result_response.json()
-                        if result.get("ok"):
-                            result_str = result.get("result", "unknown|user")
-                            installed_version, install_type = result_str.split("|") if "|" in result_str else (result_str, "user")
-                            # Cache the version
-                            self._cached_version = installed_version
-                            break
-                    time.sleep(0.1)
-                else:
-                    return None  # Timeout getting version
-            except Exception:
-                return None  # Failed to get version
-
-            # Extension version 4.x.x is always compatible (no version check needed)
-            if install_type == "ext":
-                if installed_version.startswith("4."):
-                    return None  # Extension is compatible, no warning
-                elif not installed_version or installed_version == "unknown":
-                    # Extension detected but version unknown - still OK
-                    return None  # Extension bypasses version check
-
-            if not installed_version or installed_version == "unknown":
-                # Userscript not installed or old version without version variable
-                warning = (
-                    f"\n⚠️  WARNING: Could not detect userscript version in browser.\n"
-                    f"   Expected version: {expected_version}\n"
-                    f"   Please update your userscript from: userscript_ws.js\n"
-                )
-                if show_warning:
-                    import sys
-
-                    print(warning, file=sys.stderr)
-                return warning
-
-            if installed_version != expected_version:
-                warning = (
-                    f"\n⚠️  WARNING: Userscript version mismatch!\n"
-                    f"   Installed: {installed_version}\n"
-                    f"   Expected:  {expected_version}\n"
-                    f"   Please update your userscript from: userscript_ws.js\n"
-                )
-                if show_warning:
-                    import sys
-
-                    print(warning, file=sys.stderr)
-                return warning
-
-        except Exception:
-            pass  # Silently ignore errors in version check
-
-        return None  # Versions match or check failed
-
-    def execute(self, code: str, timeout: float = 10.0, _skip_domain_check: bool = False, browser_index: int = None) -> dict[str, Any]:
+    def execute(self, code: str, timeout: float = 10.0, _skip_domain_check: bool = False, browser_index: int = None, _fast_poll: bool = False, instance: str = None) -> dict[str, Any]:
         """
         Execute JavaScript code in the browser and wait for result.
 
@@ -375,6 +424,10 @@ class BridgeClient:
             _skip_domain_check: Internal flag to prevent recursion during domain check
             browser_index: Optional index of specific browser to target (0-based).
                           If None, uses the most recently active browser.
+            _fast_poll: Internal flag to use shorter poll timeout (for domain retry scenarios)
+            instance: Optional instance identifier (ID, alias, or index string).
+                     Takes precedence over browser_index. Can also be set via
+                     INSPEKT_INSTANCE environment variable.
 
         Returns:
             Dictionary with execution result
@@ -384,37 +437,135 @@ class BridgeClient:
             TimeoutError: If execution takes longer than timeout
             RuntimeError: If code execution fails in browser
         """
-        _verbose_log("BridgeClient.execute() called", {"timeout": timeout, "code_length": len(code), "browser_index": browser_index})
+        # Check for instance from environment variable if not provided
+        if instance is None:
+            instance = os.environ.get('INSPEKT_INSTANCE')
 
-        if not self.is_alive():
-            raise ConnectionError("Bridge server is not running. Start it with: inspekt start")
+        _verbose_log("BridgeClient.execute() called", {"timeout": timeout, "code_length": len(code), "browser_index": browser_index, "instance": instance, "fast_poll": _fast_poll, "use_socket": self._use_socket})
 
-        # Check userscript version on first execute (only once per client instance)
-        if not self._version_checked:
-            self.check_userscript_version(show_warning=True)
+        # Try socket transport first (faster, more reliable)
+        if self._use_socket and not _skip_domain_check:
+            try:
+                _verbose_log("Using socket transport")
+                start_time = time.time()
+
+                # Submit code via socket
+                run_result = self._socket_run(code, timeout=timeout, browser_index=browser_index, instance=instance)
+                request_id = run_result.get("request_id")
+
+                if not request_id:
+                    raise RuntimeError("No request_id returned from server")
+
+                _verbose_log("Socket run succeeded", f"request_id={request_id}")
+
+                # Get result via socket
+                remaining_timeout = max(timeout - (time.time() - start_time), 1.0)
+                result = self._socket_result(request_id, timeout=remaining_timeout)
+
+                _verbose_log("Socket result received", f"time={time.time() - start_time:.3f}s, status={result.get('status')}")
+
+                # Handle domain authorization error (needs HTTP for domain prompt flow)
+                if not result.get("ok"):
+                    error_msg = str(result.get("error", "")).lower()
+                    is_domain_error = any(phrase in error_msg for phrase in [
+                        "not allowed to access this domain",
+                        "domain not authorized",
+                        "not authorized"
+                    ])
+                    if is_domain_error:
+                        _verbose_log("Domain error detected, falling back to HTTP for prompt flow")
+                        # Fall through to HTTP to handle domain prompt
+                    else:
+                        return result
+
+                # Check for pending status (need to poll more)
+                if result.get("status") == "pending":
+                    # Continue polling via socket
+                    while time.time() - start_time < timeout:
+                        remaining = max(timeout - (time.time() - start_time), 1.0)
+                        result = self._socket_result(request_id, timeout=min(remaining, 5.0))
+                        if result.get("status") != "pending":
+                            break
+                        time.sleep(0.5)
+
+                return result
+
+            except (TransportConnectionError, TransportTimeoutError) as e:
+                _verbose_log("Socket transport failed, falling back to HTTP", str(e))
+                # Fall through to HTTP implementation
+            except RuntimeError:
+                # Re-raise RuntimeError (browser errors) as-is
+                raise
+            except Exception as e:
+                _verbose_log("Socket transport unexpected error", str(e))
+                # Fall through to HTTP implementation
+
+        # HTTP implementation (fallback or primary when socket not available)
+        # For fast_poll mode, skip the health check to minimize latency
+        if not _fast_poll:
+            if not self.is_alive():
+                raise ConnectionError("Bridge server is not running. Start it with: inspekt start")
 
         # Submit code
         try:
             # Use execution timeout + buffer for HTTP request (not the 5s default)
             # This allows slow operations to complete
-            http_timeout = timeout + 5
-            _verbose_log("Submitting code to bridge", f"POST {self.base_url}/run")
+            # For fast_poll mode, use the raw timeout (fail fast on pre-validation checks)
+            http_timeout = timeout if _fast_poll else timeout + 5
+            _verbose_log("Submitting code to bridge", f"POST {self.base_url}/run, http_timeout={http_timeout}")
             submit_start = time.time()
 
             # Build request payload
             payload = {"code": code}
-            if browser_index is not None:
+            if instance is not None:
+                # New instance parameter takes precedence
+                payload["instance"] = instance
+            elif browser_index is not None:
                 payload["browser_index"] = browser_index
 
             response = self._session.post(
                 f"{self.base_url}/run", json=payload, timeout=http_timeout
             )
-            response.raise_for_status()
-            data = response.json()
             _verbose_log("Code submitted", f"status={response.status_code}, time={time.time() - submit_start:.3f}s")
 
+            # Parse JSON first to get detailed error messages (before raise_for_status)
+            try:
+                data = response.json()
+            except ValueError:
+                # If we can't parse JSON, fall back to HTTP error handling
+                response.raise_for_status()
+                raise RuntimeError("Invalid response from server")
+
             if not data.get("ok"):
-                raise RuntimeError(f"Failed to submit code: {data.get('error')}")
+                error = data.get("error", "unknown error")
+
+                # Handle specific error types with helpful messages
+                if error == "browser_not_responding":
+                    raise RuntimeError(
+                        "Browser tab not responding.\n\n"
+                        "The browser tab may be frozen or in the background.\n\n"
+                        "Try:\n"
+                        "  • Click on the browser tab to wake it up\n"
+                        "  • Refresh the page\n"
+                        "  • Check that the Inspekt extension is enabled"
+                    )
+                elif error == "no_browser_connected":
+                    raise RuntimeError(
+                        "No browser connected.\n\n"
+                        "Make sure:\n"
+                        "  • A browser with the Inspekt extension is open\n"
+                        "  • The extension is enabled on the current page\n"
+                        "  • The bridge server is running (`inspekt start`)"
+                    )
+                elif error == "instance_not_found":
+                    message = data.get("message", f"Instance '{instance}' not found")
+                    raise RuntimeError(
+                        f"{message}\n\n"
+                        "The specified browser instance could not be found.\n\n"
+                        "Use `inspekt instances` to list available browser instances."
+                    )
+                else:
+                    raise RuntimeError(f"Failed to submit code: {error}")
 
             request_id = data["request_id"]
             _verbose_log("Request ID assigned", request_id)
@@ -432,9 +583,21 @@ class BridgeClient:
             poll_count += 1
             try:
                 # Calculate remaining timeout for this request
-                # Server does long polling up to 180s, so set HTTP timeout accordingly
+                # IMPORTANT: HTTP request timeout must respect the overall operation timeout
+                # to prevent indefinite hangs when the bridge is unresponsive
                 remaining_time = timeout - (time.time() - start_time)
-                request_timeout = max(remaining_time + 10, 30)  # At least 30 seconds for long poll
+                if remaining_time <= 0:
+                    break  # Overall timeout exceeded, exit the loop
+
+                # Use shorter minimum timeout for domain retry scenarios (browser should respond quickly)
+                # For quick checks (pre-validation), use remaining time directly (fail fast)
+                if _fast_poll:
+                    request_timeout = max(remaining_time + 1, 2)  # At least 2s, but respect overall timeout
+                else:
+                    # Use remaining time + small buffer, with reasonable min/max bounds
+                    # Min of 5s to allow for network latency, but cap at remaining_time + 5s
+                    # to ensure we don't hang past the overall timeout
+                    request_timeout = max(min(remaining_time + 5, 60), 5)
 
                 response = self._session.get(
                     f"{self.base_url}/result",
@@ -505,7 +668,7 @@ class BridgeClient:
                                 # Try to read CSP flag from browser
                                 csp_check = self._session.post(
                                     f"{self.base_url}/run",
-                                    json={"code": "window.__ZEN_BRIDGE_CSP_BLOCKED__"},
+                                    json={"code": "window.__INSPEKT_BRIDGE_CSP_BLOCKED__"},
                                     timeout=self.timeout,
                                 )
                                 if csp_check.status_code == 200:
@@ -531,7 +694,7 @@ class BridgeClient:
                                                 "Solutions:\n"
                                                 "  • Test Inspekt on other websites without strict CSP\n"
                                                 "  • Check browser console (F12) for detailed CSP warnings\n"
-                                                "  • Read troubleshooting guide: https://roelvangils.github.io/zen-bridge/troubleshooting/csp-issues/\n\n"
+                                                "  • Read troubleshooting guide: https://roelvangils.github.io/inspekt/troubleshooting/csp-issues/\n\n"
                                                 f"Current site: {csp_data.get('url', 'unknown')}"
                                             )
                             except (requests.RequestException, KeyError):
