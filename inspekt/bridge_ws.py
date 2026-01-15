@@ -6,9 +6,12 @@ WebSocket-based bridge server using aiohttp (more compatible).
 import asyncio
 import json
 import os
+import re
+import struct
 import time
 import uuid
-from typing import Any
+from pathlib import Path
+from typing import Any, Optional
 
 from pydantic import ValidationError
 
@@ -29,6 +32,7 @@ from inspekt.domain.models import (
     parse_incoming_message,
 )
 from inspekt.services.script_loader import ScriptLoader
+from inspekt.transport.unix_socket import get_socket_path
 
 HOST = "127.0.0.1"
 PORT = 8765
@@ -54,8 +58,17 @@ pending_notifications: list = []
 # Events for long polling - notifies waiting HTTP requests when results arrive
 pending_events: dict[str, asyncio.Event] = {}
 
+# Events for execute acknowledgments - notifies /run endpoint when browser received request
+ack_events: dict[str, asyncio.Event] = {}
+
 # Cleanup old requests after 2 minutes (reduced from 5 to catch stuck requests faster)
 MAX_REQUEST_AGE = 120
+
+# Timeout for browser to acknowledge receiving a request (seconds)
+# Note: Browser tabs in the background are heavily throttled by Chrome/Firefox,
+# so we need a generous timeout. 30 seconds allows for throttled tabs to wake up.
+# If no ack within this time, the browser is likely truly frozen/unresponsive.
+ACK_TIMEOUT = 30.0
 
 # Warn about requests stuck longer than this (seconds)
 STUCK_REQUEST_THRESHOLD = 60
@@ -63,8 +76,9 @@ STUCK_REQUEST_THRESHOLD = 60
 # Time window for browser_info message before connection is considered a ghost
 BROWSER_INFO_TTL = 5
 
-# Stale connection threshold (no activity for 90 seconds = 3 missed pings)
-STALE_CONNECTION_THRESHOLD = 90
+# Stale connection threshold (no activity for 120 seconds = ~4 missed pings)
+# Background tabs are heavily throttled, so we need a generous threshold
+STALE_CONNECTION_THRESHOLD = 120
 
 # Long idle connection threshold (1 hour) - for connections that are alive but unused
 IDLE_CONNECTION_THRESHOLD = 3600
@@ -93,6 +107,510 @@ total_requests_failed = 0  # Count of failed requests
 last_activity_time = time.time()  # Track last request/result activity
 last_activity_per_connection: dict = {}  # Track last activity time per connection
 last_command_per_connection: dict = {}  # Track last command execution time per connection
+
+# Instance tracking for browser targeting
+instance_ids: dict[str, Any] = {}  # Maps instance_id (str) -> WebSocket
+instance_aliases: dict[str, str] = {}  # Maps alias (str) -> instance_id
+instance_id_to_ws: dict[str, Any] = {}  # Reverse lookup: instance_id -> WebSocket
+
+
+def generate_instance_id() -> str:
+    """Generate a short unique instance ID like 'b7x2' or 'k9m4'.
+
+    Uses lowercase letters and digits to create a 4-character ID that is:
+    - Easy to type and remember
+    - Unique enough for typical use (36^4 = 1.6M combinations)
+    - Session-scoped (regenerated on server restart)
+    """
+    import random
+    import string
+    chars = string.ascii_lowercase + string.digits
+    # Ensure uniqueness by checking against existing IDs
+    while True:
+        new_id = ''.join(random.choices(chars, k=4))
+        if new_id not in instance_ids:
+            return new_id
+
+
+def cleanup_instance_for_ws(ws: Any) -> str | None:
+    """Remove instance tracking for a disconnected WebSocket.
+
+    Returns the instance_id that was removed, or None if not found.
+    Also cleans up any aliases pointing to this instance.
+    """
+    # Find and remove instance ID for this WebSocket
+    instance_id_to_remove = None
+    for iid, stored_ws in list(instance_ids.items()):
+        if stored_ws == ws:
+            instance_id_to_remove = iid
+            break
+
+    if instance_id_to_remove:
+        instance_ids.pop(instance_id_to_remove, None)
+        instance_id_to_ws.pop(instance_id_to_remove, None)
+
+        # Remove any aliases pointing to this instance
+        aliases_to_remove = [
+            alias for alias, iid in instance_aliases.items()
+            if iid == instance_id_to_remove
+        ]
+        for alias in aliases_to_remove:
+            del instance_aliases[alias]
+
+    return instance_id_to_remove
+
+
+def get_instance_id_for_ws(ws: Any) -> str | None:
+    """Get the instance ID for a WebSocket connection."""
+    for iid, stored_ws in instance_ids.items():
+        if stored_ws == ws:
+            return iid
+    return None
+
+
+def get_alias_for_instance(instance_id: str) -> str | None:
+    """Get the alias for an instance ID, if one exists."""
+    for alias, iid in instance_aliases.items():
+        if iid == instance_id:
+            return alias
+    return None
+
+
+# Socket server state
+socket_server: Optional[asyncio.Server] = None
+socket_path: Optional[Path] = None
+
+
+# ============================================================================
+# Socket Protocol Handler
+# ============================================================================
+
+
+class SocketProtocolHandler:
+    """Handles the length-prefixed JSON protocol for socket clients.
+
+    Protocol:
+    - Messages are framed with a 4-byte big-endian length prefix
+    - Payload is UTF-8 encoded JSON
+    """
+
+    def __init__(
+        self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter
+    ) -> None:
+        self.reader = reader
+        self.writer = writer
+
+    async def read_request(self) -> Optional[dict]:
+        """Read a length-prefixed JSON request.
+
+        Returns:
+            Parsed JSON dict, or None if connection closed
+        """
+        try:
+            # Read 4-byte length prefix
+            length_data = await self.reader.readexactly(4)
+            length = struct.unpack(">I", length_data)[0]
+
+            # Read payload
+            data = await self.reader.readexactly(length)
+            return json.loads(data.decode("utf-8"))
+        except (asyncio.IncompleteReadError, ConnectionResetError):
+            return None
+
+    async def write_response(self, response: dict) -> None:
+        """Write a length-prefixed JSON response."""
+        data = json.dumps(response).encode("utf-8")
+        length_prefix = struct.pack(">I", len(data))
+        self.writer.write(length_prefix + data)
+        await self.writer.drain()
+
+
+async def dispatch_socket_method(method: str, params: dict) -> dict:
+    """Dispatch socket method to internal handlers.
+
+    Maps socket methods to the same logic used by HTTP endpoints.
+
+    Args:
+        method: Method name (e.g., "run", "health", "result")
+        params: Method parameters
+
+    Returns:
+        Response dict with success/data/error fields
+    """
+    global total_requests_processed, total_requests_succeeded, total_requests_failed
+    global last_activity_time
+
+    total_requests_processed += 1
+    last_activity_time = time.time()
+
+    try:
+        if method == "run":
+            # Execute code in browser
+            code = params.get("code", "")
+            browser_index = params.get("browser_index")
+            instance = params.get("instance")  # New: ID, alias, or index string
+
+            if not code or not isinstance(code, str):
+                return {"success": False, "error": "missing code"}
+
+            if not active_connections:
+                return {"success": False, "error": "no_browser_connected"}
+
+            # Resolve target browser instance
+            target_ws = None
+            if instance:
+                target_ws = resolve_instance(instance)
+                if target_ws is None:
+                    return {
+                        "success": False,
+                        "error": "instance_not_found",
+                        "message": f"No browser instance found for '{instance}'"
+                    }
+
+            # Create ack event before sending
+            request_id = str(uuid.uuid4())
+            ack_event = asyncio.Event()
+            ack_events[request_id] = ack_event
+
+            try:
+                await send_code_to_browser_with_id(code, request_id, browser_index=browser_index, target_ws=target_ws)
+
+                # Wait for browser acknowledgment
+                await asyncio.wait_for(ack_event.wait(), timeout=ACK_TIMEOUT)
+                total_requests_succeeded += 1
+                return {"success": True, "data": {"ok": True, "request_id": request_id}}
+
+            except asyncio.TimeoutError:
+                pending_requests.pop(request_id, None)
+                total_requests_failed += 1
+                return {
+                    "success": False,
+                    "error": "browser_not_responding",
+                    "message": "Browser tab not responding. Try clicking on the tab or refreshing the page."
+                }
+            finally:
+                ack_events.pop(request_id, None)
+
+        elif method == "result":
+            # Get execution result (with optional waiting)
+            request_id = params.get("request_id")
+            timeout = params.get("timeout", 30.0)
+
+            if not request_id:
+                return {"success": False, "error": "missing request_id"}
+
+            # If already completed, return immediately
+            if request_id in completed_requests:
+                result = completed_requests[request_id]
+                total_requests_succeeded += 1
+                return {"success": True, "data": result}
+
+            # If pending, wait for result
+            elif request_id in pending_requests:
+                if request_id not in pending_events:
+                    pending_events[request_id] = asyncio.Event()
+
+                event = pending_events[request_id]
+
+                if len(active_connections) == 0:
+                    del pending_requests[request_id]
+                    pending_events.pop(request_id, None)
+                    total_requests_failed += 1
+                    return {"success": False, "error": "no_browser_connected"}
+
+                try:
+                    await asyncio.wait_for(event.wait(), timeout=timeout)
+
+                    if request_id in completed_requests:
+                        pending_events.pop(request_id, None)
+                        result = completed_requests[request_id]
+                        total_requests_succeeded += 1
+                        return {"success": True, "data": result}
+                    else:
+                        total_requests_failed += 1
+                        return {"success": False, "error": "result_not_ready"}
+
+                except asyncio.TimeoutError:
+                    total_requests_failed += 1
+                    return {"success": True, "data": {"status": "pending"}}
+
+            else:
+                total_requests_failed += 1
+                return {"success": False, "error": "request_not_found"}
+
+        elif method == "health":
+            # Health check - return same fields as HTTP /health endpoint
+            uptime = int(time.time() - server_start_time)
+            # Note: browser_info is keyed by WebSocket object, not id(ws)
+            valid_connections = [
+                ws for ws in active_connections
+                if ws in browser_info and is_valid_browser_info(browser_info.get(ws))
+            ]
+
+            # Build browser list with full details (same as HTTP /health)
+            # Sort by connection time for consistent ordering
+            sorted_connections = sorted(valid_connections, key=lambda ws: connection_times.get(ws, time.time()))
+            most_recent = most_recent_connection if most_recent_connection in active_connections else None
+
+            browsers = []
+            for ws in sorted_connections:
+                info = browser_info.get(ws, {})
+                inst_id = get_instance_id_for_ws(ws)
+                alias = get_alias_for_instance(inst_id) if inst_id else None
+
+                # Parse browser name and version from user agent
+                ua = info.get("userAgent", "")
+                browser_name = "Unknown"
+                browser_version = ""
+                if "Firefox" in ua:
+                    browser_name = "Firefox"
+                    match = re.search(r"Firefox/(\d+\.?\d*)", ua)
+                    if match:
+                        browser_version = match.group(1)
+                elif "Edg" in ua:
+                    browser_name = "Edge"
+                    match = re.search(r"Edg/(\d+\.?\d*\.?\d*\.?\d*)", ua)
+                    if match:
+                        browser_version = match.group(1)
+                elif "Chrome" in ua:
+                    browser_name = "Chrome"
+                    match = re.search(r"Chrome/(\d+\.?\d*\.?\d*\.?\d*)", ua)
+                    if match:
+                        browser_version = match.group(1)
+                elif "Safari" in ua:
+                    browser_name = "Safari"
+                    match = re.search(r"Version/(\d+\.?\d*)", ua)
+                    if match:
+                        browser_version = match.group(1)
+
+                browsers.append({
+                    "instance_id": inst_id,
+                    "alias": alias,
+                    "browser_name": browser_name,
+                    "browser_version": browser_version,
+                    "extension_version": info.get("extensionVersion"),
+                    "url": info.get("url", ""),
+                    "title": info.get("title", ""),
+                    "user_agent": ua,
+                    "is_most_recent": ws == most_recent,
+                    "connected_duration": time.time() - connection_times.get(ws, time.time()),
+                    "visible": info.get("visible", True),
+                    "last_command_time": last_command_per_connection.get(ws),
+                })
+
+            total_requests_succeeded += 1
+            return {
+                "success": True,
+                "data": {
+                    "ok": True,
+                    "connected_browsers": len(valid_connections),
+                    "browsers": browsers,
+                    "pending": len(pending_requests),
+                    "completed": len(completed_requests),
+                    "uptime_seconds": uptime,
+                    "total_requests": total_requests_processed,
+                }
+            }
+
+        elif method == "status":
+            # Detailed server status
+            uptime = int(time.time() - server_start_time)
+            # Note: browser_info is keyed by WebSocket object, not id(ws)
+            valid_connections = [
+                ws for ws in active_connections
+                if ws in browser_info and is_valid_browser_info(browser_info.get(ws))
+            ]
+
+            browsers = []
+            for ws in valid_connections:
+                info = browser_info.get(ws, {})
+                inst_id = get_instance_id_for_ws(ws)
+                alias = get_alias_for_instance(inst_id) if inst_id else None
+                browsers.append({
+                    "instance_id": inst_id,
+                    "alias": alias,
+                    "userAgent": info.get("userAgent", "Unknown"),
+                    "url": info.get("url", ""),
+                    "title": info.get("title", ""),
+                    "extensionVersion": info.get("extensionVersion"),
+                })
+
+            total_requests_succeeded += 1
+            return {
+                "success": True,
+                "data": {
+                    "status": "ok",
+                    "browsers": browsers,
+                    "pending_requests": len(pending_requests),
+                    "completed_requests": len(completed_requests),
+                    "uptime_seconds": uptime,
+                    "socket_path": str(socket_path) if socket_path else None,
+                }
+            }
+
+        elif method == "console_logs":
+            # Get console logs from browser (same as HTTP endpoint)
+            if most_recent_connection is None:
+                total_requests_failed += 1
+                return {"success": False, "error": "no_browser_connected"}
+
+            request_id = str(uuid.uuid4())
+            message = {"type": "GET_CONSOLE_LOGS", "requestId": request_id}
+
+            pending_requests[request_id] = {
+                "timestamp": time.time(),
+                "type": "GET_CONSOLE_LOGS"
+            }
+
+            await most_recent_connection.send_json(message)
+
+            event = asyncio.Event()
+            pending_events[request_id] = event
+
+            try:
+                timeout = params.get("timeout", 10.0)
+                await asyncio.wait_for(event.wait(), timeout=timeout)
+            except asyncio.TimeoutError:
+                pending_requests.pop(request_id, None)
+                pending_events.pop(request_id, None)
+                total_requests_failed += 1
+                return {"success": False, "error": "timeout"}
+
+            result = completed_requests.pop(request_id, None)
+            pending_events.pop(request_id, None)
+
+            if result is None:
+                total_requests_failed += 1
+                return {"success": False, "error": "no_response"}
+
+            total_requests_succeeded += 1
+            return {"success": True, "data": result.get("response", result)}
+
+        elif method == "console_clear":
+            # Clear console logs in browser (same as HTTP endpoint)
+            if most_recent_connection is None:
+                total_requests_failed += 1
+                return {"success": False, "error": "no_browser_connected"}
+
+            request_id = str(uuid.uuid4())
+            message = {"type": "CLEAR_CONSOLE_LOGS", "requestId": request_id}
+
+            pending_requests[request_id] = {
+                "timestamp": time.time(),
+                "type": "CLEAR_CONSOLE_LOGS"
+            }
+
+            await most_recent_connection.send_json(message)
+
+            event = asyncio.Event()
+            pending_events[request_id] = event
+
+            try:
+                timeout = params.get("timeout", 10.0)
+                await asyncio.wait_for(event.wait(), timeout=timeout)
+            except asyncio.TimeoutError:
+                pending_requests.pop(request_id, None)
+                pending_events.pop(request_id, None)
+                total_requests_failed += 1
+                return {"success": False, "error": "timeout"}
+
+            result = completed_requests.pop(request_id, None)
+            pending_events.pop(request_id, None)
+
+            total_requests_succeeded += 1
+            return {"success": True, "data": {"cleared": True}}
+
+        else:
+            total_requests_failed += 1
+            return {"success": False, "error": f"unknown method: {method}"}
+
+    except Exception as e:
+        total_requests_failed += 1
+        return {"success": False, "error": str(e)}
+
+
+async def handle_socket_client(
+    reader: asyncio.StreamReader,
+    writer: asyncio.StreamWriter,
+) -> None:
+    """Handle a Unix socket client connection.
+
+    Each connection is handled in a loop, processing requests until
+    the client disconnects.
+    """
+    handler = SocketProtocolHandler(reader, writer)
+    peer = writer.get_extra_info("peername") or "unknown"
+
+    try:
+        while True:
+            request = await handler.read_request()
+            if request is None:
+                # Connection closed
+                break
+
+            method = request.get("method", "")
+            params = request.get("params", {})
+            request_id = request.get("id")
+
+            # Dispatch to handler
+            result = await dispatch_socket_method(method, params)
+
+            # Add request_id to response
+            result["id"] = request_id
+
+            await handler.write_response(result)
+
+    except Exception as e:
+        # Log error but don't crash
+        print(f"Socket client error ({peer}): {e}")
+
+    finally:
+        writer.close()
+        try:
+            await writer.wait_closed()
+        except Exception:
+            pass
+
+
+async def start_socket_server(socket_path_arg: Optional[Path] = None) -> Optional[asyncio.Server]:
+    """Start the Unix socket server.
+
+    Args:
+        socket_path_arg: Optional explicit socket path (uses default if None)
+
+    Returns:
+        The asyncio.Server instance, or None if socket creation failed
+    """
+    global socket_server, socket_path
+
+    socket_path = socket_path_arg or get_socket_path()
+
+    # Ensure parent directory exists
+    socket_path.parent.mkdir(parents=True, exist_ok=True)
+
+    # Remove stale socket file if it exists
+    if socket_path.exists():
+        try:
+            socket_path.unlink()
+        except OSError as e:
+            print(f"Warning: Could not remove stale socket {socket_path}: {e}")
+            return None
+
+    try:
+        server = await asyncio.start_unix_server(
+            handle_socket_client,
+            path=str(socket_path),
+        )
+
+        # Set socket permissions (owner read/write only for security)
+        socket_path.chmod(0o600)
+
+        socket_server = server
+        return server
+
+    except OSError as e:
+        print(f"Error: Could not create socket server at {socket_path}: {e}")
+        return None
 
 
 def is_valid_browser_info(info: dict) -> bool:
@@ -138,28 +656,24 @@ def parse_user_agent(user_agent: str) -> tuple[str, str]:
 
     # Detect Zen Browser (based on Firefox)
     if "Zen/" in ua:
-        import re
         match = re.search(r'Zen/([\d.]+)', ua)
         version = match.group(1) if match else ""
         return ("Zen Browser", version)
 
     # Detect Firefox
     if "Firefox/" in ua and "Seamonkey" not in ua:
-        import re
         match = re.search(r'Firefox/([\d.]+)', ua)
         version = match.group(1) if match else ""
         return ("Firefox", version)
 
     # Detect Edge (Chromium-based)
     if "Edg/" in ua:
-        import re
         match = re.search(r'Edg/([\d.]+)', ua)
         version = match.group(1) if match else ""
         return ("Edge", version)
 
     # Detect Chrome (but not Edge or other Chromium-based browsers)
     if "Chrome/" in ua and "Edg/" not in ua:
-        import re
         # Check if it's a Chromium-based browser with a different identity
         if "OPR/" in ua or "Opera/" in ua:
             match = re.search(r'(?:OPR|Opera)/([\d.]+)', ua)
@@ -178,7 +692,6 @@ def parse_user_agent(user_agent: str) -> tuple[str, str]:
 
     # Detect Safari (but not Chrome on iOS which also has Safari in UA)
     if "Safari/" in ua and "Chrome" not in ua and "Chromium" not in ua:
-        import re
         # Try to get version from Version/ token first
         match = re.search(r'Version/([\d.]+)', ua)
         if match:
@@ -265,6 +778,7 @@ async def cleanup_watchdog():
                 except Exception:
                     pass
                 active_connections.discard(ws)
+                cleanup_instance_for_ws(ws)  # Clean up instance tracking
                 connection_times.pop(ws, None)
                 last_activity_per_connection.pop(ws, None)
                 last_command_per_connection.pop(ws, None)
@@ -289,6 +803,7 @@ async def cleanup_watchdog():
                 except Exception:
                     pass
                 active_connections.discard(ws)
+                cleanup_instance_for_ws(ws)  # Clean up instance tracking
                 browser_info.pop(ws, None)
                 connection_times.pop(ws, None)
                 last_activity_per_connection.pop(ws, None)
@@ -311,6 +826,7 @@ async def cleanup_watchdog():
                 except Exception:
                     pass
                 active_connections.discard(ws)
+                cleanup_instance_for_ws(ws)  # Clean up instance tracking
                 browser_info.pop(ws, None)
                 connection_times.pop(ws, None)
                 last_activity_per_connection.pop(ws, None)
@@ -335,6 +851,7 @@ async def cleanup_watchdog():
                 except Exception:
                     pass
                 active_connections.discard(ws)
+                cleanup_instance_for_ws(ws)  # Clean up instance tracking
                 browser_info.pop(ws, None)
                 connection_times.pop(ws, None)
                 last_activity_per_connection.pop(ws, None)
@@ -462,7 +979,13 @@ async def websocket_handler(request):
     # Track connection time
     connection_times[ws] = time.time()
     last_activity_time = time.time()
-    print("Browser tab connected via WebSocket")
+
+    # Generate and assign a unique instance ID for this browser
+    instance_id = generate_instance_id()
+    instance_ids[instance_id] = ws
+    instance_id_to_ws[instance_id] = ws
+
+    print(f"Browser tab connected via WebSocket (instance: {instance_id})")
     print(f"Active connections: {len(active_connections)}")
 
     # Auto-sync domains to newly connected browser
@@ -539,6 +1062,13 @@ async def websocket_handler(request):
                             if request_id in pending_events:
                                 pending_events[request_id].set()
                                 print(f"Notified waiting HTTP request for {request_id}")
+
+                    elif message_type == "execute_ack":
+                        # Browser acknowledging it received the execute request
+                        # This confirms the browser is alive and processing the request
+                        request_id = data.get("request_id")
+                        if request_id and request_id in ack_events:
+                            ack_events[request_id].set()
 
                     elif message_type == "reinit_control":
                         # Browser requesting automatic reinitialization after page reload
@@ -670,6 +1200,7 @@ async def websocket_handler(request):
                 cancelled_count += 1
 
         active_connections.discard(ws)
+        removed_instance = cleanup_instance_for_ws(ws)  # Clean up instance tracking
         browser_info.pop(ws, None)
         connection_times.pop(ws, None)  # Clean up connection time tracking
         last_activity_per_connection.pop(ws, None)  # Clean up activity tracking
@@ -693,8 +1224,26 @@ async def send_code_to_browser(code: str, browser_index: int = None) -> str:
         code: JavaScript code to execute
         browser_index: Optional index of specific browser to target (0-based)
     """
-    global most_recent_connection
     request_id = str(uuid.uuid4())
+    await send_code_to_browser_with_id(code, request_id, browser_index)
+    return request_id
+
+
+async def send_code_to_browser_with_id(
+    code: str,
+    request_id: str,
+    browser_index: int = None,
+    target_ws: Any = None
+) -> None:
+    """Send code to browser for execution with a pre-generated request_id.
+
+    Args:
+        code: JavaScript code to execute
+        request_id: Pre-generated request ID (for ack tracking)
+        browser_index: Optional index of specific browser to target (0-based)
+        target_ws: Optional specific WebSocket to target (overrides browser_index)
+    """
+    global most_recent_connection
     pending_requests[request_id] = {
         "code": code,
         "timestamp": time.time(),
@@ -704,25 +1253,24 @@ async def send_code_to_browser(code: str, browser_index: int = None) -> str:
     # Send to most recent active browser only
     message = json.dumps({"type": "execute", "request_id": request_id, "code": code})
 
-    # Select target browser
-    target_ws = None
-
-    if browser_index is not None:
-        # Target specific browser by index
-        # Sort by connection time for consistent ordering (matches /health endpoint)
-        connections_list = sorted(active_connections, key=lambda ws: connection_times.get(ws, time.time()))
-        if 0 <= browser_index < len(connections_list):
-            target_ws = connections_list[browser_index]
+    # Select target browser - explicit target_ws has highest priority
+    if target_ws is None:
+        if browser_index is not None:
+            # Target specific browser by index
+            # Sort by connection time for consistent ordering (matches /health endpoint)
+            connections_list = sorted(active_connections, key=lambda ws: connection_times.get(ws, time.time()))
+            if 0 <= browser_index < len(connections_list):
+                target_ws = connections_list[browser_index]
+            else:
+                print(f"[Server] WARNING: Invalid browser_index {browser_index}, only {len(connections_list)} browsers connected")
         else:
-            print(f"[Server] WARNING: Invalid browser_index {browser_index}, only {len(connections_list)} browsers connected")
-    else:
-        # Use most recent connection if available, otherwise use any active connection
-        target_ws = most_recent_connection if most_recent_connection in active_connections else None
+            # Use most recent connection if available, otherwise use any active connection
+            target_ws = most_recent_connection if most_recent_connection in active_connections else None
 
-        if not target_ws and active_connections:
-            # Fallback to first available connection
-            target_ws = next(iter(active_connections))
-            most_recent_connection = target_ws
+            if not target_ws and active_connections:
+                # Fallback to first available connection
+                target_ws = next(iter(active_connections))
+                most_recent_connection = target_ws
 
     if target_ws:
         # Track which connection owns this request
@@ -747,24 +1295,78 @@ async def send_code_to_browser(code: str, browser_index: int = None) -> str:
     else:
         print(f"[Server] WARNING: No browsers connected for request {request_id[:8]}")
 
-    return request_id
-
 
 async def handle_http_run(request):
-    """HTTP endpoint: Submit code to run."""
+    """HTTP endpoint: Submit code to run.
+
+    Now waits for browser acknowledgment before returning to ensure the browser
+    is alive and received the request. Returns error within ACK_TIMEOUT seconds
+    if no acknowledgment is received (browser frozen/unresponsive).
+
+    Supports targeting specific browser instances via:
+    - instance: ID, alias, or index string (e.g., "b7x2", "homepage", "0")
+    - browser_index: Numeric index (legacy, for backwards compatibility)
+    """
     cleanup_old_requests()
 
     try:
         data = await request.json()
         code = data.get("code", "")
-        browser_index = data.get("browser_index")  # Optional: target specific browser
+        browser_index = data.get("browser_index")  # Legacy: target by numeric index
+        instance = data.get("instance")  # New: target by ID, alias, or index string
 
         if not code or not isinstance(code, str):
             return web.json_response({"ok": False, "error": "missing code"}, status=400)
 
-        request_id = await send_code_to_browser(code, browser_index=browser_index)
+        # Check if any browsers are connected before sending
+        if not active_connections:
+            return web.json_response(
+                {"ok": False, "error": "no_browser_connected"},
+                status=503
+            )
 
-        return web.json_response({"ok": True, "request_id": request_id})
+        # Resolve target browser instance
+        target_ws = None
+        if instance:
+            # New instance resolution: supports ID, alias, or index string
+            target_ws = resolve_instance(instance)
+            if target_ws is None:
+                return web.json_response(
+                    {"ok": False, "error": f"instance_not_found", "message": f"No browser instance found for '{instance}'"},
+                    status=404
+                )
+
+        # Create ack event BEFORE sending, to avoid race condition where
+        # the ack arrives before we're ready to receive it
+        request_id = str(uuid.uuid4())
+        ack_event = asyncio.Event()
+        ack_events[request_id] = ack_event
+
+        # Now send the code (using our pre-generated request_id)
+        await send_code_to_browser_with_id(code, request_id, browser_index=browser_index, target_ws=target_ws)
+
+        try:
+            await asyncio.wait_for(ack_event.wait(), timeout=ACK_TIMEOUT)
+            # Ack received - browser is alive and processing
+            return web.json_response({"ok": True, "request_id": request_id})
+
+        except asyncio.TimeoutError:
+            # No ack within timeout - browser is likely frozen/unresponsive
+            # Clean up the pending request since it won't be processed
+            pending_requests.pop(request_id, None)
+
+            return web.json_response(
+                {
+                    "ok": False,
+                    "error": "browser_not_responding",
+                    "message": "Browser tab not responding. Try clicking on the tab or refreshing the page."
+                },
+                status=504
+            )
+
+        finally:
+            # Clean up ack event
+            ack_events.pop(request_id, None)
 
     except Exception as e:
         return web.json_response({"ok": False, "error": str(e)}, status=500)
@@ -954,7 +1556,13 @@ async def handle_http_health(request):
                 }
                 browser_name = name_map.get(extension_browser_name, extension_browser_name)
 
+        # Get instance ID and alias for this connection
+        inst_id = get_instance_id_for_ws(ws)
+        alias = get_alias_for_instance(inst_id) if inst_id else None
+
         browsers_list.append({
+            "instance_id": inst_id,
+            "alias": alias,
             "browser_name": browser_name,
             "browser_version": browser_version,
             "extension_version": info.get("extensionVersion"),
@@ -1051,6 +1659,236 @@ async def handle_http_queue_clear(request):
         )
 
 
+# ============================================================================
+# INSTANCE MANAGEMENT ENDPOINTS
+# ============================================================================
+
+
+async def handle_http_instances_list(request):
+    """HTTP endpoint: List all connected browser instances with details."""
+    current_time = time.time()
+
+    # Get valid connections
+    valid_connections = [
+        ws for ws in active_connections
+        if ws in browser_info and is_valid_browser_info(browser_info.get(ws))
+    ]
+
+    # Sort by connection time for consistent ordering
+    sorted_connections = sorted(
+        valid_connections,
+        key=lambda ws: connection_times.get(ws, current_time)
+    )
+
+    instances = []
+    for index, ws in enumerate(sorted_connections):
+        info = browser_info.get(ws, {})
+        connection_time = connection_times.get(ws, current_time)
+        duration = current_time - connection_time
+
+        # Get instance ID and alias
+        inst_id = get_instance_id_for_ws(ws)
+        alias = get_alias_for_instance(inst_id) if inst_id else None
+
+        # Parse browser info
+        user_agent = info.get("userAgent", "")
+        browser_name, browser_version = parse_user_agent(user_agent)
+        if browser_name == "Unknown":
+            browser_name = info.get("browserName", "Unknown")
+
+        # Format duration
+        if duration < 60:
+            duration_str = f"{int(duration)}s"
+        elif duration < 3600:
+            duration_str = f"{int(duration / 60)}m {int(duration % 60)}s"
+        else:
+            hours = int(duration / 3600)
+            minutes = int((duration % 3600) / 60)
+            duration_str = f"{hours}h {minutes}m"
+
+        # Format last command time
+        last_cmd_time = last_command_per_connection.get(ws)
+        if last_cmd_time is None:
+            last_cmd_str = "never"
+        else:
+            ago = current_time - last_cmd_time
+            if ago < 60:
+                last_cmd_str = f"{int(ago)}s ago"
+            elif ago < 3600:
+                last_cmd_str = f"{int(ago / 60)}m ago"
+            else:
+                last_cmd_str = f"{int(ago / 3600)}h ago"
+
+        instances.append({
+            "id": inst_id,
+            "alias": alias,
+            "index": index,
+            "browser": f"{browser_name} {browser_version}".strip(),
+            "browser_name": browser_name,
+            "browser_version": browser_version,
+            "url": info.get("url", ""),
+            "title": info.get("title", ""),
+            "is_active": (ws == most_recent_connection),
+            "connected_duration": duration,
+            "connected_duration_str": duration_str,
+            "last_command_time": last_cmd_time,
+            "last_command_time_str": last_cmd_str,
+            "visible": info.get("visible", True),
+        })
+
+    return web.json_response({
+        "ok": True,
+        "instances": instances,
+        "count": len(instances),
+    })
+
+
+async def handle_http_instance_alias_set(request):
+    """HTTP endpoint: Set an alias for a browser instance."""
+    try:
+        data = await request.json()
+        instance_id = data.get("instance_id")
+        alias = data.get("alias", "").strip().lower()
+
+        if not instance_id:
+            return web.json_response(
+                {"ok": False, "error": "Missing 'instance_id' parameter"},
+                status=400
+            )
+
+        if not alias:
+            return web.json_response(
+                {"ok": False, "error": "Missing 'alias' parameter"},
+                status=400
+            )
+
+        # Validate instance exists
+        if instance_id not in instance_ids:
+            return web.json_response(
+                {"ok": False, "error": f"Instance '{instance_id}' not found"},
+                status=404
+            )
+
+        # Check if alias is already used by another instance
+        if alias in instance_aliases and instance_aliases[alias] != instance_id:
+            existing_id = instance_aliases[alias]
+            return web.json_response(
+                {"ok": False, "error": f"Alias '{alias}' is already used by instance '{existing_id}'"},
+                status=409
+            )
+
+        # Remove any existing alias for this instance
+        for old_alias, iid in list(instance_aliases.items()):
+            if iid == instance_id:
+                del instance_aliases[old_alias]
+                break
+
+        # Set new alias
+        instance_aliases[alias] = instance_id
+
+        print(f"[Instances] Set alias '{alias}' for instance {instance_id}")
+
+        return web.json_response({
+            "ok": True,
+            "instance_id": instance_id,
+            "alias": alias,
+            "message": f"Alias '{alias}' set for instance {instance_id}",
+        })
+
+    except Exception as e:
+        return web.json_response(
+            {"ok": False, "error": str(e)},
+            status=500
+        )
+
+
+async def handle_http_instance_alias_remove(request):
+    """HTTP endpoint: Remove an alias from a browser instance."""
+    try:
+        alias = request.query.get("alias", "").strip().lower()
+
+        if not alias:
+            # Try to get from JSON body
+            if request.body_exists:
+                data = await request.json()
+                alias = data.get("alias", "").strip().lower()
+
+        if not alias:
+            return web.json_response(
+                {"ok": False, "error": "Missing 'alias' parameter"},
+                status=400
+            )
+
+        if alias not in instance_aliases:
+            return web.json_response(
+                {"ok": False, "error": f"Alias '{alias}' not found"},
+                status=404
+            )
+
+        instance_id = instance_aliases.pop(alias)
+
+        print(f"[Instances] Removed alias '{alias}' from instance {instance_id}")
+
+        return web.json_response({
+            "ok": True,
+            "alias": alias,
+            "instance_id": instance_id,
+            "message": f"Alias '{alias}' removed from instance {instance_id}",
+        })
+
+    except Exception as e:
+        return web.json_response(
+            {"ok": False, "error": str(e)},
+            status=500
+        )
+
+
+def resolve_instance(identifier: str) -> Any:
+    """Resolve a browser instance by ID, alias, or numeric index.
+
+    Args:
+        identifier: Instance ID (e.g., 'b7x2'), alias (e.g., 'homepage'),
+                   or numeric index (e.g., '0', '1')
+
+    Returns:
+        WebSocket connection for the instance, or None if not found.
+    """
+    if not identifier:
+        return None
+
+    identifier = identifier.strip().lower()
+
+    # Try as instance ID first
+    if identifier in instance_ids:
+        ws = instance_ids[identifier]
+        if ws in active_connections:
+            return ws
+
+    # Try as alias
+    if identifier in instance_aliases:
+        instance_id = instance_aliases[identifier]
+        if instance_id in instance_ids:
+            ws = instance_ids[instance_id]
+            if ws in active_connections:
+                return ws
+
+    # Try as numeric index
+    if identifier.isdigit():
+        index = int(identifier)
+        valid_connections = [
+            ws for ws in active_connections
+            if ws in browser_info and is_valid_browser_info(browser_info.get(ws))
+        ]
+        sorted_connections = sorted(
+            valid_connections,
+            key=lambda ws: connection_times.get(ws, time.time())
+        )
+        if 0 <= index < len(sorted_connections):
+            return sorted_connections[index]
+
+    return None
+
+
 async def handle_http_domain_add(request):
     """HTTP endpoint: Add a domain to allowed list."""
     try:
@@ -1066,7 +1904,7 @@ async def handle_http_domain_add(request):
         # Send message to extension via WebSocket
         if not most_recent_connection or most_recent_connection not in active_connections:
             return web.json_response(
-                {"ok": False, "error": "No browser connected"},
+                {"ok": False, "error": "No browser connected. If Chrome is open, make sure you're on a regular webpage (not chrome://, new tab, or extension pages where content scripts can't run)."},
                 status=503
             )
 
@@ -1125,7 +1963,7 @@ async def handle_http_domain_remove(request):
         # Send message to extension via WebSocket
         if not most_recent_connection or most_recent_connection not in active_connections:
             return web.json_response(
-                {"ok": False, "error": "No browser connected"},
+                {"ok": False, "error": "No browser connected. If Chrome is open, make sure you're on a regular webpage (not chrome://, new tab, or extension pages where content scripts can't run)."},
                 status=503
             )
 
@@ -1175,7 +2013,7 @@ async def handle_http_domain_list(request):
         # Send message to extension via WebSocket
         if not most_recent_connection or most_recent_connection not in active_connections:
             return web.json_response(
-                {"ok": False, "error": "No browser connected"},
+                {"ok": False, "error": "No browser connected. If Chrome is open, make sure you're on a regular webpage (not chrome://, new tab, or extension pages where content scripts can't run)."},
                 status=503
             )
 
@@ -1233,7 +2071,7 @@ async def handle_http_domain_bypass(request):
         # Send message to extension via WebSocket
         if not most_recent_connection or most_recent_connection not in active_connections:
             return web.json_response(
-                {"ok": False, "error": "No browser connected"},
+                {"ok": False, "error": "No browser connected. If Chrome is open, make sure you're on a regular webpage (not chrome://, new tab, or extension pages where content scripts can't run)."},
                 status=503
             )
 
@@ -1311,7 +2149,7 @@ async def handle_http_domain_sync(request):
         # Check if any browsers are connected
         if not active_connections:
             return web.json_response(
-                {"ok": False, "error": "No browser connected"},
+                {"ok": False, "error": "No browser connected. If Chrome is open, make sure you're on a regular webpage (not chrome://, new tab, or extension pages where content scripts can't run)."},
                 status=503
             )
 
@@ -1408,6 +2246,137 @@ async def handle_http_domain_sync(request):
 
 
 # ============================================================================
+# Navigation Endpoint
+# ============================================================================
+
+async def handle_http_navigate(request):
+    """HTTP endpoint: Navigate browser to a URL.
+
+    Uses chrome.tabs.update() in the extension background script instead of
+    window.location.href JavaScript, which properly handles navigation without
+    destroying the execution context.
+    """
+    try:
+        data = await request.json()
+        url = data.get("url")
+        wait_for = data.get("waitFor")
+        timeout = data.get("timeout", 30)
+
+        if not url:
+            return web.json_response(
+                {"ok": False, "error": "Missing 'url' parameter"},
+                status=400
+            )
+
+        if not url.startswith(("http://", "https://")):
+            return web.json_response(
+                {"ok": False, "error": "URL must start with http:// or https://"},
+                status=400
+            )
+
+        # Send message to extension via WebSocket
+        if not most_recent_connection or most_recent_connection not in active_connections:
+            print(f"[Bridge /navigate] No browser connected - user may be on a Chrome internal page")
+            return web.json_response(
+                {"ok": False, "error": "No browser connected. If Chrome is open, make sure you're on a regular webpage (not chrome://, new tab, or extension pages where content scripts can't run)."},
+                status=503
+            )
+
+        request_id = str(uuid.uuid4())
+        message = {
+            "type": "NAVIGATE",
+            "requestId": request_id,
+            "url": url,
+            "waitFor": wait_for,
+            "timeout": timeout,
+        }
+
+        print(f"[Bridge /navigate] Sending NAVIGATE message: {url} (requestId: {request_id}, timeout: {timeout}s)")
+
+        # Store pending request
+        pending_requests[request_id] = {
+            "timestamp": time.time(),
+            "type": "NAVIGATE"
+        }
+
+        # Send to browser
+        await most_recent_connection.send_json(message)
+        print(f"[Bridge /navigate] Message sent, waiting for callback...")
+
+        # Wait for response (with timeout - navigation can take longer)
+        event = asyncio.Event()
+        pending_events[request_id] = event
+
+        try:
+            await asyncio.wait_for(event.wait(), timeout=float(timeout))
+            result = completed_requests.get(request_id, {})
+            return web.json_response(result.get("response", {"ok": False, "error": "No response"}))
+        except asyncio.TimeoutError:
+            return web.json_response(
+                {"ok": False, "error": f"Navigation timed out after {timeout}s"},
+                status=504
+            )
+        finally:
+            pending_events.pop(request_id, None)
+            completed_requests.pop(request_id, None)
+
+    except Exception as e:
+        return web.json_response(
+            {"ok": False, "error": str(e)},
+            status=500
+        )
+
+
+async def handle_http_navigate_callback(request):
+    """HTTP endpoint: Receive navigation result callback from extension background script.
+
+    This endpoint receives the navigation result directly from the extension's background
+    script, bypassing the content script which gets destroyed during page navigation.
+    """
+    global most_recent_connection
+
+    try:
+        data = await request.json()
+        request_id = data.get("requestId")
+        response = data.get("response", {})
+
+        if not request_id:
+            return web.json_response(
+                {"ok": False, "error": "Missing 'requestId' parameter"},
+                status=400
+            )
+
+        # Check if there's a pending request waiting for this callback
+        if request_id in pending_events:
+            # Navigation completed - wait a moment for new content script to connect
+            # This ensures the next command will have a valid WebSocket connection
+            if response.get("ok"):
+                # Wait up to 2 seconds for a new WebSocket connection
+                for _ in range(20):
+                    await asyncio.sleep(0.1)
+                    if most_recent_connection and most_recent_connection in active_connections:
+                        # Check if it's a fresh connection (connected after navigation started)
+                        break
+
+            # Store the response and signal the waiting coroutine
+            completed_requests[request_id] = {"response": response}
+            pending_events[request_id].set()
+            return web.json_response({"ok": True, "message": "Callback received"})
+        else:
+            # Request might have already timed out
+            return web.json_response(
+                {"ok": False, "error": "No pending request found for this requestId"},
+                status=404
+            )
+
+    except Exception as e:
+        return web.json_response(
+            {"ok": False, "error": str(e)},
+            status=500
+        )
+
+
+# ============================================================================
 # CSP Bypass Endpoints
 # ============================================================================
 
@@ -1426,7 +2395,7 @@ async def handle_http_csp_bypass_enable(request):
         # Send message to extension via WebSocket
         if not most_recent_connection or most_recent_connection not in active_connections:
             return web.json_response(
-                {"ok": False, "error": "No browser connected"},
+                {"ok": False, "error": "No browser connected. If Chrome is open, make sure you're on a regular webpage (not chrome://, new tab, or extension pages where content scripts can't run)."},
                 status=503
             )
 
@@ -1485,7 +2454,7 @@ async def handle_http_csp_bypass_disable(request):
         # Send message to extension via WebSocket
         if not most_recent_connection or most_recent_connection not in active_connections:
             return web.json_response(
-                {"ok": False, "error": "No browser connected"},
+                {"ok": False, "error": "No browser connected. If Chrome is open, make sure you're on a regular webpage (not chrome://, new tab, or extension pages where content scripts can't run)."},
                 status=503
             )
 
@@ -1551,7 +2520,7 @@ async def handle_http_csp_bypass_status(request):
         # Send message to extension via WebSocket
         if not most_recent_connection or most_recent_connection not in active_connections:
             return web.json_response(
-                {"ok": False, "error": "No browser connected"},
+                {"ok": False, "error": "No browser connected. If Chrome is open, make sure you're on a regular webpage (not chrome://, new tab, or extension pages where content scripts can't run)."},
                 status=503
             )
 
@@ -1610,7 +2579,7 @@ async def handle_http_csp_bypass_global(request):
         # Send message to extension via WebSocket
         if not most_recent_connection or most_recent_connection not in active_connections:
             return web.json_response(
-                {"ok": False, "error": "No browser connected"},
+                {"ok": False, "error": "No browser connected. If Chrome is open, make sure you're on a regular webpage (not chrome://, new tab, or extension pages where content scripts can't run)."},
                 status=503
             )
 
@@ -1660,7 +2629,7 @@ async def handle_http_csp_bypass_global_status(request):
         # Send message to extension via WebSocket
         if not most_recent_connection or most_recent_connection not in active_connections:
             return web.json_response(
-                {"ok": False, "error": "No browser connected"},
+                {"ok": False, "error": "No browser connected. If Chrome is open, make sure you're on a regular webpage (not chrome://, new tab, or extension pages where content scripts can't run)."},
                 status=503
             )
 
@@ -1738,7 +2707,7 @@ async def handle_http_get_har(request):
 
     if most_recent_connection is None:
         return web.json_response(
-            {"ok": False, "error": "No browser connected"},
+            {"ok": False, "error": "No browser connected. If Chrome is open, make sure you're on a regular webpage (not chrome://, new tab, or extension pages where content scripts can't run)."},
             status=503
         )
 
@@ -1798,7 +2767,7 @@ async def handle_http_get_console_logs(request):
 
     if most_recent_connection is None:
         return web.json_response(
-            {"ok": False, "error": "No browser connected"},
+            {"ok": False, "error": "No browser connected. If Chrome is open, make sure you're on a regular webpage (not chrome://, new tab, or extension pages where content scripts can't run)."},
             status=503
         )
 
@@ -1850,7 +2819,7 @@ async def handle_http_clear_console_logs(request):
 
     if most_recent_connection is None:
         return web.json_response(
-            {"ok": False, "error": "No browser connected"},
+            {"ok": False, "error": "No browser connected. If Chrome is open, make sure you're on a regular webpage (not chrome://, new tab, or extension pages where content scripts can't run)."},
             status=503
         )
 
@@ -1908,7 +2877,7 @@ async def handle_replay_mode_enable(request):
     """
     if most_recent_connection is None:
         return web.json_response(
-            {"ok": False, "error": "No browser connected"},
+            {"ok": False, "error": "No browser connected. If Chrome is open, make sure you're on a regular webpage (not chrome://, new tab, or extension pages where content scripts can't run)."},
             status=503
         )
 
@@ -1977,7 +2946,7 @@ async def handle_replay_mode_disable(request):
     """Disable replay mode in the browser extension."""
     if most_recent_connection is None:
         return web.json_response(
-            {"ok": False, "error": "No browser connected"},
+            {"ok": False, "error": "No browser connected. If Chrome is open, make sure you're on a regular webpage (not chrome://, new tab, or extension pages where content scripts can't run)."},
             status=503
         )
 
@@ -2027,7 +2996,7 @@ async def handle_replay_mode_status(request):
     """Get replay mode status from the browser extension."""
     if most_recent_connection is None:
         return web.json_response(
-            {"ok": False, "error": "No browser connected"},
+            {"ok": False, "error": "No browser connected. If Chrome is open, make sure you're on a regular webpage (not chrome://, new tab, or extension pages where content scripts can't run)."},
             status=503
         )
 
@@ -2134,7 +3103,7 @@ async def handle_screencast_start(request):
 
     if most_recent_connection is None:
         return web.json_response(
-            {"ok": False, "error": "No browser connected"},
+            {"ok": False, "error": "No browser connected. If Chrome is open, make sure you're on a regular webpage (not chrome://, new tab, or extension pages where content scripts can't run)."},
             status=503
         )
 
@@ -2556,11 +3525,29 @@ async def handle_audio_status(request):
     })
 
 
-async def main():
-    """Start HTTP and WebSocket server."""
+async def main(enable_socket: bool = True, socket_path_override: Optional[str] = None):
+    """Start HTTP, WebSocket, and Unix socket servers.
+
+    Args:
+        enable_socket: Whether to start the Unix socket server
+        socket_path_override: Optional explicit socket path
+    """
     print("Inspekt WebSocket Server (aiohttp)")
     print(f"WebSocket: ws://{HOST}:{PORT + 1}/ws")
     print(f"HTTP API: http://{HOST}:{PORT}")
+
+    # Start Unix socket server
+    sock_server = None
+    if enable_socket:
+        sock_path = Path(socket_path_override) if socket_path_override else None
+        sock_server = await start_socket_server(sock_path)
+        if sock_server:
+            print(f"Socket: {socket_path}")
+        else:
+            print("Socket: disabled (failed to create)")
+    else:
+        print("Socket: disabled")
+
     print("")
 
     # Preload control.js into cache (async, no blocking!)
@@ -2585,6 +3572,11 @@ async def main():
     app.router.add_get("/health", handle_http_health)
     app.router.add_post("/reinit-control", handle_http_reinit_control)
 
+    # Instance management endpoints
+    app.router.add_get("/instances", handle_http_instances_list)
+    app.router.add_post("/instances/alias", handle_http_instance_alias_set)
+    app.router.add_delete("/instances/alias", handle_http_instance_alias_remove)
+
     # Queue management endpoints
     app.router.add_get("/queue/status", handle_http_queue_status)
     app.router.add_post("/queue/clear", handle_http_queue_clear)
@@ -2595,6 +3587,10 @@ async def main():
     app.router.add_get("/domains/list", handle_http_domain_list)
     app.router.add_post("/domains/bypass", handle_http_domain_bypass)
     app.router.add_post("/domains/sync", handle_http_domain_sync)
+
+    # Navigation endpoint (uses chrome.tabs.update instead of JS injection)
+    app.router.add_post("/navigate", handle_http_navigate)
+    app.router.add_post("/navigate/callback", handle_http_navigate_callback)
 
     # CSP bypass endpoints
     app.router.add_post("/csp/enable", handle_http_csp_bypass_enable)
@@ -2678,8 +3674,20 @@ async def main():
     # Start background cleanup task
     asyncio.create_task(cleanup_watchdog())
 
-    # Keep running
-    await asyncio.Event().wait()
+    # Keep running until interrupted
+    try:
+        await asyncio.Event().wait()
+    finally:
+        # Clean up socket server
+        if sock_server:
+            sock_server.close()
+            await sock_server.wait_closed()
+            # Remove socket file
+            if socket_path and socket_path.exists():
+                try:
+                    socket_path.unlink()
+                except OSError:
+                    pass
 
 
 if __name__ == "__main__":
@@ -2691,7 +3699,9 @@ if __name__ == "__main__":
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  python bridge_ws.py                    # Start with defaults
+  python bridge_ws.py                    # Start with defaults (socket enabled)
+  python bridge_ws.py --no-socket        # Disable Unix socket transport
+  python bridge_ws.py --socket /tmp/x.sock  # Use custom socket path
   python bridge_ws.py --isolated         # Docker VM mode (bypass all protections)
   python bridge_ws.py --host 0.0.0.0     # Allow external connections
   python bridge_ws.py --port 9000        # Use custom port
@@ -2713,6 +3723,18 @@ Examples:
         default=8765,
         help="Port to bind to (default: 8765)"
     )
+    parser.add_argument(
+        "--socket",
+        type=str,
+        default=None,
+        metavar="PATH",
+        help="Unix socket path (default: ~/.inspekt/inspekt.sock)"
+    )
+    parser.add_argument(
+        "--no-socket",
+        action="store_true",
+        help="Disable Unix socket transport (HTTP only)"
+    )
 
     args = parser.parse_args()
 
@@ -2728,7 +3750,11 @@ Examples:
     HOST = args.host
     PORT = args.port
 
+    # Determine socket settings
+    enable_socket = not args.no_socket
+    socket_path_arg = args.socket
+
     try:
-        asyncio.run(main())
+        asyncio.run(main(enable_socket=enable_socket, socket_path_override=socket_path_arg))
     except KeyboardInterrupt:
         print("\nServer stopped")

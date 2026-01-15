@@ -28,6 +28,7 @@ import click
 from inspekt.app.cli.base import builtin_open
 from inspekt.app.cli.icons import get_icon
 from inspekt.app.cli.table import Table
+from inspekt.app.cli.url_builder import url_scheme
 from inspekt.client import BridgeClient
 
 
@@ -128,12 +129,34 @@ def _get_basic_info(client: BridgeClient) -> dict:
     raise RuntimeError(result.get("error", "Failed to get basic info"))
 
 
+def _get_current_instance_id(client: BridgeClient) -> tuple[str | None, str | None]:
+    """Get the instance ID and alias for the current (most recent) browser.
+
+    Returns:
+        Tuple of (instance_id, alias) or (None, None) if not available.
+    """
+    status = client.get_status()
+    if not status:
+        return None, None
+
+    browsers = status.get("browsers", [])
+    for browser in browsers:
+        if browser.get("is_most_recent"):
+            return browser.get("instance_id"), browser.get("alias")
+
+    # If no most_recent, return first browser's info
+    if browsers:
+        return browsers[0].get("instance_id"), browsers[0].get("alias")
+
+    return None, None
+
+
 def _get_bridge_version(client: BridgeClient) -> tuple[str, str, str]:
     """Get bridge version, type, and browser name."""
     code = """
     (function() {
-        const version = window.__INSPEKT_BRIDGE_VERSION__ || window.__ZEN_BRIDGE_VERSION__ || 'unknown';
-        const type = (window.__INSPEKT_BRIDGE_EXTENSION__ || window.__ZEN_BRIDGE_EXTENSION__) ? 'extension' : 'userscript';
+        const version = window.__INSPEKT_BRIDGE_VERSION__ || 'unknown';
+        const type = window.__INSPEKT_BRIDGE_EXTENSION__ ? 'extension' : 'userscript';
         const ua = navigator.userAgent;
         let browserName = 'Unknown';
         if (ua.includes('Firefox')) browserName = 'Firefox';
@@ -941,7 +964,8 @@ def _get_robots_txt(url: str) -> dict | None:
 # =============================================================================
 
 
-def _print_summary(data: dict, version: str, bridge_type: str, browser: str) -> None:
+def _print_summary(data: dict, version: str, bridge_type: str, browser: str,
+                   instance_id: str | None = None, instance_alias: str | None = None) -> None:
     """Print summary output."""
     bridge_label = "Extension" if bridge_type == "extension" else "Userscript"
     protocol = data.get("protocol", "N/A")
@@ -957,7 +981,17 @@ def _print_summary(data: dict, version: str, bridge_type: str, browser: str) -> 
     if is_local_file or not domain:
         domain = "-"
 
+    # Format instance display: ID with optional alias
+    if instance_id:
+        if instance_alias:
+            instance_display = click.style(f"{instance_id}", fg="cyan", bold=True) + click.style(f" ({instance_alias})", fg="yellow")
+        else:
+            instance_display = click.style(instance_id, fg="cyan", bold=True)
+    else:
+        instance_display = "-"
+
     basic_rows = [
+        ("Instance", instance_display, None),
         ("Extension", f"v{version} ({browser} {bridge_label})", None),
         ("URL", _truncate_value(data.get("url", "N/A")), None),
         ("Title", title, None),
@@ -1509,6 +1543,7 @@ def _print_layout(data: dict) -> None:
 
 
 @click.group(invoke_without_command=True)
+@url_scheme("info", param_map={"output_json": "json"}, exclude_params=["ctx"])
 @click.option("--json", "output_json", is_flag=True, help="Output as JSON")
 @click.pass_context
 def info(ctx, output_json):
@@ -1540,14 +1575,17 @@ def info(ctx, output_json):
             client = _get_bridge_client()
             data = _collect_summary_data(client)
             version, bridge_type, browser = _get_bridge_version(client)
+            instance_id, instance_alias = _get_current_instance_id(client)
 
             if output_json:
                 data["bridgeVersion"] = version
                 data["bridgeType"] = bridge_type
                 data["browser"] = browser
+                data["instanceId"] = instance_id
+                data["instanceAlias"] = instance_alias
                 click.echo(json.dumps(data, indent=2))
             else:
-                _print_summary(data, version, bridge_type, browser)
+                _print_summary(data, version, bridge_type, browser, instance_id, instance_alias)
 
         except (ConnectionError, TimeoutError, RuntimeError) as e:
             if output_json:

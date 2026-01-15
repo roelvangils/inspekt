@@ -113,6 +113,8 @@ class BridgeExecutor:
         timeout: float = 10.0,
         retry_on_timeout: bool = False,
         skip_domain_check: bool = False,
+        fast_poll: bool = False,
+        instance: str = None,
     ) -> dict[str, Any]:
         """
         Execute JavaScript code in browser with error handling and optional retries.
@@ -122,6 +124,9 @@ class BridgeExecutor:
             timeout: Maximum time to wait for result in seconds
             retry_on_timeout: If True, retry on TimeoutError
             skip_domain_check: If True, skip the pre-execution domain check
+            fast_poll: If True, use shorter HTTP timeouts for quick checks (pre-validation)
+            instance: Optional instance identifier (ID, alias, or index string).
+                     If None, uses INSPEKT_INSTANCE env var or most recent browser.
 
         Returns:
             Dictionary with execution result:
@@ -136,7 +141,7 @@ class BridgeExecutor:
         Raises:
             SystemExit: If execution fails after retries
         """
-        _verbose_log("Starting execution", {"timeout": timeout, "retry_on_timeout": retry_on_timeout})
+        _verbose_log("Starting execution", {"timeout": timeout, "retry_on_timeout": retry_on_timeout, "instance": instance})
         start_time = time.time()
 
         self.ensure_server_running()
@@ -172,7 +177,7 @@ class BridgeExecutor:
             try:
                 _verbose_log(f"Sending code to browser (attempt {attempt + 1}/{retries})")
                 exec_start = time.time()
-                result = self.client.execute(code, timeout=timeout)
+                result = self.client.execute(code, timeout=timeout, _fast_poll=fast_poll, instance=instance)
                 _verbose_log(f"Execution completed", f"{time.time() - exec_start:.3f}s")
 
                 # Check if this is a domain permission error (fallback for edge cases)
@@ -194,7 +199,7 @@ class BridgeExecutor:
                         if domain and self._prompt_add_domain(domain):
                             # User agreed to add domain, retry execution
                             # Sync confirmation already handled in _prompt_add_domain
-                            result = self.client.execute(code, timeout=timeout)
+                            result = self.client.execute(code, timeout=timeout, _fast_poll=fast_poll, instance=instance)
 
                 _verbose_log("Total execution time", f"{time.time() - start_time:.3f}s")
                 _verbose_log("Result status", {"ok": result.get("ok"), "has_error": "error" in result})
@@ -422,7 +427,7 @@ class BridgeExecutor:
         Execute a helper script with template substitutions.
 
         Args:
-            script_name: Name of script file in zen/scripts/
+            script_name: Name of script file in inspekt/scripts/
             substitutions: Dictionary of placeholder -> value substitutions
             timeout: Maximum time to wait for result in seconds
             retry_on_timeout: If True, retry on TimeoutError
@@ -470,17 +475,86 @@ class BridgeExecutor:
         """
         return self.client.get_status()
 
-    def check_userscript_version(self, show_warning: bool = True) -> str | None:
+    def console_clear(self, timeout: float = 5.0) -> bool:
         """
-        Check if userscript version matches expected version.
+        Clear console logs in the browser.
+
+        Uses socket transport when available, falls back to HTTP.
 
         Args:
-            show_warning: If True, print warning when versions don't match
+            timeout: Maximum time to wait for response
 
         Returns:
-            Warning message if versions don't match, None otherwise
+            True if cleared successfully, False otherwise
         """
-        return self.client.check_userscript_version(show_warning=show_warning)
+        # Try socket transport first if client supports it
+        if hasattr(self.client, '_use_socket') and self.client._use_socket:
+            try:
+                from inspekt.transport import Request
+                transport = self.client._get_socket_transport()
+                if not transport.is_connected():
+                    transport.connect()
+
+                response = transport.send(
+                    Request(method="console_clear", params={"timeout": timeout}),
+                    timeout=timeout
+                )
+                return response.success
+            except Exception:
+                pass  # Fall back to HTTP
+
+        # HTTP fallback
+        import requests
+        try:
+            response = requests.post(
+                f"http://{self.host}:{self.port}/console/clear",
+                timeout=timeout,
+            )
+            return response.status_code == 200
+        except Exception:
+            return False
+
+    def console_logs(self, timeout: float = 5.0) -> dict[str, Any]:
+        """
+        Get console logs from the browser.
+
+        Uses socket transport when available, falls back to HTTP.
+
+        Args:
+            timeout: Maximum time to wait for response
+
+        Returns:
+            Dict with console logs data, or empty dict on error
+        """
+        # Try socket transport first if client supports it
+        if hasattr(self.client, '_use_socket') and self.client._use_socket:
+            try:
+                from inspekt.transport import Request
+                transport = self.client._get_socket_transport()
+                if not transport.is_connected():
+                    transport.connect()
+
+                response = transport.send(
+                    Request(method="console_logs", params={"timeout": timeout}),
+                    timeout=timeout
+                )
+                if response.success:
+                    return response.data
+            except Exception:
+                pass  # Fall back to HTTP
+
+        # HTTP fallback
+        import requests
+        try:
+            response = requests.get(
+                f"http://{self.host}:{self.port}/console/logs",
+                timeout=timeout,
+            )
+            if response.status_code == 200:
+                return response.json()
+        except Exception:
+            pass
+        return {}
 
 
 # Global executor instance (lazy-initialized)
