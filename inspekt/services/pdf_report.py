@@ -24,6 +24,7 @@ from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from inspekt.services.pdf_checker import PDFEnhancedMetadata, PDFFullResult
+    from inspekt.services.pdf_contrast_checker import ContrastAnalysisResult
     from inspekt.services.pdf_issue_visualizer import VisualizationResult
     from inspekt.services.pdf_ocr import TextDiscrepancyResult
     from inspekt.services.pdf_report_data import PDFReportData
@@ -298,70 +299,18 @@ def _get_page_size_icon_svg(width_pts: float, height_pts: float, size: int = 32)
 
 
 # =============================================================================
-# Creator/Producer Icons
+# Creator/Producer Icons (using pdf_tool_matcher service)
 # =============================================================================
 
-# SVG icons for common PDF creation tools (simplified, inline-friendly)
-CREATOR_ICONS = {
-    # Adobe products
-    "indesign": '''<svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <rect width="24" height="24" rx="4" fill="#49021F"/>
-        <path d="M8 6v12h2V6H8zM13.5 18h2v-3.5h1c2.21 0 4-1.567 4-3.5s-1.79-3.5-4-3.5h-3v10.5zm2-8.5h1c1.1 0 2 .672 2 1.5s-.9 1.5-2 1.5h-1v-3z" fill="#FF3366"/>
-    </svg>''',
-    "illustrator": '''<svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <rect width="24" height="24" rx="4" fill="#310000"/>
-        <path d="M12 6l-5 12h2.5l1-2.5h3l1 2.5H17L12 6zm-1 7.5L12 10l1 3.5h-2zM18 9h2v2h-2V9z" fill="#FF9A00"/>
-    </svg>''',
-    "acrobat": '''<svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <rect width="24" height="24" rx="4" fill="#B30B00"/>
-        <path d="M6 6h12v2H6V6zM6 10h8v2H6v-2zM6 14h10v2H6v-2zM6 18h6v2H6v-2z" fill="white"/>
-    </svg>''',
-    "photoshop": '''<svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <rect width="24" height="24" rx="4" fill="#001E36"/>
-        <path d="M6 6v12h2v-4h2c2.21 0 4-1.79 4-4s-1.79-4-4-4H6zm2 2h2c1.1 0 2 .9 2 2s-.9 2-2 2H8V8zM15 10h2c1.66 0 3 1.34 3 3v1h-3v-1c0-.55-.45-1-1-1h-1v6h-2v-8h2z" fill="#31A8FF"/>
-    </svg>''',
-    # Microsoft products
-    "word": '''<svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <rect width="24" height="24" rx="4" fill="#2B579A"/>
-        <path d="M6 5l2 14h2l1.5-9L13 19h2l2-14h-2l-1 9-1.5-9h-2L9 14l-1-9H6z" fill="white"/>
-    </svg>''',
-    "powerpoint": '''<svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <rect width="24" height="24" rx="4" fill="#D24726"/>
-        <path d="M7 5v14h2v-5h3c2.21 0 4-1.79 4-4.5S14.21 5 12 5H7zm2 2h3c1.1 0 2 1.12 2 2.5S13.1 12 12 12H9V7z" fill="white"/>
-    </svg>''',
-    "excel": '''<svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <rect width="24" height="24" rx="4" fill="#217346"/>
-        <path d="M7 6l3.5 6L7 18h2.5l2.5-4 2.5 4H17l-3.5-6L17 6h-2.5L12 10 9.5 6H7z" fill="white"/>
-    </svg>''',
-    # Other tools
-    "latex": '''<svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <rect width="24" height="24" rx="4" fill="#008080"/>
-        <text x="12" y="16" font-family="serif" font-size="10" fill="white" text-anchor="middle">L<tspan baseline-shift="sub" font-size="8">A</tspan>T<tspan baseline-shift="sub" font-size="8">E</tspan>X</text>
-    </svg>''',
-    "quark": '''<svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <rect width="24" height="24" rx="4" fill="#5C2D91"/>
-        <text x="12" y="16" font-family="sans-serif" font-size="12" font-weight="bold" fill="white" text-anchor="middle">Q</text>
-    </svg>''',
-    "pages": '''<svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <rect width="24" height="24" rx="4" fill="#FF9500"/>
-        <path d="M6 4h8l4 4v12H6V4zm7 1v4h4" fill="none" stroke="white" stroke-width="1.5"/>
-    </svg>''',
-    "libreoffice": '''<svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <rect width="24" height="24" rx="4" fill="#18A303"/>
-        <path d="M6 4h8l4 4v12H6V4z" fill="none" stroke="white" stroke-width="1.5"/>
-        <path d="M9 10h6M9 13h6M9 16h4" stroke="white" stroke-width="1"/>
-    </svg>''',
-    "default": '''<svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <rect width="24" height="24" rx="4" fill="#6B7280"/>
-        <path d="M6 4h8l4 4v12H6V4z" fill="none" stroke="white" stroke-width="1.5"/>
-        <path d="M14 4v4h4" fill="none" stroke="white" stroke-width="1.5"/>
-    </svg>''',
-}
+# Import the get_creator_info function from pdf_tool_matcher
+from inspekt.services.pdf_tool_matcher import get_creator_info
 
 
-def _get_creator_icon(creator: str | None, producer: str | None) -> tuple[str, str]:
+def _get_creator_icon(creator: str | None, producer: str | None) -> tuple[str, str | None]:
     """
     Get SVG icon and tool name based on creator/producer strings.
+
+    This is a thin wrapper around get_creator_info for backward compatibility.
 
     Args:
         creator: PDF Creator metadata
@@ -370,32 +319,8 @@ def _get_creator_icon(creator: str | None, producer: str | None) -> tuple[str, s
     Returns:
         tuple: (svg_icon_string, tool_name)
     """
-    combined = f"{creator or ''} {producer or ''}".lower()
-
-    if "indesign" in combined:
-        return CREATOR_ICONS["indesign"], "Adobe InDesign"
-    elif "illustrator" in combined:
-        return CREATOR_ICONS["illustrator"], "Adobe Illustrator"
-    elif "photoshop" in combined:
-        return CREATOR_ICONS["photoshop"], "Adobe Photoshop"
-    elif "acrobat" in combined or "adobe pdf" in combined:
-        return CREATOR_ICONS["acrobat"], "Adobe Acrobat"
-    elif "word" in combined or "microsoft office word" in combined:
-        return CREATOR_ICONS["word"], "Microsoft Word"
-    elif "powerpoint" in combined:
-        return CREATOR_ICONS["powerpoint"], "Microsoft PowerPoint"
-    elif "excel" in combined:
-        return CREATOR_ICONS["excel"], "Microsoft Excel"
-    elif "latex" in combined or "pdftex" in combined or "xetex" in combined or "luatex" in combined:
-        return CREATOR_ICONS["latex"], "LaTeX"
-    elif "quark" in combined:
-        return CREATOR_ICONS["quark"], "QuarkXPress"
-    elif "pages" in combined:
-        return CREATOR_ICONS["pages"], "Apple Pages"
-    elif "libreoffice" in combined or "openoffice" in combined:
-        return CREATOR_ICONS["libreoffice"], "LibreOffice"
-    else:
-        return CREATOR_ICONS["default"], None
+    icon, tool_name, _ = get_creator_info(creator, producer)
+    return icon, tool_name
 
 
 # =============================================================================
@@ -486,6 +411,21 @@ LANGUAGE_NAMES = {
     "fi": "Finnish",
 }
 
+# Language code to flag emoji mapping
+LANGUAGE_FLAGS = {
+    # Base codes → primary country
+    "en": "🇬🇧", "nl": "🇳🇱", "fr": "🇫🇷", "de": "🇩🇪", "es": "🇪🇸",
+    "it": "🇮🇹", "pt": "🇵🇹", "ja": "🇯🇵", "zh": "🇨🇳", "ko": "🇰🇷",
+    "ar": "🇸🇦", "ru": "🇷🇺", "pl": "🇵🇱", "sv": "🇸🇪", "da": "🇩🇰",
+    "no": "🇳🇴", "fi": "🇫🇮",
+    # Regional variants
+    "en-US": "🇺🇸", "en-GB": "🇬🇧", "en-AU": "🇦🇺",
+    "nl-NL": "🇳🇱", "nl-BE": "🇧🇪",
+    "fr-FR": "🇫🇷", "fr-BE": "🇧🇪", "fr-CA": "🇨🇦",
+    "de-DE": "🇩🇪", "de-AT": "🇦🇹", "de-CH": "🇨🇭",
+    "pt-BR": "🇧🇷", "pt-PT": "🇵🇹",
+}
+
 
 def _get_language_display_name(lang_code: str | None) -> str | None:
     """Get human-readable language name from ISO code."""
@@ -511,11 +451,203 @@ def _normalize_language_code(lang_code: str | None) -> str | None:
     return lang_code.split("-")[0].lower()
 
 
+def _get_language_flag(lang_code: str | None) -> str | None:
+    """
+    Get flag emoji for language code.
+
+    Tries exact match first (e.g., "nl-BE" → 🇧🇪), then falls back
+    to base code (e.g., "nl" → 🇳🇱).
+
+    Args:
+        lang_code: ISO language code (e.g., "nl", "nl-BE", "en-US")
+
+    Returns:
+        Flag emoji or None if no match found
+    """
+    if not lang_code:
+        return None
+
+    # Try exact match first (for regional variants)
+    if lang_code in LANGUAGE_FLAGS:
+        return LANGUAGE_FLAGS[lang_code]
+
+    # Try base code
+    base_code = lang_code.split("-")[0].lower()
+    return LANGUAGE_FLAGS.get(base_code)
+
+
+def _format_date_locale_aware(iso_date: str | None, locale: str = "en_GB") -> str:
+    """
+    Format ISO date string in locale-aware format.
+
+    Uses babel for localized month names with 24-hour clock.
+    Format: "18 January 2025 at 14:30"
+
+    Args:
+        iso_date: ISO date string (e.g., "2025-01-18T14:30:00")
+        locale: Babel locale code (default: "en_GB")
+
+    Returns:
+        Formatted date string, or empty string if parsing fails
+    """
+    if not iso_date:
+        return ""
+
+    try:
+        from babel.dates import format_datetime
+
+        # Parse the ISO date - handle various formats
+        dt = None
+        for fmt in [
+            "%Y-%m-%dT%H:%M:%S%z",
+            "%Y-%m-%dT%H:%M:%S",
+            "%Y-%m-%d %H:%M:%S",
+            "%Y-%m-%d",
+        ]:
+            try:
+                dt = datetime.strptime(iso_date.replace("Z", "+00:00")[:19], fmt[:len(fmt) - (1 if fmt.endswith("%z") else 0)])
+                break
+            except ValueError:
+                continue
+
+        if not dt:
+            return iso_date
+
+        # Format: "18 January 2025 at 14:30"
+        # Babel format pattern: d MMMM yyyy 'at' HH:mm
+        return format_datetime(dt, "d MMMM yyyy 'at' HH:mm", locale=locale)
+    except Exception:
+        return iso_date
+
+
+def _format_relative_time(earlier_date: str | None, later_date: str | None) -> str | None:
+    """
+    Calculate relative time difference between two dates.
+
+    Returns an English phrase like "(15 minutes later)" or None if dates
+    are identical (within 1 minute) or if parsing fails.
+
+    Args:
+        earlier_date: Earlier ISO date string
+        later_date: Later ISO date string
+
+    Returns:
+        Relative time string or None
+    """
+    if not earlier_date or not later_date:
+        return None
+
+    try:
+        import humanize
+
+        # Parse both dates
+        def parse_date(iso_str: str) -> datetime | None:
+            for fmt in [
+                "%Y-%m-%dT%H:%M:%S%z",
+                "%Y-%m-%dT%H:%M:%S",
+                "%Y-%m-%d %H:%M:%S",
+                "%Y-%m-%d",
+            ]:
+                try:
+                    return datetime.strptime(iso_str.replace("Z", "+00:00")[:19], fmt[:len(fmt) - (1 if fmt.endswith("%z") else 0)])
+                except ValueError:
+                    continue
+            return None
+
+        dt_earlier = parse_date(earlier_date)
+        dt_later = parse_date(later_date)
+
+        if not dt_earlier or not dt_later:
+            return None
+
+        # Calculate difference
+        delta = dt_later - dt_earlier
+
+        # If within 1 minute, consider them the same
+        if abs(delta.total_seconds()) < 60:
+            return None
+
+        # Ensure English locale is active (humanize uses English by default)
+        try:
+            humanize.deactivate()
+        except Exception:
+            pass
+
+        # Get human-readable delta in English
+        relative = humanize.naturaldelta(delta)
+
+        return f"({relative} later)"
+    except Exception:
+        return None
+
+
+def _get_accessibility_structure_stats(pdf_path: Path | str, meta) -> dict:
+    """
+    Extract accessibility structure statistics from PDF.
+
+    Gathers heading count/depth, image count with alt text status,
+    table/list/form field counts from the structure tree.
+
+    Args:
+        pdf_path: Path to the PDF file
+        meta: Enhanced metadata from pdf_checker
+
+    Returns:
+        Dictionary with structure statistics:
+        - heading_count, heading_depth (max H level)
+        - image_count, images_without_alt
+        - table_count, list_count, form_field_count
+    """
+    stats = {
+        "heading_count": 0,
+        "heading_depth": 0,
+        "image_count": 0,
+        "images_without_alt": 0,
+        "table_count": 0,
+        "list_count": 0,
+        "form_field_count": 0,
+    }
+
+    try:
+        # Get structure statistics
+        from inspekt.services.pdf_structure_extractor import PDFStructureExtractor
+
+        extractor = PDFStructureExtractor(pdf_path)
+        result = extractor.extract()
+
+        if result and result.statistics:
+            s = result.statistics
+            stats["heading_count"] = s.heading_count
+            stats["heading_depth"] = s.max_heading_level
+            stats["table_count"] = s.table_count
+            stats["list_count"] = s.list_count
+    except Exception:
+        pass
+
+    try:
+        # Get image statistics from content auditor
+        from inspekt.services.pdf_content_auditor import PDFContentAuditor
+
+        auditor = PDFContentAuditor(pdf_path)
+        audit_result = auditor.audit()
+
+        if audit_result:
+            stats["image_count"] = audit_result.image_count
+            stats["images_without_alt"] = audit_result.images_without_alt
+            # Form fields count
+            stats["form_field_count"] = audit_result.form_field_count
+    except Exception:
+        pass
+
+    return stats
+
+
 def generate_pdf_report(
     result: "PDFFullResult",
     output_path: Path | str | None = None,
     pdf_path: Path | str | None = None,
     config_overrides: dict[str, Any] | None = None,
+    show_progress: bool = False,
 ) -> str:
     """
     Generate an HTML accessibility report for a PDF document.
@@ -530,13 +662,14 @@ def generate_pdf_report(
             - show-metadata: bool (default True)
             - show-text-discrepancy-section: bool (default True)
             - no-cover, no-screenshots, no-ocr: CLI flags
+        show_progress: Whether to print progress messages to stdout
 
     Returns:
         HTML string of the report
     """
     from inspekt.config import get_pdf_report_config
 
-    # Merge config with overrides
+    # Merge config with overrides first (needed for step planning)
     config = get_pdf_report_config()
     if config_overrides:
         config.update(config_overrides)
@@ -555,134 +688,255 @@ def generate_pdf_report(
 
         assets = PDFReportAssets(output_path)
 
+    # Build list of steps based on what will actually run
+    # Each step is (name, condition)
+    # Names indicate: (local) = no API cost, (AI) = uses API tokens
+    step_definitions = [
+        ("Create cover preview", config.get("show-cover-page", True) and assets),
+        ("Capture issue screenshots", config.get("show-issue-screenshots", True) and result.verapdf and assets),
+        ("Analyze text layer (local OCR)", config.get("show-text-discrepancy-section", True)),
+        ("Analyze color contrast (OCR)", config.get("check-contrast", False)),
+        ("Extract structure tree", True),
+        ("Extract images & tables", config.get("show-content-audit", True)),
+        ("Generate thumbnails", config.get("show-content-audit", True) and config.get("show-image-thumbnails", True)),
+        ("Classify images (local ML)", config.get("classify-images", True)),
+        ("Generate alt-text (AI)", config.get("generate-alt-text", False)),
+        ("Build report", True),
+        ("Save report", True),
+    ]
+
+    # Filter to only active steps and build index mapping
+    active_steps = [(name, i) for i, (name, condition) in enumerate(step_definitions) if condition]
+    step_names = [name for name, _ in active_steps]
+    step_map = {orig_idx: new_idx for new_idx, (_, orig_idx) in enumerate(active_steps)}
+
+    # Import and setup progress display
+    if show_progress:
+        from inspekt.app.cli.table import ProgressChecklist
+        checklist = ProgressChecklist(step_names)
+        checklist.start()
+
+        def run_step(orig_index: int):
+            """Context manager for running a step by original index."""
+            if orig_index in step_map:
+                return checklist.step(step_map[orig_index])
+            else:
+                from contextlib import nullcontext
+                return nullcontext()
+
+        print_substep = lambda msg: None  # Substeps handled differently now
+    else:
+        # No-op when progress is disabled
+        from contextlib import nullcontext
+        run_step = lambda idx: nullcontext()
+        print_substep = lambda msg: None
+        checklist = None
+
     # Generate executive summary section (accessibility score)
     executive_summary_section = _generate_executive_summary_section(result, config)
 
     # Generate new sections
     cover_section = ""
     if config.get("show-cover-page", True) and assets:
-        cover_section = _generate_cover_section(pdf_path, assets, config)
+        with run_step(0):  # Generate cover preview
+            cover_section = _generate_cover_section(pdf_path, assets, config)
 
     issue_screenshots_section = ""
     if config.get("show-issue-screenshots", True) and result.verapdf and assets:
-        issue_screenshots_section = _generate_issue_screenshots_section(
-            pdf_path, result.verapdf.violations, assets, config
-        )
+        with run_step(1):  # Capture issue screenshots
+            issue_screenshots_section = _generate_issue_screenshots_section(
+                pdf_path, result.verapdf.violations, assets, config
+            )
 
     text_discrepancy_section = ""
     if config.get("show-text-discrepancy-section", True):
-        text_discrepancy_section = _generate_text_discrepancy_section(pdf_path, config)
+        with run_step(2):  # Analyze text layer (OCR)
+            text_discrepancy_section = _generate_text_discrepancy_section(pdf_path, config)
+
+    # Generate contrast analysis section
+    contrast_section = ""
+    contrast_result = None
+    if config.get("check-contrast", False):
+        with run_step(3):  # Analyze color contrast (OCR)
+            from inspekt.services.pdf_contrast_checker import (
+                PDFContrastChecker,
+                check_tesseract_available,
+            )
+
+            if not check_tesseract_available():
+                # Skip with warning - don't fail the whole report
+                contrast_section = _generate_contrast_error_section(
+                    "Tesseract OCR not available. Install with: brew install tesseract"
+                )
+            else:
+                # Parse page range if specified
+                pages = None
+                if config.get("contrast-pages"):
+                    from inspekt.services.pdf_tag_visualizer import parse_page_range
+                    import fitz
+
+                    with fitz.open(pdf_path) as doc:
+                        max_pages = len(doc)
+                    pages = parse_page_range(config["contrast-pages"], max_pages)
+
+                # Run contrast analysis
+                with PDFContrastChecker(pdf_path) as checker:
+                    contrast_result = checker.analyze_document(pages=pages)
+
+                contrast_section = _generate_contrast_section(contrast_result, config)
+
+    # Add contrast check to the results table
+    if contrast_result is not None:
+        from inspekt.services.simple_pdf_checker import SimplePDFCheckResult
+
+        if contrast_result.total_issues == 0:
+            contrast_status = "pass"
+            contrast_message = f"No contrast issues found ({contrast_result.total_text_regions} text regions analyzed)"
+            contrast_severity = "minor"
+        else:
+            contrast_status = "fail"
+            contrast_message = f"{contrast_result.total_issues} contrast issues ({contrast_result.serious_issues} serious)"
+            contrast_severity = "serious" if contrast_result.serious_issues > 0 else "moderate"
+
+        contrast_check = SimplePDFCheckResult(
+            check_id="color_contrast",
+            name="Color Contrast",
+            status=contrast_status,
+            message=contrast_message,
+            severity=contrast_severity,
+            wcag_sc="1.4.3",
+            wcag_level="AA",
+            details={
+                "total_issues": contrast_result.total_issues,
+                "serious_issues": contrast_result.serious_issues,
+                "moderate_issues": contrast_result.moderate_issues,
+                "pages_analyzed": contrast_result.total_pages_analyzed,
+            },
+        )
+        checks.append(contrast_check)
 
     # Generate structure tree section
-    structure_tree_section = _generate_structure_tree_section(pdf_path, config)
+    with run_step(4):  # Extract structure tree
+        structure_tree_section = _generate_structure_tree_section(pdf_path, config, print_substep)
 
     # Generate tag visualization section (Phase 2)
     tag_visualization_section = _generate_tag_visualization_section(pdf_path, config)
 
+    # Pass document language to interactive preview for TTS fallback
+    if meta.language:
+        config["document-language"] = meta.language
+
     # Generate interactive preview section (Phase 6)
-    interactive_preview_section = _generate_interactive_preview_section(pdf_path, config)
+    interactive_preview_section = _generate_interactive_preview_section(
+        pdf_path, config, output_path=output_path
+    )
 
-    # Generate content audit section
-    content_audit_section = _generate_content_audit_section(pdf_path, config)
+    # Generate content audit section (includes steps 4-7)
+    content_audit_section = _generate_content_audit_section(
+        pdf_path, config, run_step
+    )
 
-    # Generate remediation roadmap section
-    remediation_roadmap_section = _generate_remediation_section(result, pdf_path, config)
+    # Step 9: Build report - assemble all HTML sections
+    with run_step(9):
+        # Generate remediation roadmap section
+        remediation_roadmap_section = _generate_remediation_section(result, pdf_path, config)
 
-    # Build check rows using helper function
-    check_rows = [_render_check_row(check) for check in checks]
+        # Build check rows using helper function
+        check_rows = [_render_check_row(check) for check in checks]
 
-    # Build veraPDF section if available
-    verapdf_section = ""
-    if result.verapdf:
-        vera = result.verapdf
-        compliance_class = "compliant" if vera.compliant else "non-compliant"
-        compliance_text = "Compliant" if vera.compliant else "Non-Compliant"
+        # Build veraPDF section if available
+        verapdf_section = ""
+        if result.verapdf:
+            vera = result.verapdf
+            compliance_class = "compliant" if vera.compliant else "non-compliant"
+            compliance_text = "Compliant" if vera.compliant else "Non-Compliant"
 
-        violation_rows = []
-        for v in vera.violations[:50]:  # Limit to 50
-            page_info = f"Page {v.page_number + 1}" if v.page_number is not None else "-"
-            violation_rows.append(f"""
-            <tr>
-                <td class="violation-rule"><code>{_escape_html(v.rule_id)}</code></td>
-                <td class="violation-clause">{_escape_html(v.clause)}</td>
-                <td class="violation-page">{page_info}</td>
-                <td class="violation-desc">{_escape_html(v.description)}</td>
-            </tr>
-            """)
-
-        more_violations = ""
-        if len(vera.violations) > 50:
-            more_violations = f'<p class="more-violations">... and {len(vera.violations) - 50} more violations</p>'
-
-        verapdf_section = f"""
-        <section class="verapdf-results">
-            <h2>PDF/{vera.profile.upper()} Validation</h2>
-            <div class="compliance-status {compliance_class}">
-                <span class="compliance-icon">{('✓' if vera.compliant else '✗')}</span>
-                <span class="compliance-text">PDF/{vera.profile.upper()} {compliance_text}</span>
-            </div>
-            <dl class="verapdf-meta">
-                <dt>Passed Rules</dt><dd>{vera.passed_rules}</dd>
-                <dt>Failed Rules</dt><dd>{vera.failed_rules}</dd>
-                <dt>Total Violations</dt><dd>{vera.total_violations}</dd>
-                {f'<dt>veraPDF Version</dt><dd>{vera.verapdf_version}</dd>' if vera.verapdf_version else ''}
-            </dl>
-            {f'''
-            <h3>Violations</h3>
-            <table class="violations-table">
-                <thead>
-                    <tr>
-                        <th>Rule</th>
-                        <th>Clause</th>
-                        <th>Page</th>
-                        <th>Description</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {''.join(violation_rows)}
-                </tbody>
-            </table>
-            {more_violations}
-            ''' if violation_rows else '<p class="no-violations">No violations found!</p>'}
-        </section>
-        """
-
-    # Build remediation section
-    remediation_items = []
-    for check in checks:
-        if check.status in ("fail", "warn"):
-            check_info = _get_check_info(check.check_id)
-            if check_info and check_info.get("remediation"):
-                remediation_items.append(f"""
-                <div class="remediation-item">
-                    <h4>{_escape_html(check.name)}</h4>
-                    <p class="remediation-text">{_escape_html(check_info['remediation'])}</p>
-                </div>
+            violation_rows = []
+            for v in vera.violations[:50]:  # Limit to 50
+                page_info = f"Page {v.page_number + 1}" if v.page_number is not None else "-"
+                violation_rows.append(f"""
+                <tr>
+                    <td class="violation-rule"><code>{_escape_html(v.rule_id)}</code></td>
+                    <td class="violation-clause">{_escape_html(v.clause)}</td>
+                    <td class="violation-page">{page_info}</td>
+                    <td class="violation-desc">{_escape_html(v.description)}</td>
+                </tr>
                 """)
 
-    remediation_section = ""
-    if remediation_items:
-        remediation_section = f"""
-        <section id="remediation" class="remediation">
-            <h2>Remediation Guidance</h2>
-            {''.join(remediation_items)}
-        </section>
-        """
+            more_violations = ""
+            if len(vera.violations) > 50:
+                more_violations = f'<p class="more-violations">... and {len(vera.violations) - 50} more violations</p>'
 
-    # Summary counts
-    summary = result.basic
+            verapdf_section = f"""
+            <section class="verapdf-results">
+                <h2>PDF/{vera.profile.upper()} Validation</h2>
+                <div class="compliance-status {compliance_class}">
+                    <span class="compliance-icon">{('✓' if vera.compliant else '✗')}</span>
+                    <span class="compliance-text">PDF/{vera.profile.upper()} {compliance_text}</span>
+                </div>
+                <dl class="verapdf-meta">
+                    <dt>Passed Rules</dt><dd>{vera.passed_rules}</dd>
+                    <dt>Failed Rules</dt><dd>{vera.failed_rules}</dd>
+                    <dt>Total Violations</dt><dd>{vera.total_violations}</dd>
+                    {f'<dt>veraPDF Version</dt><dd>{vera.verapdf_version}</dd>' if vera.verapdf_version else ''}
+                </dl>
+                {f'''
+                <h3>Violations</h3>
+                <table class="violations-table">
+                    <thead>
+                        <tr>
+                            <th>Rule</th>
+                            <th>Clause</th>
+                            <th>Page</th>
+                            <th>Description</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {''.join(violation_rows)}
+                    </tbody>
+                </table>
+                {more_violations}
+                ''' if violation_rows else '<p class="no-violations">No violations found!</p>'}
+            </section>
+            """
 
-    # Generate the unified About This Document section
-    about_section = _generate_about_document_section(pdf_path, assets, config)
+        # Build remediation section
+        remediation_items = []
+        for check in checks:
+            if check.status in ("fail", "warn"):
+                check_info = _get_check_info(check.check_id)
+                if check_info and check_info.get("remediation"):
+                    remediation_items.append(f"""
+                    <div class="remediation-item">
+                        <h4>{_escape_html(check.name)}</h4>
+                        <p class="remediation-text">{_escape_html(check_info['remediation'])}</p>
+                    </div>
+                    """)
 
-    # Generate disclaimer section
-    disclaimer_section = _generate_disclaimer_section()
+        remediation_section = ""
+        if remediation_items:
+            remediation_section = f"""
+            <section id="remediation" class="remediation">
+                <h2>Remediation Guidance</h2>
+                {''.join(remediation_items)}
+            </section>
+            """
+
+        # Summary counts
+        summary = result.basic
+
+        # Generate the unified About This Document section
+        about_section = _generate_about_document_section(pdf_path, assets, config)
+
+        # Generate disclaimer section
+        disclaimer_section = _generate_disclaimer_section()
 
     html_content = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
     <title>PDF Accessibility Report - {_escape_html(meta.file_path.name)}</title>
     <style>
         {_get_all_css()}
@@ -748,6 +1002,8 @@ def generate_pdf_report(
 
         {text_discrepancy_section}
 
+        {contrast_section}
+
         {structure_tree_section}
 
         {tag_visualization_section}
@@ -773,15 +1029,16 @@ def generate_pdf_report(
 """
 
     if output_path:
-        output_path = Path(output_path)
-        # Add .html extension if not present
-        if not output_path.suffix:
-            output_path = output_path.with_suffix('.html')
-        output_path.write_text(html_content)
+        with run_step(10):  # Save report
+            output_path = Path(output_path)
+            # Add .html extension if not present
+            if not output_path.suffix:
+                output_path = output_path.with_suffix('.html')
+            output_path.write_text(html_content)
 
-        # Clean up orphaned assets
-        if assets:
-            assets.cleanup_orphaned()
+            # Clean up orphaned assets
+            if assets:
+                assets.cleanup_orphaned()
 
     return html_content
 
@@ -791,30 +1048,30 @@ def _generate_toc_nav() -> str:
     return """
     <nav class="toc-nav" aria-label="Table of Contents">
         <div class="toc-header">
-            <span class="toc-icon">☰</span>
+            <span class="material-icons toc-icon">menu</span>
             <span class="toc-title">Contents</span>
         </div>
         <ul class="toc-list" role="list">
-            <li><a href="#about">About This Document</a></li>
-            <li><a href="#score">Accessibility Score</a></li>
-            <li><a href="#summary">Summary</a></li>
-            <li><a href="#basic-checks">Basic Checks</a></li>
-            <li><a href="#text-analysis">Text Layer Analysis</a></li>
-            <li><a href="#structure">Structure Tree</a></li>
-            <li><a href="#interactive-preview">Interactive Preview</a></li>
+            <li><a href="#about"><span class="material-icons">description</span>About This Document</a></li>
+            <li><a href="#score"><span class="material-icons">assessment</span>Accessibility Score</a></li>
+            <li><a href="#summary"><span class="material-icons">summarize</span>Summary</a></li>
+            <li><a href="#basic-checks"><span class="material-icons">fact_check</span>Basic Checks</a></li>
+            <li><a href="#text-analysis"><span class="material-icons">text_fields</span>Text Layer Analysis</a></li>
+            <li><a href="#structure"><span class="material-icons">account_tree</span>Structure Tree</a></li>
+            <li><a href="#interactive-preview"><span class="material-icons">touch_app</span>Interactive Preview</a></li>
             <li class="toc-group">
-                <a href="#content-audit">Content Audit</a>
+                <a href="#content-audit"><span class="material-icons">inventory_2</span>Content Audit</a>
                 <ul class="toc-sublist" role="list">
-                    <li><a href="#audit-images">Images</a></li>
-                    <li><a href="#audit-tables">Tables</a></li>
-                    <li><a href="#audit-forms">Forms</a></li>
-                    <li><a href="#audit-links">Links</a></li>
-                    <li><a href="#audit-lists">Lists</a></li>
+                    <li><a href="#audit-images"><span class="material-icons">image</span>Images</a></li>
+                    <li><a href="#audit-tables"><span class="material-icons">grid_on</span>Tables</a></li>
+                    <li><a href="#audit-forms"><span class="material-icons">edit_note</span>Forms</a></li>
+                    <li><a href="#audit-links"><span class="material-icons">link</span>Links</a></li>
+                    <li><a href="#audit-lists"><span class="material-icons">format_list_bulleted</span>Lists</a></li>
                 </ul>
             </li>
-            <li><a href="#remediation-roadmap">Remediation Roadmap</a></li>
-            <li><a href="#remediation">Remediation Advice</a></li>
-            <li><a href="#disclaimer">Disclaimer</a></li>
+            <li><a href="#remediation-roadmap"><span class="material-icons">map</span>Remediation Roadmap</a></li>
+            <li><a href="#remediation"><span class="material-icons">build</span>Remediation Advice</a></li>
+            <li><a href="#disclaimer"><span class="material-icons">info</span>Disclaimer</a></li>
         </ul>
         <button class="toc-toggle" aria-expanded="true" aria-controls="toc-list">
             <span class="visually-hidden">Toggle navigation</span>
@@ -854,7 +1111,7 @@ def _get_toc_css() -> str:
             left: 0;
             top: 0;
             bottom: 0;
-            width: 220px;
+            width: 260px;
             background: var(--bg-white);
             border-right: 1px solid var(--border-color);
             padding: 1rem 0;
@@ -864,7 +1121,7 @@ def _get_toc_css() -> str:
         }
 
         .toc-nav.collapsed {
-            transform: translateX(-180px);
+            transform: translateX(-220px);
         }
 
         .toc-header {
@@ -879,6 +1136,24 @@ def _get_toc_css() -> str:
         .toc-icon {
             font-size: 1.25rem;
             color: var(--text-secondary);
+        }
+
+        /* Material Icons in TOC */
+        .toc-list .material-icons {
+            font-size: 18px;
+            flex-shrink: 0;
+            opacity: 0.7;
+            transition: opacity 0.2s;
+        }
+
+        .toc-list a:hover .material-icons,
+        .toc-list a:focus .material-icons,
+        .toc-list a.active .material-icons {
+            opacity: 1;
+        }
+
+        .toc-sublist .material-icons {
+            font-size: 16px;
         }
 
         .toc-title {
@@ -897,13 +1172,16 @@ def _get_toc_css() -> str:
         }
 
         .toc-list a {
-            display: block;
+            display: flex;
+            align-items: flex-start;
+            gap: 0.5rem;
             padding: 0.5rem 1rem;
             color: var(--text-secondary);
             text-decoration: none;
             font-size: 0.875rem;
             border-left: 3px solid transparent;
             transition: all 0.2s ease;
+            line-height: 1.4;
         }
 
         .toc-list a:hover,
@@ -927,7 +1205,7 @@ def _get_toc_css() -> str:
         }
 
         .toc-sublist a {
-            padding-left: 2rem;
+            padding-left: 2.5rem;
             font-size: 0.8125rem;
         }
 
@@ -964,7 +1242,7 @@ def _get_toc_css() -> str:
 
         /* Main content offset for TOC */
         .main-content {
-            margin-left: 220px;
+            margin-left: 260px;
             transition: margin-left 0.3s ease;
         }
 
@@ -1024,8 +1302,8 @@ def _get_toc_css() -> str:
         .about-metadata {
             flex: 1;
             min-width: 300px;
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            display: flex;
+            flex-direction: column;
             gap: 1.5rem;
         }
 
@@ -1055,6 +1333,7 @@ def _get_toc_css() -> str:
         .about-metadata dt {
             color: var(--text-secondary);
             font-size: 0.8125rem;
+            font-weight: 600;
         }
 
         .about-metadata dd {
@@ -1076,6 +1355,52 @@ def _get_toc_css() -> str:
             content: ' ↓';
             font-size: 0.75em;
             opacity: 0.7;
+        }
+
+        .file-size-warning {
+            display: block;
+            margin-top: 0.5rem;
+            padding: 0.625rem 0.75rem;
+            background: #fef3c7;
+            border-left: 3px solid #f59e0b;
+            border-radius: 0 4px 4px 0;
+            color: #92400e;
+            font-size: 0.8125rem;
+            line-height: 1.5;
+        }
+
+        .file-size-warning strong {
+            color: #b45309;
+        }
+
+        .file-size-warning a {
+            color: #b45309;
+            text-decoration: underline;
+            text-underline-offset: 2px;
+        }
+
+        .file-size-warning a:hover {
+            color: #92400e;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            .file-size-warning {
+                background: #422006;
+                border-left-color: #d97706;
+                color: #fde68a;
+            }
+
+            .file-size-warning strong {
+                color: #fbbf24;
+            }
+
+            .file-size-warning a {
+                color: #fcd34d;
+            }
+
+            .file-size-warning a:hover {
+                color: #fde68a;
+            }
         }
 
         /* Disclaimer section */
@@ -1116,6 +1441,99 @@ def _get_toc_css() -> str:
 
         .disclaimer-group li {
             margin-bottom: 0.25rem;
+        }
+
+        /* Metadata "Show more" details section */
+        .metadata-details {
+            margin-top: 0.75rem;
+            border-top: 1px solid var(--border-color);
+            padding-top: 0.5rem;
+        }
+
+        .metadata-details summary {
+            cursor: pointer;
+            color: var(--color-moderate);
+            font-size: 0.8125rem;
+            font-weight: 500;
+            list-style: none;
+            display: flex;
+            align-items: center;
+            gap: 0.375rem;
+            padding: 0.25rem 0;
+        }
+
+        .metadata-details summary::-webkit-details-marker {
+            display: none;
+        }
+
+        .metadata-details summary::before {
+            content: "▶";
+            font-size: 0.625rem;
+            transition: transform 0.2s ease;
+            display: inline-block;
+        }
+
+        .metadata-details[open] summary::before {
+            transform: rotate(90deg);
+        }
+
+        .metadata-details summary:hover {
+            color: var(--color-serious);
+        }
+
+        .metadata-details > dl {
+            margin-top: 0.5rem;
+            padding-top: 0.5rem;
+            border-top: 1px dashed var(--border-color);
+        }
+
+        /* Version warning box */
+        .version-warning {
+            display: flex;
+            gap: 0.75rem;
+            padding: 0.75rem 1rem;
+            background: var(--bg-light);
+            border-left: 3px solid var(--color-moderate);
+            border-radius: 4px;
+            margin-top: 0.75rem;
+            font-size: 0.875rem;
+        }
+
+        .version-warning .warning-icon {
+            flex-shrink: 0;
+            font-size: 1rem;
+        }
+
+        .version-warning .warning-content {
+            flex: 1;
+        }
+
+        .version-warning .warning-content strong {
+            display: block;
+            margin-bottom: 0.25rem;
+            color: var(--text-primary);
+        }
+
+        .version-warning p {
+            margin: 0.25rem 0 0;
+            color: var(--text-secondary);
+            line-height: 1.5;
+        }
+
+        .version-warning a {
+            color: var(--color-moderate);
+            text-decoration: none;
+        }
+
+        .version-warning a:hover {
+            text-decoration: underline;
+        }
+
+        /* Help text for metadata values */
+        .help-text {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            font-style: italic;
         }
     """
 
@@ -1422,6 +1840,43 @@ def _get_report_css() -> str:
             font-size: 1.25rem;
             font-weight: 600;
             color: var(--score-color, #22c55e);
+        }
+
+        /* Celebration pigeon for perfect scores */
+        .celebration-container {
+            position: relative;
+            width: 120px;
+            height: 140px;
+            overflow: hidden;
+            align-self: flex-end;
+            margin-left: auto;
+            flex-shrink: 0;
+        }
+
+        .celebration-pigeon {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 120px;
+            height: auto;
+            transform: scaleX(-1);
+            animation: pigeon-peek 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+        }
+
+        @keyframes pigeon-peek {
+            0% {
+                transform: scaleX(-1) translateY(100%);
+            }
+            100% {
+                transform: scaleX(-1) translateY(0);
+            }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .celebration-pigeon {
+                animation: none;
+                transform: scaleX(-1) translateY(0);
+            }
         }
 
         .score-details {
@@ -2115,8 +2570,27 @@ def _generate_executive_summary_section(
         return ""
 
     from inspekt.services.pdf_scoring import calculate_accessibility_score, ScoreCategory
+    import base64
 
     score = calculate_accessibility_score(result)
+
+    # Celebration pigeon for perfect scores! 🎉
+    celebration_html = ""
+    if score.score >= 100:
+        try:
+            pigeon_path = Path(__file__).parent.parent / "static" / "images" / "elly_party.png"
+            if pigeon_path.exists():
+                pigeon_b64 = base64.b64encode(pigeon_path.read_bytes()).decode("utf-8")
+                celebration_html = f'''
+                <div class="celebration-container" aria-hidden="true">
+                    <img src="data:image/png;base64,{pigeon_b64}"
+                         alt=""
+                         class="celebration-pigeon"
+                         title="Perfect score! Elly is proud of you!">
+                </div>
+                '''
+        except Exception:
+            pass  # Silently skip if image can't be loaded
 
     # Build category bars
     category_bars = []
@@ -2125,7 +2599,7 @@ def _generate_executive_summary_section(
         if cat_score:
             bar_width = cat_score.score
             bar_color = _get_score_color(cat_score.score)
-            issues_text = f"{cat_score.issues_count} issue{'s' if cat_score.issues_count != 1 else ''}" if cat_score.issues_count > 0 else "No issues"
+            issues_text = cat_score.display_issues
             category_bars.append(f"""
             <div class="category-row">
                 <div class="category-label">{category.value}</div>
@@ -2186,6 +2660,7 @@ def _generate_executive_summary_section(
                     {severity_html}
                 </div>
             </div>
+            {celebration_html}
         </div>
         <div class="category-breakdown">
             <h3>Score by Category</h3>
@@ -2249,8 +2724,15 @@ def _generate_about_document_section(
 
     Combines document information and metadata into a single, well-organized section
     with groups for Basic Information, Technical Details, and Accessibility.
+
+    Enhanced features:
+    - Reordered Basic Information with locale-aware dates
+    - Language with flag emoji and detection indicator
+    - "Created with" showing tool icon and name
+    - More Details with code styling for IDs and yes/no icons for booleans
+    - Accessibility section with structure statistics (headings, images, tables, forms, lists)
     """
-    from inspekt.services.pdf_checker import extract_enhanced_metadata, format_date_human_readable
+    from inspekt.services.pdf_checker import extract_enhanced_metadata
     from inspekt.services.pdf_ocr import extract_pdf_text
 
     meta = extract_enhanced_metadata(pdf_path)
@@ -2267,62 +2749,112 @@ def _generate_about_document_section(
         query = urllib.parse.quote(author)
         return f'<a href="https://duckduckgo.com/?q={query}" target="_blank" rel="noopener noreferrer" title="Search for {_escape_html(author)} on DuckDuckGo">{_escape_html(author)}</a>'
 
-    # Group 1: Basic Information
+    # Get accessibility structure statistics
+    structure_stats = _get_accessibility_structure_stats(pdf_path, meta)
+
+    # Detect language early (needed for both Basic Info and Accessibility)
+    declared_lang = meta.language
+    detected_lang = None
+    try:
+        sample_text = ""
+        for page_num in range(min(3, meta.page_count)):
+            page_text = extract_pdf_text(pdf_path, page_num)
+            if page_text:
+                sample_text += page_text + " "
+            if len(sample_text) > 5000:
+                break
+        if sample_text.strip():
+            detected_lang = _detect_language_from_text(sample_text)
+    except Exception:
+        pass
+
+    # ==========================================================================
+    # Group 1: Basic Information (always visible)
+    # Order: Title, Filename, File Size, Pages, Language, Author, Page Size,
+    #        Created with, Created, Modified
+    # ==========================================================================
     basic_items = []
-    # Make filename a clickable download link
-    file_path_str = str(meta.file_path.absolute()) if meta.file_path.is_absolute() else str(meta.file_path)
-    basic_items.append(f'<dt>Filename</dt><dd><a href="{_escape_html(file_path_str)}" download class="download-link">{_escape_html(meta.file_path.name)}</a></dd>')
-    basic_items.append(f"<dt>File Size</dt><dd>{_format_file_size(meta.file_size)}</dd>")
-    basic_items.append(f"<dt>Pages</dt><dd>{meta.page_count}</dd>")
-    if meta.pdf_version:
-        basic_items.append(f"<dt>PDF Version</dt><dd>{meta.pdf_version}</dd>")
+
+    # 1. Title (only if set)
     if meta.title:
         basic_items.append(f"<dt>Title</dt><dd>{_escape_html(meta.title)}</dd>")
+
+    # 2. Filename (download link)
+    file_path_str = str(meta.file_path.absolute()) if meta.file_path.is_absolute() else str(meta.file_path)
+    basic_items.append(f'<dt>Filename</dt><dd><a href="{_escape_html(file_path_str)}" download class="download-link">{_escape_html(meta.file_path.name)}</a></dd>')
+
+    # 3. File Size (with warning for large files)
+    file_size_html = _format_file_size(meta.file_size)
+    if meta.file_size > 10 * 1024 * 1024:  # > 10 MB
+        file_size_html += '''
+            <small class="file-size-warning">
+                <strong>Warning:</strong> this file is larger than 10 MB. Depending on the user's internet speed,
+                it may take a while to download, and some email providers may refuse attachments this large.
+                Consider re-exporting at a lower quality or compressing it with
+                <a href="https://apps.apple.com/us/app/pdf-squeezer-4/id1502111349?mt=12" target="_blank" rel="noopener">PDF Squeezer</a> (Mac App Store)
+                or <a href="https://smallpdf.com/compress-pdf" target="_blank" rel="noopener">Smallpdf</a> (online).
+            </small>
+        '''
+    basic_items.append(f"<dt>File Size</dt><dd>{file_size_html}</dd>")
+
+    # 4. Pages
+    basic_items.append(f"<dt>Pages</dt><dd>{meta.page_count}</dd>")
+
+    # 5. Language (with flag emoji and detection indicator)
+    if declared_lang:
+        lang_display_name = _get_language_display_name(declared_lang) or declared_lang
+        lang_flag = _get_language_flag(declared_lang)
+        flag_html = f'<span class="lang-flag">{lang_flag}</span> ' if lang_flag else ""
+
+        if detected_lang:
+            declared_norm = _normalize_language_code(declared_lang)
+            detected_norm = _normalize_language_code(detected_lang)
+
+            if declared_norm == detected_norm:
+                lang_html = f'''
+                <span class="lang-verified">
+                    {flag_html}{_escape_html(lang_display_name)} ({_escape_html(declared_lang)})
+                    <span class="lang-check" title="Detected language matches declared language">✓</span>
+                </span>
+                '''
+            else:
+                detected_name = _get_language_display_name(detected_lang)
+                lang_html = f'''
+                <span class="lang-mismatch">
+                    {flag_html}{_escape_html(lang_display_name)} ({_escape_html(declared_lang)})
+                    <span class="lang-warning" title="Detected language ({detected_name}) may differ from declared">⚠</span>
+                </span>
+                '''
+        else:
+            lang_html = f'{flag_html}{_escape_html(lang_display_name)} ({_escape_html(declared_lang)})'
+        basic_items.append(f"<dt>Language</dt><dd>{lang_html}</dd>")
+
+    # 6. Author (DuckDuckGo link)
     if meta.author:
         basic_items.append(f"<dt>Author</dt><dd>{_author_link(meta.author)}</dd>")
-    if meta.subject:
-        basic_items.append(f"<dt>Subject</dt><dd>{_escape_html(meta.subject)}</dd>")
-    if meta.keywords:
-        basic_items.append(f"<dt>Keywords</dt><dd>{_escape_html(meta.keywords)}</dd>")
 
-    # Dates
-    if meta.creation_date:
-        display_date = format_date_human_readable(meta.creation_date)
-        basic_items.append(f"<dt>Created</dt><dd>{_escape_html(display_date)}</dd>")
-    if meta.modification_date:
-        display_date = format_date_human_readable(meta.modification_date)
-        basic_items.append(f"<dt>Modified</dt><dd>{_escape_html(display_date)}</dd>")
-
-    # Group 2: Technical Details
-    tech_items = []
-
-    # Creator/Producer with icon
-    if meta.creator or meta.producer:
-        creator_icon, tool_name = _get_creator_icon(meta.creator, meta.producer)
-        if tool_name:
-            creator_display = f'''<span class="creator-with-icon">{creator_icon} {_escape_html(tool_name)}</span>'''
-            if meta.creator and meta.creator.lower() != tool_name.lower():
-                creator_display += f'<br><span class="creator-detail">{_escape_html(meta.creator)}</span>'
-        else:
-            creator_display = f'''<span class="creator-with-icon">{creator_icon} {_escape_html(meta.creator or meta.producer)}</span>'''
-        tech_items.append(f"<dt>Creator</dt><dd>{creator_display}</dd>")
-
-    if meta.producer and (not meta.creator or meta.producer != meta.creator):
-        tech_items.append(f"<dt>Producer</dt><dd>{_escape_html(meta.producer)}</dd>")
-
-    # Page size with standard name
+    # 7. Page Size (moved from extended section) with unit toggle
     if meta.page_dimensions and len(meta.page_dimensions) > 0:
         w, h = meta.page_dimensions[0]
         w_in = w / 72
         h_in = h / 72
+        w_cm = w_in * 2.54
+        h_cm = h_in * 2.54
         paper_name, orientation = _identify_paper_size(w, h)
         size_icon = _get_page_size_icon_svg(w, h, size=32)
 
+        # Build size parts with toggle-able dimensions
         size_parts = []
         if paper_name:
             size_parts.append(f"<strong>{paper_name}</strong>")
-        size_parts.append(f'{w_in:.1f}" × {h_in:.1f}"')
+
+        # Dimensions with data attributes for toggle
+        size_inches = f'{w_in:.1f}" × {h_in:.1f}"'
+        size_cm = f'{w_cm:.1f} × {h_cm:.1f} cm'
+        dimensions_html = f'''<span class="page-size-dimensions" data-size-inches='{size_inches}' data-size-cm='{size_cm}' data-current-unit="inches">{size_inches}</span>'''
+        size_parts.append(dimensions_html)
         size_parts.append(f'<span class="orientation-badge orientation-{orientation}">{orientation.capitalize()}</span>')
+        size_parts.append('<button type="button" class="page-size-toggle" onclick="togglePageSizeUnit(this)">Show in cm</button>')
 
         page_size_html = f'''
         <span class="page-size-display">
@@ -2330,12 +2862,111 @@ def _generate_about_document_section(
             <span class="page-size-info">{" · ".join(size_parts)}</span>
         </span>
         '''
-        tech_items.append(f"<dt>Page Size</dt><dd>{page_size_html}</dd>")
+        basic_items.append(f"<dt>Page Size</dt><dd>{page_size_html}</dd>")
+
+    # 8. Created with (tool icon + name)
+    if meta.creator or meta.producer:
+        creator_icon, tool_name, accessibility_docs_url = get_creator_info(meta.creator, meta.producer)
+
+        # Build the docs link icon if we have a URL
+        docs_link_html = ""
+        if accessibility_docs_url:
+            docs_link_html = f'''<a href="{_escape_html(accessibility_docs_url)}" class="creator-docs-link" target="_blank" rel="noopener" title="View accessibility documentation for {_escape_html(tool_name or 'this tool')}">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
+                    <path d="M12 7v6M12 16v1" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                </svg>
+            </a>'''
+
+        if tool_name:
+            creator_display = f'''<span class="creator-with-icon">{creator_icon} <span class="creator-name">{_escape_html(tool_name)}</span>{docs_link_html}</span>'''
+        else:
+            creator_display = f'''<span class="creator-with-icon">{creator_icon} {_escape_html(meta.creator or meta.producer)}</span>'''
+        basic_items.append(f"<dt>Created with</dt><dd>{creator_display}</dd>")
+
+    # 9. Created (locale-aware)
+    if meta.creation_date:
+        display_date = _format_date_locale_aware(meta.creation_date)
+        basic_items.append(f"<dt>Created</dt><dd>{_escape_html(display_date)}</dd>")
+
+    # 10. Modified (locale-aware with relative time on new line, or hidden if same as Created)
+    if meta.modification_date:
+        relative_time = _format_relative_time(meta.creation_date, meta.modification_date)
+        if relative_time:  # Only show if different from creation date
+            display_date = _format_date_locale_aware(meta.modification_date)
+            basic_items.append(f'<dt>Modified</dt><dd>{_escape_html(display_date)}<br><span class="relative-time">{_escape_html(relative_time)}</span></dd>')
+
+    # ==========================================================================
+    # Group 2: Extended details (collapsible "Show more")
+    # ==========================================================================
+    extended_items = []
+
+    if meta.pdf_version:
+        extended_items.append(f"<dt>PDF Version</dt><dd>{meta.pdf_version}</dd>")
+    if meta.subject:
+        extended_items.append(f"<dt>Subject</dt><dd>{_escape_html(meta.subject)}</dd>")
+    if meta.keywords:
+        extended_items.append(f"<dt>Keywords</dt><dd>{_escape_html(meta.keywords)}</dd>")
+
+    # Producer (if different from creator)
+    if meta.producer and (not meta.creator or meta.producer != meta.creator):
+        extended_items.append(f"<dt>Producer</dt><dd>{_escape_html(meta.producer)}</dd>")
+
+    # Linearized status
+    is_linearized = getattr(meta, 'is_linearized', False)
+    if is_linearized:
+        extended_items.append('<dt>Linearized</dt><dd><span class="bool-true">✓ Yes</span> <span class="help-text">(optimized for web)</span></dd>')
+    else:
+        extended_items.append('<dt>Linearized</dt><dd><span class="bool-false">✗ No</span></dd>')
+
+    # Trapped status
+    trapped = getattr(meta, 'trapped', None)
+    if trapped:
+        if trapped == "True":
+            trapped_display = '<span class="bool-true">✓ Yes</span>'
+        elif trapped == "False":
+            trapped_display = '<span class="bool-false">✗ No</span>'
+        else:
+            trapped_display = f'<span class="not-set">{_escape_html(trapped)}</span>'
+        extended_items.append(f"<dt>Trapped</dt><dd>{trapped_display}</dd>")
 
     if meta.is_encrypted:
-        tech_items.append('<dt>Encrypted</dt><dd>Yes ⚠</dd>')
+        extended_items.append('<dt>Encrypted</dt><dd><span class="bool-true">✓ Yes</span> ⚠</dd>')
 
+    # XMP metadata highlights - PDF/A conformance
+    xmp_metadata = getattr(meta, 'xmp_metadata', None)
+    if xmp_metadata:
+        if "pdfa_conformance" in xmp_metadata:
+            extended_items.append(f'<dt>PDF/A</dt><dd><span class="ua-badge">{_escape_html(xmp_metadata["pdfa_conformance"])}</span></dd>')
+
+    # Custom metadata fields with special styling
+    # Fields to style with <code>: tanDocumentId, tanDocumentVersionId, tanDocumentType
+    # Fields with yes/no icons: tanUserGenerated and any boolean-like values
+    CODE_STYLED_FIELDS = {"tanDocumentId", "tanDocumentVersionId", "tanDocumentType"}
+    BOOLEAN_FIELDS = {"tanUserGenerated"}
+
+    custom_metadata = getattr(meta, 'custom_metadata', None)
+    if custom_metadata:
+        for key, value in custom_metadata.items():
+            # Truncate long values
+            display_value = value[:100] + "..." if len(value) > 100 else value
+
+            # Check if it's a code-styled field
+            if key in CODE_STYLED_FIELDS:
+                extended_items.append(f'<dt>{_escape_html(key)}</dt><dd><code class="metadata-code">{_escape_html(display_value)}</code></dd>')
+            # Check if it's a boolean field
+            elif key in BOOLEAN_FIELDS or value.lower() in ("true", "false", "yes", "no", "1", "0"):
+                is_true = value.lower() in ("true", "yes", "1")
+                if is_true:
+                    extended_items.append(f'<dt>{_escape_html(key)}</dt><dd><span class="bool-true">✓ Yes</span></dd>')
+                else:
+                    extended_items.append(f'<dt>{_escape_html(key)}</dt><dd><span class="bool-false">✗ No</span></dd>')
+            else:
+                extended_items.append(f"<dt>{_escape_html(key)}</dt><dd>{_escape_html(display_value)}</dd>")
+
+    # ==========================================================================
     # Group 3: Accessibility
+    # ==========================================================================
     a11y_items = []
 
     # Check if document is tagged by looking for structure tree
@@ -2360,25 +2991,12 @@ def _generate_about_document_section(
     else:
         a11y_items.append('<dt>PDF/UA</dt><dd><span class="not-set">Not declared</span></dd>')
 
-    # Language with detection
-    declared_lang = meta.language
-    detected_lang = None
-
-    try:
-        sample_text = ""
-        for page_num in range(min(3, meta.page_count)):
-            page_text = extract_pdf_text(pdf_path, page_num)
-            if page_text:
-                sample_text += page_text + " "
-            if len(sample_text) > 5000:
-                break
-        if sample_text.strip():
-            detected_lang = _detect_language_from_text(sample_text)
-    except Exception:
-        pass
-
+    # Language with detection verification (in accessibility context)
     if declared_lang:
         lang_display_name = _get_language_display_name(declared_lang) or declared_lang
+        lang_flag = _get_language_flag(declared_lang)
+        flag_html = f'<span class="lang-flag">{lang_flag}</span> ' if lang_flag else ""
+
         if detected_lang:
             declared_norm = _normalize_language_code(declared_lang)
             detected_norm = _normalize_language_code(detected_lang)
@@ -2387,20 +3005,20 @@ def _generate_about_document_section(
             if declared_norm == detected_norm:
                 lang_html = f'''
                 <span class="lang-verified">
-                    {_escape_html(lang_display_name)}
+                    {flag_html}{_escape_html(lang_display_name)}
                     <span class="lang-check" title="Detected language matches declared language">✓</span>
                 </span>
                 '''
             else:
                 lang_html = f'''
                 <span class="lang-mismatch">
-                    {_escape_html(lang_display_name)}
+                    {flag_html}{_escape_html(lang_display_name)}
                     <span class="lang-warning" title="Detected language ({detected_name}) may differ from declared">⚠</span>
                 </span>
                 <span class="lang-detected">Detected: {_escape_html(detected_name or detected_lang)}</span>
                 '''
         else:
-            lang_html = _escape_html(lang_display_name)
+            lang_html = f'{flag_html}{_escape_html(lang_display_name)}'
         a11y_items.append(f"<dt>Language</dt><dd>{lang_html}</dd>")
     else:
         if detected_lang:
@@ -2415,8 +3033,65 @@ def _generate_about_document_section(
         else:
             a11y_items.append('<dt>Language</dt><dd><span class="not-set">Not specified</span></dd>')
 
+    # Structure statistics: Headings
+    if structure_stats["heading_count"] > 0:
+        heading_text = f'{structure_stats["heading_count"]} headings'
+        if structure_stats["heading_depth"] > 0:
+            heading_text += f', {structure_stats["heading_depth"]} levels deep'
+        a11y_items.append(f'<dt>Headings</dt><dd>{heading_text}</dd>')
+    elif is_tagged:
+        a11y_items.append('<dt>Headings</dt><dd><span class="not-set">None found</span></dd>')
+
+    # Structure statistics: Images
+    if structure_stats["image_count"] > 0:
+        if structure_stats["images_without_alt"] > 0:
+            image_html = f'{structure_stats["image_count"]} images <span class="structure-stat-warn">({structure_stats["images_without_alt"]} without alt text)</span>'
+        else:
+            image_html = f'{structure_stats["image_count"]} images, all with alt text ✓'
+        a11y_items.append(f'<dt>Images</dt><dd>{image_html}</dd>')
+
+    # Structure statistics: Content (tables, lists, forms)
+    content_parts = []
+    if structure_stats["table_count"] > 0:
+        content_parts.append(f'tables ({structure_stats["table_count"]})')
+    if structure_stats["list_count"] > 0:
+        content_parts.append(f'lists ({structure_stats["list_count"]})')
+    if structure_stats["form_field_count"] > 0:
+        content_parts.append(f'form fields ({structure_stats["form_field_count"]})')
+
+    if content_parts:
+        a11y_items.append(f'<dt>Content</dt><dd>Contains {", ".join(content_parts)}</dd>')
+
+    # OCR Quality warning
     if meta.has_suspects_flag:
         a11y_items.append('<dt>OCR Quality</dt><dd><span class="suspects-warning">⚠ Document may have OCR errors</span></dd>')
+
+    # Version count warning
+    version_count = getattr(meta, 'version_count', 1)
+    version_warning_html = ""
+    if version_count > 1:
+        version_warning_html = f"""
+        <div class="version-warning">
+            <span class="warning-icon">ℹ️</span>
+            <div class="warning-content">
+                <strong>Multiple versions detected</strong>
+                <p>This PDF contains {version_count} incremental save versions.
+                   Previous versions may contain content that was later modified or removed.
+                   Consider using <a href="https://github.com/enferex/pdfresurrect" target="_blank" rel="noopener">pdfresurrect</a>
+                   to extract and review embedded versions.</p>
+            </div>
+        </div>
+        """
+
+    # Build the "Show more" details section
+    show_more_html = ""
+    if extended_items:
+        show_more_html = f"""
+        <details class="metadata-details">
+            <summary>Show more details</summary>
+            <dl>{''.join(extended_items)}</dl>
+        </details>
+        """
 
     # Build the complete section
     return f"""
@@ -2428,14 +3103,12 @@ def _generate_about_document_section(
                 <div class="metadata-group">
                     <h3>Basic Information</h3>
                     <dl>{''.join(basic_items)}</dl>
+                    {show_more_html}
                 </div>
-                {f'''<div class="metadata-group">
-                    <h3>Technical Details</h3>
-                    <dl>{''.join(tech_items)}</dl>
-                </div>''' if tech_items else ''}
                 <div class="metadata-group">
                     <h3>Accessibility</h3>
                     <dl>{''.join(a11y_items)}</dl>
+                    {version_warning_html}
                 </div>
             </div>
         </div>
@@ -2515,7 +3188,7 @@ def _generate_text_discrepancy_section(pdf_path: Path | str, config: dict) -> st
     if result.is_sampled:
         sampling_notice_html = f"""
         <div class="sampling-notice">
-            <span class="sampling-notice-title">📊 Sampled Analysis:</span> {_escape_html(result.sampling_description or '')}
+            <span class="sampling-notice-title"><span class="material-icons">analytics</span> Sampled Analysis:</span> {_escape_html(result.sampling_description or '')}
             <p class="sampling-notice-text">
                 For large documents, a representative sample of pages is analyzed (first 10, last 5, plus random middle pages).
                 Use <code class="sampling-notice-code">--ocr-all-pages</code> to analyze every page.
@@ -2684,19 +3357,171 @@ def _get_check_info(check_id: str) -> dict | None:
     return get_check_info(check_id)
 
 
+def _get_structure_tree_css() -> str:
+    """Load structure tree CSS from static file."""
+    css_path = Path(__file__).parent.parent / "static" / "css" / "structure-tree.css"
+    try:
+        return css_path.read_text()
+    except Exception as e:
+        logger.warning(f"Failed to load structure tree CSS: {e}")
+        return ""
+
+
+def _generate_contrast_error_section(error_message: str) -> str:
+    """Generate a placeholder section when contrast analysis can't run."""
+    return f"""
+    <section id="contrast" class="contrast-analysis">
+        <h2>Color Contrast Analysis</h2>
+        <div class="contrast-unavailable">
+            <p class="warning-message">
+                <span class="status-icon">⚠</span>
+                {_escape_html(error_message)}
+            </p>
+        </div>
+    </section>
+    """
+
+
+def _generate_contrast_section(
+    contrast_result: "ContrastAnalysisResult",
+    config: dict,
+) -> str:
+    """Generate the color contrast analysis section.
+
+    Args:
+        contrast_result: Results from PDFContrastChecker
+        config: Report configuration options
+
+    Returns:
+        HTML string for the contrast analysis section
+    """
+    if not contrast_result:
+        return ""
+
+    if not contrast_result.has_issues:
+        # No issues - show success message
+        return f"""
+        <section id="contrast" class="contrast-analysis">
+            <h2>Color Contrast Analysis</h2>
+            <p class="success-message">
+                <span class="status-pass">✓</span>
+                No contrast issues detected in {contrast_result.total_text_regions} text regions
+                across {contrast_result.total_pages_analyzed} page{'s' if contrast_result.total_pages_analyzed != 1 else ''}.
+            </p>
+        </section>
+        """
+
+    # Build issue rows with color swatches
+    issue_rows = []
+    for page_result in contrast_result.pages:
+        for issue in page_result.issues:
+            # Truncate text sample and escape HTML
+            text_sample = issue.text_sample[:30]
+            if len(issue.text_sample) > 30:
+                text_sample += "…"
+
+            issue_rows.append(f"""
+            <tr class="severity-{issue.severity}">
+                <td class="contrast-page">{issue.display_page}</td>
+                <td class="contrast-colors">
+                    <div class="color-swatch-group">
+                        <div class="color-swatch" style="background:{issue.fg_hex}" title="Foreground: {issue.fg_hex}"></div>
+                        <code class="color-code">{issue.fg_hex}</code>
+                    </div>
+                </td>
+                <td class="contrast-colors">
+                    <div class="color-swatch-group">
+                        <div class="color-swatch" style="background:{issue.bg_hex}" title="Background: {issue.bg_hex}"></div>
+                        <code class="color-code">{issue.bg_hex}</code>
+                    </div>
+                </td>
+                <td class="contrast-sample">{_escape_html(text_sample)}</td>
+                <td class="contrast-ratio"><strong>{issue.contrast_ratio:.2f}:1</strong></td>
+                <td class="contrast-required">{issue.required_ratio}:1</td>
+                <td class="contrast-severity"><span class="severity-badge {issue.severity}">{issue.severity}</span></td>
+            </tr>
+            """)
+
+    # Build summary stats
+    pages_with_issues = sum(1 for p in contrast_result.pages if p.issues)
+
+    return f"""
+    <section id="contrast" class="contrast-analysis collapsible">
+        <h2>Color Contrast Analysis</h2>
+        <p class="section-summary">
+            Found <strong>{contrast_result.total_issues}</strong> contrast issue{'s' if contrast_result.total_issues != 1 else ''}
+            ({contrast_result.serious_issues} serious, {contrast_result.moderate_issues} moderate)
+            across {pages_with_issues} of {contrast_result.total_pages_analyzed} page{'s' if contrast_result.total_pages_analyzed != 1 else ''} analyzed.
+        </p>
+        <div class="contrast-legend">
+            <span class="legend-item"><span class="severity-badge serious">serious</span> Ratio &lt; {3.375:.2f}:1 (below 75% of requirement)</span>
+            <span class="legend-item"><span class="severity-badge moderate">moderate</span> Ratio &lt; 4.5:1 but ≥ {3.375:.2f}:1</span>
+        </div>
+        <div class="table-scroll-container">
+            <table class="contrast-table">
+                <thead>
+                    <tr>
+                        <th>Page</th>
+                        <th>Foreground</th>
+                        <th>Background</th>
+                        <th>Text Sample</th>
+                        <th>Ratio</th>
+                        <th>Required</th>
+                        <th>Severity</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {''.join(issue_rows)}
+                </tbody>
+            </table>
+        </div>
+        <p class="section-note">
+            <em>Note: Contrast ratios are based on OCR text detection and color sampling.
+            Results may vary for text rendered with anti-aliasing or on gradient backgrounds.
+            WCAG 2.1 requires 4.5:1 for normal text (AA) and 3.0:1 for large text (18pt+ or 14pt bold).</em>
+        </p>
+    </section>
+    """
+
+
+def _get_structure_tree_js() -> str:
+    """Load structure tree JavaScript from static file."""
+    js_path = Path(__file__).parent.parent / "static" / "js" / "structure-tree.js"
+    try:
+        return js_path.read_text()
+    except Exception as e:
+        logger.warning(f"Failed to load structure tree JS: {e}")
+        return ""
+
+
 def _generate_structure_tree_section(
     pdf_path: Path | str,
     config: dict,
+    progress_callback: callable = None,
 ) -> str:
-    """Generate the structure tree visualization section."""
+    """Generate the structure tree visualization section.
+
+    Args:
+        pdf_path: Path to the PDF file
+        config: Configuration dictionary
+        progress_callback: Optional callback for progress updates (e.g., print_substep)
+    """
     if not config.get("show-structure", True):
         return ""
+
+    def report_progress(msg: str) -> None:
+        """Report progress if callback is provided."""
+        if progress_callback:
+            progress_callback(msg)
 
     try:
         from inspekt.services.pdf_structure_extractor import PDFStructureExtractor
 
         with PDFStructureExtractor(pdf_path) as extractor:
             result = extractor.extract()
+
+        if result.was_truncated:
+            report_progress(f"Truncated at {extractor._max_nodes:,} nodes (large document)")
 
         if not result.has_structure:
             return f"""
@@ -2711,8 +3536,9 @@ def _generate_structure_tree_section(
             </section>
             """
 
-        # Build tree HTML
-        tree_html = _build_tree_html(result.root) if result.root else ""
+        # Build tree HTML (with optional figure thumbnails for tooltips)
+        figure_thumbnails = {}  # TODO: Populate from image extraction if available
+        tree_html = _build_tree_html(result.root, figure_thumbnails=figure_thumbnails) if result.root else ""
 
         # Statistics summary
         stats = result.statistics
@@ -2752,17 +3578,55 @@ def _generate_structure_tree_section(
             </div>
             """
 
+        # Info panel with legend and keyboard shortcuts
+        info_panel_html = """
+        <div class="structure-tree-info">
+            <details open>
+                <summary>Legend &amp; Help</summary>
+                <div class="color-legend">
+                    <span class="legend-item"><span class="legend-swatch" style="background:#dc2626"></span> Headings (H1-H6)</span>
+                    <span class="legend-item"><span class="legend-swatch" style="background:#0284c7"></span> Paragraphs</span>
+                    <span class="legend-item"><span class="legend-swatch" style="background:#a855f7"></span> Figures</span>
+                    <span class="legend-item"><span class="legend-swatch" style="background:#06b6d4"></span> Tables</span>
+                    <span class="legend-item"><span class="legend-swatch" style="background:#f97316"></span> Lists</span>
+                    <span class="legend-item"><span class="legend-swatch" style="background:#eab308"></span> Links</span>
+                </div>
+                <p><strong>Keyboard:</strong> Hold <kbd>Ctrl</kbd> (Win/Linux) or <kbd>Cmd</kbd> (Mac) + click to expand/collapse all descendants.</p>
+                <p><strong>Resize:</strong> Drag the handle at the bottom to adjust panel height.</p>
+                <p><strong>Hide generic tags:</strong> Removes Span, Div, NonStruct, and Private tags that add visual noise without semantic meaning.</p>
+                <p><strong>Hide identical siblings:</strong> Collapses consecutive tags of the same type (e.g., 20 paragraphs) into a single entry with a "Show more" link.</p>
+            </details>
+        </div>
+        """
+
         return f"""
         <section id="structure" class="structure-tree collapsible">
             <h2 class="section-header"><span class="icon icon-chart"></span>Structure Tree</h2>
             <div class="section-content">
                 {stats_html}
                 {validation_html}
-                <div class="tree-container">
-                    {tree_html}
+                <div id="structure-tree-panel" class="structure-tree-container">
+                    <div class="structure-tree-toolbar">
+                        <button class="toggle-all-btn" aria-expanded="true">Collapse All</button>
+                        <span class="toolbar-separator"></span>
+                        <label class="toolbar-checkbox" for="hide-generic-tags">
+                            <input type="checkbox" id="hide-generic-tags">
+                            Hide generic tags
+                        </label>
+                        <label class="toolbar-checkbox" for="hide-all-identical-siblings">
+                            <input type="checkbox" id="hide-all-identical-siblings">
+                            Hide all identical siblings
+                        </label>
+                    </div>
+                    <ul>{tree_html}</ul>
+                    <div class="resize-handle" aria-label="Resize structure tree panel"></div>
                 </div>
+                {info_panel_html}
+                <div id="structure-figure-tooltip" class="structure-figure-tooltip" hidden></div>
             </div>
         </section>
+        <style>{_get_structure_tree_css()}</style>
+        <script>{_get_structure_tree_js()}</script>
         """
 
     except Exception as e:
@@ -2770,35 +3634,64 @@ def _generate_structure_tree_section(
         return ""
 
 
-def _build_tree_html(node, depth: int = 0) -> str:
-    """Recursively build HTML for structure tree."""
+def _build_tree_html(node, depth: int = 0, figure_thumbnails: dict | None = None) -> str:
+    """Recursively build HTML for structure tree.
+
+    Args:
+        node: StructureNode to render
+        depth: Current recursion depth
+        figure_thumbnails: Optional dict mapping figure indices to base64 thumbnails
+    """
     if depth > 10:  # Prevent infinite recursion
         return ""
 
-    tag_class = "tag-heading" if node.is_heading else "tag-standard"
+    if figure_thumbnails is None:
+        figure_thumbnails = {}
+
+    # Build tag-specific CSS class
+    tag_type = node.tag_type
+    tag_class = f"tag tag-{tag_type}"
     if node.has_issues:
         tag_class += " has-issues"
 
+    # Add data-thumbnail for Figure tags if available
+    data_attrs = ""
+    if tag_type == "Figure" and hasattr(node, "figure_index") and node.figure_index is not None:
+        thumbnail = figure_thumbnails.get(node.figure_index)
+        if thumbnail:
+            data_attrs = f' data-thumbnail="{thumbnail}"'
+
     # Build node content
-    content = f'<span class="tag {tag_class}">{_escape_html(node.tag_type)}</span>'
-    if node.text_content:
+    content = f'<span class="{tag_class}"{data_attrs}>{_escape_html(tag_type)}</span>'
+
+    # For headings (H1-H6), show bold preview text
+    if node.is_heading and node.text_content:
+        preview = node.text_content[:30] + "..." if len(node.text_content) > 30 else node.text_content
+        content += f' <span class="heading-preview">{_escape_html(preview)}</span>'
+    elif node.text_content:
+        # Non-heading text preview
         preview = node.text_content[:50] + "..." if len(node.text_content) > 50 else node.text_content
         content += f' <span class="tag-preview">"{_escape_html(preview)}"</span>'
+
     if node.alt_text:
-        content += f' <span class="tag-alt">(alt: {_escape_html(node.alt_text[:30])})</span>'
+        alt_preview = node.alt_text[:30] + "..." if len(node.alt_text) > 30 else node.alt_text
+        content += f' <span class="tag-alt">[alt: {_escape_html(alt_preview)}]</span>'
     if node.has_issues:
         content += ' <span class="tag-warning">⚠</span>'
 
     if not node.children:
         return f'<li>{content}</li>'
 
-    children_html = "".join(_build_tree_html(child, depth + 1) for child in node.children[:20])
+    children_html = "".join(
+        _build_tree_html(child, depth + 1, figure_thumbnails)
+        for child in node.children[:20]
+    )
     if len(node.children) > 20:
         children_html += f'<li class="more-items">... and {len(node.children) - 20} more</li>'
 
     return f"""
     <li>
-        <details{'open' if depth < 2 else ''}>
+        <details{' open' if depth < 2 else ''}>
             <summary>{content}</summary>
             <ul>{children_html}</ul>
         </details>
@@ -2985,6 +3878,7 @@ def _generate_tag_visualization_section(
 def _generate_interactive_preview_section(
     pdf_path: Path | str,
     config: dict,
+    output_path: Path | str | None = None,
 ) -> str:
     """
     Generate the interactive HTML preview section (Phase 6).
@@ -2994,9 +3888,14 @@ def _generate_interactive_preview_section(
     - Keyboard navigation (Tab/Shift+Tab)
     - Details panel showing tag info
     - Reading order visualization
-    - Zoom controls
+    - Pagination for multiple pages
+
+    Args:
+        pdf_path: Path to the PDF file
+        config: Configuration dictionary
+        output_path: Path to the output HTML file (for external assets mode)
     """
-    if not config.get("show-interactive-preview", False):
+    if not config.get("interactive-preview", True):
         return ""
 
     try:
@@ -3006,57 +3905,135 @@ def _generate_interactive_preview_section(
 
         from inspekt.services.pdf_tag_visualizer import PDFTagVisualizer, TAG_COLORS
 
-        # Determine which page to visualize (already 0-indexed from CLI)
-        page_num = config.get("interactive-page", 0)
-        if page_num < 0:
-            page_num = 0
+        # Load PDF tag reference data for educational callouts
+        tag_reference_path = PathLib(__file__).parent.parent / "data" / "pdf_tags.json"
+        tag_reference_data = {}
+        if tag_reference_path.exists():
+            try:
+                tag_reference_data = json.loads(tag_reference_path.read_text())
+            except Exception as e:
+                logger.warning(f"Failed to load PDF tag reference: {e}")
+
+        # Check if external assets mode is enabled
+        external_assets = config.get("external-assets", False) and output_path is not None
+
+        # Setup external assets directories if needed
+        assets_base_dir = None
+        thumbnails_dir = None
+        pages_dir = None
+        assets_rel_path = None
+
+        if external_assets:
+            output_path_obj = PathLib(output_path) if not isinstance(output_path, PathLib) else output_path
+            # Create assets folder: report.html → report_assets/
+            assets_base_dir = output_path_obj.parent / f"{output_path_obj.stem}_assets"
+            thumbnails_dir = assets_base_dir / "thumbnails"
+            pages_dir = assets_base_dir / "pages"
+            thumbnails_dir.mkdir(parents=True, exist_ok=True)
+            pages_dir.mkdir(parents=True, exist_ok=True)
+            # Relative path from HTML to assets folder
+            assets_rel_path = f"{output_path_obj.stem}_assets"
+
+        # Determine how many pages to show (default: 5, 0 = all)
+        num_pages_to_show = config.get("interactive-pages", 5)
 
         with PDFTagVisualizer(pdf_path) as visualizer:
             if not visualizer._fitz_doc:
                 return ""
 
-            max_pages = len(visualizer._fitz_doc)
-            if page_num >= max_pages:
-                page_num = 0
+            total_pages = len(visualizer._fitz_doc)
 
-            # Get page dimensions
-            page = visualizer._fitz_doc[page_num]
-            page_width = page.rect.width
-            page_height = page.rect.height
+            # Calculate actual pages to render
+            if num_pages_to_show == 0 or num_pages_to_show >= total_pages:
+                pages_to_render = list(range(total_pages))
+                showing_all = True
+            else:
+                pages_to_render = list(range(min(num_pages_to_show, total_pages)))
+                showing_all = False
 
-            # Extract tags for this page
-            tags = visualizer.extract_page_tags(page_num)
-
-            if not tags:
-                return ""
-
-            # Render the page as a base64 image (without tag overlays - JS will draw them)
+            # Collect page data
+            pages_data = []
             import fitz
             dpi = 150
             zoom = dpi / 72
-            mat = fitz.Matrix(zoom, zoom)
-            pix = page.get_pixmap(matrix=mat, alpha=False)
-            image_bytes = pix.tobytes("png")
-            image_base64 = base64.b64encode(image_bytes).decode('utf-8')
 
-            # Convert tags to JSON-serializable format
-            tags_json = []
-            for tag in tags:
-                tags_json.append({
-                    "tag_type": tag.tag_type,
-                    "bbox": tag.bbox if tag.bbox else None,
-                    "reading_order": tag.reading_order,
-                    "text_preview": tag.text_preview[:100] if tag.text_preview else None,
-                    "alt_text": tag.alt_text,
-                    "has_issues": tag.has_issues,
+            for page_num in pages_to_render:
+                page = visualizer._fitz_doc[page_num]
+                page_width = page.rect.width
+                page_height = page.rect.height
+
+                # Extract tags for this page
+                tags = visualizer.extract_page_tags(page_num)
+
+                # Render the page as an image
+                mat = fitz.Matrix(zoom, zoom)
+                pix = page.get_pixmap(matrix=mat, alpha=False)
+                image_bytes = pix.tobytes("png")
+
+                # Generate small thumbnail for navigation (50px height)
+                thumb_zoom = 50 / page_height
+                thumb_mat = fitz.Matrix(thumb_zoom, thumb_zoom)
+                thumb_pix = page.get_pixmap(matrix=thumb_mat, alpha=False)
+                thumb_bytes = thumb_pix.tobytes("png")
+
+                # Either save to files or encode as base64
+                if external_assets and pages_dir and thumbnails_dir and assets_rel_path:
+                    # Save page image to file
+                    page_filename = f"page-{page_num + 1:03d}.png"
+                    page_path = pages_dir / page_filename
+                    page_path.write_bytes(image_bytes)
+                    image_src = f"{assets_rel_path}/pages/{page_filename}"
+
+                    # Save thumbnail to file
+                    thumb_filename = f"page-{page_num + 1:03d}-thumb.png"
+                    thumb_path = thumbnails_dir / thumb_filename
+                    thumb_path.write_bytes(thumb_bytes)
+                    thumb_src = f"{assets_rel_path}/thumbnails/{thumb_filename}"
+                else:
+                    # Embed as base64 (default behavior)
+                    image_src = f"data:image/png;base64,{base64.b64encode(image_bytes).decode('utf-8')}"
+                    thumb_src = f"data:image/png;base64,{base64.b64encode(thumb_bytes).decode('utf-8')}"
+
+                # Convert tags to JSON-serializable format
+                tags_json = []
+                figure_counter = 0  # Track Figure index on this page
+                for tag in tags:
+                    tag_data = {
+                        "tag_type": tag.tag_type,
+                        "bbox": tag.bbox if tag.bbox else None,
+                        "reading_order": tag.reading_order,
+                        "text_preview": tag.text_preview[:200] if tag.text_preview else None,
+                        "alt_text": tag.alt_text,
+                        "has_issues": tag.has_issues,
+                        "detected_language": tag.detected_language,
+                    }
+
+                    # Track Figure tags for linking to Content Audit Images
+                    if tag.tag_type == "Figure":
+                        tag_data["image_page"] = page_num + 1  # 1-indexed for display
+                        tag_data["image_index"] = figure_counter
+                        figure_counter += 1
+
+                    tags_json.append(tag_data)
+
+                pages_data.append({
+                    "page_num": page_num,
+                    "page_width": page_width,
+                    "page_height": page_height,
+                    "image_src": image_src,
+                    "thumb_src": thumb_src,
+                    "tags": tags_json,
+                    "tag_count": len(tags_json),
                 })
+
+        if not pages_data:
+            return ""
 
         # Read the JavaScript component
         js_path = PathLib(__file__).parent.parent / "static" / "js" / "pdf-preview.js"
         if js_path.exists():
             preview_js = js_path.read_text()
         else:
-            # Fallback: inline minimal JS
             logger.warning(f"PDF preview JavaScript not found at {js_path}")
             preview_js = "console.warn('PDF preview JS not found');"
 
@@ -3067,6 +4044,91 @@ def _generate_interactive_preview_section(
         else:
             preview_css = ""
 
+        # Build page tabs with prev/next buttons
+        total_preview_pages = len(pages_data)
+        max_visible_thumbs = 10
+
+        # Previous button (disabled on first page)
+        prev_btn_html = ""
+        next_btn_html = ""
+        if total_preview_pages > 1:
+            prev_btn_html = (
+                f'<button class="preview-nav-btn prev-btn" data-action="prev-page" disabled aria-label="Previous page">'
+                f'<span class="material-icons">chevron_left</span>'
+                f'</button>'
+            )
+            next_btn_html = (
+                f'<button class="preview-nav-btn next-btn" data-action="next-page" aria-label="Next page">'
+                f'<span class="material-icons">chevron_right</span>'
+                f'</button>'
+            )
+
+        # Page tabs with thumbnails (all rendered, visibility controlled by JS)
+        page_tabs = []
+        for i, pd in enumerate(pages_data):
+            active_class = "active" if i == 0 else ""
+            hidden_class = "" if i < max_visible_thumbs else "thumb-hidden"
+            page_num_display = pd["page_num"] + 1
+            tag_count = pd["tag_count"]
+            # Use the pre-computed src (either file path or data URI)
+            thumb_src_value = pd["thumb_src"]
+            # Get full-size image for hover preview
+            full_src_value = pd["image_src"]
+            page_tabs.append(
+                f'<button class="preview-tab {active_class} {hidden_class}" data-page-index="{i}" data-full-src="{full_src_value}" aria-selected="{str(i == 0).lower()}" aria-label="Page {page_num_display}, {tag_count} tags">'
+                f'<img class="page-thumb" src="{thumb_src_value}" alt="Page {page_num_display} preview">'
+                f'<span class="page-badge">{page_num_display}</span>'
+                f'<span class="tag-count"><span class="material-icons">sell</span>{tag_count}</span>'
+                f'</button>'
+            )
+
+        # Combine into structured HTML
+        page_tabs_html = f'''
+            {prev_btn_html}
+            <div class="page-tabs-window" data-max-visible="{max_visible_thumbs}">
+                {''.join(page_tabs)}
+            </div>
+            {next_btn_html}
+        '''
+
+        # Build page containers (hidden except first)
+        page_containers = []
+        for i, pd in enumerate(pages_data):
+            hidden_class = "" if i == 0 else "hidden"
+            page_containers.append(
+                f'<div class="preview-page-container {hidden_class}" data-page-index="{i}" '
+                f'id="preview-page-{i}"></div>'
+            )
+
+        # Hint about more pages
+        more_pages_hint = ""
+        if not showing_all and total_pages > len(pages_to_render):
+            remaining = total_pages - len(pages_to_render)
+            more_pages_hint = f'''
+                <div class="preview-hint" style="margin-top: 1rem; padding: 0.75rem 1rem; background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 6px; font-size: 0.875rem; color: #0369a1;">
+                    <strong>💡 Tip:</strong> Showing {len(pages_to_render)} of {total_pages} pages.
+                    To include more pages, use <code>--interactive-pages {total_pages}</code> or <code>--interactive-pages 0</code> for all pages.
+                </div>
+            '''
+
+        # Prepare JSON data for JavaScript (must be done outside the f-string)
+        # Uses pre-computed src values (either file paths or data URIs)
+        pages_json_data = [
+            {
+                "pageImage": pd["image_src"],
+                "thumbnail": pd["thumb_src"],
+                "tags": pd["tags"],
+                "pageWidth": pd["page_width"],
+                "pageHeight": pd["page_height"],
+                "pageNum": pd["page_num"] + 1,  # 1-indexed for display
+                "dpi": dpi
+            }
+            for pd in pages_data
+        ]
+        pages_json_str = json.dumps(pages_json_data)
+        tag_reference_json_str = json.dumps(tag_reference_data)
+        document_language = config.get("document-language", "en")
+
         # Build the section HTML
         return f'''
         <section id="interactive-preview" class="interactive-preview-section collapsible">
@@ -3074,10 +4136,23 @@ def _generate_interactive_preview_section(
             <div class="section-content">
                 <p class="section-description" style="margin-bottom: 1rem; color: #6b7280;">
                     Click on tag regions to view details, or use <kbd>Tab</kbd> / <kbd>Shift+Tab</kbd> to navigate through the reading order.
-                    Page {page_num + 1} of {max_pages}.
                 </p>
 
-                <div id="pdf-interactive-preview-container"></div>
+                <div class="preview-tabs-container" role="tablist" aria-label="Page selection">
+                    {page_tabs_html}
+                    <div class="page-input-group">
+                        <label class="page-input-label">
+                            <span class="material-icons" style="font-size: 16px; vertical-align: middle;">keyboard</span>
+                            Go to:
+                        </label>
+                        <input type="number" class="page-input" id="page-number-input" min="1" max="{total_preview_pages}" value="1" aria-label="Page number">
+                        <span class="page-total">/ {total_preview_pages}</span>
+                    </div>
+                </div>
+
+                <div class="preview-pages-wrapper">
+                    {''.join(page_containers)}
+                </div>
 
                 <div class="preview-keyboard-hints" style="margin-top: 1rem; font-size: 0.875rem; color: #6b7280;">
                     <strong>Keyboard shortcuts:</strong>
@@ -3085,6 +4160,8 @@ def _generate_interactive_preview_section(
                     <kbd>Shift+Tab</kbd> Previous tag &nbsp;|&nbsp;
                     <kbd>Esc</kbd> Deselect
                 </div>
+
+                {more_pages_hint}
             </div>
         </section>
 
@@ -3101,30 +4178,491 @@ def _generate_interactive_preview_section(
                 border-radius: 4px;
                 box-shadow: 0 1px 0 #d1d5db;
             }}
+
+            .preview-tabs-container {{
+                display: flex;
+                align-items: center;
+                gap: 0.5rem;
+                margin-bottom: 1rem;
+                padding: 0.75rem 0;
+                border-bottom: 1px solid #e5e7eb;
+            }}
+
+            .page-tabs-window {{
+                display: flex;
+                align-items: center;
+                gap: 0.5rem;
+                flex-wrap: nowrap;
+                overflow: hidden;
+            }}
+
+            .preview-tab.thumb-hidden {{
+                display: none;
+            }}
+
+            .preview-tab {{
+                position: relative;
+                display: block;
+                padding: 0;
+                border: 2px solid #e5e7eb;
+                border-radius: 6px;
+                background: white;
+                cursor: pointer;
+                transition: all 0.15s ease;
+                box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+                overflow: hidden;
+            }}
+
+            .preview-tab:hover {{
+                border-color: #93c5fd;
+                box-shadow: 0 2px 8px rgba(59, 130, 246, 0.15);
+                transform: translateY(-1px);
+            }}
+
+            .preview-tab.active {{
+                border-color: #2563eb;
+                box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2);
+            }}
+
+            .preview-tab .page-thumb {{
+                display: block;
+                height: 64px;
+                width: auto;
+                border-radius: 4px;
+            }}
+
+            .preview-tab .page-badge {{
+                position: absolute;
+                top: 4px;
+                left: 4px;
+                background: rgba(30, 41, 59, 0.9);
+                color: white;
+                font-size: 0.65rem;
+                font-weight: 600;
+                padding: 2px 6px;
+                border-radius: 3px;
+                z-index: 1;
+                line-height: 1.2;
+            }}
+
+            .preview-tab.active .page-badge {{
+                background: rgba(37, 99, 235, 0.95);
+            }}
+
+            .preview-tab .tag-count {{
+                position: absolute;
+                top: 4px;
+                right: 4px;
+                display: flex;
+                align-items: center;
+                gap: 1px;
+                background: rgba(255, 255, 255, 0.95);
+                font-size: 0.6rem;
+                font-weight: 600;
+                color: #6b7280;
+                padding: 2px 5px;
+                border-radius: 3px;
+                z-index: 1;
+                line-height: 1.2;
+            }}
+
+            .preview-tab .tag-count .material-icons {{
+                font-size: 10px;
+            }}
+
+            .preview-tab.active .tag-count {{
+                color: #2563eb;
+                background: rgba(239, 246, 255, 0.95);
+            }}
+
+            /* Hover preview tooltip */
+            .preview-tab-tooltip {{
+                position: absolute;
+                top: 100%;
+                left: 50%;
+                transform: translateX(-50%);
+                margin-top: 8px;
+                padding: 4px;
+                background: white;
+                border: 1px solid #e5e7eb;
+                border-radius: 8px;
+                box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+                z-index: 100;
+                opacity: 0;
+                visibility: hidden;
+                transition: opacity 0.2s ease, visibility 0.2s ease;
+                pointer-events: none;
+            }}
+
+            .preview-tab-tooltip::before {{
+                content: '';
+                position: absolute;
+                bottom: 100%;
+                left: 50%;
+                transform: translateX(-50%);
+                border: 8px solid transparent;
+                border-bottom-color: white;
+            }}
+
+            .preview-tab-tooltip::after {{
+                content: '';
+                position: absolute;
+                bottom: 100%;
+                left: 50%;
+                transform: translateX(-50%);
+                border: 9px solid transparent;
+                border-bottom-color: #e5e7eb;
+                z-index: -1;
+            }}
+
+            .preview-tab-tooltip img {{
+                display: block;
+                max-height: 300px;
+                width: auto;
+                border-radius: 4px;
+            }}
+
+            .preview-tab-tooltip.visible {{
+                opacity: 1;
+                visibility: visible;
+            }}
+
+            .preview-page-container.hidden {{
+                display: none;
+            }}
+
+            .preview-hint code {{
+                background: #e0f2fe;
+                padding: 0.125rem 0.375rem;
+                border-radius: 3px;
+                font-size: 0.8rem;
+            }}
+
+            /* Navigation buttons */
+            .preview-nav-btn {{
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                width: 36px;
+                height: 60px;
+                padding: 0;
+                border: 2px solid #e5e7eb;
+                border-radius: 6px;
+                background: #f9fafb;
+                cursor: pointer;
+                color: #6b7280;
+                transition: all 0.15s ease;
+                flex-shrink: 0;
+            }}
+
+            .preview-nav-btn .material-icons {{
+                font-size: 24px;
+            }}
+
+            .preview-nav-btn:hover:not(:disabled) {{
+                background: #f3f4f6;
+                border-color: #93c5fd;
+                color: #2563eb;
+            }}
+
+            .preview-nav-btn:disabled {{
+                opacity: 0.3;
+                cursor: not-allowed;
+            }}
+
+            /* Page input group */
+            .page-input-group {{
+                display: flex;
+                align-items: center;
+                gap: 0.5rem;
+                margin-left: auto;
+                padding-left: 1rem;
+                border-left: 1px solid #e5e7eb;
+            }}
+
+            .page-input-label {{
+                display: flex;
+                align-items: center;
+                gap: 0.25rem;
+                font-size: 0.8rem;
+                color: #6b7280;
+                white-space: nowrap;
+            }}
+
+            .page-input {{
+                width: 50px;
+                padding: 0.375rem 0.5rem;
+                border: 1px solid #d1d5db;
+                border-radius: 4px;
+                font-size: 0.875rem;
+                text-align: center;
+                -moz-appearance: textfield;
+            }}
+
+            .page-input::-webkit-outer-spin-button,
+            .page-input::-webkit-inner-spin-button {{
+                -webkit-appearance: none;
+                margin: 0;
+            }}
+
+            .page-input:focus {{
+                outline: none;
+                border-color: #2563eb;
+                box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
+            }}
+
+            .page-total {{
+                font-size: 0.8rem;
+                color: #6b7280;
+            }}
         </style>
 
         <script>
             {preview_js}
 
-            // Initialize the interactive preview when DOM is ready
+            // Page data for all previews
+            const pagesData = {pages_json_str};
+
+            // PDF tag reference data for educational callouts
+            const PDF_TAG_REFERENCE = {tag_reference_json_str};
+
+            // Document language for TTS fallback
+            const DOCUMENT_LANGUAGE = "{document_language}";
+
+            // Store preview instances
+            const previewInstances = {{}};
+
+            // Current page tracking
+            let currentPageIndex = 0;
+
+            // Thumbnail window tracking
+            const maxVisibleThumbs = parseInt(document.querySelector('.page-tabs-window')?.dataset.maxVisible || '10');
+            let windowStart = 0;
+
+            // Initialize previews when DOM is ready
             document.addEventListener('DOMContentLoaded', function() {{
-                if (typeof PDFInteractivePreview !== 'undefined') {{
-                    const preview = new PDFInteractivePreview('pdf-interactive-preview-container', {{
-                        pageImage: 'data:image/png;base64,{image_base64}',
-                        tags: {json.dumps(tags_json)},
-                        pageWidth: {page_width},
-                        pageHeight: {page_height},
-                        dpi: {dpi},
-                        showReadingOrder: true,
-                        showLabels: true,
-                        onTagSelect: function(tag, index) {{
-                            console.log('Selected tag:', tag.tag_type, 'at index', index);
+                if (typeof PDFInteractivePreview === 'undefined') {{
+                    console.error('PDFInteractivePreview class not found');
+                    return;
+                }}
+
+                // Initialize first page immediately
+                initializePreview(0);
+
+                // Tab switching
+                document.querySelectorAll('.preview-tab').forEach(tab => {{
+                    tab.addEventListener('click', function() {{
+                        const pageIndex = parseInt(this.dataset.pageIndex);
+                        switchToPage(pageIndex);
+                    }});
+                }});
+
+                // Prev/Next button handlers
+                const prevBtn = document.querySelector('.preview-nav-btn.prev-btn');
+                const nextBtn = document.querySelector('.preview-nav-btn.next-btn');
+
+                if (prevBtn) {{
+                    prevBtn.addEventListener('click', function() {{
+                        if (currentPageIndex > 0) {{
+                            switchToPage(currentPageIndex - 1);
                         }}
                     }});
-                }} else {{
-                    console.error('PDFInteractivePreview class not found');
                 }}
+
+                if (nextBtn) {{
+                    nextBtn.addEventListener('click', function() {{
+                        if (currentPageIndex < pagesData.length - 1) {{
+                            switchToPage(currentPageIndex + 1);
+                        }}
+                    }});
+                }}
+
+                // Page number input handler
+                const pageInput = document.getElementById('page-number-input');
+                if (pageInput) {{
+                    pageInput.addEventListener('change', function() {{
+                        const pageNum = parseInt(this.value);
+                        if (pageNum >= 1 && pageNum <= pagesData.length) {{
+                            switchToPage(pageNum - 1); // Convert to 0-indexed
+                        }} else {{
+                            // Reset to current page if invalid
+                            this.value = currentPageIndex + 1;
+                        }}
+                    }});
+
+                    pageInput.addEventListener('keydown', function(e) {{
+                        if (e.key === 'Enter') {{
+                            this.blur(); // Trigger change event
+                        }}
+                    }});
+                }}
+
+                // Hover preview tooltip with 0.5s delay
+                let hoverTimeout = null;
+                let activeTooltip = null;
+
+                document.querySelectorAll('.preview-tab').forEach(tab => {{
+                    tab.addEventListener('mouseenter', function() {{
+                        const fullSrc = this.dataset.fullSrc;
+                        if (!fullSrc) return;
+
+                        hoverTimeout = setTimeout(() => {{
+                            // Remove any existing tooltip
+                            if (activeTooltip) {{
+                                activeTooltip.remove();
+                                activeTooltip = null;
+                            }}
+
+                            // Create tooltip
+                            const tooltip = document.createElement('div');
+                            tooltip.className = 'preview-tab-tooltip';
+                            tooltip.innerHTML = `<img src="${{fullSrc}}" alt="Page preview">`;
+                            this.appendChild(tooltip);
+
+                            // Position adjustment to prevent overflow
+                            requestAnimationFrame(() => {{
+                                const rect = tooltip.getBoundingClientRect();
+                                const viewportWidth = window.innerWidth;
+
+                                // Check right edge overflow
+                                if (rect.right > viewportWidth - 16) {{
+                                    const overflow = rect.right - (viewportWidth - 16);
+                                    tooltip.style.transform = `translateX(calc(-50% - ${{overflow}}px))`;
+                                }}
+                                // Check left edge overflow
+                                if (rect.left < 16) {{
+                                    tooltip.style.transform = `translateX(calc(-50% + ${{16 - rect.left}}px))`;
+                                }}
+
+                                tooltip.classList.add('visible');
+                            }});
+
+                            activeTooltip = tooltip;
+                        }}, 500); // 0.5 second delay
+                    }});
+
+                    tab.addEventListener('mouseleave', function() {{
+                        if (hoverTimeout) {{
+                            clearTimeout(hoverTimeout);
+                            hoverTimeout = null;
+                        }}
+                        if (activeTooltip) {{
+                            activeTooltip.remove();
+                            activeTooltip = null;
+                        }}
+                    }});
+                }});
             }});
+
+            function switchToPage(pageIndex) {{
+                // Stop any running reading flow simulation on all previews
+                Object.values(previewInstances).forEach(preview => {{
+                    if (preview && typeof preview.stopReadingFlowSimulation === 'function') {{
+                        preview.stopReadingFlowSimulation();
+                    }}
+                }});
+
+                currentPageIndex = pageIndex;
+
+                // Update tab states
+                document.querySelectorAll('.preview-tab').forEach(t => {{
+                    t.classList.remove('active');
+                    t.setAttribute('aria-selected', 'false');
+                }});
+                const activeTab = document.querySelector(`.preview-tab[data-page-index="${{pageIndex}}"]`);
+                if (activeTab) {{
+                    activeTab.classList.add('active');
+                    activeTab.setAttribute('aria-selected', 'true');
+                }}
+
+                // Show/hide page containers
+                document.querySelectorAll('.preview-page-container').forEach(c => {{
+                    c.classList.add('hidden');
+                }});
+                const container = document.querySelector(`.preview-page-container[data-page-index="${{pageIndex}}"]`);
+                if (container) {{
+                    container.classList.remove('hidden');
+                }}
+
+                // Initialize preview if not already done
+                initializePreview(pageIndex);
+
+                // Update navigation buttons
+                updateNavButtons();
+
+                // Update thumbnail window to keep current page visible
+                updateThumbnailWindow();
+
+                // Update page input
+                const pageInput = document.getElementById('page-number-input');
+                if (pageInput) {{
+                    pageInput.value = pageIndex + 1; // Convert to 1-indexed
+                }}
+            }}
+
+            function updateNavButtons() {{
+                const prevBtn = document.querySelector('.preview-nav-btn.prev-btn');
+                const nextBtn = document.querySelector('.preview-nav-btn.next-btn');
+
+                if (prevBtn) {{
+                    prevBtn.disabled = currentPageIndex === 0;
+                }}
+
+                if (nextBtn) {{
+                    nextBtn.disabled = currentPageIndex === pagesData.length - 1;
+                }}
+            }}
+
+            function updateThumbnailWindow() {{
+                // Adjust window to keep current page visible
+                if (currentPageIndex < windowStart) {{
+                    // Current page is before window, shift window left
+                    windowStart = currentPageIndex;
+                }} else if (currentPageIndex >= windowStart + maxVisibleThumbs) {{
+                    // Current page is after window, shift window right
+                    windowStart = currentPageIndex - maxVisibleThumbs + 1;
+                }}
+
+                // Ensure window doesn't go negative or too far
+                windowStart = Math.max(0, Math.min(windowStart, pagesData.length - maxVisibleThumbs));
+                if (pagesData.length <= maxVisibleThumbs) {{
+                    windowStart = 0;
+                }}
+
+                // Update visibility of all thumbnails
+                document.querySelectorAll('.preview-tab').forEach((tab, index) => {{
+                    const isVisible = index >= windowStart && index < windowStart + maxVisibleThumbs;
+                    if (isVisible) {{
+                        tab.classList.remove('thumb-hidden');
+                    }} else {{
+                        tab.classList.add('thumb-hidden');
+                    }}
+                }});
+            }}
+
+            function initializePreview(pageIndex) {{
+                if (previewInstances[pageIndex]) return; // Already initialized
+
+                const containerId = `preview-page-${{pageIndex}}`;
+                const data = pagesData[pageIndex];
+
+                // Pre-calculate image dimensions to prevent layout shift
+                const imageWidth = Math.round(data.pageWidth * (data.dpi / 72));
+                const imageHeight = Math.round(data.pageHeight * (data.dpi / 72));
+
+                previewInstances[pageIndex] = new PDFInteractivePreview(containerId, {{
+                    pageImage: data.pageImage,
+                    tags: data.tags,
+                    pageWidth: data.pageWidth,
+                    pageHeight: data.pageHeight,
+                    dpi: data.dpi,
+                    imageWidth: imageWidth,
+                    imageHeight: imageHeight,
+                    onTagSelect: function(tag, index) {{
+                        console.log('Selected tag:', tag.tag_type, 'at index', index);
+                    }}
+                }});
+            }}
         </script>
         '''
 
@@ -3141,10 +4679,22 @@ def _generate_interactive_preview_section(
 def _generate_content_audit_section(
     pdf_path: Path | str,
     config: dict,
+    run_step: callable = None,
 ) -> str:
-    """Generate the content audit section (images, tables, forms, links)."""
+    """Generate the content audit section (images, tables, forms, links).
+
+    Args:
+        pdf_path: Path to the PDF file
+        config: Configuration dictionary
+        run_step: Optional function that returns a context manager for step tracking
+    """
     if not config.get("show-content-audit", True):
         return ""
+
+    # Create no-op run_step if not provided
+    if run_step is None:
+        from contextlib import nullcontext
+        run_step = lambda idx: nullcontext()
 
     try:
         from inspekt.services.pdf_content_auditor import PDFContentAuditor
@@ -3153,52 +4703,69 @@ def _generate_content_audit_section(
         include_thumbnails = config.get("show-image-thumbnails", True)
 
         with PDFContentAuditor(pdf_path) as auditor:
-            result = auditor.audit()
+            # Step 5: Extract images and tables
+            with run_step(5):
+                result = auditor.audit()
 
-            # Extract thumbnails and lightbox images if enabled
+            # Extract thumbnails and lightbox images if enabled (step 6)
             if include_thumbnails and result.images:
-                for img in result.images[:20]:  # Limit to displayed images
-                    thumbnail, lightbox = auditor.get_image_dual_size(
-                        img.page,
-                        img.index,
-                        thumbnail_size=100,
-                        lightbox_size=600,
+                with run_step(6):  # Generate image thumbnails
+                    for img in result.images:  # Process ALL images
+                        thumbnail, lightbox = auditor.get_image_dual_size(
+                            img.page,
+                            img.index,
+                            thumbnail_size=100,
+                            lightbox_size=600,
+                        )
+                        img.thumbnail_base64 = thumbnail
+                        img.lightbox_base64 = lightbox
+
+            # AI Image Classification (step 7)
+            # Enabled by default (local ML, no API cost). Limited to max-image-classification.
+            if config.get("classify-images", True) and result.images:
+                with run_step(7):  # Classify images with local ML
+                    ai_provider = config.get("ai-provider")
+                    use_clip = True  # Try CLIP first (fast, local)
+                    use_vision_ai = ai_provider is not None  # Use Vision AI if provider specified
+                    max_classification = config.get("max-image-classification", 100)
+
+                    # Apply limit (0 = unlimited)
+                    images_to_classify = result.images
+                    if max_classification > 0 and len(result.images) > max_classification:
+                        logger.info(f"Limiting classification to first {max_classification} of {len(result.images)} images")
+                        images_to_classify = result.images[:max_classification]
+                    else:
+                        logger.info(f"Classifying {len(result.images)} images...")
+
+                    auditor.classify_images(
+                        images_to_classify,
+                        use_clip=use_clip,
+                        use_vision_ai=use_vision_ai,
+                        ai_provider=ai_provider,
                     )
-                    img.thumbnail_base64 = thumbnail
-                    img.lightbox_base64 = lightbox
 
-            # AI Image Classification (Phase 1)
-            if config.get("classify-images") and result.images:
-                ai_provider = config.get("ai-provider")
-                use_clip = True  # Try CLIP first (fast, local)
-                use_vision_ai = ai_provider is not None  # Use Vision AI if provider specified
-
-                logger.info(f"Classifying {len(result.images)} images...")
-                auditor.classify_images(
-                    result.images[:20],  # Limit to displayed images
-                    use_clip=use_clip,
-                    use_vision_ai=use_vision_ai,
-                    ai_provider=ai_provider,
-                )
-
-            # AI Alt-Text Generation (Phase 3)
+            # AI Alt-Text Generation (step 8)
+            # Limited by default to control API costs (configurable via --max-alt-text)
             if config.get("generate-alt-text") and result.images:
-                ai_provider = config.get("ai-provider")
+                with run_step(8):  # Generate alt text suggestions
+                    ai_provider = config.get("ai-provider")
+                    max_alt_text = config.get("max-alt-text", 10)  # Default: first 10 images
 
-                # Get document title for context
-                try:
-                    import pikepdf
-                    with pikepdf.open(pdf_path) as pdf:
-                        doc_title = str(pdf.docinfo.get("/Title", "")) or None
-                except Exception:
-                    doc_title = None
+                    # Get document title for context
+                    try:
+                        import pikepdf
+                        with pikepdf.open(pdf_path) as pdf:
+                            doc_title = str(pdf.docinfo.get("/Title", "")) or None
+                    except Exception:
+                        doc_title = None
 
-                logger.info("Generating AI alt-text suggestions...")
-                auditor.generate_alt_text_suggestions(
-                    result.images[:20],  # Limit to displayed images
-                    ai_provider=ai_provider,
-                    document_title=doc_title,
-                )
+                    images_for_alt = result.images[:max_alt_text] if max_alt_text > 0 else result.images
+                    logger.info(f"Generating AI alt-text suggestions for {len(images_for_alt)} images...")
+                    auditor.generate_alt_text_suggestions(
+                        images_for_alt,
+                        ai_provider=ai_provider,
+                        document_title=doc_title,
+                    )
 
         sections = []
 
@@ -3206,7 +4773,7 @@ def _generate_content_audit_section(
         if result.total_images > 0:
             # Group images by page
             images_by_page: dict[int, list] = {}
-            for img in result.images[:50]:  # Limit to 50 images
+            for img in result.images:  # Process ALL images
                 page = img.display_page
                 if page not in images_by_page:
                     images_by_page[page] = []
@@ -3217,7 +4784,7 @@ def _generate_content_audit_section(
 
             # Collect unique categories and statuses for filter options
             all_categories = set()
-            for img in result.images[:50]:
+            for img in result.images:  # Process ALL images
                 if img.image_category:
                     all_categories.add(img.image_category)
 
@@ -3286,7 +4853,7 @@ def _generate_content_audit_section(
                     else:
                         thumbnail_html = '<span class="no-preview">No preview</span>'
 
-                    # Category badge with color coding
+                    # Category badge with color coding and confidence indicator
                     category_html = ""
                     category_value = img.image_category or "unknown"
                     if img.image_category:
@@ -3303,9 +4870,28 @@ def _generate_content_audit_section(
                         }
                         color = category_colors.get(img.image_category, "#9ca3af")
                         display_name = img.category_display_name
-                        confidence = f"{img.category_confidence:.0%}" if img.category_confidence else ""
+                        confidence_pct = f"{img.category_confidence:.0%}" if img.category_confidence else ""
                         warning_icon = " ⚠️" if img.category_needs_warning else ""
-                        category_html = f'''<span class="category-badge" style="background: {color}; color: white; padding: 2px 6px; border-radius: 3px; font-size: 0.75rem; white-space: nowrap;" title="Confidence: {confidence}">{display_name}{warning_icon}</span>'''
+                        conf_level = img.confidence_level
+
+                        # Style based on confidence level
+                        if conf_level == "high":
+                            # Solid badge for high confidence
+                            badge_style = f"background: {color}; color: white;"
+                            conf_indicator = ""
+                            conf_title = f"High confidence ({confidence_pct})"
+                        elif conf_level == "medium":
+                            # Slightly transparent for medium confidence
+                            badge_style = f"background: {color}cc; color: white;"
+                            conf_indicator = " ~"
+                            conf_title = f"Medium confidence ({confidence_pct})"
+                        else:
+                            # Outlined/dashed for low confidence (best guess)
+                            badge_style = f"background: transparent; color: {color}; border: 1px dashed {color};"
+                            conf_indicator = " ?"
+                            conf_title = f"Low confidence ({confidence_pct}) - best guess"
+
+                        category_html = f'''<span class="category-badge" style="{badge_style} padding: 2px 6px; border-radius: 3px; font-size: 0.75rem; white-space: nowrap;" title="{conf_title}">{display_name}{warning_icon}{conf_indicator}</span>'''
                     else:
                         category_html = '<span class="category-unclassified">—</span>'
 
@@ -3322,8 +4908,11 @@ def _generate_content_audit_section(
 
                     alt_cell_content = alt_display + ai_suggestion_html
 
+                    # Count images on this page for unique ID
+                    page_image_index = page_images.index(img)
+
                     image_rows.append(f"""
-                    <tr class="{status_class}" data-category="{category_value}" data-alt-status="{alt_status}" data-status="{img.status}" data-page="{page_num}">
+                    <tr id="image-page-{page_num}-index-{page_image_index}" class="{status_class}" data-category="{category_value}" data-alt-status="{alt_status}" data-status="{img.status}" data-page="{page_num}">
                         <td class="thumbnail-cell">{thumbnail_html}</td>
                         <td>{int(img.width)}×{int(img.height)}</td>
                         <td class="category-cell">{category_html}</td>
@@ -3487,8 +5076,30 @@ def _generate_content_audit_section(
                 else:
                     page_link = link.display_page
 
-                # Link text
-                text_display = _escape_html(link.link_text[:50]) if link.link_text else '<span class="missing">❌ Missing</span>'
+                # Link text - with URL/email fallback for missing text
+                if link.link_text:
+                    text_display = _escape_html(link.link_text[:50])
+                elif link.destination:
+                    # Use destination as fallback display when link text is missing/garbage
+                    dest = link.destination
+                    if dest.startswith('mailto:'):
+                        # Extract email address for display
+                        email = dest[7:].split('?')[0]  # Remove query params
+                        text_display = f'<span class="url-fallback" title="Email (link text missing)">{_escape_html(email)}</span>'
+                    elif dest.startswith(('http://', 'https://')):
+                        # Extract domain for display
+                        try:
+                            from urllib.parse import urlparse
+                            parsed = urlparse(dest)
+                            domain = parsed.netloc
+                            text_display = f'<span class="url-fallback" title="URL (link text missing)">{_escape_html(domain)}</span>'
+                        except Exception:
+                            text_display = f'<span class="url-fallback" title="URL (link text missing)">{_escape_html(dest[:40])}</span>'
+                    else:
+                        # Internal or other link type - show truncated destination
+                        text_display = f'<span class="url-fallback" title="Link text missing">{_escape_html(dest[:40])}</span>'
+                else:
+                    text_display = '<span class="missing">❌ Missing</span>'
 
                 # Consolidate link text and destination into one cell
                 dest_html = ""
@@ -4005,6 +5616,12 @@ def _get_interactive_css() -> str:
             font-weight: 500;
         }
 
+        .url-fallback {
+            color: var(--color-warning, #d97706);
+            font-style: italic;
+            font-size: 0.9em;
+        }
+
         .decorative {
             color: var(--text-secondary);
             font-style: italic;
@@ -4226,6 +5843,132 @@ def _get_interactive_css() -> str:
             color: var(--text-warning);
         }
 
+        /* Color Contrast Analysis Section */
+        .contrast-analysis {
+            margin-bottom: 2rem;
+        }
+
+        .contrast-analysis .success-message {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 1rem;
+            background: var(--bg-success);
+            border-radius: 0.5rem;
+            color: var(--text-success);
+        }
+
+        .contrast-analysis .warning-message {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 1rem;
+            background: var(--bg-warning);
+            border-radius: 0.5rem;
+            color: var(--text-warning);
+        }
+
+        .contrast-analysis .section-summary {
+            margin-bottom: 1rem;
+            color: var(--text-secondary);
+        }
+
+        .contrast-analysis .contrast-legend {
+            display: flex;
+            gap: 1.5rem;
+            margin-bottom: 1rem;
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+        }
+
+        .contrast-analysis .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .contrast-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.875rem;
+        }
+
+        .contrast-table th,
+        .contrast-table td {
+            padding: 0.75rem;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .contrast-table th {
+            background: var(--bg-light);
+            font-weight: 600;
+            font-size: 0.8125rem;
+            color: var(--text-secondary);
+        }
+
+        .contrast-table tr.severity-serious {
+            background: color-mix(in srgb, var(--color-fail) 8%, transparent);
+        }
+
+        .contrast-table tr.severity-moderate {
+            background: color-mix(in srgb, var(--color-warn) 8%, transparent);
+        }
+
+        .color-swatch-group {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .color-swatch {
+            display: inline-block;
+            width: 24px;
+            height: 24px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            vertical-align: middle;
+            flex-shrink: 0;
+        }
+
+        .color-code {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            font-family: var(--font-mono);
+        }
+
+        .contrast-sample {
+            max-width: 200px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            font-style: italic;
+            color: var(--text-secondary);
+        }
+
+        .contrast-ratio {
+            font-family: var(--font-mono);
+            text-align: center;
+        }
+
+        .contrast-required {
+            font-family: var(--font-mono);
+            color: var(--text-secondary);
+            text-align: center;
+        }
+
+        .contrast-analysis .section-note {
+            margin-top: 1rem;
+            font-size: 0.8125rem;
+            color: var(--text-secondary);
+            border-left: 3px solid var(--border-color);
+            padding-left: 1rem;
+        }
+
+        .table-scroll-container {
+            overflow-x: auto;
+        }
+
         /* Remediation roadmap */
         .remediation-summary {
             display: flex;
@@ -4424,6 +6167,28 @@ def _get_interactive_css() -> str:
             color: var(--text-serious);
         }
 
+        .page-size-toggle {
+            font-size: 0.75rem;
+            padding: 0.125rem 0.375rem;
+            margin-left: 0.25rem;
+            background: var(--bg-light);
+            border: 1px solid var(--border-color);
+            border-radius: 3px;
+            cursor: pointer;
+            color: var(--text-secondary);
+            transition: background-color 0.15s ease, border-color 0.15s ease;
+        }
+
+        .page-size-toggle:hover {
+            background: var(--border-color);
+            border-color: var(--text-tertiary);
+        }
+
+        .page-size-toggle:focus {
+            outline: 2px solid var(--primary);
+            outline-offset: 1px;
+        }
+
         /* Creator icons */
         .creator-with-icon {
             display: inline-flex;
@@ -4432,6 +6197,8 @@ def _get_interactive_css() -> str:
         }
 
         .creator-with-icon svg {
+            width: 24px;
+            height: 24px;
             vertical-align: middle;
             flex-shrink: 0;
         }
@@ -4439,6 +6206,37 @@ def _get_interactive_css() -> str:
         .creator-detail {
             font-size: 0.8125rem;
             color: var(--text-secondary);
+        }
+
+        .creator-name {
+            font-weight: 500;
+        }
+
+        .creator-docs-link {
+            display: inline-flex;
+            align-items: center;
+            margin-left: 0.375rem;
+            color: var(--primary);
+            opacity: 0.7;
+            transition: opacity 0.15s ease, color 0.15s ease;
+            text-decoration: none;
+        }
+
+        .creator-docs-link:hover {
+            opacity: 1;
+            color: var(--primary);
+        }
+
+        .creator-docs-link:focus {
+            opacity: 1;
+            outline: 2px solid var(--primary);
+            outline-offset: 2px;
+            border-radius: 2px;
+        }
+
+        .creator-docs-link svg {
+            width: 14px;
+            height: 14px;
         }
 
         /* Language verification */
@@ -4468,6 +6266,45 @@ def _get_interactive_css() -> str:
             font-size: 0.8125rem;
             color: var(--text-secondary);
             margin-top: 0.25rem;
+        }
+
+        /* Language flag emoji */
+        .lang-flag {
+            font-size: 1.1em;
+            margin-right: 0.25em;
+        }
+
+        /* Code styling for custom metadata IDs */
+        .metadata-code {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            font-size: 0.85em;
+            background: var(--bg-light);
+            padding: 0.125rem 0.375rem;
+            border-radius: 3px;
+            color: var(--text-primary);
+        }
+
+        /* Boolean indicators for metadata */
+        .bool-true {
+            color: #059669;
+            font-weight: 500;
+        }
+
+        .bool-false {
+            color: #dc2626;
+            font-weight: 500;
+        }
+
+        /* Structure statistics warnings */
+        .structure-stat-warn {
+            color: #d97706;
+        }
+
+        /* Relative time display */
+        .relative-time {
+            color: var(--text-secondary);
+            font-size: 0.875em;
+            font-weight: normal;
         }
 
         /* Link audit table */
@@ -4750,6 +6587,22 @@ def _get_interactive_js() -> str:
         };
         window.collapseAll = function() {
             document.querySelectorAll('.collapsible').forEach(s => s.classList.add('collapsed'));
+        };
+
+        // Toggle page size unit between inches and centimeters
+        window.togglePageSizeUnit = function(btn) {
+            const dims = btn.parentElement.querySelector('.page-size-dimensions');
+            if (!dims) return;
+            const currentUnit = dims.dataset.currentUnit || 'inches';
+            if (currentUnit === 'inches') {
+                dims.textContent = dims.dataset.sizeCm;
+                dims.dataset.currentUnit = 'cm';
+                btn.textContent = 'Show in inches';
+            } else {
+                dims.textContent = dims.dataset.sizeInches;
+                dims.dataset.currentUnit = 'inches';
+                btn.textContent = 'Show in cm';
+            }
         };
 
         // Page tabs for text layer analysis
