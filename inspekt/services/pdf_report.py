@@ -1055,9 +1055,11 @@ def _generate_toc_nav() -> str:
             <li><a href="#about"><span class="material-icons">description</span>About This Document</a></li>
             <li><a href="#score"><span class="material-icons">assessment</span>Accessibility Score</a></li>
             <li><a href="#summary"><span class="material-icons">summarize</span>Summary</a></li>
-            <li><a href="#basic-checks"><span class="material-icons">fact_check</span>Basic Checks</a></li>
+            <li><a href="#basic-checks"><span class="material-icons">fact_check</span>Essential Accessibility Checks</a></li>
             <li><a href="#text-analysis"><span class="material-icons">text_fields</span>Text Layer Analysis</a></li>
+            <li><a href="#contrast"><span class="material-icons">contrast</span>Color Contrast Analysis</a></li>
             <li><a href="#structure"><span class="material-icons">account_tree</span>Structure Tree</a></li>
+            <li><a href="#tag-visualization"><span class="material-icons">layers</span>Tag Structure Visualization</a></li>
             <li><a href="#interactive-preview"><span class="material-icons">touch_app</span>Interactive Preview</a></li>
             <li class="toc-group">
                 <a href="#content-audit"><span class="material-icons">inventory_2</span>Content Audit</a>
@@ -1070,7 +1072,7 @@ def _generate_toc_nav() -> str:
                 </ul>
             </li>
             <li><a href="#remediation-roadmap"><span class="material-icons">map</span>Remediation Roadmap</a></li>
-            <li><a href="#remediation"><span class="material-icons">build</span>Remediation Advice</a></li>
+            <li><a href="#remediation"><span class="material-icons">build</span>Remediation Guidance</a></li>
             <li><a href="#disclaimer"><span class="material-icons">info</span>Disclaimer</a></li>
         </ul>
         <button class="toc-toggle" aria-expanded="true" aria-controls="toc-list">
@@ -1485,48 +1487,6 @@ def _get_toc_css() -> str:
             margin-top: 0.5rem;
             padding-top: 0.5rem;
             border-top: 1px dashed var(--border-color);
-        }
-
-        /* Version warning box */
-        .version-warning {
-            display: flex;
-            gap: 0.75rem;
-            padding: 0.75rem 1rem;
-            background: var(--bg-light);
-            border-left: 3px solid var(--color-moderate);
-            border-radius: 4px;
-            margin-top: 0.75rem;
-            font-size: 0.875rem;
-        }
-
-        .version-warning .warning-icon {
-            flex-shrink: 0;
-            font-size: 1rem;
-        }
-
-        .version-warning .warning-content {
-            flex: 1;
-        }
-
-        .version-warning .warning-content strong {
-            display: block;
-            margin-bottom: 0.25rem;
-            color: var(--text-primary);
-        }
-
-        .version-warning p {
-            margin: 0.25rem 0 0;
-            color: var(--text-secondary);
-            line-height: 1.5;
-        }
-
-        .version-warning a {
-            color: var(--color-moderate);
-            text-decoration: none;
-        }
-
-        .version-warning a:hover {
-            text-decoration: underline;
         }
 
         /* Help text for metadata values */
@@ -2779,9 +2739,20 @@ def _generate_about_document_section(
     if meta.title:
         basic_items.append(f"<dt>Title</dt><dd>{_escape_html(meta.title)}</dd>")
 
-    # 2. Filename (download link)
+    # 2. Filename (download link, with version warning if multiple versions detected)
     file_path_str = str(meta.file_path.absolute()) if meta.file_path.is_absolute() else str(meta.file_path)
-    basic_items.append(f'<dt>Filename</dt><dd><a href="{_escape_html(file_path_str)}" download class="download-link">{_escape_html(meta.file_path.name)}</a></dd>')
+    filename_html = f'<a href="{_escape_html(file_path_str)}" download class="download-link">{_escape_html(meta.file_path.name)}</a>'
+    version_count = getattr(meta, 'version_count', 1)
+    if version_count > 1:
+        filename_html += f'''
+            <small class="file-size-warning">
+                <strong>Note:</strong> This PDF contains {version_count} incremental save versions.
+                Previous versions may contain content that was later modified or removed.
+                Consider using <a href="https://github.com/enferex/pdfresurrect" target="_blank" rel="noopener">pdfresurrect</a>
+                to extract and review embedded versions.
+            </small>
+        '''
+    basic_items.append(f'<dt>Filename</dt><dd>{filename_html}</dd>')
 
     # 3. File Size (with warning for large files)
     file_size_html = _format_file_size(meta.file_size)
@@ -3066,23 +3037,6 @@ def _generate_about_document_section(
     if meta.has_suspects_flag:
         a11y_items.append('<dt>OCR Quality</dt><dd><span class="suspects-warning">⚠ Document may have OCR errors</span></dd>')
 
-    # Version count warning
-    version_count = getattr(meta, 'version_count', 1)
-    version_warning_html = ""
-    if version_count > 1:
-        version_warning_html = f"""
-        <div class="version-warning">
-            <span class="warning-icon">ℹ️</span>
-            <div class="warning-content">
-                <strong>Multiple versions detected</strong>
-                <p>This PDF contains {version_count} incremental save versions.
-                   Previous versions may contain content that was later modified or removed.
-                   Consider using <a href="https://github.com/enferex/pdfresurrect" target="_blank" rel="noopener">pdfresurrect</a>
-                   to extract and review embedded versions.</p>
-            </div>
-        </div>
-        """
-
     # Build the "Show more" details section
     show_more_html = ""
     if extended_items:
@@ -3108,7 +3062,6 @@ def _generate_about_document_section(
                 <div class="metadata-group">
                     <h3>Accessibility</h3>
                     <dl>{''.join(a11y_items)}</dl>
-                    {version_warning_html}
                 </div>
             </div>
         </div>
