@@ -15,6 +15,8 @@ This module provides commands for plugin management:
 from __future__ import annotations
 
 import json
+import shutil
+import subprocess
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -101,8 +103,10 @@ def plugin_list(category, mcp, output_json):
 @click.option("--tags", "-t", help="Comma-separated tags")
 @click.option("--mcp", is_flag=True, help="Expose as MCP tool")
 @click.option("--returns-data", is_flag=True, help="Plugin returns JSON data")
+@click.option("--autorun", is_flag=True, help="Enable autorun on page load")
+@click.option("--domains", help="Comma-separated domain patterns for autorun")
 @click.option("--update", is_flag=True, help="Update if plugin already exists")
-def plugin_add(name, code, file_path, url, description, category, tags, mcp, returns_data, update):
+def plugin_add(name, code, file_path, url, description, category, tags, mcp, returns_data, autorun, domains, update):
     """
     Add a new plugin.
 
@@ -152,6 +156,8 @@ def plugin_add(name, code, file_path, url, description, category, tags, mcp, ret
             tags=tag_list,
             returns_data=returns_data,
             mcp_exposed=mcp,
+            autorun=autorun,
+            autorun_domains=domains,
         )
 
         if result.get("ok"):
@@ -244,11 +250,13 @@ def plugin_remove(name_or_id, force):
 
 
 @plugin.command(name="run")
-@click.argument("name_or_id", shell_complete=complete_plugin_names)
+@click.argument("name_or_id", required=False, default=None, shell_complete=complete_plugin_names)
+@click.option("--interactive", "-i", is_flag=True, help="Browse and select plugin interactively")
+@click.option("--category", "-c", help="Filter by category (with --interactive)")
 @click.option("--timeout", "-t", type=int, default=30, help="Execution timeout (seconds)")
 @click.option("--json", "-j", "output_json", is_flag=True, help="Output result as JSON")
 @click.option("--quiet", "-q", is_flag=True, help="Suppress console output")
-def plugin_run(name_or_id, timeout, output_json, quiet):
+def plugin_run(name_or_id, interactive, category, timeout, output_json, quiet):
     """
     Execute a plugin in the browser.
 
@@ -259,8 +267,19 @@ def plugin_run(name_or_id, timeout, output_json, quiet):
         inspekt plugin run text-spacing
         inspekt plugin run "Dark Mode" --timeout 10
         inspekt plugin run extractor --json
+        inspekt plugin run --interactive
+        inspekt plugin run -i --category a11y
     """
     try:
+        if interactive:
+            name_or_id = _interactive_plugin_select(category=category)
+            if name_or_id is None:
+                return  # User cancelled
+        elif name_or_id is None:
+            raise click.UsageError(
+                "Missing argument 'NAME_OR_ID'. Use --interactive to browse plugins."
+            )
+
         plugin_service = get_plugin_service()
 
         # Find plugin
@@ -287,11 +306,36 @@ def plugin_run(name_or_id, timeout, output_json, quiet):
             click.echo(json.dumps(result, indent=2))
         else:
             if result.get("ok"):
-                click.echo(f"Plugin executed: {plugin_data['name']}")
+                from inspekt.app.cli.icons import get_icon
+                from inspekt.app.cli.table import print_hint, print_success
 
-                # Show execution time
-                if result.get("execution_time_ms"):
-                    click.echo(f"  Time: {result['execution_time_ms']}ms")
+                # Get page context for richer feedback
+                page_title = None
+                page_url = None
+                try:
+                    from inspekt.client import BridgeClient
+
+                    client = BridgeClient()
+                    page_result = client.execute("({url: location.href, title: document.title})")
+                    if page_result.get("ok"):
+                        page_data = page_result.get("result", {})
+                        page_title = page_data.get("title")
+                        page_url = page_data.get("url")
+                except Exception:
+                    pass
+
+                # Success message with plugin icon
+                icon = get_icon("Plugin")
+                time_ms = result.get("execution_time_ms", 0)
+                run_count = plugin_data.get("run_count", 0) + 1
+                print_success(f"{icon} `{plugin_data['name']}` executed in {time_ms}ms (run #{run_count})")
+
+                # Show page context
+                if page_title or page_url:
+                    display = page_title or page_url
+                    if len(display) > 60:
+                        display = display[:57] + "..."
+                    click.secho(f"  on {display}", fg="bright_black")
 
                 # Show return value if present
                 if result.get("result") is not None:
@@ -307,6 +351,11 @@ def plugin_run(name_or_id, timeout, output_json, quiet):
                         color = {"error": "red", "warn": "yellow"}.get(level)
                         prefix = f"    [{level}] "
                         click.echo(click.style(prefix, fg=color) + msg)
+
+                # Show unload hint if plugin supports it
+                unload_mode = plugin_data.get("unload_mode", "none")
+                if unload_mode != "none":
+                    print_hint(f"Run `inspekt plugin unload {plugin_data['id']}` to reverse")
             else:
                 click.echo(f"Error: {result.get('error')}", err=True)
                 sys.exit(1)
@@ -436,6 +485,76 @@ def plugin_show(name_or_id, output_json):
         sys.exit(1)
 
 
+@plugin.command(name="autorun")
+@click.argument("name_or_id", shell_complete=complete_plugin_names)
+@click.option("--domains", "-d", help="Comma-separated domain/path patterns (e.g. 'github.com, *.gitlab.com')")
+@click.option("--off", is_flag=True, help="Disable autorun for this plugin")
+def plugin_autorun(name_or_id, domains, off):
+    """
+    Enable or disable autorun for a plugin.
+
+    When autorun is enabled, the plugin executes automatically on every
+    page load. Use --domains to restrict to specific domains.
+
+    Domain patterns:
+        github.com          Match github.com and www.github.com
+        *.github.com        Match any subdomain of github.com
+        github.com/org/*    Match path prefix on github.com
+
+    Examples:
+        inspekt plugin autorun dark-mode
+        inspekt plugin autorun dark-mode --domains "github.com, *.gitlab.com"
+        inspekt plugin autorun dark-mode --off
+    """
+    from inspekt.app.cli.table import print_hint, print_success
+
+    try:
+        plugin_service = get_plugin_service()
+
+        # Find plugin
+        plugin_data = plugin_service.get_plugin(name_or_id)
+        if not plugin_data:
+            plugin_data = plugin_service.get_plugin_by_name(name_or_id)
+
+        if not plugin_data:
+            click.echo(f"Error: Plugin '{name_or_id}' not found", err=True)
+            sys.exit(1)
+
+        if off:
+            result = plugin_service.update_plugin(
+                plugin_data["id"], autorun=False, autorun_domains=None
+            )
+            if result.get("ok"):
+                print_success(f"Autorun disabled for `{plugin_data['name']}`")
+            else:
+                click.echo(f"Error: {result.get('error')}", err=True)
+                sys.exit(1)
+        else:
+            updates = {"autorun": True}
+            if domains is not None:
+                updates["autorun_domains"] = domains
+            elif not plugin_data.get("autorun"):
+                # First time enabling — no domains means all pages
+                updates["autorun_domains"] = None
+
+            result = plugin_service.update_plugin(plugin_data["id"], **updates)
+            if result.get("ok"):
+                plugin_updated = result["plugin"]
+                domain_str = plugin_updated.get("autorun_domains")
+                if domain_str:
+                    print_success(f"Autorun enabled for `{plugin_data['name']}` on: {domain_str}")
+                else:
+                    print_success(f"Autorun enabled for `{plugin_data['name']}` on all pages")
+                print_hint("Plugin will auto-execute on every page load")
+            else:
+                click.echo(f"Error: {result.get('error')}", err=True)
+                sys.exit(1)
+
+    except Exception as e:
+        click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
+
+
 @plugin.command(name="export")
 @click.option("--output", "-o", type=click.Path(), help="Output file path")
 @click.option("--ids", help="Comma-separated plugin IDs to export")
@@ -536,6 +655,74 @@ def plugin_import(file_path, replace, skip):
 # ============================================================================
 
 
+def _interactive_plugin_select(category: str | None = None) -> str | None:
+    """Launch gum filter for interactive plugin selection. Returns plugin ID or None if cancelled."""
+    from inspekt.app.cli.table import print_error, print_hint
+
+    if not shutil.which("gum"):
+        print_error("gum is not installed (needed for interactive mode)")
+        print_hint("Install with `brew install gum` or see https://github.com/charmbracelet/gum")
+        sys.exit(1)
+
+    plugin_service = get_plugin_service()
+    plugins = plugin_service.list_plugins(category=category)
+
+    if not plugins:
+        label = f" in category '{category}'" if category else ""
+        print_error(f"No plugins found{label}")
+        print_hint("Add plugins with `inspekt plugin add`")
+        return None
+
+    # Build display lines and a mapping back to plugin IDs
+    display_map: dict[str, str] = {}
+    lines = []
+    for p in plugins:
+        desc = p.get("description") or ""
+        if len(desc) > 50:
+            desc = desc[:47] + "..."
+        cat = p.get("category")
+        if desc and cat:
+            line = f"{p['name']} ({cat}) — {desc}"
+        elif desc:
+            line = f"{p['name']} — {desc}"
+        elif cat:
+            line = f"{p['name']} ({cat})"
+        else:
+            line = p["name"]
+        display_map[line] = p["id"]
+        lines.append(line)
+
+    header = f"Select a plugin ({len(lines)} available)"
+    if category:
+        header = f"Select a plugin in '{category}' ({len(lines)} available)"
+
+    try:
+        result = subprocess.run(
+            [
+                "gum", "filter",
+                "--header", header,
+                "--placeholder", "Type to search...",
+                "--height", str(max(10, min(len(lines) + 2, 20))),
+                "--header.foreground", "39",
+                "--indicator.foreground", "39",
+                "--match.foreground", "39",
+            ],
+            input="\n".join(lines),
+            stdout=subprocess.PIPE,
+            text=True,
+        )
+    except OSError as e:
+        print_error(f"Failed to launch gum: {e}")
+        sys.exit(1)
+
+    if result.returncode != 0 or not result.stdout.strip():
+        click.echo("Cancelled")
+        return None
+
+    selected_line = result.stdout.strip()
+    return display_map.get(selected_line)
+
+
 def _execute_plugin(
     code: str,
     timeout: float = 30.0,
@@ -622,8 +809,8 @@ def _display_plugins(plugins: list[dict]) -> None:
     from inspekt.app.cli.icons import get_icon
     from inspekt.app.cli.table import Table
 
-    headers = ["Name", "Category", "MCP", "Runs"]
-    alignments = ["left", "left", "center", "right"]
+    headers = ["Name", "Category", "MCP", "Auto", "Runs"]
+    alignments = ["left", "left", "center", "center", "right"]
     title = f"Plugins ({len(plugins)})"
     icon = get_icon("Plugins")
 
@@ -640,10 +827,12 @@ def _display_plugins(plugins: list[dict]) -> None:
     rows = []
     for p in plugins:
         mcp_indicator = "*" if p.get("mcp_exposed") else ""
+        auto_indicator = "*" if p.get("autorun") else ""
         rows.append([
             p["name"],
             p.get("category") or "-",
             mcp_indicator,
+            auto_indicator,
             str(p.get("run_count", 0)),
         ])
 
@@ -658,8 +847,14 @@ def _display_plugins(plugins: list[dict]) -> None:
 
     # Legend
     mcp_count = sum(1 for p in plugins if p.get("mcp_exposed"))
+    auto_count = sum(1 for p in plugins if p.get("autorun"))
+    legends = []
     if mcp_count:
-        click.echo(f"\n  * = MCP tool ({mcp_count} exposed)")
+        legends.append(f"MCP * = MCP tool ({mcp_count} exposed)")
+    if auto_count:
+        legends.append(f"Auto * = autorun ({auto_count} enabled)")
+    if legends:
+        click.echo(f"\n  {' | '.join(legends)}")
 
 
 def _display_plugin_details(plugin: dict) -> None:
@@ -682,6 +877,16 @@ def _display_plugin_details(plugin: dict) -> None:
 
     if plugin.get("mcp_exposed"):
         click.echo(f"  MCP tool name: plugin_{plugin['id']}")
+
+    # Autorun
+    if plugin.get("autorun"):
+        domains = plugin.get("autorun_domains")
+        if domains:
+            click.echo(f"  Autorun: Yes (domains: {domains})")
+        else:
+            click.echo(f"  Autorun: Yes (all pages)")
+    else:
+        click.echo(f"  Autorun: No")
 
     # Unload behavior
     unload_mode = plugin.get("unload_mode", "none")
