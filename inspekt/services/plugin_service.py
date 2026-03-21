@@ -19,7 +19,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import unquote
 
-from inspekt.config import find_config_file
+from inspekt.config import get_data_dir
 
 
 def generate_slug(name: str) -> str:
@@ -100,15 +100,7 @@ class PluginService:
 
     def __init__(self):
         """Initialize plugin service."""
-        # Use same database as other services
-        config_file = find_config_file()
-        if config_file:
-            config_dir = config_file.parent
-        else:
-            config_dir = Path.home() / ".inspekt"
-            config_dir.mkdir(parents=True, exist_ok=True)
-
-        self.db_path = config_dir / "data.db"
+        self.db_path = get_data_dir() / "data.db"
         self._ensure_plugins_table()
 
     def _ensure_plugins_table(self) -> None:

@@ -14,7 +14,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-from inspekt.config import find_config_file
+from inspekt.config import get_data_dir
 
 
 class PersistenceService:
@@ -22,16 +22,7 @@ class PersistenceService:
 
     def __init__(self):
         """Initialize persistence database."""
-        # Follow existing pattern from content_cache.py
-        config_file = find_config_file()
-        if config_file:
-            config_dir = config_file.parent
-        else:
-            # Use .inspekt directory for user data
-            config_dir = Path.home() / ".inspekt"
-            config_dir.mkdir(parents=True, exist_ok=True)
-
-        self.db_path = config_dir / "data.db"
+        self.db_path = get_data_dir() / "data.db"
         self._init_database()
 
     def _init_database(self):

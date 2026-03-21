@@ -1,5 +1,5 @@
 """
-Content caching service for 'zen describe' and 'zen summarize' commands.
+Content caching service for 'inspekt describe' and 'inspekt summarize' commands.
 
 This module provides intelligent content caching with fingerprinting:
 - Caches AI-generated descriptions and summaries
@@ -17,7 +17,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-from inspekt.config import find_config_file, load_config
+from inspekt.config import get_data_dir, load_config
 
 
 class ContentCache:
@@ -25,17 +25,7 @@ class ContentCache:
 
     def __init__(self):
         """Initialize the content cache with SQLite database."""
-        # Get config directory from config file location
-        config_file = find_config_file()
-        if config_file:
-            config_dir = config_file.parent
-        else:
-            # Default to ~/.config/zen-bridge
-            config_dir = Path.home() / ".config" / "zen-bridge"
-            config_dir.mkdir(parents=True, exist_ok=True)
-
-        # Use same database as action cache
-        self.db_path = config_dir / "action_cache.db"
+        self.db_path = get_data_dir() / "action_cache.db"
         self._init_database()
         self.config = self._load_config()
 
@@ -63,6 +53,17 @@ class ContentCache:
                 "max_entries": 50,
             },
             "ask": {
+                "enabled": True,
+                "ttl_hours": 1,
+                "max_entries": 200,
+            },
+            "extract": {
+                "enabled": True,
+                "ttl_days": 7,
+                "similarity_threshold": 0.90,
+                "max_entries": 100,
+            },
+            "element_ask": {
                 "enabled": True,
                 "ttl_hours": 1,
                 "max_entries": 200,
@@ -161,6 +162,80 @@ class ContentCache:
         }
         return json.dumps(fingerprint, sort_keys=True)
 
+    def create_extract_fingerprint(self, article_data: dict, engine: str) -> str:
+        """
+        Create a fingerprint for extracted article content.
+
+        Includes: title, content hash, content length, publish date, engine
+        """
+        html_content = article_data.get("htmlContent", "")
+        content_length = len(html_content)
+
+        # Create content hash from first 1000 and last 200 characters
+        if len(html_content) > 1200:
+            content_sample = html_content[:1000] + html_content[-200:]
+        else:
+            content_sample = html_content
+        content_hash = hashlib.sha256(content_sample.encode()).hexdigest()[:16]
+
+        fingerprint = {
+            "articleTitle": article_data.get("title", ""),
+            "contentLength": content_length,
+            "contentHash": content_hash,
+            "publishDate": article_data.get("publishedDate", ""),
+            "engine": engine,
+        }
+        return json.dumps(fingerprint, sort_keys=True)
+
+    def create_element_ask_fingerprint(self, element_data: dict, question: str) -> str:
+        """
+        Create a fingerprint for element_ask command.
+
+        Includes: element tag, id, accessible name, text content hash, and question.
+        This allows caching of AI responses for the same element + question combination.
+        """
+        # Get element identifier components
+        tag = element_data.get("tag", "unknown")
+        element_id = element_data.get("id", "")
+
+        # Get accessibility info
+        a11y = element_data.get("accessibility", {})
+        accessible_name = a11y.get("accessibleName", "")
+
+        # Get text content hash (for detecting content changes)
+        text_content = element_data.get("textContent", "")
+        text_hash = hashlib.sha256(text_content.encode()).hexdigest()[:16] if text_content else ""
+
+        # Get dimensions (element size can indicate state changes)
+        dims = element_data.get("dimensions", {})
+        width = dims.get("width", 0)
+        height = dims.get("height", 0)
+
+        fingerprint = {
+            "tag": tag,
+            "id": element_id,
+            "accessibleName": accessible_name[:100],  # Truncate for consistency
+            "textHash": text_hash,
+            "dimensions": f"{width}x{height}",
+            "question": question,
+        }
+        return json.dumps(fingerprint, sort_keys=True)
+
+    def get_element_cache_key(self, element_data: dict, question: str) -> str:
+        """
+        Generate a cache key for element_ask.
+
+        Combines element identity and question into a hash suitable for the 'language' field.
+        """
+        tag = element_data.get("tag", "unknown")
+        element_id = element_data.get("id", "")
+        a11y = element_data.get("accessibility", {})
+        accessible_name = a11y.get("accessibleName", "")[:50]
+
+        # Create a composite key from element identity + question
+        key_parts = f"{tag}:{element_id}:{accessible_name}:{question}"
+        return hashlib.sha256(key_parts.encode()).hexdigest()[:24]
+
     def get_question_hash(self, question: str) -> str:
         """
         Get a hash of the question for use as cache key.
@@ -185,6 +260,10 @@ class ContentCache:
                 return self._calculate_summarize_similarity(fp1, fp2)
             elif command == "ask":
                 return self._calculate_ask_similarity(fp1, fp2)
+            elif command == "extract":
+                return self._calculate_extract_similarity(fp1, fp2)
+            elif command == "element_ask":
+                return self._calculate_element_ask_similarity(fp1, fp2)
             else:
                 return 0.0
         except Exception:
@@ -272,6 +351,79 @@ class ContentCache:
         # For ask, we require exact question match
         return 1.0 if fp1.get("question") == fp2.get("question") else 0.0
 
+    def _calculate_extract_similarity(self, fp1: dict, fp2: dict) -> float:
+        """Calculate similarity for article extraction."""
+        # Must use same engine
+        if fp1.get("engine") != fp2.get("engine"):
+            return 0.0
+
+        # Compare title
+        title_similarity = 1.0 if fp1.get("articleTitle") == fp2.get("articleTitle") else 0.0
+
+        # Compare content hash (most important - determines if content changed)
+        hash_similarity = 1.0 if fp1.get("contentHash") == fp2.get("contentHash") else 0.0
+
+        # Compare content length (within 5% tolerance)
+        length1 = fp1.get("contentLength", 0)
+        length2 = fp2.get("contentLength", 0)
+        if length1 and length2:
+            length_ratio = min(length1, length2) / max(length1, length2)
+            length_similarity = 1.0 if length_ratio >= 0.95 else length_ratio
+        else:
+            length_similarity = 0.0
+
+        # Compare publish date
+        date_similarity = 1.0 if fp1.get("publishDate") == fp2.get("publishDate") else 0.0
+
+        # Weighted average (hash is most important for extract)
+        similarity = (
+            title_similarity * 0.15 +
+            hash_similarity * 0.55 +
+            length_similarity * 0.15 +
+            date_similarity * 0.15
+        )
+        return similarity
+
+    def _calculate_element_ask_similarity(self, fp1: dict, fp2: dict) -> float:
+        """
+        Calculate similarity for element_ask questions.
+
+        Requires exact match on question and high similarity on element identity.
+        """
+        # Question must match exactly
+        if fp1.get("question") != fp2.get("question"):
+            return 0.0
+
+        # Element tag must match
+        if fp1.get("tag") != fp2.get("tag"):
+            return 0.0
+
+        # Element ID should match if present
+        id1, id2 = fp1.get("id", ""), fp2.get("id", "")
+        if id1 and id2 and id1 != id2:
+            return 0.0
+
+        # Text content hash should match (content unchanged)
+        hash_similarity = 1.0 if fp1.get("textHash") == fp2.get("textHash") else 0.0
+
+        # Accessible name should be similar
+        name1 = fp1.get("accessibleName", "")
+        name2 = fp2.get("accessibleName", "")
+        name_similarity = 1.0 if name1 == name2 else (0.8 if name1 and name2 else 0.5)
+
+        # Dimensions should be close (element hasn't resized significantly)
+        dims1 = fp1.get("dimensions", "0x0")
+        dims2 = fp2.get("dimensions", "0x0")
+        dims_similarity = 1.0 if dims1 == dims2 else 0.7
+
+        # Weighted average
+        similarity = (
+            hash_similarity * 0.5 +
+            name_similarity * 0.3 +
+            dims_similarity * 0.2
+        )
+        return similarity
+
     def get_cached_content(
         self, url: str, command: str, current_fingerprint: str, language: str = "auto"
     ) -> dict | None:
@@ -306,25 +458,31 @@ class ContentCache:
 
             # Check if cache is fresh
             command_config = self.config.get(command, {})
-            if command == "describe" or command == "ask":
-                ttl_seconds = command_config.get("ttl_hours", 12 if command == "describe" else 1) * 3600
-            else:  # summarize
+            if command in ("describe", "ask", "element_ask"):
+                default_hours = 12 if command == "describe" else 1
+                ttl_seconds = command_config.get("ttl_hours", default_hours) * 3600
+            else:  # summarize, extract
                 ttl_seconds = command_config.get("ttl_days", 7) * 86400
 
             if time.time() - last_updated > ttl_seconds:
                 return None
 
-            # Check similarity
-            similarity = self.calculate_similarity(cached_fingerprint, current_fingerprint, command)
+            # Check similarity (skip if no fingerprint provided - just check freshness)
+            if current_fingerprint:
+                similarity = self.calculate_similarity(cached_fingerprint, current_fingerprint, command)
 
-            # For ask, require exact match (threshold 1.0)
-            if command == "ask":
-                threshold = 1.0
+                # For ask and element_ask, require high threshold (0.85)
+                # This ensures question + element identity must match closely
+                if command in ("ask", "element_ask"):
+                    threshold = command_config.get("similarity_threshold", 0.85)
+                else:
+                    threshold = command_config.get("similarity_threshold", 0.85 if command == "describe" else 0.90)
+
+                if similarity < threshold:
+                    return None
             else:
-                threshold = command_config.get("similarity_threshold", 0.85 if command == "describe" else 0.90)
-
-            if similarity < threshold:
-                return None
+                # No fingerprint provided - trust the cache if it's fresh
+                similarity = 1.0
 
             # Update hit count
             cursor.execute(
