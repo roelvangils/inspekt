@@ -1,5 +1,5 @@
 """
-Action caching service for the 'zen do' command.
+Action caching service for the 'inspekt do' command.
 
 This module provides intelligent caching and matching for user actions:
 1. Cache: Store successful action → element mappings per URL
@@ -18,7 +18,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-from inspekt.config import find_config_file, load_config
+from inspekt.config import get_data_dir, load_config
 
 
 class ActionCache:
@@ -26,16 +26,7 @@ class ActionCache:
 
     def __init__(self):
         """Initialize the action cache with SQLite database."""
-        # Get config directory from config file location
-        config_file = find_config_file()
-        if config_file:
-            config_dir = config_file.parent
-        else:
-            # Default to ~/.config/zen-bridge
-            config_dir = Path.home() / ".config" / "zen-bridge"
-            config_dir.mkdir(parents=True, exist_ok=True)
-
-        self.db_path = config_dir / "action_cache.db"
+        self.db_path = get_data_dir() / "action_cache.db"
         self._init_database()
         self.config = self._load_config()
         self.filler_words = self._load_filler_words()

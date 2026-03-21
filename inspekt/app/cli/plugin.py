@@ -22,7 +22,7 @@ from pathlib import Path
 import click
 import requests
 
-from inspekt.app.cli.util import open_or_download
+from inspekt.app.cli.output import OutputHandler
 from inspekt.services.plugin_service import get_plugin_service, parse_bookmarklet
 
 # Bridge server defaults
@@ -101,18 +101,21 @@ def plugin_list(category, mcp, output_json):
 @click.option("--tags", "-t", help="Comma-separated tags")
 @click.option("--mcp", is_flag=True, help="Expose as MCP tool")
 @click.option("--returns-data", is_flag=True, help="Plugin returns JSON data")
-def plugin_add(name, code, file_path, url, description, category, tags, mcp, returns_data):
+@click.option("--update", is_flag=True, help="Update if plugin already exists")
+def plugin_add(name, code, file_path, url, description, category, tags, mcp, returns_data, update):
     """
     Add a new plugin.
 
     Provide code via --code, --file, or --url (bookmarklet).
     Bookmarklet URLs are automatically parsed and cleaned.
+    Use --update to overwrite an existing plugin with the same name.
 
     Examples:
         inspekt plugin add "Dark Mode" --code "(function(){...})();"
         inspekt plugin add "Text Spacing" --url "javascript:(function(){...})();"
         inspekt plugin add "Custom" --file ./my-plugin.js --category utility
         inspekt plugin add "Extractor" --code "..." --returns-data --mcp
+        inspekt plugin add "Dark Mode" --code "..." --update
     """
     try:
         # Validate input sources
@@ -161,6 +164,32 @@ def plugin_add(name, code, file_path, url, description, category, tags, mcp, ret
 
             if mcp:
                 click.echo(f"  MCP tool: plugin_{plugin_data['id']}")
+        elif update and "already exists" in result.get("error", ""):
+            # Update existing plugin
+            from inspekt.services.plugin_service import generate_slug
+
+            plugin_id = generate_slug(name)
+            updates = {"code": code}
+            if description is not None:
+                updates["description"] = description
+            if category is not None:
+                updates["category"] = category
+            if tag_list is not None:
+                updates["tags"] = tag_list
+            if url:
+                updates["source_url"] = url
+            if returns_data:
+                updates["returns_data"] = returns_data
+            if mcp:
+                updates["mcp_exposed"] = mcp
+
+            update_result = plugin_service.update_plugin(plugin_id, **updates)
+            if update_result.get("ok"):
+                plugin_data = update_result["plugin"]
+                click.echo(f"Plugin updated: {plugin_data['name']} (id: {plugin_data['id']})")
+            else:
+                click.echo(f"Error: {update_result.get('error')}", err=True)
+                sys.exit(1)
         else:
             click.echo(f"Error: {result.get('error')}", err=True)
             sys.exit(1)
@@ -445,13 +474,11 @@ def plugin_export(output, ids, open_after, reveal_after):
 
             # Open file if --open flag was set
             if open_after:
-                open_or_download(output)
+                OutputHandler.open_file(output)
 
             # Reveal file if --reveal flag was set
             if reveal_after:
-                from inspekt.app.cli.util import reveal_or_download
-
-                reveal_or_download(output)
+                OutputHandler.reveal_file(output)
         else:
             click.echo(json_str)
 

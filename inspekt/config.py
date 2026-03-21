@@ -26,6 +26,24 @@ def is_isolated_mode() -> bool:
     return os.environ.get(ISOLATED_ENV_VAR, "").lower() in ("1", "true", "yes")
 
 
+def is_dev_mode() -> bool:
+    """
+    Check if running from source repository (development mode).
+
+    Development mode is detected by checking if a Makefile exists
+    in the parent directory of the inspekt package. This indicates
+    we're running from the source checkout rather than a pip install.
+
+    Returns:
+        True if running from source repository, False otherwise
+    """
+    # Get the directory containing this config.py file (inspekt/)
+    package_dir = Path(__file__).parent
+    # Check for Makefile in parent (the repo root)
+    repo_root = package_dir.parent
+    return (repo_root / "Makefile").exists()
+
+
 # Bridge server ports
 # In isolated mode (VM), the bridge runs on different ports to avoid conflicts
 BRIDGE_HTTP_PORT_DEFAULT = 8765
@@ -136,12 +154,53 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "permissions": {
         "allow-local-files": True,  # Allow file:// URLs without adding to domain list
     },
+    "transport": {
+        "type": "auto",  # "auto" (Unix on macOS/Linux, TCP on Windows), "unix", "tcp", "http"
+        "socket-path": None,  # Override socket path (default: ~/.inspekt/inspekt.sock)
+        "auto-start": False,  # Auto-start server if not running (disabled by default)
+        "connect-timeout": 5.0,  # Timeout for connection attempts (seconds)
+        "max-retries": 50,  # Max retries when auto-starting server
+        "retry-delay": 0.1,  # Delay between retries (seconds)
+    },
     "do": {
         "synonyms-file": None,  # Custom path to synonyms YAML file (default: built-in)
         "literal-match-threshold": 0.8,  # Minimum score for literal text matching
         "substring-match-threshold": 0.5,  # Minimum score for substring matching
         "use-fuzzy-matching": True,  # Enable typo-tolerant fuzzy matching
         "max-fuzzy-distance": 2,  # Maximum Levenshtein distance for fuzzy matches
+    },
+    "summarize": {
+        "extractor": "readability",  # "readability" (Mozilla) or "custom" (built-in lightweight)
+    },
+    "pdf-report": {
+        "show-cover-page": True,  # Include first page preview
+        "show-issue-screenshots": True,  # Capture screenshots of issue locations
+        "show-metadata": True,  # Show enhanced document metadata
+        "show-text-discrepancy-section": True,  # Compare text layer vs OCR
+        "cover-max-height": 400,  # Max height in pixels for cover preview
+        "issue-screenshot-dpi": 150,  # DPI for issue screenshots
+        "max-issues-per-rule": 1,  # Max screenshots per rule type
+        "text-discrepancy-threshold": 0.10,  # 10% difference triggers warning
+        "max-ocr-pages": 50,  # Limit OCR processing for large documents (smart sampling)
+        "ocr-analyze-all": False,  # Analyze all pages (disables sampling)
+        "ocr-include-thumbnails": True,  # Include page thumbnails in text layer analysis
+    },
+    "tts": {
+        "default-voice": "margot",
+        "voices": {
+            "margot": {
+                "voice-id": "RwI6GdsC2IOUEWwiv1aM",
+                "language-code": "nl",
+                "model-id": "eleven_v3",
+                "output-format": "mp3_44100_192",
+                "voice-settings": {
+                    "stability": 0,
+                    "similarity-boost": 1,
+                    "style": 1,
+                    "use-speaker-boost": False,
+                },
+            },
+        },
     },
     "mcp": {
         "enabled": True,
@@ -187,10 +246,11 @@ def find_config_file() -> Path | None:
     Returns:
         Path to config file if found, None otherwise
     """
-    # Check current directory
+    # Check current directory (resolve to absolute path so that
+    # config_file.parent always gives a stable directory for data.db)
     local_config = Path("config.json")
     if local_config.exists():
-        return local_config
+        return local_config.resolve()
 
     # Check ~/.config/inspekt.json (XDG Base Directory standard)
     xdg_config = Path.home() / ".config" / "inspekt.json"
@@ -203,6 +263,36 @@ def find_config_file() -> Path | None:
         return legacy_config
 
     return None
+
+
+def get_data_dir() -> Path:
+    """
+    Get the directory for storing persistent data (data.db, caches, etc.).
+
+    Always uses a fixed, user-level directory so that data is consistent
+    regardless of the working directory or how a process was started.
+
+    Resolution order:
+    1. ~/.config/inspekt/ (XDG Base Directory standard, if ~/.config/inspekt.json exists)
+    2. ~/.inspekt/ (legacy or default)
+
+    Note: Local config.json in the project root is intentionally NOT used
+    for data storage — it only affects configuration. This prevents the
+    CLI and API server from using different databases when started from
+    different working directories.
+
+    Returns:
+        Absolute path to the data directory (created if needed)
+    """
+    # If user has XDG-style config, use XDG-style data dir
+    xdg_config = Path.home() / ".config" / "inspekt.json"
+    if xdg_config.exists():
+        config_dir = Path.home() / ".config" / "inspekt"
+    else:
+        config_dir = Path.home() / ".inspekt"
+
+    config_dir.mkdir(parents=True, exist_ok=True)
+    return config_dir
 
 
 def load_config() -> dict[str, Any]:
@@ -296,6 +386,38 @@ def load_config() -> dict[str, Any]:
                     config["do"].update(user_config["do"])
                 else:
                     config["do"] = user_config["do"]
+            elif key == "summarize" and isinstance(user_config["summarize"], dict):
+                # Nested summarize config - merge deeply
+                if isinstance(config.get("summarize"), dict):
+                    config["summarize"].update(user_config["summarize"])
+                else:
+                    config["summarize"] = user_config["summarize"]
+            elif key == "pdf-report" and isinstance(user_config["pdf-report"], dict):
+                # Nested pdf-report config - merge deeply
+                if isinstance(config.get("pdf-report"), dict):
+                    config["pdf-report"].update(user_config["pdf-report"])
+                else:
+                    config["pdf-report"] = user_config["pdf-report"]
+            elif key == "transport" and isinstance(user_config["transport"], dict):
+                # Nested transport config - merge deeply
+                if isinstance(config.get("transport"), dict):
+                    config["transport"].update(user_config["transport"])
+                else:
+                    config["transport"] = user_config["transport"]
+            elif key == "tts" and isinstance(user_config["tts"], dict):
+                # Nested TTS config - merge deeply (including voices dict)
+                if isinstance(config.get("tts"), dict):
+                    # Deep merge: update top-level keys
+                    for tts_key, tts_value in user_config["tts"].items():
+                        if tts_key == "voices" and isinstance(tts_value, dict):
+                            # Merge voices dict (add/update individual voices)
+                            if "voices" not in config["tts"]:
+                                config["tts"]["voices"] = {}
+                            config["tts"]["voices"].update(tts_value)
+                        else:
+                            config["tts"][tts_key] = tts_value
+                else:
+                    config["tts"] = user_config["tts"]
             else:
                 # Root-level properties like ai-language - overwrite
                 config[key] = user_config[key]
@@ -1043,4 +1165,336 @@ def get_do_config() -> dict[str, Any]:
         "substring-match-threshold": substring_threshold,
         "use-fuzzy-matching": use_fuzzy,
         "max-fuzzy-distance": max_distance,
+    }
+
+
+def get_summarize_config() -> dict[str, Any]:
+    """
+    Get `inspekt summarize` command configuration with validation.
+
+    Returns:
+        Summarize command configuration dictionary with validated values:
+        - extractor: "readability" (Mozilla Readability) or "custom" (built-in lightweight)
+    """
+    config = load_config()
+    summarize_config = config.get("summarize", {})
+
+    # extractor: must be "readability" or "custom"
+    extractor = summarize_config.get("extractor", "readability").lower()
+    if extractor not in ["readability", "custom"]:
+        extractor = "readability"
+
+    return {
+        "extractor": extractor,
+    }
+
+
+def get_extract_config() -> dict[str, Any]:
+    """
+    Get `inspekt extract` command configuration with validation.
+
+    Returns:
+        Extract command configuration dictionary with validated values:
+        - engine: "readability" (Mozilla Readability) or "defuddle" (Obsidian's modern extractor)
+    """
+    config = load_config()
+    extract_config = config.get("extract", {})
+
+    # engine: must be "readability" or "defuddle"
+    engine = extract_config.get("engine", "readability").lower()
+    if engine not in ["readability", "defuddle"]:
+        engine = "readability"
+
+    return {
+        "engine": engine,
+    }
+
+
+def get_tts_config() -> dict[str, Any]:
+    """
+    Get TTS (text-to-speech) configuration with validation.
+
+    Returns:
+        TTS configuration dictionary with validated values:
+        - default-voice: name of the default voice to use
+        - voices: dictionary of voice configurations
+        - api-key: ElevenLabs API key from environment variable
+
+    Voice configuration includes:
+        - voice-id: ElevenLabs voice ID
+        - language-code: ISO 639-1 language code
+        - model-id: ElevenLabs model (e.g., eleven_v3)
+        - output-format: Audio format (e.g., mp3_44100_192)
+        - voice-settings: stability, similarity-boost, style, use-speaker-boost
+    """
+    config = load_config()
+    tts_config = config.get("tts", {})
+
+    # Get API key from environment variable
+    api_key = os.environ.get("ELEVENLABS_API_KEY", "")
+
+    # default-voice: string (defaults to "margot")
+    default_voice = tts_config.get("default-voice", "margot")
+
+    # voices: dictionary of voice configurations
+    voices = tts_config.get("voices", {})
+
+    # Validate each voice configuration
+    validated_voices = {}
+    for voice_name, voice_config in voices.items():
+        if not isinstance(voice_config, dict):
+            continue
+
+        # Required: voice-id
+        voice_id = voice_config.get("voice-id")
+        if not voice_id:
+            continue
+
+        # Optional settings with defaults
+        validated_voice = {
+            "voice-id": str(voice_id),
+            "language-code": str(voice_config.get("language-code", "en")),
+            "model-id": str(voice_config.get("model-id", "eleven_v3")),
+            "output-format": str(voice_config.get("output-format", "mp3_44100_192")),
+        }
+
+        # Voice settings with defaults matching ElevenLabs defaults
+        voice_settings = voice_config.get("voice-settings", {})
+        if isinstance(voice_settings, dict):
+            # stability: float 0-1
+            stability = voice_settings.get("stability", 0.5)
+            try:
+                stability = max(0.0, min(1.0, float(stability)))
+            except (ValueError, TypeError):
+                stability = 0.5
+
+            # similarity-boost: float 0-1
+            similarity_boost = voice_settings.get("similarity-boost", 0.75)
+            try:
+                similarity_boost = max(0.0, min(1.0, float(similarity_boost)))
+            except (ValueError, TypeError):
+                similarity_boost = 0.75
+
+            # style: float 0-1
+            style = voice_settings.get("style", 0)
+            try:
+                style = max(0.0, min(1.0, float(style)))
+            except (ValueError, TypeError):
+                style = 0
+
+            # use-speaker-boost: boolean
+            use_speaker_boost = bool(voice_settings.get("use-speaker-boost", False))
+
+            validated_voice["voice-settings"] = {
+                "stability": stability,
+                "similarity-boost": similarity_boost,
+                "style": style,
+                "use-speaker-boost": use_speaker_boost,
+            }
+        else:
+            validated_voice["voice-settings"] = {
+                "stability": 0.5,
+                "similarity-boost": 0.75,
+                "style": 0,
+                "use-speaker-boost": False,
+            }
+
+        validated_voices[voice_name.lower()] = validated_voice
+
+    return {
+        "default-voice": default_voice,
+        "voices": validated_voices,
+        "api-key": api_key,
+    }
+
+
+def get_tts_voice(voice_name: str | None = None) -> dict[str, Any] | None:
+    """
+    Get configuration for a specific TTS voice.
+
+    Args:
+        voice_name: Name of the voice to get. If None, uses default voice.
+
+    Returns:
+        Voice configuration dictionary or None if voice not found.
+    """
+    tts_config = get_tts_config()
+
+    if voice_name is None:
+        voice_name = tts_config.get("default-voice", "margot")
+
+    voice_name = voice_name.lower()
+    voices = tts_config.get("voices", {})
+
+    if voice_name not in voices:
+        return None
+
+    voice = voices[voice_name].copy()
+    voice["api-key"] = tts_config.get("api-key", "")
+    return voice
+
+
+def get_transport_config() -> dict[str, Any]:
+    """
+    Get transport configuration with validation.
+
+    Supports environment variable overrides:
+        - INSPEKT_TRANSPORT: Force transport type ("auto", "unix", "tcp", "http")
+        - INSPEKT_SOCKET_PATH: Override socket path
+
+    Returns:
+        Transport configuration dictionary with validated values:
+        - type: "auto" | "unix" | "tcp" | "http"
+        - socket-path: Optional path override (None = use default)
+        - auto-start: bool (auto-start server if not running)
+        - connect-timeout: float (seconds)
+        - max-retries: int (retries when auto-starting)
+        - retry-delay: float (seconds between retries)
+    """
+    config = load_config()
+    transport_config = config.get("transport", {})
+
+    # type: must be one of the valid transport types
+    # Environment variable takes precedence
+    transport_type = os.environ.get("INSPEKT_TRANSPORT")
+    if transport_type is None:
+        transport_type = transport_config.get("type", "auto")
+    transport_type = str(transport_type).lower()
+    if transport_type not in ["auto", "unix", "tcp", "http"]:
+        transport_type = "auto"
+
+    # socket-path: optional path override
+    # Environment variable takes precedence
+    socket_path = os.environ.get("INSPEKT_SOCKET_PATH")
+    if socket_path is None:
+        socket_path = transport_config.get("socket-path")
+    # Expand ~ if a path is provided
+    if socket_path:
+        socket_path = str(Path(socket_path).expanduser())
+
+    # auto-start: boolean (default False for safety)
+    auto_start = transport_config.get("auto-start", False)
+    auto_start = bool(auto_start)
+
+    # connect-timeout: positive float (seconds)
+    connect_timeout = transport_config.get("connect-timeout", 5.0)
+    try:
+        connect_timeout = max(0.1, float(connect_timeout))
+    except (ValueError, TypeError):
+        connect_timeout = 5.0
+
+    # max-retries: positive integer
+    max_retries = transport_config.get("max-retries", 50)
+    try:
+        max_retries = max(1, int(max_retries))
+    except (ValueError, TypeError):
+        max_retries = 50
+
+    # retry-delay: positive float (seconds)
+    retry_delay = transport_config.get("retry-delay", 0.1)
+    try:
+        retry_delay = max(0.01, float(retry_delay))
+    except (ValueError, TypeError):
+        retry_delay = 0.1
+
+    return {
+        "type": transport_type,
+        "socket-path": socket_path,
+        "auto-start": auto_start,
+        "connect-timeout": connect_timeout,
+        "max-retries": max_retries,
+        "retry-delay": retry_delay,
+    }
+
+
+def get_pdf_report_config() -> dict[str, Any]:
+    """
+    Get PDF report configuration with validation.
+
+    Returns:
+        PDF report configuration dictionary with validated values:
+        - show-cover-page: bool (include first page preview)
+        - show-issue-screenshots: bool (capture issue location screenshots)
+        - show-metadata: bool (show enhanced document metadata)
+        - show-text-discrepancy-section: bool (compare text layer vs OCR)
+        - cover-max-height: int (max height in pixels for cover preview)
+        - issue-screenshot-dpi: int (DPI for issue screenshots, 72-300)
+        - max-issues-per-rule: int (max screenshots per rule type)
+        - text-discrepancy-threshold: float (0.0-1.0, triggers warning)
+        - max-ocr-pages: int (limit OCR processing for large documents)
+    """
+    config = load_config()
+    pdf_report_config = config.get("pdf-report", {})
+
+    # show-cover-page: boolean (default True)
+    show_cover_page = pdf_report_config.get("show-cover-page", True)
+    show_cover_page = bool(show_cover_page)
+
+    # show-issue-screenshots: boolean (default True)
+    show_issue_screenshots = pdf_report_config.get("show-issue-screenshots", True)
+    show_issue_screenshots = bool(show_issue_screenshots)
+
+    # show-metadata: boolean (default True)
+    show_metadata = pdf_report_config.get("show-metadata", True)
+    show_metadata = bool(show_metadata)
+
+    # show-text-discrepancy-section: boolean (default True)
+    show_text_discrepancy_section = pdf_report_config.get("show-text-discrepancy-section", True)
+    show_text_discrepancy_section = bool(show_text_discrepancy_section)
+
+    # cover-max-height: positive integer (default 400)
+    cover_max_height = pdf_report_config.get("cover-max-height", 400)
+    try:
+        cover_max_height = max(100, min(1200, int(cover_max_height)))
+    except (ValueError, TypeError):
+        cover_max_height = 400
+
+    # issue-screenshot-dpi: integer between 72 and 300 (default 150)
+    issue_screenshot_dpi = pdf_report_config.get("issue-screenshot-dpi", 150)
+    try:
+        issue_screenshot_dpi = max(72, min(300, int(issue_screenshot_dpi)))
+    except (ValueError, TypeError):
+        issue_screenshot_dpi = 150
+
+    # max-issues-per-rule: positive integer (default 1)
+    max_issues_per_rule = pdf_report_config.get("max-issues-per-rule", 1)
+    try:
+        max_issues_per_rule = max(1, min(10, int(max_issues_per_rule)))
+    except (ValueError, TypeError):
+        max_issues_per_rule = 1
+
+    # text-discrepancy-threshold: float between 0 and 1 (default 0.10)
+    text_discrepancy_threshold = pdf_report_config.get("text-discrepancy-threshold", 0.10)
+    try:
+        text_discrepancy_threshold = max(0.0, min(1.0, float(text_discrepancy_threshold)))
+    except (ValueError, TypeError):
+        text_discrepancy_threshold = 0.10
+
+    # max-ocr-pages: positive integer (default 50)
+    max_ocr_pages = pdf_report_config.get("max-ocr-pages", 50)
+    try:
+        max_ocr_pages = max(1, min(500, int(max_ocr_pages)))
+    except (ValueError, TypeError):
+        max_ocr_pages = 50
+
+    # ocr-analyze-all: boolean (default False)
+    ocr_analyze_all = pdf_report_config.get("ocr-analyze-all", False)
+    ocr_analyze_all = bool(ocr_analyze_all)
+
+    # ocr-include-thumbnails: boolean (default True)
+    ocr_include_thumbnails = pdf_report_config.get("ocr-include-thumbnails", True)
+    ocr_include_thumbnails = bool(ocr_include_thumbnails)
+
+    return {
+        "show-cover-page": show_cover_page,
+        "show-issue-screenshots": show_issue_screenshots,
+        "show-metadata": show_metadata,
+        "show-text-discrepancy-section": show_text_discrepancy_section,
+        "cover-max-height": cover_max_height,
+        "issue-screenshot-dpi": issue_screenshot_dpi,
+        "max-issues-per-rule": max_issues_per_rule,
+        "text-discrepancy-threshold": text_discrepancy_threshold,
+        "max-ocr-pages": max_ocr_pages,
+        "ocr-analyze-all": ocr_analyze_all,
+        "ocr-include-thumbnails": ocr_include_thumbnails,
     }

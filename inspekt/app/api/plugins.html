@@ -1183,21 +1183,25 @@
     </style>
 
     <!-- CodeMirror 6 via esm.sh -->
+    <!-- Use ?deps= to force all packages to share the same @codemirror/state instance (prevents duplicate instanceof failures) -->
     <script type="module">
+        // Force all packages to share a single @codemirror/state instance
+        const SHARED = '?deps=@codemirror/state@6.5.2';
+
         // Core CodeMirror
-        import {EditorView, basicSetup} from 'https://esm.sh/codemirror@6.0.2';
-        import {keymap} from 'https://esm.sh/@codemirror/view@6.35.0';
-        import {EditorState} from 'https://esm.sh/@codemirror/state@6.5.2';
-        import {indentWithTab} from 'https://esm.sh/@codemirror/commands@6.7.1';
-        import {javascript} from 'https://esm.sh/@codemirror/lang-javascript@6.2.4';
-        import {oneDark} from 'https://esm.sh/@codemirror/theme-one-dark@6.1.2';
-        import {linter, lintGutter} from 'https://esm.sh/@codemirror/lint@6.8.4';
-        import {syntaxTree} from 'https://esm.sh/@codemirror/language@6.10.8';
+        const {EditorView, basicSetup} = await import(`https://esm.sh/codemirror@6.0.2${SHARED}`);
+        const {keymap} = await import(`https://esm.sh/@codemirror/view@6.35.0${SHARED}`);
+        const {EditorState} = await import('https://esm.sh/@codemirror/state@6.5.2');
+        const {indentWithTab} = await import(`https://esm.sh/@codemirror/commands@6.7.1${SHARED}`);
+        const {javascript} = await import(`https://esm.sh/@codemirror/lang-javascript@6.2.4${SHARED}`);
+        const {oneDark} = await import(`https://esm.sh/@codemirror/theme-one-dark@6.1.2${SHARED}`);
+        const {linter, lintGutter} = await import(`https://esm.sh/@codemirror/lint@6.8.4${SHARED}`);
+        const {syntaxTree} = await import(`https://esm.sh/@codemirror/language@6.10.8${SHARED}`);
 
         // Prettier for formatting
-        import prettier from 'https://esm.sh/prettier@3.4.2/standalone';
-        import prettierBabel from 'https://esm.sh/prettier@3.4.2/plugins/babel';
-        import prettierEstree from 'https://esm.sh/prettier@3.4.2/plugins/estree';
+        const prettier = (await import('https://esm.sh/prettier@3.4.2/standalone')).default;
+        const prettierBabel = (await import('https://esm.sh/prettier@3.4.2/plugins/babel')).default;
+        const prettierEstree = (await import('https://esm.sh/prettier@3.4.2/plugins/estree')).default;
 
         // Detect dark mode
         const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
@@ -1423,36 +1427,38 @@
             }
         });
 
-        // Initialize editors when DOM is ready
-        document.addEventListener('DOMContentLoaded', function() {
-            // Main code editor (with linting)
-            const container = document.getElementById('code-editor-container');
-            window.editor = createEditor(container, '', true);
+        // Initialize editors immediately — DOM is guaranteed ready because:
+        // 1. <script type="module"> is deferred (runs after DOM parse)
+        // 2. The await import() calls above add further delay
+        // So DOMContentLoaded has always fired by this point.
 
-            // Unload code editor (without linting - simpler)
-            const unloadContainer = document.getElementById('unload-editor-container');
-            window.unloadEditor = createEditor(unloadContainer, '', false);
+        // Main code editor (with linting)
+        const container = document.getElementById('code-editor-container');
+        window.editor = createEditor(container, '', true);
 
-            // Expose helpers globally
-            window.getEditorValue = getEditorValue;
-            window.setEditorValue = setEditorValue;
-            window.formatCode = formatCode;
-            window.copyCode = copyCode;
-            window.toggleFullscreen = toggleFullscreen;
+        // Unload code editor (without linting - simpler)
+        const unloadContainer = document.getElementById('unload-editor-container');
+        window.unloadEditor = createEditor(unloadContainer, '', false);
 
-            window.editorReady = true;
-            if (window.onEditorReady) window.onEditorReady();
+        // Expose helpers globally
+        window.getEditorValue = getEditorValue;
+        window.setEditorValue = setEditorValue;
+        window.formatCode = formatCode;
+        window.copyCode = copyCode;
+        window.toggleFullscreen = toggleFullscreen;
 
-            // Handle unload mode radio changes
-            document.querySelectorAll('input[name="unload-mode"]').forEach(radio => {
-                radio.addEventListener('change', function() {
-                    const unloadCodeGroup = document.getElementById('unload-code-group');
-                    if (this.value === 'custom') {
-                        unloadCodeGroup.style.display = 'block';
-                    } else {
-                        unloadCodeGroup.style.display = 'none';
-                    }
-                });
+        window.editorReady = true;
+        if (window.onEditorReady) window.onEditorReady();
+
+        // Handle unload mode radio changes
+        document.querySelectorAll('input[name="unload-mode"]').forEach(radio => {
+            radio.addEventListener('change', function() {
+                const unloadCodeGroup = document.getElementById('unload-code-group');
+                if (this.value === 'custom') {
+                    unloadCodeGroup.style.display = 'block';
+                } else {
+                    unloadCodeGroup.style.display = 'none';
+                }
             });
         });
     </script>
