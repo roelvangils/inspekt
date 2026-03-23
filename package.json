@@ -2,5 +2,15 @@
   "dependencies": {
     "material-icons": "^1.13.14"
   },
-  "packageManager": "pnpm@10.17.0+sha512.fce8a3dd29a4ed2ec566fb53efbb04d8c44a0f05bc6f24a73046910fb9c3ce7afa35a0980500668fa3573345bd644644fa98338fa168235c80f4aa17aa17fbef"
+  "packageManager": "pnpm@10.17.0+sha512.fce8a3dd29a4ed2ec566fb53efbb04d8c44a0f05bc6f24a73046910fb9c3ce7afa35a0980500668fa3573345bd644644fa98338fa168235c80f4aa17aa17fbef",
+  "devDependencies": {
+    "@siteimprove/alfa-act": "^0.108.2",
+    "@siteimprove/alfa-device": "^0.108.2",
+    "@siteimprove/alfa-dom": "^0.108.2",
+    "@siteimprove/alfa-http": "^0.108.2",
+    "@siteimprove/alfa-rules": "^0.108.2",
+    "@siteimprove/alfa-web": "^0.108.2",
+    "esbuild": "^0.27.4",
+    "jsdom": "^29.0.1"
+  }
 }
