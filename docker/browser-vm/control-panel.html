@@ -6,12 +6,12 @@
     <title>Inspekt Browser VM</title>
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%23667eea'/><text x='50' y='68' font-size='50' text-anchor='middle' fill='white' font-family='system-ui' font-weight='bold'>I</text></svg>">
     <!-- xterm.js -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css">
-    <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/xterm-addon-web-links@0.9.0/lib/xterm-addon-web-links.min.js"></script>
-    <!-- ninja-keys command palette -->
-    <script type="module" src="https://unpkg.com/ninja-keys?module"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css" integrity="sha384-LJcOxlx9IMbNXDqJ2axpfEQKkAYbFjJfhXexLfiRJhjDU81mzgkiQq8rkV0j6dVh" crossorigin="anonymous">
+    <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.min.js" integrity="sha384-xjfWUeCWdMtvpAb/SmM6lMzS6pQGcQa0loOl1d97j6Odw0vjK9nW3+dTb/bn/mwH" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.min.js" integrity="sha384-dpjGwSSISUTz2taP54Bor7qkyMR20sSO9oe11UVYnGs2/YdUBf7HW30XKQx9PCzn" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xterm-addon-web-links@0.9.0/lib/xterm-addon-web-links.min.js" integrity="sha384-iAAiqSZrWZz/YKZSTKOPNaRhVOg9JY14avg2EWEpYNnUsrnATA+Sg8pV7mak84/G" crossorigin="anonymous"></script>
+    <!-- ninja-keys command palette (pinned version) -->
+    <script type="module" src="https://unpkg.com/ninja-keys@1.2.2/dist/ninja-keys.js" integrity="sha384-mY15TPaxlubSsNXsJELAAD1vTAticpVNQadqtGcUFoHQGsKtps3edr4jCF36RRh/" crossorigin="anonymous"></script>
     <style>
         /* JetBrains Mono Nerd Font for terminal */
         @font-face {
@@ -291,27 +291,505 @@
             cursor: not-allowed;
         }
 
-        /* URL Bar */
-        .url-bar {
+        /* URL Bar Wrapper (positioning container for dropdown) */
+        .url-bar-wrapper {
+            position: relative;
             flex: 1;
             max-width: 500px;
-            padding: 8px 12px;
+        }
+
+        /* Cloud Icon Button */
+        .url-bar-cloud-icon {
+            position: absolute;
+            left: 6px;
+            top: 50%;
+            transform: translateY(-50%);
+            z-index: 2;
+            width: 28px;
+            height: 28px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
             border: none;
+            background: transparent;
+            color: var(--text-dim);
+            cursor: pointer;
             border-radius: 6px;
+            transition: color 0.15s ease, background 0.15s ease;
+            padding: 0;
+        }
+
+        .url-bar-cloud-icon:hover {
+            color: var(--text);
+            background: var(--bg-btn-hover);
+        }
+
+        .url-bar-cloud-icon.secure {
+            color: var(--success);
+        }
+
+        .url-bar-cloud-icon .cloud-padlock {
+            display: none;
+        }
+
+        .url-bar-cloud-icon.secure .cloud-padlock {
+            display: block;
+        }
+
+        .url-bar-cloud-icon.internal {
+            cursor: default;
+            pointer-events: none;
+            color: var(--text-dim);
+        }
+
+        /* Plugin Icon Button (right side of URL bar) */
+        .url-bar-plugin-icon {
+            position: absolute;
+            right: 6px;
+            top: 50%;
+            transform: translateY(-50%);
+            z-index: 2;
+            width: 28px;
+            height: 28px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: none;
+            background: transparent;
+            color: var(--text-dim);
+            cursor: pointer;
+            border-radius: 6px;
+            transition: color 0.15s ease, background 0.15s ease;
+            padding: 0;
+        }
+
+        .url-bar-plugin-icon:hover {
+            color: var(--text);
+            background: var(--bg-btn-hover);
+        }
+
+        .url-bar-plugin-icon.has-autorun {
+            color: var(--success);
+        }
+
+        /* Shared popout base (glassmorphism panel anchored to URL bar) */
+        .url-bar-popout {
+            display: none;
+            position: absolute;
+            top: calc(100% + 4px);
+            background: color-mix(in srgb, var(--bg-bar) 85%, transparent);
+            -webkit-backdrop-filter: blur(20px) saturate(180%);
+            backdrop-filter: blur(20px) saturate(180%);
+            border: 1px solid color-mix(in srgb, var(--divider) 60%, transparent);
+            border-radius: 12px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+            z-index: 1001;
+            overflow: hidden;
+        }
+
+        .url-bar-popout.show { display: flex; }
+
+        /* Plugin Dropdown */
+        .plugin-dropdown {
+            right: 0;
+            width: 320px;
+            max-height: 360px;
+            flex-direction: column;
+        }
+
+        .plugin-dropdown-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 14px;
+            border-bottom: 1px solid var(--divider);
+            flex-shrink: 0;
+        }
+
+        .plugin-dropdown-header span {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-bright);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .plugin-dropdown-header a {
+            font-size: 11px;
+            color: var(--accent);
+            text-decoration: none;
+            cursor: pointer;
+        }
+
+        .plugin-dropdown-header a:hover {
+            text-decoration: underline;
+        }
+
+        .plugin-list {
+            overflow-y: auto;
+            flex: 1;
+        }
+
+        .plugin-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 14px;
+            transition: background 0.1s ease;
+        }
+
+        .plugin-row:hover {
+            background: var(--bg-btn);
+        }
+
+        /* Autorun toggle switch */
+        .plugin-autorun-toggle {
+            position: relative;
+            width: 28px;
+            height: 16px;
+            background: var(--divider);
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            flex-shrink: 0;
+            transition: background 0.2s ease;
+            padding: 0;
+        }
+
+        .plugin-autorun-toggle::after {
+            content: '';
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 12px;
+            height: 12px;
+            background: var(--text-bright);
+            border-radius: 50%;
+            transition: transform 0.2s ease;
+        }
+
+        .plugin-autorun-toggle[aria-checked="true"] {
+            background: var(--success);
+        }
+
+        .plugin-autorun-toggle[aria-checked="true"]::after {
+            transform: translateX(12px);
+        }
+
+        .plugin-name {
+            flex: 1;
+            font-size: 12px;
+            color: var(--text);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            line-height: 1.4;
+        }
+
+        .plugin-name .plugin-run-count {
+            font-size: 10px;
+            color: var(--text-dim);
+            margin-left: 4px;
+        }
+
+        .plugin-action-btn {
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: none;
+            background: transparent;
+            color: var(--text-dim);
+            cursor: pointer;
+            border-radius: 4px;
+            padding: 0;
+            flex-shrink: 0;
+            transition: color 0.15s ease, background 0.15s ease;
+        }
+
+        .plugin-action-btn:hover {
+            color: var(--text);
+            background: var(--bg-btn-hover);
+        }
+
+        .plugin-action-btn.loading {
+            opacity: 0.5;
+            pointer-events: none;
+        }
+
+        .plugin-action-btn.unload-btn {
+            color: var(--success);
+        }
+
+        .plugin-action-btn.unload-btn:hover {
+            color: var(--text-bright);
+            background: var(--success);
+        }
+
+        .plugin-empty {
+            padding: 24px 14px;
+            text-align: center;
+            color: var(--text-dim);
+            font-size: 12px;
+        }
+
+        /* URL Bar */
+        .url-bar {
+            width: 100%;
+            padding: 8px 36px 8px 36px;
+            border: none;
+            border-radius: 999px;
             background: var(--bg-btn);
             color: var(--text);
             font-size: 13px;
-            font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
+            font-family: inherit;
             outline: none;
             transition: all 0.15s ease;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            overflow: hidden;
         }
 
         .url-bar:focus {
             background: var(--bg-page);
             box-shadow: 0 0 0 2px var(--accent);
+            border-radius: 12px;
         }
 
         .url-bar::placeholder {
+            color: var(--text-dim);
+        }
+
+        /* Loading Progress Bar */
+        .url-bar-progress {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: var(--accent);
+            transform: scaleX(0);
+            transform-origin: left;
+            transition: transform 0.3s ease;
+            border-radius: 0 0 999px 999px;
+            opacity: 0;
+            pointer-events: none;
+            z-index: 1;
+        }
+        .url-bar-progress.active { opacity: 1; }
+        .url-bar-progress.complete {
+            transition: transform 0.2s ease, opacity 0.4s ease 0.2s;
+            opacity: 0;
+        }
+        .url-bar-progress.error {
+            background: var(--danger);
+            transition: transform 0.15s ease, opacity 0.5s ease 0.3s;
+            opacity: 0;
+        }
+
+        /* Tab Favicon Spinner */
+        .tab-favicon-spinner {
+            width: 16px;
+            height: 16px;
+            flex-shrink: 0;
+            border: 2px solid var(--divider);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            display: none;
+        }
+        .tab.loading .tab-favicon,
+        .tab.loading .tab-favicon-placeholder { display: none; }
+        .tab.loading .tab-favicon-spinner { display: block; }
+
+        /* Reduced motion */
+        @media (prefers-reduced-motion: reduce) {
+            .url-bar-progress { transition-duration: 0.01ms !important; }
+            .tab-favicon-spinner { animation: none; }
+            .splash-spinner { animation: none; }
+            .status-dot.success, .status-dot.connecting { animation: none; }
+        }
+
+        /* URL History Dropdown */
+        .url-history-dropdown {
+            display: none;
+            position: absolute;
+            top: calc(100% + 4px);
+            left: 0;
+            right: 0;
+            background: color-mix(in srgb, var(--bg-bar) 85%, transparent);
+            -webkit-backdrop-filter: blur(20px) saturate(180%);
+            backdrop-filter: blur(20px) saturate(180%);
+            border: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+            border-radius: 12px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+            max-height: 400px;
+            overflow-y: auto;
+            z-index: 1000;
+        }
+
+        .url-history-dropdown.show {
+            display: block;
+        }
+
+        .url-history-dropdown .history-option {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            padding: 8px 14px;
+            cursor: pointer;
+            transition: background 0.1s ease;
+        }
+
+        .url-history-dropdown .history-option:first-child {
+            border-radius: 12px 12px 0 0;
+        }
+
+        .url-history-dropdown .history-option:hover,
+        .url-history-dropdown .history-option.active {
+            background: var(--bg-btn);
+        }
+
+        .url-history-dropdown .history-option-title {
+            font-size: 13px;
+            color: var(--text);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .url-history-dropdown .history-option-url {
+            font-size: 11px;
+            color: var(--text-dim);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .url-history-dropdown mark {
+            background: none;
+            color: var(--accent);
+            font-weight: 600;
+        }
+
+        .url-history-dropdown .history-clear {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 8px 14px;
+            border-top: 1px solid var(--border);
+            font-size: 12px;
+            color: var(--text-dim);
+            cursor: pointer;
+            transition: background 0.1s ease;
+            border-radius: 0 0 12px 12px;
+        }
+
+        .url-history-dropdown .history-clear:hover {
+            background: var(--bg-btn);
+            color: var(--text);
+        }
+
+        .url-history-dropdown .history-empty {
+            padding: 16px 14px;
+            text-align: center;
+            font-size: 12px;
+            color: var(--text-dim);
+        }
+
+        /* Page Info Popout */
+        .page-info-popout {
+            left: 0;
+            width: 520px;
+            max-height: 450px;
+        }
+
+        .page-info-tabs {
+            width: 130px;
+            flex-shrink: 0;
+            border-right: 1px solid var(--divider);
+            padding: 8px 0;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .page-info-tab {
+            background: none;
+            border: none;
+            padding: 8px 14px;
+            text-align: left;
+            font-size: 12px;
+            color: var(--text-dim);
+            cursor: pointer;
+            border-left: 2px solid transparent;
+            transition: all 0.1s ease;
+            font-family: inherit;
+        }
+
+        .page-info-tab:hover { color: var(--text); background: var(--bg-btn); }
+        .page-info-tab.active {
+            color: var(--accent);
+            border-left-color: var(--accent);
+            background: rgba(102, 126, 234, 0.08);
+        }
+
+        .page-info-content {
+            flex: 1;
+            padding: 12px 16px;
+            overflow-y: auto;
+            font-size: 12px;
+            color: var(--text);
+            min-width: 0;
+        }
+
+        .page-info-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            padding: 4px 0;
+            border-bottom: 1px solid color-mix(in srgb, var(--divider) 30%, transparent);
+            gap: 12px;
+        }
+
+        .page-info-key { color: var(--text-dim); flex-shrink: 0; }
+        .page-info-value {
+            color: var(--text);
+            text-align: right;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            min-width: 0;
+        }
+        .page-info-value.wrap { white-space: normal; word-break: break-word; }
+
+        .page-info-section-title {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin: 12px 0 6px;
+        }
+        .page-info-section-title:first-child { margin-top: 0; }
+
+        .page-info-badge {
+            display: inline-block;
+            padding: 1px 6px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 500;
+        }
+        .page-info-badge.good { background: rgba(40, 167, 69, 0.15); color: var(--success); }
+        .page-info-badge.warn { background: rgba(255, 193, 7, 0.15); color: #ffc107; }
+        .page-info-badge.bad { background: rgba(220, 53, 69, 0.15); color: var(--danger); }
+
+        .page-info-loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100px;
             color: var(--text-dim);
         }
 
@@ -394,9 +872,21 @@
             background: var(--bg-btn-hover);
         }
 
+        .tab.has-theme-color {
+            background: color-mix(in srgb, var(--tab-theme-color) 15%, var(--bg-btn));
+        }
+
+        .tab.has-theme-color:hover {
+            background: color-mix(in srgb, var(--tab-theme-color) 25%, var(--bg-btn-hover));
+        }
+
         .tab.active {
             background: var(--bg-page);
             color: var(--text-bright);
+        }
+
+        .tab.active.has-theme-color {
+            background: color-mix(in srgb, var(--tab-theme-color) 12%, var(--bg-page));
         }
 
         .tab.dragging {
@@ -444,10 +934,12 @@
         .tab-close {
             width: 18px;
             height: 18px;
-            border-radius: 4px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            padding: 0;
+            margin: 0;
+            box-sizing: content-box;
+            border-radius: 50%;
+            display: grid;
+            place-items: center;
             background: transparent;
             border: none;
             color: var(--text-dim);
@@ -455,8 +947,9 @@
             opacity: 0;
             transition: all 0.15s ease;
             flex-shrink: 0;
-            font-size: 14px;
+            font-size: 12px;
             line-height: 1;
+            aspect-ratio: 1;
         }
 
         .tab:hover .tab-close,
@@ -476,7 +969,7 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            background: transparent;
+            background: var(--bg-bar);
             border: none;
             color: var(--text-dim);
             cursor: pointer;
@@ -484,11 +977,110 @@
             font-size: 18px;
             margin-left: 4px;
             flex-shrink: 0;
+            position: sticky;
+            right: 0;
         }
 
         .new-tab-btn:hover {
             background: var(--bg-btn);
             color: var(--text-bright);
+        }
+
+        /* Tab Context Menu */
+        @keyframes contextMenuIn {
+            from { opacity: 0; transform: scale(0.96); }
+            to   { opacity: 1; transform: scale(1); }
+        }
+        @keyframes contextMenuOut {
+            from { opacity: 1; transform: scale(1); }
+            to   { opacity: 0; transform: scale(0.96); }
+        }
+
+        .context-menu {
+            position: fixed;
+            z-index: 10000;
+            background: var(--bg-page);
+            border: 1px solid var(--divider);
+            border-radius: 8px;
+            padding: 4px 0;
+            min-width: 180px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+            font-size: 13px;
+            animation: contextMenuIn 120ms ease-out;
+        }
+        .context-menu.closing {
+            animation: contextMenuOut 100ms ease-in forwards;
+        }
+
+        .context-menu [role="menuitem"] {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 12px;
+            color: var(--text);
+            cursor: pointer;
+            border: none;
+            background: none;
+            width: 100%;
+            text-align: left;
+            font: inherit;
+        }
+
+        .context-menu [role="menuitem"]:hover,
+        .context-menu [role="menuitem"]:focus-visible {
+            background: var(--bg-btn-hover);
+            color: var(--text-bright);
+            border-radius: 0 !important;
+            outline: none;
+        }
+
+        .context-menu [role="menuitem"]:disabled {
+            color: var(--text-dim);
+            cursor: default;
+        }
+        .context-menu [role="menuitem"]:disabled:hover {
+            background: none;
+        }
+
+        .context-menu [role="separator"] {
+            height: 1px;
+            background: var(--divider);
+            margin: 4px 0;
+        }
+
+        /* Navigation icon row (Reload / Back / Forward) */
+        .context-menu-nav {
+            display: flex;
+            align-items: center;
+            gap: 2px;
+            padding: 4px 8px;
+        }
+        .context-menu-nav button {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 32px;
+            height: 28px;
+            border: none;
+            background: none;
+            color: var(--text);
+            cursor: pointer;
+            border-radius: 4px;
+        }
+        .context-menu-nav button:hover:not(:disabled) {
+            background: var(--bg-btn-hover);
+            color: var(--text-bright);
+        }
+        .context-menu-nav button:disabled {
+            opacity: 0.4;
+            cursor: default;
+        }
+        .context-menu-nav button svg {
+            width: 16px;
+            height: 16px;
+            min-width: 16px;
+            min-height: 16px;
+            fill: currentColor;
         }
 
         /* =============================================
@@ -501,10 +1093,102 @@
             overflow: hidden;
         }
 
+        /* Native iframe container for inspekt:// internal tool pages */
+        .native-container {
+            flex: 1;
+            position: relative;
+            background: var(--bg-page);
+            overflow: hidden;
+            display: none;  /* hidden by default; shown when an internal URL is active */
+        }
+
+        .native-container.active {
+            display: block;
+        }
+
+        .native-container iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+            background: #fff;
+        }
+
+        /* When native view is active, hide the VNC container */
+        .vnc-container.hidden-for-native {
+            display: none;
+        }
+
+        .resize-dimensions {
+            position: absolute;
+            top: 12px;
+            left: 12px;
+            z-index: 100;
+            padding: 6px 12px;
+            border-radius: 6px;
+            background: rgba(0, 0, 0, 0.7);
+            color: #fff;
+            font-family: ui-monospace, 'SF Mono', Monaco, monospace;
+            font-size: 13px;
+            letter-spacing: 0.5px;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.15s ease-out;
+        }
+
+        .resize-dimensions.visible {
+            opacity: 1;
+        }
+
         .vnc-container iframe {
             width: 100%;
             height: 100%;
             border: none;
+        }
+
+        /* =============================================
+         * VNC Overlay System (host-side highlights)
+         * ============================================= */
+        #vncOverlayContainer {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            z-index: 50;
+            overflow: hidden;
+        }
+
+        .vnc-overlay-highlight {
+            border: 2px solid #667eea;
+            background: rgba(102, 126, 234, 0.12);
+            transition: left 0.15s cubic-bezier(0.4, 0, 0.2, 1),
+                        top 0.15s cubic-bezier(0.4, 0, 0.2, 1),
+                        width 0.15s cubic-bezier(0.4, 0, 0.2, 1),
+                        height 0.15s cubic-bezier(0.4, 0, 0.2, 1),
+                        opacity 0.1s ease-out;
+            border-radius: 1px;
+        }
+
+        .vnc-overlay-highlight.entering {
+            opacity: 0;
+        }
+
+        .vnc-overlay-tooltip {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: #fff;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font: 11px/1.4 system-ui, sans-serif;
+            white-space: nowrap;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+            max-width: 400px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            transition: left 0.15s cubic-bezier(0.4, 0, 0.2, 1),
+                        top 0.15s cubic-bezier(0.4, 0, 0.2, 1),
+                        opacity 0.1s ease-out;
+        }
+
+        .vnc-overlay-tooltip.entering {
+            opacity: 0;
         }
 
         /* =============================================
@@ -531,8 +1215,8 @@
         }
 
         .focus-overlay-hint {
-            background: var(--bg-card);
-            color: var(--text-primary);
+            background: var(--bg-bar);
+            color: var(--text-bright);
             padding: 16px 32px;
             border-radius: 8px;
             font-size: 16px;
@@ -887,6 +1571,104 @@
             color: white !important;
         }
 
+        /* Inspect button active state */
+        button.inspect-active {
+            background: linear-gradient(135deg, #3498db 0%, #2980b9 100%) !important;
+            color: white !important;
+            animation: inspectPulse 1.5s ease-in-out infinite;
+        }
+
+        @keyframes inspectPulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(52, 152, 219, 0.4); }
+            50% { box-shadow: 0 0 0 6px rgba(52, 152, 219, 0); }
+        }
+
+        /* Hover-inspect crosshair cursor */
+        #vncContainer.hover-inspect-active iframe {
+            cursor: crosshair !important;
+        }
+
+        /* Host-side inspect info panel */
+        .vnc-inspect-info-panel {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            width: 320px;
+            max-height: 80vh;
+            overflow-y: auto;
+            z-index: 60;
+            background: #1a1a2e;
+            color: #fff;
+            border-radius: 8px;
+            font: 12px/1.5 system-ui, -apple-system, sans-serif;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+            pointer-events: auto;
+        }
+        .vnc-inspect-info-panel .panel-header {
+            padding: 12px;
+            border-bottom: 1px solid #333;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .vnc-inspect-info-panel .panel-header b { font-size: 13px; }
+        .vnc-inspect-info-panel .panel-close {
+            cursor: pointer;
+            font-size: 18px;
+            color: #888;
+            background: none;
+            border: none;
+            padding: 0 4px;
+            line-height: 1;
+        }
+        .vnc-inspect-info-panel .panel-close:hover { color: #fff; }
+        .vnc-inspect-info-panel .panel-body { padding: 12px; }
+        .vnc-inspect-info-panel .selector-box {
+            background: #252540;
+            padding: 8px;
+            border-radius: 4px;
+            font-family: monospace;
+            color: #3498db;
+            word-break: break-all;
+            margin-bottom: 10px;
+        }
+        .vnc-inspect-info-panel .info-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 6px;
+            margin-bottom: 10px;
+        }
+        .vnc-inspect-info-panel .info-cell {
+            background: #252540;
+            padding: 6px;
+            border-radius: 4px;
+        }
+        .vnc-inspect-info-panel .info-cell small { color: #888; }
+        .vnc-inspect-info-panel .info-section { margin-bottom: 10px; }
+        .vnc-inspect-info-panel .info-section small { color: #888; }
+        .vnc-inspect-info-panel .info-section-content {
+            background: #252540;
+            padding: 8px;
+            border-radius: 4px;
+            margin-top: 4px;
+        }
+        .vnc-inspect-info-panel .attr-name { color: #9b59b6; }
+        .vnc-inspect-info-panel .attr-value { color: #2ecc71; }
+        .vnc-inspect-info-panel .text-content { color: #aaa; }
+        .vnc-inspect-info-panel .styles-grid {
+            font: 11px monospace;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 4px;
+        }
+        .vnc-inspect-info-panel .panel-footer {
+            text-align: center;
+            color: #666;
+            margin-top: 12px;
+            font-size: 11px;
+            padding-bottom: 4px;
+        }
+
         /* Light mode adjustments */
         @media (prefers-color-scheme: light) {
             .terminal-overlay {
@@ -927,9 +1709,9 @@
             pointer-events: none;
             opacity: 0;
             visibility: hidden;
-            /* Position transition always 500ms, opacity for fade in/out */
-            transition: left 0.5s cubic-bezier(0.4, 0, 0.2, 1),
-                        top 0.5s cubic-bezier(0.4, 0, 0.2, 1),
+            /* Position slides between tabs, opacity for initial appear/disappear */
+            transition: left 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+                        top 0.35s cubic-bezier(0.4, 0, 0.2, 1),
                         opacity 0.2s ease,
                         visibility 0.2s ease;
         }
@@ -961,7 +1743,7 @@
             width: 240px;
             height: auto;
             border-radius: 4px;
-            transition: opacity 0.3s ease;
+            transition: opacity 0.35s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
         .thumbnail-preview .thumbnail-images img.thumbnail-current {
@@ -973,9 +1755,9 @@
         }
 
         .thumbnail-preview .thumbnail-url {
-            font-size: 11px;
+            font-size: 12px;
             color: var(--text-dim);
-            padding: 4px 4px 0;
+            padding: 6px 8px 2px;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
@@ -1823,19 +2605,77 @@
 
         <!-- Navigation Buttons -->
         <div class="btn-group">
-            <button class="nav-btn" onclick="goBack()" title="Go back">
+            <button class="nav-btn" id="reloadBtn" title="Reload page" aria-label="Reload page">
+                <svg viewBox="0 0 24 24"><path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
+            </button>
+            <button class="nav-btn" id="backBtn" onclick="goBack()" title="Go back" disabled>
                 <svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
             </button>
-            <button class="nav-btn" onclick="goForward()" title="Go forward">
+            <button class="nav-btn" id="forwardBtn" onclick="goForward()" title="Go forward" disabled>
                 <svg viewBox="0 0 24 24"><path d="M12 4l-1.41 1.41L16.17 11H4v2h12.17l-5.58 5.59L12 20l8-8z"/></svg>
-            </button>
-            <button class="nav-btn" onclick="reloadPage()" title="Reload page">
-                <svg viewBox="0 0 24 24"><path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
             </button>
         </div>
 
         <!-- URL Bar -->
-        <input type="text" class="url-bar" id="urlBar" placeholder="Enter URL..." onkeydown="handleUrlKeydown(event)">
+        <div class="url-bar-wrapper" id="urlBarWrapper">
+            <button class="url-bar-cloud-icon" id="urlBarCloudIcon"
+                    title="Remote browsing (cloud VM)"
+                    aria-label="Page information"
+                    onclick="togglePageInfo()">
+                <svg viewBox="0 0 24 24" width="16" height="16">
+                    <path class="cloud-shape" d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96z" fill="currentColor"/>
+                    <g class="cloud-padlock">
+                        <rect x="9" y="12.5" width="6" height="4.5" rx="1" fill="var(--bg-bar)"/>
+                        <path d="M10.5 12.5V11a1.5 1.5 0 0 1 3 0v1.5" stroke="var(--bg-bar)" stroke-width="1.3" fill="none"/>
+                    </g>
+                </svg>
+            </button>
+            <input type="text" class="url-bar" id="urlBar"
+                   placeholder="Enter URL..."
+                   role="combobox"
+                   aria-expanded="false"
+                   aria-controls="urlHistoryDropdown"
+                   aria-autocomplete="list"
+                   autocomplete="off">
+            <div class="url-history-dropdown" id="urlHistoryDropdown"
+                 role="listbox"
+                 aria-label="Navigation history">
+            </div>
+            <div class="url-bar-progress" id="urlBarProgress" role="progressbar"
+                 aria-label="Page loading progress" aria-valuenow="0"
+                 aria-valuemin="0" aria-valuemax="100"></div>
+            <button id="urlBarPluginIcon" class="url-bar-plugin-icon"
+                    title="Plugins"
+                    aria-label="Plugins"
+                    aria-expanded="false"
+                    onclick="togglePluginDropdown()">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19.439 7.85c-.049.322.059.648.289.878l1.568 1.568c.47.47.706 1.087.706 1.704s-.235 1.233-.706 1.704l-1.611 1.611a.98.98 0 0 1-.837.276c-.47-.07-.802-.48-.968-.925a2.501 2.501 0 1 0-3.214 3.214c.446.166.855.497.925.968a.979.979 0 0 1-.276.837l-1.611 1.611a2.404 2.404 0 0 1-1.704.706 2.402 2.402 0 0 1-1.704-.706l-1.568-1.568a1.026 1.026 0 0 0-.877-.29c-.493.074-.84.504-1.02.968a2.5 2.5 0 1 1-3.237-3.237c.464-.18.894-.527.967-1.02a1.026 1.026 0 0 0-.289-.877l-1.568-1.568A2.402 2.402 0 0 1 1.998 12c0-.617.236-1.234.706-1.704L4.16 8.74c.24-.24.33-.59.274-.862-.058-.284-.27-.546-.535-.728a2.5 2.5 0 1 1 3.258-3.258c.18.264.443.477.728.535.272.056.621-.034.862-.274l1.557-1.557c.47-.47 1.088-.706 1.704-.706.617 0 1.234.236 1.704.706l1.568 1.568c.23.23.556.338.877.29.493-.074.84-.504 1.02-.968a2.5 2.5 0 1 1 3.237 3.237c-.464.18-.894.527-.967 1.02Z"/></svg>
+            </button>
+            <div id="pluginDropdown" class="url-bar-popout plugin-dropdown" role="dialog" aria-label="Plugins">
+                <div class="plugin-dropdown-header">
+                    <span>Plugins</span>
+                    <a onclick="openPluginManager()" title="Open plugin manager">Manage</a>
+                </div>
+                <div id="pluginList" class="plugin-list"></div>
+            </div>
+            <div class="url-bar-popout page-info-popout" id="pageInfoPopout">
+                <div class="page-info-tabs" role="tablist" aria-label="Page information categories">
+                    <button class="page-info-tab active" data-tab="summary" role="tab">Summary</button>
+                    <button class="page-info-tab" data-tab="performance" role="tab">Performance</button>
+                    <button class="page-info-tab" data-tab="meta" role="tab">Meta</button>
+                    <button class="page-info-tab" data-tab="seo" role="tab">SEO</button>
+                    <button class="page-info-tab" data-tab="security" role="tab">Security</button>
+                    <button class="page-info-tab" data-tab="accessibility" role="tab">Accessibility</button>
+                    <button class="page-info-tab" data-tab="resources" role="tab">Resources</button>
+                    <button class="page-info-tab" data-tab="storage" role="tab">Storage</button>
+                    <button class="page-info-tab" data-tab="tech" role="tab">Tech</button>
+                    <button class="page-info-tab" data-tab="layout" role="tab">Layout</button>
+                </div>
+                <div class="page-info-content" id="pageInfoContent" role="tabpanel">
+                    <div class="page-info-loading">Loading...</div>
+                </div>
+            </div>
+        </div>
 
         <div class="divider"></div>
 
@@ -1849,6 +2689,12 @@
         <button id="devtoolsBtn" onclick="toggleDevTools()" title="Toggle DevTools (D)">
             <svg viewBox="0 0 24 24"><path d="M22.7 19l-9.1-9.1c.9-2.3.4-5-1.5-6.9-2-2-5-2.4-7.4-1.3L9 6 6 9 1.6 4.7C.4 7.1.9 10.1 2.9 12.1c1.9 1.9 4.6 2.4 6.9 1.5l9.1 9.1c.4.4 1 .4 1.4 0l2.3-2.3c.5-.4.5-1.1.1-1.4z"/></svg>
             DevTools
+        </button>
+
+        <!-- Element Inspect Button -->
+        <button id="inspectBtn" onclick="toggleHoverInspect()" title="Toggle Element Inspector (I)">
+            <svg viewBox="0 0 24 24"><path d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3A8.994 8.994 0 0 0 13 3.06V1h-2v2.06A8.994 8.994 0 0 0 3.06 11H1v2h2.06A8.994 8.994 0 0 0 11 20.94V23h2v-2.06A8.994 8.994 0 0 0 20.94 13H23v-2h-2.06zM12 19c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"/></svg>
+            Inspect
         </button>
 
         <!-- Audio Toggle Button -->
@@ -1925,8 +2771,8 @@
     <div class="tab-bar" id="tabBar">
         <div class="tabs-container" id="tabsContainer">
             <!-- Tabs will be dynamically inserted here -->
+            <button class="new-tab-btn" onclick="createNewTab()" title="New tab (Ctrl+T)">+</button>
         </div>
-        <button class="new-tab-btn" onclick="createNewTab()" title="New tab (Ctrl+T)">+</button>
         <button class="grid-view-btn" id="gridViewBtn" onclick="toggleTabGrid()" title="Tab overview">
             <svg width="16" height="16" viewBox="0 0 16 16">
                 <rect x="1" y="1" width="6" height="6" rx="1" fill="currentColor"/>
@@ -1938,7 +2784,12 @@
     </div>
 
     <!-- VNC Container -->
-    <div class="vnc-container" id="vncContainer"></div>
+    <div class="vnc-container" id="vncContainer">
+        <div class="resize-dimensions" id="resizeDimensions"></div>
+    </div>
+
+    <!-- Native Container for inspekt:// internal tool pages -->
+    <div class="native-container" id="nativeContainer"></div>
 
     <!-- Click-to-focus overlay (appears when terminal closes) -->
     <div class="focus-overlay" id="focusOverlay" onclick="hideFocusOverlay()">
@@ -1966,8 +2817,8 @@
     <!-- Tab Thumbnail Preview -->
     <div class="thumbnail-preview" id="thumbnailPreview">
         <div class="thumbnail-images">
-            <img class="thumbnail-current" src="" alt="Tab preview">
-            <img class="thumbnail-next" src="" alt="Tab preview">
+            <img class="thumbnail-current" src="" alt="">
+            <img class="thumbnail-next" src="" alt="">
         </div>
         <div class="thumbnail-url"></div>
     </div>
@@ -2358,6 +3209,90 @@
             }
         }
 
+        // Dynamic viewport resize — matches VM resolution to host browser viewport
+        function setupViewportResize() {
+            const container = document.getElementById('vncContainer');
+            if (!container) return;
+
+            let lastWidth = 0;
+            let lastHeight = 0;
+            let debounceTimer = null;
+            const dimsEl = document.getElementById('resizeDimensions');
+
+            const observer = new ResizeObserver(entries => {
+                // Show live dimensions immediately (before debounce)
+                const rect = entries[0]?.contentRect;
+                if (rect && dimsEl) {
+                    let w = Math.round(rect.width);
+                    let h = Math.round(rect.height);
+                    if (w % 2 !== 0) w++;
+                    if (h % 2 !== 0) h++;
+                    dimsEl.textContent = `${w} × ${h}`;
+                }
+                // Show dimensions badge during resize
+                if (dimsEl) dimsEl.classList.add('visible');
+                // Hide overlays during resize (rects are temporarily invalid)
+                if (typeof vncOverlay !== 'undefined') {
+                    vncOverlay.dismiss('inspect-highlight', false);
+                    vncOverlay.dismiss('inspect-tooltip', false);
+                }
+                clearTimeout(debounceTimer);
+                debounceTimer = setTimeout(() => {
+                    const entry = entries[0];
+                    if (!entry) return;
+
+                    // Use CSS pixels (1:1 mapping with noVNC canvas)
+                    let width = Math.round(entry.contentRect.width);
+                    let height = Math.round(entry.contentRect.height);
+
+                    // Round to even numbers (X11 preference)
+                    if (width % 2 !== 0) width++;
+                    if (height % 2 !== 0) height++;
+
+                    // Skip if unchanged
+                    if (width === lastWidth && height === lastHeight) {
+                        if (dimsEl) dimsEl.classList.remove('visible');
+                        if (typeof _inspectTrackingActive !== 'undefined' && _inspectTrackingActive) _pollInspectRect();
+                        return;
+                    }
+                    // Skip unreasonably small sizes
+                    if (width < 320 || height < 240) {
+                        if (dimsEl) dimsEl.classList.remove('visible');
+                        return;
+                    }
+
+                    lastWidth = width;
+                    lastHeight = height;
+
+                    console.log(`[viewport-resize] Requesting ${width}x${height}`);
+
+                    fetch(`http://${VNC_HOST}:${CONTROL_PORT}/resize`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ width, height })
+                    })
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data.changed) {
+                            console.log(`[viewport-resize] Resolution changed to ${data.resolution}`);
+                        }
+                        // Short delay to let noVNC receive the new framebuffer, then restore overlay
+                        setTimeout(() => {
+                            if (dimsEl) dimsEl.classList.remove('visible');
+                            if (typeof _inspectTrackingActive !== 'undefined' && _inspectTrackingActive) _pollInspectRect();
+                        }, 200);
+                    })
+                    .catch(err => {
+                        console.warn('[viewport-resize] Resize failed:', err);
+                        if (dimsEl) dimsEl.classList.remove('visible');
+                    });
+                }, 300); // 300ms debounce
+            });
+
+            observer.observe(container);
+            console.log('[viewport-resize] ResizeObserver active');
+        }
+
         // Connect to VNC
         function connectVNC() {
             updateSplashStatus('Connecting to VM...');
@@ -2365,7 +3300,7 @@
             const container = document.getElementById('vncContainer');
             const params = new URLSearchParams({
                 autoconnect: 'true',
-                resize: 'scale',
+                resize: 'remote',
                 reconnect: 'true',
                 reconnect_delay: '1000',
                 show_dot: 'false',
@@ -2380,9 +3315,17 @@
 
             iframe.onload = () => {
                 updateSplashStatus('VM ready!');
+
+                // Early check: if Chrome is on an internal URL, switch to native
+                // view before the splash screen even hides — prevents a flash of
+                // the internal page rendered through VNC.
+                checkInitialInternalUrl();
+
                 setTimeout(() => {
                     hideSplash();
                     updateStatus(true);
+                    // Start dynamic viewport resizing
+                    setupViewportResize();
                     // Check for saved tabs to restore (after restart)
                     setTimeout(restoreTabsFromStorage, 2000);
                 }, 500);
@@ -2395,6 +3338,33 @@
 
             container.appendChild(iframe);
         }
+
+        /**
+         * Quick URL check on startup: ask the control server what URL Chrome is
+         * on. If it's an internal http://inspekt/ page, immediately switch to
+         * native view so the VNC canvas never shows it.
+         */
+        async function checkInitialInternalUrl() {
+            try {
+                const resp = await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/url`, {
+                    signal: AbortSignal.timeout(2000)
+                });
+                const data = await resp.json();
+                if (data.ok && data.url && isInternalUrl(data.url)) {
+                    // We don't have an activeTabId yet, but fetchTabs will set
+                    // it shortly. For now, stash the URL and hide VNC preemptively.
+                    currentUrl = data.url;
+                    showNativeView(resolveInternalUrl(data.url));
+                    updateCloudIconState(data.url);
+                    document.getElementById('urlBar').value = displayUrl(data.url, false);
+                    // Mark a pending internal state; fetchTabs will assign to the right tab
+                    _pendingInternalUrl = data.url;
+                }
+            } catch {
+                // Control server not ready yet — fetchTabs will handle it later
+            }
+        }
+        let _pendingInternalUrl = null;
 
         // Update connection status
         function updateStatus(connected) {
@@ -2448,105 +3418,1606 @@
         }
 
         // =============================================
+        // Internal URL (http://inspekt/) Support
+        // =============================================
+
+        // Track which tabs are showing internal content
+        const internalTabs = {};  // { tabId: inspektUrl }
+
+        /**
+         * Check if a URL points to the internal Inspekt web interface.
+         * These are URLs like http://inspekt/status, http://inspekt/commands, etc.
+         */
+        function isInternalUrl(url) {
+            return typeof url === 'string' && /^https?:\/\/inspekt(\/|$)/.test(url);
+        }
+
+        /**
+         * Convert an http://inspekt/ URL to a proxied URL via the control server.
+         * e.g. http://inspekt/status → http://host:8888/internal/status
+         * The control server reverse-proxies to the Inspekt API (port 80 inside the VM).
+         */
+        function resolveInternalUrl(inspektUrl) {
+            const pathAndQuery = inspektUrl.replace(/^https?:\/\/inspekt/, '');
+            return `http://${VNC_HOST}:${CONTROL_PORT}/internal${pathAndQuery || '/'}`;
+        }
+
+        /**
+         * Switch the viewport to show the native iframe (for internal tool pages).
+         * The VNC canvas is hidden and the native container is shown.
+         */
+        function showNativeView(httpUrl) {
+            const vncContainer = document.getElementById('vncContainer');
+            const nativeContainer = document.getElementById('nativeContainer');
+
+            vncContainer.classList.add('hidden-for-native');
+            nativeContainer.classList.add('active');
+
+            // Reuse existing iframe or create a new one
+            let iframe = nativeContainer.querySelector('iframe');
+            if (!iframe) {
+                iframe = document.createElement('iframe');
+                // No sandbox — these are trusted internal pages from our own API server
+                nativeContainer.appendChild(iframe);
+            }
+            iframe.src = httpUrl;
+        }
+
+        /**
+         * Switch the viewport back to the VNC canvas (for regular web pages).
+         */
+        function showVncView() {
+            const vncContainer = document.getElementById('vncContainer');
+            const nativeContainer = document.getElementById('nativeContainer');
+
+            nativeContainer.classList.remove('active');
+            vncContainer.classList.remove('hidden-for-native');
+
+            // Stop loading any internal page
+            const iframe = nativeContainer.querySelector('iframe');
+            if (iframe) iframe.src = 'about:blank';
+        }
+
+        /**
+         * Update the viewport based on whether the active tab is internal.
+         * Called on tab switch and after navigation.
+         */
+        function syncViewport() {
+            if (activeTabId && internalTabs[activeTabId]) {
+                showNativeView(resolveInternalUrl(internalTabs[activeTabId]));
+            } else {
+                showVncView();
+            }
+        }
+
+        // =============================================
         // Browser Navigation
         // =============================================
 
+        const HISTORY_STORAGE_KEY = 'inspekt_url_history';
+
         let currentUrl = '';
+        let currentTitle = '';
+        let visitedHistory = [];       // [{title, url}]
+        let historyDropdownOpen = false;
+        let historyActiveIndex = -1;
+
+        // Load history from localStorage on startup
+        try {
+            const saved = localStorage.getItem(HISTORY_STORAGE_KEY);
+            if (saved) visitedHistory = JSON.parse(saved);
+        } catch (e) { /* ignore corrupt data */ }
+
+        function saveHistory() {
+            try {
+                localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(visitedHistory));
+            } catch (e) { /* ignore quota errors */ }
+        }
+
+        // --- Utility functions ---
+
+        function stripScheme(url) {
+            return url.replace(/^https?:\/\//, '');
+        }
+
+        function displayUrl(url, showScheme) {
+            if (!url || url === 'about:blank') return url || '';
+            return showScheme ? url : stripScheme(url);
+        }
+
+        function escapeHtml(str) {
+            const div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
+        }
+
+        function escapeRegex(str) {
+            return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        }
+
+        function highlightMatch(text, filter) {
+            if (!filter) return escapeHtml(text);
+            const escaped = escapeHtml(text);
+            const filterEscaped = escapeHtml(filter);
+            const regex = new RegExp('(' + escapeRegex(filterEscaped) + ')', 'gi');
+            return escaped.replace(regex, '<mark>$1</mark>');
+        }
+
+        // --- Nav button state ---
+
+        function updateNavButtons(canGoBack, canGoForward) {
+            document.getElementById('backBtn').disabled = !canGoBack;
+            document.getElementById('forwardBtn').disabled = !canGoForward;
+        }
+
+        // --- Per-tab navigation history helpers ---
+
+        function getNavHistory(tabId) {
+            if (!tabNavHistory[tabId]) {
+                tabNavHistory[tabId] = { entries: [], index: -1 };
+            }
+            return tabNavHistory[tabId];
+        }
+
+        function addToNavHistory(tabId, url) {
+            if (!url || url === 'about:blank') return;
+            const history = getNavHistory(tabId);
+            // Don't add duplicate of current position
+            if (history.index >= 0 && history.entries[history.index] === url) return;
+            // Truncate any forward history (like a real browser)
+            history.entries = history.entries.slice(0, history.index + 1);
+            // Add new entry
+            history.entries.push(url);
+            // Enforce max history size
+            if (history.entries.length > MAX_NAV_HISTORY) {
+                history.entries.shift();
+            }
+            history.index = history.entries.length - 1;
+        }
+
+        function updateNavButtonsFromHistory() {
+            if (!activeTabId) {
+                updateNavButtons(false, false);
+                return;
+            }
+            const history = getNavHistory(activeTabId);
+            updateNavButtons(history.index > 0, history.index < history.entries.length - 1);
+        }
+
+        function fetchHistoryState() {
+            updateNavButtonsFromHistory();
+        }
+
+        // --- Navigation actions ---
 
         async function goBack() {
+            if (!activeTabId) return;
+            const history = getNavHistory(activeTabId);
+            if (history.index <= 0) return;
+
+            history.index--;
+            const targetUrl = history.entries[history.index];
+            navHistoryTarget = targetUrl;
+            updateNavButtonsFromHistory();
+
+            // If the target is an internal URL, handle locally
+            if (isInternalUrl(targetUrl)) {
+                internalTabs[activeTabId] = targetUrl;
+                currentUrl = targetUrl;
+                document.getElementById('urlBar').value = targetUrl;
+                updateCloudIconState(targetUrl);
+                showNativeView(resolveInternalUrl(targetUrl));
+                navHistoryTarget = null;
+                return;
+            }
+
+            // Navigating back to a normal page — restore VNC if needed
+            if (internalTabs[activeTabId]) {
+                delete internalTabs[activeTabId];
+                showVncView();
+            }
+
+            startLoading(null);
             try {
-                const response = await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/back`);
+                const response = await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/navigate?url=${encodeURIComponent(targetUrl)}&tab=${activeTabId}`);
                 const data = await response.json();
                 if (data.ok) {
-                    updateCurrentUrl();
+                    setTimeout(updateCurrentUrl, 500);
+                    setTimeout(() => { if (loadingState === 'loading') completeLoading(); }, 400);
                 } else {
+                    history.index++;  // Revert on failure
+                    navHistoryTarget = null;
+                    updateNavButtonsFromHistory();
+                    errorLoading();
                     showToast(data.error || 'Cannot go back', 'error');
                 }
             } catch (e) {
+                history.index++;  // Revert on failure
+                navHistoryTarget = null;
+                updateNavButtonsFromHistory();
+                errorLoading();
                 showToast('Navigation failed', 'error');
             }
         }
 
         async function goForward() {
+            if (!activeTabId) return;
+            const history = getNavHistory(activeTabId);
+            if (history.index >= history.entries.length - 1) return;
+
+            history.index++;
+            const targetUrl = history.entries[history.index];
+            navHistoryTarget = targetUrl;
+            updateNavButtonsFromHistory();
+
+            // If the target is an internal URL, handle locally
+            if (isInternalUrl(targetUrl)) {
+                internalTabs[activeTabId] = targetUrl;
+                currentUrl = targetUrl;
+                document.getElementById('urlBar').value = targetUrl;
+                updateCloudIconState(targetUrl);
+                showNativeView(resolveInternalUrl(targetUrl));
+                navHistoryTarget = null;
+                return;
+            }
+
+            // Navigating forward to a normal page — restore VNC if needed
+            if (internalTabs[activeTabId]) {
+                delete internalTabs[activeTabId];
+                showVncView();
+            }
+
+            startLoading(null);
             try {
-                const response = await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/forward`);
+                const response = await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/navigate?url=${encodeURIComponent(targetUrl)}&tab=${activeTabId}`);
                 const data = await response.json();
                 if (data.ok) {
-                    updateCurrentUrl();
+                    setTimeout(updateCurrentUrl, 500);
+                    setTimeout(() => { if (loadingState === 'loading') completeLoading(); }, 400);
                 } else {
+                    history.index--;  // Revert on failure
+                    navHistoryTarget = null;
+                    updateNavButtonsFromHistory();
+                    errorLoading();
                     showToast(data.error || 'Cannot go forward', 'error');
                 }
             } catch (e) {
+                history.index--;  // Revert on failure
+                navHistoryTarget = null;
+                updateNavButtonsFromHistory();
+                errorLoading();
                 showToast('Navigation failed', 'error');
             }
         }
 
         async function reloadPage() {
+            // Reload internal pages by re-setting the iframe src
+            if (activeTabId && internalTabs[activeTabId]) {
+                const nativeIframe = document.querySelector('#nativeContainer iframe');
+                if (nativeIframe) {
+                    nativeIframe.src = resolveInternalUrl(internalTabs[activeTabId]);
+                    showToast('Page reloaded', 'success');
+                }
+                return;
+            }
+
+            startLoading(currentUrl);
             try {
-                const response = await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/reload-page`);
+                const response = await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/reload-page?tab=${activeTabId}`);
                 const data = await response.json();
                 if (data.ok) {
                     showToast('Page reloaded', 'success');
+                    if (activeTabId) {
+                        delete thumbnailCache[activeTabId];
+                        setTimeout(() => captureTabThumbnail(activeTabId), 2000);
+                    }
+                    // URL won't change on reload — brief flash for visual feedback
+                    setTimeout(() => { if (loadingState === 'loading') completeLoading(); }, 400);
                 } else {
+                    errorLoading();
                     showToast(data.error || 'Reload failed', 'error');
                 }
             } catch (e) {
+                errorLoading();
                 showToast('Reload failed', 'error');
             }
         }
 
+        function looksLikeUrl(input) {
+            // Has explicit protocol
+            if (/^https?:\/\//i.test(input)) return true;
+            // Has a dot followed by a TLD-like segment (no spaces)
+            if (/^[^\s]+\.[a-z]{2,}(\/.*)?$/i.test(input)) return true;
+            // localhost or IP address
+            if (/^(localhost|(\d{1,3}\.){3}\d{1,3})(:\d+)?(\/.*)?$/.test(input)) return true;
+            return false;
+        }
+
         async function navigateTo(url) {
             if (!url) return;
+            dismissHistoryDropdown();
 
-            // Add protocol if missing
-            if (!url.startsWith('http://') && !url.startsWith('https://')) {
+            // --- Handle http://inspekt/ internal URLs ---
+            if (isInternalUrl(url.trim())) {
+                const inspektUrl = url.trim();
+                const urlBar = document.getElementById('urlBar');
+                urlBar.value = inspektUrl;
+                urlBar.blur();
+                currentUrl = inspektUrl;
+
+                // Track this tab as internal
+                if (activeTabId) {
+                    internalTabs[activeTabId] = inspektUrl;
+                    addToNavHistory(activeTabId, inspektUrl);
+                }
+
+                addToHistory(inspektUrl, inspektUrl);
+                showNativeView(resolveInternalUrl(inspektUrl));
+                updateCloudIconState(inspektUrl);
+                fetchHistoryState();
+                return;
+            }
+
+            // --- Normal URL handling (unchanged) ---
+
+            // Search query → DuckDuckGo; URL-like input → navigate directly
+            if (!looksLikeUrl(url.trim())) {
+                url = 'https://duckduckgo.com/?q=' + encodeURIComponent(url.trim());
+            } else if (!url.startsWith('http://') && !url.startsWith('https://')) {
                 url = 'https://' + url;
+            }
+
+            // Leaving an internal page → clear internal state and restore VNC
+            if (activeTabId && internalTabs[activeTabId]) {
+                delete internalTabs[activeTabId];
+                showVncView();
             }
 
             const urlBar = document.getElementById('urlBar');
             urlBar.value = url;
+            urlBar.blur();
+
+            // Handle about:blank immediately
+            if (url === 'about:blank') {
+                startLoading(url);
+                completeLoading();
+            } else {
+                startLoading(url);
+            }
 
             try {
-                const response = await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/navigate?url=${encodeURIComponent(url)}`);
+                const response = await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/navigate?url=${encodeURIComponent(url)}&tab=${activeTabId}`);
                 const data = await response.json();
                 if (data.ok) {
-                    setTimeout(updateCurrentUrl, 1000);
+                    setTimeout(() => {
+                        updateCurrentUrl();
+                        // Add to history after title has been captured
+                        addToHistory(url, currentTitle || url);
+                    }, 1500);
+                    if (activeTabId) {
+                        delete thumbnailCache[activeTabId];
+                        setTimeout(() => captureTabThumbnail(activeTabId), 2000);
+                    }
+                    setTimeout(fetchHistoryState, 1000);
+                    // Same-URL navigation (Enter on loaded page): URL won't change,
+                    // brief flash for visual feedback
+                    if (url === currentUrl) {
+                        setTimeout(() => { if (loadingState === 'loading') completeLoading(); }, 400);
+                    }
                 } else {
+                    errorLoading();
                     showToast(data.error || 'Navigation failed', 'error');
                 }
             } catch (e) {
+                errorLoading();
                 showToast('Navigation failed', 'error');
             }
         }
 
-        function handleUrlKeydown(event) {
-            if (event.key === 'Enter') {
-                event.preventDefault();
-                const urlBar = document.getElementById('urlBar');
-                navigateTo(urlBar.value);
-                urlBar.blur();
-            }
-        }
+        // --- URL display & polling ---
 
         async function updateCurrentUrl() {
+            // Don't poll Chrome for URL when viewing an internal page
+            if (activeTabId && internalTabs[activeTabId]) return;
+
             try {
-                const response = await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/url`);
+                const response = await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/url?tab=${activeTabId}`);
                 const data = await response.json();
                 if (data.ok && data.url) {
+                    // Detect navigation completion
+                    if (loadingState === 'loading' && data.url) {
+                        const urlChanged = data.url !== loadingPreviousUrl;
+                        const isReload = loadingExpectedUrl === loadingPreviousUrl;
+                        // For reload: URL won't change, handled by its own setTimeout
+                        // For everything else: complete as soon as URL differs from pre-nav URL
+                        if (!isReload && urlChanged) {
+                            completeLoading();
+                        }
+                    }
+                    currentTitle = data.title || '';
                     const urlBar = document.getElementById('urlBar');
-                    // Only update if not focused (avoid interrupting user typing)
-                    if (document.activeElement !== urlBar && data.url !== currentUrl) {
-                        urlBar.value = data.url;
+                    const urlChanged = data.url !== currentUrl;
+                    if (document.activeElement !== urlBar && urlChanged) {
+                        currentUrl = data.url;
+                        urlBar.value = displayUrl(currentUrl, false);
+                    } else if (urlChanged) {
                         currentUrl = data.url;
                     }
+                    // Update cloud icon HTTPS state
+                    if (urlChanged) {
+                        updateCloudIconState(currentUrl);
+                        // Clear plugin loaded state on navigation
+                        loadedPlugins.clear();
+                        if (pluginDropdownOpen) renderPluginList();
+                        // Trigger autorun plugins on navigation
+                        triggerAutorunPlugins(currentUrl);
+                    }
+                    // Auto-detect internal URL: if Chrome navigated to http://inspekt/,
+                    // switch to native iframe view automatically
+                    if (urlChanged && isInternalUrl(data.url) && activeTabId && !internalTabs[activeTabId]) {
+                        internalTabs[activeTabId] = data.url;
+                        showNativeView(resolveInternalUrl(data.url));
+                    }
+                    // Track URL changes for back/forward navigation history
+                    if (urlChanged && activeTabId) {
+                        if (navHistoryTarget) {
+                            // Expected navigation from back/forward — don't add new entry
+                            navHistoryTarget = null;
+                        } else {
+                            addToNavHistory(activeTabId, data.url);
+                        }
+                    }
+                    // Refresh back/forward button state from client-side history
+                    fetchHistoryState();
                 }
             } catch (e) {
-                // Silently fail - don't spam errors
+                // Silently fail
             }
         }
 
         // Poll for URL updates every 2 seconds
         setInterval(updateCurrentUrl, 2000);
+
+        // --- Loading Progress Indicator ---
+
+        let loadingState = 'idle'; // idle | loading | completing | error
+        let loadingProgress = 0;
+        let loadingTrickleTimer = null;
+        let loadingFastPollTimer = null;
+        let loadingExpectedUrl = null;
+        let loadingStartTime = 0;
+        let loadingPreviousUrl = '';
+        const LOADING_MAX_TIMEOUT = 30000;
+
+        const RELOAD_SVG = '<svg viewBox="0 0 24 24"><path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>';
+        const STOP_SVG = '<svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>';
+
+        function startLoading(expectedUrl) {
+            // Cancel any in-progress loading
+            if (loadingTrickleTimer) clearInterval(loadingTrickleTimer);
+            if (loadingFastPollTimer) clearInterval(loadingFastPollTimer);
+
+            loadingState = 'loading';
+            loadingProgress = 0;
+            loadingExpectedUrl = expectedUrl;
+            loadingPreviousUrl = currentUrl;
+            loadingStartTime = Date.now();
+
+            const bar = document.getElementById('urlBarProgress');
+            bar.className = 'url-bar-progress active';
+            setProgress(0);
+
+            // Set tab spinner
+            if (activeTabId) setTabLoading(activeTabId, true);
+
+            // Swap reload → stop
+            setReloadButtonMode('stop');
+
+            // Start trickle
+            loadingTrickleTimer = setInterval(() => {
+                if (loadingState !== 'loading') return;
+
+                // Max timeout
+                if (Date.now() - loadingStartTime > LOADING_MAX_TIMEOUT) {
+                    completeLoading();
+                    return;
+                }
+
+                // Trickle algorithm: decreasing increments
+                let increment;
+                if (loadingProgress < 30) {
+                    increment = 3 + Math.random() * 5;
+                } else if (loadingProgress < 60) {
+                    increment = 1 + Math.random() * 3;
+                } else if (loadingProgress < 85) {
+                    increment = 0.3 + Math.random();
+                } else {
+                    increment = 0; // Freeze at 85-95%, wait for signal
+                }
+
+                loadingProgress = Math.min(loadingProgress + increment, 95);
+                setProgress(loadingProgress);
+            }, 400);
+
+            // Fast-poll URL during loading (500ms) for quicker completion detection
+            loadingFastPollTimer = setInterval(() => {
+                if (loadingState !== 'loading') return;
+                updateCurrentUrl();
+            }, 500);
+        }
+
+        function setProgress(value) {
+            const bar = document.getElementById('urlBarProgress');
+            bar.style.transform = `scaleX(${value / 100})`;
+            bar.setAttribute('aria-valuenow', Math.round(value));
+        }
+
+        function completeLoading() {
+            if (loadingState === 'idle') return;
+            loadingState = 'completing';
+
+            if (loadingTrickleTimer) {
+                clearInterval(loadingTrickleTimer);
+                loadingTrickleTimer = null;
+            }
+            if (loadingFastPollTimer) {
+                clearInterval(loadingFastPollTimer);
+                loadingFastPollTimer = null;
+            }
+
+            // Jump to 100% and fade
+            setProgress(100);
+            const bar = document.getElementById('urlBarProgress');
+            bar.classList.add('complete');
+
+            // Restore reload button and clear spinner
+            setReloadButtonMode('reload');
+            if (activeTabId) setTabLoading(activeTabId, false);
+
+            // Reset after fade-out
+            setTimeout(() => {
+                bar.className = 'url-bar-progress';
+                bar.style.transform = 'scaleX(0)';
+                loadingState = 'idle';
+                loadingExpectedUrl = null;
+            }, 600);
+        }
+
+        function errorLoading() {
+            if (loadingState === 'idle') return;
+
+            if (loadingTrickleTimer) {
+                clearInterval(loadingTrickleTimer);
+                loadingTrickleTimer = null;
+            }
+            if (loadingFastPollTimer) {
+                clearInterval(loadingFastPollTimer);
+                loadingFastPollTimer = null;
+            }
+
+            loadingState = 'error';
+
+            // Red fill and fade
+            setProgress(100);
+            const bar = document.getElementById('urlBarProgress');
+            bar.className = 'url-bar-progress active error';
+
+            // Trigger fade after a brief red flash
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                    bar.classList.remove('active');
+                });
+            });
+
+            // Restore reload button and clear spinner
+            setReloadButtonMode('reload');
+            if (activeTabId) setTabLoading(activeTabId, false);
+
+            // Reset after fade-out
+            setTimeout(() => {
+                bar.className = 'url-bar-progress';
+                bar.style.transform = 'scaleX(0)';
+                loadingState = 'idle';
+                loadingExpectedUrl = null;
+            }, 800);
+        }
+
+        function setReloadButtonMode(mode) {
+            const btn = document.getElementById('reloadBtn');
+            if (!btn) return;
+            if (mode === 'stop') {
+                btn.innerHTML = STOP_SVG;
+                btn.onclick = stopLoading;
+                btn.title = 'Stop loading';
+                btn.setAttribute('aria-label', 'Stop loading');
+            } else {
+                btn.innerHTML = RELOAD_SVG;
+                btn.onclick = reloadPage;
+                btn.title = 'Reload page';
+                btn.setAttribute('aria-label', 'Reload page');
+            }
+        }
+
+        function stopLoading() {
+            completeLoading();
+        }
+
+        // Initialize reload button handler (no HTML onclick attribute — managed by JS)
+        setReloadButtonMode('reload');
+
+        function setTabLoading(tabId, isLoading) {
+            const tabEl = document.querySelector(`.tab[data-tab-id="${tabId}"]`);
+            if (!tabEl) return;
+            if (isLoading) {
+                tabEl.classList.add('loading');
+                // Inject spinner if not already present
+                if (!tabEl.querySelector('.tab-favicon-spinner')) {
+                    const spinner = document.createElement('div');
+                    spinner.className = 'tab-favicon-spinner';
+                    tabEl.insertBefore(spinner, tabEl.firstChild);
+                }
+            } else {
+                tabEl.classList.remove('loading');
+            }
+        }
+
+        // --- Focus/blur lifecycle (scheme show/hide) ---
+
+        (function setupUrlBarFocusHandlers() {
+            const urlBar = document.getElementById('urlBar');
+
+            urlBar.addEventListener('focus', () => {
+                urlBar.value = currentUrl;
+                urlBar.select();
+                showHistoryDropdown();
+            });
+
+            urlBar.addEventListener('blur', () => {
+                setTimeout(() => {
+                    if (!historyDropdownOpen) {
+                        urlBar.value = displayUrl(currentUrl, false);
+                    }
+                }, 150);
+            });
+        })();
+
+        // --- History data management ---
+
+        function addToHistory(url, title) {
+            if (!url || url === 'about:blank') return;
+            // Remove existing entry with same URL
+            visitedHistory = visitedHistory.filter(e => e.url !== url);
+            // Prepend new entry
+            visitedHistory.unshift({ url, title: title || url });
+            // Cap at 15
+            if (visitedHistory.length > 15) {
+                visitedHistory = visitedHistory.slice(0, 15);
+            }
+            saveHistory();
+        }
+
+        function clearHistory() {
+            visitedHistory = [];
+            saveHistory();
+            dismissHistoryDropdown();
+        }
+
+        async function seedHistoryFromServer() {
+            try {
+                const response = await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/history?tab=${activeTabId}`);
+                const data = await response.json();
+                if (data.ok && data.entries) {
+                    let added = false;
+                    for (const entry of data.entries) {
+                        if (entry.url && entry.url !== 'about:blank') {
+                            // Only add if not already present
+                            if (!visitedHistory.some(e => e.url === entry.url)) {
+                                visitedHistory.push({ url: entry.url, title: entry.title || entry.url });
+                                added = true;
+                            }
+                        }
+                    }
+                    // Cap at 15
+                    if (visitedHistory.length > 15) {
+                        visitedHistory = visitedHistory.slice(0, 15);
+                    }
+                    if (added) saveHistory();
+                }
+            } catch (e) {
+                // Silently fail
+            }
+        }
+
+        // --- Cloud icon HTTPS state ---
+
+        // SVG constants for the cloud icon button
+        const CLOUD_SVG = '<svg viewBox="0 0 24 24" width="16" height="16"><path class="cloud-shape" d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96z" fill="currentColor"/><g class="cloud-padlock"><rect x="9" y="12.5" width="6" height="4.5" rx="1" fill="var(--bg-bar)"/><path d="M10.5 12.5V11a1.5 1.5 0 0 1 3 0v1.5" stroke="var(--bg-bar)" stroke-width="1.3" fill="none"/></g></svg>';
+        const INSPEKT_SVG = '<svg viewBox="0 0 16 16" width="16" height="16"><rect x="1" y="1" width="14" height="14" rx="3" fill="currentColor"/><text x="8" y="12" text-anchor="middle" font-size="10" font-weight="700" font-family="system-ui, sans-serif" fill="var(--bg-bar)">I</text></svg>';
+
+        function updateCloudIconState(url) {
+            const cloudIcon = document.getElementById('urlBarCloudIcon');
+            const pluginIcon = document.getElementById('urlBarPluginIcon');
+            if (!cloudIcon) return;
+
+            const isInternal = isInternalUrl(url);
+
+            if (isInternal) {
+                // Internal page: show Inspekt placeholder icon, non-clickable
+                cloudIcon.classList.remove('secure');
+                cloudIcon.classList.add('internal');
+                cloudIcon.innerHTML = INSPEKT_SVG;
+                cloudIcon.title = 'Inspekt internal page';
+                cloudIcon.setAttribute('aria-label', 'Inspekt internal page');
+            } else {
+                // External page: restore cloud icon and click behavior
+                cloudIcon.classList.remove('internal');
+                cloudIcon.innerHTML = CLOUD_SVG;
+                if (url && url.startsWith('https://')) {
+                    cloudIcon.classList.add('secure');
+                    cloudIcon.title = 'Secure connection (HTTPS) — Click for page info';
+                } else if (url && url !== 'about:blank') {
+                    cloudIcon.classList.remove('secure');
+                    cloudIcon.title = 'Not secure (HTTP) — Click for page info';
+                }
+                cloudIcon.setAttribute('aria-label', 'Page information');
+            }
+
+            // Hide plugin icon on internal Inspekt pages
+            if (pluginIcon) {
+                pluginIcon.style.display = isInternal ? 'none' : '';
+                if (isInternal && pluginDropdownOpen) closePluginDropdown();
+            }
+        }
+
+        // =============================================
+        // URL Bar Popout Manager (shared dismissal logic)
+        // =============================================
+        //
+        // Both the page-info popout and the plugin dropdown are
+        // "URL bar popouts" — glassmorphism panels anchored to
+        // the URL bar. This manager ensures only one is open at
+        // a time and provides a single outside-click + Escape
+        // handler that works for any popout.
+
+        /** @type {{ panel: HTMLElement, trigger: HTMLElement, close: () => void } | null} */
+        let activePopout = null;
+
+        function openPopout(panelId, triggerId, closeFn) {
+            // Close whichever popout is currently open
+            if (activePopout) activePopout.close();
+
+            const panel = document.getElementById(panelId);
+            const trigger = document.getElementById(triggerId);
+            panel.classList.add('show');
+            if (trigger) trigger.setAttribute('aria-expanded', 'true');
+
+            activePopout = { panel, trigger, close: closeFn };
+
+            // Register outside-click (delayed so the opening click doesn't immediately close)
+            setTimeout(() => document.addEventListener('mousedown', onPopoutOutsideClick, true), 0);
+        }
+
+        function dismissActivePopout() {
+            if (!activePopout) return;
+            activePopout.panel.classList.remove('show');
+            if (activePopout.trigger) activePopout.trigger.setAttribute('aria-expanded', 'false');
+            document.removeEventListener('mousedown', onPopoutOutsideClick, true);
+            activePopout = null;
+        }
+
+        function onPopoutOutsideClick(e) {
+            if (!activePopout) return;
+            if (!activePopout.panel.contains(e.target) &&
+                (!activePopout.trigger || !activePopout.trigger.contains(e.target))) {
+                activePopout.close();
+            }
+        }
+
+        // Single Escape handler for all popouts
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && activePopout) {
+                activePopout.close();
+            }
+        });
+
+        // --- Page Info Popout ---
+
+        let pageInfoOpen = false;
+        let pageInfoData = null;
+        let pageInfoActiveTab = 'summary';
+
+        function togglePageInfo() {
+            // No page info for internal Inspekt pages
+            if (activeTabId && internalTabs[activeTabId]) return;
+
+            if (pageInfoOpen) {
+                closePageInfo();
+            } else {
+                openPageInfo();
+            }
+        }
+
+        async function openPageInfo() {
+            openPopout('pageInfoPopout', 'urlBarCloudIcon', closePageInfo);
+            pageInfoOpen = true;
+
+            const content = document.getElementById('pageInfoContent');
+            content.innerHTML = '<div class="page-info-loading">Loading...</div>';
+
+            // Reset active tab to summary
+            pageInfoActiveTab = 'summary';
+            document.querySelectorAll('.page-info-tab').forEach(t => {
+                t.classList.toggle('active', t.dataset.tab === 'summary');
+            });
+
+            // Fetch page info
+            try {
+                const response = await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/page-info?tab=${activeTabId}`);
+                const data = await response.json();
+                if (data.ok && data.data) {
+                    pageInfoData = data.data;
+                    renderPageInfoTab(pageInfoActiveTab);
+                } else {
+                    content.innerHTML = `<div class="page-info-loading">${data.error || 'Failed to load'}</div>`;
+                }
+            } catch (e) {
+                content.innerHTML = '<div class="page-info-loading">Connection error</div>';
+            }
+        }
+
+        function closePageInfo() {
+            dismissActivePopout();
+            pageInfoOpen = false;
+            pageInfoData = null;
+        }
+
+        // =============================================
+        // Plugin Dropdown
+        // =============================================
+
+        let pluginDropdownOpen = false;
+        let pluginsCache = [];
+        const loadedPlugins = new Set();
+
+        const PUZZLE_OUTLINE_SVG = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19.439 7.85c-.049.322.059.648.289.878l1.568 1.568c.47.47.706 1.087.706 1.704s-.235 1.233-.706 1.704l-1.611 1.611a.98.98 0 0 1-.837.276c-.47-.07-.802-.48-.968-.925a2.501 2.501 0 1 0-3.214 3.214c.446.166.855.497.925.968a.979.979 0 0 1-.276.837l-1.611 1.611a2.404 2.404 0 0 1-1.704.706 2.402 2.402 0 0 1-1.704-.706l-1.568-1.568a1.026 1.026 0 0 0-.877-.29c-.493.074-.84.504-1.02.968a2.5 2.5 0 1 1-3.237-3.237c.464-.18.894-.527.967-1.02a1.026 1.026 0 0 0-.289-.877l-1.568-1.568A2.402 2.402 0 0 1 1.998 12c0-.617.236-1.234.706-1.704L4.16 8.74c.24-.24.33-.59.274-.862-.058-.284-.27-.546-.535-.728a2.5 2.5 0 1 1 3.258-3.258c.18.264.443.477.728.535.272.056.621-.034.862-.274l1.557-1.557c.47-.47 1.088-.706 1.704-.706.617 0 1.234.236 1.704.706l1.568 1.568c.23.23.556.338.877.29.493-.074.84-.504 1.02-.968a2.5 2.5 0 1 1 3.237 3.237c-.464.18-.894.527-.967 1.02Z"/></svg>';
+        const PUZZLE_FILLED_SVG = '<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" stroke="none"><path d="M19.439 7.85c-.049.322.059.648.289.878l1.568 1.568c.47.47.706 1.087.706 1.704s-.235 1.233-.706 1.704l-1.611 1.611a.98.98 0 0 1-.837.276c-.47-.07-.802-.48-.968-.925a2.501 2.501 0 1 0-3.214 3.214c.446.166.855.497.925.968a.979.979 0 0 1-.276.837l-1.611 1.611a2.404 2.404 0 0 1-1.704.706 2.402 2.402 0 0 1-1.704-.706l-1.568-1.568a1.026 1.026 0 0 0-.877-.29c-.493.074-.84.504-1.02.968a2.5 2.5 0 1 1-3.237-3.237c.464-.18.894-.527.967-1.02a1.026 1.026 0 0 0-.289-.877l-1.568-1.568A2.402 2.402 0 0 1 1.998 12c0-.617.236-1.234.706-1.704L4.16 8.74c.24-.24.33-.59.274-.862-.058-.284-.27-.546-.535-.728a2.5 2.5 0 1 1 3.258-3.258c.18.264.443.477.728.535.272.056.621-.034.862-.274l1.557-1.557c.47-.47 1.088-.706 1.704-.706.617 0 1.234.236 1.704.706l1.568 1.568c.23.23.556.338.877.29.493-.074.84-.504 1.02-.968a2.5 2.5 0 1 1 3.237 3.237c-.464.18-.894.527-.967 1.02Z"/></svg>';
+        const PLUGIN_PLAY_SVG = '<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>';
+        const PLUGIN_UNLOAD_SVG = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>';
+        const PLUGIN_EDIT_SVG = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>';
+
+        function togglePluginDropdown() {
+            if (pluginDropdownOpen) {
+                closePluginDropdown();
+            } else {
+                openPluginDropdown();
+            }
+        }
+
+        async function openPluginDropdown() {
+            openPopout('pluginDropdown', 'urlBarPluginIcon', closePluginDropdown);
+            pluginDropdownOpen = true;
+
+            const list = document.getElementById('pluginList');
+            list.innerHTML = '<div class="plugin-empty">Loading…</div>';
+
+            try {
+                const response = await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/api/plugins`);
+                const data = await response.json();
+                if (data.ok) {
+                    pluginsCache = data.plugins || [];
+                    renderPluginList();
+                    updatePluginIconState();
+                } else {
+                    list.innerHTML = '<div class="plugin-empty">Failed to load plugins</div>';
+                }
+            } catch (e) {
+                list.innerHTML = '<div class="plugin-empty">Connection error</div>';
+            }
+        }
+
+        function closePluginDropdown() {
+            dismissActivePopout();
+            pluginDropdownOpen = false;
+        }
+
+        function renderPluginList() {
+            const list = document.getElementById('pluginList');
+            if (pluginsCache.length === 0) {
+                list.innerHTML = '<div class="plugin-empty">No plugins yet.<br>Click "Manage" to add some.</div>';
+                return;
+            }
+            list.innerHTML = pluginsCache.map(p => {
+                const isLoaded = loadedPlugins.has(p.id);
+                const canUnload = isLoaded && p.unload_mode && p.unload_mode !== 'none';
+                const runCountHtml = p.run_count > 0 ? `<span class="plugin-run-count">×${p.run_count}</span>` : '';
+                const desc = p.description ? p.description.replace(/"/g, '&quot;') : p.name;
+                return `<div class="plugin-row" data-plugin-id="${p.id}">
+                    <button class="plugin-autorun-toggle"
+                            role="switch"
+                            aria-checked="${!!p.autorun}"
+                            aria-label="Autorun ${p.name.replace(/"/g, '&quot;')}"
+                            title="Auto-run on page load"
+                            onclick="togglePluginAutorun('${p.id}')"></button>
+                    <span class="plugin-name" title="${desc}">${p.name}${runCountHtml}</span>
+                    ${canUnload
+                        ? `<button class="plugin-action-btn unload-btn" aria-label="Unload ${p.name.replace(/"/g, '&quot;')}" title="Unload" onclick="unloadPlugin('${p.id}')">${PLUGIN_UNLOAD_SVG}</button>`
+                        : `<button class="plugin-action-btn run-btn" aria-label="Run ${p.name.replace(/"/g, '&quot;')}" title="Run" onclick="runPlugin('${p.id}')">${PLUGIN_PLAY_SVG}</button>`
+                    }
+                    <button class="plugin-action-btn" aria-label="Edit ${p.name.replace(/"/g, '&quot;')}" title="Edit" onclick="editPlugin('${p.id}')">${PLUGIN_EDIT_SVG}</button>
+                </div>`;
+            }).join('');
+        }
+
+        function updatePluginIconState() {
+            const icon = document.getElementById('urlBarPluginIcon');
+            if (!icon) return;
+            const hasAutorun = pluginsCache.some(p => p.autorun);
+            icon.classList.toggle('has-autorun', hasAutorun);
+            icon.innerHTML = hasAutorun ? PUZZLE_FILLED_SVG : PUZZLE_OUTLINE_SVG;
+        }
+
+        async function runPlugin(pluginId) {
+            const row = document.querySelector(`.plugin-row[data-plugin-id="${pluginId}"]`);
+            const btn = row ? row.querySelector('.run-btn') : null;
+            if (btn) btn.classList.add('loading');
+
+            try {
+                const response = await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/api/plugins/${pluginId}/run?capture_console=true`, { method: 'POST' });
+                const data = await response.json();
+                const plugin = pluginsCache.find(p => p.id === pluginId);
+                const name = plugin ? plugin.name : pluginId;
+
+                if (data.ok) {
+                    // Track loaded state for unload support
+                    if (plugin && plugin.unload_mode && plugin.unload_mode !== 'none') {
+                        loadedPlugins.add(pluginId);
+                    }
+                    // Update run count in cache
+                    if (plugin) plugin.run_count = (plugin.run_count || 0) + 1;
+                    renderPluginList();
+
+                    const timeMs = data.execution_time_ms || 0;
+                    showToast(`✓ ${name} executed in ${timeMs}ms`, 'success');
+
+                    // Show console log output as toasts (cap at 3)
+                    if (data.console_output && data.console_output.length > 0) {
+                        const logs = data.console_output.filter(e => e.level === 'log');
+                        const toShow = logs.slice(0, 3);
+                        toShow.forEach((entry, i) => {
+                            setTimeout(() => showToast(entry.text, '', 4000), (i + 1) * 500);
+                        });
+                        if (logs.length > 3) {
+                            setTimeout(() => showToast(`…and ${logs.length - 3} more log entries`, '', 3000), 2000);
+                        }
+                    }
+                } else {
+                    showToast(`✗ ${name}: ${data.error || 'execution failed'}`, 'error');
+                }
+            } catch (e) {
+                showToast('Plugin execution failed', 'error');
+            }
+
+            if (btn) btn.classList.remove('loading');
+        }
+
+        async function unloadPlugin(pluginId) {
+            const row = document.querySelector(`.plugin-row[data-plugin-id="${pluginId}"]`);
+            const btn = row ? row.querySelector('.unload-btn') : null;
+            if (btn) btn.classList.add('loading');
+
+            try {
+                const response = await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/api/plugins/${pluginId}/unload?capture_console=true`, { method: 'POST' });
+                const data = await response.json();
+                const plugin = pluginsCache.find(p => p.id === pluginId);
+                const name = plugin ? plugin.name : pluginId;
+
+                if (data.ok) {
+                    loadedPlugins.delete(pluginId);
+                    renderPluginList();
+                    showToast(`${name} unloaded`, 'success');
+                } else {
+                    showToast(`✗ ${name}: ${data.error || 'unload failed'}`, 'error');
+                }
+            } catch (e) {
+                showToast('Plugin unload failed', 'error');
+            }
+
+            if (btn) btn.classList.remove('loading');
+        }
+
+        async function togglePluginAutorun(pluginId) {
+            const plugin = pluginsCache.find(p => p.id === pluginId);
+            if (!plugin) return;
+
+            const newState = !plugin.autorun;
+            try {
+                const response = await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/api/plugins/${pluginId}/autorun`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ enabled: newState })
+                });
+                const data = await response.json();
+                if (data.ok) {
+                    plugin.autorun = newState;
+                    renderPluginList();
+                    updatePluginIconState();
+                    showToast(`${plugin.name} autorun ${newState ? 'enabled' : 'disabled'}`, 'success');
+                } else {
+                    showToast(`Failed to toggle autorun: ${data.error || data.detail || 'unknown error'}`, 'error');
+                }
+            } catch (e) {
+                showToast('Failed to toggle autorun', 'error');
+            }
+        }
+
+        function editPlugin(pluginId) {
+            navigateTo(`http://inspekt/plugins?id=${pluginId}`);
+            closePluginDropdown();
+        }
+
+        function openPluginManager() {
+            navigateTo('http://inspekt/plugins');
+            closePluginDropdown();
+        }
+
+        // =============================================
+        // Autorun on Navigation
+        // =============================================
+        //
+        // The extension's content script triggers autorun via
+        // browser_info on ws.onopen, which works on refresh but
+        // can miss link-click navigations due to WebSocket
+        // lifecycle timing. This backup mechanism detects URL
+        // changes via the control panel's polling and triggers
+        // autorun via the API as a reliable fallback.
+
+        let lastAutorunUrl = '';
+        let lastAutorunTime = 0;
+        const AUTORUN_DEBOUNCE_MS = 3000;
+
+        /**
+         * Simple glob-style pattern matcher (mirrors Python's fnmatch).
+         * Supports '*' (any chars) and '?' (single char).
+         */
+        function globMatch(text, pattern) {
+            // Convert glob to regex: escape regex chars, then convert * and ?
+            let re = pattern.replace(/[.+^${}()|[\]\\]/g, '\\$&');
+            re = re.replace(/\*/g, '.*').replace(/\?/g, '.');
+            return new RegExp('^' + re + '$', 'i').test(text);
+        }
+
+        /**
+         * Check if a URL matches autorun domain/path patterns.
+         * Mirrors the Python matches_autorun_pattern() logic.
+         */
+        function matchesAutorunPattern(url, patternsStr) {
+            if (!patternsStr || patternsStr.trim() === '' || patternsStr.trim() === '*') return true;
+            try {
+                const parsed = new URL(url);
+                const hostname = parsed.hostname;
+                const full = hostname + parsed.pathname;
+                for (const raw of patternsStr.split(',')) {
+                    const pattern = raw.trim();
+                    if (!pattern) continue;
+                    if (pattern.includes('/')) {
+                        // Pattern includes path
+                        if (globMatch(full, pattern) || globMatch(full, 'www.' + pattern)) return true;
+                    } else {
+                        // Domain-only pattern
+                        if (globMatch(hostname, pattern) || globMatch(hostname, 'www.' + pattern)) return true;
+                        if (hostname.startsWith('www.') && globMatch(hostname.slice(4), pattern)) return true;
+                    }
+                }
+            } catch (e) { /* invalid URL */ }
+            return false;
+        }
+
+        /**
+         * Trigger autorun plugins for a URL change.
+         * Debounced to avoid double-execution when the content script's
+         * browser_info also triggers autorun on the bridge side.
+         */
+        async function triggerAutorunPlugins(url) {
+            if (!url || !url.startsWith('http') || isInternalUrl(url)) return;
+
+            const now = Date.now();
+            if (url === lastAutorunUrl && (now - lastAutorunTime) < AUTORUN_DEBOUNCE_MS) return;
+            lastAutorunUrl = url;
+            lastAutorunTime = now;
+
+            try {
+                const resp = await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/api/plugins/autorun`);
+                const data = await resp.json();
+                if (!data.ok || !data.plugins || data.plugins.length === 0) return;
+
+                for (const plugin of data.plugins) {
+                    if (!matchesAutorunPattern(url, plugin.autorun_domains)) continue;
+                    try {
+                        await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/api/plugins/${plugin.id}/run`, { method: 'POST' });
+                        console.log(`[Autorun] Executed '${plugin.name}' on ${url.slice(0, 60)}`);
+                    } catch (e) {
+                        console.warn(`[Autorun] Failed to execute '${plugin.name}':`, e);
+                    }
+                }
+            } catch (e) {
+                // API not available — silently skip
+            }
+        }
+
+        // Tab switching
+        document.addEventListener('click', (e) => {
+            const tab = e.target.closest('.page-info-tab');
+            if (!tab) return;
+            pageInfoActiveTab = tab.dataset.tab;
+            document.querySelectorAll('.page-info-tab').forEach(t => {
+                t.classList.toggle('active', t.dataset.tab === pageInfoActiveTab);
+            });
+            renderPageInfoTab(pageInfoActiveTab);
+        });
+
+        function renderPageInfoTab(name) {
+            const content = document.getElementById('pageInfoContent');
+            if (!pageInfoData) {
+                content.innerHTML = '<div class="page-info-loading">No data</div>';
+                return;
+            }
+            const d = pageInfoData[name];
+            if (!d) {
+                content.innerHTML = '<div class="page-info-loading">No data for this category</div>';
+                return;
+            }
+            const renderers = {
+                summary: renderSummaryTab,
+                performance: renderPerformanceTab,
+                meta: renderMetaTab,
+                seo: renderSeoTab,
+                security: renderSecurityTab,
+                accessibility: renderAccessibilityTab,
+                resources: renderResourcesTab,
+                storage: renderStorageTab,
+                tech: renderTechTab,
+                layout: renderLayoutTab
+            };
+            content.innerHTML = (renderers[name] || (() => ''))(d);
+        }
+
+        function row(key, value) {
+            if (value === null || value === undefined) return '';
+            return `<div class="page-info-row"><span class="page-info-key">${key}</span><span class="page-info-value">${value}</span></div>`;
+        }
+
+        function badge(text, level) {
+            return `<span class="page-info-badge ${level}">${text}</span>`;
+        }
+
+        function sectionTitle(text) {
+            return `<div class="page-info-section-title">${text}</div>`;
+        }
+
+        function formatBytes(bytes) {
+            if (!bytes || bytes === 0) return '0 B';
+            if (bytes < 1024) return bytes + ' B';
+            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+            return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+        }
+
+        function formatMs(ms) {
+            if (ms === null || ms === undefined) return '—';
+            if (ms < 1000) return ms + ' ms';
+            return (ms / 1000).toFixed(2) + ' s';
+        }
+
+        // --- Render functions for each tab ---
+
+        function renderSummaryTab(d) {
+            const secure = d.isSecure ? badge('HTTPS', 'good') : badge('HTTP', 'bad');
+            return [
+                row('URL', `<span class="page-info-value wrap" style="font-size:11px">${esc(d.url || '')}</span>`),
+                row('Title', esc(d.title || '—')),
+                row('Domain', esc(d.domain || '—')),
+                row('Protocol', secure),
+                row('Viewport', `${d.width || '?'} × ${d.height || '?'}`),
+                row('Language', esc(d.device?.language || '—')),
+                row('Screen', esc(d.device?.screenResolution || '—')),
+                row('DPR', d.device?.devicePixelRatio || '—'),
+                row('Touch', d.device?.touchSupport ? 'Yes' : 'No'),
+                row('Online', d.device?.onlineStatus ? badge('Yes', 'good') : badge('No', 'bad')),
+                row('Cookies', d.cookieCount || 0),
+            ].join('');
+        }
+
+        function renderPerformanceTab(d) {
+            const lcpBadge = (ms) => {
+                if (ms === null || ms === undefined) return '—';
+                if (ms < 2500) return badge(formatMs(ms), 'good');
+                if (ms < 4000) return badge(formatMs(ms), 'warn');
+                return badge(formatMs(ms), 'bad');
+            };
+            const clsBadge = (v) => {
+                if (v === null || v === undefined) return '—';
+                const val = v.toFixed(3);
+                if (v < 0.1) return badge(val, 'good');
+                if (v < 0.25) return badge(val, 'warn');
+                return badge(val, 'bad');
+            };
+            return [
+                sectionTitle('Timing'),
+                row('Page Load', formatMs(d.pageLoadTime)),
+                row('DOM Content Loaded', formatMs(d.domContentLoaded)),
+                row('Time to First Byte', formatMs(d.timeToFirstByte)),
+                sectionTitle('Paint'),
+                row('First Paint', formatMs(d.firstPaint)),
+                row('First Contentful Paint', formatMs(d.firstContentfulPaint)),
+                row('Largest Contentful Paint', lcpBadge(d.largestContentfulPaint)),
+                sectionTitle('Core Web Vitals'),
+                row('CLS', clsBadge(d.cls)),
+                row('FID', d.fid !== undefined ? formatMs(d.fid) : '—'),
+                row('INP', d.inp !== undefined ? formatMs(d.inp) : '—'),
+            ].join('');
+        }
+
+        function renderMetaTab(d) {
+            let html = '';
+            html += sectionTitle('Document');
+            html += row('Language', esc(d.specifiedLanguage || '—'));
+            html += row('Charset', esc(d.charset || '—'));
+
+            if (d.openGraph && Object.keys(d.openGraph).length > 0) {
+                html += sectionTitle('Open Graph');
+                for (const [k, v] of Object.entries(d.openGraph)) {
+                    html += row('og:' + k, esc(v || ''));
+                }
+            }
+
+            if (d.twitterCard && Object.keys(d.twitterCard).length > 0) {
+                html += sectionTitle('Twitter Card');
+                for (const [k, v] of Object.entries(d.twitterCard)) {
+                    html += row('twitter:' + k, esc(v || ''));
+                }
+            }
+
+            if (d.metaTags && d.metaTags.length > 0) {
+                html += sectionTitle(`Meta Tags (${d.metaTags.length})`);
+                d.metaTags.slice(0, 15).forEach(tag => {
+                    const name = tag.name || tag.property || tag['http-equiv'] || 'meta';
+                    const content = tag.content || '—';
+                    html += row(esc(name), esc(content));
+                });
+                if (d.metaTags.length > 15) {
+                    html += row('...', `+${d.metaTags.length - 15} more`);
+                }
+            }
+            return html;
+        }
+
+        function renderSeoTab(d) {
+            let html = '';
+            html += row('Canonical', d.canonical ? esc(d.canonical) : '—');
+            html += row('Description', d.description ? esc(d.description) : '—');
+            html += row('Keywords', d.keywords ? esc(d.keywords) : '—');
+            html += row('Robots', d.robots ? esc(d.robots) : '—');
+            html += row('Sitemap', d.sitemap ? esc(d.sitemap) : '—');
+            html += row('Favicon', d.favicon || '—');
+            html += row('Microdata', d.microdataCount || 0);
+
+            if (d.jsonLd && d.jsonLd.length > 0) {
+                html += sectionTitle('JSON-LD');
+                html += row('Types', d.jsonLd.map(esc).join(', '));
+            }
+
+            if (d.alternateLanguages && d.alternateLanguages.length > 0) {
+                html += sectionTitle('Hreflang');
+                d.alternateLanguages.forEach(al => {
+                    html += row(esc(al.lang), esc(al.href || ''));
+                });
+            }
+            return html;
+        }
+
+        function renderSecurityTab(d) {
+            return [
+                row('HTTPS', d.isSecure ? badge('Secure', 'good') : badge('Not Secure', 'bad')),
+                row('Mixed Content', d.hasMixedContent ? badge('Detected', 'bad') : badge('None', 'good')),
+                row('CSP (meta)', d.cspMeta ? esc(d.cspMeta).substring(0, 80) + (d.cspMeta.length > 80 ? '...' : '') : '—'),
+                row('Referrer Policy', d.referrerPolicy ? esc(d.referrerPolicy) : '—'),
+            ].join('');
+        }
+
+        function renderAccessibilityTab(d) {
+            let html = '';
+            html += sectionTitle('Landmarks');
+            if (d.landmarks) {
+                for (const [role, count] of Object.entries(d.landmarks)) {
+                    html += row(esc(role), count);
+                }
+            }
+            html += row('Total', d.landmarkCount || 0);
+
+            html += sectionTitle('Headings');
+            if (d.headingStructure) {
+                for (const [h, count] of Object.entries(d.headingStructure)) {
+                    if (count > 0) html += row(h.toUpperCase(), count);
+                }
+            }
+
+            html += sectionTitle('Issues');
+            html += row('Images without alt', d.imagesWithoutAlt !== undefined
+                ? (d.imagesWithoutAlt > 0 ? badge(d.imagesWithoutAlt, 'bad') : badge('0', 'good'))
+                : '—');
+            html += row('Total images', d.totalImages || 0);
+            if (d.formLabelsIssues) {
+                html += row('Form fields', d.formLabelsIssues.total || 0);
+                html += row('Missing labels', d.formLabelsIssues.missingLabels > 0
+                    ? badge(d.formLabelsIssues.missingLabels, 'bad')
+                    : badge('0', 'good'));
+            }
+            html += row('Links without text', d.linksWithoutText > 0 ? badge(d.linksWithoutText, 'bad') : badge('0', 'good'));
+            html += row('Unlabeled buttons', d.buttonsWithoutLabels > 0 ? badge(d.buttonsWithoutLabels, 'bad') : badge('0', 'good'));
+
+            html += sectionTitle('Features');
+            html += row('Skip link', d.hasSkipLink ? badge('Yes', 'good') : badge('No', 'warn'));
+            html += row('ARIA attributes', d.ariaAttributeCount || 0);
+            html += row('lang attribute', d.hasLangAttribute ? badge('Yes', 'good') : badge('No', 'bad'));
+            return html;
+        }
+
+        function renderResourcesTab(d) {
+            let html = '';
+            html += sectionTitle('Counts');
+            html += row('Scripts', d.scriptCount || 0);
+            html += row('Stylesheets', d.stylesheetCount || 0);
+            html += row('Images', d.imageCount || 0);
+            html += row('Links', d.linkCount || 0);
+            html += row('Forms', d.formCount || 0);
+            html += row('Iframes', d.iframeCount || 0);
+            html += row('Videos', d.videos || 0);
+            html += row('Audio', d.audio || 0);
+            html += row('SVGs', d.svgImages || 0);
+
+            if (d.thirdParty) {
+                html += sectionTitle('Third-Party');
+                html += row('External domains', d.thirdParty.externalDomainCount || 0);
+                if (d.thirdParty.externalDomains && d.thirdParty.externalDomains.length > 0) {
+                    d.thirdParty.externalDomains.forEach(domain => {
+                        html += row('', esc(domain));
+                    });
+                }
+            }
+
+            if (d.fonts) {
+                html += sectionTitle('Fonts');
+                html += row('Font files', d.fonts.totalFontFiles || 0);
+                if (d.fonts.googleFonts && d.fonts.googleFonts.length > 0) {
+                    html += row('Google Fonts', d.fonts.googleFonts.map(esc).join(', '));
+                }
+                if (d.fonts.customFonts && d.fonts.customFonts.length > 0) {
+                    html += row('Custom fonts', d.fonts.customFonts.map(esc).join(', '));
+                }
+            }
+
+            if (d.network) {
+                html += sectionTitle('Network');
+                html += row('Total requests', d.network.totalRequests || 0);
+                html += row('Total transfer', formatBytes(d.network.totalSize));
+                if (d.network.largestResource) {
+                    html += row('Largest resource', `${esc(d.network.largestResource.name)} (${formatBytes(d.network.largestResource.size)})`);
+                }
+            }
+            return html;
+        }
+
+        function renderStorageTab(d) {
+            let html = '';
+            html += sectionTitle('Cookies');
+            html += row('Count', d.cookieCount || 0);
+            if (d.cookieNames && d.cookieNames.length > 0) {
+                d.cookieNames.slice(0, 10).forEach(name => {
+                    html += row('', esc(name));
+                });
+                if (d.cookieNames.length > 10) {
+                    html += row('', `+${d.cookieNames.length - 10} more`);
+                }
+            }
+
+            html += sectionTitle('Local Storage');
+            html += row('Size', formatBytes(d.localStorageSize || 0));
+            html += row('Keys', (d.localStorageKeys || []).length);
+            if (d.localStorageKeys && d.localStorageKeys.length > 0) {
+                d.localStorageKeys.slice(0, 8).forEach(key => {
+                    html += row('', esc(key));
+                });
+                if (d.localStorageKeys.length > 8) {
+                    html += row('', `+${d.localStorageKeys.length - 8} more`);
+                }
+            }
+
+            html += sectionTitle('Session Storage');
+            html += row('Size', formatBytes(d.sessionStorageSize || 0));
+            html += row('Keys', (d.sessionStorageKeys || []).length);
+
+            html += sectionTitle('Service Worker');
+            html += row('Registered', d.hasServiceWorker ? 'Yes' : 'No');
+            return html;
+        }
+
+        function renderTechTab(d) {
+            let html = '';
+            if (!d || Object.keys(d).length === 0) {
+                return '<div class="page-info-loading">No technologies detected</div>';
+            }
+            for (const [category, items] of Object.entries(d)) {
+                html += sectionTitle(esc(category));
+                items.forEach(item => {
+                    html += row('', esc(item));
+                });
+            }
+            return html;
+        }
+
+        function renderLayoutTab(d) {
+            return [
+                sectionTitle('Viewport'),
+                row('Width', d.viewportWidth || '—'),
+                row('Height', d.viewportHeight || '—'),
+                sectionTitle('Document'),
+                row('Width', d.documentWidth || '—'),
+                row('Height', d.documentHeight || '—'),
+                sectionTitle('Scroll'),
+                row('X', d.scrollX || 0),
+                row('Y', d.scrollY || 0),
+                row('Visible', d.visiblePercentage !== undefined ? Math.round(d.visiblePercentage) + '%' : '—'),
+            ].join('');
+        }
+
+        // HTML escape helper for page-info
+        function esc(str) {
+            const div = document.createElement('div');
+            div.textContent = String(str);
+            return div.innerHTML;
+        }
+
+        // --- Dropdown render/filter/dismiss ---
+
+        function renderHistoryDropdown(filter) {
+            const dropdown = document.getElementById('urlHistoryDropdown');
+            const lowerFilter = (filter || '').toLowerCase();
+            const filtered = lowerFilter
+                ? visitedHistory.filter(e =>
+                    e.url.toLowerCase().includes(lowerFilter) ||
+                    e.title.toLowerCase().includes(lowerFilter))
+                : visitedHistory;
+
+            if (filtered.length === 0 && visitedHistory.length === 0) {
+                dropdown.innerHTML = '<div class="history-empty">No history yet</div>';
+                return;
+            }
+
+            if (filtered.length === 0) {
+                dropdown.innerHTML = '<div class="history-empty">No matches</div>';
+                return;
+            }
+
+            let html = '';
+            filtered.forEach((entry, i) => {
+                const activeClass = i === historyActiveIndex ? ' active' : '';
+                const titleHtml = highlightMatch(entry.title || entry.url, filter);
+                const urlHtml = highlightMatch(stripScheme(entry.url), filter);
+                html += `<div class="history-option${activeClass}" role="option" data-index="${i}" data-url="${escapeHtml(entry.url)}">
+                    <span class="history-option-title">${titleHtml}</span>
+                    <span class="history-option-url">${urlHtml}</span>
+                </div>`;
+            });
+            html += '<div class="history-clear" role="button">Clear history</div>';
+            dropdown.innerHTML = html;
+
+            // Attach click handlers
+            dropdown.querySelectorAll('.history-option').forEach(opt => {
+                opt.addEventListener('mousedown', (e) => {
+                    e.preventDefault(); // Prevent blur
+                    navigateTo(opt.dataset.url);
+                });
+            });
+
+            const clearBtn = dropdown.querySelector('.history-clear');
+            if (clearBtn) {
+                clearBtn.addEventListener('mousedown', (e) => {
+                    e.preventDefault();
+                    clearHistory();
+                });
+            }
+        }
+
+        function showHistoryDropdown() {
+            const dropdown = document.getElementById('urlHistoryDropdown');
+            const urlBar = document.getElementById('urlBar');
+            historyActiveIndex = -1;
+            renderHistoryDropdown(urlBar === document.activeElement ? '' : '');
+            dropdown.classList.add('show');
+            urlBar.setAttribute('aria-expanded', 'true');
+            historyDropdownOpen = true;
+            document.addEventListener('click', onHistoryOutsideClick, true);
+        }
+
+        function dismissHistoryDropdown() {
+            const dropdown = document.getElementById('urlHistoryDropdown');
+            const urlBar = document.getElementById('urlBar');
+            dropdown.classList.remove('show');
+            urlBar.setAttribute('aria-expanded', 'false');
+            historyDropdownOpen = false;
+            historyActiveIndex = -1;
+            document.removeEventListener('click', onHistoryOutsideClick, true);
+        }
+
+        function onHistoryOutsideClick(e) {
+            const wrapper = document.getElementById('urlBarWrapper');
+            if (!wrapper.contains(e.target)) {
+                dismissHistoryDropdown();
+            }
+        }
+
+        // --- Keyboard handler ---
+
+        (function setupUrlBarKeyboard() {
+            const urlBar = document.getElementById('urlBar');
+
+            urlBar.addEventListener('keydown', (e) => {
+                if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    if (!historyDropdownOpen) {
+                        showHistoryDropdown();
+                    } else {
+                        const options = document.querySelectorAll('#urlHistoryDropdown .history-option');
+                        if (options.length > 0) {
+                            historyActiveIndex = Math.min(historyActiveIndex + 1, options.length - 1);
+                            updateHistoryActiveOption();
+                        }
+                    }
+                } else if (e.key === 'ArrowUp') {
+                    if (historyDropdownOpen) {
+                        e.preventDefault();
+                        historyActiveIndex = Math.max(historyActiveIndex - 1, -1);
+                        updateHistoryActiveOption();
+                    }
+                } else if (e.key === 'Enter') {
+                    e.preventDefault();
+                    if (historyDropdownOpen && historyActiveIndex >= 0) {
+                        const options = document.querySelectorAll('#urlHistoryDropdown .history-option');
+                        if (options[historyActiveIndex]) {
+                            navigateTo(options[historyActiveIndex].dataset.url);
+                        }
+                    } else {
+                        navigateTo(urlBar.value);
+                    }
+                } else if (e.key === 'Escape') {
+                    if (historyDropdownOpen) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        dismissHistoryDropdown();
+                        urlBar.value = displayUrl(currentUrl, false);
+                        // Keep focus — second Escape (global handler) will blur
+                    }
+                }
+            });
+
+            urlBar.addEventListener('input', () => {
+                if (!historyDropdownOpen) {
+                    showHistoryDropdown();
+                }
+                historyActiveIndex = -1;
+                renderHistoryDropdown(urlBar.value);
+            });
+        })();
+
+        function updateHistoryActiveOption() {
+            const options = document.querySelectorAll('#urlHistoryDropdown .history-option');
+            options.forEach((opt, i) => {
+                opt.classList.toggle('active', i === historyActiveIndex);
+            });
+            // Scroll active option into view
+            if (historyActiveIndex >= 0 && options[historyActiveIndex]) {
+                options[historyActiveIndex].scrollIntoView({ block: 'nearest' });
+            }
+        }
 
         // =============================================
         // Terminal File Download
@@ -2557,6 +5028,23 @@
 
         // Regex to detect hide-terminal escape sequence: OSC 1337 ; hide-terminal BEL
         const HIDE_TERMINAL_REGEX = /\x1b\]1337;hide-terminal\x07/g;
+
+        // Regex to detect clipboard signal: OSC 1337 ; clipboard BEL
+        // When detected, fetch clipboard text from control server and copy to host clipboard
+        const CLIPBOARD_SIGNAL_REGEX = /\x1b\]1337;clipboard\x07/g;
+
+        async function handleClipboardSignal() {
+            try {
+                const resp = await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/clipboard`);
+                const data = await resp.json();
+                if (data.ok && data.text) {
+                    await navigator.clipboard.writeText(data.text);
+                    // Silent success — the CLI command already prints its own confirmation
+                }
+            } catch (err) {
+                console.warn('[Terminal] Clipboard relay failed:', err);
+            }
+        }
 
         async function triggerFileDownload(filePath) {
             // Use fetch + blob to avoid cross-origin navigation issue
@@ -2993,6 +5481,12 @@
                     triggerFileDownload(filePath);
                 }
 
+                // Check for clipboard signal and relay to host clipboard
+                CLIPBOARD_SIGNAL_REGEX.lastIndex = 0;
+                if (CLIPBOARD_SIGNAL_REGEX.test(data)) {
+                    handleClipboardSignal();
+                }
+
                 // Check for hide-terminal escape sequence
                 // CLI tools emit this to request terminal auto-hide (e.g., when recording starts)
                 const hasHideSignal = HIDE_TERMINAL_REGEX.test(data);
@@ -3011,6 +5505,7 @@
                 // Strip escape sequences before writing to terminal
                 let cleanData = data.replace(DOWNLOAD_MARKER_REGEX, '');
                 cleanData = cleanData.replace(HIDE_TERMINAL_REGEX, '');
+                cleanData = cleanData.replace(CLIPBOARD_SIGNAL_REGEX, '');
                 terminal.write(cleanData);
             };
 
@@ -3315,6 +5810,179 @@
         }
 
         // =============================================
+        // Hover-Inspect Mode (host-side overlay)
+        // =============================================
+
+        let isHoverInspectActive = false;
+        let _hoverAbortController = null;
+        let _hoverThrottleTimer = null;
+
+        function toggleHoverInspect() {
+            if (isHoverInspectActive) {
+                deactivateHoverInspect();
+                showToast('Inspect mode disabled');
+            } else {
+                activateHoverInspect();
+                showToast('Inspect mode enabled \u2014 hover to highlight, click to lock');
+            }
+        }
+
+        function activateHoverInspect() {
+            isHoverInspectActive = true;
+            updateInspectButton();
+            // Notify VNC iframe to start forwarding pointermove and intercepting clicks
+            const iframe = document.querySelector('#vncContainer iframe');
+            if (iframe?.contentWindow) {
+                iframe.contentWindow.postMessage({ type: 'inspekt-hover-mode', enabled: true }, '*');
+            }
+            document.getElementById('vncContainer').classList.add('hover-inspect-active');
+        }
+
+        function deactivateHoverInspect() {
+            isHoverInspectActive = false;
+            updateInspectButton();
+            // Notify VNC iframe to stop
+            const iframe = document.querySelector('#vncContainer iframe');
+            if (iframe?.contentWindow) {
+                iframe.contentWindow.postMessage({ type: 'inspekt-hover-mode', enabled: false }, '*');
+            }
+            document.getElementById('vncContainer').classList.remove('hover-inspect-active');
+            // Cancel any in-flight hover request
+            if (_hoverAbortController) {
+                _hoverAbortController.abort();
+                _hoverAbortController = null;
+            }
+            // Dismiss hover overlays (but not locked overlays)
+            if (!_inspectTrackingActive) {
+                vncOverlay.dismiss('inspect-highlight', true);
+                vncOverlay.dismiss('inspect-tooltip', true);
+            }
+        }
+
+        function updateInspectButton() {
+            const btn = document.getElementById('inspectBtn');
+            if (btn) {
+                btn.classList.toggle('inspect-active', isHoverInspectActive || _inspectTrackingActive);
+            }
+        }
+
+        // Handle pointermove from VNC iframe during hover-inspect
+        async function _handleHoverMove(vmX, vmY) {
+            if (!isHoverInspectActive) return;
+
+            // Throttle to ~80ms (12 fps) for smooth but efficient updates
+            if (_hoverThrottleTimer) return;
+            _hoverThrottleTimer = setTimeout(() => { _hoverThrottleTimer = null; }, 80);
+
+            // Cancel previous in-flight request
+            if (_hoverAbortController) _hoverAbortController.abort();
+            _hoverAbortController = new AbortController();
+
+            try {
+                const resp = await fetch(
+                    `http://${VNC_HOST}:${CONTROL_PORT}/inspect/element-at-point?x=${vmX}&y=${vmY}`,
+                    { signal: _hoverAbortController.signal }
+                );
+                const data = await resp.json();
+                if (data.ok && data.rect && isHoverInspectActive) {
+                    _positionInspectOverlay(data.rect, data.selector);
+                }
+            } catch {
+                // Aborted or network error — ignore
+            }
+        }
+
+        // Handle click-to-lock during hover-inspect
+        async function _handleHoverLock(vmX, vmY) {
+            // Deactivate hover mode first
+            deactivateHoverInspect();
+
+            // Commit the element via set-at-point
+            try {
+                const resp = await fetch(
+                    `http://${VNC_HOST}:${CONTROL_PORT}/inspect/set-at-point?x=${vmX}&y=${vmY}`
+                );
+                const data = await resp.json();
+                if (data.ok && data.rect) {
+                    showInspectOverlay(data.rect, data.selector);
+                    showToast(`Inspecting: ${data.selector}`, 'success');
+                    // Fetch and show detailed info panel
+                    _showInspectInfoPanel();
+                } else {
+                    showToast(data.error || 'Could not inspect element', 'error');
+                }
+            } catch (e) {
+                showToast('Failed to inspect element', 'error');
+            }
+        }
+
+        // Fetch element details and render host-side info panel
+        async function _showInspectInfoPanel() {
+            try {
+                const resp = await fetch(
+                    `http://${VNC_HOST}:${CONTROL_PORT}/inspect/element-details`,
+                    { signal: AbortSignal.timeout(2000) }
+                );
+                const d = await resp.json();
+                if (!d.ok) return;
+
+                // Build attributes HTML
+                let attrsHtml = '';
+                if (d.attributes && d.attributes.length > 0) {
+                    const lines = d.attributes.map(a =>
+                        `<span class="attr-name">${_esc(a.name)}</span>="<span class="attr-value">${_esc(a.value)}</span>"`
+                    ).join('<br>');
+                    attrsHtml = `<div class="info-section"><small>ATTRIBUTES</small><div class="info-section-content" style="font:11px monospace;">${lines}</div></div>`;
+                }
+
+                // Build text HTML
+                let textHtml = '';
+                if (d.text) {
+                    textHtml = `<div class="info-section"><small>TEXT</small><div class="info-section-content text-content">${_esc(d.text)}</div></div>`;
+                }
+
+                // Build styles HTML
+                const s = d.styles || {};
+                const stylesHtml = `<div class="info-section"><small>STYLES</small><div class="info-section-content styles-grid">
+                    <div>font: ${_esc(s.fontSize || '')}</div><div>color: ${_esc((s.color || '').slice(0,20))}</div>
+                    <div>bg: ${_esc((s.backgroundColor || '').slice(0,20))}</div><div>display: ${_esc(s.display || '')}</div>
+                    <div>position: ${_esc(s.position || '')}</div><div>family: ${_esc(s.fontFamily || '')}</div>
+                </div></div>`;
+
+                const r = d.rect || {};
+                const panelHtml = `
+                    <div class="panel-header"><b>Element Inspector</b><button class="panel-close" onclick="_dismissInspectInfoPanel()">\u00d7</button></div>
+                    <div class="panel-body">
+                        <div class="selector-box">${_esc(d.selector || '')}</div>
+                        <div class="info-grid">
+                            <div class="info-cell"><small>Size</small><br>${Math.round(r.width || 0)} \u00d7 ${Math.round(r.height || 0)}</div>
+                            <div class="info-cell"><small>Position</small><br>${Math.round(r.left || 0)}, ${Math.round(r.top || 0)}</div>
+                        </div>
+                        ${attrsHtml}${textHtml}${stylesHtml}
+                        <div class="panel-footer">Arrow keys to navigate \u2022 C to copy selector \u2022 Escape to dismiss</div>
+                    </div>`;
+
+                // Render as a vncOverlay element
+                vncOverlay.show('inspect-info-panel', null, {
+                    html: panelHtml,
+                    className: 'vnc-inspect-info-panel',
+                    style: { pointerEvents: 'auto' }
+                });
+            } catch {
+                // Silent fail — info panel is optional
+            }
+        }
+
+        function _dismissInspectInfoPanel() {
+            vncOverlay.dismiss('inspect-info-panel', true);
+        }
+
+        // HTML escape helper
+        function _esc(s) {
+            return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        }
+
+        // =============================================
         // CDP Setup Modal
         // =============================================
 
@@ -3400,6 +6068,84 @@
             closeCdpModal();
             // Open DevTools inside the VM
             toggleDevToolsInVM();
+        }
+
+        // Run Inspekt command and copy output to clipboard
+        async function runInspektForClipboard(command, label) {
+            try {
+                showToast(`Copying ${label}...`);
+                const response = await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/inspekt/${encodeURIComponent(command)}`);
+                const data = await response.json();
+                if (data.ok && data.output) {
+                    await navigator.clipboard.writeText(data.output.trim());
+                    showToast(`${label} copied!`, 'success');
+                } else {
+                    showToast(data.error || 'No selection found', 'error');
+                }
+            } catch (e) {
+                showToast('Failed: ' + e.message, 'error');
+            }
+        }
+
+        // Run a slow Inspekt command (AI-powered) with persistent loading toast
+        async function runInspektAI(command, loadingLabel, successLabel) {
+            try {
+                showToast(`${loadingLabel}...`, '', 60000);  // persistent toast during AI processing
+                const response = await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/inspekt/${encodeURIComponent(command)}`);
+                const data = await response.json();
+                if (data.ok && data.output) {
+                    await navigator.clipboard.writeText(data.output.trim());
+                    showToast(`${successLabel} copied to clipboard!`, 'success');
+                } else {
+                    showToast(data.error || 'Command failed', 'error');
+                }
+            } catch (e) {
+                showToast('Failed: ' + e.message, 'error');
+            }
+        }
+
+        // Download a screenshot from the given endpoint
+        async function screenshotToDownload(endpoint, filename) {
+            try {
+                showToast('Capturing screenshot...', '', 15000);
+                const resp = await fetch(`http://${VNC_HOST}:${CONTROL_PORT}${endpoint}`);
+                const data = await resp.json();
+                if (!data.ok) { showToast(data.error || 'Screenshot failed', 'error'); return; }
+                // Convert base64 to blob and trigger download
+                const byteChars = atob(data.data);
+                const byteArray = new Uint8Array(byteChars.length);
+                for (let i = 0; i < byteChars.length; i++) byteArray[i] = byteChars.charCodeAt(i);
+                const blob = new Blob([byteArray], { type: 'image/png' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                URL.revokeObjectURL(url);
+                showToast('Screenshot saved!', 'success');
+            } catch (e) {
+                showToast('Screenshot failed: ' + e.message, 'error');
+            }
+        }
+
+        // Show prompt dialog for "Ask" AI commands
+        function showAskDialog(scope) {
+            // scope: 'selection', 'inspected', or 'page'
+            const scopeLabels = { selection: 'selection', inspected: 'element', page: 'page' };
+            const question = prompt(`Ask about the ${scopeLabels[scope] || scope}:`);
+            if (!question || !question.trim()) return;
+
+            // Shell-quote the question so shlex.split() treats it as one token
+            const q = '"' + question.trim().replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '"';
+
+            let command;
+            if (scope === 'selection') command = `selection ask ${q}`;
+            else if (scope === 'inspected') command = `inspected ask ${q}`;
+            else command = `ask ${q}`;
+
+            runInspektAI(command, 'Thinking', 'Answer');
         }
 
         // Run Inspekt command
@@ -4076,6 +6822,11 @@
         let activeTabId = null;
         let draggedTab = null;
 
+        // Per-tab navigation history for back/forward buttons
+        const tabNavHistory = {};  // { tabId: { entries: [url, ...], index: -1 } }
+        const MAX_NAV_HISTORY = 50;
+        let navHistoryTarget = null;  // Expected URL from back/forward navigation
+
         // =============================================
         // Tab Thumbnail Management
         // =============================================
@@ -4087,6 +6838,9 @@
         const THUMBNAIL_HOVER_DELAY = 300;  // ms before showing thumbnail
         const THUMBNAIL_HIDE_DELAY = 100;   // ms delay before hiding (allows transition to next tab)
         let currentThumbnailTabId = null;  // Track which tab's thumbnail is showing
+        const thumbnailCache = {};      // {tabId: base64Data} — avoids redundant fetches
+        const lastKnownUrls = {};       // {tabId: url} — tracks URL changes to invalidate thumbnails
+        let thumbnailRequestId = 0;     // monotonic counter — guards against stale async responses
 
         function onTabActivated(tabId) {
             tabActivationTimes[tabId] = Date.now();
@@ -4103,6 +6857,7 @@
         async function captureTabThumbnail(tabId) {
             try {
                 await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/tabs/${tabId}/screenshot`);
+                delete thumbnailCache[tabId];
             } catch (e) {
                 console.warn('[Thumbnails] Failed to capture:', e);
             }
@@ -4123,9 +6878,10 @@
         }
 
         async function showThumbnail(tabId, tabElement) {
-            // Don't show thumbnail for active tab
-            if (tabId === activeTabId) {
-                console.log('[Thumbnail] showThumbnail: skipping active tab', tabId);
+            // Don't show thumbnail for about:blank or empty tabs — hide if currently visible
+            const tab = tabs.find(t => t.id === tabId);
+            if (tab && (!tab.url || tab.url === 'about:blank')) {
+                hideThumbnail();
                 return;
             }
 
@@ -4144,11 +6900,46 @@
             // If already showing a thumbnail, animate to new position with crossfade
             const isAlreadyVisible = preview.classList.contains('visible') || preview.classList.contains('moving');
 
-            console.log('[Thumbnail] showThumbnail:', tabId, 'isAlreadyVisible:', isAlreadyVisible, 'currentThumbnailTabId:', currentThumbnailTabId);
+            // Same tab already visible - just reposition if needed, no fetch
+            if (isAlreadyVisible && currentThumbnailTabId === tabId) {
+                preview.style.left = `${pos.left}px`;
+                preview.style.top = `${pos.top}px`;
+                return;
+            }
 
-            if (isAlreadyVisible && currentThumbnailTabId !== tabId) {
+            // Stale-response guard: increment counter, capture our request ID
+            const myRequestId = ++thumbnailRequestId;
+
+            // Helper to get thumbnail data (from cache or network)
+            async function getThumbnailData() {
+                // Check cache first
+                if (thumbnailCache[tabId]) {
+                    return thumbnailCache[tabId];
+                }
+
+                // For the active tab with no cache, trigger a live capture first
+                if (tabId === activeTabId) {
+                    try {
+                        await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/tabs/${tabId}/screenshot`);
+                    } catch (e) {
+                        // Ignore capture failure, still try to fetch thumbnail
+                    }
+                    // Stale check after await
+                    if (thumbnailRequestId !== myRequestId) return null;
+                }
+
+                const response = await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/tabs/${tabId}/thumbnail`);
+                const data = await response.json();
+
+                if (data.ok && data.thumbnail) {
+                    thumbnailCache[tabId] = data.thumbnail;
+                    return data.thumbnail;
+                }
+                return null;
+            }
+
+            if (isAlreadyVisible) {
                 // Moving to a different tab - animate position and crossfade
-                console.log('[Thumbnail] → ANIMATING to new position');
                 preview.classList.add('moving');
 
                 // Set new position (will animate due to CSS transition)
@@ -4157,36 +6948,38 @@
 
                 // Fetch new thumbnail and crossfade
                 try {
-                    const response = await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/tabs/${tabId}/thumbnail`);
-                    const data = await response.json();
+                    const base64 = await getThumbnailData();
+                    if (thumbnailRequestId !== myRequestId) return;  // stale
 
-                    if (data.ok && data.thumbnail) {
-                        // Load new image in the "next" slot
-                        nextImg.src = `data:image/jpeg;base64,${data.thumbnail}`;
+                    if (base64) {
+                        const dataUrl = `data:image/jpeg;base64,${base64}`;
 
-                        // Wait for image to load, then crossfade
-                        nextImg.onload = () => {
-                            // Crossfade: fade in next, fade out current
-                            nextImg.classList.add('thumbnail-current');
-                            nextImg.classList.remove('thumbnail-next');
-                            currentImg.classList.add('thumbnail-next');
-                            currentImg.classList.remove('thumbnail-current');
+                        // Preload image off-screen before showing
+                        const preload = new Image();
+                        preload.src = dataUrl;
+                        try { await preload.decode(); } catch (e) { /* fallback: show anyway */ }
+                        if (thumbnailRequestId !== myRequestId) return;  // stale
 
-                            // After crossfade completes, swap the images back for next time
-                            setTimeout(() => {
-                                currentImg.src = nextImg.src;
-                                currentImg.classList.add('thumbnail-current');
-                                currentImg.classList.remove('thumbnail-next');
-                                nextImg.classList.add('thumbnail-next');
-                                nextImg.classList.remove('thumbnail-current');
-                                nextImg.src = '';
-                            }, 350);
-                        };
+                        // Assign decoded image to the next slot (still opacity 0)
+                        nextImg.src = dataUrl;
+
+                        // Fade nextImg in over the still-visible currentImg
+                        requestAnimationFrame(() => {
+                            nextImg.style.opacity = '1';
+                        });
+
+                        // After crossfade completes, swap images back for next transition
+                        nextImg.addEventListener('transitionend', function onEnd() {
+                            nextImg.removeEventListener('transitionend', onEnd);
+                            currentImg.src = nextImg.src;
+                            // Reset inline opacity so classes take effect again
+                            nextImg.style.opacity = '';
+                            nextImg.src = '';
+                        }, { once: true });
 
                         // Update URL
-                        const tab = tabs.find(t => t.id === tabId);
                         if (tab) {
-                            urlDiv.textContent = tab.url;
+                            urlDiv.textContent = tab.url.replace(/^https?:\/\//, '');
                         }
 
                         currentThumbnailTabId = tabId;
@@ -4194,19 +6987,26 @@
                 } catch (e) {
                     console.warn('[Thumbnails] Failed to fetch:', e);
                 }
-            } else if (!isAlreadyVisible) {
+            } else {
                 // First show - no animation, just appear
                 try {
-                    const response = await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/tabs/${tabId}/thumbnail`);
-                    const data = await response.json();
+                    const base64 = await getThumbnailData();
+                    if (thumbnailRequestId !== myRequestId) return;  // stale
 
-                    if (data.ok && data.thumbnail) {
-                        currentImg.src = `data:image/jpeg;base64,${data.thumbnail}`;
+                    if (base64) {
+                        const dataUrl = `data:image/jpeg;base64,${base64}`;
+
+                        // Preload image off-screen before showing
+                        const preload = new Image();
+                        preload.src = dataUrl;
+                        try { await preload.decode(); } catch (e) { /* fallback: show anyway */ }
+                        if (thumbnailRequestId !== myRequestId) return;  // stale
+
+                        currentImg.src = dataUrl;
 
                         // Update URL
-                        const tab = tabs.find(t => t.id === tabId);
                         if (tab) {
-                            urlDiv.textContent = tab.url;
+                            urlDiv.textContent = tab.url.replace(/^https?:\/\//, '');
                         }
 
                         // Set position BEFORE making visible (fixes top-left jump)
@@ -4233,23 +7033,31 @@
 
         function hideThumbnail() {
             // Use a delay so that moving between tabs allows smooth transition
-            console.log('[Thumbnail] hideThumbnail called, scheduling hide in', THUMBNAIL_HIDE_DELAY, 'ms');
             clearTimeout(thumbnailHideTimeout);
             thumbnailHideTimeout = setTimeout(() => {
-                console.log('[Thumbnail] hide timeout fired, hiding now');
+                // Invalidate any in-flight showThumbnail() calls
+                thumbnailRequestId++;
                 const preview = document.getElementById('thumbnailPreview');
                 preview.classList.remove('visible');
                 preview.classList.remove('moving');
                 currentThumbnailTabId = null;
+                // Reset crossfade state so next show starts clean
+                const nextImg = preview.querySelector('.thumbnail-next');
+                if (nextImg) { nextImg.style.opacity = ''; nextImg.src = ''; }
             }, THUMBNAIL_HIDE_DELAY);
         }
 
         function hideThumbnailImmediately() {
             clearTimeout(thumbnailHideTimeout);
+            // Invalidate any in-flight showThumbnail() calls
+            thumbnailRequestId++;
             const preview = document.getElementById('thumbnailPreview');
             preview.classList.remove('visible');
             preview.classList.remove('moving');
             currentThumbnailTabId = null;
+            // Reset crossfade state so next show starts clean
+            const nextImg = preview.querySelector('.thumbnail-next');
+            if (nextImg) { nextImg.style.opacity = ''; nextImg.src = ''; }
         }
 
         // =============================================
@@ -4498,7 +7306,16 @@
                         }
                     });
 
+                    // Invalidate thumbnail cache for tabs whose URL changed
+                    tabs.forEach(tab => {
+                        if (lastKnownUrls[tab.id] && lastKnownUrls[tab.id] !== tab.url) {
+                            delete thumbnailCache[tab.id];
+                        }
+                        lastKnownUrls[tab.id] = tab.url;
+                    });
+
                     renderTabs();
+                    fetchThemeColors(); // async, non-blocking
 
                     // Update URL bar if we have an active tab
                     const activeTab = tabs.find(t => t.id === activeTabId) || tabs[0];
@@ -4512,21 +7329,91 @@
                         if (!tabActivationTimes[activeTabId]) {
                             onTabActivated(activeTabId);
                         }
-                        const urlBar = document.getElementById('urlBar');
-                        if (document.activeElement !== urlBar) {
-                            urlBar.value = activeTab.url;
-                            currentUrl = activeTab.url;
+                        // Don't overwrite URL bar when viewing an internal page —
+                        // Chrome's URL may differ from the native iframe's URL.
+                        if (!internalTabs[activeTabId]) {
+                            const urlBar = document.getElementById('urlBar');
+                            if (document.activeElement !== urlBar) {
+                                currentUrl = activeTab.url;
+                                urlBar.value = displayUrl(currentUrl, false);
+                            }
+
+                            // Detect internal URLs on tab sync (including startup).
+                            // Also picks up the pending state from checkInitialInternalUrl().
+                            if (isInternalUrl(activeTab.url)) {
+                                internalTabs[activeTabId] = activeTab.url;
+                                showNativeView(resolveInternalUrl(activeTab.url));
+                                updateCloudIconState(activeTab.url);
+                            }
+                        }
+                        if (_pendingInternalUrl) {
+                            _pendingInternalUrl = null;
                         }
                     }
+                    // Update back/forward button state
+                    fetchHistoryState();
                 }
             } catch (e) {
                 console.error('[Tabs] Failed to fetch tabs:', e);
             }
         }
 
+        // Tab theme colors cache: {tabId: colorString}
+        const tabThemeColors = {};
+        let themeColorFetchPending = false;
+
+        async function fetchThemeColors() {
+            if (themeColorFetchPending) return;
+            themeColorFetchPending = true;
+            try {
+                const resp = await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/tabs/theme-colors`, {
+                    signal: AbortSignal.timeout(3000)
+                });
+                const data = await resp.json();
+                if (data.ok && data.colors) {
+                    // Update cache and apply to DOM
+                    let changed = false;
+                    for (const [tabId, color] of Object.entries(data.colors)) {
+                        if (tabThemeColors[tabId] !== color) {
+                            tabThemeColors[tabId] = color;
+                            changed = true;
+                        }
+                    }
+                    // Remove stale entries
+                    for (const tabId of Object.keys(tabThemeColors)) {
+                        if (!(tabId in data.colors)) {
+                            delete tabThemeColors[tabId];
+                            changed = true;
+                        }
+                    }
+                    if (changed) applyThemeColors();
+                }
+            } catch (e) {
+                // Silent fail — theme colors are cosmetic
+            } finally {
+                themeColorFetchPending = false;
+            }
+        }
+
+        function applyThemeColors() {
+            document.querySelectorAll('.tab').forEach(tabEl => {
+                const tabId = tabEl.dataset.tabId;
+                const color = tabThemeColors[tabId];
+                if (color) {
+                    // Parse the color and apply as a translucent tint
+                    tabEl.style.setProperty('--tab-theme-color', color);
+                    tabEl.classList.add('has-theme-color');
+                } else {
+                    tabEl.style.removeProperty('--tab-theme-color');
+                    tabEl.classList.remove('has-theme-color');
+                }
+            });
+        }
+
         // Render tabs in the tab bar (smart update to avoid flicker)
         function renderTabs() {
             const container = document.getElementById('tabsContainer');
+            const newTabBtn = container.querySelector('.new-tab-btn');
             const existingTabEls = container.querySelectorAll('.tab');
             const existingTabMap = new Map();
 
@@ -4538,20 +7425,24 @@
             // Track which tabs we've processed
             const processedIds = new Set();
 
+            // Get only .tab children (exclude the new-tab button) for index calculations
+            const tabChildren = () => Array.from(container.querySelectorAll('.tab'));
+
             tabs.forEach((tab, index) => {
                 processedIds.add(tab.id);
                 let tabEl = existingTabMap.get(tab.id);
 
                 if (tabEl) {
                     // Update existing tab element (no DOM recreation = no flicker)
-                    tabEl.className = 'tab' + (tab.id === activeTabId ? ' active' : '');
+                    const wasLoading = tabEl.classList.contains('loading');
+                    tabEl.className = 'tab' + (tab.id === activeTabId ? ' active' : '') + (wasLoading ? ' loading' : '');
                     tabEl.dataset.index = index;
 
                     // Update title
                     const titleEl = tabEl.querySelector('.tab-title');
                     if (titleEl) {
                         titleEl.textContent = tab.title || 'New Tab';
-                        titleEl.title = tab.title + '\n' + tab.url;
+                        titleEl.title = tab.title || 'New Tab';
                     }
 
                     // Update close button visibility
@@ -4559,7 +7450,7 @@
                     if (tabs.length > 1 && !closeBtn) {
                         closeBtn = document.createElement('button');
                         closeBtn.className = 'tab-close';
-                        closeBtn.innerHTML = '×';
+                        closeBtn.innerHTML = '<svg width="8" height="8" viewBox="0 0 8 8"><path d="M1 1l6 6M7 1l-6 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>';
                         closeBtn.title = 'Close tab';
                         closeBtn.onclick = (e) => {
                             e.stopPropagation();
@@ -4571,26 +7462,32 @@
                     }
 
                     // Move to correct position if needed
-                    const currentIndex = Array.from(container.children).indexOf(tabEl);
+                    const currentTabs = tabChildren();
+                    const currentIndex = currentTabs.indexOf(tabEl);
                     if (currentIndex !== index) {
                         if (index === 0) {
                             container.prepend(tabEl);
                         } else {
-                            const prevTab = container.children[index - 1];
+                            const currentTabs2 = tabChildren();
+                            const prevTab = currentTabs2[index - 1];
                             if (prevTab) {
                                 prevTab.after(tabEl);
                             }
                         }
                     }
                 } else {
-                    // Create new tab element
+                    // Create new tab element — insert before the "+" button
                     tabEl = createTabElement(tab, index);
                     if (index === 0) {
                         container.prepend(tabEl);
-                    } else if (container.children[index - 1]) {
-                        container.children[index - 1].after(tabEl);
                     } else {
-                        container.appendChild(tabEl);
+                        const currentTabs = tabChildren();
+                        const prevTab = currentTabs[index - 1];
+                        if (prevTab) {
+                            prevTab.after(tabEl);
+                        } else {
+                            container.insertBefore(tabEl, newTabBtn);
+                        }
                     }
                 }
             });
@@ -4601,6 +7498,12 @@
                     el.remove();
                 }
             });
+
+            // Scroll active tab into view (e.g. when many tabs overflow)
+            const activeEl = container.querySelector('.tab.active');
+            if (activeEl) {
+                activeEl.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+            }
         }
 
         // Create a new tab element
@@ -4631,18 +7534,23 @@
                 tabEl.appendChild(placeholder);
             }
 
+            // Loading spinner (hidden by default, shown via .tab.loading CSS)
+            const spinner = document.createElement('div');
+            spinner.className = 'tab-favicon-spinner';
+            tabEl.appendChild(spinner);
+
             // Title
             const title = document.createElement('span');
             title.className = 'tab-title';
             title.textContent = tab.title || 'New Tab';
-            title.title = tab.title + '\n' + tab.url;
+            title.title = tab.title || 'New Tab';
             tabEl.appendChild(title);
 
             // Close button (only show if more than 1 tab)
             if (tabs.length > 1) {
                 const closeBtn = document.createElement('button');
                 closeBtn.className = 'tab-close';
-                closeBtn.innerHTML = '×';
+                closeBtn.innerHTML = '<svg width="8" height="8" viewBox="0 0 8 8"><path d="M1 1l6 6M7 1l-6 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>';
                 closeBtn.title = 'Close tab';
                 closeBtn.onclick = (e) => {
                     e.stopPropagation();
@@ -4653,6 +7561,11 @@
 
             // Click to activate
             tabEl.onclick = () => activateTab(tab.id);
+            tabEl.oncontextmenu = (e) => showTabContextMenu(e, tab.id);
+            tabEl.onmousedown = () => {
+                clearTimeout(thumbnailHoverTimeout);
+                hideThumbnailImmediately();
+            };
 
             // Hover events for thumbnail preview
             tabEl.onmouseenter = () => {
@@ -4663,26 +7576,19 @@
                 const preview = document.getElementById('thumbnailPreview');
                 const isVisible = preview.classList.contains('visible') || preview.classList.contains('moving');
 
-                console.log('[Thumbnail] mouseenter tab:', tab.id, 'isVisible:', isVisible, 'currentThumbnailTabId:', currentThumbnailTabId);
-
                 if (isVisible && currentThumbnailTabId !== tab.id) {
                     // Thumbnail already showing for different tab - transition immediately
-                    console.log('[Thumbnail] → transitioning to new tab immediately');
                     clearTimeout(thumbnailHoverTimeout);
                     showThumbnail(tab.id, tabEl);
                 } else if (!isVisible) {
                     // Not visible - use normal delay
-                    console.log('[Thumbnail] → not visible, using delay');
                     clearTimeout(thumbnailHoverTimeout);
                     thumbnailHoverTimeout = setTimeout(() => {
                         showThumbnail(tab.id, tabEl);
                     }, THUMBNAIL_HOVER_DELAY);
-                } else {
-                    console.log('[Thumbnail] → same tab, ignoring');
                 }
             };
             tabEl.onmouseleave = () => {
-                console.log('[Thumbnail] mouseleave tab:', tab.id);
                 clearTimeout(thumbnailHoverTimeout);
                 hideThumbnail();
             };
@@ -4701,12 +7607,16 @@
         // Create a new tab
         async function createNewTab() {
             try {
-                const response = await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/tabs/new?url=about:blank`);
+                const response = await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/tabs/new?url=http://inspekt/status`);
                 const data = await response.json();
                 if (data.ok) {
                     activeTabId = data.tab.id;
                     await fetchTabs();
                     showToast('New tab created', 'success');
+                    // Focus address bar and select text for immediate typing
+                    const urlBar = document.getElementById('urlBar');
+                    urlBar.focus();
+                    urlBar.select();
                 } else {
                     showToast(data.error || 'Failed to create tab', 'error');
                 }
@@ -4719,10 +7629,33 @@
         async function activateTab(tabId) {
             if (tabId === activeTabId) return;
 
+            // Save inspect state for the tab we're leaving
+            if (activeTabId) {
+                _tabInspectState[activeTabId] = { wasTracking: _inspectTrackingActive };
+                if (_inspectTrackingActive) {
+                    _stopInspectTracking();
+                    vncOverlay.dismiss('inspect-highlight', false);
+                    vncOverlay.dismiss('inspect-tooltip', false);
+                }
+            }
+
             // Capture thumbnail of current tab before switching (if user spent enough time)
             if (activeTabId && shouldCaptureThumbnail(activeTabId)) {
                 // Fire and forget - don't wait for screenshot
                 captureTabThumbnail(activeTabId);
+            }
+
+            // If switching to an internal tab, skip CDP activation — just swap viewport
+            if (internalTabs[tabId]) {
+                activeTabId = tabId;
+                onTabActivated(tabId);
+                renderTabs();
+                currentUrl = internalTabs[tabId];
+                document.getElementById('urlBar').value = currentUrl;
+                updateCloudIconState(currentUrl);
+                fetchHistoryState();
+                syncViewport();
+                return;
             }
 
             try {
@@ -4732,11 +7665,32 @@
                     activeTabId = tabId;
                     onTabActivated(tabId);  // Track when this tab became active
                     renderTabs();
+                    applyThemeColors();
                     // Update URL bar
                     const tab = tabs.find(t => t.id === tabId);
                     if (tab) {
-                        document.getElementById('urlBar').value = tab.url;
                         currentUrl = tab.url;
+                        document.getElementById('urlBar').value = displayUrl(currentUrl, false);
+                        updateCloudIconState(currentUrl);
+                    }
+                    fetchHistoryState();  // Refresh back/forward buttons for this tab
+
+                    // Switching to a normal tab — ensure VNC is visible
+                    syncViewport();
+
+                    // Restore inspect state for the tab we're switching to
+                    const saved = _tabInspectState[tabId];
+                    if (saved?.wasTracking) {
+                        try {
+                            const resp = await fetch(
+                                `http://${VNC_HOST}:${CONTROL_PORT}/inspect/get-rect?tab=${tabId}`,
+                                { signal: AbortSignal.timeout(500) }
+                            );
+                            const rectData = await resp.json();
+                            if (rectData.ok && rectData.rect) {
+                                showInspectOverlay(rectData.rect, rectData.selector);
+                            }
+                        } catch {}
                     }
                 } else {
                     showToast(data.error || 'Failed to switch tab', 'error');
@@ -4748,6 +7702,11 @@
 
         // Close a tab
         async function closeTab(tabId) {
+            delete thumbnailCache[tabId];
+            delete lastKnownUrls[tabId];
+            delete tabNavHistory[tabId];
+            delete _tabInspectState[tabId];
+            delete internalTabs[tabId];
             try {
                 const response = await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/tabs/${tabId}/close`);
                 const data = await response.json();
@@ -4766,6 +7725,583 @@
                 }
             } catch (e) {
                 showToast('Failed to close tab', 'error');
+            }
+        }
+
+        // =============================================
+        // VNC Overlay Manager (host-side highlights)
+        // =============================================
+
+        const vncOverlay = {
+            _container: null,
+            _overlays: {},
+
+            _ensureContainer() {
+                if (this._container) return this._container;
+                const c = document.createElement('div');
+                c.id = 'vncOverlayContainer';
+                document.getElementById('vncContainer').appendChild(c);
+                this._container = c;
+                return c;
+            },
+
+            show(id, rect, options = {}) {
+                this._ensureContainer();
+                let entry = this._overlays[id];
+                if (!entry) {
+                    const el = document.createElement('div');
+                    el.dataset.overlayId = id;
+                    el.style.position = 'absolute';
+                    el.style.pointerEvents = 'none';
+                    this._container.appendChild(el);
+                    entry = { element: el };
+                    this._overlays[id] = entry;
+                }
+                const el = entry.element;
+                if (rect) {
+                    el.style.left = rect.left + 'px';
+                    el.style.top = rect.top + 'px';
+                    if (rect.width != null) el.style.width = rect.width + 'px';
+                    if (rect.height != null) el.style.height = rect.height + 'px';
+                }
+                if (options.text !== undefined) el.textContent = options.text;
+                else if (options.html !== undefined) el.innerHTML = options.html;
+                if (options.className) el.className = options.className;
+                if (options.style) Object.assign(el.style, options.style);
+                el.style.display = 'block';
+                return el;
+            },
+
+            update(id, rect) {
+                const entry = this._overlays[id];
+                if (!entry) return;
+                const el = entry.element;
+                if (rect.left != null) el.style.left = rect.left + 'px';
+                if (rect.top != null) el.style.top = rect.top + 'px';
+                if (rect.width != null) el.style.width = rect.width + 'px';
+                if (rect.height != null) el.style.height = rect.height + 'px';
+            },
+
+            dismiss(id, animate = true) {
+                const entry = this._overlays[id];
+                if (!entry) return;
+                const el = entry.element;
+                if (animate) {
+                    el.style.transition = 'opacity 0.15s ease';
+                    el.style.opacity = '0';
+                    setTimeout(() => {
+                        el.remove();
+                        delete this._overlays[id];
+                    }, 150);
+                } else {
+                    el.remove();
+                    delete this._overlays[id];
+                }
+            },
+
+            dismissAll(animate = false) {
+                for (const id of Object.keys(this._overlays)) {
+                    this.dismiss(id, animate);
+                }
+            },
+
+            isVisible(id) { return !!this._overlays[id]; }
+        };
+
+        // --- Inspect overlay tracking state ---
+        let _inspectTrackingInterval = null;
+        let _inspectTrackingActive = false;
+        let _lastInspectMeta = {};  // { siblingIndex, siblingCount }
+        const _tabInspectState = {};  // { tabId: { wasTracking: bool } }
+
+        function _positionInspectOverlay(rect, selector, meta) {
+            // Update sibling metadata if provided
+            if (meta && meta.siblingIndex) {
+                _lastInspectMeta = { siblingIndex: meta.siblingIndex, siblingCount: meta.siblingCount };
+            }
+            const isNew = !vncOverlay.isVisible('inspect-highlight');
+
+            if (isNew) {
+                // First show: create with entering class, then remove to trigger fade-in
+                vncOverlay.show('inspect-highlight', rect, { className: 'vnc-overlay-highlight entering' });
+                requestAnimationFrame(() => {
+                    const entry = vncOverlay._overlays['inspect-highlight'];
+                    if (entry) entry.element.classList.remove('entering');
+                });
+            } else {
+                // Subsequent updates: just move — CSS transition handles the animation
+                vncOverlay.update('inspect-highlight', rect);
+            }
+
+            // Tooltip: position + content (with optional sibling index)
+            let tooltipText = selector;
+            if (_lastInspectMeta.siblingIndex && _lastInspectMeta.siblingCount > 1) {
+                tooltipText += ` (${_lastInspectMeta.siblingIndex}/${_lastInspectMeta.siblingCount})`;
+            }
+            tooltipText += ' \u2022 ' + Math.round(rect.width) + '\u00d7' + Math.round(rect.height);
+            const tooltipTop = rect.top >= 28 ? rect.top - 28 : rect.top + rect.height + 4;
+            const tooltipLeft = Math.max(0, rect.left);
+            const tooltipRect = { left: tooltipLeft, top: tooltipTop };
+
+            if (isNew) {
+                vncOverlay.show('inspect-tooltip', null, {
+                    className: 'vnc-overlay-tooltip entering',
+                    text: tooltipText,
+                    style: { left: tooltipLeft + 'px', top: tooltipTop + 'px', width: 'auto', height: 'auto' }
+                });
+                requestAnimationFrame(() => {
+                    const entry = vncOverlay._overlays['inspect-tooltip'];
+                    if (entry) entry.element.classList.remove('entering');
+                });
+            } else {
+                // Move tooltip and update text — CSS transition handles position
+                const entry = vncOverlay._overlays['inspect-tooltip'];
+                if (entry) {
+                    entry.element.style.left = tooltipLeft + 'px';
+                    entry.element.style.top = tooltipTop + 'px';
+                    entry.element.textContent = tooltipText;
+                }
+            }
+        }
+
+        function _stopInspectTracking() {
+            if (_inspectTrackingInterval) {
+                clearTimeout(_inspectTrackingInterval);
+                _inspectTrackingInterval = null;
+            }
+            _inspectTrackingActive = false;
+            // Also dismiss the info panel when tracking stops
+            _dismissInspectInfoPanel();
+            updateInspectButton();
+        }
+
+        async function _pollInspectRect() {
+            if (!_inspectTrackingActive) return;
+            try {
+                const resp = await fetch(
+                    `http://${VNC_HOST}:${CONTROL_PORT}/inspect/get-rect`,
+                    { signal: AbortSignal.timeout(500) }
+                );
+                const data = await resp.json();
+                if (data.ok && data.rect && _inspectTrackingActive) {
+                    _positionInspectOverlay(data.rect, data.selector, data);
+                } else if (!data.ok && _inspectTrackingActive) {
+                    // Element disconnected from DOM (navigated away, etc.)
+                    _stopInspectTracking();
+                    vncOverlay.dismiss('inspect-highlight', true);
+                    vncOverlay.dismiss('inspect-tooltip', true);
+                    return;
+                }
+            } catch {
+                // Network error — skip this tick
+            }
+            // Schedule next poll only AFTER this one completes (no overlap)
+            if (_inspectTrackingActive) {
+                _inspectTrackingInterval = setTimeout(_pollInspectRect, 200);
+            }
+        }
+
+        function showInspectOverlay(rect, selector) {
+            _stopInspectTracking();
+            vncOverlay.dismiss('inspect-highlight', false);
+            vncOverlay.dismiss('inspect-tooltip', false);
+            _lastInspectMeta = {};  // Reset sibling info for fresh inspection
+            if (!rect || !rect.width || !rect.height) return;
+
+            // Show initial position immediately
+            _positionInspectOverlay(rect, selector);
+
+            // Start polling to track scroll, resize, and font size changes.
+            // Uses chained setTimeout (not setInterval) to prevent request pile-up.
+            _inspectTrackingActive = true;
+            _inspectTrackingInterval = setTimeout(_pollInspectRect, 200);
+        }
+
+        // --- DOM navigation via arrow keys ---
+        let _inspectNavPending = false;
+
+        async function _navigateInspect(direction) {
+            if (_inspectNavPending || !_inspectTrackingActive) return;
+            _inspectNavPending = true;
+            try {
+                const resp = await fetch(
+                    `http://${VNC_HOST}:${CONTROL_PORT}/inspect/navigate?direction=${direction}`,
+                    { signal: AbortSignal.timeout(1000) }
+                );
+                const data = await resp.json();
+                if (data.ok && data.rect) {
+                    _positionInspectOverlay(data.rect, data.selector, data);
+                    // Flash tooltip orange on auto-climb (moved to parent because no sibling)
+                    if (data.autoClimbed) {
+                        const entry = vncOverlay._overlays['inspect-tooltip'];
+                        if (entry) {
+                            entry.element.style.background = 'linear-gradient(135deg, #e67e22, #d35400)';
+                            setTimeout(() => {
+                                if (vncOverlay._overlays['inspect-tooltip'])
+                                    vncOverlay._overlays['inspect-tooltip'].element.style.background = '';
+                            }, 600);
+                        }
+                    }
+                }
+                // If !ok, element doesn't exist in that direction — just stay put
+            } catch {
+                // Network error — ignore
+            } finally {
+                _inspectNavPending = false;
+            }
+        }
+
+        // Arrow key + shortcut handler for DOM navigation (only active when inspect overlay is showing)
+        document.addEventListener('keydown', (e) => {
+            if (!_inspectTrackingActive || activeContextMenu) return;
+
+            // Copy selector with 'c' key
+            if (e.key === 'c' && !e.metaKey && !e.ctrlKey) {
+                e.preventDefault();
+                const entry = vncOverlay._overlays['inspect-tooltip'];
+                if (entry) {
+                    const selector = entry.element.textContent.split(' \u2022 ')[0].split(' (')[0];
+                    navigator.clipboard.writeText(selector);
+                    showToast(`Copied: ${selector}`, 'success');
+                }
+                return;
+            }
+
+            const directionMap = {
+                'ArrowUp': 'up',
+                'ArrowDown': 'down',
+                'ArrowLeft': 'left',
+                'ArrowRight': 'right'
+            };
+            const direction = directionMap[e.key];
+            if (!direction) return;
+
+            e.preventDefault();
+            _navigateInspect(direction);
+        });
+
+        // =============================================
+        // Context Menu (generic, reusable)
+        // =============================================
+
+        let activeContextMenu = null;
+
+        function showContextMenu(e, items) {
+            dismissContextMenu(true);  // skip animation when replacing
+
+            const menu = document.createElement('div');
+            menu.className = 'context-menu';
+            menu.setAttribute('role', 'menu');
+
+            // Suppress real browser context menu inside our menu
+            menu.addEventListener('contextmenu', ev => ev.preventDefault());
+
+            items.forEach((item, i) => {
+                if (item.hidden) return;
+                if (item.separator) {
+                    const sep = document.createElement('div');
+                    sep.setAttribute('role', 'separator');
+                    menu.appendChild(sep);
+                    return;
+                }
+                // Navigation icon row (Back / Forward / Reload as icons)
+                if (item.navRow) {
+                    const row = document.createElement('div');
+                    row.className = 'context-menu-nav';
+                    item.navRow.forEach(nav => {
+                        const btn = document.createElement('button');
+                        const tpl = document.createElement('template');
+                        tpl.innerHTML = nav.icon;
+                        btn.appendChild(tpl.content.firstChild);
+                        btn.setAttribute('aria-label', nav.label);
+                        btn.title = nav.label;
+                        btn.disabled = !!nav.disabled;
+                        btn.onclick = () => { dismissContextMenu(); nav.action(); };
+                        row.appendChild(btn);
+                    });
+                    menu.appendChild(row);
+                    return;
+                }
+                const btn = document.createElement('button');
+                btn.setAttribute('role', 'menuitem');
+                btn.textContent = item.label;
+                btn.disabled = !!item.disabled;
+                btn.tabIndex = -1;
+                btn.onclick = () => { dismissContextMenu(); item.action(); };
+                menu.appendChild(btn);
+            });
+
+            document.body.appendChild(menu);
+            activeContextMenu = menu;
+
+            // Position: keep within viewport
+            const rect = menu.getBoundingClientRect();
+            let x = e.clientX;
+            let y = e.clientY;
+            if (x + rect.width > window.innerWidth) x = window.innerWidth - rect.width - 4;
+            if (y + rect.height > window.innerHeight) y = window.innerHeight - rect.height - 4;
+            menu.style.left = x + 'px';
+            menu.style.top = y + 'px';
+
+            // Dismiss on outside click, Escape, or window blur (cross-origin VNC iframe click)
+            // Next tick to avoid the originating right-click from immediately dismissing
+            requestAnimationFrame(() => {
+                document.addEventListener('mousedown', onMenuOutsideClick);
+                document.addEventListener('keydown', handleMenuKeydown);
+                window.addEventListener('blur', onMenuBlur);
+            });
+        }
+
+        function handleMenuKeydown(e) {
+            if (!activeContextMenu) return;
+            if (e.key === 'Escape') {
+                e.preventDefault();
+                dismissContextMenu();
+                return;
+            }
+            const items = Array.from(activeContextMenu.querySelectorAll('[role="menuitem"]:not(:disabled)'));
+            const idx = items.indexOf(document.activeElement);
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                items[(idx + 1) % items.length].focus();
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                items[(idx - 1 + items.length) % items.length].focus();
+            }
+        }
+
+        function onMenuOutsideClick(e) {
+            if (activeContextMenu && !activeContextMenu.contains(e.target)) {
+                dismissContextMenu();
+            }
+        }
+
+        function onMenuBlur() {
+            dismissContextMenu();
+        }
+
+        function dismissContextMenu(immediate) {
+            if (!activeContextMenu) return;
+            document.removeEventListener('mousedown', onMenuOutsideClick);
+            document.removeEventListener('keydown', handleMenuKeydown);
+            window.removeEventListener('blur', onMenuBlur);
+            if (immediate === true) {
+                activeContextMenu.remove();
+                activeContextMenu = null;
+                return;
+            }
+            const menu = activeContextMenu;
+            activeContextMenu = null;
+            menu.classList.add('closing');
+            menu.addEventListener('animationend', () => menu.remove(), { once: true });
+        }
+
+        // Tab context menu (thin wrapper)
+        function showTabContextMenu(e, tabId) {
+            e.preventDefault();
+            const tab = tabs.find(t => t.id === tabId);
+            if (!tab) return;
+
+            const items = [
+                { label: tab.pinned ? 'Unpin Tab' : 'Pin Tab', action: () => togglePinTab(tabId) },
+                { label: 'Refresh Tab', action: () => refreshTab(tabId) },
+                { label: 'Duplicate Tab', action: () => duplicateTab(tabId) },
+                { separator: true },
+                { label: 'Open in Host Browser', action: () => openInHostBrowser(tabId) },
+                { separator: true },
+                { label: 'Close Tab', action: () => closeTab(tabId), disabled: tabs.length <= 1 },
+                { label: 'Close Other Tabs', action: () => closeOtherTabs(tabId), disabled: tabs.length <= 1 },
+            ];
+
+            showContextMenu(e, items);
+        }
+
+        // =============================================
+        // VNC Viewport Context Menu
+        // =============================================
+
+        function canGoBack() {
+            if (!activeTabId) return false;
+            return getNavHistory(activeTabId).index > 0;
+        }
+
+        function canGoForward() {
+            if (!activeTabId) return false;
+            const h = getNavHistory(activeTabId);
+            return h.index < h.entries.length - 1;
+        }
+
+        function copyToClipboard(text) {
+            navigator.clipboard.writeText(text).then(() => {
+                showToast('Copied!', 'success');
+            }).catch(() => {
+                showToast('Failed to copy', 'error');
+            });
+        }
+
+        async function showVNCContextMenu(pageX, pageY, vmX, vmY) {
+            // Clear any previous host-side overlays when opening a new context menu
+            if (activeTabId) _tabInspectState[activeTabId] = { wasTracking: false };
+            _stopInspectTracking();
+            vncOverlay.dismissAll();
+
+            // Fetch element info from VM browser (with timeout).
+            // This also eagerly sets __INSPEKT_INSPECTED_ELEMENT__ for inspected * commands.
+            let info = { selectedText: '', isImage: false, imageSrc: '', isLink: false, linkHref: '', elementTag: '', elementSelector: '' };
+            try {
+                const controller = new AbortController();
+                const timeout = setTimeout(() => controller.abort(), 2000);
+                const resp = await fetch(
+                    `http://${VNC_HOST}:${CONTROL_PORT}/context-menu-info?x=${vmX}&y=${vmY}`,
+                    { signal: controller.signal }
+                );
+                clearTimeout(timeout);
+                const data = await resp.json();
+                if (data.ok) info = data;
+            } catch (e) {
+                // Graceful degradation — show menu with defaults
+            }
+
+            const hasSelection = !!info.selectedText;
+            const hasLink = !!info.linkHref;
+            const hasImage = info.isImage;
+            const hasElement = !!info.elementTag;
+            const selectorLabel = info.elementSelector || info.elementTag || 'element';
+
+            // Build contextual menu — only show sections relevant to what was right-clicked
+            const items = [];
+
+            // --- Navigation row (always shown) ---
+            items.push({ navRow: [
+                { label: 'Reload', icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>', action: () => reloadPage() },
+                { label: 'Back', icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>', action: () => goBack(), disabled: !canGoBack() },
+                { label: 'Forward', icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 4l-1.41 1.41L16.17 11H4v2h12.17l-5.58 5.59L12 20l8-8z"/></svg>', action: () => goForward(), disabled: !canGoForward() },
+            ] });
+            items.push({ separator: true });
+
+            // --- Selection section (only when text is selected) ---
+            if (hasSelection) {
+                items.push({ label: 'Copy as Text', action: () => runInspektForClipboard('selection text --raw', 'Text') });
+                items.push({ label: 'Copy as Markdown', action: () => runInspektForClipboard('selection markdown --raw', 'Markdown') });
+                items.push({ label: 'Copy as HTML (Original)', action: () => runInspektForClipboard('selection html --raw', 'HTML') });
+                items.push({ label: 'Copy as HTML (Cleaned up)', action: () => runInspektForClipboard('selection html --compact --raw', 'Cleaned up HTML') });
+                items.push({ separator: true });
+                items.push({ label: 'Describe Selection', action: () => runInspektAI('selection describe', 'Describing selection', 'Description') });
+                items.push({ label: 'Ask About Selection\u2026', action: () => showAskDialog('selection') });
+                items.push({ separator: true });
+            }
+
+            // --- Link section (only when right-clicking a link) ---
+            if (hasLink) {
+                items.push({ label: 'Open Link in New Tab', action: () => openLinkInNewTab(info.linkHref) });
+                items.push({ label: 'Open Link in Host Browser', action: () => window.open(info.linkHref, '_blank') });
+                items.push({ label: 'Copy Link Address', action: () => copyToClipboard(info.linkHref) });
+                items.push({ separator: true });
+            }
+
+            // --- Image section (only when right-clicking an image) ---
+            if (hasImage) {
+                items.push({ label: 'Copy Image URL', action: () => copyToClipboard(info.imageSrc) });
+                items.push({ separator: true });
+            }
+
+            // --- Element section (always available — right-click always has a target) ---
+            if (hasElement) {
+                items.push({ label: `Inspect \u2039${selectorLabel}\u203A`, action: async () => {
+                    // Call set-at-point to set inspected element and get its rect
+                    try {
+                        const resp = await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/inspect/set-at-point?x=${vmX}&y=${vmY}`);
+                        const data = await resp.json();
+                        if (data.ok) {
+                            // Show host-side overlay (crisp, no DOM pollution)
+                            showInspectOverlay(data.rect, data.selector || selectorLabel);
+                            showToast(`Inspecting: ${data.selector || selectorLabel}`, 'success');
+                            // Show detailed info panel
+                            _showInspectInfoPanel();
+                        } else {
+                            showToast(data.error || 'Could not inspect element', 'error');
+                        }
+                    } catch (e) {
+                        showToast('Failed to inspect element', 'error');
+                    }
+                }});
+                items.push({ label: 'Copy Element HTML', action: () => runInspektForClipboard('inspected html --raw', 'Element HTML') });
+                items.push({ label: 'Copy Element Text', action: () => runInspektForClipboard('inspected text --raw', 'Element text') });
+                items.push({ label: 'Describe Element', action: () => runInspektAI('inspected describe', 'Describing element', 'Element description') });
+                items.push({ label: 'Ask About Element\u2026', action: () => showAskDialog('inspected') });
+                items.push({ separator: true });
+            }
+
+            // --- Screenshot section (always available) ---
+            items.push({ label: 'Screenshot Viewport', action: () => {
+                const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+                screenshotToDownload('/screenshot/viewport', `viewport-${timestamp}.png`);
+            }});
+            items.push({ label: 'Screenshot Full Page', action: () => {
+                const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+                screenshotToDownload('/screenshot/page', `fullpage-${timestamp}.png`);
+            }});
+            items.push({ separator: true });
+
+            // --- Utilities (always shown) ---
+            items.push({ label: 'Inspect (DevTools)', action: () => toggleDevToolsInVM() });
+            items.push({ label: isTerminalOpen ? 'Hide Terminal' : 'Show Terminal', action: () => toggleTerminal() });
+
+            showContextMenu({ clientX: pageX, clientY: pageY }, items);
+        }
+
+        function togglePinTab(tabId) {
+            const tab = tabs.find(t => t.id === tabId);
+            if (tab) {
+                tab.pinned = !tab.pinned;
+                renderTabs();
+                showToast(tab.pinned ? 'Tab pinned' : 'Tab unpinned', 'success');
+            }
+        }
+
+        async function refreshTab(tabId) {
+            if (tabId !== activeTabId) {
+                await activateTab(tabId);
+            }
+            await reloadPage();
+        }
+
+        async function duplicateTab(tabId) {
+            const tab = tabs.find(t => t.id === tabId);
+            if (!tab || !tab.url) return;
+            try {
+                await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/tabs/new?url=${encodeURIComponent(tab.url)}`);
+                await refreshTabs();
+            } catch (err) {
+                console.warn('[tabs] Failed to duplicate tab:', err);
+            }
+        }
+
+        async function openLinkInNewTab(url) {
+            try {
+                const response = await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/tabs/new?url=${encodeURIComponent(url)}`);
+                const data = await response.json();
+                if (data.ok) {
+                    activeTabId = data.tab.id;
+                    await fetchTabs();
+                } else {
+                    showToast(data.error || 'Failed to open link', 'error');
+                }
+            } catch (e) {
+                showToast('Failed to open link', 'error');
+            }
+        }
+
+        function openInHostBrowser(tabId) {
+            const tab = tabs.find(t => t.id === tabId);
+            if (!tab || !tab.url || tab.url === 'about:blank') return;
+            window.open(tab.url, '_blank');
+        }
+
+        async function closeOtherTabs(tabId) {
+            const othersToClose = tabs.filter(t => t.id !== tabId);
+            for (const t of othersToClose) {
+                await closeTab(t.id);
             }
         }
 
@@ -4826,6 +8362,18 @@
         // Poll for tab updates every 2 seconds
         setInterval(fetchTabs, 2000);
 
+        // Fetch initial plugin icon state (autorun indicator)
+        (async () => {
+            try {
+                const resp = await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/api/plugins`);
+                const data = await resp.json();
+                if (data.ok) {
+                    pluginsCache = data.plugins || [];
+                    updatePluginIconState();
+                }
+            } catch (e) { /* control server not ready yet */ }
+        })();
+
         // Terminal visibility state polling (for recording workflow)
         // When inspekt record starts, the CLI signals the control server to hide the terminal
         // When recording stops, the CLI signals to show it again
@@ -4874,6 +8422,45 @@
             }
         }
 
+        // VNC viewport messages: right-click, left-click, hover-inspect pointermove
+        window.addEventListener('message', (e) => {
+            if (e.data?.type === 'vnc-contextmenu') {
+                // Deactivate hover-inspect before showing context menu
+                if (isHoverInspectActive) deactivateHoverInspect();
+                const iframe = document.querySelector('#vncContainer iframe');
+                if (!iframe) return;
+                const rect = iframe.getBoundingClientRect();
+                showVNCContextMenu(
+                    rect.left + e.data.clientX,
+                    rect.top + e.data.clientY,
+                    e.data.clientX,
+                    e.data.clientY
+                );
+            } else if (e.data?.type === 'vnc-pointermove') {
+                // Hover-inspect: forward mouse position to element-at-point
+                _handleHoverMove(e.data.clientX, e.data.clientY);
+            } else if (e.data?.type === 'vnc-pointerdown') {
+                if (e.data.hoverInspect) {
+                    // Click-to-lock during hover-inspect mode
+                    _handleHoverLock(e.data.clientX, e.data.clientY);
+                    return;
+                }
+                if (activeContextMenu) dismissContextMenu();
+                // Dismiss host-side overlays and stop tracking on any click in the VNC viewport
+                if (_inspectTrackingActive && activeTabId) {
+                    _tabInspectState[activeTabId] = { wasTracking: false };
+                }
+                _stopInspectTracking();
+                vncOverlay.dismissAll(true);
+            }
+        });
+
+        // Note: Escape key dismissal for inspect overlay is handled in the
+        // unified keyboard shortcuts handler below (search "Keyboard shortcuts").
+
+        // Prevent default context menu on VNC container border/padding
+        document.getElementById('vncContainer').addEventListener('contextmenu', e => e.preventDefault());
+
         // Initialize
         window.addEventListener('load', () => {
             updateSplashStatus('Loading...');
@@ -4891,13 +8478,50 @@
 
             // Fetch tabs on load (with small delay to let Chrome start)
             setTimeout(fetchTabs, 1500);
+
+            // Seed URL history from Chrome's navigation history
+            setTimeout(seedHistoryFromServer, 2000);
         });
 
         // Keyboard shortcuts
         document.addEventListener('keydown', (e) => {
             // Escape to close overlays or toggle terminal
             if (e.key === 'Escape') {
-                // Close output panel first (highest priority)
+                // Close page info popout first
+                if (pageInfoOpen) {
+                    e.preventDefault();
+                    closePageInfo();
+                    return;
+                }
+                // Blur URL bar if focused (second Escape after closing dropdown)
+                if (document.activeElement === document.getElementById('urlBar')) {
+                    e.preventDefault();
+                    document.getElementById('urlBar').blur();
+                    return;
+                }
+                // Dismiss context menu first (highest priority)
+                if (activeContextMenu) {
+                    e.preventDefault();
+                    dismissContextMenu();
+                    return;
+                }
+                // Dismiss hover-inspect mode (before locked inspect)
+                if (isHoverInspectActive) {
+                    e.preventDefault();
+                    deactivateHoverInspect();
+                    vncOverlay.dismiss('inspect-highlight', true);
+                    vncOverlay.dismiss('inspect-tooltip', true);
+                    return;
+                }
+                // Dismiss locked inspect overlay (before checking panels/modals)
+                if (_inspectTrackingActive) {
+                    e.preventDefault();
+                    if (activeTabId) _tabInspectState[activeTabId] = { wasTracking: false };
+                    _stopInspectTracking();
+                    vncOverlay.dismissAll(true);
+                    return;
+                }
+                // Close output panel
                 if (document.getElementById('outputPanel').classList.contains('open')) {
                     e.preventDefault();
                     closeOutputPanel();
@@ -4951,6 +8575,20 @@
                 return;
             }
 
+            // Ctrl+Tab / Ctrl+Shift+Tab to cycle tabs
+            if (e.key === 'Tab' && (e.ctrlKey || e.metaKey)) {
+                e.preventDefault();
+                const currentIndex = tabs.findIndex(t => t.id === activeTabId);
+                let nextIndex;
+                if (e.shiftKey) {
+                    nextIndex = (currentIndex - 1 + tabs.length) % tabs.length;
+                } else {
+                    nextIndex = (currentIndex + 1) % tabs.length;
+                }
+                activateTab(tabs[nextIndex].id);
+                return;
+            }
+
             // Skip other shortcuts if typing in input fields
             if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
 
@@ -4972,6 +8610,12 @@
             if (e.key === 'd' && !e.ctrlKey && !e.metaKey && !isTerminalOpen && !gridState.isOpen) {
                 e.preventDefault();
                 toggleDevTools();
+            }
+
+            // I for Inspect element mode
+            if (e.key === 'i' && !e.ctrlKey && !e.metaKey && !isTerminalOpen && !gridState.isOpen) {
+                e.preventDefault();
+                toggleHoverInspect();
             }
 
             // A for Audio

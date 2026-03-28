@@ -258,6 +258,8 @@ def _start_container(dev_mode: bool = False, vm_dir: Path = None) -> bool:
         "--name", CONTAINER_NAME,
         "--network", "host",
         "--shm-size=2g",
+        # Persist data directory (plugins, caches) across container restarts
+        "-v", "inspekt-vm-data:/root/.config/inspekt",
     ]
 
     # Add volume mounts for development mode
@@ -297,6 +299,7 @@ def _start_container(dev_mode: bool = False, vm_dir: Path = None) -> bool:
         click.echo("    • control-server.py → /opt/control-server.py")
         click.echo("    • terminal-server.py → /opt/terminal-server.py")
         click.echo("    • inspekt-config.json → /root/.config/inspekt.json")
+        click.echo("    • inspekt-vm-data → /root/.config/inspekt/ (persistent)")
         if inspekt_src.exists():
             click.echo("    • inspekt/ → /opt/inspekt/inspekt/")
         if extensions_src.exists():
@@ -631,6 +634,8 @@ def status(output_json):
         inspekt vm status --json # JSON output
     """
     import json
+    from inspekt.app.cli.icons import get_indicator
+    from inspekt.app.cli.table import Table, format_status_icon
 
     docker_running = _is_docker_running()
     container_running = _is_container_running() if docker_running else False
@@ -647,33 +652,61 @@ def status(output_json):
         click.echo(json.dumps(data, indent=2))
         return
 
-    click.echo("Inspekt Browser VM Status\n")
-    click.echo("=" * 40)
+    click.echo()
+
+    # === VM Status Table ===
+    table = Table(["Component", "Status"], title="Browser VM", icon=get_indicator("docker"))
 
     # Docker status
     if docker_running:
-        click.echo("Docker:     ✓ Running")
+        docker_status = f"{format_status_icon('pass')} " + click.style("Running", fg="green")
     else:
-        click.echo("Docker:     ✗ Not running")
-        click.echo("\nStart Docker to use the VM.")
-        sys.exit(1)
+        docker_status = f"{format_status_icon('fail')} " + click.style("Not running", fg="red")
 
     # Image status
     if image_exists:
-        click.echo(f"Image:      ✓ Built ({IMAGE_NAME})")
+        image_status = f"{format_status_icon('pass')} " + click.style(f"Built ({IMAGE_NAME})", fg="green")
     else:
-        click.echo("Image:      ○ Not built")
+        image_status = f"{format_status_icon('warning')} " + click.style("Not built", fg="yellow")
 
     # Container status
     if container_running:
-        click.echo("VM:         ✓ Running")
-        click.echo("=" * 40)
-        click.echo(f"\nControl panel: http://localhost:{NOVNC_PORT}/control.html")
-        click.echo(f"VNC viewer:    http://localhost:{NOVNC_PORT}/vnc.html")
+        vm_status = f"{format_status_icon('pass')} " + click.style("Running", fg="green")
     else:
-        click.echo("VM:         ✗ Not running")
-        click.echo("=" * 40)
-        click.echo("\nStart with: inspekt vm start")
+        vm_status = f"{format_status_icon('fail')} " + click.style("Not running", fg="red")
+
+    data = [
+        ["Docker", docker_status],
+        ["Image", image_status],
+        ["VM", vm_status],
+    ]
+    table.set_data(data)
+    table.print_header(skip_column_headers=True)
+    for row in data:
+        table.print_row(row)
+    table.print_footer()
+
+    if not docker_running:
+        click.echo()
+        click.echo(click.style("  Start Docker to use the VM.", fg="yellow"))
+        sys.exit(1)
+
+    if container_running:
+        click.echo()
+        # === URLs Table ===
+        urls_table = Table(["Endpoint", "URL"], title="Access URLs", icon=get_indicator("globe"))
+        urls_data = [
+            ["Control Panel", f"http://localhost:{NOVNC_PORT}/control.html"],
+            ["VNC Viewer", f"http://localhost:{NOVNC_PORT}/vnc.html"],
+        ]
+        urls_table.set_data(urls_data)
+        urls_table.print_header(skip_column_headers=True)
+        for row in urls_data:
+            urls_table.print_row(row)
+        urls_table.print_footer()
+    else:
+        click.echo()
+        click.echo(f"  Start with: " + click.style("inspekt vm start", fg="cyan"))
         sys.exit(1)
 
 

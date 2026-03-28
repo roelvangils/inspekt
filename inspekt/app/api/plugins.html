@@ -263,6 +263,15 @@
             font-weight: 600;
         }
 
+        .plugin-autorun-badge {
+            font-size: 10px;
+            padding: 2px 6px;
+            background: light-dark(#43a047, #66bb6a);
+            color: white;
+            border-radius: 4px;
+            font-weight: 600;
+        }
+
         .plugin-meta {
             display: flex;
             gap: 8px;
@@ -848,6 +857,15 @@
                         <input type="checkbox" id="plugin-mcp-exposed">
                         Expose as MCP tool
                     </label>
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="plugin-autorun" onchange="toggleAutorunDomains()">
+                        Autorun on page load
+                    </label>
+                </div>
+
+                <div class="form-group" id="autorun-domains-group" style="display:none;">
+                    <label for="plugin-autorun-domains">Autorun domains <span style="color:var(--text-secondary);font-weight:normal">(optional)</span></label>
+                    <input type="text" id="plugin-autorun-domains" placeholder="e.g. github.com, *.gitlab.com (empty = all pages)">
                 </div>
 
                 <!-- Unload Behavior -->
@@ -1497,12 +1515,16 @@
                     updateCategoryFilter();
 
                     // Check for ?id= query parameter (from dashboard link)
+                    // or #edit= hash fragment (from plugin dropdown)
                     const urlParams = new URLSearchParams(window.location.search);
                     const pluginIdFromUrl = urlParams.get('id');
+                    const hashMatch = window.location.hash.match(/^#edit=(.+)$/);
+                    const pluginIdFromHash = hashMatch ? decodeURIComponent(hashMatch[1]) : null;
+                    const targetPluginId = pluginIdFromUrl || pluginIdFromHash;
 
-                    if (pluginIdFromUrl && plugins.find(p => p.id === pluginIdFromUrl)) {
+                    if (targetPluginId && plugins.find(p => p.id === targetPluginId)) {
                         // Select the plugin from URL
-                        selectPlugin(pluginIdFromUrl);
+                        selectPlugin(targetPluginId);
                         // Clean up URL without reloading
                         window.history.replaceState({}, '', '/plugins');
                     } else if (!selectedPluginId && plugins.length > 0) {
@@ -1539,6 +1561,7 @@
                     <div class="plugin-item-header">
                         <span class="plugin-name">${escapeHtml(p.name)}</span>
                         ${p.mcp_exposed ? '<span class="plugin-mcp-badge">MCP</span>' : ''}
+                        ${p.autorun ? '<span class="plugin-autorun-badge">Auto</span>' : ''}
                     </div>
                     <div class="plugin-meta">
                         ${p.category ? `<span class="plugin-category">${escapeHtml(p.category)}</span>` : ''}
@@ -1597,6 +1620,9 @@
             document.getElementById('plugin-credits').value = plugin.credits || '';
             document.getElementById('plugin-returns-data').checked = plugin.returns_data;
             document.getElementById('plugin-mcp-exposed').checked = plugin.mcp_exposed;
+            document.getElementById('plugin-autorun').checked = plugin.autorun;
+            document.getElementById('plugin-autorun-domains').value = plugin.autorun_domains || '';
+            document.getElementById('autorun-domains-group').style.display = plugin.autorun ? 'block' : 'none';
 
             // Set code (CodeMirror 6 API)
             waitForEditor(() => {
@@ -1639,6 +1665,8 @@
                         code: window.getEditorValue(window.editor),
                         returns_data: document.getElementById('plugin-returns-data').checked,
                         mcp_exposed: document.getElementById('plugin-mcp-exposed').checked,
+                        autorun: document.getElementById('plugin-autorun').checked,
+                        autorun_domains: document.getElementById('plugin-autorun-domains').value || null,
                         unload_mode: document.querySelector('input[name="unload-mode"]:checked').value,
                         unload_code: window.getEditorValue(window.unloadEditor) || null
                     })
@@ -2129,6 +2157,12 @@
 
         // Start polling when page loads
         document.addEventListener('DOMContentLoaded', startBrowserTargetPolling);
+
+        // Toggle autorun domains input visibility
+        function toggleAutorunDomains() {
+            const checked = document.getElementById('plugin-autorun').checked;
+            document.getElementById('autorun-domains-group').style.display = checked ? 'block' : 'none';
+        }
 
         // Escape HTML
         function escapeHtml(text) {
