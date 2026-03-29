@@ -1118,6 +1118,13 @@
             display: none;
         }
 
+        /* In split mode, native container takes VNC container's flex slot */
+        body.split-mode .native-container.active {
+            display: block;
+            width: var(--split-vnc-width, 50%);
+            flex-shrink: 0;
+        }
+
         .resize-dimensions {
             position: absolute;
             top: 12px;
@@ -1460,6 +1467,135 @@
             transform: translateX(0);
         }
 
+        /* Left-side floating terminal */
+        .terminal-overlay.position-left {
+            right: auto;
+            left: 20px;
+            transform: translateX(calc(-100% - 20px));
+        }
+        .terminal-overlay.position-left.open {
+            transform: translateX(0);
+        }
+
+        /* =============================================
+         * Split Mode Layout
+         * ============================================= */
+
+        /* Wrapper is invisible in floating mode */
+        .split-content-row {
+            display: contents;
+        }
+
+        /* In split mode, wrapper becomes a horizontal flex row */
+        body.split-mode .split-content-row {
+            display: flex;
+            flex-direction: row;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        /* VNC takes a variable width in split mode */
+        body.split-mode .vnc-container {
+            flex: none;
+            width: var(--split-vnc-width, 50%);
+            transition: width 0.2s ease;
+        }
+
+        /* Terminal becomes a static flex child (overrides all floating styles) */
+        body.split-mode .terminal-overlay {
+            position: static !important;
+            transform: none !important;
+            width: auto !important;
+            height: auto !important;
+            top: auto !important;
+            right: auto !important;
+            left: auto !important;
+            border-radius: 0 !important;
+            box-shadow: none !important;
+            backdrop-filter: none !important;
+            -webkit-backdrop-filter: none !important;
+            background: rgba(15, 15, 25, 0.95) !important;
+            flex: 1;
+            z-index: auto;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* Flipped: terminal on left, VNC on right */
+        body.split-mode.split-flipped .split-content-row {
+            flex-direction: row-reverse;
+        }
+
+        /* Drag handle */
+        .split-drag-handle {
+            width: 5px;
+            background: var(--divider);
+            cursor: col-resize;
+            flex-shrink: 0;
+            position: relative;
+            z-index: 10;
+            transition: background 0.15s ease;
+        }
+        .split-drag-handle:hover,
+        .split-drag-handle.dragging {
+            background: var(--accent);
+        }
+
+        /* Flip button centered on drag handle */
+        .split-flip-btn {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            background: var(--bg-bar);
+            border: 1px solid var(--divider);
+            color: var(--text);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 11;
+            transition: all 0.15s ease;
+            padding: 0;
+        }
+        .split-flip-btn:hover {
+            background: var(--bg-btn-hover);
+            border-color: var(--accent);
+            color: var(--text-bright);
+        }
+
+        /* Blur both panels during drag */
+        body.split-dragging .vnc-container,
+        body.split-dragging .terminal-overlay {
+            filter: blur(3px);
+            pointer-events: none;
+            transition: filter 0.1s ease;
+        }
+        body.split-dragging .split-drag-handle {
+            pointer-events: auto;
+            filter: none;
+        }
+
+        /* Disable width transition during drag to prevent jank */
+        body.split-dragging .vnc-container {
+            transition: none;
+        }
+
+        /* Light mode split adjustments */
+        @media (prefers-color-scheme: light) {
+            body.split-mode .terminal-overlay {
+                background: rgba(245, 245, 250, 0.95) !important;
+            }
+            .split-flip-btn {
+                background: var(--bg-bar);
+                border-color: rgba(0, 0, 0, 0.15);
+            }
+        }
+
         .terminal-header {
             display: flex;
             align-items: center;
@@ -1497,6 +1633,33 @@
         .terminal-close:hover {
             background: rgba(255, 255, 255, 0.1);
             color: #fff;
+        }
+
+        .terminal-header-btn {
+            background: none;
+            border: none;
+            padding: 4px 6px;
+            color: #888;
+            cursor: pointer;
+            font-size: 12px;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.15s ease;
+        }
+        .terminal-header-btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+            color: #fff;
+        }
+        .terminal-header-btn.active {
+            background: rgba(102, 126, 234, 0.2);
+            color: var(--accent);
+        }
+        .terminal-header-btn svg {
+            width: 14px;
+            height: 14px;
+            fill: currentColor;
         }
 
         .terminal-link-settings {
@@ -1690,6 +1853,13 @@
                 color: #666;
             }
             .terminal-close:hover {
+                background: rgba(0, 0, 0, 0.08);
+                color: #000;
+            }
+            .terminal-header-btn {
+                color: #666;
+            }
+            .terminal-header-btn:hover {
                 background: rgba(0, 0, 0, 0.08);
                 color: #000;
             }
@@ -2783,13 +2953,22 @@
         </button>
     </div>
 
-    <!-- VNC Container -->
-    <div class="vnc-container" id="vncContainer">
-        <div class="resize-dimensions" id="resizeDimensions"></div>
-    </div>
+    <!-- Split Content Row: wraps VNC + drag handle + terminal for split mode -->
+    <div class="split-content-row" id="splitContentRow">
+        <!-- VNC Container -->
+        <div class="vnc-container" id="vncContainer">
+            <div class="resize-dimensions" id="resizeDimensions"></div>
+        </div>
 
-    <!-- Native Container for inspekt:// internal tool pages -->
-    <div class="native-container" id="nativeContainer"></div>
+        <!-- Native Container for inspekt:// internal tool pages -->
+        <div class="native-container" id="nativeContainer"></div>
+
+        <!-- Split mode drag handle (hidden in floating mode) -->
+        <div class="split-drag-handle" id="splitDragHandle" style="display:none">
+            <button class="split-flip-btn" onclick="flipSplitLayout()" title="Swap canvas and terminal positions">
+                <svg viewBox="0 0 24 24" width="14" height="14"><path d="M6.99 11L3 15l3.99 4v-3H14v-2H6.99v-3zM21 9l-3.99-4v3H10v2h7.01v3L21 9z" fill="currentColor"/></svg>
+            </button>
+        </div>
 
     <!-- Click-to-focus overlay (appears when terminal closes) -->
     <div class="focus-overlay" id="focusOverlay" onclick="hideFocusOverlay()">
@@ -2869,10 +3048,19 @@
                     <option value="auto">Auto-decide</option>
                 </select>
             </div>
-            <button class="terminal-close" onclick="toggleTerminal()">Close ✕</button>
+            <div style="display:flex; align-items:center; gap:4px;">
+                <button class="terminal-header-btn" id="terminalPositionBtn" onclick="toggleTerminalPosition()" title="Move to left side">
+                    <svg viewBox="0 0 24 24"><path d="M15.41 16.59L10.83 12l4.58-4.59L14 6l-6 6 6 6z"/></svg>
+                </button>
+                <button class="terminal-header-btn" id="splitModeBtn" onclick="toggleSplitMode()" title="Split view">
+                    <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="18" rx="1"/><rect x="14" y="3" width="7" height="18" rx="1"/></svg>
+                </button>
+                <button class="terminal-close" onclick="toggleTerminal()">Close ✕</button>
+            </div>
         </div>
         <div class="terminal-container" id="terminalContainer"></div>
     </div>
+    </div><!-- /split-content-row -->
 
     <!-- Restart Modal -->
     <div class="restart-modal-overlay" id="restartModalOverlay">
@@ -3194,6 +3382,57 @@
         let fitAddon = null;
         let isTerminalOpen = false;
         let hasTerminalSession = false; // Track if we have an active terminal session
+        let _terminalPromptDomain = 'inspekt'; // Tracks domain shown in terminal prompt
+
+        // Split mode & position state
+        let terminalPosition = localStorage.getItem('terminalPosition') || 'right';
+        let terminalMode = 'floating';  // 'floating' | 'split'
+        let splitRatio = parseFloat(localStorage.getItem('splitRatio')) || 0.5;
+        let splitFlipped = localStorage.getItem('splitFlipped') === 'true';
+        let isDraggingSplitHandle = false;
+
+        /**
+         * Cosmetically rewrite the terminal prompt when the active URL changes.
+         * This is purely visual — the shell's real prompt updates on next Enter
+         * via the background domain-fetch mechanism in zshrc.
+         */
+        function updateTerminalPrompt(newUrl) {
+            if (!terminal || !hasTerminalSession) return;
+
+            let newDomain;
+            try { newDomain = new URL(newUrl).hostname || 'inspekt'; }
+            catch { newDomain = 'inspekt'; }
+
+            if (newDomain === _terminalPromptDomain) return;
+            const oldDomain = _terminalPromptDomain;
+            _terminalPromptDomain = newDomain;
+
+            const buffer = terminal.buffer.active;
+            const absRow = buffer.baseY + buffer.cursorY;
+            const line = buffer.getLine(absRow);
+            if (!line) return;
+
+            const lineText = line.translateToString(true);
+
+            // Match zsh prompt: domain:/path$ optional_user_input
+            const escaped = oldDomain.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const match = lineText.match(new RegExp('^' + escaped + ':(\\S*)\\$ (.*)$'));
+            if (!match) return;
+
+            const path = match[1];
+            const userInput = match[2];
+            const viewportRow = buffer.cursorY + 1; // ANSI rows are 1-indexed
+            const newCursorCol = buffer.cursorX + (newDomain.length - oldDomain.length) + 1;
+
+            terminal.write(
+                '\x1b[' + viewportRow + ';1H' +     // Move to start of prompt line
+                '\x1b[2K' +                           // Clear entire line
+                '\x1b[32m' + newDomain + '\x1b[0m:' + // Green domain
+                '\x1b[34m' + path + '\x1b[0m$ ' +     // Blue path + prompt char
+                userInput +                            // Preserve any typed input
+                '\x1b[' + viewportRow + ';' + newCursorCol + 'H' // Restore cursor at adjusted column
+            );
+        }
 
         // Splash screen management
         function updateSplashStatus(message) {
@@ -3326,6 +3565,8 @@
                     updateStatus(true);
                     // Start dynamic viewport resizing
                     setupViewportResize();
+                    // Initialize split mode drag handle
+                    initSplitDragHandle();
                     // Check for saved tabs to restore (after restart)
                     setTimeout(restoreTabsFromStorage, 2000);
                 }, 500);
@@ -3447,6 +3688,7 @@
          * The VNC canvas is hidden and the native container is shown.
          */
         function showNativeView(httpUrl) {
+            // Terminal stays visible (split or floating) when switching to internal tabs
             const vncContainer = document.getElementById('vncContainer');
             const nativeContainer = document.getElementById('nativeContainer');
 
@@ -3843,9 +4085,10 @@
                     } else if (urlChanged) {
                         currentUrl = data.url;
                     }
-                    // Update cloud icon HTTPS state
+                    // Update cloud icon HTTPS state + terminal prompt
                     if (urlChanged) {
                         updateCloudIconState(currentUrl);
+                        updateTerminalPrompt(currentUrl);
                         // Clear plugin loaded state on navigation
                         loadedPlugins.clear();
                         if (pluginDropdownOpen) renderPluginList();
@@ -5198,6 +5441,11 @@
             const termBtn = document.querySelector('button[onclick="toggleTerminal()"]');
 
             if (isTerminalOpen) {
+                // If in split mode, exit split first then close
+                if (terminalMode === 'split') {
+                    exitSplitMode();
+                }
+
                 // Hide terminal (keep session alive)
                 overlay.classList.remove('open');
                 overlay.inert = true; // Make overlay non-interactive while hidden
@@ -5207,18 +5455,292 @@
                 // Try to auto-focus VNC (best effort, no blocking overlay)
                 setTimeout(() => tryFocusVNC(), 100);
             } else {
-                // Show terminal
+                // If user's last mode was split, re-enter split mode
+                if (localStorage.getItem('terminalMode') === 'split') {
+                    enterSplitMode();
+                    return;
+                }
+
+                // Show terminal (floating)
                 overlay.classList.add('open');
                 overlay.inert = false; // Make overlay interactive when shown
                 if (termBtn) termBtn.classList.add('terminal-active');
                 isTerminalOpen = true;
 
-                // Focus the terminal
+                // Focus the terminal and sync PTY size
                 if (terminal) {
                     terminal.focus();
-                    if (fitAddon) fitAddon.fit();
+                    if (fitAddon) {
+                        fitAddon.fit();
+                        sendTerminalSize();
+                    }
                 }
             }
+        }
+
+        function toggleTerminalPosition() {
+            if (terminalMode === 'split') {
+                flipSplitLayout();
+                return;
+            }
+            const overlay = document.getElementById('terminalOverlay');
+            const wasOpen = overlay.classList.contains('open');
+
+            if (wasOpen) {
+                overlay.classList.remove('open'); // slide out current side
+            }
+
+            setTimeout(() => {
+                if (terminalPosition === 'right') {
+                    overlay.classList.add('position-left');
+                    terminalPosition = 'left';
+                } else {
+                    overlay.classList.remove('position-left');
+                    terminalPosition = 'right';
+                }
+                updatePositionButton();
+                localStorage.setItem('terminalPosition', terminalPosition);
+
+                if (wasOpen) {
+                    // Force reflow then slide in from new side
+                    void overlay.offsetHeight;
+                    overlay.classList.add('open');
+                    if (fitAddon) {
+                        requestAnimationFrame(() => {
+                            fitAddon.fit();
+                            sendTerminalSize();
+                        });
+                    }
+                }
+            }, wasOpen ? 320 : 0);
+        }
+
+        function updatePositionButton() {
+            const btn = document.getElementById('terminalPositionBtn');
+            if (!btn) return;
+            const isLeft = terminalPosition === 'left';
+            // Arrow pointing toward the other side
+            btn.innerHTML = isLeft
+                ? '<svg viewBox="0 0 24 24"><path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6z"/></svg>'
+                : '<svg viewBox="0 0 24 24"><path d="M15.41 16.59L10.83 12l4.58-4.59L14 6l-6 6 6 6z"/></svg>';
+            btn.title = isLeft ? 'Move to right side' : 'Move to left side';
+        }
+
+        // Restore terminal position on load
+        (function restoreTerminalPosition() {
+            if (terminalPosition === 'left') {
+                const overlay = document.getElementById('terminalOverlay');
+                if (overlay) overlay.classList.add('position-left');
+                updatePositionButton();
+            }
+        })();
+
+        // =============================================
+        // Split Mode
+        // =============================================
+
+        function toggleSplitMode() {
+            // Don't enter split if window too narrow
+            if (terminalMode === 'floating' && window.innerWidth < 700) return;
+
+            if (terminalMode === 'floating') {
+                enterSplitMode();
+            } else {
+                exitSplitMode();
+            }
+        }
+
+        // Exit split mode if window becomes too narrow
+        window.addEventListener('resize', () => {
+            if (terminalMode === 'split' && window.innerWidth < 700) {
+                exitSplitMode();
+            }
+            updateSplitButton();
+        });
+
+        function enterSplitMode() {
+            terminalMode = 'split';
+            const overlay = document.getElementById('terminalOverlay');
+            const handle = document.getElementById('splitDragHandle');
+
+            // Remove floating classes
+            overlay.classList.remove('open', 'position-left');
+            overlay.inert = false;
+
+            // Activate split mode on body
+            document.body.classList.add('split-mode');
+            if (splitFlipped) {
+                document.body.classList.add('split-flipped');
+            }
+
+            // Show drag handle
+            handle.style.display = '';
+
+            // Set VNC width from ratio
+            document.body.style.setProperty('--split-vnc-width', (splitRatio * 100) + '%');
+
+            // Mark terminal as open
+            isTerminalOpen = true;
+            const termBtn = document.querySelector('button[onclick="toggleTerminal()"]');
+            if (termBtn) termBtn.classList.add('terminal-active');
+
+            // Update button states
+            updateSplitButton();
+            updatePositionButton();
+
+            // After layout settles, fit terminal and let VNC ResizeObserver fire
+            requestAnimationFrame(() => {
+                if (fitAddon) {
+                    fitAddon.fit();
+                    sendTerminalSize();
+                }
+                if (terminal) terminal.focus();
+            });
+
+            localStorage.setItem('terminalMode', 'split');
+        }
+
+        function exitSplitMode() {
+            terminalMode = 'floating';
+            const overlay = document.getElementById('terminalOverlay');
+            const handle = document.getElementById('splitDragHandle');
+
+            // Remove split classes
+            document.body.classList.remove('split-mode', 'split-flipped', 'split-dragging');
+
+            // Hide drag handle
+            handle.style.display = 'none';
+
+            // Restore terminal as floating overlay
+            if (terminalPosition === 'left') {
+                overlay.classList.add('position-left');
+            }
+
+            // Update button states
+            updateSplitButton();
+            updatePositionButton();
+
+            localStorage.setItem('terminalMode', 'floating');
+
+            // After layout restores, refit (VNC ResizeObserver fires automatically)
+            requestAnimationFrame(() => {
+                if (fitAddon && isTerminalOpen) {
+                    fitAddon.fit();
+                    sendTerminalSize();
+                }
+            });
+        }
+
+        function flipSplitLayout() {
+            if (terminalMode !== 'split') return;
+            splitFlipped = !splitFlipped;
+            document.body.classList.toggle('split-flipped', splitFlipped);
+            localStorage.setItem('splitFlipped', splitFlipped);
+
+            // Refit after layout change
+            requestAnimationFrame(() => {
+                if (fitAddon) {
+                    fitAddon.fit();
+                    sendTerminalSize();
+                }
+            });
+        }
+
+        function updateSplitButton() {
+            const btn = document.getElementById('splitModeBtn');
+            if (!btn) return;
+            const tooNarrow = window.innerWidth < 700;
+            btn.classList.toggle('active', terminalMode === 'split');
+            btn.disabled = tooNarrow;
+            btn.title = tooNarrow ? 'Window too narrow for split view' :
+                         terminalMode === 'split' ? 'Exit split view' : 'Split view';
+        }
+
+        // Initialize drag handle
+        function initSplitDragHandle() {
+            const handle = document.getElementById('splitDragHandle');
+            if (!handle) return;
+
+            const SNAP_POINTS = [0.25, 1/3, 0.5, 2/3, 0.75];
+            const SNAP_THRESHOLD = 0.02; // ~15px at typical widths
+
+            // Prevent flip button clicks from triggering drag
+            const flipBtn = handle.querySelector('.split-flip-btn');
+            if (flipBtn) {
+                flipBtn.addEventListener('mousedown', (e) => {
+                    e.stopPropagation();
+                });
+            }
+
+            handle.addEventListener('mousedown', (e) => {
+                e.preventDefault();
+
+                isDraggingSplitHandle = true;
+                handle.classList.add('dragging');
+                document.body.classList.add('split-dragging');
+
+                const contentRow = document.getElementById('splitContentRow');
+                const totalWidth = contentRow.offsetWidth - 5; // minus handle width
+                const startX = e.clientX;
+                const startRatio = splitRatio;
+
+                function onMouseMove(e) {
+                    const deltaX = e.clientX - startX;
+                    let newRatio = splitFlipped
+                        ? startRatio - (deltaX / totalWidth)
+                        : startRatio + (deltaX / totalWidth);
+
+                    // Clamp: minimum 300px for each side
+                    const minRatio = 300 / totalWidth;
+                    const maxRatio = 1 - (300 / totalWidth);
+                    newRatio = Math.max(minRatio, Math.min(maxRatio, newRatio));
+
+                    // Snap to common ratios
+                    for (const snap of SNAP_POINTS) {
+                        if (Math.abs(newRatio - snap) < SNAP_THRESHOLD) {
+                            newRatio = snap;
+                            break;
+                        }
+                    }
+
+                    splitRatio = newRatio;
+                    document.body.style.setProperty('--split-vnc-width', (splitRatio * 100) + '%');
+                }
+
+                function onMouseUp() {
+                    isDraggingSplitHandle = false;
+                    handle.classList.remove('dragging');
+                    document.body.classList.remove('split-dragging');
+                    document.removeEventListener('mousemove', onMouseMove);
+                    document.removeEventListener('mouseup', onMouseUp);
+
+                    // Refit both panels
+                    if (fitAddon) {
+                        fitAddon.fit();
+                        sendTerminalSize();
+                    }
+                    // VNC ResizeObserver fires automatically
+
+                    localStorage.setItem('splitRatio', splitRatio);
+                }
+
+                document.addEventListener('mousemove', onMouseMove);
+                document.addEventListener('mouseup', onMouseUp);
+            });
+
+            // Double-click to reset to 50/50
+            handle.addEventListener('dblclick', (e) => {
+                splitRatio = 0.5;
+                document.body.style.setProperty('--split-vnc-width', '50%');
+                localStorage.setItem('splitRatio', 0.5);
+
+                requestAnimationFrame(() => {
+                    if (fitAddon) {
+                        fitAddon.fit();
+                        sendTerminalSize();
+                    }
+                });
+            });
         }
 
         function applyTerminalTheme(themeName) {
@@ -5444,13 +5966,21 @@
                     }
                 });
 
-                // Handle resize
+                // Handle resize — both window-level and container-level (catches
+                // CSS transitions, panel toggles, and any other layout changes)
                 window.addEventListener('resize', () => {
                     if (isTerminalOpen && fitAddon) {
                         fitAddon.fit();
                         sendTerminalSize();
                     }
                 });
+                const termResizeObserver = new ResizeObserver(() => {
+                    if (isTerminalOpen && fitAddon) {
+                        fitAddon.fit();
+                        sendTerminalSize();
+                    }
+                });
+                termResizeObserver.observe(container);
             }
 
             // Connect WebSocket
@@ -6228,7 +6758,7 @@
 
         // Convert to ninja-keys format
         function buildCommandPaletteData() {
-            return inspektCommands.map(cmd => ({
+            const items = inspektCommands.map(cmd => ({
                 id: cmd.id,
                 title: cmd.title,
                 icon: cmd.icon,
@@ -6236,6 +6766,44 @@
                 keywords: cmd.keywords,
                 handler: () => executeCommand(cmd)
             }));
+
+            // Terminal layout commands
+            items.push({
+                id: 'split-terminal',
+                title: terminalMode === 'split' ? 'Exit Split View' : 'Split Terminal View',
+                icon: '◫',
+                section: 'Terminal',
+                keywords: 'split side by side layout terminal',
+                hotkey: 'cmd+\\',
+                handler: () => {
+                    if (isTerminalOpen || terminalMode === 'split') {
+                        toggleSplitMode();
+                    } else {
+                        enterSplitMode();
+                    }
+                }
+            });
+            items.push({
+                id: 'flip-split',
+                title: 'Flip Split Layout',
+                icon: '⇄',
+                section: 'Terminal',
+                keywords: 'swap flip terminal canvas position',
+                handler: () => {
+                    if (terminalMode !== 'split') enterSplitMode();
+                    flipSplitLayout();
+                }
+            });
+            items.push({
+                id: 'move-terminal',
+                title: terminalPosition === 'left' ? 'Move Terminal Right' : 'Move Terminal Left',
+                icon: '↔',
+                section: 'Terminal',
+                keywords: 'move terminal position left right',
+                handler: () => toggleTerminalPosition()
+            });
+
+            return items;
         }
 
         // Output Panel Functions
@@ -7334,8 +7902,10 @@
                         if (!internalTabs[activeTabId]) {
                             const urlBar = document.getElementById('urlBar');
                             if (document.activeElement !== urlBar) {
+                                const urlChanged = activeTab.url !== currentUrl;
                                 currentUrl = activeTab.url;
                                 urlBar.value = displayUrl(currentUrl, false);
+                                if (urlChanged) updateTerminalPrompt(currentUrl);
                             }
 
                             // Detect internal URLs on tab sync (including startup).
@@ -7672,6 +8242,7 @@
                         currentUrl = tab.url;
                         document.getElementById('urlBar').value = displayUrl(currentUrl, false);
                         updateCloudIconState(currentUrl);
+                        updateTerminalPrompt(currentUrl);
                     }
                     fetchHistoryState();  // Refresh back/forward buttons for this tab
 
@@ -8548,6 +9119,18 @@
                 // Toggle terminal (open if closed, close if open)
                 e.preventDefault();
                 toggleTerminal();
+                return;
+            }
+
+            // Cmd/Ctrl+\ for split mode toggle
+            if (e.key === '\\' && (e.ctrlKey || e.metaKey)) {
+                e.preventDefault();
+                if (isTerminalOpen || terminalMode === 'split') {
+                    toggleSplitMode();
+                } else {
+                    // Open terminal in split mode directly
+                    enterSplitMode();
+                }
                 return;
             }
 
