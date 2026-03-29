@@ -128,6 +128,7 @@ nav:
       - Installation: getting-started/installation.md
       - Browser Extensions: extensions/README.md
       - Quick Start: getting-started/quick-start.md
+      - Shell Completion: getting-started/shell-completion.md
       - Configuration: getting-started/configuration.md
       - Updating: getting-started/updating.md
   - User Guide:
@@ -144,25 +145,73 @@ nav:
       - Viewport & Zoom Matching: guide/viewport-zoom-matching.md
       - Native Controls: guide/native-controls.md
       - Accessibility Testing: guide/accessibility-testing.md
+      - Accessible Name Computation: guide/accessible-name-computation.md
+      - PDF Accessibility: guide/pdf-accessibility.md
+      - Plugins: guide/plugins.md
+      - State Management: guide/state-management.md
+      - Keyboard Focus Replay: keyboard-focus-replay.md
       - Caching: caching.md
+      - Tunneling Local Sites: guide/tunneling.md
       - Advanced Usage: guide/advanced.md
   - API Reference:
       - CLI Commands: api/commands.md
       - HTTP API Guide: api/http-api.md
       - URL Scheme (inspekt://): url-scheme.md
+      - URL Scheme Protocol: url-scheme-protocol.md
+      - URL Scheme Quick Start: url-scheme-quick-start.md
+      - MCP Integration: MCP_INTEGRATION.md
       - Command Reference:
+          - inspekt axe: commands/axe.md
+          - inspekt console: commands/console.md
           - inspekt do: commands/do.md
+          - inspekt extract: commands/extract.md
+          - inspekt focused: commands/focused.md
+          - inspekt inspected css: commands/inspected-css.md
+          - inspekt pdf: commands/pdf.md
+          - inspekt press: commands/press.md
+          - inspekt record: commands/record.md
+          - inspekt replay: commands/replay.md
+          - inspekt save: commands/save.md
+          - inspekt screenshot: commands/screenshot.md
+          - inspekt selection: commands/selection.md
+          - inspekt validate: commands/validate.md
+          - inspekt tunnel: commands/tunnel.md
           - inspekt vm: commands/vm.md
       - Services: api/services.md
       - Models: api/models.md
       - Protocol: api/protocol.md
+  - Extensions:
+      - Overview: extensions/README.md
+      - Architecture: extensions/EXTENSION_ARCHITECTURE.md
+      - Security Features: extensions/SECURITY_FEATURES.md
+      - Implementation Summary: extensions/IMPLEMENTATION_SUMMARY.md
+      - Chrome:
+          - Overview: extensions/chrome/README.md
+          - Chrome Web Store: extensions/chrome/CHROME_WEB_STORE.md
+          - Development: extensions/chrome/DEVELOPMENT.md
+          - Modular Refactoring: extensions/chrome/MODULAR_REFACTORING.md
+      - Firefox:
+          - Overview: extensions/firefox/README.md
+          - Installation: extensions/firefox/INSTALL.md
   - Development:
       - Architecture: development/architecture.md
+      - Recording & Video Architecture: development/recording-video-architecture.md
+      - VM Development: development/vm.md
+      - Bridge Pattern: development/bridge.md
+      - Adding Commands: development/adding-commands.md
+      - UI Development: development/ui-development.md
+      - Adding Tiles: ADDING_TILES.md
       - Contributing: development/contributing.md
       - Testing: development/testing.md
       - Security: development/security.md
+      - Roadmaps:
+          - PDF Accessibility Roadmap: pdf-accessibility-roadmap.md
+          - Recording Roadmap: guide/recording-roadmap.md
   - Troubleshooting:
+      - General: troubleshooting.md
       - CSP Issues: troubleshooting/csp-issues.md
+      - Disable Fetch Workarounds: DISABLE_FETCH_WORKAROUNDS.md
   - About:
       - Changelog: about/changelog.md
+      - Comparison with webctl: webctl-comparison.md
       - License: about/license.md
