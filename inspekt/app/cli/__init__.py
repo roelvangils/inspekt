@@ -533,6 +533,38 @@ cli.add_lazy_command("plugin", "plugin", "plugin")
 # VM management commands (from vm.py)
 cli.add_lazy_command("vm", "vm", "vm")
 
+# PDF accessibility commands (from pdf.py)
+cli.add_lazy_command("pdf", "pdf", "pdf")
+
+# Autostart management (macOS LaunchAgent)
+cli.add_lazy_command("autostart", "autostart", "autostart")
+
+# Tunnel command (expose local port to VM)
+cli.add_lazy_command("tunnel", "tunnel", "tunnel")
+
+
+# ============================================================================
+# VM Restricted Mode
+# ============================================================================
+# When INSPEKT_RESTRICTED=1 (set by terminal-server.py in the VM),
+# remove commands that are dangerous in a shared/sandboxed terminal.
+
+import os as _os
+if _os.environ.get('INSPEKT_RESTRICTED') == '1':
+    _RESTRICTED_COMMANDS = {
+        'eval', 'exec', 'repl',    # Arbitrary JS execution
+        'plugin',                    # Persistent JS plugins
+        'yolo',                      # Bypass all security restrictions
+        'domain',                    # CSP/domain bypass
+        'vm',                        # Docker management (nonsensical inside VM)
+        'do',                        # Natural language browser actions
+        'mcp',                       # MCP server management
+        'autostart',                 # macOS LaunchAgent (nonsensical inside VM)
+        'tunnel',                    # Tunneling from inside VM is nonsensical
+    }
+    for _cmd in _RESTRICTED_COMMANDS:
+        cli._lazy_commands.pop(_cmd, None)
+
 
 # ============================================================================
 # Export main CLI

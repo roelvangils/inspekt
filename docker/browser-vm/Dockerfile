@@ -38,8 +38,11 @@ RUN apk add --no-cache \
     tini \
     # Process manager
     supervisor \
-    # X11 virtual framebuffer
-    xvfb \
+    # X11 server with dummy video driver (supports xrandr for dynamic resolution)
+    xorg-server \
+    xf86-video-dummy \
+    xrandr \
+    libxcvt \
     # VNC server
     x11vnc \
     # Lightweight window manager
@@ -52,10 +55,12 @@ RUN apk add --no-cache \
     ttf-liberation \
     # Window management tools
     xdotool \
+    # Clipboard (for inspekt --copy commands)
+    xclip \
     # Python for Inspekt
     python3 \
     py3-pip \
-    # WebSocket library
+    # WebSocket library (needed by control-server.py and terminal-server.py under system Python)
     py3-websockets \
     # Certificate management
     nss-tools \
@@ -65,11 +70,14 @@ RUN apk add --no-cache \
     curl \
     wget \
     bash \
+    zsh \
     jq \
     # Git needed for pip to install Click from GitHub (until 8.3.2 is released)
     git \
     # Video recording for inspekt replay --video
     ffmpeg \
+    # PNG optimization for inspekt screenshot --optimize
+    oxipng \
     # Audio support
     pulseaudio \
     pulseaudio-utils \
@@ -79,13 +87,34 @@ RUN apk add --no-cache \
     gst-plugins-good \
     gst-plugins-bad \
     socat \
+    # Firewall for user network restrictions
+    iptables \
     # noVNC and websockify
     novnc \
+    # Node.js for lightningcss-cli (CSS optimization)
+    nodejs \
+    npm \
+    # Runtime libraries for PyMuPDF (compiled from source on musl/aarch64)
+    freetype harfbuzz jpeg openjpeg jbig2dec mupdf \
     && \
     # Create noVNC symlink
     ln -sf /usr/share/novnc/vnc.html /usr/share/novnc/index.html && \
     # Create necessary directories
     mkdir -p /var/log/supervisor /root/.config/openbox /opt/inspekt /opt/certs /run/dbus
+
+# Install bore tunnel server (allows users to tunnel localhost to VM)
+RUN BORE_VERSION="0.5.2" && \
+    ARCH="$(uname -m)" && \
+    if [ "$ARCH" = "aarch64" ]; then BORE_TARGET="aarch64-unknown-linux-musl"; \
+    else BORE_TARGET="x86_64-unknown-linux-musl"; fi && \
+    wget -q "https://github.com/ekzhang/bore/releases/download/v${BORE_VERSION}/bore-v${BORE_VERSION}-${BORE_TARGET}.tar.gz" \
+        -O /tmp/bore.tar.gz && \
+    tar xzf /tmp/bore.tar.gz -C /usr/local/bin/ bore && \
+    chmod +x /usr/local/bin/bore && \
+    rm /tmp/bore.tar.gz
+
+# Install lightningcss-cli for CSS optimization (inspekt focused css)
+RUN npm install -g lightningcss-cli prettier --no-audit --no-fund
 
 # Install mkcert and generate certificates
 RUN wget -q "https://dl.filippo.io/mkcert/latest?for=linux/amd64" -O /usr/local/bin/mkcert && \
@@ -108,13 +137,86 @@ COPY prompts /opt/inspekt/prompts
 COPY pyproject.toml /opt/inspekt/
 
 # Install Inspekt from source
+# PyMuPDF has no pre-built musl/aarch64 wheel, so we need build tools to compile it.
+# Build deps are installed and removed in the same layer to keep image small.
 RUN chmod -R a+rX /opt/inspekt/extensions && \
+    apk add --no-cache --virtual .build-deps \
+        gcc g++ make swig \
+        python3-dev musl-dev \
+        freetype-dev harfbuzz-dev jpeg-dev openjpeg-dev jbig2dec-dev \
+        mupdf-dev clang-dev && \
+    ln -sf /usr/bin/gcc /usr/local/bin/cc && \
+    ln -sf /usr/bin/g++ /usr/local/bin/c++ && \
     cd /opt/inspekt && \
     python3 -m venv .venv && \
     .venv/bin/pip install --no-cache-dir --upgrade pip && \
     .venv/bin/pip install --no-cache-dir -e . && \
-    printf '#!/bin/sh\nsource /opt/inspekt/.venv/bin/activate\nexec inspekt "$@"\n' > /usr/local/bin/inspekt && \
-    chmod +x /usr/local/bin/inspekt
+    printf '#!/bin/zsh\nsource /opt/inspekt/.venv/bin/activate\n/opt/inspekt/.venv/bin/inspekt "$@"\n' > /usr/local/bin/inspekt && \
+    chmod +x /usr/local/bin/inspekt && \
+    rm -f /usr/local/bin/cc /usr/local/bin/c++ && \
+    apk del .build-deps
+
+# --- Restricted terminal user ---
+# The terminal runs as this user to prevent system modification
+RUN adduser -D -h /home/inspekt -s /bin/zsh inspekt && \
+    mkdir -p /home/inspekt/Downloads && \
+    chown -R inspekt:inspekt /home/inspekt
+
+# 1) Inspekt command wrappers — one symlink per CLI command, all pointing to .wrapper
+#    This gives tab completion and zero-prefix usage (e.g. "screenshot" instead of "inspekt screenshot")
+#    The wrapper uses zsh (not /bin/sh) and includes a denylist for restricted commands.
+RUN mkdir -p /opt/inspekt/commands && \
+    printf '#!/bin/zsh\ncmd="$(basename "$0")"\ncase "$cmd" in\n    eval|exec|repl|plugin|yolo|domain|vm|do|mcp|autostart)\n        echo "This command is not available in the VM terminal." >&2\n        exit 1\n        ;;\n    *)\n        /opt/inspekt/.venv/bin/inspekt "$cmd" "$@"\n        ;;\nesac\n' \
+        > /opt/inspekt/commands/.wrapper && \
+    chmod +x /opt/inspekt/commands/.wrapper
+
+# Generate symlinks at build time by reading the Click CLI
+RUN /opt/inspekt/.venv/bin/python3 -c "\
+from inspekt.app.cli import cli; \
+from click import Context; \
+import os; \
+ctx = Context(cli); \
+names = cli.list_commands(ctx); \
+[os.symlink('.wrapper', f'/opt/inspekt/commands/{n}') for n in names]; \
+print(f'Created {len(names)} command symlinks')"
+
+# Remove symlinks for restricted commands (prevents tab completion showing them)
+RUN for cmd in eval exec repl plugin yolo domain vm do mcp autostart; do \
+        rm -f /opt/inspekt/commands/$cmd; \
+    done
+
+# 2) Allowed system utilities — curated symlinks
+#    Removed dangerous utils: awk (system()), env (exec), less (!sh escape),
+#    xargs (runs commands), chmod (makes scripts executable)
+RUN mkdir -p /opt/inspekt/allowed-bin && \
+    for cmd in \
+        ls cat pwd mkdir touch rm cp mv \
+        head tail more grep wc sort uniq tr \
+        echo date file stat basename dirname realpath uname \
+        clear whoami which tee \
+        curl jq sed; do \
+        for dir in /usr/bin /bin; do \
+            [ -x "$dir/$cmd" ] && ln -sf "$dir/$cmd" /opt/inspekt/allowed-bin/$cmd && break; \
+        done; \
+    done && \
+    ln -sf /usr/local/bin/download /opt/inspekt/allowed-bin/download && \
+    ln -sf /usr/local/bin/inspekt /opt/inspekt/allowed-bin/inspekt && \
+    printf '#!/bin/zsh\nPATH=/usr/bin:/usr/local/bin:$PATH /usr/local/bin/lightningcss "$@"\n' \
+        > /opt/inspekt/allowed-bin/lightningcss && chmod +x /opt/inspekt/allowed-bin/lightningcss && \
+    printf '#!/bin/zsh\nPATH=/usr/bin:/usr/local/bin:$PATH /usr/local/bin/prettier "$@"\n' \
+        > /opt/inspekt/allowed-bin/prettier && chmod +x /opt/inspekt/allowed-bin/prettier
+
+# Inspekt config must be copied before the permissions step that copies it to /home/inspekt
+COPY docker/browser-vm/inspekt-config.json /root/.config/inspekt.json
+
+# File permissions for restricted user
+RUN chmod -R a+rX /opt/inspekt/.venv && \
+    chmod -R a+rX /opt/inspekt/inspekt && \
+    chmod -R a+rX /opt/inspekt/commands && \
+    chmod -R a+rX /opt/inspekt/allowed-bin && \
+    mkdir -p /home/inspekt/.config && \
+    cp /root/.config/inspekt.json /home/inspekt/.config/inspekt.json && \
+    chown -R inspekt:inspekt /home/inspekt
 
 # Copy VM configuration files
 COPY docker/browser-vm/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
@@ -127,12 +229,50 @@ COPY docker/browser-vm/control-panel.html /usr/share/novnc/control.html
 COPY docker/browser-vm/fonts /usr/share/novnc/fonts
 COPY docker/browser-vm/inspekt-chromium.sh /opt/inspekt-chromium.sh
 COPY docker/browser-vm/devtools-manager.sh /opt/devtools-manager.sh
+COPY docker/browser-vm/xorg.conf /etc/X11/xorg.conf
+COPY docker/browser-vm/resize-display.sh /opt/resize-display.sh
 COPY docker/browser-vm/download.sh /usr/local/bin/download
 COPY docker/browser-vm/audio-proxy.sh /opt/audio-proxy.sh
 COPY docker/browser-vm/pulse-config.pa /etc/pulse/default.pa
 
-# Inspekt config with nerdfont enabled (for nice icons in terminal)
-COPY docker/browser-vm/inspekt-config.json /root/.config/inspekt.json
+# Shell config with inspekt completion
+COPY docker/browser-vm/bashrc /root/.bashrc
+COPY docker/browser-vm/inputrc /root/.inputrc
+COPY docker/browser-vm/zshrc /root/.zshrc
+
+# Copy Python binary into venv (not symlink) so inspekt CLI works
+# after chmod o-x on system Python. This must run BEFORE chmod.
+RUN PYTHON_REAL=$(readlink -f /opt/inspekt/.venv/bin/python3) && \
+    rm -f /opt/inspekt/.venv/bin/python3 /opt/inspekt/.venv/bin/python && \
+    cp "$PYTHON_REAL" /opt/inspekt/.venv/bin/python3 && \
+    ln -s python3 /opt/inspekt/.venv/bin/python && \
+    chmod 755 /opt/inspekt/.venv/bin/python3
+
+# Remove execute permission on interpreters/tools for non-root users.
+# Root services (supervisord, bridge, API) are unaffected.
+RUN chmod o-x /usr/bin/python3 /usr/bin/python3.12 2>/dev/null; \
+    chmod o-x /usr/bin/npm 2>/dev/null; \
+    chmod o-x /usr/bin/wget 2>/dev/null; \
+    chmod o-x /usr/local/bin/mkcert 2>/dev/null; \
+    # node and env stay executable — needed by prettier/lightningcss which
+    # run as subprocess of inspekt CLI. Direct access is blocked by:
+    #   - PATH restriction (node/env not in allowed-bin)
+    #   - Shell function overrides (node() in zshrc returns error)
+    #   - iptables (no outbound network even if node runs)
+    # Ensure busybox stays world-executable — it provides all allowed-bin
+    # commands (ls, cat, grep, etc.) and /bin/zsh completion helpers need it
+    chmod 755 /bin/busybox 2>/dev/null; \
+    true
+
+# Restricted shell config in root-owned ZDOTDIR (prevents .zshenv bypass)
+# ZDOTDIR tells zsh where to look for startup files. By pointing it to a
+# root-owned directory, the user cannot create/modify .zshenv, .zshrc, etc.
+RUN mkdir -p /etc/inspekt-shell
+COPY docker/browser-vm/zshrc-restricted /etc/inspekt-shell/.zshrc
+RUN touch /etc/inspekt-shell/.zshenv && \
+    chown -R root:root /etc/inspekt-shell && \
+    chmod 755 /etc/inspekt-shell && \
+    chmod 644 /etc/inspekt-shell/.zshrc /etc/inspekt-shell/.zshenv
 
 # Replace noVNC base CSS with custom minimal theme
 COPY docker/browser-vm/novnc-base.css /usr/share/novnc/app/styles/base.css
@@ -140,15 +280,22 @@ COPY docker/browser-vm/novnc-base.css /usr/share/novnc/app/styles/base.css
 # Customize noVNC HTML and set permissions
 RUN chmod +x /entrypoint.sh /root/.config/openbox/autostart /opt/inspekt-chromium.sh \
               /opt/devtools-manager.sh /opt/terminal-server.py /usr/local/bin/download \
-              /opt/audio-proxy.sh && \
+              /opt/audio-proxy.sh /opt/resize-display.sh && \
     # Remove noVNC logo from HTML
     sed -i 's|<h1 class="noVNC_logo" translate="no"><span>no</span><br>VNC</h1>||g' /usr/share/novnc/vnc.html && \
     sed -i 's|<div class="noVNC_logo" translate="no"><span>no</span>VNC</div>||g' /usr/share/novnc/vnc.html && \
     # Update page title
-    sed -i 's|<title>noVNC</title>|<title>Inspekt Browser VM</title>|' /usr/share/novnc/vnc.html
+    sed -i 's|<title>noVNC</title>|<title>Inspekt Browser VM</title>|' /usr/share/novnc/vnc.html && \
+    # Inject right-click interceptor for VNC viewport context menu.
+    # Capture phase (3rd arg = true) fires BEFORE noVNC's canvas handlers.
+    # - Intercepts pointerdown/up for button 2 so right-clicks don't reach VNC
+    #   (preserving text selection in the VM browser)
+    # - Posts coordinates to parent on contextmenu for the custom menu
+    # - Notifies parent on left pointerdown so it can dismiss an open context menu
+    sed -i 's|</body>|<script>var _inspektHoverActive=false;window.addEventListener("message",function(e){if(e.data\&\&e.data.type==="inspekt-hover-mode"){_inspektHoverActive=!!e.data.enabled}});["pointerdown","pointerup"].forEach(function(t){document.addEventListener(t,function(e){if(e.button===2){e.preventDefault();e.stopImmediatePropagation()}if(_inspektHoverActive\&\&e.button===0){e.preventDefault();e.stopImmediatePropagation();if(t==="pointerdown"){window.parent.postMessage({type:"vnc-pointerdown",hoverInspect:true,clientX:e.clientX,clientY:e.clientY},"*")}}},true)});document.addEventListener("pointerdown",function(e){if(e.button===0\&\&!_inspektHoverActive)window.parent.postMessage({type:"vnc-pointerdown"},"*")},true);document.addEventListener("pointermove",function(e){if(_inspektHoverActive){window.parent.postMessage({type:"vnc-pointermove",clientX:e.clientX,clientY:e.clientY},"*")}},true);document.addEventListener("contextmenu",function(e){e.preventDefault();e.stopImmediatePropagation();window.parent.postMessage({type:"vnc-contextmenu",clientX:e.clientX,clientY:e.clientY},"*")},true);</script></body>|' /usr/share/novnc/vnc.html
 
 # Expose ports
-EXPOSE 443 6080 6081 8767 8768 8889 9222
+EXPOSE 443 6080 6081 7835 8767 8768 8889 9222
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
