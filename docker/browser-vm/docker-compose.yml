@@ -1,13 +1,14 @@
-version: '3.8'
-
 services:
   browser:
     build:
-      context: .
-      dockerfile: Dockerfile
+      context: ../..
+      dockerfile: docker/browser-vm/Dockerfile
     container_name: inspekt-browser
     ports:
-      - "6080:6080"
+      - "6080:6080"   # noVNC web UI
+      - "8888:8888"   # Control server (navigation, tabs, CDP proxy)
+      - "7835:7835"   # bore tunnel server
+      - "8889:8889"   # Terminal WebSocket server
     environment:
       - VNC_RESOLUTION=1280x720
       - VNC_PASSWORD=
@@ -15,6 +16,21 @@ services:
     # Increase shared memory for Chromium
     shm_size: 2g
     restart: unless-stopped
+    # Security hardening
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - SETUID         # terminal-server.py privilege drop (setuid)
+      - SETGID         # terminal-server.py privilege drop (setgid)
+      - CHOWN          # entrypoint.sh chown operations
+      - DAC_OVERRIDE   # Root services reading/writing all files
+      - FOWNER         # chmod operations
+      - KILL           # supervisord managing child processes
+      - NET_ADMIN      # iptables for user network restrictions
+      - NET_RAW        # Required by iptables
+      - NET_BIND_SERVICE  # Bind to privileged ports (API on 80, HTTPS)
     # Resource limits
     deploy:
       resources:

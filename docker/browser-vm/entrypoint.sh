@@ -16,6 +16,9 @@ export INSPEKT_BRIDGE_URL="http://localhost:8767"
 echo "INSPEKT_BRIDGE_URL=${INSPEKT_BRIDGE_URL}" >> /etc/environment
 echo "Bridge URL: ${INSPEKT_BRIDGE_URL}"
 
+# Write initial resolution for devtools-manager.sh and resize-display.sh
+echo "${VNC_RESOLUTION}" > /tmp/inspekt_resolution
+
 # Configure VNC password if set
 if [ -n "${VNC_PASSWORD}" ]; then
     echo "VNC password: (protected)"
@@ -30,6 +33,81 @@ fi
 echo "=========================="
 echo "Connect via browser: http://localhost:${NOVNC_PORT}"
 echo "=========================="
+
+# Ensure shared temp files are writable by the restricted terminal user
+# Use group permissions instead of world-writable to prevent prompt injection
+touch /tmp/.inspekt_domain
+chown root:inspekt /tmp/.inspekt_domain
+chmod 664 /tmp/.inspekt_domain
+
+# --- Tunnel secret for bore server ---
+# Generate a random secret if not provided via environment
+if [ -z "${BORE_SECRET}" ]; then
+    export BORE_SECRET=$(head -c 16 /dev/urandom | base64 | tr -d '/+=' | head -c 22)
+fi
+echo "${BORE_SECRET}" > /tmp/.bore_secret
+chmod 644 /tmp/.bore_secret
+echo "Tunnel secret generated"
+
+# --- Network restrictions for restricted terminal user ---
+# Allow inspekt user to reach only required local services.
+# Blocks: CDP (9222), all external/internet traffic.
+INSPEKT_UID=$(id -u inspekt)
+
+# Allow specific local services
+iptables -A OUTPUT -m owner --uid-owner $INSPEKT_UID -o lo -p tcp --dport 80 -j ACCEPT     # inspekt API
+iptables -A OUTPUT -m owner --uid-owner $INSPEKT_UID -o lo -p tcp --dport 8767 -j ACCEPT  # bridge WebSocket
+iptables -A OUTPUT -m owner --uid-owner $INSPEKT_UID -o lo -p tcp --dport 8768 -j ACCEPT  # bridge HTTP
+iptables -A OUTPUT -m owner --uid-owner $INSPEKT_UID -o lo -p tcp --dport 8888 -j ACCEPT  # control server
+
+# Drop everything else (CDP on 9222, internet, other ports)
+iptables -A OUTPUT -m owner --uid-owner $INSPEKT_UID -j DROP
+
+echo "Network restrictions applied for inspekt user (uid=$INSPEKT_UID)"
+
+# Clear Chromium caches on every start for privacy and to ensure
+# the extension loads fresh code from the bind-mounted source files
+CHROMIUM_PROFILE="/root/.config/chromium"
+if [ -d "$CHROMIUM_PROFILE/Default" ]; then
+    echo "Clearing Chromium caches..."
+    rm -rf \
+        "$CHROMIUM_PROFILE/Default/Service Worker" \
+        "$CHROMIUM_PROFILE/Default/Extension Scripts" \
+        "$CHROMIUM_PROFILE/Default/Extension Rules" \
+        "$CHROMIUM_PROFILE/Default/Extension State" \
+        "$CHROMIUM_PROFILE/Default/GPUCache" \
+        "$CHROMIUM_PROFILE/Default/DawnGraphiteCache" \
+        "$CHROMIUM_PROFILE/Default/DawnWebGPUCache" \
+        "$CHROMIUM_PROFILE/Default/Local Storage" \
+        "$CHROMIUM_PROFILE/Default/Session Storage" \
+        "$CHROMIUM_PROFILE/Default/Sessions" \
+        "$CHROMIUM_PROFILE/Default/blob_storage" \
+        "$CHROMIUM_PROFILE/Default/Sync Data" \
+        "$CHROMIUM_PROFILE/Default/Sync Extension Settings" \
+        "$CHROMIUM_PROFILE/Default/WebStorage" \
+        "$CHROMIUM_PROFILE/Default/Shared Dictionary" \
+        "$CHROMIUM_PROFILE/Default/Cookies" \
+        "$CHROMIUM_PROFILE/Default/Cookies-journal" \
+        "$CHROMIUM_PROFILE/Default/History" \
+        "$CHROMIUM_PROFILE/Default/History-journal" \
+        "$CHROMIUM_PROFILE/Default/Visited Links" \
+        "$CHROMIUM_PROFILE/Default/Web Data" \
+        "$CHROMIUM_PROFILE/Default/Web Data-journal" \
+        "$CHROMIUM_PROFILE/Default/Login Data" \
+        "$CHROMIUM_PROFILE/Default/Login Data-journal" \
+        "$CHROMIUM_PROFILE/Default/Favicons" \
+        "$CHROMIUM_PROFILE/Default/Favicons-journal" \
+        "$CHROMIUM_PROFILE/Default/Network Action Predictor" \
+        "$CHROMIUM_PROFILE/Default/QuotaManager" \
+        "$CHROMIUM_PROFILE/Default/QuotaManager-journal" \
+        "$CHROMIUM_PROFILE/Default/shared_proto_db" \
+        "$CHROMIUM_PROFILE/Crash Reports" \
+        "$CHROMIUM_PROFILE/GraphiteDawnCache" \
+        "$CHROMIUM_PROFILE/GrShaderCache" \
+        "$CHROMIUM_PROFILE/ShaderCache" \
+        2>/dev/null || true
+    echo "Chromium caches cleared"
+fi
 
 # Start supervisor (manages all processes)
 exec /usr/bin/supervisord -c /etc/supervisor/conf.d/supervisord.conf
