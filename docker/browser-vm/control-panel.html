@@ -5973,6 +5973,11 @@
                 const kb = rfb._keyboard;
                 const origHandler = kb._eventHandlers.keydown;
                 const patchedHandler = function(e) {
+                    // Note: this fix was written for Mac where noVNC strips
+                    // the Shift modifier from Tab. On Windows/Linux, noVNC
+                    // may handle Shift+Tab correctly natively. If this causes
+                    // issues on other platforms, add a guard:
+                    //   if (... && navigator.platform.includes('Mac'))
                     if (e.code === 'Tab' && shiftHeld) {
                         e.preventDefault();
                         e.stopImmediatePropagation();
