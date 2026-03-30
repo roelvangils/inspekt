@@ -1146,10 +1146,9 @@
             opacity: 1;
         }
 
-        .vnc-container iframe {
+        .vnc-container canvas {
             width: 100%;
             height: 100%;
-            border: none;
         }
 
         /* =============================================
@@ -1939,7 +1938,7 @@
         }
 
         /* Hover-inspect crosshair cursor */
-        #vncContainer.hover-inspect-active iframe {
+        #vncContainer.hover-inspect-active canvas {
             cursor: crosshair !important;
         }
 
@@ -3564,6 +3563,25 @@
         // Log port configuration for debugging
         console.log('[Inspekt] Port config:', { pagePort, VNC_PORT, CONTROL_PORT, TERMINAL_PORT });
 
+        // =============================================
+        // RFB (noVNC) — direct embedding (no iframe)
+        // =============================================
+        let rfb = null;
+        let _rfbReconnectAttempts = 0;
+        const _RFB_MAX_RECONNECT_DELAY = 5000;
+
+        // Convert parent-document client coordinates to VM pixel coordinates
+        function _clientToVm(clientX, clientY) {
+            const canvas = document.querySelector('#vncContainer canvas');
+            if (!canvas) return { x: clientX, y: clientY };
+            const rect = canvas.getBoundingClientRect();
+            const resolution = currentResolution || { width: rect.width, height: rect.height };
+            return {
+                x: Math.round((clientX - rect.left) * resolution.width / rect.width),
+                y: Math.round((clientY - rect.top) * resolution.height / rect.height)
+            };
+        }
+
         // Terminal color themes (with semi-transparent backgrounds for blur effect)
         const TERMINAL_THEMES = {
             'tokyo-night': {
@@ -3804,33 +3822,45 @@
             console.log('[viewport-resize] ResizeObserver active');
         }
 
-        // Connect to VNC
-        function connectVNC() {
+        // Connect to VNC via direct RFB embedding (no iframe)
+        async function connectVNC() {
             updateSplashStatus('Connecting to VM...');
 
             const container = document.getElementById('vncContainer');
-            const params = new URLSearchParams({
-                autoconnect: 'true',
-                resize: 'remote',
-                reconnect: 'true',
-                reconnect_delay: '1000',
-                show_dot: 'false',
-                bell: 'false',
-                view_only: 'false'
-            });
 
-            const iframe = document.createElement('iframe');
-            // Use same protocol as parent page to avoid mixed content issues
-            const protocol = window.location.protocol;
-            iframe.src = `${protocol}//${VNC_HOST}:${VNC_PORT}/vnc.html?${params}`;
+            // Clean up previous RFB instance on reconnect
+            if (rfb) {
+                try { rfb.disconnect(); } catch (_) {}
+                rfb = null;
+            }
+            // Remove any leftover noVNC DOM elements from a previous connection
+            // RFB creates a <div class="noVNC_screen"> containing the canvas
+            const oldScreen = container.querySelector('.noVNC_screen');
+            if (oldScreen) oldScreen.remove();
 
-            iframe.onload = () => {
+            // Dynamic import of RFB (ES module, cached by browser after first load)
+            const httpProtocol = window.location.protocol;
+            const { default: RFB } = await import(`${httpProtocol}//${VNC_HOST}:${VNC_PORT}/core/rfb.js`);
+
+            const wsProtocol = httpProtocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${wsProtocol}//${VNC_HOST}:${VNC_PORT}/websockify`;
+
+            rfb = new RFB(container, wsUrl, { shared: true });
+            rfb.resizeSession = true;
+            rfb.scaleViewport = true;
+            rfb.showDotCursor = false;
+
+            rfb.addEventListener('connect', () => {
+                _rfbReconnectAttempts = 0;
                 updateSplashStatus('VM ready!');
 
                 // Early check: if Chrome is on an internal URL, switch to native
                 // view before the splash screen even hides — prevents a flash of
                 // the internal page rendered through VNC.
                 checkInitialInternalUrl();
+
+                // Set up canvas event interceptors for right-click and hover-inspect
+                _setupCanvasEventInterceptors();
 
                 setTimeout(() => {
                     hideSplash();
@@ -3841,15 +3871,22 @@
                     initSplitDragHandle();
                     // Check for saved tabs to restore (after restart)
                     setTimeout(restoreTabsFromStorage, 2000);
+                    rfb.focus();
                 }, 500);
-            };
+            });
 
-            iframe.onerror = () => {
-                updateSplashStatus('Connection failed. Retrying...');
+            rfb.addEventListener('disconnect', (e) => {
                 updateStatus(false);
-            };
+                if (e.detail.clean) return; // Clean disconnect — don't reconnect
+                const delay = Math.min(1000 * Math.pow(2, _rfbReconnectAttempts), _RFB_MAX_RECONNECT_DELAY);
+                _rfbReconnectAttempts++;
+                updateSplashStatus('Connection lost. Reconnecting...');
+                setTimeout(connectVNC, delay);
+            });
 
-            container.appendChild(iframe);
+            rfb.addEventListener('clipboard', (e) => {
+                // Handle clipboard data from VM (future use)
+            });
         }
 
         /**
@@ -5594,84 +5631,16 @@
 
         /**
          * Try to focus the VNC canvas directly without user interaction.
-         * Uses multiple strategies: focus(), click(), and synthetic MouseEvent.
-         * Returns true if we think it worked, false otherwise.
+         * With direct RFB embedding, we just call rfb.focus() — no iframe boundary.
          */
         function tryFocusVNC() {
-            try {
-                const vncIframe = document.querySelector('#vncContainer iframe');
-                if (!vncIframe) return false;
-
-                // Focus the iframe itself first
-                vncIframe.focus();
-
-                // Try to access the canvas inside (same-origin should allow this)
-                const iframeDoc = vncIframe.contentDocument || vncIframe.contentWindow?.document;
-                if (iframeDoc) {
-                    // noVNC uses a canvas element for rendering
-                    const canvas = iframeDoc.querySelector('canvas');
-                    if (canvas) {
-                        // Ensure canvas is focusable
-                        if (!canvas.hasAttribute('tabindex')) {
-                            canvas.setAttribute('tabindex', '0');
-                        }
-
-                        // Strategy 1: Direct focus
-                        canvas.focus();
-
-                        // Strategy 2: Synthetic click (may grant focus)
-                        canvas.click();
-
-                        // Strategy 3: Dispatch a full MouseEvent at canvas center
-                        const rect = canvas.getBoundingClientRect();
-                        const clickEvent = new MouseEvent('click', {
-                            bubbles: true,
-                            cancelable: true,
-                            view: iframeDoc.defaultView,
-                            clientX: rect.left + rect.width / 2,
-                            clientY: rect.top + rect.height / 2
-                        });
-                        canvas.dispatchEvent(clickEvent);
-
-                        // Also dispatch mousedown/mouseup (some handlers need these)
-                        const mousedownEvent = new MouseEvent('mousedown', {
-                            bubbles: true,
-                            cancelable: true,
-                            view: iframeDoc.defaultView,
-                            clientX: rect.left + rect.width / 2,
-                            clientY: rect.top + rect.height / 2,
-                            button: 0
-                        });
-                        const mouseupEvent = new MouseEvent('mouseup', {
-                            bubbles: true,
-                            cancelable: true,
-                            view: iframeDoc.defaultView,
-                            clientX: rect.left + rect.width / 2,
-                            clientY: rect.top + rect.height / 2,
-                            button: 0
-                        });
-                        canvas.dispatchEvent(mousedownEvent);
-                        canvas.dispatchEvent(mouseupEvent);
-
-                        // Focus again after synthetic events
-                        canvas.focus();
-
-                        // Check if focus landed on canvas
-                        if (iframeDoc.activeElement === canvas) {
-                            console.log('[Inspekt] VNC canvas focused successfully');
-                        }
-                    }
-                }
-
-                // Always call /chrome/click to focus AND click in the VM-side Chromium
-                // This uses xdotool to activate the window and click, enabling keyboard input
-                fetch(`http://${VNC_HOST}:${CONTROL_PORT}/chrome/click`).catch(() => {});
-                console.log('[Inspekt] Requested VM-side focus via xdotool');
-                return true;
-            } catch (e) {
-                console.log('[Inspekt] Failed to focus VNC:', e);
-                return false;
-            }
+            if (!rfb) return false;
+            rfb.focus();
+            // Also call /chrome/click to focus AND click in the VM-side Chromium
+            // This uses xdotool to activate the window and click, enabling keyboard input
+            fetch(`http://${VNC_HOST}:${CONTROL_PORT}/chrome/click`).catch(() => {});
+            console.log('[Inspekt] Requested VM-side focus via xdotool');
+            return true;
         }
 
         function showFocusOverlay() {
@@ -5683,22 +5652,10 @@
             const overlay = document.getElementById('focusOverlay');
             overlay.classList.remove('visible');
 
-            // After hiding overlay, try to focus the VNC iframe
+            // After hiding overlay, try to focus the VNC canvas
             // This may work since we just had a real user click
             setTimeout(() => {
-                const vncIframe = document.querySelector('#vncContainer iframe');
-                if (vncIframe) {
-                    vncIframe.focus();
-                    // Try to focus the noVNC canvas inside the iframe
-                    try {
-                        const canvas = vncIframe.contentDocument?.querySelector('canvas');
-                        if (canvas) {
-                            canvas.focus();
-                        }
-                    } catch (e) {
-                        // Cross-origin, ignore
-                    }
-                }
+                if (rfb) rfb.focus();
                 // Also trigger Chrome focus inside VM
                 fetch(`http://${VNC_HOST}:${CONTROL_PORT}/chrome`).catch(() => {});
             }, 50);
@@ -5893,20 +5850,20 @@
         function updateSRFocusIndicator(vmRect) {
             const indicator = document.getElementById('srFocusIndicator');
             const vncContainer = document.getElementById('vncContainer');
-            const iframe = vncContainer.querySelector('iframe');
-            if (!iframe) return;
+            const canvas = vncContainer.querySelector('canvas');
+            if (!canvas) return;
 
-            const iframeRect = iframe.getBoundingClientRect();
+            const canvasRect = canvas.getBoundingClientRect();
             const containerRect = vncContainer.getBoundingClientRect();
 
             // Get VM resolution for coordinate mapping
-            const resolution = currentResolution || { width: iframeRect.width, height: iframeRect.height };
-            const scaleX = iframeRect.width / resolution.width;
-            const scaleY = iframeRect.height / resolution.height;
+            const resolution = currentResolution || { width: canvasRect.width, height: canvasRect.height };
+            const scaleX = canvasRect.width / resolution.width;
+            const scaleY = canvasRect.height / resolution.height;
 
             // Position relative to the VNC container
-            const offsetX = iframeRect.left - containerRect.left;
-            const offsetY = iframeRect.top - containerRect.top;
+            const offsetX = canvasRect.left - containerRect.left;
+            const offsetY = canvasRect.top - containerRect.top;
 
             indicator.style.left = (offsetX + vmRect.x * scaleX) + 'px';
             indicator.style.top = (offsetY + vmRect.y * scaleY) + 'px';
@@ -5971,74 +5928,51 @@
             }
         }
 
-        // ── Shift+Tab VNC fix ──────────────────────────────────
-        // noVNC on Mac: when the VNC iframe has focus, the browser
-        // intercepts Shift+Tab for its own focus management and
-        // never passes it to JavaScript. But when the iframe does
-        // NOT have focus, the parent page sees all keys normally.
-        //
-        // Fix: when Shift is pressed, briefly blur the iframe.
-        // If Tab follows within 200ms, we catch it on the parent,
-        // send it via xdotool, and refocus the iframe.
-        // If any other key follows, refocus immediately.
-        //
+        // ── Shift+Tab ─────────────────────────────────────────
+        // With direct RFB embedding (no iframe), Shift+Tab
+        // propagates normally through the DOM — no workaround needed.
         // See: https://github.com/novnc/noVNC/issues/1413
         // ──────────────────────────────────────────────────────────
-        let _shiftTabPending = false;
-        let _shiftTabTimer = null;
 
-        function _refocusVNC() {
-            const iframe = document.querySelector('#vncContainer iframe');
-            if (iframe) iframe.focus();
-            _shiftTabPending = false;
-        }
+        // ── Shift+Tab fix ──────────────────────────────────────
+        // noVNC on Mac strips the Shift modifier from Tab when
+        // encoding through the VNC protocol. The Tab keydown
+        // event is consumed by noVNC internally (never propagates),
+        // but the Tab keyup DOES propagate.
+        //
+        // Fix: track Shift state via keydown/keyup on the canvas.
+        // When Tab keyup arrives while Shift is held, send
+        // XK_ISO_Left_Tab (0xFE20) via rfb.sendKey() — the
+        // standard X11 keysym for backward tab navigation.
+        //
+        // We briefly ungrab the keyboard to prevent noVNC from
+        // also sending its own (broken) version of the event.
+        //
+        // See: https://github.com/novnc/noVNC/issues/1413
+        // ──────────────────────────────────────────────────────
+        (function setupShiftTabFix() {
+            let shiftHeld = false;
+            // Wait for canvas to exist (RFB creates it on connect)
+            function attach() {
+                const canvas = document.querySelector('#vncContainer canvas');
+                if (!canvas) { setTimeout(attach, 500); return; }
 
-        document.addEventListener('keydown', (e) => {
-            // Don't interfere when SR simulator is active (it has its own handler)
-            if (srActive) return;
-            // Don't interfere when terminal or inputs are focused
-            const termOverlay = document.getElementById('terminalOverlay');
-            if (termOverlay && termOverlay.classList.contains('open')) return;
-            if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) return;
+                canvas.addEventListener('keydown', (e) => {
+                    if (e.key === 'Shift') shiftHeld = true;
+                }, true);
 
-            // Step 1: When Shift is pressed, blur iframe so we can catch Tab
-            if (e.key === 'Shift' && !_shiftTabPending) {
-                const iframe = document.querySelector('#vncContainer iframe');
-                if (iframe && document.activeElement === iframe) {
-                    iframe.blur();
-                    _shiftTabPending = true;
-                    // Safety: refocus after 200ms if no Tab follows
-                    _shiftTabTimer = setTimeout(() => { _refocusVNC(); }, 200);
-                }
-                return;
+                canvas.addEventListener('keyup', (e) => {
+                    if (e.key === 'Tab' && shiftHeld && rfb) {
+                        rfb._keyboard.ungrab();
+                        rfb.sendKey(0xFE20, 'Tab', true);  // XK_ISO_Left_Tab
+                        rfb.sendKey(0xFE20, 'Tab', false);
+                        setTimeout(() => { if (rfb) rfb._keyboard.grab(); }, 100);
+                    }
+                    if (e.key === 'Shift') shiftHeld = false;
+                }, true);
             }
-
-            // Step 2: If Tab arrives while Shift is pending, send Shift+Tab via xdotool
-            if (e.key === 'Tab' && _shiftTabPending) {
-                e.preventDefault();
-                e.stopPropagation();
-                clearTimeout(_shiftTabTimer);
-                _shiftTabPending = false;
-                fetch(`http://${VNC_HOST}:${CONTROL_PORT}/keys/send?keys=shift+Tab`)
-                    .catch(() => {})
-                    .finally(() => { setTimeout(_refocusVNC, 50); });
-                return;
-            }
-
-            // Step 3: Any other key while Shift is pending — refocus immediately
-            if (_shiftTabPending) {
-                clearTimeout(_shiftTabTimer);
-                _refocusVNC();
-            }
-        }, true);
-
-        document.addEventListener('keyup', (e) => {
-            // If Shift is released without Tab, refocus immediately
-            if (e.key === 'Shift' && _shiftTabPending) {
-                clearTimeout(_shiftTabTimer);
-                _refocusVNC();
-            }
-        }, true);
+            attach();
+        })();
 
         // SR Keyboard interception (capture phase — before VNC gets the keys)
         document.addEventListener('keydown', (e) => {
@@ -7097,22 +7031,14 @@
         function activateHoverInspect() {
             isHoverInspectActive = true;
             updateInspectButton();
-            // Notify VNC iframe to start forwarding pointermove and intercepting clicks
-            const iframe = document.querySelector('#vncContainer iframe');
-            if (iframe?.contentWindow) {
-                iframe.contentWindow.postMessage({ type: 'inspekt-hover-mode', enabled: true }, '*');
-            }
+            // With direct RFB, hover-inspect is handled by capture-phase
+            // event interceptors on the VNC container (see _setupCanvasEventInterceptors)
             document.getElementById('vncContainer').classList.add('hover-inspect-active');
         }
 
         function deactivateHoverInspect() {
             isHoverInspectActive = false;
             updateInspectButton();
-            // Notify VNC iframe to stop
-            const iframe = document.querySelector('#vncContainer iframe');
-            if (iframe?.contentWindow) {
-                iframe.contentWindow.postMessage({ type: 'inspekt-hover-mode', enabled: false }, '*');
-            }
             document.getElementById('vncContainer').classList.remove('hover-inspect-active');
             // Cancel any in-flight hover request
             if (_hoverAbortController) {
@@ -7133,7 +7059,7 @@
             }
         }
 
-        // Handle pointermove from VNC iframe during hover-inspect
+        // Handle pointermove from VNC canvas during hover-inspect
         async function _handleHoverMove(vmX, vmY) {
             if (!isHoverInspectActive) return;
 
@@ -8062,14 +7988,11 @@
         // Toggle fullscreen
         function toggleFullscreen() {
             const container = document.getElementById('vncContainer');
-            const iframe = container.querySelector('iframe');
 
-            if (iframe) {
-                if (document.fullscreenElement) {
-                    document.exitFullscreen();
-                } else {
-                    iframe.requestFullscreen();
-                }
+            if (document.fullscreenElement) {
+                document.exitFullscreen();
+            } else {
+                container.requestFullscreen();
             }
         }
 
@@ -9351,7 +9274,7 @@
             menu.style.left = x + 'px';
             menu.style.top = y + 'px';
 
-            // Dismiss on outside click, Escape, or window blur (cross-origin VNC iframe click)
+            // Dismiss on outside click, Escape, or window blur
             // Next tick to avoid the originating right-click from immediately dismissing
             requestAnimationFrame(() => {
                 document.addEventListener('mousedown', onMenuOutsideClick);
@@ -9730,44 +9653,73 @@
             }
         }
 
-        // VNC viewport messages: right-click, left-click, hover-inspect pointermove
-        window.addEventListener('message', (e) => {
-            if (e.data?.type === 'vnc-contextmenu') {
-                // Deactivate hover-inspect before showing context menu
+        // VNC canvas event interceptors — replaces the old postMessage bridge.
+        // With direct RFB embedding, we add capture-phase listeners on the
+        // VNC container to intercept events BEFORE RFB's canvas handlers.
+        let _canvasInterceptorsSetup = false;
+
+        function _setupCanvasEventInterceptors() {
+            if (_canvasInterceptorsSetup) return;
+            _canvasInterceptorsSetup = true;
+
+            const container = document.getElementById('vncContainer');
+
+            // Right-click: always intercept to show custom context menu
+            container.addEventListener('contextmenu', (e) => {
+                e.preventDefault();
+                e.stopImmediatePropagation();
                 if (isHoverInspectActive) deactivateHoverInspect();
-                const iframe = document.querySelector('#vncContainer iframe');
-                if (!iframe) return;
-                const rect = iframe.getBoundingClientRect();
-                showVNCContextMenu(
-                    rect.left + e.data.clientX,
-                    rect.top + e.data.clientY,
-                    e.data.clientX,
-                    e.data.clientY
-                );
-            } else if (e.data?.type === 'vnc-pointermove') {
-                // Hover-inspect: forward mouse position to element-at-point
-                _handleHoverMove(e.data.clientX, e.data.clientY);
-            } else if (e.data?.type === 'vnc-pointerdown') {
-                if (e.data.hoverInspect) {
-                    // Click-to-lock during hover-inspect mode
-                    _handleHoverLock(e.data.clientX, e.data.clientY);
+                const vm = _clientToVm(e.clientX, e.clientY);
+                showVNCContextMenu(e.clientX, e.clientY, vm.x, vm.y);
+            }, true);
+
+            // Block right-click pointer events from reaching RFB
+            container.addEventListener('pointerdown', (e) => {
+                if (e.button === 2) {
+                    e.preventDefault();
+                    e.stopImmediatePropagation();
                     return;
                 }
-                if (activeContextMenu) dismissContextMenu();
-                // Dismiss host-side overlays and stop tracking on any click in the VNC viewport
-                if (_inspectTrackingActive && activeTabId) {
-                    _tabInspectState[activeTabId] = { wasTracking: false };
+                // Hover-inspect: intercept left click to lock element
+                if (isHoverInspectActive && e.button === 0) {
+                    e.preventDefault();
+                    e.stopImmediatePropagation();
+                    const vm = _clientToVm(e.clientX, e.clientY);
+                    _handleHoverLock(vm.x, vm.y);
+                    return;
                 }
-                _stopInspectTracking();
-                vncOverlay.dismissAll(true);
-            }
-        });
+                // Normal left click: dismiss overlays
+                if (e.button === 0) {
+                    if (activeContextMenu) dismissContextMenu();
+                    if (_inspectTrackingActive && activeTabId) {
+                        _tabInspectState[activeTabId] = { wasTracking: false };
+                    }
+                    _stopInspectTracking();
+                    vncOverlay.dismissAll(true);
+                }
+            }, true);
+
+            container.addEventListener('pointerup', (e) => {
+                if (e.button === 2) {
+                    e.preventDefault();
+                    e.stopImmediatePropagation();
+                }
+            }, true);
+
+            // Hover-inspect: track pointer moves for element highlighting
+            container.addEventListener('pointermove', (e) => {
+                if (isHoverInspectActive) {
+                    const vm = _clientToVm(e.clientX, e.clientY);
+                    _handleHoverMove(vm.x, vm.y);
+                }
+            });
+        }
 
         // Note: Escape key dismissal for inspect overlay is handled in the
         // unified keyboard shortcuts handler below (search "Keyboard shortcuts").
 
-        // Prevent default context menu on VNC container border/padding
-        document.getElementById('vncContainer').addEventListener('contextmenu', e => e.preventDefault());
+        // Note: context menu prevention on VNC container is now handled by
+        // _setupCanvasEventInterceptors() capture-phase listener.
 
         // Initialize
         window.addEventListener('load', () => {

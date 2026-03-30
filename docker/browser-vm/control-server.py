@@ -2236,11 +2236,37 @@ class ControlHandler(BaseHTTPRequestHandler):
                 self.send_json({'ok': False, 'error': 'Missing keys parameter'}, 400)
                 return
             try:
-                subprocess.run(
-                    ['xdotool', 'key', '--delay', '50', keys],
-                    env={**os.environ, 'DISPLAY': DISPLAY},
-                    timeout=2, capture_output=True,
-                )
+                xdotool_env = {**os.environ, 'DISPLAY': DISPLAY}
+                # For modifier+key combos (e.g., shift+Tab), use a shell
+                # command string with && chaining, matching the docker exec
+                # approach that's proven to work reliably.
+                if '+' in keys:
+                    # Get the active window and send keys to it explicitly.
+                    # xdotool modifier combos fail from the HTTP server's
+                    # threads without explicit window targeting.
+                    xdotool_env = {**os.environ, 'DISPLAY': DISPLAY}
+                    wid_result = subprocess.run(
+                        ['xdotool', 'getactivewindow'],
+                        env=xdotool_env, capture_output=True, text=True, timeout=2,
+                    )
+                    wid = wid_result.stdout.strip()
+                    if wid:
+                        subprocess.Popen(
+                            ['xdotool', 'key', '--window', wid, keys],
+                            env=xdotool_env,
+                        )
+                    else:
+                        subprocess.Popen(
+                            ['xdotool', 'key', keys],
+                            env=xdotool_env,
+                        )
+                    self.send_json({'ok': True})
+                    return
+                    if result.returncode != 0:
+                        self.send_json({'ok': False, 'error': result.stderr or 'xdotool failed'}, 500)
+                        return
+                else:
+                    subprocess.run(['xdotool', 'key', keys], env=xdotool_env, timeout=2, capture_output=True)
                 self.send_json({'ok': True})
             except Exception as e:
                 self.send_json({'ok': False, 'error': str(e)}, 500)

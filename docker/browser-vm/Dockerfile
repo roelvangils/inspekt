@@ -292,14 +292,10 @@ RUN chmod +x /entrypoint.sh /root/.config/openbox/autostart /opt/inspekt-chromiu
     sed -i 's|<h1 class="noVNC_logo" translate="no"><span>no</span><br>VNC</h1>||g' /usr/share/novnc/vnc.html && \
     sed -i 's|<div class="noVNC_logo" translate="no"><span>no</span>VNC</div>||g' /usr/share/novnc/vnc.html && \
     # Update page title
-    sed -i 's|<title>noVNC</title>|<title>Inspekt Browser VM</title>|' /usr/share/novnc/vnc.html && \
-    # Inject right-click interceptor for VNC viewport context menu.
-    # Capture phase (3rd arg = true) fires BEFORE noVNC's canvas handlers.
-    # - Intercepts pointerdown/up for button 2 so right-clicks don't reach VNC
-    #   (preserving text selection in the VM browser)
-    # - Posts coordinates to parent on contextmenu for the custom menu
-    # - Notifies parent on left pointerdown so it can dismiss an open context menu
-    sed -i 's|</body>|<script>var _inspektHoverActive=false;window.addEventListener("message",function(e){if(e.data\&\&e.data.type==="inspekt-hover-mode"){_inspektHoverActive=!!e.data.enabled}});["pointerdown","pointerup"].forEach(function(t){document.addEventListener(t,function(e){if(e.button===2){e.preventDefault();e.stopImmediatePropagation()}if(_inspektHoverActive\&\&e.button===0){e.preventDefault();e.stopImmediatePropagation();if(t==="pointerdown"){window.parent.postMessage({type:"vnc-pointerdown",hoverInspect:true,clientX:e.clientX,clientY:e.clientY},"*")}}},true)});document.addEventListener("pointerdown",function(e){if(e.button===0\&\&!_inspektHoverActive)window.parent.postMessage({type:"vnc-pointerdown"},"*")},true);document.addEventListener("pointermove",function(e){if(_inspektHoverActive){window.parent.postMessage({type:"vnc-pointermove",clientX:e.clientX,clientY:e.clientY},"*")}},true);document.addEventListener("contextmenu",function(e){e.preventDefault();e.stopImmediatePropagation();window.parent.postMessage({type:"vnc-contextmenu",clientX:e.clientX,clientY:e.clientY},"*")},true);</script></body>|' /usr/share/novnc/vnc.html
+    sed -i 's|<title>noVNC</title>|<title>Inspekt Browser VM</title>|' /usr/share/novnc/vnc.html
+    # Note: pointer/keyboard event interception previously injected into vnc.html
+    # is no longer needed — control-panel.html embeds RFB directly (no iframe),
+    # so all event handling happens via capture-phase listeners on the VNC container.
 
 # Expose ports
 EXPOSE 443 6080 6081 7835 8767 8768 8889 9222
