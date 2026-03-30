@@ -1,0 +1,330 @@
+{
+  "_meta": {
+    "version": "1.0.0",
+    "description": "Keyboard commands for each screen reader, organized by mode. The 'SR' modifier is configurable (defaults to CapsLock, replaces Insert).",
+    "sources": [
+      "https://github.com/w3c/aria-at/blob/master/tests/commands.json",
+      "https://github.com/w3c/aria-at/blob/master/tests/support.json",
+      "JAWS 2024 keyboard reference",
+      "NVDA 2024.1 user guide",
+      "VoiceOver macOS 15 commands reference"
+    ],
+    "modifier_note": "In the VM simulator, 'SR' (Insert) is replaced by a configurable modifier key (default: CapsLock). 'VO' (VoiceOver modifier) is Control+Option."
+  },
+
+  "jaws": {
+    "_info": {
+      "name": "JAWS",
+      "full_name": "Job Access With Speech",
+      "platform": "Windows",
+      "modifier": "Insert",
+      "modes": {
+        "reading": "Virtual Cursor (reading mode) — navigate page content line by line",
+        "interaction": "PC Cursor (forms/interaction mode) — interact with form controls and widgets"
+      },
+      "mode_switch": "JAWS auto-switches to interaction mode on form controls. Press Escape to return to reading mode."
+    },
+    "reading": {
+      "_description": "Virtual cursor active — read and navigate page content",
+      "navigation": {
+        "ArrowDown":       { "action": "next-line", "label": "Next line" },
+        "ArrowUp":         { "action": "previous-line", "label": "Previous line" },
+        "ArrowRight":      { "action": "next-character", "label": "Next character" },
+        "ArrowLeft":       { "action": "previous-character", "label": "Previous character" },
+        "Tab":             { "action": "next-focusable", "label": "Next focusable element" },
+        "Shift+Tab":       { "action": "previous-focusable", "label": "Previous focusable element" },
+        "Home":            { "action": "top-of-page", "label": "Top of page" },
+        "End":             { "action": "bottom-of-page", "label": "Bottom of page" }
+      },
+      "quick_nav": {
+        "h":               { "action": "next-heading", "label": "Next heading" },
+        "Shift+h":         { "action": "previous-heading", "label": "Previous heading" },
+        "1":               { "action": "next-heading-level", "level": 1, "label": "Next heading level 1" },
+        "2":               { "action": "next-heading-level", "level": 2, "label": "Next heading level 2" },
+        "3":               { "action": "next-heading-level", "level": 3, "label": "Next heading level 3" },
+        "4":               { "action": "next-heading-level", "level": 4, "label": "Next heading level 4" },
+        "5":               { "action": "next-heading-level", "level": 5, "label": "Next heading level 5" },
+        "6":               { "action": "next-heading-level", "level": 6, "label": "Next heading level 6" },
+        "k":               { "action": "next-link", "label": "Next link" },
+        "Shift+k":         { "action": "previous-link", "label": "Previous link" },
+        "u":               { "action": "next-unvisited-link", "label": "Next unvisited link" },
+        "v":               { "action": "next-visited-link", "label": "Next visited link" },
+        "f":               { "action": "next-form-field", "label": "Next form field" },
+        "Shift+f":         { "action": "previous-form-field", "label": "Previous form field" },
+        "b":               { "action": "next-button", "label": "Next button" },
+        "Shift+b":         { "action": "previous-button", "label": "Previous button" },
+        "t":               { "action": "next-table", "label": "Next table" },
+        "Shift+t":         { "action": "previous-table", "label": "Previous table" },
+        "l":               { "action": "next-list", "label": "Next list" },
+        "Shift+l":         { "action": "previous-list", "label": "Previous list" },
+        "i":               { "action": "next-list-item", "label": "Next list item" },
+        "Shift+i":         { "action": "previous-list-item", "label": "Previous list item" },
+        "g":               { "action": "next-graphic", "label": "Next graphic" },
+        "Shift+g":         { "action": "previous-graphic", "label": "Previous graphic" },
+        "r":               { "action": "next-landmark", "label": "Next landmark" },
+        "Shift+r":         { "action": "previous-landmark", "label": "Previous landmark" },
+        "q":               { "action": "next-blockquote", "label": "Next blockquote" },
+        "Shift+q":         { "action": "previous-blockquote", "label": "Previous blockquote" },
+        "s":               { "action": "next-separator", "label": "Next separator" }
+      },
+      "actions": {
+        "Enter":           { "action": "activate", "label": "Activate link/button" },
+        "Space":           { "action": "activate", "label": "Activate element" },
+        "SR+ArrowDown":    { "action": "say-all", "label": "Read from cursor to end" },
+        "SR+ArrowUp":      { "action": "say-line", "label": "Read current line" },
+        "Escape":          { "action": "stop-speech", "label": "Stop speech" }
+      },
+      "lists": {
+        "SR+F5":           { "action": "list-form-fields", "label": "List form fields" },
+        "SR+F6":           { "action": "list-headings", "label": "List headings" },
+        "SR+F7":           { "action": "list-links", "label": "List links" },
+        "SR+F9":           { "action": "list-frames", "label": "List frames" }
+      }
+    },
+    "interaction": {
+      "_description": "PC cursor active — interact with form controls and widgets",
+      "navigation": {
+        "Tab":             { "action": "next-focusable", "label": "Next focusable element" },
+        "Shift+Tab":       { "action": "previous-focusable", "label": "Previous focusable element" },
+        "ArrowDown":       { "action": "widget-next", "label": "Next option/item" },
+        "ArrowUp":         { "action": "widget-previous", "label": "Previous option/item" },
+        "ArrowRight":      { "action": "widget-right", "label": "Move right in widget" },
+        "ArrowLeft":       { "action": "widget-left", "label": "Move left in widget" }
+      },
+      "actions": {
+        "Enter":           { "action": "activate", "label": "Activate/submit" },
+        "Space":           { "action": "toggle", "label": "Toggle checkbox/button" },
+        "Escape":          { "action": "exit-to-reading", "label": "Return to reading mode" }
+      }
+    }
+  },
+
+  "nvda": {
+    "_info": {
+      "name": "NVDA",
+      "full_name": "NonVisual Desktop Access",
+      "platform": "Windows",
+      "modifier": "Insert (or CapsLock)",
+      "modes": {
+        "browse": "Browse mode — read and navigate page content",
+        "focus": "Focus mode — interact with form controls and widgets"
+      },
+      "mode_switch": "NVDA auto-switches on form controls. Toggle manually with Insert+Space."
+    },
+    "browse": {
+      "_description": "Browse mode — read and navigate page content",
+      "navigation": {
+        "ArrowDown":       { "action": "next-line", "label": "Next line" },
+        "ArrowUp":         { "action": "previous-line", "label": "Previous line" },
+        "ArrowRight":      { "action": "next-character", "label": "Next character" },
+        "ArrowLeft":       { "action": "previous-character", "label": "Previous character" },
+        "Tab":             { "action": "next-focusable", "label": "Next focusable element" },
+        "Shift+Tab":       { "action": "previous-focusable", "label": "Previous focusable element" },
+        "Ctrl+Home":       { "action": "top-of-page", "label": "Top of page" },
+        "Ctrl+End":        { "action": "bottom-of-page", "label": "Bottom of page" }
+      },
+      "quick_nav": {
+        "h":               { "action": "next-heading", "label": "Next heading" },
+        "Shift+h":         { "action": "previous-heading", "label": "Previous heading" },
+        "1":               { "action": "next-heading-level", "level": 1, "label": "Next heading level 1" },
+        "2":               { "action": "next-heading-level", "level": 2, "label": "Next heading level 2" },
+        "3":               { "action": "next-heading-level", "level": 3, "label": "Next heading level 3" },
+        "4":               { "action": "next-heading-level", "level": 4, "label": "Next heading level 4" },
+        "5":               { "action": "next-heading-level", "level": 5, "label": "Next heading level 5" },
+        "6":               { "action": "next-heading-level", "level": 6, "label": "Next heading level 6" },
+        "k":               { "action": "next-link", "label": "Next link" },
+        "Shift+k":         { "action": "previous-link", "label": "Previous link" },
+        "u":               { "action": "next-unvisited-link", "label": "Next unvisited link" },
+        "v":               { "action": "next-visited-link", "label": "Next visited link" },
+        "f":               { "action": "next-form-field", "label": "Next form field" },
+        "Shift+f":         { "action": "previous-form-field", "label": "Previous form field" },
+        "b":               { "action": "next-button", "label": "Next button" },
+        "Shift+b":         { "action": "previous-button", "label": "Previous button" },
+        "t":               { "action": "next-table", "label": "Next table" },
+        "Shift+t":         { "action": "previous-table", "label": "Previous table" },
+        "l":               { "action": "next-list", "label": "Next list" },
+        "Shift+l":         { "action": "previous-list", "label": "Previous list" },
+        "i":               { "action": "next-list-item", "label": "Next list item" },
+        "Shift+i":         { "action": "previous-list-item", "label": "Previous list item" },
+        "g":               { "action": "next-graphic", "label": "Next graphic" },
+        "Shift+g":         { "action": "previous-graphic", "label": "Previous graphic" },
+        "d":               { "action": "next-landmark", "label": "Next landmark" },
+        "Shift+d":         { "action": "previous-landmark", "label": "Previous landmark" },
+        "e":               { "action": "next-edit-field", "label": "Next edit field" },
+        "Shift+e":         { "action": "previous-edit-field", "label": "Previous edit field" },
+        "x":               { "action": "next-checkbox", "label": "Next checkbox" },
+        "Shift+x":         { "action": "previous-checkbox", "label": "Previous checkbox" },
+        "c":               { "action": "next-combobox", "label": "Next combo box" },
+        "Shift+c":         { "action": "previous-combobox", "label": "Previous combo box" },
+        "r":               { "action": "next-radio-button", "label": "Next radio button" },
+        "Shift+r":         { "action": "previous-radio-button", "label": "Previous radio button" },
+        "n":               { "action": "next-no-link-text", "label": "Next text (non-link)" },
+        "Shift+n":         { "action": "previous-no-link-text", "label": "Previous text (non-link)" },
+        "s":               { "action": "next-separator", "label": "Next separator" }
+      },
+      "actions": {
+        "Enter":           { "action": "activate", "label": "Activate link/button" },
+        "Space":           { "action": "activate", "label": "Activate element" },
+        "SR+ArrowDown":    { "action": "say-all", "label": "Read from cursor to end" },
+        "SR+ArrowUp":      { "action": "say-line", "label": "Read current line" },
+        "SR+Space":        { "action": "toggle-mode", "label": "Toggle browse/focus mode" },
+        "Ctrl":            { "action": "stop-speech", "label": "Stop speech" }
+      },
+      "lists": {
+        "SR+F7":           { "action": "elements-list", "label": "Elements list (headings, links, landmarks)" }
+      }
+    },
+    "focus": {
+      "_description": "Focus mode — interact with form controls and widgets",
+      "navigation": {
+        "Tab":             { "action": "next-focusable", "label": "Next focusable element" },
+        "Shift+Tab":       { "action": "previous-focusable", "label": "Previous focusable element" },
+        "ArrowDown":       { "action": "widget-next", "label": "Next option/item" },
+        "ArrowUp":         { "action": "widget-previous", "label": "Previous option/item" },
+        "ArrowRight":      { "action": "widget-right", "label": "Move right in widget" },
+        "ArrowLeft":       { "action": "widget-left", "label": "Move left in widget" }
+      },
+      "actions": {
+        "Enter":           { "action": "activate", "label": "Activate/submit" },
+        "Space":           { "action": "toggle", "label": "Toggle checkbox/button" },
+        "SR+Space":        { "action": "toggle-mode", "label": "Toggle focus/browse mode" },
+        "Escape":          { "action": "exit-to-browse", "label": "Return to browse mode" }
+      }
+    }
+  },
+
+  "voiceover": {
+    "_info": {
+      "name": "VoiceOver",
+      "full_name": "VoiceOver for macOS",
+      "platform": "macOS",
+      "modifier": "Control+Option (VO)",
+      "modes": {
+        "reading": "Standard navigation — VO+Arrow keys to move through content",
+        "quick_nav": "Quick Nav (Left+Right arrows simultaneously to toggle) — arrow keys navigate without VO modifier",
+        "interaction": "Interact mode (VO+Shift+Down) — navigate within complex widgets"
+      },
+      "mode_note": "VoiceOver doesn't have a traditional mode switch like JAWS/NVDA. Quick Nav changes arrow key behavior."
+    },
+    "reading": {
+      "_description": "Standard VoiceOver navigation with VO modifier",
+      "navigation": {
+        "VO+ArrowRight":   { "action": "next-element", "label": "Next element" },
+        "VO+ArrowLeft":    { "action": "previous-element", "label": "Previous element" },
+        "VO+ArrowDown":    { "action": "next-line", "label": "Next line / Read next" },
+        "VO+ArrowUp":      { "action": "previous-line", "label": "Previous line" },
+        "Tab":             { "action": "next-focusable", "label": "Next focusable element" },
+        "Shift+Tab":       { "action": "previous-focusable", "label": "Previous focusable element" },
+        "VO+Home":         { "action": "top-of-page", "label": "Top of page" },
+        "VO+End":          { "action": "bottom-of-page", "label": "Bottom of page" },
+        "VO+Shift+ArrowDown": { "action": "interact-with", "label": "Interact with container" },
+        "VO+Shift+ArrowUp":   { "action": "stop-interacting", "label": "Stop interacting with container" }
+      },
+      "quick_nav": {
+        "VO+Cmd+h":        { "action": "next-heading", "label": "Next heading" },
+        "VO+Cmd+Shift+h":  { "action": "previous-heading", "label": "Previous heading" },
+        "VO+Cmd+l":        { "action": "next-link", "label": "Next link" },
+        "VO+Cmd+Shift+l":  { "action": "previous-link", "label": "Previous link" },
+        "VO+Cmd+j":        { "action": "next-form-field", "label": "Next form control" },
+        "VO+Cmd+Shift+j":  { "action": "previous-form-field", "label": "Previous form control" },
+        "VO+Cmd+t":        { "action": "next-table", "label": "Next table" },
+        "VO+Cmd+Shift+t":  { "action": "previous-table", "label": "Previous table" },
+        "VO+Cmd+x":        { "action": "next-list", "label": "Next list" },
+        "VO+Cmd+Shift+x":  { "action": "previous-list", "label": "Previous list" },
+        "VO+Cmd+g":        { "action": "next-graphic", "label": "Next graphic" },
+        "VO+Cmd+Shift+g":  { "action": "previous-graphic", "label": "Previous graphic" }
+      },
+      "actions": {
+        "VO+Space":        { "action": "activate", "label": "Activate element" },
+        "VO+a":            { "action": "say-all", "label": "Read from cursor to end" },
+        "Ctrl":            { "action": "stop-speech", "label": "Stop speech" },
+        "VO+u":            { "action": "rotor", "label": "Open Rotor (headings, links, etc.)" },
+        "VO+F3":           { "action": "item-description", "label": "Describe item" }
+      }
+    },
+    "quick_nav_on": {
+      "_description": "Quick Nav enabled — arrow keys navigate without VO modifier. Toggle with Left+Right arrows simultaneously.",
+      "navigation": {
+        "ArrowRight":      { "action": "next-element", "label": "Next element" },
+        "ArrowLeft":       { "action": "previous-element", "label": "Previous element" },
+        "ArrowDown":       { "action": "next-heading", "label": "Next heading (or Rotor item)" },
+        "ArrowUp":         { "action": "previous-heading", "label": "Previous heading (or Rotor item)" }
+      }
+    }
+  },
+
+  "_cheat_sheet_templates": {
+    "_description": "Simplified keyboard shortcuts for the VM cheat sheet UI, grouped by category.",
+    "jaws": {
+      "Navigate": [
+        ["↓ / ↑", "Next / previous line"],
+        ["Tab", "Next focusable"],
+        ["H", "Next heading"],
+        ["1-6", "Next heading level N"],
+        ["K", "Next link"],
+        ["F", "Next form field"],
+        ["B", "Next button"],
+        ["T", "Next table"],
+        ["L", "Next list"],
+        ["R", "Next landmark"],
+        ["G", "Next graphic"]
+      ],
+      "Actions": [
+        ["Enter / Space", "Activate"],
+        ["SR+↓", "Read all"],
+        ["SR+↑", "Read line"],
+        ["Escape", "Stop / exit mode"]
+      ],
+      "Lists": [
+        ["SR+F6", "Headings list"],
+        ["SR+F7", "Links list"],
+        ["SR+F5", "Form fields list"]
+      ]
+    },
+    "nvda": {
+      "Navigate": [
+        ["↓ / ↑", "Next / previous line"],
+        ["Tab", "Next focusable"],
+        ["H", "Next heading"],
+        ["1-6", "Next heading level N"],
+        ["K", "Next link"],
+        ["F", "Next form field"],
+        ["B", "Next button"],
+        ["T", "Next table"],
+        ["L", "Next list"],
+        ["D", "Next landmark"],
+        ["G", "Next graphic"]
+      ],
+      "Actions": [
+        ["Enter / Space", "Activate"],
+        ["SR+↓", "Read all"],
+        ["SR+↑", "Read line"],
+        ["SR+Space", "Toggle browse/focus"],
+        ["Ctrl", "Stop speech"]
+      ],
+      "Lists": [
+        ["SR+F7", "Elements list"]
+      ]
+    },
+    "voiceover": {
+      "Navigate": [
+        ["VO+→ / VO+←", "Next / previous element"],
+        ["Tab", "Next focusable"],
+        ["VO+⌘+H", "Next heading"],
+        ["VO+⌘+L", "Next link"],
+        ["VO+⌘+J", "Next form control"],
+        ["VO+⌘+T", "Next table"],
+        ["VO+⌘+X", "Next list"],
+        ["VO+⌘+G", "Next graphic"],
+        ["VO+⇧+↓", "Interact with container"],
+        ["VO+⇧+↑", "Stop interacting"]
+      ],
+      "Actions": [
+        ["VO+Space", "Activate"],
+        ["VO+A", "Read all"],
+        ["VO+U", "Open Rotor"],
+        ["Ctrl", "Stop speech"]
+      ]
+    }
+  }
+}

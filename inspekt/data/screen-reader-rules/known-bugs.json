@@ -1,0 +1,135 @@
+{
+  "_meta": {
+    "version": "1.0.0",
+    "description": "Documented screen reader bugs and quirks sourced from ARIA-AT test results and a11ysupport.io. Each bug is tied to a role or property, a specific SR, and optionally a browser.",
+    "sources": [
+      "https://aria-at.w3.org/",
+      "https://a11ysupport.io/",
+      "https://github.com/w3c/aria-at/issues"
+    ],
+    "last_updated": "2026-03-30"
+  },
+
+  "bugs": [
+    {
+      "id": "voiceover-alert-no-role",
+      "role": "alert",
+      "screen_reader": "voiceover",
+      "browser": "chrome",
+      "severity": "moderate",
+      "description": "VoiceOver on Chrome does not announce the 'alert' role for dynamically added alerts. Content is read but without the assertive interruption behavior.",
+      "workaround": "Use Safari for VoiceOver testing, or add role='alert' to a container that exists in the DOM before content is injected.",
+      "source_url": "https://a11ysupport.io/tech/aria/alert_role"
+    },
+    {
+      "id": "jaws-aria-describedby-browse",
+      "property": "aria-describedby",
+      "screen_reader": "jaws",
+      "browser": "all",
+      "severity": "minor",
+      "description": "JAWS does not read aria-describedby content in virtual cursor mode by default. Users must press Insert+F1 to hear the description.",
+      "workaround": "Ensure critical information is in the accessible name (aria-label/aria-labelledby), not just the description.",
+      "source_url": "https://a11ysupport.io/tech/aria/aria-describedby_attribute"
+    },
+    {
+      "id": "nvda-combobox-expanded-not-announced",
+      "role": "combobox",
+      "screen_reader": "nvda",
+      "browser": "firefox",
+      "severity": "moderate",
+      "description": "NVDA with Firefox sometimes does not announce the expanded/collapsed state change when a combobox is toggled.",
+      "workaround": "Ensure aria-expanded is toggled on the combobox element itself, not a child.",
+      "source_url": "https://github.com/w3c/aria-at/issues"
+    },
+    {
+      "id": "voiceover-table-not-announced",
+      "role": "table",
+      "screen_reader": "voiceover",
+      "browser": "safari",
+      "severity": "serious",
+      "description": "VoiceOver on Safari does not recognize elements with role='table' as tables unless they also have a caption or aria-label. Without a name, the table structure is flattened.",
+      "workaround": "Always provide an accessible name for ARIA tables via aria-label or aria-labelledby.",
+      "source_url": "https://a11ysupport.io/tech/aria/table_role"
+    },
+    {
+      "id": "jaws-aria-current-missing",
+      "property": "aria-current",
+      "screen_reader": "jaws",
+      "browser": "chrome",
+      "severity": "minor",
+      "description": "JAWS 2023 and earlier do not announce aria-current='step' or aria-current='location'. Only 'page' and 'true' values are reliably announced.",
+      "workaround": "Use aria-current='page' when possible, or provide visual indicators alongside aria-current.",
+      "source_url": "https://a11ysupport.io/tech/aria/aria-current_attribute"
+    },
+    {
+      "id": "orca-no-live-region",
+      "role": "alert",
+      "screen_reader": "orca",
+      "browser": "firefox",
+      "severity": "critical",
+      "description": "Orca does not automatically announce alert role live regions. No automatic announcement is triggered when content changes.",
+      "workaround": "No reliable workaround. Consider alternative notification mechanisms for Orca users.",
+      "source_url": "https://a11ysupport.io/tech/aria/alert_role"
+    },
+    {
+      "id": "voiceover-aria-expanded-button",
+      "property": "aria-expanded",
+      "screen_reader": "voiceover",
+      "browser": "safari",
+      "severity": "minor",
+      "description": "VoiceOver announces expanded/collapsed state but uses inconsistent wording. Sometimes says 'expanded' and other times 'open' depending on the role of the element.",
+      "workaround": "None needed — the state is still conveyed, just with different wording.",
+      "source_url": "https://a11ysupport.io/tech/aria/aria-expanded_attribute"
+    },
+    {
+      "id": "nvda-aria-required-not-announced",
+      "property": "aria-required",
+      "screen_reader": "nvda",
+      "browser": "chrome",
+      "severity": "moderate",
+      "description": "NVDA does not announce aria-required on custom controls (div[role='textbox']) in Chrome. Works correctly on native input elements.",
+      "workaround": "Use native HTML form elements where possible. If using custom controls, add 'required' to the visible label text.",
+      "source_url": "https://a11ysupport.io/tech/aria/aria-required_attribute"
+    },
+    {
+      "id": "jaws-meter-not-supported",
+      "role": "meter",
+      "screen_reader": "jaws",
+      "browser": "all",
+      "severity": "moderate",
+      "description": "JAWS does not recognize role='meter'. The element is read as plain text without the meter value context.",
+      "workaround": "Use the native <meter> HTML element, or provide the value information in the accessible name.",
+      "source_url": "https://a11ysupport.io/tech/aria/meter_role"
+    },
+    {
+      "id": "voiceover-checkbox-mixed",
+      "role": "checkbox",
+      "screen_reader": "voiceover",
+      "browser": "chrome",
+      "severity": "minor",
+      "description": "VoiceOver on Chrome announces mixed-state checkboxes as 'mixed' instead of 'partially checked'. This differs from VoiceOver on Safari which says 'mixed'.",
+      "workaround": "No workaround needed — both convey the mixed state, just with different wording.",
+      "source_url": "https://a11ysupport.io/tech/aria/aria-checked_attribute"
+    },
+    {
+      "id": "nvda-dialog-focus-loss",
+      "role": "dialog",
+      "screen_reader": "nvda",
+      "browser": "chrome",
+      "severity": "serious",
+      "description": "When a modal dialog opens, NVDA sometimes does not move focus to the dialog. The user remains focused on the trigger element behind the modal.",
+      "workaround": "Explicitly set focus to the first focusable element or the dialog title when the dialog opens. Use aria-modal='true' and manage focus trapping.",
+      "source_url": "https://github.com/w3c/aria-at"
+    },
+    {
+      "id": "jaws-aria-roledescription-ignored",
+      "property": "aria-roledescription",
+      "screen_reader": "jaws",
+      "browser": "firefox",
+      "severity": "minor",
+      "description": "JAWS ignores aria-roledescription in Firefox, falling back to the native role name. Works in Chrome and Edge.",
+      "workaround": "Test with Chrome/Edge, or don't rely solely on aria-roledescription for critical information.",
+      "source_url": "https://a11ysupport.io/tech/aria/aria-roledescription_attribute"
+    }
+  ]
+}
