@@ -7,7 +7,7 @@
 #   docker run -d --network host --shm-size=2g inspekt-browser-vm
 #   Open http://localhost:6080/control.html in your browser
 
-FROM alpine:3.20
+FROM alpine:3.21
 
 LABEL maintainer="Inspekt" \
       description="Chromium browser with Inspekt extension accessible via noVNC" \
@@ -89,18 +89,25 @@ RUN apk add --no-cache \
     socat \
     # Firewall for user network restrictions
     iptables \
-    # noVNC and websockify
-    novnc \
+    # websockify (noVNC installed separately from GitHub for latest version)
+    websockify \
     # Node.js for lightningcss-cli (CSS optimization)
     nodejs \
     npm \
     # Runtime libraries for PyMuPDF (compiled from source on musl/aarch64)
     freetype harfbuzz jpeg openjpeg jbig2dec mupdf \
     && \
-    # Create noVNC symlink
-    ln -sf /usr/share/novnc/vnc.html /usr/share/novnc/index.html && \
     # Create necessary directories
     mkdir -p /var/log/supervisor /root/.config/openbox /opt/inspekt /opt/certs /run/dbus
+
+# Install noVNC 1.6.0 from GitHub (Alpine's package only has 1.4.0)
+# 1.6.0 has keyboard modifier key fixes important for Mac users
+RUN NOVNC_VERSION="1.6.0" && \
+    wget -q "https://github.com/novnc/noVNC/archive/refs/tags/v${NOVNC_VERSION}.tar.gz" -O /tmp/novnc.tar.gz && \
+    mkdir -p /usr/share/novnc && \
+    tar xzf /tmp/novnc.tar.gz -C /usr/share/novnc --strip-components=1 && \
+    ln -sf /usr/share/novnc/vnc.html /usr/share/novnc/index.html && \
+    rm /tmp/novnc.tar.gz
 
 # Install bore tunnel server (allows users to tunnel localhost to VM)
 RUN BORE_VERSION="0.5.2" && \

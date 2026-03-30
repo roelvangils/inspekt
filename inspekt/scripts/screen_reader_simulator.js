@@ -1174,7 +1174,8 @@
       cursor: null,
       liveMonitor: null,
       screenReader: null,
-      lastAnnouncement: null
+      lastAnnouncement: null,
+      options: {},
     };
   }
 
@@ -1182,9 +1183,13 @@
 
   /**
    * Start the screen reader simulator.
+   * @param {string} screenReader — 'jaws' | 'nvda' | 'voiceover'
+   * @param {string} verbosity — 'high' | 'medium' | 'low'
+   * @param {object} options — { startFromFocus, syncFocus, syncMouse }
    */
-  function startSimulator(screenReader, verbosity) {
+  function startSimulator(screenReader, verbosity, options) {
     SR.screenReader = screenReader;
+    SR.options = options || {};
     SR.engine = new AnnouncementEngine(screenReader, verbosity || 'high');
     SR.cursor = new VirtualCursor(SR.engine);
     SR.cursor.init(document.body);
@@ -1194,7 +1199,21 @@
     SR.liveMonitor.start();
     SR.active = true;
 
-    // Move to first element
+    // Start from currently focused element if requested
+    if (SR.options.startFromFocus) {
+      const focused = document.activeElement;
+      if (focused && focused !== document.body && focused !== document.documentElement) {
+        const index = SR.cursor.nodes.findIndex(n => n.element === focused);
+        if (index !== -1) {
+          SR.cursor.position = index;
+          const result = SR.cursor._currentResult();
+          SR.lastAnnouncement = result;
+          return result;
+        }
+      }
+    }
+
+    // Default: start from first element
     const first = SR.cursor.moveNext();
     SR.lastAnnouncement = first;
     return first;
@@ -1318,6 +1337,15 @@
 
     if (result) {
       SR.lastAnnouncement = result;
+
+      // Sync browser focus if enabled
+      if (SR.options?.syncFocus) {
+        const el = SR.cursor.getCurrentElement();
+        if (el && typeof el.focus === 'function') {
+          el.focus({ preventScroll: true });
+        }
+      }
+
       return { ok: true, ...result };
     }
 
@@ -1348,7 +1376,7 @@
   if (CONFIG.mode === 'walk') {
     return walkPage(CONFIG);
   } else if (CONFIG.mode === 'start') {
-    return startSimulator(CONFIG.screenReader, CONFIG.verbosity);
+    return startSimulator(CONFIG.screenReader, CONFIG.verbosity, CONFIG.options);
   } else if (CONFIG.mode === 'stop') {
     return stopSimulator();
   } else if (CONFIG.mode === 'navigate') {

@@ -307,7 +307,14 @@ def _get_or_create_cdp_connection(ws_url):
     """Get existing pooled connection or create a new one. Caller must hold _cdp_lock."""
     if ws_url in _cdp_connections:
         loop, ws, lock = _cdp_connections[ws_url]
-        if ws.open:
+        # Check if connection is still open (compatible with both old and new websockets)
+        try:
+            is_open = ws.open
+        except AttributeError:
+            # websockets v14+ removed .open; check .state instead
+            from websockets.protocol import State as WsState
+            is_open = (ws.state == WsState.OPEN)
+        if is_open:
             return loop, ws, lock
         # Connection closed, clean up
         del _cdp_connections[ws_url]
@@ -2221,6 +2228,23 @@ class ControlHandler(BaseHTTPRequestHandler):
             # Return the latest clipboard text posted by CLI commands
             self.send_json({'ok': True, 'text': clipboard_data['text'], 'timestamp': clipboard_data['timestamp']})
 
+        elif path == '/keys/send':
+            # Send keystrokes via xdotool (bypasses VNC for modifier key issues)
+            query = parse_qs(urlparse(self.path).query)
+            keys = query.get('keys', [None])[0]
+            if not keys:
+                self.send_json({'ok': False, 'error': 'Missing keys parameter'}, 400)
+                return
+            try:
+                subprocess.run(
+                    ['xdotool', 'key', '--delay', '50', keys],
+                    env={**os.environ, 'DISPLAY': DISPLAY},
+                    timeout=2, capture_output=True,
+                )
+                self.send_json({'ok': True})
+            except Exception as e:
+                self.send_json({'ok': False, 'error': str(e)}, 500)
+
         # ── Screen Reader Simulator GET endpoints ─────────────────
 
         elif path == '/sr/state':
@@ -2359,6 +2383,9 @@ class ControlHandler(BaseHTTPRequestHandler):
 
                 screen_reader = data.get('screenReader', 'jaws')
                 verbosity = data.get('verbosity', 'high')
+                sync_focus = data.get('syncFocus', False)
+                sync_mouse = data.get('syncMouse', False)
+                start_from_focus = data.get('startFromFocus', True)
 
                 tab = get_active_tab()
                 if not tab or not tab.get('webSocketDebuggerUrl'):
@@ -2372,6 +2399,10 @@ class ControlHandler(BaseHTTPRequestHandler):
                     'mode': 'start',
                     'screenReader': screen_reader,
                     'verbosity': verbosity,
+                    'options': {
+                        'startFromFocus': start_from_focus,
+                        'syncFocus': sync_focus,
+                    },
                 }
                 result = _sr_execute(ws_url, config)
 
@@ -2379,6 +2410,7 @@ class ControlHandler(BaseHTTPRequestHandler):
                     sr_state['active'] = True
                     sr_state['screen_reader'] = screen_reader
                     sr_state['verbosity'] = verbosity
+                    sr_state['sync_mouse'] = sync_mouse
                     sr_state['script_injected'] = True
                     sr_state['tab_ws_url'] = ws_url
                     self.send_json({
@@ -2421,6 +2453,21 @@ class ControlHandler(BaseHTTPRequestHandler):
                     'params': params,
                 }
                 result = _sr_execute(ws_url, config)
+
+                # Move system mouse pointer if sync_mouse is enabled
+                if sr_state.get('sync_mouse') and result.get('ok') and result.get('rect'):
+                    try:
+                        rect = result['rect']
+                        mx = int(rect['x'] + rect['width'] / 2)
+                        my = int(rect['y'] + rect['height'] / 2)
+                        subprocess.run(
+                            ['xdotool', 'mousemove', str(mx), str(my)],
+                            env={**os.environ, 'DISPLAY': DISPLAY},
+                            timeout=2, capture_output=True,
+                        )
+                    except Exception:
+                        pass  # Mouse sync is best-effort
+
                 self.send_json(result)
 
             except Exception as e:

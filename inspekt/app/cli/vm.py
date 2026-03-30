@@ -258,6 +258,18 @@ def _start_container(dev_mode: bool = False, vm_dir: Path = None) -> bool:
         "--name", CONTAINER_NAME,
         "--network", "host",
         "--shm-size=2g",
+        # Security: drop all capabilities, then add only what's needed
+        "--security-opt", "no-new-privileges:true",
+        "--cap-drop=ALL",
+        "--cap-add=SETUID",
+        "--cap-add=SETGID",
+        "--cap-add=CHOWN",
+        "--cap-add=DAC_OVERRIDE",
+        "--cap-add=FOWNER",
+        "--cap-add=KILL",
+        "--cap-add=NET_ADMIN",        # iptables for user network restrictions
+        "--cap-add=NET_RAW",         # Required by iptables
+        "--cap-add=NET_BIND_SERVICE", # Bind to privileged ports (API on 80, HTTPS)
         # Persist data directory (plugins, caches) across container restarts
         "-v", "inspekt-vm-data:/root/.config/inspekt",
     ]
@@ -277,6 +289,7 @@ def _start_container(dev_mode: bool = False, vm_dir: Path = None) -> bool:
         cmd.extend([
             "-v", f"{vm_dir}/control-panel.html:/usr/share/novnc/control.html:ro",
             "-v", f"{vm_dir}/fonts:/usr/share/novnc/fonts:ro",
+            "-v", f"{vm_dir}/icons:/usr/share/novnc/icons:ro",
             "-v", f"{vm_dir}/control-server.py:/opt/control-server.py:ro",
             "-v", f"{vm_dir}/terminal-server.py:/opt/terminal-server.py:ro",
             "-v", f"{vm_dir}/inspekt-config.json:/root/.config/inspekt.json:ro",

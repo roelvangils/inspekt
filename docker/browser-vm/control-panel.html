@@ -1265,51 +1265,74 @@
         .sr-captions-btn:hover { color: #fff; background: rgba(255, 255, 255, 0.1); }
         .sr-captions-btn.active { color: #667eea; }
 
-        /* SR launcher popout */
+        /* SR launcher popout — override base .url-bar-popout completely */
         .sr-popout {
-            width: 280px;
+            display: none !important;
+            flex-direction: column !important;
             right: 0;
             left: auto;
-            padding: 12px;
+            padding: 14px !important;
+            width: 220px !important;
+            min-width: 220px !important;
+            max-width: 220px !important;
+            box-sizing: border-box !important;
         }
+        .sr-popout.show { display: flex !important; }
+
         .sr-popout-header {
-            font: 600 13px/1.4 system-ui, sans-serif;
-            color: rgba(255, 255, 255, 0.7);
-            margin-bottom: 10px;
+            font: 500 10px/1.2 system-ui, sans-serif;
+            color: rgba(255, 255, 255, 0.4);
+            margin-bottom: 8px;
             text-transform: uppercase;
-            letter-spacing: 0.05em;
-            font-size: 11px;
+            letter-spacing: 0.08em;
         }
-        .sr-selector { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; }
+        .sr-selector {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            margin-bottom: 10px;
+        }
         .sr-option {
-            display: flex; align-items: center; gap: 10px;
-            background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 8px; padding: 8px 12px; cursor: pointer;
-            color: #fff; font-family: system-ui, sans-serif;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 8px;
+            padding: 6px 10px;
+            cursor: pointer;
+            color: #fff;
+            font-family: system-ui, sans-serif;
             transition: background 0.15s, border-color 0.15s;
+            text-align: left;
+            min-width: 0;
         }
-        .sr-option:hover { background: rgba(255, 255, 255, 0.1); border-color: rgba(255, 255, 255, 0.2); }
-        .sr-option.active { border-color: #667eea; background: rgba(102, 126, 234, 0.15); }
-        .sr-badge {
-            width: 32px; height: 32px; border-radius: 6px;
-            display: flex; align-items: center; justify-content: center;
-            font: 700 14px/1 system-ui; color: #fff; flex-shrink: 0;
+        .sr-option:hover { background: rgba(255, 255, 255, 0.08); border-color: rgba(255, 255, 255, 0.18); }
+        .sr-option.active { border-color: #667eea; background: rgba(102, 126, 234, 0.12); }
+        img.sr-badge {
+            width: 26px; height: 26px;
+            border-radius: 6px;
+            flex-shrink: 0;
+            object-fit: cover;
         }
-        .sr-badge.sr-jaws { background: #2196f3; }
-        .sr-badge.sr-nvda { background: #9c27b0; }
-        .sr-badge.sr-voiceover { background: #333; }
-        .sr-option-name { font-weight: 600; font-size: 14px; }
-        .sr-option-platform { font-size: 12px; color: rgba(255, 255, 255, 0.5); }
+        .sr-option-name { font-weight: 600; font-size: 13px; line-height: 1.2; }
+        .sr-option-platform { font-size: 11px; color: rgba(255, 255, 255, 0.4); }
         .sr-popout-options {
-            display: flex; gap: 16px; align-items: center;
-            padding-top: 10px; border-top: 1px solid rgba(255, 255, 255, 0.08);
-            font: 13px system-ui; color: rgba(255, 255, 255, 0.6);
+            font: 12px/1.4 system-ui, sans-serif;
+            color: rgba(255, 255, 255, 0.5);
         }
         .sr-popout-options select {
-            background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.15);
-            color: #fff; border-radius: 4px; padding: 2px 6px; font-size: 12px;
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            color: #fff; border-radius: 4px;
+            padding: 2px 6px; font-size: 11px;
+            margin-left: 4px;
         }
-        .sr-popout-options label { display: flex; align-items: center; gap: 4px; cursor: pointer; }
+        .sr-popout-options label {
+            display: flex; align-items: center;
+            gap: 4px; cursor: pointer;
+            white-space: nowrap; font-size: 12px;
+        }
 
         /* SR button active state */
         button.sr-active {
@@ -3043,7 +3066,8 @@
             Audio
         </button>
 
-        <!-- Screen Reader Simulator Button -->
+        <!-- Screen Reader Simulator Button + Popout wrapper -->
+        <div style="position: relative;">
         <button id="srBtn" onclick="toggleSRPopout()" title="Screen Reader Simulator">
             <svg viewBox="0 0 24 24"><path d="M17 20c-.29 0-.56-.06-.76-.15-.71-.37-1.21-.88-1.71-2.38-.51-1.56-1.47-2.29-2.39-3-.79-.61-1.61-1.24-2.32-2.53C9.29 10.98 9 9.93 9 9c0-2.8 2.2-5 5-5s5 2.2 5 5h2c0-3.93-3.07-7-7-7S7 5.07 7 9c0 1.26.38 2.65 1.07 3.9.91 1.65 1.98 2.48 2.85 3.15.81.62 1.39 1.07 1.71 2.05.6 1.82 1.37 2.84 2.73 3.55A3.999 3.999 0 0 0 21 18h-2c0 1.1-.9 2-2 2zM7.64 2.64L6.22 1.22C4.23 3.21 3 5.96 3 9s1.23 5.79 3.22 7.78l1.41-1.41C6.01 13.74 5 11.49 5 9s1.01-4.74 2.64-6.36zM11.5 9a2.5 2.5 0 0 0 5 0 2.5 2.5 0 0 0-5 0z" fill="currentColor"/></svg>
             SR
@@ -3054,41 +3078,49 @@
             <div class="sr-popout-header">Screen Reader Simulator</div>
             <div class="sr-selector">
                 <button class="sr-option" data-sr="jaws" onclick="startSRSimulation('jaws')">
-                    <span class="sr-badge sr-jaws">J</span>
+                    <img class="sr-badge" src="icons/jaws.png" alt="">
                     <div>
                         <div class="sr-option-name">JAWS</div>
                         <div class="sr-option-platform">Windows</div>
                     </div>
                 </button>
                 <button class="sr-option" data-sr="nvda" onclick="startSRSimulation('nvda')">
-                    <span class="sr-badge sr-nvda">N</span>
+                    <img class="sr-badge" src="icons/nvda.png" alt="">
                     <div>
                         <div class="sr-option-name">NVDA</div>
                         <div class="sr-option-platform">Windows</div>
                     </div>
                 </button>
                 <button class="sr-option" data-sr="voiceover" onclick="startSRSimulation('voiceover')">
-                    <span class="sr-badge sr-voiceover">VO</span>
+                    <img class="sr-badge" src="icons/voiceover.png" alt="">
                     <div>
                         <div class="sr-option-name">VoiceOver</div>
                         <div class="sr-option-platform">macOS</div>
                     </div>
                 </button>
             </div>
-            <div class="sr-popout-options">
-                <label>
-                    Verbosity
-                    <select id="srVerbosity">
-                        <option value="high" selected>High</option>
-                        <option value="medium">Medium</option>
-                        <option value="low">Low</option>
-                    </select>
-                </label>
-                <label>
-                    <input type="checkbox" id="srTTSCheckbox"> Speech
-                </label>
+            <div class="sr-popout-options" style="flex-direction: column; align-items: flex-start; gap: 6px;">
+                <div style="display: flex; gap: 14px; align-items: center; width: 100%;">
+                    <label>
+                        Verbosity
+                        <select id="srVerbosity">
+                            <option value="high" selected>High</option>
+                            <option value="medium">Medium</option>
+                            <option value="low">Low</option>
+                        </select>
+                    </label>
+                    <label>
+                        <input type="checkbox" id="srTTSCheckbox"> Speech
+                    </label>
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 4px; padding-top: 6px; border-top: 1px solid rgba(255,255,255,0.06); width: 100%;">
+                    <label><input type="checkbox" id="srStartFromFocus" checked> Start from focus</label>
+                    <label><input type="checkbox" id="srSyncFocus"> Sync browser focus</label>
+                    <label><input type="checkbox" id="srSyncMouse"> Mouse follows cursor</label>
+                </div>
             </div>
         </div>
+        </div><!-- end SR wrapper -->
 
         <div class="divider"></div>
 
@@ -3502,7 +3534,7 @@
         // Port Configuration (supports local dev & server deployment)
         // =============================================
         // Use 127.0.0.1 instead of localhost to force IPv4 (Docker port forwarding issue)
-        const VNC_HOST = window.location.hostname === 'localhost' ? '127.0.0.1' : window.location.hostname;
+        const VNC_HOST = window.location.hostname || 'localhost';
 
         // Smart port detection:
         // - Inside container: page=6080 → control=8888, terminal=8889
@@ -5712,7 +5744,13 @@
                 const response = await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/sr/start`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ screenReader, verbosity })
+                    body: JSON.stringify({
+                        screenReader,
+                        verbosity,
+                        startFromFocus: document.getElementById('srStartFromFocus').checked,
+                        syncFocus: document.getElementById('srSyncFocus').checked,
+                        syncMouse: document.getElementById('srSyncMouse').checked,
+                    })
                 });
                 const result = await response.json();
 
@@ -5933,7 +5971,76 @@
             }
         }
 
-        // Keyboard interception (capture phase — before VNC gets the keys)
+        // ── Shift+Tab VNC fix ──────────────────────────────────
+        // noVNC on Mac: when the VNC iframe has focus, the browser
+        // intercepts Shift+Tab for its own focus management and
+        // never passes it to JavaScript. But when the iframe does
+        // NOT have focus, the parent page sees all keys normally.
+        //
+        // Fix: when Shift is pressed, briefly blur the iframe.
+        // If Tab follows within 200ms, we catch it on the parent,
+        // send it via xdotool, and refocus the iframe.
+        // If any other key follows, refocus immediately.
+        //
+        // See: https://github.com/novnc/noVNC/issues/1413
+        // ──────────────────────────────────────────────────────────
+        let _shiftTabPending = false;
+        let _shiftTabTimer = null;
+
+        function _refocusVNC() {
+            const iframe = document.querySelector('#vncContainer iframe');
+            if (iframe) iframe.focus();
+            _shiftTabPending = false;
+        }
+
+        document.addEventListener('keydown', (e) => {
+            // Don't interfere when SR simulator is active (it has its own handler)
+            if (srActive) return;
+            // Don't interfere when terminal or inputs are focused
+            const termOverlay = document.getElementById('terminalOverlay');
+            if (termOverlay && termOverlay.classList.contains('open')) return;
+            if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) return;
+
+            // Step 1: When Shift is pressed, blur iframe so we can catch Tab
+            if (e.key === 'Shift' && !_shiftTabPending) {
+                const iframe = document.querySelector('#vncContainer iframe');
+                if (iframe && document.activeElement === iframe) {
+                    iframe.blur();
+                    _shiftTabPending = true;
+                    // Safety: refocus after 200ms if no Tab follows
+                    _shiftTabTimer = setTimeout(() => { _refocusVNC(); }, 200);
+                }
+                return;
+            }
+
+            // Step 2: If Tab arrives while Shift is pending, send Shift+Tab via xdotool
+            if (e.key === 'Tab' && _shiftTabPending) {
+                e.preventDefault();
+                e.stopPropagation();
+                clearTimeout(_shiftTabTimer);
+                _shiftTabPending = false;
+                fetch(`http://${VNC_HOST}:${CONTROL_PORT}/keys/send?keys=shift+Tab`)
+                    .catch(() => {})
+                    .finally(() => { setTimeout(_refocusVNC, 50); });
+                return;
+            }
+
+            // Step 3: Any other key while Shift is pending — refocus immediately
+            if (_shiftTabPending) {
+                clearTimeout(_shiftTabTimer);
+                _refocusVNC();
+            }
+        }, true);
+
+        document.addEventListener('keyup', (e) => {
+            // If Shift is released without Tab, refocus immediately
+            if (e.key === 'Shift' && _shiftTabPending) {
+                clearTimeout(_shiftTabTimer);
+                _refocusVNC();
+            }
+        }, true);
+
+        // SR Keyboard interception (capture phase — before VNC gets the keys)
         document.addEventListener('keydown', (e) => {
             if (!srActive) return;
 
@@ -6015,17 +6122,20 @@
             }
 
             // Navigation keys (arrows, Tab, Home, End)
+            // Check modifier combos BEFORE plain key (Shift+Tab before Tab)
             const nav = mode.navigation || {};
-            if (nav[key]) return nav[key];
 
-            // With Shift
-            if (shift && nav['Shift+' + key]) return nav['Shift+' + key];
-
-            // With Ctrl
             if (event.ctrlKey) {
                 const ctrlCombo = 'Ctrl+' + key;
                 if (nav[ctrlCombo]) return nav[ctrlCombo];
             }
+
+            if (shift) {
+                const shiftCombo = 'Shift+' + key;
+                if (nav[shiftCombo]) return nav[shiftCombo];
+            }
+
+            if (nav[key]) return nav[key];
 
             // Action keys (Enter, Space)
             const actions = mode.actions || {};
