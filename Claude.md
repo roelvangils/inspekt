@@ -168,12 +168,16 @@ noVNC on Mac strips the Shift modifier from Tab during VNC protocol encoding. Th
 
 **Key code in control-panel.html:** Search for `setupShiftTabFix`
 
+**Final solution:** Monkey-patch noVNC's keyboard event handler to intercept Tab when Shift is tracked. Replace the bound `_eventHandlers.keydown` listener (not just the method — the actual registered event listener must be swapped).
+
 **What DOESN'T work (and why):**
 - `e.shiftKey` on the Tab event → always `false` (noVNC strips it)
 - xdotool via subprocess/os.system → works from `docker exec` but fails from control server's Python process (unknown X11 threading issue)
 - CDP `Input.dispatchKeyEvent` → synthetic events don't trigger browser Tab navigation
 - `rfb.sendKey()` with Shift+Tab keysyms → noVNC also sends its own broken version, causing double events
-- **Only `rfb.sendKey(0xFE20)` (ISO_Left_Tab) works** — single keysym, no modifier needed
+- Overriding `rfb._keyboard._handleKeyDown` directly → the old bound function is still the registered listener
+- Two backward tabs to undo the forward → works but causes visible flicker
+- **Working: monkey-patch `_eventHandlers.keydown`** → swap the actual listener, send `rfb.sendKey(0xFE20)` (ISO_Left_Tab), block original handler
 
 **Safe on all platforms:** The fix only activates when Shift is held during Tab keyup. On Windows where noVNC handles Shift+Tab correctly, the fix doesn't interfere.
 
