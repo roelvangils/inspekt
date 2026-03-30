@@ -43,6 +43,83 @@ terminal_hidden = False
 # Clipboard relay: CLI posts text here, control panel fetches it
 clipboard_data = {'text': '', 'timestamp': 0}
 
+# Screen reader simulator state
+sr_state = {
+    'active': False,
+    'screen_reader': None,
+    'verbosity': 'high',
+    'script_injected': False,  # Whether the SR script has been injected into the current tab
+    'tab_ws_url': None,  # WebSocket URL of the tab where SR is active
+}
+
+
+# Cache for the prepared SR script (data injected, CONFIG placeholder remaining)
+_sr_script_cache = None
+
+
+def _get_sr_base_path():
+    """Get the base path for SR scripts and data, supporting dev mode."""
+    # Dev mode: source repo mounted at /opt/inspekt
+    dev_path = '/opt/inspekt/inspekt'
+    if os.path.exists(os.path.join(dev_path, 'scripts', 'screen_reader_simulator.js')):
+        return dev_path
+    # Fallback: installed package
+    return '/opt/inspekt/.venv/lib/python3.12/site-packages/inspekt'
+
+
+def _load_sr_script():
+    """Load and prepare the SR simulator script with data (cached after first call)."""
+    global _sr_script_cache
+    if _sr_script_cache is not None:
+        return _sr_script_cache
+
+    base = _get_sr_base_path()
+    scripts_dir = os.path.join(base, 'scripts')
+    data_dir = os.path.join(base, 'data', 'screen-reader-rules')
+
+    with open(os.path.join(scripts_dir, 'screen_reader_simulator.js')) as f:
+        script = f.read()
+    with open(os.path.join(data_dir, 'announcements.json')) as f:
+        announcements = f.read()
+    with open(os.path.join(data_dir, 'verbosity-levels.json')) as f:
+        verbosity = f.read()
+    with open(os.path.join(data_dir, 'known-bugs.json')) as f:
+        known_bugs = f.read()
+
+    script = script.replace('__SR_ANNOUNCEMENTS__', announcements)
+    script = script.replace('__SR_VERBOSITY__', verbosity)
+    script = script.replace('__SR_KNOWN_BUGS__', known_bugs)
+
+    _sr_script_cache = script
+    return script
+
+
+def _sr_execute(ws_url, config):
+    """Execute a screen reader simulator command via CDP."""
+    script = _load_sr_script()
+    # Only replace the CONFIG placeholder per call (script body is cached)
+    script = script.replace('__SR_CONFIG__', json.dumps(config))
+
+    result = send_cdp_command(ws_url, 'Runtime.evaluate', {
+        'expression': script,
+        'returnByValue': True,
+        'awaitPromise': True,
+    })
+
+    value = result.get('result', {}).get('result', {}).get('value')
+    if value is None:
+        error = result.get('result', {}).get('exceptionDetails', {})
+        return {'ok': False, 'error': str(error) if error else 'No result returned'}
+    return value
+
+
+def _sr_get_keyboard_commands():
+    """Load keyboard commands data for the control panel."""
+    base = _get_sr_base_path()
+    data_dir = os.path.join(base, 'data', 'screen-reader-rules')
+    with open(os.path.join(data_dir, 'keyboard-commands.json')) as f:
+        return json.load(f)
+
 
 def get_cdp_tabs():
     """Get list of Chrome tabs from CDP."""
@@ -2144,6 +2221,23 @@ class ControlHandler(BaseHTTPRequestHandler):
             # Return the latest clipboard text posted by CLI commands
             self.send_json({'ok': True, 'text': clipboard_data['text'], 'timestamp': clipboard_data['timestamp']})
 
+        # ── Screen Reader Simulator GET endpoints ─────────────────
+
+        elif path == '/sr/state':
+            self.send_json({
+                'ok': True,
+                'active': sr_state['active'],
+                'screen_reader': sr_state['screen_reader'],
+                'verbosity': sr_state['verbosity'],
+            })
+
+        elif path == '/sr/keyboard-commands':
+            try:
+                commands = _sr_get_keyboard_commands()
+                self.send_json({'ok': True, 'commands': commands})
+            except Exception as e:
+                self.send_json({'ok': False, 'error': str(e)}, 500)
+
         elif path.startswith('/internal/') or path.startswith('/api/'):
             # Reverse proxy to Inspekt API server (port 80)
             self._proxy_to_api('GET')
@@ -2252,6 +2346,173 @@ class ControlHandler(BaseHTTPRequestHandler):
                 except (json.JSONDecodeError, ValueError):
                     response = {'ok': False, 'error': result.stderr.strip() or result.stdout.strip() or 'Unknown error'}
                 self.send_json(response, 200 if response.get('ok') else 500)
+            except Exception as e:
+                self.send_json({'ok': False, 'error': str(e)}, 500)
+
+        # ── Screen Reader Simulator POST endpoints ────────────────
+
+        elif path == '/sr/start':
+            try:
+                content_length = int(self.headers.get('Content-Length', 0))
+                body = self.rfile.read(content_length).decode() if content_length > 0 else '{}'
+                data = json.loads(body)
+
+                screen_reader = data.get('screenReader', 'jaws')
+                verbosity = data.get('verbosity', 'high')
+
+                tab = get_active_tab()
+                if not tab or not tab.get('webSocketDebuggerUrl'):
+                    self.send_json({'ok': False, 'error': 'No active tab found'}, 500)
+                    return
+
+                ws_url = tab['webSocketDebuggerUrl']
+
+                # Initialize the simulator in the browser tab
+                config = {
+                    'mode': 'start',
+                    'screenReader': screen_reader,
+                    'verbosity': verbosity,
+                }
+                result = _sr_execute(ws_url, config)
+
+                if result.get('ok') or result.get('announcement'):
+                    sr_state['active'] = True
+                    sr_state['screen_reader'] = screen_reader
+                    sr_state['verbosity'] = verbosity
+                    sr_state['script_injected'] = True
+                    sr_state['tab_ws_url'] = ws_url
+                    self.send_json({
+                        'ok': True,
+                        'announcement': result.get('announcement', ''),
+                        'role': result.get('role', ''),
+                        'name': result.get('name', ''),
+                        'rect': result.get('rect'),
+                        'position': result.get('position'),
+                        'language': result.get('language', 'en'),
+                    })
+                else:
+                    self.send_json({'ok': False, 'error': result.get('error', 'Failed to start SR simulator')}, 500)
+            except Exception as e:
+                self.send_json({'ok': False, 'error': str(e)}, 500)
+
+        elif path == '/sr/navigate':
+            try:
+                content_length = int(self.headers.get('Content-Length', 0))
+                body = self.rfile.read(content_length).decode() if content_length > 0 else '{}'
+                data = json.loads(body)
+
+                action = data.get('action')
+                params = data.get('params', {})
+
+                if not action:
+                    self.send_json({'ok': False, 'error': 'Missing action'}, 400)
+                    return
+
+                if not sr_state['active'] or not sr_state['tab_ws_url']:
+                    self.send_json({'ok': False, 'error': 'SR simulator not active'}, 400)
+                    return
+
+                ws_url = sr_state['tab_ws_url']
+
+                # Navigate in the simulator
+                config = {
+                    'mode': 'navigate',
+                    'action': action,
+                    'params': params,
+                }
+                result = _sr_execute(ws_url, config)
+                self.send_json(result)
+
+            except Exception as e:
+                self.send_json({'ok': False, 'error': str(e)}, 500)
+
+        elif path == '/sr/stop':
+            try:
+                if sr_state['active'] and sr_state['tab_ws_url']:
+                    config = {'mode': 'stop'}
+                    _sr_execute(sr_state['tab_ws_url'], config)
+
+                sr_state['active'] = False
+                sr_state['screen_reader'] = None
+                sr_state['script_injected'] = False
+                sr_state['tab_ws_url'] = None
+                self.send_json({'ok': True})
+            except Exception as e:
+                # Still mark as stopped even if cleanup fails
+                sr_state['active'] = False
+                sr_state['screen_reader'] = None
+                sr_state['script_injected'] = False
+                sr_state['tab_ws_url'] = None
+                self.send_json({'ok': True})
+
+        elif path == '/sr/speak':
+            try:
+                content_length = int(self.headers.get('Content-Length', 0))
+                body = self.rfile.read(content_length).decode() if content_length > 0 else '{}'
+                data = json.loads(body)
+                text = data.get('text', '')
+                lang = data.get('lang', 'en')
+                rate = data.get('rate', 1.5)
+
+                if not sr_state['active'] or not sr_state['tab_ws_url']:
+                    self.send_json({'ok': False, 'error': 'SR simulator not active'}, 400)
+                    return
+
+                # Execute speechSynthesis in the browser tab
+                js_speak = f'''
+(() => {{
+    const synth = window.speechSynthesis;
+    synth.cancel();
+    const utterance = new SpeechSynthesisUtterance({json.dumps(text)});
+    utterance.rate = {rate};
+    utterance.lang = {json.dumps(lang)};
+    synth.speak(utterance);
+    return {{ ok: true }};
+}})()
+'''
+                result = send_cdp_command(sr_state['tab_ws_url'], 'Runtime.evaluate', {
+                    'expression': js_speak,
+                    'returnByValue': True,
+                })
+                self.send_json({'ok': True})
+            except Exception as e:
+                self.send_json({'ok': False, 'error': str(e)}, 500)
+
+        elif path == '/sr/scroll':
+            try:
+                content_length = int(self.headers.get('Content-Length', 0))
+                body = self.rfile.read(content_length).decode() if content_length > 0 else '{}'
+                data = json.loads(body)
+
+                if not sr_state['active'] or not sr_state['tab_ws_url']:
+                    self.send_json({'ok': False, 'error': 'SR simulator not active'}, 400)
+                    return
+
+                # Scroll to bring the current SR element into view
+                js_scroll = '''
+(() => {
+    if (!window.__inspektSR || !window.__inspektSR.cursor) return { ok: false };
+    const el = window.__inspektSR.cursor.getCurrentElement();
+    if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        // Return updated rect after scroll settles
+        return new Promise(resolve => {
+            setTimeout(() => {
+                const r = el.getBoundingClientRect();
+                resolve({ ok: true, rect: { x: r.x, y: r.y, width: r.width, height: r.height } });
+            }, 300);
+        });
+    }
+    return { ok: false };
+})()
+'''
+                result = send_cdp_command(sr_state['tab_ws_url'], 'Runtime.evaluate', {
+                    'expression': js_scroll,
+                    'returnByValue': True,
+                    'awaitPromise': True,
+                })
+                value = result.get('result', {}).get('result', {}).get('value', {})
+                self.send_json(value if value else {'ok': False})
             except Exception as e:
                 self.send_json({'ok': False, 'error': str(e)}, 500)
 

@@ -623,6 +623,7 @@
       this.nodes = [];
       this.position = -1;
       this._linearize(rootElement || document.body, 0);
+      this._nonExitCount = this.nodes.filter(n => !n.isExit).length;
       return this.nodes.length;
     }
 
@@ -859,7 +860,7 @@
     getPosition() {
       return {
         index: this.position,
-        total: this.nodes.filter(n => !n.isExit).length,
+        total: this._nonExitCount,
         mode: this.mode
       };
     }
@@ -880,6 +881,12 @@
     _currentResult() {
       const node = this.nodes[this.position];
       if (!node) return null;
+
+      // Skip elements that have been removed from the DOM
+      if (!node.element.isConnected) {
+        // Try to move to the next connected element
+        return this.moveNext();
+      }
 
       // Handle exit announcements
       if (node.isExit) {
@@ -924,11 +931,14 @@
       if (el.tabIndex < 0) return false;
 
       const tag = el.tagName.toLowerCase();
+
+      // <a> without href is not focusable (unless it has tabindex)
+      if (tag === 'a' && !el.hasAttribute('href') && !el.hasAttribute('tabindex')) return false;
+
       const nativelyFocusable = ['a', 'button', 'input', 'select', 'textarea', 'summary', 'details'];
       if (nativelyFocusable.includes(tag) && el.tabIndex >= 0) return true;
-      if (tag === 'a' && !el.hasAttribute('href')) return false;
 
-      if (el.tabIndex > 0 || el.tabIndex === 0) return true;
+      if (el.tabIndex >= 0 && el.hasAttribute('tabindex')) return true;
       if (el.hasAttribute('contenteditable')) return true;
 
       return false;

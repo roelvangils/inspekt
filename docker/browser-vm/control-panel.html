@@ -1199,6 +1199,175 @@
         }
 
         /* =============================================
+         * Screen Reader Simulator UI
+         * ============================================= */
+
+        /* Focus indicator (positioned over VNC canvas) */
+        .sr-focus-indicator {
+            position: absolute;
+            border: 3px solid #2196f3;
+            border-radius: 2px;
+            background: rgba(33, 150, 243, 0.06);
+            pointer-events: none;
+            z-index: 51;
+            transition: left 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+                        top 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+                        width 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+                        height 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+                        opacity 0.15s ease-out;
+            box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.25);
+        }
+        .sr-focus-indicator.sr-jaws    { border-color: #2196f3; box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.25); }
+        .sr-focus-indicator.sr-nvda    { border-color: #9c27b0; box-shadow: 0 0 0 2px rgba(156, 39, 176, 0.25); }
+        .sr-focus-indicator.sr-voiceover { border-color: #333; box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.25); }
+
+        .sr-focus-label {
+            position: absolute;
+            top: -22px;
+            left: -3px;
+            background: #2196f3;
+            color: #fff;
+            font: 500 11px/1 system-ui, sans-serif;
+            padding: 3px 8px;
+            border-radius: 3px 3px 0 0;
+            white-space: nowrap;
+        }
+        .sr-focus-indicator.sr-nvda .sr-focus-label { background: #9c27b0; }
+        .sr-focus-indicator.sr-voiceover .sr-focus-label { background: #333; }
+
+        /* Caption bar (between VNC and terminal) */
+        .sr-captions {
+            background: rgba(15, 15, 25, 0.95);
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 8px 16px;
+            font-family: system-ui, sans-serif;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            min-height: 44px;
+            animation: srCaptionSlideIn 0.2s ease-out;
+        }
+        @keyframes srCaptionSlideIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .sr-captions-current { display: flex; align-items: center; flex: 1; min-width: 0; }
+        .sr-captions-indicator { color: #667eea; margin-right: 8px; font-size: 14px; }
+        .sr-captions-text { color: #fff; font-size: 16px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .sr-captions-history { color: rgba(255, 255, 255, 0.35); font-size: 13px; margin-right: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 250px; }
+        .sr-captions-meta { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
+        .sr-captions-position { color: rgba(255, 255, 255, 0.5); font: 13px/1 system-ui; font-variant-numeric: tabular-nums; margin-right: 8px; }
+        .sr-captions-btn {
+            background: none; border: none; color: rgba(255, 255, 255, 0.5);
+            cursor: pointer; font-size: 15px; padding: 4px 6px; border-radius: 4px;
+            transition: color 0.15s, background 0.15s;
+        }
+        .sr-captions-btn:hover { color: #fff; background: rgba(255, 255, 255, 0.1); }
+        .sr-captions-btn.active { color: #667eea; }
+
+        /* SR launcher popout */
+        .sr-popout {
+            width: 280px;
+            right: 0;
+            left: auto;
+            padding: 12px;
+        }
+        .sr-popout-header {
+            font: 600 13px/1.4 system-ui, sans-serif;
+            color: rgba(255, 255, 255, 0.7);
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            font-size: 11px;
+        }
+        .sr-selector { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; }
+        .sr-option {
+            display: flex; align-items: center; gap: 10px;
+            background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px; padding: 8px 12px; cursor: pointer;
+            color: #fff; font-family: system-ui, sans-serif;
+            transition: background 0.15s, border-color 0.15s;
+        }
+        .sr-option:hover { background: rgba(255, 255, 255, 0.1); border-color: rgba(255, 255, 255, 0.2); }
+        .sr-option.active { border-color: #667eea; background: rgba(102, 126, 234, 0.15); }
+        .sr-badge {
+            width: 32px; height: 32px; border-radius: 6px;
+            display: flex; align-items: center; justify-content: center;
+            font: 700 14px/1 system-ui; color: #fff; flex-shrink: 0;
+        }
+        .sr-badge.sr-jaws { background: #2196f3; }
+        .sr-badge.sr-nvda { background: #9c27b0; }
+        .sr-badge.sr-voiceover { background: #333; }
+        .sr-option-name { font-weight: 600; font-size: 14px; }
+        .sr-option-platform { font-size: 12px; color: rgba(255, 255, 255, 0.5); }
+        .sr-popout-options {
+            display: flex; gap: 16px; align-items: center;
+            padding-top: 10px; border-top: 1px solid rgba(255, 255, 255, 0.08);
+            font: 13px system-ui; color: rgba(255, 255, 255, 0.6);
+        }
+        .sr-popout-options select {
+            background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.15);
+            color: #fff; border-radius: 4px; padding: 2px 6px; font-size: 12px;
+        }
+        .sr-popout-options label { display: flex; align-items: center; gap: 4px; cursor: pointer; }
+
+        /* SR button active state */
+        button.sr-active {
+            color: #667eea !important;
+            position: relative;
+        }
+        button.sr-active::after {
+            content: '';
+            position: absolute;
+            bottom: 2px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 16px;
+            height: 2px;
+            background: #667eea;
+            border-radius: 1px;
+        }
+
+        /* Cheat sheet overlay */
+        .sr-cheat-sheet {
+            position: absolute;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.88);
+            z-index: 200;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-family: system-ui, sans-serif;
+            color: #fff;
+            animation: srCheatFadeIn 0.15s ease-out;
+        }
+        @keyframes srCheatFadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        .sr-cheat-title { font-size: 18px; font-weight: 600; margin-bottom: 20px; color: rgba(255,255,255,0.9); }
+        .sr-cheat-grid {
+            display: grid; grid-template-columns: 1fr 1fr;
+            gap: 6px 40px; max-width: 480px;
+        }
+        .sr-cheat-section-title {
+            grid-column: span 2;
+            font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em;
+            color: rgba(255,255,255,0.4); margin-top: 12px; margin-bottom: 2px;
+        }
+        .sr-cheat-section-title:first-child { margin-top: 0; }
+        .sr-cheat-row { display: flex; gap: 10px; align-items: baseline; }
+        .sr-cheat-key {
+            background: rgba(255, 255, 255, 0.12); padding: 2px 8px;
+            border-radius: 4px; font: 12px/1.6 'SF Mono', Menlo, monospace;
+            min-width: 36px; text-align: center; color: rgba(255,255,255,0.85);
+            border: 1px solid rgba(255,255,255,0.08);
+        }
+        .sr-cheat-desc { color: rgba(255,255,255,0.6); font-size: 13px; }
+        .sr-cheat-footer { margin-top: 24px; color: rgba(255,255,255,0.3); font-size: 12px; }
+
+        /* =============================================
          * Focus Overlay (click-to-interact prompt)
          * ============================================= */
         .focus-overlay {
@@ -2874,6 +3043,53 @@
             Audio
         </button>
 
+        <!-- Screen Reader Simulator Button -->
+        <button id="srBtn" onclick="toggleSRPopout()" title="Screen Reader Simulator">
+            <svg viewBox="0 0 24 24"><path d="M17 20c-.29 0-.56-.06-.76-.15-.71-.37-1.21-.88-1.71-2.38-.51-1.56-1.47-2.29-2.39-3-.79-.61-1.61-1.24-2.32-2.53C9.29 10.98 9 9.93 9 9c0-2.8 2.2-5 5-5s5 2.2 5 5h2c0-3.93-3.07-7-7-7S7 5.07 7 9c0 1.26.38 2.65 1.07 3.9.91 1.65 1.98 2.48 2.85 3.15.81.62 1.39 1.07 1.71 2.05.6 1.82 1.37 2.84 2.73 3.55A3.999 3.999 0 0 0 21 18h-2c0 1.1-.9 2-2 2zM7.64 2.64L6.22 1.22C4.23 3.21 3 5.96 3 9s1.23 5.79 3.22 7.78l1.41-1.41C6.01 13.74 5 11.49 5 9s1.01-4.74 2.64-6.36zM11.5 9a2.5 2.5 0 0 0 5 0 2.5 2.5 0 0 0-5 0z" fill="currentColor"/></svg>
+            SR
+        </button>
+
+        <!-- SR Popout Dropdown -->
+        <div id="srPopout" class="url-bar-popout sr-popout">
+            <div class="sr-popout-header">Screen Reader Simulator</div>
+            <div class="sr-selector">
+                <button class="sr-option" data-sr="jaws" onclick="startSRSimulation('jaws')">
+                    <span class="sr-badge sr-jaws">J</span>
+                    <div>
+                        <div class="sr-option-name">JAWS</div>
+                        <div class="sr-option-platform">Windows</div>
+                    </div>
+                </button>
+                <button class="sr-option" data-sr="nvda" onclick="startSRSimulation('nvda')">
+                    <span class="sr-badge sr-nvda">N</span>
+                    <div>
+                        <div class="sr-option-name">NVDA</div>
+                        <div class="sr-option-platform">Windows</div>
+                    </div>
+                </button>
+                <button class="sr-option" data-sr="voiceover" onclick="startSRSimulation('voiceover')">
+                    <span class="sr-badge sr-voiceover">VO</span>
+                    <div>
+                        <div class="sr-option-name">VoiceOver</div>
+                        <div class="sr-option-platform">macOS</div>
+                    </div>
+                </button>
+            </div>
+            <div class="sr-popout-options">
+                <label>
+                    Verbosity
+                    <select id="srVerbosity">
+                        <option value="high" selected>High</option>
+                        <option value="medium">Medium</option>
+                        <option value="low">Low</option>
+                    </select>
+                </label>
+                <label>
+                    <input type="checkbox" id="srTTSCheckbox"> Speech
+                </label>
+            </div>
+        </div>
+
         <div class="divider"></div>
 
         <!-- Auto-Scan Toggle -->
@@ -2958,6 +3174,16 @@
         <!-- VNC Container -->
         <div class="vnc-container" id="vncContainer">
             <div class="resize-dimensions" id="resizeDimensions"></div>
+            <!-- SR Focus Indicator (positioned over VNC canvas) -->
+            <div id="srFocusIndicator" class="sr-focus-indicator" style="display: none;">
+                <span class="sr-focus-label" id="srFocusLabel"></span>
+            </div>
+            <!-- SR Cheat Sheet (overlays the VNC canvas) -->
+            <div id="srCheatSheet" class="sr-cheat-sheet" style="display: none;">
+                <div class="sr-cheat-title" id="srCheatTitle">JAWS Shortcuts</div>
+                <div class="sr-cheat-grid" id="srCheatGrid"></div>
+                <div class="sr-cheat-footer">Press any key to dismiss</div>
+            </div>
         </div>
 
         <!-- Native Container for inspekt:// internal tool pages -->
@@ -2969,6 +3195,20 @@
                 <svg viewBox="0 0 24 24" width="14" height="14"><path d="M6.99 11L3 15l3.99 4v-3H14v-2H6.99v-3zM21 9l-3.99-4v3H10v2h7.01v3L21 9z" fill="currentColor"/></svg>
             </button>
         </div>
+
+    <!-- SR Caption Bar (appears when simulation is active) -->
+    <div id="srCaptions" class="sr-captions" style="display: none;">
+        <div class="sr-captions-current">
+            <span class="sr-captions-indicator">▸</span>
+            <span id="srCaptionText" class="sr-captions-text"></span>
+        </div>
+        <div class="sr-captions-meta">
+            <span id="srCaptionHistory" class="sr-captions-history"></span>
+            <span id="srPosition" class="sr-captions-position"></span>
+            <button id="srTTSBtn" class="sr-captions-btn" onclick="toggleSRTTS()" title="Toggle speech (T)">🔊</button>
+            <button class="sr-captions-btn" onclick="stopSRSimulation()" title="Stop simulation (Escape)">✕</button>
+        </div>
+    </div>
 
     <!-- Click-to-focus overlay (appears when terminal closes) -->
     <div class="focus-overlay" id="focusOverlay" onclick="hideFocusOverlay()">
@@ -5430,6 +5670,393 @@
                 // Also trigger Chrome focus inside VM
                 fetch(`http://${VNC_HOST}:${CONTROL_PORT}/chrome`).catch(() => {});
             }, 50);
+        }
+
+        // =============================================
+        // Screen Reader Simulator
+        // =============================================
+
+        let srActive = false;
+        let srScreenReader = null;
+        let srKeyMap = null;
+        let srCheatSheetVisible = false;
+        let srPreviousAnnouncement = '';
+
+        // SR Popout (launcher dropdown)
+        function toggleSRPopout() {
+            if (srActive) {
+                stopSRSimulation();
+                return;
+            }
+            const isOpen = document.getElementById('srPopout').classList.contains('show');
+            if (isOpen) {
+                closeSRPopout();
+            } else {
+                openPopout('srPopout', 'srBtn', closeSRPopout);
+            }
+        }
+
+        function closeSRPopout() {
+            document.getElementById('srPopout').classList.remove('show');
+            document.getElementById('srBtn').setAttribute('aria-expanded', 'false');
+            dismissActivePopout();
+        }
+
+        // Start simulation
+        async function startSRSimulation(screenReader) {
+            closeSRPopout();
+
+            const verbosity = document.getElementById('srVerbosity').value;
+
+            try {
+                const response = await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/sr/start`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ screenReader, verbosity })
+                });
+                const result = await response.json();
+
+                if (!result.ok) {
+                    showToast('Failed to start SR simulation: ' + (result.error || 'Unknown error'), 'error');
+                    return;
+                }
+
+                // Activate SR state
+                srActive = true;
+                srScreenReader = screenReader;
+
+                // Load keyboard commands
+                if (!srKeyMap) {
+                    const kcResp = await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/sr/keyboard-commands`);
+                    const kcData = await kcResp.json();
+                    srKeyMap = kcData.commands;
+                }
+
+                // Start resolution polling for coordinate mapping
+                startSRResolutionPolling();
+
+                // Update UI
+                document.getElementById('srBtn').classList.add('sr-active');
+                document.getElementById('srCaptions').style.display = 'flex';
+                document.getElementById('srFocusIndicator').style.display = 'block';
+                document.getElementById('srFocusIndicator').className =
+                    'sr-focus-indicator sr-' + screenReader;
+
+                // Show first element
+                if (result.announcement) {
+                    updateSRUI(result);
+                }
+
+                // Highlight active option in popout
+                document.querySelectorAll('.sr-option').forEach(o => o.classList.remove('active'));
+                const activeOpt = document.querySelector(`.sr-option[data-sr="${screenReader}"]`);
+                if (activeOpt) activeOpt.classList.add('active');
+
+            } catch (e) {
+                showToast('SR simulation error: ' + e.message, 'error');
+            }
+        }
+
+        // Stop simulation
+        async function stopSRSimulation() {
+            try {
+                await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/sr/stop`, { method: 'POST' });
+            } catch (e) { /* ignore cleanup errors */ }
+
+            srActive = false;
+            srScreenReader = null;
+            srPreviousAnnouncement = '';
+            stopSRResolutionPolling();
+
+            // Hide UI
+            document.getElementById('srBtn').classList.remove('sr-active');
+            document.getElementById('srCaptions').style.display = 'none';
+            document.getElementById('srFocusIndicator').style.display = 'none';
+            document.getElementById('srCheatSheet').style.display = 'none';
+            srCheatSheetVisible = false;
+
+            document.querySelectorAll('.sr-option').forEach(o => o.classList.remove('active'));
+
+            showToast('Screen reader simulation ended');
+        }
+
+        // Navigate (called by keyboard handler)
+        async function srNavigate(action, params) {
+            if (!srActive) return;
+
+            try {
+                const response = await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/sr/navigate`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action, params })
+                });
+                const result = await response.json();
+
+                if (result.ok) {
+                    updateSRUI(result);
+
+                    // TTS
+                    if (document.getElementById('srTTSCheckbox').checked && result.announcement) {
+                        fetch(`http://${VNC_HOST}:${CONTROL_PORT}/sr/speak`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                text: result.announcement,
+                                lang: result.language || 'en'
+                            })
+                        }).catch(() => {});
+                    }
+
+                    // Auto-scroll
+                    if (result.rect) {
+                        fetch(`http://${VNC_HOST}:${CONTROL_PORT}/sr/scroll`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ y: result.rect.y })
+                        }).then(r => r.json()).then(scrollResult => {
+                            // Update focus indicator with new rect after scroll
+                            if (scrollResult.ok && scrollResult.rect) {
+                                updateSRFocusIndicator(scrollResult.rect);
+                            }
+                        }).catch(() => {});
+                    }
+                }
+            } catch (e) {
+                console.error('SR navigate error:', e);
+            }
+        }
+
+        // Update all SR UI elements
+        function updateSRUI(result) {
+            // Caption text
+            srPreviousAnnouncement = document.getElementById('srCaptionText').textContent;
+            document.getElementById('srCaptionText').textContent = result.announcement || '';
+
+            // History (previous announcement, dimmed)
+            document.getElementById('srCaptionHistory').textContent = srPreviousAnnouncement || '';
+
+            // Position counter
+            const pos = result.position;
+            if (pos) {
+                document.getElementById('srPosition').textContent =
+                    `${pos.index + 1} / ${pos.total}`;
+            }
+
+            // Focus indicator
+            if (result.rect) {
+                updateSRFocusIndicator(result.rect);
+            }
+
+            // Focus label (role)
+            document.getElementById('srFocusLabel').textContent = result.role || '';
+        }
+
+        // Position the focus indicator over the VNC canvas
+        function updateSRFocusIndicator(vmRect) {
+            const indicator = document.getElementById('srFocusIndicator');
+            const vncContainer = document.getElementById('vncContainer');
+            const iframe = vncContainer.querySelector('iframe');
+            if (!iframe) return;
+
+            const iframeRect = iframe.getBoundingClientRect();
+            const containerRect = vncContainer.getBoundingClientRect();
+
+            // Get VM resolution for coordinate mapping
+            const resolution = currentResolution || { width: iframeRect.width, height: iframeRect.height };
+            const scaleX = iframeRect.width / resolution.width;
+            const scaleY = iframeRect.height / resolution.height;
+
+            // Position relative to the VNC container
+            const offsetX = iframeRect.left - containerRect.left;
+            const offsetY = iframeRect.top - containerRect.top;
+
+            indicator.style.left = (offsetX + vmRect.x * scaleX) + 'px';
+            indicator.style.top = (offsetY + vmRect.y * scaleY) + 'px';
+            indicator.style.width = (vmRect.width * scaleX) + 'px';
+            indicator.style.height = (vmRect.height * scaleY) + 'px';
+        }
+
+        // TTS toggle
+        function toggleSRTTS() {
+            const cb = document.getElementById('srTTSCheckbox');
+            cb.checked = !cb.checked;
+            const btn = document.getElementById('srTTSBtn');
+            btn.classList.toggle('active', cb.checked);
+        }
+
+        // Cheat sheet
+        function toggleSRCheatSheet() {
+            const sheet = document.getElementById('srCheatSheet');
+            if (srCheatSheetVisible) {
+                sheet.style.display = 'none';
+                srCheatSheetVisible = false;
+            } else {
+                buildSRCheatSheet();
+                sheet.style.display = 'flex';
+                srCheatSheetVisible = true;
+            }
+        }
+
+        function buildSRCheatSheet() {
+            if (!srKeyMap || !srScreenReader) return;
+
+            const templates = srKeyMap._cheat_sheet_templates;
+            if (!templates || !templates[srScreenReader]) return;
+
+            const srNames = { jaws: 'JAWS', nvda: 'NVDA', voiceover: 'VoiceOver' };
+            document.getElementById('srCheatTitle').textContent =
+                srNames[srScreenReader] + ' Shortcuts';
+
+            const grid = document.getElementById('srCheatGrid');
+            grid.innerHTML = '';
+
+            const sections = templates[srScreenReader];
+            for (const [sectionName, shortcuts] of Object.entries(sections)) {
+                const title = document.createElement('div');
+                title.className = 'sr-cheat-section-title';
+                title.textContent = sectionName;
+                grid.appendChild(title);
+
+                for (const [key, desc] of shortcuts) {
+                    const row = document.createElement('div');
+                    row.className = 'sr-cheat-row';
+                    const keySpan = document.createElement('span');
+                    keySpan.className = 'sr-cheat-key';
+                    keySpan.textContent = key;
+                    const descSpan = document.createElement('span');
+                    descSpan.className = 'sr-cheat-desc';
+                    descSpan.textContent = desc;
+                    row.appendChild(keySpan);
+                    row.appendChild(descSpan);
+                    grid.appendChild(row);
+                }
+            }
+        }
+
+        // Keyboard interception (capture phase — before VNC gets the keys)
+        document.addEventListener('keydown', (e) => {
+            if (!srActive) return;
+
+            // Don't intercept when terminal is focused
+            const termOverlay = document.getElementById('terminalOverlay');
+            if (termOverlay && termOverlay.classList.contains('open')) return;
+
+            // Cheat sheet: dismiss on any key
+            if (srCheatSheetVisible) {
+                if (e.key !== '?' && e.key !== 'F1') {
+                    toggleSRCheatSheet();
+                    e.preventDefault();
+                    e.stopPropagation();
+                    return;
+                }
+            }
+
+            // Map key to SR action
+            const action = mapSRKeyToAction(e);
+            if (!action) return;
+
+            e.preventDefault();
+            e.stopPropagation();
+
+            // Handle special actions
+            if (action === 'toggle-cheat-sheet') {
+                toggleSRCheatSheet();
+                return;
+            }
+            if (action === 'stop-simulation') {
+                stopSRSimulation();
+                return;
+            }
+
+            // Navigate
+            srNavigate(action.action || action, action.params);
+
+        }, true);  // capture phase
+
+        // Key mapping
+        function mapSRKeyToAction(event) {
+            if (event.key === 'Escape') return 'stop-simulation';
+            if (event.key === '?' || event.key === 'F1') return 'toggle-cheat-sheet';
+
+            if (!srKeyMap || !srScreenReader) return null;
+
+            const sr = srKeyMap[srScreenReader];
+            if (!sr) return null;
+
+            // Get the reading/browse mode
+            const mode = sr.reading || sr.browse;
+            if (!mode) return null;
+
+            const key = event.key;
+            const shift = event.shiftKey;
+
+            // Quick nav (single letter shortcuts: h, k, f, b, t, l, i, g, r, etc.)
+            const quickNav = mode.quick_nav || {};
+            if (!event.ctrlKey && !event.altKey && !event.metaKey) {
+                // Try with Shift prefix
+                if (shift) {
+                    const shiftCombo = 'Shift+' + key.toLowerCase();
+                    if (quickNav[shiftCombo]) return quickNav[shiftCombo];
+                }
+
+                // Single letter (lowercase)
+                if (key.length === 1 && !shift) {
+                    if (quickNav[key]) return quickNav[key];
+                    if (quickNav[key.toLowerCase()]) return quickNav[key.toLowerCase()];
+                }
+
+                // Number keys for heading levels
+                if (key >= '1' && key <= '6') {
+                    const headingEntry = quickNav[key];
+                    if (headingEntry) {
+                        return { action: headingEntry.action, params: { level: parseInt(key) } };
+                    }
+                }
+            }
+
+            // Navigation keys (arrows, Tab, Home, End)
+            const nav = mode.navigation || {};
+            if (nav[key]) return nav[key];
+
+            // With Shift
+            if (shift && nav['Shift+' + key]) return nav['Shift+' + key];
+
+            // With Ctrl
+            if (event.ctrlKey) {
+                const ctrlCombo = 'Ctrl+' + key;
+                if (nav[ctrlCombo]) return nav[ctrlCombo];
+            }
+
+            // Action keys (Enter, Space)
+            const actions = mode.actions || {};
+            if (actions[key]) return actions[key];
+
+            return null;
+        }
+
+        // Resolution tracking for focus indicator coordinate mapping
+        let currentResolution = null;
+        let srResolutionPollTimer = null;
+
+        function startSRResolutionPolling() {
+            if (srResolutionPollTimer) return; // Already polling
+            async function poll() {
+                if (!srActive) { srResolutionPollTimer = null; return; }
+                try {
+                    const resp = await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/resolution`);
+                    const data = await resp.json();
+                    if (data.ok) currentResolution = { width: data.width, height: data.height };
+                } catch (e) {}
+                srResolutionPollTimer = setTimeout(poll, 5000);
+            }
+            poll();
+        }
+
+        function stopSRResolutionPolling() {
+            if (srResolutionPollTimer) {
+                clearTimeout(srResolutionPollTimer);
+                srResolutionPollTimer = null;
+            }
         }
 
         // =============================================
