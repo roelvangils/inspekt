@@ -1,0 +1,2054 @@
+{
+  "synced_at": "2026-03-30 17:28",
+  "total_failures": 303,
+  "failures": {
+    "jaws|chrome|aria/alert_role|convey_aria_live_value_assertive": {
+      "screen_reader": "jaws",
+      "browser": "chrome",
+      "assertion_id": "convey_aria_live_value_assertive",
+      "feature_id": "aria/alert_role",
+      "output": "\"<1st announcement in full>, <2nd announcement in full>, existing content, I am now populated\"",
+      "test_file": ""
+    },
+    "jaws|chrome|aria/alert_role|convey_name_and_role_if_named": {
+      "screen_reader": "jaws",
+      "browser": "chrome",
+      "assertion_id": "convey_name_and_role_if_named",
+      "feature_id": "aria/alert_role",
+      "output": "\"existing content\"",
+      "test_file": ""
+    },
+    "jaws|edge|aria/alert_role|convey_aria_live_value_assertive": {
+      "screen_reader": "jaws",
+      "browser": "edge",
+      "assertion_id": "convey_aria_live_value_assertive",
+      "feature_id": "aria/alert_role",
+      "output": "\"<1st announcement in full>, <2nd announcement in full>, existing content, I am now populated\"",
+      "test_file": ""
+    },
+    "jaws|edge|aria/alert_role|convey_name_and_role_if_named": {
+      "screen_reader": "jaws",
+      "browser": "edge",
+      "assertion_id": "convey_name_and_role_if_named",
+      "feature_id": "aria/alert_role",
+      "output": "\"existing content\"",
+      "test_file": ""
+    },
+    "jaws|ie|aria/alert_role|convey_name_and_role_if_named": {
+      "screen_reader": "jaws",
+      "browser": "ie",
+      "assertion_id": "convey_name_and_role_if_named",
+      "feature_id": "aria/alert_role",
+      "output": "\"existing content\"",
+      "test_file": ""
+    },
+    "jaws|firefox|aria/alert_role|convey_name_and_role_if_named": {
+      "screen_reader": "jaws",
+      "browser": "firefox",
+      "assertion_id": "convey_name_and_role_if_named",
+      "feature_id": "aria/alert_role",
+      "output": "\"existing content\"",
+      "test_file": ""
+    },
+    "nvda|chrome|aria/alert_role|convey_name_and_role_if_named": {
+      "screen_reader": "nvda",
+      "browser": "chrome",
+      "assertion_id": "convey_name_and_role_if_named",
+      "feature_id": "aria/alert_role",
+      "output": "\"existing content\"",
+      "test_file": ""
+    },
+    "nvda|edge|aria/alert_role|convey_name_and_role_if_named": {
+      "screen_reader": "nvda",
+      "browser": "edge",
+      "assertion_id": "convey_name_and_role_if_named",
+      "feature_id": "aria/alert_role",
+      "output": "\"existing content\"",
+      "test_file": ""
+    },
+    "nvda|firefox|aria/alert_role|convey_name_and_role_if_named": {
+      "screen_reader": "nvda",
+      "browser": "firefox",
+      "assertion_id": "convey_name_and_role_if_named",
+      "feature_id": "aria/alert_role",
+      "output": "\"existing content\"",
+      "test_file": ""
+    },
+    "jaws|chrome|aria/aria-atomic_attribute|convey_value_false": {
+      "screen_reader": "jaws",
+      "browser": "chrome",
+      "assertion_id": "convey_value_false",
+      "feature_id": "aria/aria-atomic_attribute",
+      "output": "\"Announce what has changed\"",
+      "test_file": ""
+    },
+    "jaws|edge|aria/aria-atomic_attribute|convey_value_false": {
+      "screen_reader": "jaws",
+      "browser": "edge",
+      "assertion_id": "convey_value_false",
+      "feature_id": "aria/aria-atomic_attribute",
+      "output": "\"Announce what has changed\"",
+      "test_file": ""
+    },
+    "nvda|chrome|aria/aria-atomic_attribute|convey_value_false": {
+      "screen_reader": "nvda",
+      "browser": "chrome",
+      "assertion_id": "convey_value_false",
+      "feature_id": "aria/aria-atomic_attribute",
+      "output": "\"Announce what has changed\"",
+      "test_file": ""
+    },
+    "nvda|edge|aria/aria-atomic_attribute|convey_value_false": {
+      "screen_reader": "nvda",
+      "browser": "edge",
+      "assertion_id": "convey_value_false",
+      "feature_id": "aria/aria-atomic_attribute",
+      "output": "\"Announce what has changed\"",
+      "test_file": ""
+    },
+    "jaws|chrome|aria/aria-autocomplete_attribute|convey_value_inline": {
+      "screen_reader": "jaws",
+      "browser": "chrome",
+      "assertion_id": "convey_value_inline",
+      "feature_id": "aria/aria-autocomplete_attribute",
+      "output": "\"Target 1, edit, type in text\"",
+      "test_file": ""
+    },
+    "jaws|chrome|aria/aria-autocomplete_attribute|convey_value_list": {
+      "screen_reader": "jaws",
+      "browser": "chrome",
+      "assertion_id": "convey_value_list",
+      "feature_id": "aria/aria-autocomplete_attribute",
+      "output": "\"Target 3, edit combo, collapsed, to set the value use the arrow keys or type the value\"",
+      "test_file": ""
+    },
+    "jaws|chrome|aria/aria-autocomplete_attribute|convey_value_both": {
+      "screen_reader": "jaws",
+      "browser": "chrome",
+      "assertion_id": "convey_value_both",
+      "feature_id": "aria/aria-autocomplete_attribute",
+      "output": "\"Target 4, edit combo, collapsed, to set the value use the arrow keys or type the value\"",
+      "test_file": ""
+    },
+    "jaws|edge|aria/aria-autocomplete_attribute|convey_value_inline": {
+      "screen_reader": "jaws",
+      "browser": "edge",
+      "assertion_id": "convey_value_inline",
+      "feature_id": "aria/aria-autocomplete_attribute",
+      "output": "\"Target 1, edit, type in text\"",
+      "test_file": ""
+    },
+    "jaws|edge|aria/aria-autocomplete_attribute|convey_value_list": {
+      "screen_reader": "jaws",
+      "browser": "edge",
+      "assertion_id": "convey_value_list",
+      "feature_id": "aria/aria-autocomplete_attribute",
+      "output": "\"Target 3, edit combo, collapsed, to set the value use the arrow keys or type the value\"",
+      "test_file": ""
+    },
+    "jaws|edge|aria/aria-autocomplete_attribute|convey_value_both": {
+      "screen_reader": "jaws",
+      "browser": "edge",
+      "assertion_id": "convey_value_both",
+      "feature_id": "aria/aria-autocomplete_attribute",
+      "output": "\"Target 4, edit combo, collapsed, to set the value use the arrow keys or type the value\"",
+      "test_file": ""
+    },
+    "jaws|ie|aria/aria-autocomplete_attribute|convey_value_inline": {
+      "screen_reader": "jaws",
+      "browser": "ie",
+      "assertion_id": "convey_value_inline",
+      "feature_id": "aria/aria-autocomplete_attribute",
+      "output": "\"Target 1, edit, type in text\"",
+      "test_file": ""
+    },
+    "jaws|ie|aria/aria-autocomplete_attribute|convey_value_list": {
+      "screen_reader": "jaws",
+      "browser": "ie",
+      "assertion_id": "convey_value_list",
+      "feature_id": "aria/aria-autocomplete_attribute",
+      "output": "\"Target 3, edit, has popup, type in text\"",
+      "test_file": ""
+    },
+    "jaws|ie|aria/aria-autocomplete_attribute|convey_value_both": {
+      "screen_reader": "jaws",
+      "browser": "ie",
+      "assertion_id": "convey_value_both",
+      "feature_id": "aria/aria-autocomplete_attribute",
+      "output": "\"Target 4, edit, has popup, type in text\"",
+      "test_file": ""
+    },
+    "jaws|firefox|aria/aria-autocomplete_attribute|convey_value_inline": {
+      "screen_reader": "jaws",
+      "browser": "firefox",
+      "assertion_id": "convey_value_inline",
+      "feature_id": "aria/aria-autocomplete_attribute",
+      "output": "\"Target 1, edit, type in text\"",
+      "test_file": ""
+    },
+    "jaws|firefox|aria/aria-autocomplete_attribute|convey_value_list": {
+      "screen_reader": "jaws",
+      "browser": "firefox",
+      "assertion_id": "convey_value_list",
+      "feature_id": "aria/aria-autocomplete_attribute",
+      "output": "\"Target 3, edit combo, collapsed, to set the value use the arrow keys or type the value\"",
+      "test_file": ""
+    },
+    "jaws|firefox|aria/aria-autocomplete_attribute|convey_value_both": {
+      "screen_reader": "jaws",
+      "browser": "firefox",
+      "assertion_id": "convey_value_both",
+      "feature_id": "aria/aria-autocomplete_attribute",
+      "output": "\"Target 3, edit combo, collapsed, to set the value use the arrow keys or type the value\"",
+      "test_file": ""
+    },
+    "nvda|firefox|aria/aria-autocomplete_attribute|convey_value_none": {
+      "screen_reader": "nvda",
+      "browser": "firefox",
+      "assertion_id": "convey_value_none",
+      "feature_id": "aria/aria-autocomplete_attribute",
+      "output": "\"Target 2, edit, has auto complete, blank\"",
+      "test_file": ""
+    },
+    "voiceover|safari|aria/aria-autocomplete_attribute|convey_value_inline": {
+      "screen_reader": "voiceover",
+      "browser": "safari",
+      "assertion_id": "convey_value_inline",
+      "feature_id": "aria/aria-autocomplete_attribute",
+      "output": "\"Target 1, edit text\"",
+      "test_file": ""
+    },
+    "voiceover|safari|aria/aria-autocomplete_attribute|convey_value_list": {
+      "screen_reader": "voiceover",
+      "browser": "safari",
+      "assertion_id": "convey_value_list",
+      "feature_id": "aria/aria-autocomplete_attribute",
+      "output": "\"Target 3, list box popup, menu popup, combo box\"",
+      "test_file": ""
+    },
+    "voiceover|safari|aria/aria-autocomplete_attribute|convey_value_both": {
+      "screen_reader": "voiceover",
+      "browser": "safari",
+      "assertion_id": "convey_value_both",
+      "feature_id": "aria/aria-autocomplete_attribute",
+      "output": "\"Target 3, list box popup, menu popup, combo box\"",
+      "test_file": ""
+    },
+    "jaws|ie|aria/aria-busy_attribute|convey_value_true": {
+      "screen_reader": "jaws",
+      "browser": "ie",
+      "assertion_id": "convey_value_true",
+      "feature_id": "aria/aria-busy_attribute",
+      "output": "\"test two\"",
+      "test_file": ""
+    },
+    "nvda|chrome|aria/aria-busy_attribute|convey_value_true": {
+      "screen_reader": "nvda",
+      "browser": "chrome",
+      "assertion_id": "convey_value_true",
+      "feature_id": "aria/aria-busy_attribute",
+      "output": "\"test two\"",
+      "test_file": ""
+    },
+    "nvda|edge|aria/aria-busy_attribute|convey_value_true": {
+      "screen_reader": "nvda",
+      "browser": "edge",
+      "assertion_id": "convey_value_true",
+      "feature_id": "aria/aria-busy_attribute",
+      "output": "\"test two\"",
+      "test_file": ""
+    },
+    "nvda|firefox|aria/aria-busy_attribute|convey_value_true": {
+      "screen_reader": "nvda",
+      "browser": "firefox",
+      "assertion_id": "convey_value_true",
+      "feature_id": "aria/aria-busy_attribute",
+      "output": "\"test two\"",
+      "test_file": ""
+    },
+    "voiceover|safari|aria/aria-busy_attribute|convey_value_true": {
+      "screen_reader": "voiceover",
+      "browser": "safari",
+      "assertion_id": "convey_value_true",
+      "feature_id": "aria/aria-busy_attribute",
+      "output": "\"test two\"",
+      "test_file": ""
+    },
+    "jaws|chrome|aria/aria-colcount_attribute|do_not_calculate_unknown_column_count": {
+      "screen_reader": "jaws",
+      "browser": "chrome",
+      "assertion_id": "do_not_calculate_unknown_column_count",
+      "feature_id": "aria/aria-colcount_attribute",
+      "output": "\"Table with 4 of minus 1 columns and 6 of 6 rows\"",
+      "test_file": ""
+    },
+    "jaws|edge|aria/aria-colcount_attribute|do_not_calculate_unknown_column_count": {
+      "screen_reader": "jaws",
+      "browser": "edge",
+      "assertion_id": "do_not_calculate_unknown_column_count",
+      "feature_id": "aria/aria-colcount_attribute",
+      "output": "\"Table with 4 of minus 1 columns and 6 of 6 rows\"",
+      "test_file": ""
+    },
+    "jaws|firefox|aria/aria-colcount_attribute|do_not_calculate_unknown_column_count": {
+      "screen_reader": "jaws",
+      "browser": "firefox",
+      "assertion_id": "do_not_calculate_unknown_column_count",
+      "feature_id": "aria/aria-colcount_attribute",
+      "output": "\"Table with 4 columns and 6 rows\"",
+      "test_file": ""
+    },
+    "nvda|chrome|aria/aria-colcount_attribute|do_not_calculate_unknown_column_count": {
+      "screen_reader": "nvda",
+      "browser": "chrome",
+      "assertion_id": "do_not_calculate_unknown_column_count",
+      "feature_id": "aria/aria-colcount_attribute",
+      "output": "\"Table with 6 rows and minus 1 columns, Table 2\"",
+      "test_file": ""
+    },
+    "nvda|edge|aria/aria-colcount_attribute|do_not_calculate_unknown_column_count": {
+      "screen_reader": "nvda",
+      "browser": "edge",
+      "assertion_id": "do_not_calculate_unknown_column_count",
+      "feature_id": "aria/aria-colcount_attribute",
+      "output": "\"Table with 6 rows and minus 1 columns, Table 2\"",
+      "test_file": ""
+    },
+    "nvda|firefox|aria/aria-colcount_attribute|do_not_calculate_unknown_column_count": {
+      "screen_reader": "nvda",
+      "browser": "firefox",
+      "assertion_id": "do_not_calculate_unknown_column_count",
+      "feature_id": "aria/aria-colcount_attribute",
+      "output": "\"Table with 6 rows and minus 1 columns, Table 2\"",
+      "test_file": ""
+    },
+    "voiceover|safari|aria/aria-colcount_attribute|convey_column_count_hidden_cols": {
+      "screen_reader": "voiceover",
+      "browser": "safari",
+      "assertion_id": "convey_column_count_hidden_cols",
+      "feature_id": "aria/aria-colcount_attribute",
+      "output": "\"Table 1, table 4 columns, 6 rows\"",
+      "test_file": ""
+    },
+    "voiceover|safari|aria/aria-colcount_attribute|do_not_calculate_unknown_column_count": {
+      "screen_reader": "voiceover",
+      "browser": "safari",
+      "assertion_id": "do_not_calculate_unknown_column_count",
+      "feature_id": "aria/aria-colcount_attribute",
+      "output": "\"Table 2, table 4 columns, 6 rows\"",
+      "test_file": ""
+    },
+    "jaws|chrome|aria/aria-controls_attribute|convey_presence": {
+      "screen_reader": "jaws",
+      "browser": "chrome",
+      "assertion_id": "convey_presence",
+      "feature_id": "aria/aria-controls_attribute",
+      "output": "target button",
+      "test_file": ""
+    },
+    "jaws|edge|aria/aria-controls_attribute|convey_presence": {
+      "screen_reader": "jaws",
+      "browser": "edge",
+      "assertion_id": "convey_presence",
+      "feature_id": "aria/aria-controls_attribute",
+      "output": "\"target button\"",
+      "test_file": ""
+    },
+    "jaws|ie|aria/aria-controls_attribute|convey_presence": {
+      "screen_reader": "jaws",
+      "browser": "ie",
+      "assertion_id": "convey_presence",
+      "feature_id": "aria/aria-controls_attribute",
+      "output": "target button",
+      "test_file": ""
+    },
+    "jaws|firefox|aria/aria-controls_attribute|convey_presence": {
+      "screen_reader": "jaws",
+      "browser": "firefox",
+      "assertion_id": "convey_presence",
+      "feature_id": "aria/aria-controls_attribute",
+      "output": "target button",
+      "test_file": ""
+    },
+    "nvda|chrome|aria/aria-controls_attribute|convey_presence": {
+      "screen_reader": "nvda",
+      "browser": "chrome",
+      "assertion_id": "convey_presence",
+      "feature_id": "aria/aria-controls_attribute",
+      "output": "\"target button\"",
+      "test_file": ""
+    },
+    "nvda|chrome|aria/aria-controls_attribute|allow_jump_to_controlled": {
+      "screen_reader": "nvda",
+      "browser": "chrome",
+      "assertion_id": "allow_jump_to_controlled",
+      "feature_id": "aria/aria-controls_attribute",
+      "output": "\"target button\"",
+      "test_file": ""
+    },
+    "nvda|edge|aria/aria-controls_attribute|convey_presence": {
+      "screen_reader": "nvda",
+      "browser": "edge",
+      "assertion_id": "convey_presence",
+      "feature_id": "aria/aria-controls_attribute",
+      "output": "\"target button\"",
+      "test_file": ""
+    },
+    "nvda|edge|aria/aria-controls_attribute|allow_jump_to_controlled": {
+      "screen_reader": "nvda",
+      "browser": "edge",
+      "assertion_id": "allow_jump_to_controlled",
+      "feature_id": "aria/aria-controls_attribute",
+      "output": "\"target button\"",
+      "test_file": ""
+    },
+    "nvda|firefox|aria/aria-controls_attribute|convey_presence": {
+      "screen_reader": "nvda",
+      "browser": "firefox",
+      "assertion_id": "convey_presence",
+      "feature_id": "aria/aria-controls_attribute",
+      "output": "(property was not conveyed)",
+      "test_file": ""
+    },
+    "nvda|firefox|aria/aria-controls_attribute|allow_jump_to_controlled": {
+      "screen_reader": "nvda",
+      "browser": "firefox",
+      "assertion_id": "allow_jump_to_controlled",
+      "feature_id": "aria/aria-controls_attribute",
+      "output": "(property was not conveyed)",
+      "test_file": ""
+    },
+    "nvda|ie|aria/aria-controls_attribute|convey_presence": {
+      "screen_reader": "nvda",
+      "browser": "ie",
+      "assertion_id": "convey_presence",
+      "feature_id": "aria/aria-controls_attribute",
+      "output": "(property was not conveyed)",
+      "test_file": ""
+    },
+    "nvda|ie|aria/aria-controls_attribute|allow_jump_to_controlled": {
+      "screen_reader": "nvda",
+      "browser": "ie",
+      "assertion_id": "allow_jump_to_controlled",
+      "feature_id": "aria/aria-controls_attribute",
+      "output": "(property was not conveyed)",
+      "test_file": ""
+    },
+    "voiceover|safari|aria/aria-controls_attribute|convey_presence": {
+      "screen_reader": "voiceover",
+      "browser": "safari",
+      "assertion_id": "convey_presence",
+      "feature_id": "aria/aria-controls_attribute",
+      "output": "(property was not conveyed)",
+      "test_file": ""
+    },
+    "voiceover|safari|aria/aria-controls_attribute|allow_jump_to_controlled": {
+      "screen_reader": "voiceover",
+      "browser": "safari",
+      "assertion_id": "allow_jump_to_controlled",
+      "feature_id": "aria/aria-controls_attribute",
+      "output": "(property was not conveyed)",
+      "test_file": ""
+    },
+    "jaws|chrome|aria/aria-current_attribute|convey_addition": {
+      "screen_reader": "jaws",
+      "browser": "chrome",
+      "assertion_id": "convey_addition",
+      "feature_id": "aria/aria-current_attribute",
+      "output": "\"enter\"",
+      "test_file": ""
+    },
+    "jaws|edge|aria/aria-current_attribute|convey_addition": {
+      "screen_reader": "jaws",
+      "browser": "edge",
+      "assertion_id": "convey_addition",
+      "feature_id": "aria/aria-current_attribute",
+      "output": "\"enter\"",
+      "test_file": ""
+    },
+    "jaws|firefox|aria/aria-current_attribute|convey_addition": {
+      "screen_reader": "jaws",
+      "browser": "firefox",
+      "assertion_id": "convey_addition",
+      "feature_id": "aria/aria-current_attribute",
+      "output": "\"enter\"",
+      "test_file": ""
+    },
+    "voiceover|safari|aria/aria-current_attribute|convey_addition": {
+      "screen_reader": "voiceover",
+      "browser": "safari",
+      "assertion_id": "convey_addition",
+      "feature_id": "aria/aria-current_attribute",
+      "output": "earcon",
+      "test_file": ""
+    },
+    "voiceover|safari|aria/aria-describedby_attribute|contribute_to_description": {
+      "screen_reader": "voiceover",
+      "browser": "safari",
+      "assertion_id": "contribute_to_description",
+      "feature_id": "aria/aria-describedby_attribute",
+      "output": "\"Example label, edit text\"",
+      "test_file": ""
+    },
+    "jaws|chrome|aria/aria-description_attribute|contribute_to_description": {
+      "screen_reader": "jaws",
+      "browser": "chrome",
+      "assertion_id": "contribute_to_description",
+      "feature_id": "aria/aria-description_attribute",
+      "output": "\"target\"",
+      "test_file": ""
+    },
+    "jaws|edge|aria/aria-description_attribute|contribute_to_description": {
+      "screen_reader": "jaws",
+      "browser": "edge",
+      "assertion_id": "contribute_to_description",
+      "feature_id": "aria/aria-description_attribute",
+      "output": "\"target\"",
+      "test_file": ""
+    },
+    "jaws|firefox|aria/aria-description_attribute|contribute_to_description": {
+      "screen_reader": "jaws",
+      "browser": "firefox",
+      "assertion_id": "contribute_to_description",
+      "feature_id": "aria/aria-description_attribute",
+      "output": "\"target\"",
+      "test_file": ""
+    },
+    "nvda|firefox|aria/aria-description_attribute|convey_description_change": {
+      "screen_reader": "nvda",
+      "browser": "firefox",
+      "assertion_id": "convey_description_change",
+      "feature_id": "aria/aria-description_attribute",
+      "output": "(only character was announced)",
+      "test_file": ""
+    },
+    "voiceover|safari|aria/aria-description_attribute|convey_description_change": {
+      "screen_reader": "voiceover",
+      "browser": "safari",
+      "assertion_id": "convey_description_change",
+      "feature_id": "aria/aria-description_attribute",
+      "output": "(only the character was announced)",
+      "test_file": ""
+    },
+    "voiceover|safari|aria/aria-description_attribute|contribute_to_description": {
+      "screen_reader": "voiceover",
+      "browser": "safari",
+      "assertion_id": "contribute_to_description",
+      "feature_id": "aria/aria-description_attribute",
+      "output": "\"target\"",
+      "test_file": ""
+    },
+    "jaws|chrome|aria/aria-details_attribute|convey_referenced_content": {
+      "screen_reader": "jaws",
+      "browser": "chrome",
+      "assertion_id": "convey_referenced_content",
+      "feature_id": "aria/aria-details_attribute",
+      "output": "\"no more flows found\" (does not let user navigate to the referenced element)",
+      "test_file": ""
+    },
+    "jaws|edge|aria/aria-details_attribute|convey_referenced_content": {
+      "screen_reader": "jaws",
+      "browser": "edge",
+      "assertion_id": "convey_referenced_content",
+      "feature_id": "aria/aria-details_attribute",
+      "output": "\"no more flows found\" (does not let user navigate to the referenced element)",
+      "test_file": ""
+    },
+    "jaws|ie|aria/aria-details_attribute|convey_referenced_content": {
+      "screen_reader": "jaws",
+      "browser": "ie",
+      "assertion_id": "convey_referenced_content",
+      "feature_id": "aria/aria-details_attribute",
+      "output": "\"Graphic, unavailable, Cats, has details.\"",
+      "test_file": ""
+    },
+    "jaws|firefox|aria/aria-details_attribute|convey_referenced_content": {
+      "screen_reader": "jaws",
+      "browser": "firefox",
+      "assertion_id": "convey_referenced_content",
+      "feature_id": "aria/aria-details_attribute",
+      "output": "(does not let user navigate to the referenced element)",
+      "test_file": ""
+    },
+    "nvda|chrome|aria/aria-details_attribute|convey_details_boundaries": {
+      "screen_reader": "nvda",
+      "browser": "chrome",
+      "assertion_id": "convey_details_boundaries",
+      "feature_id": "aria/aria-details_attribute",
+      "output": "\"Cats have 4 legs, one tail, and are link full of awesome.\"",
+      "test_file": ""
+    },
+    "nvda|edge|aria/aria-details_attribute|convey_details_boundaries": {
+      "screen_reader": "nvda",
+      "browser": "edge",
+      "assertion_id": "convey_details_boundaries",
+      "feature_id": "aria/aria-details_attribute",
+      "output": "\"Cats have 4 legs, one tail, and are link full of awesome.\"",
+      "test_file": ""
+    },
+    "nvda|firefox|aria/aria-details_attribute|convey_details_boundaries": {
+      "screen_reader": "nvda",
+      "browser": "firefox",
+      "assertion_id": "convey_details_boundaries",
+      "feature_id": "aria/aria-details_attribute",
+      "output": "\"Cats have 4 legs, one tail, and are link full of awesome.\"",
+      "test_file": ""
+    },
+    "voiceover|safari|aria/aria-details_attribute|convey_presence": {
+      "screen_reader": "voiceover",
+      "browser": "safari",
+      "assertion_id": "convey_presence",
+      "feature_id": "aria/aria-details_attribute",
+      "output": "\"Cats, image, has details in paragraph\"",
+      "test_file": ""
+    },
+    "voiceover|safari|aria/aria-details_attribute|convey_referenced_content": {
+      "screen_reader": "voiceover",
+      "browser": "safari",
+      "assertion_id": "convey_referenced_content",
+      "feature_id": "aria/aria-details_attribute",
+      "output": "\"Cats, image, has details in paragraph\"",
+      "test_file": ""
+    },
+    "voiceover|safari|aria/aria-details_attribute|convey_details_boundaries": {
+      "screen_reader": "voiceover",
+      "browser": "safari",
+      "assertion_id": "convey_details_boundaries",
+      "feature_id": "aria/aria-details_attribute",
+      "output": "\"Cats have 4 legs, one tail, and are full of awesome., details for Cats\"",
+      "test_file": ""
+    },
+    "jaws|ie|aria/aria-errormessage_attribute|convey_not_pertinent": {
+      "screen_reader": "jaws",
+      "browser": "ie",
+      "assertion_id": "convey_not_pertinent",
+      "feature_id": "aria/aria-errormessage_attribute",
+      "output": "\"Input with aria-invalid=\"false\", edit, has error, example error text, type in text\"",
+      "test_file": ""
+    },
+    "jaws|firefox|aria/aria-errormessage_attribute|convey_pertinent": {
+      "screen_reader": "jaws",
+      "browser": "firefox",
+      "assertion_id": "convey_pertinent",
+      "feature_id": "aria/aria-errormessage_attribute",
+      "output": "\"Input with aria-invalid=\"true\" Edit invalid entry\"",
+      "test_file": ""
+    },
+    "nvda|edge|aria/aria-errormessage_attribute|convey_pertinent": {
+      "screen_reader": "nvda",
+      "browser": "edge",
+      "assertion_id": "convey_pertinent",
+      "feature_id": "aria/aria-errormessage_attribute",
+      "output": "\"Input with aria-invalid=\"true\", edit, invalid entry, blank\"",
+      "test_file": ""
+    },
+    "voiceover|safari|aria/aria-errormessage_attribute|convey_pertinent": {
+      "screen_reader": "voiceover",
+      "browser": "safari",
+      "assertion_id": "convey_pertinent",
+      "feature_id": "aria/aria-errormessage_attribute",
+      "output": "\"Input with aria-invalid=\"true\", invalid data, edit text\"",
+      "test_file": ""
+    },
+    "nvda|chrome|aria/aria-flowto_attribute|convey_presence_to": {
+      "screen_reader": "nvda",
+      "browser": "chrome",
+      "assertion_id": "convey_presence_to",
+      "feature_id": "aria/aria-flowto_attribute",
+      "output": "(does not convey presence of aria-flowto)",
+      "test_file": ""
+    },
+    "nvda|chrome|aria/aria-flowto_attribute|allow_navigation_to": {
+      "screen_reader": "nvda",
+      "browser": "chrome",
+      "assertion_id": "allow_navigation_to",
+      "feature_id": "aria/aria-flowto_attribute",
+      "output": "(does not convey presence of aria-flowto)",
+      "test_file": ""
+    },
+    "nvda|chrome|aria/aria-flowto_attribute|convey_presence_from": {
+      "screen_reader": "nvda",
+      "browser": "chrome",
+      "assertion_id": "convey_presence_from",
+      "feature_id": "aria/aria-flowto_attribute",
+      "output": "(does not convey presence of aria-flowto)",
+      "test_file": ""
+    },
+    "nvda|chrome|aria/aria-flowto_attribute|allow_navigation_from": {
+      "screen_reader": "nvda",
+      "browser": "chrome",
+      "assertion_id": "allow_navigation_from",
+      "feature_id": "aria/aria-flowto_attribute",
+      "output": "(does not convey presence of aria-flowto)",
+      "test_file": ""
+    },
+    "nvda|edge|aria/aria-flowto_attribute|convey_presence_to": {
+      "screen_reader": "nvda",
+      "browser": "edge",
+      "assertion_id": "convey_presence_to",
+      "feature_id": "aria/aria-flowto_attribute",
+      "output": "(does not convey presence of aria-flowto)",
+      "test_file": ""
+    },
+    "nvda|edge|aria/aria-flowto_attribute|allow_navigation_to": {
+      "screen_reader": "nvda",
+      "browser": "edge",
+      "assertion_id": "allow_navigation_to",
+      "feature_id": "aria/aria-flowto_attribute",
+      "output": "(does not convey presence of aria-flowto)",
+      "test_file": ""
+    },
+    "nvda|edge|aria/aria-flowto_attribute|convey_presence_from": {
+      "screen_reader": "nvda",
+      "browser": "edge",
+      "assertion_id": "convey_presence_from",
+      "feature_id": "aria/aria-flowto_attribute",
+      "output": "(does not convey presence of aria-flowto)",
+      "test_file": ""
+    },
+    "nvda|edge|aria/aria-flowto_attribute|allow_navigation_from": {
+      "screen_reader": "nvda",
+      "browser": "edge",
+      "assertion_id": "allow_navigation_from",
+      "feature_id": "aria/aria-flowto_attribute",
+      "output": "(does not convey presence of aria-flowto)",
+      "test_file": ""
+    },
+    "nvda|firefox|aria/aria-flowto_attribute|convey_presence_to": {
+      "screen_reader": "nvda",
+      "browser": "firefox",
+      "assertion_id": "convey_presence_to",
+      "feature_id": "aria/aria-flowto_attribute",
+      "output": "(does not convey presence of aria-flowto)",
+      "test_file": ""
+    },
+    "nvda|firefox|aria/aria-flowto_attribute|allow_navigation_to": {
+      "screen_reader": "nvda",
+      "browser": "firefox",
+      "assertion_id": "allow_navigation_to",
+      "feature_id": "aria/aria-flowto_attribute",
+      "output": "(does not convey presence of aria-flowto)",
+      "test_file": ""
+    },
+    "nvda|firefox|aria/aria-flowto_attribute|convey_presence_from": {
+      "screen_reader": "nvda",
+      "browser": "firefox",
+      "assertion_id": "convey_presence_from",
+      "feature_id": "aria/aria-flowto_attribute",
+      "output": "(does not convey presence of aria-flowto)",
+      "test_file": ""
+    },
+    "nvda|firefox|aria/aria-flowto_attribute|allow_navigation_from": {
+      "screen_reader": "nvda",
+      "browser": "firefox",
+      "assertion_id": "allow_navigation_from",
+      "feature_id": "aria/aria-flowto_attribute",
+      "output": "(does not convey presence of aria-flowto)",
+      "test_file": ""
+    },
+    "voiceover|safari|aria/aria-flowto_attribute|convey_presence_to": {
+      "screen_reader": "voiceover",
+      "browser": "safari",
+      "assertion_id": "convey_presence_to",
+      "feature_id": "aria/aria-flowto_attribute",
+      "output": "Does not convey presence of aria-flowto, as VoiceOver's concept of a virtual focus is somewhat different than JAWS and NVDA.",
+      "test_file": ""
+    },
+    "voiceover|safari|aria/aria-flowto_attribute|allow_navigation_to": {
+      "screen_reader": "voiceover",
+      "browser": "safari",
+      "assertion_id": "allow_navigation_to",
+      "feature_id": "aria/aria-flowto_attribute",
+      "output": "Does not convey presence of aria-flowto, as VoiceOver's concept of a virtual focus is somewhat different than JAWS and NVDA.",
+      "test_file": ""
+    },
+    "voiceover|safari|aria/aria-flowto_attribute|convey_presence_from": {
+      "screen_reader": "voiceover",
+      "browser": "safari",
+      "assertion_id": "convey_presence_from",
+      "feature_id": "aria/aria-flowto_attribute",
+      "output": "Does not convey presence of aria-flowto, as VoiceOver's concept of a virtual focus is somewhat different than JAWS and NVDA.",
+      "test_file": ""
+    },
+    "voiceover|safari|aria/aria-flowto_attribute|allow_navigation_from": {
+      "screen_reader": "voiceover",
+      "browser": "safari",
+      "assertion_id": "allow_navigation_from",
+      "feature_id": "aria/aria-flowto_attribute",
+      "output": "Does not convey presence of aria-flowto, as VoiceOver's concept of a virtual focus is somewhat different than JAWS and NVDA.",
+      "test_file": ""
+    },
+    "jaws|ie|aria/aria-haspopup_attribute|convey_value_dialog": {
+      "screen_reader": "jaws",
+      "browser": "ie",
+      "assertion_id": "convey_value_dialog",
+      "feature_id": "aria/aria-haspopup_attribute",
+      "output": "\"action button menu\"",
+      "test_file": ""
+    },
+    "jaws|ie|aria/aria-haspopup_attribute|convey_value_grid": {
+      "screen_reader": "jaws",
+      "browser": "ie",
+      "assertion_id": "convey_value_grid",
+      "feature_id": "aria/aria-haspopup_attribute",
+      "output": "\"action button menu\"",
+      "test_file": ""
+    },
+    "jaws|ie|aria/aria-haspopup_attribute|convey_value_listbox": {
+      "screen_reader": "jaws",
+      "browser": "ie",
+      "assertion_id": "convey_value_listbox",
+      "feature_id": "aria/aria-haspopup_attribute",
+      "output": "\"action button menu\"",
+      "test_file": ""
+    },
+    "jaws|ie|aria/aria-haspopup_attribute|convey_value_tree": {
+      "screen_reader": "jaws",
+      "browser": "ie",
+      "assertion_id": "convey_value_tree",
+      "feature_id": "aria/aria-haspopup_attribute",
+      "output": "\"action button menu\"",
+      "test_file": ""
+    },
+    "nvda|ie|aria/aria-haspopup_attribute|convey_value_dialog": {
+      "screen_reader": "nvda",
+      "browser": "ie",
+      "assertion_id": "convey_value_dialog",
+      "feature_id": "aria/aria-haspopup_attribute",
+      "output": "\"action button subMenu\"",
+      "test_file": ""
+    },
+    "nvda|ie|aria/aria-haspopup_attribute|convey_value_grid": {
+      "screen_reader": "nvda",
+      "browser": "ie",
+      "assertion_id": "convey_value_grid",
+      "feature_id": "aria/aria-haspopup_attribute",
+      "output": "\"action button subMenu\"",
+      "test_file": ""
+    },
+    "nvda|ie|aria/aria-haspopup_attribute|convey_value_listbox": {
+      "screen_reader": "nvda",
+      "browser": "ie",
+      "assertion_id": "convey_value_listbox",
+      "feature_id": "aria/aria-haspopup_attribute",
+      "output": "\"action button subMenu\"",
+      "test_file": ""
+    },
+    "nvda|ie|aria/aria-haspopup_attribute|convey_value_tree": {
+      "screen_reader": "nvda",
+      "browser": "ie",
+      "assertion_id": "convey_value_tree",
+      "feature_id": "aria/aria-haspopup_attribute",
+      "output": "\"action button subMenu\"",
+      "test_file": ""
+    },
+    "jaws|ie|aria/aria-invalid_attribute|convey_value_grammar": {
+      "screen_reader": "jaws",
+      "browser": "ie",
+      "assertion_id": "convey_value_grammar",
+      "feature_id": "aria/aria-invalid_attribute",
+      "output": "\"target 3, cats, edit, cats, type in text\"",
+      "test_file": ""
+    },
+    "jaws|ie|aria/aria-invalid_attribute|convey_value_spelling": {
+      "screen_reader": "jaws",
+      "browser": "ie",
+      "assertion_id": "convey_value_spelling",
+      "feature_id": "aria/aria-invalid_attribute",
+      "output": "\"target 4, cats, edit, cats, type in text\"",
+      "test_file": ""
+    },
+    "jaws|ie|aria/aria-invalid_attribute|convey_value_true": {
+      "screen_reader": "jaws",
+      "browser": "ie",
+      "assertion_id": "convey_value_true",
+      "feature_id": "aria/aria-invalid_attribute",
+      "output": "\"target 6, combobox, none, 1 of 4\"",
+      "test_file": ""
+    },
+    "jaws|chrome|aria/aria-live_attribute|convey_value_assertive": {
+      "screen_reader": "jaws",
+      "browser": "chrome",
+      "assertion_id": "convey_value_assertive",
+      "feature_id": "aria/aria-live_attribute",
+      "output": "\"enter <1st announcement in full>, <2nd announcement in full>, I am now populated aria-live=assertive\"",
+      "test_file": ""
+    },
+    "jaws|edge|aria/aria-live_attribute|convey_value_assertive": {
+      "screen_reader": "jaws",
+      "browser": "edge",
+      "assertion_id": "convey_value_assertive",
+      "feature_id": "aria/aria-live_attribute",
+      "output": "\"enter <1st announcement in full>, <2nd announcement in full>, I am now populated aria-live=assertive\"",
+      "test_file": ""
+    },
+    "jaws|ie|aria/aria-live_attribute|convey_value_assertive": {
+      "screen_reader": "jaws",
+      "browser": "ie",
+      "assertion_id": "convey_value_assertive",
+      "feature_id": "aria/aria-live_attribute",
+      "output": "\"<1st announcement in full>, <2nd announcement in full>, I am now populated aria-live=assertive\"",
+      "test_file": ""
+    },
+    "jaws|firefox|aria/aria-live_attribute|convey_value_assertive": {
+      "screen_reader": "jaws",
+      "browser": "firefox",
+      "assertion_id": "convey_value_assertive",
+      "feature_id": "aria/aria-live_attribute",
+      "output": "\"enter <1st announcement in full>, <2nd announcement in full>, I am now populated aria-live=assertive\"",
+      "test_file": ""
+    },
+    "voiceover|safari|aria/aria-live_attribute|convey_value_polite": {
+      "screen_reader": "voiceover",
+      "browser": "safari",
+      "assertion_id": "convey_value_polite",
+      "feature_id": "aria/aria-live_attribute",
+      "output": "\"<1st announcement interrupted>, <2nd announcement interrupted>, I am now populated aria-live=polite\"",
+      "test_file": ""
+    },
+    "jaws|chrome|aria/aria-placeholder_attribute|convey_placeholder_labelled_with_value": {
+      "screen_reader": "jaws",
+      "browser": "chrome",
+      "assertion_id": "convey_placeholder_labelled_with_value",
+      "feature_id": "aria/aria-placeholder_attribute",
+      "output": "\"Her birthday, edit, 1 2 dash 2 5 dash 2 0 0 0\"",
+      "test_file": ""
+    },
+    "jaws|edge|aria/aria-placeholder_attribute|convey_placeholder_labelled_with_value": {
+      "screen_reader": "jaws",
+      "browser": "edge",
+      "assertion_id": "convey_placeholder_labelled_with_value",
+      "feature_id": "aria/aria-placeholder_attribute",
+      "output": "\"Her birthday, edit, 1 2 dash 2 5 dash 2 0 0 0\"",
+      "test_file": ""
+    },
+    "jaws|firefox|aria/aria-placeholder_attribute|no_aria_placeholder_if_html_placeholder_present": {
+      "screen_reader": "jaws",
+      "browser": "firefox",
+      "assertion_id": "no_aria_placeholder_if_html_placeholder_present",
+      "feature_id": "aria/aria-placeholder_attribute",
+      "output": "\"His birthday, edit, 10 characters, type in text\"",
+      "test_file": ""
+    },
+    "jaws|firefox|aria/aria-placeholder_attribute|convey_placeholder_labelled_with_value": {
+      "screen_reader": "jaws",
+      "browser": "firefox",
+      "assertion_id": "convey_placeholder_labelled_with_value",
+      "feature_id": "aria/aria-placeholder_attribute",
+      "output": "\"Her birthday, edit, 1 2 dash 2 5 dash 2 0 0 0\"",
+      "test_file": ""
+    },
+    "nvda|chrome|aria/aria-placeholder_attribute|convey_placeholder_labelled_with_value": {
+      "screen_reader": "nvda",
+      "browser": "chrome",
+      "assertion_id": "convey_placeholder_labelled_with_value",
+      "feature_id": "aria/aria-placeholder_attribute",
+      "output": "\"Her birthday, edit, selected, 1 2 2 5 2 0 0 0\"",
+      "test_file": ""
+    },
+    "nvda|edge|aria/aria-placeholder_attribute|convey_placeholder_labelled_with_value": {
+      "screen_reader": "nvda",
+      "browser": "edge",
+      "assertion_id": "convey_placeholder_labelled_with_value",
+      "feature_id": "aria/aria-placeholder_attribute",
+      "output": "\"Her birthday, edit, selected, 1 2 2 5 2 0 0 0\"",
+      "test_file": ""
+    },
+    "nvda|firefox|aria/aria-placeholder_attribute|convey_placeholder_labelled_with_value": {
+      "screen_reader": "nvda",
+      "browser": "firefox",
+      "assertion_id": "convey_placeholder_labelled_with_value",
+      "feature_id": "aria/aria-placeholder_attribute",
+      "output": "\"Her birthday, edit, has autocomplete, selected, 1 2 2 5 2 0 0 0\"",
+      "test_file": ""
+    },
+    "voiceover|safari|aria/aria-placeholder_attribute|convey_placeholder_labelled_with_value": {
+      "screen_reader": "voiceover",
+      "browser": "safari",
+      "assertion_id": "convey_placeholder_labelled_with_value",
+      "feature_id": "aria/aria-placeholder_attribute",
+      "output": "\"12 25 dash 2000, content selected, her birthday, edit text\"",
+      "test_file": ""
+    },
+    "jaws|edge|aria/aria-pressed_attribute|convey_value_mixed": {
+      "screen_reader": "jaws",
+      "browser": "edge",
+      "assertion_id": "convey_value_mixed",
+      "feature_id": "aria/aria-pressed_attribute",
+      "output": "\"action, toggle button, partially checked, not pressed\"",
+      "test_file": ""
+    },
+    "jaws|ie|aria/aria-pressed_attribute|convey_value_mixed": {
+      "screen_reader": "jaws",
+      "browser": "ie",
+      "assertion_id": "convey_value_mixed",
+      "feature_id": "aria/aria-pressed_attribute",
+      "output": "\"action, toggle button\"",
+      "test_file": ""
+    },
+    "jaws|ie|aria/aria-pressed_attribute|convey_value_undefined": {
+      "screen_reader": "jaws",
+      "browser": "ie",
+      "assertion_id": "convey_value_undefined",
+      "feature_id": "aria/aria-pressed_attribute",
+      "output": "\"action, toggle button\"",
+      "test_file": ""
+    },
+    "nvda|chrome|aria/aria-pressed_attribute|convey_value_mixed": {
+      "screen_reader": "nvda",
+      "browser": "chrome",
+      "assertion_id": "convey_value_mixed",
+      "feature_id": "aria/aria-pressed_attribute",
+      "output": "\"action, toggle button, not pressed, half-checked\"",
+      "test_file": ""
+    },
+    "nvda|edge|aria/aria-pressed_attribute|convey_value_mixed": {
+      "screen_reader": "nvda",
+      "browser": "edge",
+      "assertion_id": "convey_value_mixed",
+      "feature_id": "aria/aria-pressed_attribute",
+      "output": "\"action, toggle button, not pressed, half-checked\"",
+      "test_file": ""
+    },
+    "nvda|firefox|aria/aria-pressed_attribute|convey_value_mixed": {
+      "screen_reader": "nvda",
+      "browser": "firefox",
+      "assertion_id": "convey_value_mixed",
+      "feature_id": "aria/aria-pressed_attribute",
+      "output": "\"action, toggle button, not pressed, half-checked\"",
+      "test_file": ""
+    },
+    "voiceover|safari|aria/aria-pressed_attribute|convey_change_in_state": {
+      "screen_reader": "voiceover",
+      "browser": "safari",
+      "assertion_id": "convey_change_in_state",
+      "feature_id": "aria/aria-pressed_attribute",
+      "output": "nothing was conveyed",
+      "test_file": ""
+    },
+    "jaws|firefox|aria/aria-relevant_attribute|convey_value_removals": {
+      "screen_reader": "jaws",
+      "browser": "firefox",
+      "assertion_id": "convey_value_removals",
+      "feature_id": "aria/aria-relevant_attribute",
+      "output": "\"enter Removed Content changed\"",
+      "test_file": ""
+    },
+    "nvda|chrome|aria/aria-relevant_attribute|convey_value_additions": {
+      "screen_reader": "nvda",
+      "browser": "chrome",
+      "assertion_id": "convey_value_additions",
+      "feature_id": "aria/aria-relevant_attribute",
+      "output": "(nothing was conveyed)",
+      "test_file": ""
+    },
+    "nvda|chrome|aria/aria-relevant_attribute|convey_value_removals": {
+      "screen_reader": "nvda",
+      "browser": "chrome",
+      "assertion_id": "convey_value_removals",
+      "feature_id": "aria/aria-relevant_attribute",
+      "output": "(nothing was conveyed)",
+      "test_file": ""
+    },
+    "nvda|edge|aria/aria-relevant_attribute|convey_value_additions": {
+      "screen_reader": "nvda",
+      "browser": "edge",
+      "assertion_id": "convey_value_additions",
+      "feature_id": "aria/aria-relevant_attribute",
+      "output": "(nothing was conveyed)",
+      "test_file": ""
+    },
+    "nvda|edge|aria/aria-relevant_attribute|convey_value_removals": {
+      "screen_reader": "nvda",
+      "browser": "edge",
+      "assertion_id": "convey_value_removals",
+      "feature_id": "aria/aria-relevant_attribute",
+      "output": "(nothing was conveyed)",
+      "test_file": ""
+    },
+    "nvda|firefox|aria/aria-relevant_attribute|convey_value_additions": {
+      "screen_reader": "nvda",
+      "browser": "firefox",
+      "assertion_id": "convey_value_additions",
+      "feature_id": "aria/aria-relevant_attribute",
+      "output": "(nothing was conveyed)",
+      "test_file": ""
+    },
+    "nvda|firefox|aria/aria-relevant_attribute|convey_value_removals": {
+      "screen_reader": "nvda",
+      "browser": "firefox",
+      "assertion_id": "convey_value_removals",
+      "feature_id": "aria/aria-relevant_attribute",
+      "output": "(nothing was conveyed)",
+      "test_file": ""
+    },
+    "voiceover|safari|aria/aria-relevant_attribute|convey_value_text": {
+      "screen_reader": "voiceover",
+      "browser": "safari",
+      "assertion_id": "convey_value_text",
+      "feature_id": "aria/aria-relevant_attribute",
+      "output": "(nothing was conveyed)",
+      "test_file": ""
+    },
+    "jaws|chrome|html/fieldset_element|convey_name": {
+      "screen_reader": "jaws",
+      "browser": "chrome",
+      "assertion_id": "convey_name",
+      "feature_id": "html/fieldset_element",
+      "output": "\"group end\"",
+      "test_file": ""
+    },
+    "jaws|chrome|html/legend_element|convey_name": {
+      "screen_reader": "jaws",
+      "browser": "chrome",
+      "assertion_id": "convey_name",
+      "feature_id": "html/legend_element",
+      "output": "\"group end\"",
+      "test_file": ""
+    },
+    "jaws|edge|html/fieldset_element|convey_name": {
+      "screen_reader": "jaws",
+      "browser": "edge",
+      "assertion_id": "convey_name",
+      "feature_id": "html/fieldset_element",
+      "output": "\"group end\"",
+      "test_file": ""
+    },
+    "jaws|edge|html/legend_element|convey_name": {
+      "screen_reader": "jaws",
+      "browser": "edge",
+      "assertion_id": "convey_name",
+      "feature_id": "html/legend_element",
+      "output": "\"group end\"",
+      "test_file": ""
+    },
+    "jaws|ie|html/fieldset_element|convey_name": {
+      "screen_reader": "jaws",
+      "browser": "ie",
+      "assertion_id": "convey_name",
+      "feature_id": "html/fieldset_element",
+      "output": "\"group end\"",
+      "test_file": ""
+    },
+    "jaws|ie|html/legend_element|convey_name": {
+      "screen_reader": "jaws",
+      "browser": "ie",
+      "assertion_id": "convey_name",
+      "feature_id": "html/legend_element",
+      "output": "\"group end\"",
+      "test_file": ""
+    },
+    "jaws|ie|html/input(type-radio)_element|convey_posinset": {
+      "screen_reader": "jaws",
+      "browser": "ie",
+      "assertion_id": "convey_posinset",
+      "feature_id": "html/input(type-radio)_element",
+      "output": "\"Animal, cat radio button, not checked, required\"",
+      "test_file": ""
+    },
+    "jaws|firefox|html/fieldset_element|convey_name": {
+      "screen_reader": "jaws",
+      "browser": "firefox",
+      "assertion_id": "convey_name",
+      "feature_id": "html/fieldset_element",
+      "output": "\"group end\"",
+      "test_file": ""
+    },
+    "jaws|firefox|html/legend_element|convey_name": {
+      "screen_reader": "jaws",
+      "browser": "firefox",
+      "assertion_id": "convey_name",
+      "feature_id": "html/legend_element",
+      "output": "\"group end\"",
+      "test_file": ""
+    },
+    "nvda|chrome|html/input(type-radio)_element|convey_posinset": {
+      "screen_reader": "nvda",
+      "browser": "chrome",
+      "assertion_id": "convey_posinset",
+      "feature_id": "html/input(type-radio)_element",
+      "output": "\"radio button, not checked, required, Cat, radio button, not checked, required, dog, radio button, not checked, required, CatDog\"",
+      "test_file": ""
+    },
+    "nvda|chrome|html/fieldset_element|convey_name": {
+      "screen_reader": "nvda",
+      "browser": "chrome",
+      "assertion_id": "convey_name",
+      "feature_id": "html/fieldset_element",
+      "output": "\"grouping, radio button, not checked, required, Cat, radio button, not checked, required, dog, radio button, not checked, required, CatDog\"",
+      "test_file": ""
+    },
+    "nvda|chrome|html/legend_element|convey_name": {
+      "screen_reader": "nvda",
+      "browser": "chrome",
+      "assertion_id": "convey_name",
+      "feature_id": "html/legend_element",
+      "output": "\"grouping, radio button, not checked, required, Cat, radio button, not checked, required, dog, radio button, not checked, required, CatDog\"",
+      "test_file": ""
+    },
+    "nvda|edge|html/input(type-radio)_element|convey_posinset": {
+      "screen_reader": "nvda",
+      "browser": "edge",
+      "assertion_id": "convey_posinset",
+      "feature_id": "html/input(type-radio)_element",
+      "output": "\"radio button, not checked, required, Cat, radio button, not checked, required, dog, radio button, not checked, required, CatDog\"",
+      "test_file": ""
+    },
+    "nvda|edge|html/fieldset_element|convey_name": {
+      "screen_reader": "nvda",
+      "browser": "edge",
+      "assertion_id": "convey_name",
+      "feature_id": "html/fieldset_element",
+      "output": "\"grouping, radio button, not checked, required, Cat, radio button, not checked, required, dog, radio button, not checked, required, CatDog\"",
+      "test_file": ""
+    },
+    "nvda|edge|html/legend_element|convey_name": {
+      "screen_reader": "nvda",
+      "browser": "edge",
+      "assertion_id": "convey_name",
+      "feature_id": "html/legend_element",
+      "output": "\"grouping, radio button, not checked, required, Cat, radio button, not checked, required, dog, radio button, not checked, required, CatDog\"",
+      "test_file": ""
+    },
+    "nvda|firefox|html/fieldset_element|convey_role": {
+      "screen_reader": "nvda",
+      "browser": "firefox",
+      "assertion_id": "convey_role",
+      "feature_id": "html/fieldset_element",
+      "output": "\"radio button, not checked, required, clickable, Cat, radio button, not checked, required, clickable, CatDog\"",
+      "test_file": ""
+    },
+    "nvda|firefox|html/fieldset_element|convey_boundaries": {
+      "screen_reader": "nvda",
+      "browser": "firefox",
+      "assertion_id": "convey_boundaries",
+      "feature_id": "html/fieldset_element",
+      "output": "\"radio button, not checked, required, clickable, Cat, radio button, not checked, required, clickable, CatDog\"",
+      "test_file": ""
+    },
+    "nvda|firefox|html/fieldset_element|convey_name": {
+      "screen_reader": "nvda",
+      "browser": "firefox",
+      "assertion_id": "convey_name",
+      "feature_id": "html/fieldset_element",
+      "output": "\"radio button, not checked, required, clickable, Cat, radio button, not checked, required, clickable, CatDog\"",
+      "test_file": ""
+    },
+    "nvda|firefox|html/legend_element|convey_name": {
+      "screen_reader": "nvda",
+      "browser": "firefox",
+      "assertion_id": "convey_name",
+      "feature_id": "html/legend_element",
+      "output": "\"radio button, not checked, required, clickable, Cat, radio button, not checked, required, clickable, CatDog\"",
+      "test_file": ""
+    },
+    "jaws|chrome|aria/radiogroup_role|convey_name": {
+      "screen_reader": "jaws",
+      "browser": "chrome",
+      "assertion_id": "convey_name",
+      "feature_id": "aria/radiogroup_role",
+      "output": "\"group end\"",
+      "test_file": ""
+    },
+    "jaws|edge|aria/radiogroup_role|convey_name": {
+      "screen_reader": "jaws",
+      "browser": "edge",
+      "assertion_id": "convey_name",
+      "feature_id": "aria/radiogroup_role",
+      "output": "\"group end\"",
+      "test_file": ""
+    },
+    "jaws|ie|aria/radiogroup_role|convey_name": {
+      "screen_reader": "jaws",
+      "browser": "ie",
+      "assertion_id": "convey_name",
+      "feature_id": "aria/radiogroup_role",
+      "output": "\"group end\"",
+      "test_file": ""
+    },
+    "jaws|firefox|aria/radiogroup_role|convey_name": {
+      "screen_reader": "jaws",
+      "browser": "firefox",
+      "assertion_id": "convey_name",
+      "feature_id": "aria/radiogroup_role",
+      "output": "\"group end\"",
+      "test_file": ""
+    },
+    "nvda|chrome|aria/radiogroup_role|convey_boundaries": {
+      "screen_reader": "nvda",
+      "browser": "chrome",
+      "assertion_id": "convey_boundaries",
+      "feature_id": "aria/radiogroup_role",
+      "output": "\"grouping, required, radio button  not checked, Cat. radio button  not checked, dog, radio button  not checked. clickable. CatDog.\"",
+      "test_file": ""
+    },
+    "nvda|edge|aria/radiogroup_role|convey_boundaries": {
+      "screen_reader": "nvda",
+      "browser": "edge",
+      "assertion_id": "convey_boundaries",
+      "feature_id": "aria/radiogroup_role",
+      "output": "\"grouping, required, radio button  not checked, Cat. radio button  not checked, dog, radio button  not checked. clickable. CatDog.\"",
+      "test_file": ""
+    },
+    "nvda|firefox|aria/radiogroup_role|convey_role": {
+      "screen_reader": "nvda",
+      "browser": "firefox",
+      "assertion_id": "convey_role",
+      "feature_id": "aria/radiogroup_role",
+      "output": "\"Heading level 3 Animal\"",
+      "test_file": ""
+    },
+    "nvda|firefox|aria/radiogroup_role|convey_boundaries": {
+      "screen_reader": "nvda",
+      "browser": "firefox",
+      "assertion_id": "convey_boundaries",
+      "feature_id": "aria/radiogroup_role",
+      "output": "\"Button. Submit.\"",
+      "test_file": ""
+    },
+    "jaws|chrome|aria/aria-rowcount_attribute|do_not_calculate_unknown_row_count": {
+      "screen_reader": "jaws",
+      "browser": "chrome",
+      "assertion_id": "do_not_calculate_unknown_row_count",
+      "feature_id": "aria/aria-rowcount_attribute",
+      "output": "\"Table with 4 of 4 columns and 4 of minus 1 rows\"",
+      "test_file": ""
+    },
+    "jaws|edge|aria/aria-rowcount_attribute|do_not_calculate_unknown_row_count": {
+      "screen_reader": "jaws",
+      "browser": "edge",
+      "assertion_id": "do_not_calculate_unknown_row_count",
+      "feature_id": "aria/aria-rowcount_attribute",
+      "output": "\"Table with 4 of 4 columns and 4 of minus 1 rows\"",
+      "test_file": ""
+    },
+    "jaws|firefox|aria/aria-rowcount_attribute|do_not_calculate_unknown_row_count": {
+      "screen_reader": "jaws",
+      "browser": "firefox",
+      "assertion_id": "do_not_calculate_unknown_row_count",
+      "feature_id": "aria/aria-rowcount_attribute",
+      "output": "\"Table with 4 columns and 4 rows\"",
+      "test_file": ""
+    },
+    "nvda|chrome|aria/aria-rowcount_attribute|do_not_calculate_unknown_row_count": {
+      "screen_reader": "nvda",
+      "browser": "chrome",
+      "assertion_id": "do_not_calculate_unknown_row_count",
+      "feature_id": "aria/aria-rowcount_attribute",
+      "output": "\"Table with minus 1 rows and 4 columns, Table 2\"",
+      "test_file": ""
+    },
+    "nvda|edge|aria/aria-rowcount_attribute|do_not_calculate_unknown_row_count": {
+      "screen_reader": "nvda",
+      "browser": "edge",
+      "assertion_id": "do_not_calculate_unknown_row_count",
+      "feature_id": "aria/aria-rowcount_attribute",
+      "output": "\"Table with minus 1 rows and 4 columns, Table 2\"",
+      "test_file": ""
+    },
+    "nvda|firefox|aria/aria-rowcount_attribute|do_not_calculate_unknown_row_count": {
+      "screen_reader": "nvda",
+      "browser": "firefox",
+      "assertion_id": "do_not_calculate_unknown_row_count",
+      "feature_id": "aria/aria-rowcount_attribute",
+      "output": "\"Table with minus 1 rows and 4 columns, Table 2\"",
+      "test_file": ""
+    },
+    "voiceover|safari|aria/aria-rowcount_attribute|do_not_calculate_unknown_row_count": {
+      "screen_reader": "voiceover",
+      "browser": "safari",
+      "assertion_id": "do_not_calculate_unknown_row_count",
+      "feature_id": "aria/aria-rowcount_attribute",
+      "output": "\"Table 2, table, 4 columns, minus 1 row\"",
+      "test_file": ""
+    },
+    "jaws|chrome|aria/aria-sort_attribute|convey_value_none_as_sortable": {
+      "screen_reader": "jaws",
+      "browser": "chrome",
+      "assertion_id": "convey_value_none_as_sortable",
+      "feature_id": "aria/aria-sort_attribute",
+      "output": "\"Title column header, title button, to activate press enter\"",
+      "test_file": ""
+    },
+    "jaws|chrome|aria/aria-sort_attribute|convey_change_in_value": {
+      "screen_reader": "jaws",
+      "browser": "chrome",
+      "assertion_id": "convey_change_in_value",
+      "feature_id": "aria/aria-sort_attribute",
+      "output": "\"enter\"",
+      "test_file": ""
+    },
+    "jaws|ie|aria/aria-sort_attribute|convey_value_none_as_sortable": {
+      "screen_reader": "jaws",
+      "browser": "ie",
+      "assertion_id": "convey_value_none_as_sortable",
+      "feature_id": "aria/aria-sort_attribute",
+      "output": "\"Title button, to activate press enter\"",
+      "test_file": ""
+    },
+    "jaws|ie|aria/aria-sort_attribute|convey_change_in_value": {
+      "screen_reader": "jaws",
+      "browser": "ie",
+      "assertion_id": "convey_change_in_value",
+      "feature_id": "aria/aria-sort_attribute",
+      "output": "\"\"",
+      "test_file": ""
+    },
+    "jaws|firefox|aria/aria-sort_attribute|convey_value_none_as_sortable": {
+      "screen_reader": "jaws",
+      "browser": "firefox",
+      "assertion_id": "convey_value_none_as_sortable",
+      "feature_id": "aria/aria-sort_attribute",
+      "output": "\"Title column header, title button, to activate press enter\"",
+      "test_file": ""
+    },
+    "nvda|chrome|aria/aria-sort_attribute|convey_value_none_as_sortable": {
+      "screen_reader": "nvda",
+      "browser": "chrome",
+      "assertion_id": "convey_value_none_as_sortable",
+      "feature_id": "aria/aria-sort_attribute",
+      "output": "\"Title column 2 title button\"",
+      "test_file": ""
+    },
+    "nvda|chrome|aria/aria-sort_attribute|convey_change_in_value": {
+      "screen_reader": "nvda",
+      "browser": "chrome",
+      "assertion_id": "convey_change_in_value",
+      "feature_id": "aria/aria-sort_attribute",
+      "output": "\"enter\"",
+      "test_file": ""
+    },
+    "nvda|edge|aria/aria-sort_attribute|convey_value_none_as_sortable": {
+      "screen_reader": "nvda",
+      "browser": "edge",
+      "assertion_id": "convey_value_none_as_sortable",
+      "feature_id": "aria/aria-sort_attribute",
+      "output": "\"Title column 2 title button\"",
+      "test_file": ""
+    },
+    "nvda|edge|aria/aria-sort_attribute|convey_change_in_value": {
+      "screen_reader": "nvda",
+      "browser": "edge",
+      "assertion_id": "convey_change_in_value",
+      "feature_id": "aria/aria-sort_attribute",
+      "output": "\"enter\"",
+      "test_file": ""
+    },
+    "nvda|firefox|aria/aria-sort_attribute|convey_value_none_as_sortable": {
+      "screen_reader": "nvda",
+      "browser": "firefox",
+      "assertion_id": "convey_value_none_as_sortable",
+      "feature_id": "aria/aria-sort_attribute",
+      "output": "\"column 2 title button\"",
+      "test_file": ""
+    },
+    "nvda|firefox|aria/aria-sort_attribute|convey_change_in_value": {
+      "screen_reader": "nvda",
+      "browser": "firefox",
+      "assertion_id": "convey_change_in_value",
+      "feature_id": "aria/aria-sort_attribute",
+      "output": "\"\"",
+      "test_file": ""
+    },
+    "voiceover|safari|aria/aria-sort_attribute|convey_value_ascending": {
+      "screen_reader": "voiceover",
+      "browser": "safari",
+      "assertion_id": "convey_value_ascending",
+      "feature_id": "aria/aria-sort_attribute",
+      "output": "\"Title, button\"",
+      "test_file": ""
+    },
+    "voiceover|safari|aria/aria-sort_attribute|convey_value_descending": {
+      "screen_reader": "voiceover",
+      "browser": "safari",
+      "assertion_id": "convey_value_descending",
+      "feature_id": "aria/aria-sort_attribute",
+      "output": "\"Title, button\"",
+      "test_file": ""
+    },
+    "voiceover|safari|aria/aria-sort_attribute|convey_value_none_as_sortable": {
+      "screen_reader": "voiceover",
+      "browser": "safari",
+      "assertion_id": "convey_value_none_as_sortable",
+      "feature_id": "aria/aria-sort_attribute",
+      "output": "\"Title, button\"",
+      "test_file": ""
+    },
+    "voiceover|safari|aria/aria-sort_attribute|convey_value_other": {
+      "screen_reader": "voiceover",
+      "browser": "safari",
+      "assertion_id": "convey_value_other",
+      "feature_id": "aria/aria-sort_attribute",
+      "output": "\"Title, button\"",
+      "test_file": ""
+    },
+    "voiceover|safari|aria/aria-sort_attribute|convey_change_in_value": {
+      "screen_reader": "voiceover",
+      "browser": "safari",
+      "assertion_id": "convey_change_in_value",
+      "feature_id": "aria/aria-sort_attribute",
+      "output": "\"press Title, button\"",
+      "test_file": ""
+    },
+    "jaws|chrome|aria/grid_role|convey_name": {
+      "screen_reader": "jaws",
+      "browser": "chrome",
+      "assertion_id": "convey_name",
+      "feature_id": "aria/grid_role",
+      "output": "\"Grid with 2 columns and 3 rows\"",
+      "test_file": ""
+    },
+    "jaws|chrome|aria/grid_role|change_mode_interaction": {
+      "screen_reader": "jaws",
+      "browser": "chrome",
+      "assertion_id": "change_mode_interaction",
+      "feature_id": "aria/grid_role",
+      "output": "\"Grid end\"",
+      "test_file": ""
+    },
+    "jaws|edge|aria/grid_role|convey_name": {
+      "screen_reader": "jaws",
+      "browser": "edge",
+      "assertion_id": "convey_name",
+      "feature_id": "aria/grid_role",
+      "output": "\"Grid with 2 columns and 3 rows\"",
+      "test_file": ""
+    },
+    "jaws|edge|aria/grid_role|change_mode_interaction": {
+      "screen_reader": "jaws",
+      "browser": "edge",
+      "assertion_id": "change_mode_interaction",
+      "feature_id": "aria/grid_role",
+      "output": "\"Grid end\"",
+      "test_file": ""
+    },
+    "jaws|ie|aria/grid_role|convey_name": {
+      "screen_reader": "jaws",
+      "browser": "ie",
+      "assertion_id": "convey_name",
+      "feature_id": "aria/grid_role",
+      "output": "\"grid with 2 columns and 3 rows\"",
+      "test_file": ""
+    },
+    "jaws|ie|aria/grid_role|change_mode_interaction": {
+      "screen_reader": "jaws",
+      "browser": "ie",
+      "assertion_id": "change_mode_interaction",
+      "feature_id": "aria/grid_role",
+      "output": "\"grid end\"",
+      "test_file": ""
+    },
+    "jaws|firefox|aria/grid_role|convey_name": {
+      "screen_reader": "jaws",
+      "browser": "firefox",
+      "assertion_id": "convey_name",
+      "feature_id": "aria/grid_role",
+      "output": "\"grid with 2 columns and 3 rows\"",
+      "test_file": ""
+    },
+    "jaws|firefox|aria/grid_role|change_mode_interaction": {
+      "screen_reader": "jaws",
+      "browser": "firefox",
+      "assertion_id": "change_mode_interaction",
+      "feature_id": "aria/grid_role",
+      "output": "\"grid end\"",
+      "test_file": ""
+    },
+    "jaws|firefox|aria/gridcell_role|convey_position": {
+      "screen_reader": "jaws",
+      "browser": "firefox",
+      "assertion_id": "convey_position",
+      "feature_id": "aria/gridcell_role",
+      "output": "\"target, target selected, type in text\"",
+      "test_file": ""
+    },
+    "nvda|chrome|aria/grid_role|convey_name": {
+      "screen_reader": "nvda",
+      "browser": "chrome",
+      "assertion_id": "convey_name",
+      "feature_id": "aria/grid_role",
+      "output": "\"table with 3 rows and 2 columns, row 1, date, column 1 date\"",
+      "test_file": ""
+    },
+    "nvda|chrome|aria/grid_role|change_mode_interaction": {
+      "screen_reader": "nvda",
+      "browser": "chrome",
+      "assertion_id": "change_mode_interaction",
+      "feature_id": "aria/grid_role",
+      "output": "\"table with 3 rows and 2 columns name column 2 alex\"",
+      "test_file": ""
+    },
+    "nvda|edge|aria/grid_role|convey_name": {
+      "screen_reader": "nvda",
+      "browser": "edge",
+      "assertion_id": "convey_name",
+      "feature_id": "aria/grid_role",
+      "output": "\"table with 3 rows and 2 columns, row 1, date, column 1 date\"",
+      "test_file": ""
+    },
+    "nvda|edge|aria/grid_role|change_mode_interaction": {
+      "screen_reader": "nvda",
+      "browser": "edge",
+      "assertion_id": "change_mode_interaction",
+      "feature_id": "aria/grid_role",
+      "output": "\"table with 3 rows and 2 columns name column 2 alex\"",
+      "test_file": ""
+    },
+    "nvda|firefox|aria/grid_role|change_mode_interaction": {
+      "screen_reader": "nvda",
+      "browser": "firefox",
+      "assertion_id": "change_mode_interaction",
+      "feature_id": "aria/grid_role",
+      "output": "\"table with 3 rows and 2 columns, row 1, column 1, editable, date\"",
+      "test_file": ""
+    },
+    "voiceover|safari|aria/columnheader_role|convey_role": {
+      "screen_reader": "voiceover",
+      "browser": "safari",
+      "assertion_id": "convey_role",
+      "feature_id": "aria/columnheader_role",
+      "output": "\"name\"",
+      "test_file": ""
+    },
+    "voiceover|safari|aria/gridcell_role|convey_role": {
+      "screen_reader": "voiceover",
+      "browser": "safari",
+      "assertion_id": "convey_role",
+      "feature_id": "aria/gridcell_role",
+      "output": "\"target\"",
+      "test_file": ""
+    },
+    "voiceover|safari|aria/gridcell_role|convey_position": {
+      "screen_reader": "voiceover",
+      "browser": "safari",
+      "assertion_id": "convey_position",
+      "feature_id": "aria/gridcell_role",
+      "output": "\"target\"",
+      "test_file": ""
+    },
+    "voiceover|safari|aria/heading_role|default_level_of_2": {
+      "screen_reader": "voiceover",
+      "browser": "safari",
+      "assertion_id": "default_level_of_2",
+      "feature_id": "aria/heading_role",
+      "output": "\"heading, <name>,\"",
+      "test_file": ""
+    },
+    "jaws|chrome|aria/aria-level_attribute|convey_presence_and_value": {
+      "screen_reader": "jaws",
+      "browser": "chrome",
+      "assertion_id": "convey_presence_and_value",
+      "feature_id": "aria/aria-level_attribute",
+      "output": "\"heading level 2, <name>\"",
+      "test_file": ""
+    },
+    "jaws|edge|aria/aria-level_attribute|convey_presence_and_value": {
+      "screen_reader": "jaws",
+      "browser": "edge",
+      "assertion_id": "convey_presence_and_value",
+      "feature_id": "aria/aria-level_attribute",
+      "output": "\"heading level 2, <name>\"",
+      "test_file": ""
+    },
+    "jaws|firefox|aria/aria-level_attribute|convey_presence_and_value": {
+      "screen_reader": "jaws",
+      "browser": "firefox",
+      "assertion_id": "convey_presence_and_value",
+      "feature_id": "aria/aria-level_attribute",
+      "output": "\"heading level 2, <name>\"",
+      "test_file": ""
+    },
+    "jaws|chrome|aria/log_role|convey_name_and_role_in_announcement_if_named": {
+      "screen_reader": "jaws",
+      "browser": "chrome",
+      "assertion_id": "convey_name_and_role_in_announcement_if_named",
+      "feature_id": "aria/log_role",
+      "output": "\"<1st announcement in full>, <2nd announcement in full>, bullet Me: where is the cake?\n\"",
+      "test_file": ""
+    },
+    "jaws|edge|aria/log_role|convey_name_and_role_in_announcement_if_named": {
+      "screen_reader": "jaws",
+      "browser": "edge",
+      "assertion_id": "convey_name_and_role_in_announcement_if_named",
+      "feature_id": "aria/log_role",
+      "output": "\"<1st announcement in full>, <2nd announcement in full>, bullet Me: where is the cake?\n\"",
+      "test_file": ""
+    },
+    "jaws|firefox|aria/log_role|convey_name_and_role_in_announcement_if_named": {
+      "screen_reader": "jaws",
+      "browser": "firefox",
+      "assertion_id": "convey_name_and_role_in_announcement_if_named",
+      "feature_id": "aria/log_role",
+      "output": "\"<1st announcement in full>, <2nd announcement in full>, bullet Me: where is the cake?; bullet Me: where is the cake?\"",
+      "test_file": ""
+    },
+    "jaws|firefox|aria/log_role|convey_name_and_role_if_named": {
+      "screen_reader": "jaws",
+      "browser": "firefox",
+      "assertion_id": "convey_name_and_role_if_named",
+      "feature_id": "aria/log_role",
+      "output": "\"list of 1 items\"",
+      "test_file": ""
+    },
+    "nvda|firefox|aria/log_role|convey_name_and_role_in_announcement_if_named": {
+      "screen_reader": "nvda",
+      "browser": "firefox",
+      "assertion_id": "convey_name_and_role_in_announcement_if_named",
+      "feature_id": "aria/log_role",
+      "output": "\"<1st announcement in full>, <2nd announcement in full>, bullet me: where is the cake?\"",
+      "test_file": ""
+    },
+    "nvda|firefox|aria/log_role|convey_name_and_role_if_named": {
+      "screen_reader": "nvda",
+      "browser": "firefox",
+      "assertion_id": "convey_name_and_role_if_named",
+      "feature_id": "aria/log_role",
+      "output": "\"list  with 1 items; bullet Customer support: hello, how may I help?\"",
+      "test_file": ""
+    },
+    "voiceover|safari|aria/log_role|convey_name_and_role_in_announcement_if_named": {
+      "screen_reader": "voiceover",
+      "browser": "safari",
+      "assertion_id": "convey_name_and_role_in_announcement_if_named",
+      "feature_id": "aria/log_role",
+      "output": "\"<1st announcement skipped>, <2nd announcement in full>, bullet me: where is the cake?\"",
+      "test_file": ""
+    },
+    "jaws|chrome|aria/note_role|convey_name": {
+      "screen_reader": "jaws",
+      "browser": "chrome",
+      "assertion_id": "convey_name",
+      "feature_id": "aria/note_role",
+      "output": "\"Example Note, note\"",
+      "test_file": ""
+    },
+    "jaws|edge|aria/note_role|convey_name": {
+      "screen_reader": "jaws",
+      "browser": "edge",
+      "assertion_id": "convey_name",
+      "feature_id": "aria/note_role",
+      "output": "\"Example Note, note\"",
+      "test_file": ""
+    },
+    "nvda|chrome|aria/note_role|convey_role": {
+      "screen_reader": "nvda",
+      "browser": "chrome",
+      "assertion_id": "convey_role",
+      "feature_id": "aria/note_role",
+      "output": "\"Example Note, note\"",
+      "test_file": ""
+    },
+    "nvda|chrome|aria/note_role|convey_name": {
+      "screen_reader": "nvda",
+      "browser": "chrome",
+      "assertion_id": "convey_name",
+      "feature_id": "aria/note_role",
+      "output": "\"Example Note, note\"",
+      "test_file": ""
+    },
+    "nvda|chrome|aria/note_role|convey_boundaries": {
+      "screen_reader": "nvda",
+      "browser": "chrome",
+      "assertion_id": "convey_boundaries",
+      "feature_id": "aria/note_role",
+      "output": "\"Example Note, note\"",
+      "test_file": ""
+    },
+    "nvda|edge|aria/note_role|convey_role": {
+      "screen_reader": "nvda",
+      "browser": "edge",
+      "assertion_id": "convey_role",
+      "feature_id": "aria/note_role",
+      "output": "\"Example Note, note\"",
+      "test_file": ""
+    },
+    "nvda|edge|aria/note_role|convey_name": {
+      "screen_reader": "nvda",
+      "browser": "edge",
+      "assertion_id": "convey_name",
+      "feature_id": "aria/note_role",
+      "output": "\"Example Note, note\"",
+      "test_file": ""
+    },
+    "nvda|edge|aria/note_role|convey_boundaries": {
+      "screen_reader": "nvda",
+      "browser": "edge",
+      "assertion_id": "convey_boundaries",
+      "feature_id": "aria/note_role",
+      "output": "\"Example Note, note\"",
+      "test_file": ""
+    },
+    "nvda|firefox|aria/note_role|convey_role": {
+      "screen_reader": "nvda",
+      "browser": "firefox",
+      "assertion_id": "convey_role",
+      "feature_id": "aria/note_role",
+      "output": "\"Example Note, note\"",
+      "test_file": ""
+    },
+    "nvda|firefox|aria/note_role|convey_name": {
+      "screen_reader": "nvda",
+      "browser": "firefox",
+      "assertion_id": "convey_name",
+      "feature_id": "aria/note_role",
+      "output": "\"Example Note, note\"",
+      "test_file": ""
+    },
+    "nvda|firefox|aria/note_role|convey_boundaries": {
+      "screen_reader": "nvda",
+      "browser": "firefox",
+      "assertion_id": "convey_boundaries",
+      "feature_id": "aria/note_role",
+      "output": "\"Example Note, note\"",
+      "test_file": ""
+    },
+    "jaws|chrome|aria/tooltip_role|convey_role": {
+      "screen_reader": "jaws",
+      "browser": "chrome",
+      "assertion_id": "convey_role",
+      "feature_id": "aria/tooltip_role",
+      "output": "\"heading level 3, example tooltip\"",
+      "test_file": ""
+    },
+    "jaws|chrome|aria/tooltip_role|convey_name": {
+      "screen_reader": "jaws",
+      "browser": "chrome",
+      "assertion_id": "convey_name",
+      "feature_id": "aria/tooltip_role",
+      "output": "\"heading level 3, example tooltip\"",
+      "test_file": ""
+    },
+    "jaws|chrome|aria/tooltip_role|convey_boundaries": {
+      "screen_reader": "jaws",
+      "browser": "chrome",
+      "assertion_id": "convey_boundaries",
+      "feature_id": "aria/tooltip_role",
+      "output": "\"heading level 3, example tooltip\"",
+      "test_file": ""
+    },
+    "jaws|edge|aria/tooltip_role|convey_role": {
+      "screen_reader": "jaws",
+      "browser": "edge",
+      "assertion_id": "convey_role",
+      "feature_id": "aria/tooltip_role",
+      "output": "\"heading level 3, example tooltip\"",
+      "test_file": ""
+    },
+    "jaws|edge|aria/tooltip_role|convey_name": {
+      "screen_reader": "jaws",
+      "browser": "edge",
+      "assertion_id": "convey_name",
+      "feature_id": "aria/tooltip_role",
+      "output": "\"heading level 3, example tooltip\"",
+      "test_file": ""
+    },
+    "jaws|edge|aria/tooltip_role|convey_boundaries": {
+      "screen_reader": "jaws",
+      "browser": "edge",
+      "assertion_id": "convey_boundaries",
+      "feature_id": "aria/tooltip_role",
+      "output": "\"heading level 3, example tooltip\"",
+      "test_file": ""
+    },
+    "jaws|firefox|aria/tooltip_role|convey_role": {
+      "screen_reader": "jaws",
+      "browser": "firefox",
+      "assertion_id": "convey_role",
+      "feature_id": "aria/tooltip_role",
+      "output": "\"heading level 3, example tooltip\"",
+      "test_file": ""
+    },
+    "jaws|firefox|aria/tooltip_role|convey_name": {
+      "screen_reader": "jaws",
+      "browser": "firefox",
+      "assertion_id": "convey_name",
+      "feature_id": "aria/tooltip_role",
+      "output": "\"heading level 3, example tooltip\"",
+      "test_file": ""
+    },
+    "jaws|firefox|aria/tooltip_role|convey_boundaries": {
+      "screen_reader": "jaws",
+      "browser": "firefox",
+      "assertion_id": "convey_boundaries",
+      "feature_id": "aria/tooltip_role",
+      "output": "\"heading level 3, example tooltip\"",
+      "test_file": ""
+    },
+    "nvda|chrome|aria/tooltip_role|convey_role": {
+      "screen_reader": "nvda",
+      "browser": "chrome",
+      "assertion_id": "convey_role",
+      "feature_id": "aria/tooltip_role",
+      "output": "\"heading level 3, example tooltip\"",
+      "test_file": ""
+    },
+    "nvda|chrome|aria/tooltip_role|convey_name": {
+      "screen_reader": "nvda",
+      "browser": "chrome",
+      "assertion_id": "convey_name",
+      "feature_id": "aria/tooltip_role",
+      "output": "\"heading level 3, example tooltip\"",
+      "test_file": ""
+    },
+    "nvda|chrome|aria/tooltip_role|convey_boundaries": {
+      "screen_reader": "nvda",
+      "browser": "chrome",
+      "assertion_id": "convey_boundaries",
+      "feature_id": "aria/tooltip_role",
+      "output": "\"heading level 3, example tooltip\"",
+      "test_file": ""
+    },
+    "nvda|edge|aria/tooltip_role|convey_role": {
+      "screen_reader": "nvda",
+      "browser": "edge",
+      "assertion_id": "convey_role",
+      "feature_id": "aria/tooltip_role",
+      "output": "\"heading level 3, example tooltip\"",
+      "test_file": ""
+    },
+    "nvda|edge|aria/tooltip_role|convey_name": {
+      "screen_reader": "nvda",
+      "browser": "edge",
+      "assertion_id": "convey_name",
+      "feature_id": "aria/tooltip_role",
+      "output": "\"heading level 3, example tooltip\"",
+      "test_file": ""
+    },
+    "nvda|edge|aria/tooltip_role|convey_boundaries": {
+      "screen_reader": "nvda",
+      "browser": "edge",
+      "assertion_id": "convey_boundaries",
+      "feature_id": "aria/tooltip_role",
+      "output": "\"heading level 3, example tooltip\"",
+      "test_file": ""
+    },
+    "nvda|firefox|aria/tooltip_role|convey_role": {
+      "screen_reader": "nvda",
+      "browser": "firefox",
+      "assertion_id": "convey_role",
+      "feature_id": "aria/tooltip_role",
+      "output": "\"heading level 3, example tooltip\"",
+      "test_file": ""
+    },
+    "nvda|firefox|aria/tooltip_role|convey_name": {
+      "screen_reader": "nvda",
+      "browser": "firefox",
+      "assertion_id": "convey_name",
+      "feature_id": "aria/tooltip_role",
+      "output": "\"heading level 3, example tooltip\"",
+      "test_file": ""
+    },
+    "nvda|firefox|aria/tooltip_role|convey_boundaries": {
+      "screen_reader": "nvda",
+      "browser": "firefox",
+      "assertion_id": "convey_boundaries",
+      "feature_id": "aria/tooltip_role",
+      "output": "\"heading level 3, example tooltip\"",
+      "test_file": ""
+    },
+    "jaws|chrome|aria/status_role|convey_name_and_role_if_named": {
+      "screen_reader": "jaws",
+      "browser": "chrome",
+      "assertion_id": "convey_name_and_role_if_named",
+      "feature_id": "aria/status_role",
+      "output": "\"existing content\"",
+      "test_file": ""
+    },
+    "jaws|edge|aria/status_role|convey_name_and_role_if_named": {
+      "screen_reader": "jaws",
+      "browser": "edge",
+      "assertion_id": "convey_name_and_role_if_named",
+      "feature_id": "aria/status_role",
+      "output": "\"existing content\"",
+      "test_file": ""
+    },
+    "jaws|ie|aria/status_role|convey_aria_atomic_value_true": {
+      "screen_reader": "jaws",
+      "browser": "ie",
+      "assertion_id": "convey_aria_atomic_value_true",
+      "feature_id": "aria/status_role",
+      "output": "\"<1st announcement in full>, <2nd announcement in full>, I am now populated\"",
+      "test_file": ""
+    },
+    "jaws|ie|aria/status_role|convey_name_and_role_in_announcement_if_named": {
+      "screen_reader": "jaws",
+      "browser": "ie",
+      "assertion_id": "convey_name_and_role_in_announcement_if_named",
+      "feature_id": "aria/status_role",
+      "output": "\"<1st announcement in full>, <2nd announcement in full>, polite message, I am now populated\"",
+      "test_file": ""
+    },
+    "jaws|ie|aria/status_role|convey_name_and_role_if_named": {
+      "screen_reader": "jaws",
+      "browser": "ie",
+      "assertion_id": "convey_name_and_role_if_named",
+      "feature_id": "aria/status_role",
+      "output": "\"existing content\"",
+      "test_file": ""
+    },
+    "jaws|firefox|aria/status_role|convey_aria_atomic_value_true": {
+      "screen_reader": "jaws",
+      "browser": "firefox",
+      "assertion_id": "convey_aria_atomic_value_true",
+      "feature_id": "aria/status_role",
+      "output": "\"<1st announcement in full>, <2nd announcement in full>, I am now populated\"",
+      "test_file": ""
+    },
+    "jaws|firefox|aria/status_role|convey_name_and_role_in_announcement_if_named": {
+      "screen_reader": "jaws",
+      "browser": "firefox",
+      "assertion_id": "convey_name_and_role_in_announcement_if_named",
+      "feature_id": "aria/status_role",
+      "output": "\"<1st announcement in full>, <2nd announcement in full>, I am now populated\"",
+      "test_file": ""
+    },
+    "jaws|firefox|aria/status_role|convey_name_and_role_if_named": {
+      "screen_reader": "jaws",
+      "browser": "firefox",
+      "assertion_id": "convey_name_and_role_if_named",
+      "feature_id": "aria/status_role",
+      "output": "\"existing content\"",
+      "test_file": ""
+    },
+    "nvda|chrome|aria/status_role|convey_name_and_role_if_named": {
+      "screen_reader": "nvda",
+      "browser": "chrome",
+      "assertion_id": "convey_name_and_role_if_named",
+      "feature_id": "aria/status_role",
+      "output": "\"existing content\"",
+      "test_file": ""
+    },
+    "nvda|edge|aria/status_role|convey_name_and_role_if_named": {
+      "screen_reader": "nvda",
+      "browser": "edge",
+      "assertion_id": "convey_name_and_role_if_named",
+      "feature_id": "aria/status_role",
+      "output": "\"existing content\"",
+      "test_file": ""
+    },
+    "nvda|firefox|aria/status_role|convey_aria_atomic_value_true": {
+      "screen_reader": "nvda",
+      "browser": "firefox",
+      "assertion_id": "convey_aria_atomic_value_true",
+      "feature_id": "aria/status_role",
+      "output": "\"<1st announcement in full>, <2nd announcement in full>, I am now populated\"",
+      "test_file": ""
+    },
+    "nvda|firefox|aria/status_role|convey_name_and_role_in_announcement_if_named": {
+      "screen_reader": "nvda",
+      "browser": "firefox",
+      "assertion_id": "convey_name_and_role_in_announcement_if_named",
+      "feature_id": "aria/status_role",
+      "output": "\"<1st announcement in full>, <2nd announcement in full>, I am now populated\"",
+      "test_file": ""
+    },
+    "nvda|firefox|aria/status_role|convey_name_and_role_if_named": {
+      "screen_reader": "nvda",
+      "browser": "firefox",
+      "assertion_id": "convey_name_and_role_if_named",
+      "feature_id": "aria/status_role",
+      "output": "\"existing content\"",
+      "test_file": ""
+    }
+  }
+}

@@ -291,81 +291,93 @@ def show_sr_output_for_role(role: str):
     print(f"  No test data found for role '{role}'")
 
 
-# ── Sync Logic ────────────────────────────────────────────────
+# ── Baseline + Sync Logic ─────────────────────────────────────
+
+BASELINE_FILE = "last-sync-baseline.json"
+
+
+def _failure_key(failure: dict) -> str:
+    """Create a unique key for a failure entry."""
+    return f"{failure['screen_reader']}|{failure['browser']}|{failure.get('feature_id', '')}|{failure.get('assertion_id', '')}"
+
+
+def _load_baseline() -> dict:
+    """Load the previous sync baseline, or return empty."""
+    path = DATA_DIR / BASELINE_FILE
+    if path.exists():
+        with open(path) as f:
+            return json.load(f)
+    return {"failures": {}, "synced_at": None}
+
+
+def _save_baseline(failures: list[dict]) -> None:
+    """Save current upstream failures as the new baseline."""
+    baseline = {
+        "synced_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
+        "total_failures": len(failures),
+        "failures": {_failure_key(f): f for f in failures},
+    }
+    path = DATA_DIR / BASELINE_FILE
+    with open(path, "w") as f:
+        json.dump(baseline, f, indent=2, ensure_ascii=False)
+        f.write("\n")
+    print(f"  Baseline saved: {len(failures)} failures ({path.name})")
 
 
 class SyncReport:
     """Collects sync diff results."""
 
     def __init__(self):
-        self.new_bug_candidates: list[dict] = []
-        self.potentially_fixed: list[dict] = []
+        self.new_failures: list[dict] = []     # Failures not in previous baseline
+        self.resolved_failures: list[dict] = []  # Failures in baseline but no longer upstream
         self.new_roles: list[str] = []
+        self.total_upstream: int = 0
+        self.baseline_count: int = 0
         self.changes_made = False
 
     def has_changes(self) -> bool:
-        return bool(self.new_bug_candidates or self.potentially_fixed or self.new_roles)
+        return bool(self.new_failures or self.resolved_failures or self.new_roles)
 
     def print_summary(self):
         print("\n=== Sync Report ===\n")
 
+        print(f"  Upstream failures:  {self.total_upstream}")
+        print(f"  Previous baseline:  {self.baseline_count}")
+
         if not self.has_changes():
-            print("  No changes detected. Everything is up to date.")
+            print("\n  No changes detected. Everything is up to date.")
             return
 
-        if self.new_bug_candidates:
-            print(f"  NEW BUG CANDIDATES ({len(self.new_bug_candidates)}):")
-            for bug in self.new_bug_candidates:
-                print(f"    - {bug['screen_reader']} + {bug['browser']}: "
-                      f"{bug['feature_id']} / {bug['assertion_id']}")
-                if bug.get("output"):
-                    print(f"      Output: {bug['output'][:80]}")
+        if self.new_failures:
+            print(f"\n  NEW FAILURES since last sync ({len(self.new_failures)}):")
+            for f in self.new_failures:
+                print(f"    - {f['screen_reader']} + {f['browser']}: "
+                      f"{f.get('feature_id', '?')} / {f.get('assertion_id', '?')}")
+                if f.get("output"):
+                    print(f"      Output: {f['output'][:80]}")
             print()
 
-        if self.potentially_fixed:
-            print(f"  POTENTIALLY FIXED ({len(self.potentially_fixed)}):")
-            for bug in self.potentially_fixed:
-                print(f"    - {bug['id']}: {bug['description'][:60]}…")
+        if self.resolved_failures:
+            print(f"  RESOLVED since last sync ({len(self.resolved_failures)}):")
+            for f in self.resolved_failures:
+                print(f"    - {f['screen_reader']} + {f['browser']}: "
+                      f"{f.get('feature_id', '?')} / {f.get('assertion_id', '?')}")
             print()
 
         if self.new_roles:
-            print(f"  NEW ROLES ({len(self.new_roles)}):")
+            print(f"  NEW ROLES on a11ysupport.io ({len(self.new_roles)}):")
             for role in self.new_roles:
                 print(f"    - {role}")
             print()
 
 
-def sync_known_bugs(dry_run: bool = False) -> SyncReport:
-    """Sync known-bugs.json with a11ysupport.io test results.
-
-    1. Fetch all test result files from a11ysupport.io
-    2. Extract failures → new bug candidates
-    3. Check if our existing bugs still fail → potentially fixed
-    4. Update known-bugs.json if not dry_run
-    """
-    report = SyncReport()
-
-    # Load our current bugs
-    bugs_data = load_local("known-bugs.json")
-    our_bugs = bugs_data.get("bugs", [])
-    our_bug_ids = {b["id"] for b in our_bugs}
-
-    # Build a lookup of our bugs by role/property + SR
-    our_bug_lookup = {}
-    for bug in our_bugs:
-        key_role = bug.get("role", "")
-        key_prop = bug.get("property", "")
-        key_sr = bug["screen_reader"]
-        our_bug_lookup[(key_role, key_prop, key_sr)] = bug
-
+def fetch_all_upstream_failures() -> list[dict]:
+    """Fetch all test files from a11ysupport.io and extract failures."""
     print("Fetching test result file list...")
     test_files = list_remote_test_files()
     print(f"  Found {len(test_files)} test files")
 
-    # Collect all failures from upstream
-    all_upstream_failures = []
-    roles_with_failures = set()
-
+    all_failures = []
     for i, test_file in enumerate(test_files):
         if i % 10 == 0:
             print(f"  Fetching {i + 1}/{len(test_files)}...", end="\r")
@@ -375,70 +387,53 @@ def sync_known_bugs(dry_run: bool = False) -> SyncReport:
             continue
 
         failures = extract_failures_from_test(data)
-        all_upstream_failures.extend(failures)
-        for f in failures:
-            feature = f.get("feature_id", "")
-            if "/" in feature:
-                roles_with_failures.add(feature.split("/")[1])
+        all_failures.extend(failures)
 
-    print(f"\n  Total upstream failures: {len(all_upstream_failures)}")
+    print(f"\n  Total upstream failures: {len(all_failures)}")
+    return all_failures
 
-    # Find NEW bug candidates (upstream failures not in our list)
-    seen_candidates = set()
-    for failure in all_upstream_failures:
-        sr = failure["screen_reader"]
-        feature = failure.get("feature_id", "")
 
-        # Extract role or property from feature_id (e.g., "aria/alert_role" → "alert")
-        role = ""
-        prop = ""
-        if "/" in feature:
-            part = feature.split("/")[1]
-            if part.endswith("_role"):
-                role = part.replace("_role", "")
-            elif part.startswith("aria-") or part.startswith("aria_"):
-                prop = part.replace("_attribute", "").replace("_", "-")
+def sync_with_baseline(dry_run: bool = False) -> SyncReport:
+    """Sync by comparing current upstream data against our stored baseline.
 
-        # Check if we already track this
-        if (role, prop, sr) in our_bug_lookup:
-            continue
-        if (role, "", sr) in our_bug_lookup:
-            continue
-        if ("", prop, sr) in our_bug_lookup:
-            continue
+    First run: saves baseline, reports nothing (no previous data to compare against).
+    Subsequent runs: reports only the delta (new failures, resolved failures).
 
-        # Deduplicate
-        dedup_key = (role or prop, sr, failure["browser"])
-        if dedup_key in seen_candidates:
-            continue
-        seen_candidates.add(dedup_key)
+    This keeps the known-bugs.json as a hand-curated list. The sync only alerts
+    you to changes in the upstream landscape — it does NOT auto-modify known-bugs.json.
+    """
+    report = SyncReport()
 
-        report.new_bug_candidates.append(failure)
+    # Load previous baseline
+    baseline = _load_baseline()
+    previous_failures = baseline.get("failures", {})
+    report.baseline_count = len(previous_failures)
 
-    # Find POTENTIALLY FIXED bugs (in our list but no longer failing upstream)
-    for bug in our_bugs:
-        bug_role = bug.get("role", "")
-        bug_prop = bug.get("property", "")
-        bug_sr = bug["screen_reader"]
+    # Fetch current upstream failures
+    current_failures = fetch_all_upstream_failures()
+    report.total_upstream = len(current_failures)
 
-        # Check if any upstream failure matches this bug
-        still_failing = False
-        for failure in all_upstream_failures:
-            f_sr = failure["screen_reader"]
-            f_feature = failure.get("feature_id", "")
+    current_keys = {_failure_key(f) for f in current_failures}
+    previous_keys = set(previous_failures.keys())
 
-            if f_sr != bug_sr:
-                continue
+    # First run — no baseline to compare against
+    if not previous_keys:
+        print("\n  First sync — saving baseline. No changes to report.")
+        if not dry_run:
+            _save_baseline(current_failures)
+            report.changes_made = True
+        return report
 
-            if bug_role and bug_role in f_feature:
-                still_failing = True
-                break
-            if bug_prop and bug_prop.replace("-", "_") in f_feature:
-                still_failing = True
-                break
+    # Find NEW failures (in current, not in baseline)
+    new_keys = current_keys - previous_keys
+    for f in current_failures:
+        if _failure_key(f) in new_keys:
+            report.new_failures.append(f)
 
-        if not still_failing:
-            report.potentially_fixed.append(bug)
+    # Find RESOLVED failures (in baseline, not in current)
+    resolved_keys = previous_keys - current_keys
+    for key in resolved_keys:
+        report.resolved_failures.append(previous_failures[key])
 
     # Check for new roles
     announcements = load_local("announcements.json")
@@ -448,51 +443,9 @@ def sync_known_bugs(dry_run: bool = False) -> SyncReport:
     if new_roles:
         report.new_roles = sorted(new_roles)
 
-    # Apply changes if not dry run
-    if not dry_run and report.has_changes():
-        # Add new bug candidates to known-bugs.json
-        if report.new_bug_candidates:
-            for candidate in report.new_bug_candidates[:20]:  # Cap at 20 new bugs per sync
-                role = ""
-                prop = ""
-                feature = candidate.get("feature_id", "")
-                if "/" in feature:
-                    part = feature.split("/")[1]
-                    if part.endswith("_role"):
-                        role = part.replace("_role", "")
-                    elif part.startswith("aria-") or part.startswith("aria_"):
-                        prop = part.replace("_attribute", "").replace("_", "-")
-
-                new_bug = {
-                    "id": f"sync-{candidate['screen_reader']}-{(role or prop).replace('-', '_')}-{candidate['browser']}",
-                    "screen_reader": candidate["screen_reader"],
-                    "browser": candidate["browser"],
-                    "severity": "moderate",
-                    "description": f"Upstream test failure: {candidate.get('assertion_id', 'unknown')} "
-                                   f"for {feature}. Output: {candidate.get('output', 'N/A')[:100]}",
-                    "source_url": "https://a11ysupport.io/",
-                }
-                if role:
-                    new_bug["role"] = role
-                if prop:
-                    new_bug["property"] = prop
-
-                # Avoid duplicate IDs
-                if new_bug["id"] not in our_bug_ids:
-                    our_bugs.append(new_bug)
-                    our_bug_ids.add(new_bug["id"])
-
-        # Mark potentially fixed bugs (add a "possibly_fixed" flag)
-        for fixed in report.potentially_fixed:
-            for bug in our_bugs:
-                if bug["id"] == fixed["id"]:
-                    bug["_possibly_fixed"] = True
-                    bug["_checked_date"] = datetime.now().strftime("%Y-%m-%d")
-
-        # Update metadata
-        bugs_data["_meta"]["last_updated"] = datetime.now().strftime("%Y-%m-%d")
-        bugs_data["bugs"] = our_bugs
-        save_local("known-bugs.json", bugs_data)
+    # Save new baseline
+    if not dry_run:
+        _save_baseline(current_failures)
         report.changes_made = True
 
     return report
@@ -541,17 +494,17 @@ def main():
 
     if args.sync:
         print("\n=== Syncing with a11ysupport.io ===\n")
-        report = sync_known_bugs(dry_run=args.dry_run)
+        report = sync_with_baseline(dry_run=args.dry_run)
         report.print_summary()
 
         if args.dry_run:
-            print("  (Dry run — no files were modified)")
+            print("  (Dry run — no baseline saved)")
         elif report.changes_made:
-            print("  Files updated. Review changes and commit.")
+            print("  Baseline updated.")
         else:
             print("  No changes needed.")
 
-        # Exit with code 1 if there are changes (useful for CI)
+        # Exit with code 1 if there are actual changes (useful for CI to trigger PR)
         if report.has_changes():
             sys.exit(1 if args.dry_run else 0)
 
