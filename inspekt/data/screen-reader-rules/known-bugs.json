@@ -9,7 +9,6 @@
     ],
     "last_updated": "2026-03-30"
   },
-
   "bugs": [
     {
       "id": "voiceover-alert-no-role",
@@ -19,7 +18,9 @@
       "severity": "moderate",
       "description": "VoiceOver on Chrome does not announce the 'alert' role for dynamically added alerts. Content is read but without the assertive interruption behavior.",
       "workaround": "Use Safari for VoiceOver testing, or add role='alert' to a container that exists in the DOM before content is injected.",
-      "source_url": "https://a11ysupport.io/tech/aria/alert_role"
+      "source_url": "https://a11ysupport.io/tech/aria/alert_role",
+      "_possibly_fixed": true,
+      "_checked_date": "2026-03-30"
     },
     {
       "id": "jaws-aria-describedby-browse",
@@ -29,7 +30,9 @@
       "severity": "minor",
       "description": "JAWS does not read aria-describedby content in virtual cursor mode by default. Users must press Insert+F1 to hear the description.",
       "workaround": "Ensure critical information is in the accessible name (aria-label/aria-labelledby), not just the description.",
-      "source_url": "https://a11ysupport.io/tech/aria/aria-describedby_attribute"
+      "source_url": "https://a11ysupport.io/tech/aria/aria-describedby_attribute",
+      "_possibly_fixed": true,
+      "_checked_date": "2026-03-30"
     },
     {
       "id": "nvda-combobox-expanded-not-announced",
@@ -39,7 +42,9 @@
       "severity": "moderate",
       "description": "NVDA with Firefox sometimes does not announce the expanded/collapsed state change when a combobox is toggled.",
       "workaround": "Ensure aria-expanded is toggled on the combobox element itself, not a child.",
-      "source_url": "https://github.com/w3c/aria-at/issues"
+      "source_url": "https://github.com/w3c/aria-at/issues",
+      "_possibly_fixed": true,
+      "_checked_date": "2026-03-30"
     },
     {
       "id": "voiceover-table-not-announced",
@@ -49,7 +54,9 @@
       "severity": "serious",
       "description": "VoiceOver on Safari does not recognize elements with role='table' as tables unless they also have a caption or aria-label. Without a name, the table structure is flattened.",
       "workaround": "Always provide an accessible name for ARIA tables via aria-label or aria-labelledby.",
-      "source_url": "https://a11ysupport.io/tech/aria/table_role"
+      "source_url": "https://a11ysupport.io/tech/aria/table_role",
+      "_possibly_fixed": true,
+      "_checked_date": "2026-03-30"
     },
     {
       "id": "jaws-aria-current-missing",
@@ -59,7 +66,9 @@
       "severity": "minor",
       "description": "JAWS 2023 and earlier do not announce aria-current='step' or aria-current='location'. Only 'page' and 'true' values are reliably announced.",
       "workaround": "Use aria-current='page' when possible, or provide visual indicators alongside aria-current.",
-      "source_url": "https://a11ysupport.io/tech/aria/aria-current_attribute"
+      "source_url": "https://a11ysupport.io/tech/aria/aria-current_attribute",
+      "_possibly_fixed": true,
+      "_checked_date": "2026-03-30"
     },
     {
       "id": "orca-no-live-region",
@@ -69,7 +78,9 @@
       "severity": "critical",
       "description": "Orca does not automatically announce alert role live regions. No automatic announcement is triggered when content changes.",
       "workaround": "No reliable workaround. Consider alternative notification mechanisms for Orca users.",
-      "source_url": "https://a11ysupport.io/tech/aria/alert_role"
+      "source_url": "https://a11ysupport.io/tech/aria/alert_role",
+      "_possibly_fixed": true,
+      "_checked_date": "2026-03-30"
     },
     {
       "id": "voiceover-aria-expanded-button",
@@ -79,7 +90,9 @@
       "severity": "minor",
       "description": "VoiceOver announces expanded/collapsed state but uses inconsistent wording. Sometimes says 'expanded' and other times 'open' depending on the role of the element.",
       "workaround": "None needed — the state is still conveyed, just with different wording.",
-      "source_url": "https://a11ysupport.io/tech/aria/aria-expanded_attribute"
+      "source_url": "https://a11ysupport.io/tech/aria/aria-expanded_attribute",
+      "_possibly_fixed": true,
+      "_checked_date": "2026-03-30"
     },
     {
       "id": "nvda-aria-required-not-announced",
@@ -89,7 +102,9 @@
       "severity": "moderate",
       "description": "NVDA does not announce aria-required on custom controls (div[role='textbox']) in Chrome. Works correctly on native input elements.",
       "workaround": "Use native HTML form elements where possible. If using custom controls, add 'required' to the visible label text.",
-      "source_url": "https://a11ysupport.io/tech/aria/aria-required_attribute"
+      "source_url": "https://a11ysupport.io/tech/aria/aria-required_attribute",
+      "_possibly_fixed": true,
+      "_checked_date": "2026-03-30"
     },
     {
       "id": "jaws-meter-not-supported",
@@ -99,7 +114,9 @@
       "severity": "moderate",
       "description": "JAWS does not recognize role='meter'. The element is read as plain text without the meter value context.",
       "workaround": "Use the native <meter> HTML element, or provide the value information in the accessible name.",
-      "source_url": "https://a11ysupport.io/tech/aria/meter_role"
+      "source_url": "https://a11ysupport.io/tech/aria/meter_role",
+      "_possibly_fixed": true,
+      "_checked_date": "2026-03-30"
     },
     {
       "id": "voiceover-checkbox-mixed",
@@ -109,7 +126,9 @@
       "severity": "minor",
       "description": "VoiceOver on Chrome announces mixed-state checkboxes as 'mixed' instead of 'partially checked'. This differs from VoiceOver on Safari which says 'mixed'.",
       "workaround": "No workaround needed — both convey the mixed state, just with different wording.",
-      "source_url": "https://a11ysupport.io/tech/aria/aria-checked_attribute"
+      "source_url": "https://a11ysupport.io/tech/aria/aria-checked_attribute",
+      "_possibly_fixed": true,
+      "_checked_date": "2026-03-30"
     },
     {
       "id": "nvda-dialog-focus-loss",
@@ -119,7 +138,9 @@
       "severity": "serious",
       "description": "When a modal dialog opens, NVDA sometimes does not move focus to the dialog. The user remains focused on the trigger element behind the modal.",
       "workaround": "Explicitly set focus to the first focusable element or the dialog title when the dialog opens. Use aria-modal='true' and manage focus trapping.",
-      "source_url": "https://github.com/w3c/aria-at"
+      "source_url": "https://github.com/w3c/aria-at",
+      "_possibly_fixed": true,
+      "_checked_date": "2026-03-30"
     },
     {
       "id": "jaws-aria-roledescription-ignored",
@@ -129,7 +150,189 @@
       "severity": "minor",
       "description": "JAWS ignores aria-roledescription in Firefox, falling back to the native role name. Works in Chrome and Edge.",
       "workaround": "Test with Chrome/Edge, or don't rely solely on aria-roledescription for critical information.",
-      "source_url": "https://a11ysupport.io/tech/aria/aria-roledescription_attribute"
+      "source_url": "https://a11ysupport.io/tech/aria/aria-roledescription_attribute",
+      "_possibly_fixed": true,
+      "_checked_date": "2026-03-30"
+    },
+    {
+      "id": "sync-jaws-alert-chrome",
+      "screen_reader": "jaws",
+      "browser": "chrome",
+      "severity": "moderate",
+      "description": "Upstream test failure: convey_aria_live_value_assertive for aria/alert_role. Output: \"<1st announcement in full>, <2nd announcement in full>, important message, existing content, I am n",
+      "source_url": "https://a11ysupport.io/",
+      "role": "alert"
+    },
+    {
+      "id": "sync-jaws-alert-edge",
+      "screen_reader": "jaws",
+      "browser": "edge",
+      "severity": "moderate",
+      "description": "Upstream test failure: convey_aria_live_value_assertive for aria/alert_role. Output: \"<1st announcement in full>, <2nd announcement in full>, important message, existing content, I am n",
+      "source_url": "https://a11ysupport.io/",
+      "role": "alert"
+    },
+    {
+      "id": "sync-jaws-alert-ie",
+      "screen_reader": "jaws",
+      "browser": "ie",
+      "severity": "moderate",
+      "description": "Upstream test failure: convey_name_and_role_if_named for aria/alert_role. Output: \"existing content\"",
+      "source_url": "https://a11ysupport.io/",
+      "role": "alert"
+    },
+    {
+      "id": "sync-jaws-alert-firefox",
+      "screen_reader": "jaws",
+      "browser": "firefox",
+      "severity": "moderate",
+      "description": "Upstream test failure: convey_name_and_role_if_named for aria/alert_role. Output: \"existing content\"",
+      "source_url": "https://a11ysupport.io/",
+      "role": "alert"
+    },
+    {
+      "id": "sync-nvda-alert-chrome",
+      "screen_reader": "nvda",
+      "browser": "chrome",
+      "severity": "moderate",
+      "description": "Upstream test failure: convey_name_and_role_if_named for aria/alert_role. Output: \"existing content\"",
+      "source_url": "https://a11ysupport.io/",
+      "role": "alert"
+    },
+    {
+      "id": "sync-nvda-alert-edge",
+      "screen_reader": "nvda",
+      "browser": "edge",
+      "severity": "moderate",
+      "description": "Upstream test failure: convey_name_and_role_if_named for aria/alert_role. Output: \"existing content\"",
+      "source_url": "https://a11ysupport.io/",
+      "role": "alert"
+    },
+    {
+      "id": "sync-nvda-alert-firefox",
+      "screen_reader": "nvda",
+      "browser": "firefox",
+      "severity": "moderate",
+      "description": "Upstream test failure: convey_name_and_role_if_named for aria/alert_role. Output: \"existing content\"",
+      "source_url": "https://a11ysupport.io/",
+      "role": "alert"
+    },
+    {
+      "id": "sync-jaws-aria_atomic-chrome",
+      "screen_reader": "jaws",
+      "browser": "chrome",
+      "severity": "moderate",
+      "description": "Upstream test failure: convey_value_false for aria/aria-atomic_attribute. Output: \"Announce what has changed\"",
+      "source_url": "https://a11ysupport.io/",
+      "property": "aria-atomic"
+    },
+    {
+      "id": "sync-jaws-aria_atomic-edge",
+      "screen_reader": "jaws",
+      "browser": "edge",
+      "severity": "moderate",
+      "description": "Upstream test failure: convey_value_false for aria/aria-atomic_attribute. Output: \"Announce what has changed\"",
+      "source_url": "https://a11ysupport.io/",
+      "property": "aria-atomic"
+    },
+    {
+      "id": "sync-nvda-aria_atomic-chrome",
+      "screen_reader": "nvda",
+      "browser": "chrome",
+      "severity": "moderate",
+      "description": "Upstream test failure: convey_value_false for aria/aria-atomic_attribute. Output: \"Announce what has changed\"",
+      "source_url": "https://a11ysupport.io/",
+      "property": "aria-atomic"
+    },
+    {
+      "id": "sync-nvda-aria_atomic-edge",
+      "screen_reader": "nvda",
+      "browser": "edge",
+      "severity": "moderate",
+      "description": "Upstream test failure: convey_value_false for aria/aria-atomic_attribute. Output: \"Announce what has changed\"",
+      "source_url": "https://a11ysupport.io/",
+      "property": "aria-atomic"
+    },
+    {
+      "id": "sync-jaws-aria_autocomplete-chrome",
+      "screen_reader": "jaws",
+      "browser": "chrome",
+      "severity": "moderate",
+      "description": "Upstream test failure: convey_value_inline for aria/aria-autocomplete_attribute. Output: \"Target 1, edit, type in text\"",
+      "source_url": "https://a11ysupport.io/",
+      "property": "aria-autocomplete"
+    },
+    {
+      "id": "sync-jaws-aria_autocomplete-edge",
+      "screen_reader": "jaws",
+      "browser": "edge",
+      "severity": "moderate",
+      "description": "Upstream test failure: convey_value_inline for aria/aria-autocomplete_attribute. Output: \"Target 1, edit, type in text\"",
+      "source_url": "https://a11ysupport.io/",
+      "property": "aria-autocomplete"
+    },
+    {
+      "id": "sync-jaws-aria_autocomplete-ie",
+      "screen_reader": "jaws",
+      "browser": "ie",
+      "severity": "moderate",
+      "description": "Upstream test failure: convey_value_inline for aria/aria-autocomplete_attribute. Output: \"Target 1, edit, type in text\"",
+      "source_url": "https://a11ysupport.io/",
+      "property": "aria-autocomplete"
+    },
+    {
+      "id": "sync-jaws-aria_autocomplete-firefox",
+      "screen_reader": "jaws",
+      "browser": "firefox",
+      "severity": "moderate",
+      "description": "Upstream test failure: convey_value_inline for aria/aria-autocomplete_attribute. Output: \"Target 1, edit, type in text\"",
+      "source_url": "https://a11ysupport.io/",
+      "property": "aria-autocomplete"
+    },
+    {
+      "id": "sync-nvda-aria_autocomplete-firefox",
+      "screen_reader": "nvda",
+      "browser": "firefox",
+      "severity": "moderate",
+      "description": "Upstream test failure: convey_value_none for aria/aria-autocomplete_attribute. Output: \"Target 2, edit, has auto complete, blank\"",
+      "source_url": "https://a11ysupport.io/",
+      "property": "aria-autocomplete"
+    },
+    {
+      "id": "sync-voiceover-aria_autocomplete-safari",
+      "screen_reader": "voiceover",
+      "browser": "safari",
+      "severity": "moderate",
+      "description": "Upstream test failure: convey_value_inline for aria/aria-autocomplete_attribute. Output: \"Target 1, edit text\"",
+      "source_url": "https://a11ysupport.io/",
+      "property": "aria-autocomplete"
+    },
+    {
+      "id": "sync-jaws-aria_busy-ie",
+      "screen_reader": "jaws",
+      "browser": "ie",
+      "severity": "moderate",
+      "description": "Upstream test failure: convey_value_true for aria/aria-busy_attribute. Output: \"test two\"",
+      "source_url": "https://a11ysupport.io/",
+      "property": "aria-busy"
+    },
+    {
+      "id": "sync-nvda-aria_busy-chrome",
+      "screen_reader": "nvda",
+      "browser": "chrome",
+      "severity": "moderate",
+      "description": "Upstream test failure: convey_value_true for aria/aria-busy_attribute. Output: \"test two\"",
+      "source_url": "https://a11ysupport.io/",
+      "property": "aria-busy"
+    },
+    {
+      "id": "sync-nvda-aria_busy-edge",
+      "screen_reader": "nvda",
+      "browser": "edge",
+      "severity": "moderate",
+      "description": "Upstream test failure: convey_value_true for aria/aria-busy_attribute. Output: \"test two\"",
+      "source_url": "https://a11ysupport.io/",
+      "property": "aria-busy"
     }
   ]
 }

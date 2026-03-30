@@ -1,0 +1,332 @@
+
+=== Syncing with a11ysupport.io ===
+
+Fetching test result file list...
+  Found 57 test files
+  Fetching 1/57...  Fetching 11/57...  Fetching 21/57...  Fetching 31/57...  Fetching 41/57...  Fetching 51/57...
+  Total upstream failures: 303
+Fetching role list from a11ysupport.io...
+
+=== Sync Report ===
+
+  NEW BUG CANDIDATES (152):
+    - jaws + chrome: aria/alert_role / convey_aria_live_value_assertive
+      Output: "<1st announcement in full>, <2nd announcement in full>, important message, exis
+    - jaws + edge: aria/alert_role / convey_aria_live_value_assertive
+      Output: "<1st announcement in full>, <2nd announcement in full>, important message, exis
+    - jaws + ie: aria/alert_role / convey_name_and_role_if_named
+      Output: "existing content"
+    - jaws + firefox: aria/alert_role / convey_name_and_role_if_named
+      Output: "existing content"
+    - nvda + chrome: aria/alert_role / convey_name_and_role_if_named
+      Output: "existing content"
+    - nvda + edge: aria/alert_role / convey_name_and_role_if_named
+      Output: "existing content"
+    - nvda + firefox: aria/alert_role / convey_name_and_role_if_named
+      Output: "existing content"
+    - jaws + chrome: aria/aria-atomic_attribute / convey_value_false
+      Output: "Announce what has changed"
+    - jaws + edge: aria/aria-atomic_attribute / convey_value_false
+      Output: "Announce what has changed"
+    - nvda + chrome: aria/aria-atomic_attribute / convey_value_false
+      Output: "Announce what has changed"
+    - nvda + edge: aria/aria-atomic_attribute / convey_value_false
+      Output: "Announce what has changed"
+    - jaws + chrome: aria/aria-autocomplete_attribute / convey_value_inline
+      Output: "Target 1, edit, type in text"
+    - jaws + edge: aria/aria-autocomplete_attribute / convey_value_inline
+      Output: "Target 1, edit, type in text"
+    - jaws + ie: aria/aria-autocomplete_attribute / convey_value_inline
+      Output: "Target 1, edit, type in text"
+    - jaws + firefox: aria/aria-autocomplete_attribute / convey_value_inline
+      Output: "Target 1, edit, type in text"
+    - nvda + firefox: aria/aria-autocomplete_attribute / convey_value_none
+      Output: "Target 2, edit, has auto complete, blank"
+    - voiceover + safari: aria/aria-autocomplete_attribute / convey_value_inline
+      Output: "Target 1, edit text"
+    - jaws + ie: aria/aria-busy_attribute / convey_value_true
+      Output: "test two"
+    - nvda + chrome: aria/aria-busy_attribute / convey_value_true
+      Output: "test two"
+    - nvda + edge: aria/aria-busy_attribute / convey_value_true
+      Output: "test two"
+    - nvda + firefox: aria/aria-busy_attribute / convey_value_true
+      Output: "test two"
+    - voiceover + safari: aria/aria-busy_attribute / convey_value_true
+      Output: "test two"
+    - jaws + chrome: aria/aria-colcount_attribute / do_not_calculate_unknown_column_count
+      Output: "Table with 4 of minus 1 columns and 6 of 6 rows"
+    - jaws + edge: aria/aria-colcount_attribute / do_not_calculate_unknown_column_count
+      Output: "Table with 4 of minus 1 columns and 6 of 6 rows"
+    - jaws + firefox: aria/aria-colcount_attribute / do_not_calculate_unknown_column_count
+      Output: "Table with 4 columns and 6 rows"
+    - nvda + chrome: aria/aria-colcount_attribute / do_not_calculate_unknown_column_count
+      Output: "Table with 6 rows and minus 1 columns, Table 2"
+    - nvda + edge: aria/aria-colcount_attribute / do_not_calculate_unknown_column_count
+      Output: "Table with 6 rows and minus 1 columns, Table 2"
+    - nvda + firefox: aria/aria-colcount_attribute / do_not_calculate_unknown_column_count
+      Output: "Table with 6 rows and minus 1 columns, Table 2"
+    - voiceover + safari: aria/aria-colcount_attribute / convey_column_count_hidden_cols
+      Output: "Table 1, table 4 columns, 6 rows"
+    - jaws + chrome: aria/aria-controls_attribute / convey_presence
+      Output: target button
+    - jaws + edge: aria/aria-controls_attribute / convey_presence
+      Output: "target button"
+    - jaws + ie: aria/aria-controls_attribute / convey_presence
+      Output: target button
+    - jaws + firefox: aria/aria-controls_attribute / convey_presence
+      Output: target button
+    - nvda + chrome: aria/aria-controls_attribute / convey_presence
+      Output: "target button"
+    - nvda + edge: aria/aria-controls_attribute / convey_presence
+      Output: "target button"
+    - nvda + firefox: aria/aria-controls_attribute / convey_presence
+      Output: (property was not conveyed)
+    - nvda + ie: aria/aria-controls_attribute / convey_presence
+      Output: (property was not conveyed)
+    - voiceover + safari: aria/aria-controls_attribute / convey_presence
+      Output: (property was not conveyed)
+    - voiceover + safari: aria/aria-current_attribute / convey_addition
+      Output: earcon
+    - voiceover + safari: aria/aria-describedby_attribute / contribute_to_description
+      Output: "Example label, edit text"
+    - jaws + chrome: aria/aria-description_attribute / contribute_to_description
+      Output: "target"
+    - jaws + edge: aria/aria-description_attribute / contribute_to_description
+      Output: "target"
+    - jaws + firefox: aria/aria-description_attribute / contribute_to_description
+      Output: "target"
+    - nvda + firefox: aria/aria-description_attribute / convey_description_change
+      Output: (only character was announced)
+    - voiceover + safari: aria/aria-description_attribute / convey_description_change
+      Output: (only the character was announced)
+    - jaws + chrome: aria/aria-details_attribute / convey_referenced_content
+      Output: "no more flows found" (does not let user navigate to the referenced element)
+    - jaws + edge: aria/aria-details_attribute / convey_referenced_content
+      Output: "no more flows found" (does not let user navigate to the referenced element)
+    - jaws + ie: aria/aria-details_attribute / convey_referenced_content
+      Output: "Graphic, unavailable, Cats, has details."
+    - jaws + firefox: aria/aria-details_attribute / convey_referenced_content
+      Output: (does not let user navigate to the referenced element)
+    - nvda + chrome: aria/aria-details_attribute / convey_details_boundaries
+      Output: "Cats have 4 legs, one tail, and are link full of awesome."
+    - nvda + edge: aria/aria-details_attribute / convey_details_boundaries
+      Output: "Cats have 4 legs, one tail, and are link full of awesome."
+    - nvda + firefox: aria/aria-details_attribute / convey_details_boundaries
+      Output: "Cats have 4 legs, one tail, and are link full of awesome."
+    - voiceover + safari: aria/aria-details_attribute / convey_presence
+      Output: "Cats, image, has details in paragraph"
+    - jaws + ie: aria/aria-errormessage_attribute / convey_not_pertinent
+      Output: "edit, Input with aria-invalid="false", edit, has error, example error text, typ
+    - jaws + firefox: aria/aria-errormessage_attribute / convey_pertinent
+      Output: "Input with aria-invalid="true" Edit invalid entry"
+    - nvda + edge: aria/aria-errormessage_attribute / convey_pertinent
+      Output: "Input with aria-invalid="true", edit, invalid entry"
+    - voiceover + safari: aria/aria-errormessage_attribute / convey_pertinent
+      Output: "Input with aria-invalid="true", invalid data, edit text"
+    - nvda + chrome: aria/aria-flowto_attribute / convey_presence_to
+      Output: (does not convey presence of aria-flowto)
+    - nvda + edge: aria/aria-flowto_attribute / convey_presence_to
+      Output: (does not convey presence of aria-flowto)
+    - nvda + firefox: aria/aria-flowto_attribute / convey_presence_to
+      Output: (does not convey presence of aria-flowto)
+    - voiceover + safari: aria/aria-flowto_attribute / convey_presence_to
+      Output: Does not convey presence of aria-flowto, as VoiceOver's concept of a virtual foc
+    - jaws + ie: aria/aria-haspopup_attribute / convey_value_dialog
+      Output: "action button menu"
+    - nvda + ie: aria/aria-haspopup_attribute / convey_value_dialog
+      Output: "action button subMenu"
+    - jaws + ie: aria/aria-invalid_attribute / convey_value_grammar
+      Output: "edit cats, target 3, cats, edit, cats, type in text"
+    - jaws + chrome: aria/aria-live_attribute / convey_value_assertive
+      Output: "enter <1st announcement in full>, <2nd announcement in full>, I am now populate
+    - jaws + edge: aria/aria-live_attribute / convey_value_assertive
+      Output: "enter <1st announcement in full>, <2nd announcement in full>, I am now populate
+    - jaws + ie: aria/aria-live_attribute / convey_value_assertive
+      Output: "<1st announcement in full>, <2nd announcement in full>, I am now populated aria
+    - jaws + firefox: aria/aria-live_attribute / convey_value_assertive
+      Output: "enter <1st announcement in full>, <2nd announcement in full>, I am now populate
+    - voiceover + safari: aria/aria-live_attribute / convey_value_polite
+      Output: "<1st announcement interrupted>, <2nd announcement interrupted>, I am now popula
+    - jaws + chrome: aria/aria-placeholder_attribute / convey_placeholder_labelled_with_value
+      Output: "1 2 dash 2 5 dash 2 0 0 0, edit"
+    - jaws + edge: aria/aria-placeholder_attribute / convey_placeholder_labelled_with_value
+      Output: "1 2 dash 2 5 dash 2 0 0 0, edit"
+    - jaws + firefox: aria/aria-placeholder_attribute / no_aria_placeholder_if_html_placeholder_present
+      Output: "10 characters, edit"
+    - nvda + chrome: aria/aria-placeholder_attribute / convey_placeholder_labelled_with_value
+      Output: "Her birthday, edit, 1 2 2 5 2 0 0 0"
+    - nvda + edge: aria/aria-placeholder_attribute / convey_placeholder_labelled_with_value
+      Output: "Her birthday, edit, 1 2 2 5 2 0 0 0"
+    - nvda + firefox: aria/aria-placeholder_attribute / convey_placeholder_labelled_with_value
+      Output: "Her birthday, edit, has autocomplete, 1 2 2 5 2 0 0 0"
+    - voiceover + safari: aria/aria-placeholder_attribute / convey_placeholder_labelled_with_value
+      Output: "12 25 dash 2000, content selected, her birthday, edit text"
+    - jaws + edge: aria/aria-pressed_attribute / convey_value_mixed
+      Output: "action, toggle button, partially checked, not pressed"
+    - jaws + ie: aria/aria-pressed_attribute / convey_value_mixed
+      Output: "action, toggle button"
+    - nvda + chrome: aria/aria-pressed_attribute / convey_value_mixed
+      Output: "toggle button, not pressed, half checked, action"
+    - nvda + edge: aria/aria-pressed_attribute / convey_value_mixed
+      Output: "toggle button, not pressed, half checked, action"
+    - nvda + firefox: aria/aria-pressed_attribute / convey_value_mixed
+      Output: "toggle button, not pressed, half checked, action"
+    - voiceover + safari: aria/aria-pressed_attribute / convey_change_in_state
+      Output: nothing was conveyed
+    - jaws + firefox: aria/aria-relevant_attribute / convey_value_removals
+      Output: "enter Removed Content changed"
+    - nvda + chrome: aria/aria-relevant_attribute / convey_value_additions
+      Output: (nothing was conveyed)
+    - nvda + edge: aria/aria-relevant_attribute / convey_value_additions
+      Output: (nothing was conveyed)
+    - nvda + firefox: aria/aria-relevant_attribute / convey_value_additions
+      Output: (nothing was conveyed)
+    - voiceover + safari: aria/aria-relevant_attribute / convey_value_text
+      Output: (nothing was conveyed)
+    - jaws + chrome: html/fieldset_element / convey_name
+      Output: "group end"
+    - jaws + edge: html/fieldset_element / convey_name
+      Output: "group end"
+    - jaws + ie: html/fieldset_element / convey_name
+      Output: "group end"
+    - jaws + firefox: html/fieldset_element / convey_name
+      Output: "group end"
+    - nvda + chrome: html/input(type-radio)_element / convey_posinset
+      Output: "radio button, not checked, required, Cat, radio button, not checked, required, 
+    - nvda + edge: html/input(type-radio)_element / convey_posinset
+      Output: "radio button, not checked, required, Cat, radio button, not checked, required, 
+    - nvda + firefox: html/fieldset_element / convey_role
+      Output: "Animal"
+    - jaws + chrome: aria/radiogroup_role / convey_name
+      Output: "group end"
+    - jaws + edge: aria/radiogroup_role / convey_name
+      Output: "group end"
+    - jaws + ie: aria/radiogroup_role / convey_name
+      Output: "group end"
+    - jaws + firefox: aria/radiogroup_role / convey_name
+      Output: "group end"
+    - nvda + chrome: aria/radiogroup_role / convey_boundaries
+      Output: "grouping, required, radio button  not checked, Cat. radio button  not checked, 
+    - nvda + edge: aria/radiogroup_role / convey_boundaries
+      Output: "grouping, required, radio button  not checked, Cat. radio button  not checked, 
+    - nvda + firefox: aria/radiogroup_role / convey_role
+      Output: "Heading level 3 Animal"
+    - jaws + chrome: aria/aria-rowcount_attribute / do_not_calculate_unknown_row_count
+      Output: "Table with 4 of 4 columns and 4 of minus 1 rows"
+    - jaws + edge: aria/aria-rowcount_attribute / do_not_calculate_unknown_row_count
+      Output: "Table with 4 of 4 columns and 4 of minus 1 rows"
+    - jaws + firefox: aria/aria-rowcount_attribute / do_not_calculate_unknown_row_count
+      Output: "Table with 4 columns and 4 rows"
+    - nvda + chrome: aria/aria-rowcount_attribute / do_not_calculate_unknown_row_count
+      Output: "Table with minus 1 rows and 4 columns, Table 2"
+    - nvda + edge: aria/aria-rowcount_attribute / do_not_calculate_unknown_row_count
+      Output: "Table with minus 1 rows and 4 columns, Table 2"
+    - nvda + firefox: aria/aria-rowcount_attribute / do_not_calculate_unknown_row_count
+      Output: "Table with minus 1 rows and 4 columns, Table 2"
+    - voiceover + safari: aria/aria-rowcount_attribute / do_not_calculate_unknown_row_count
+      Output: "Table 2, table, 4 columns, minus 1 row"
+    - jaws + chrome: aria/aria-sort_attribute / convey_value_none_as_sortable
+      Output: "Title button, column 2"
+    - jaws + ie: aria/aria-sort_attribute / convey_value_none_as_sortable
+      Output: "Title button, column 2"
+    - jaws + firefox: aria/aria-sort_attribute / convey_value_none_as_sortable
+      Output: "Title button, column 2"
+    - nvda + chrome: aria/aria-sort_attribute / convey_value_none_as_sortable
+      Output: "Title column 2 button Title"
+    - nvda + edge: aria/aria-sort_attribute / convey_value_none_as_sortable
+      Output: "Title column 2 button Title"
+    - nvda + firefox: aria/aria-sort_attribute / convey_value_none_as_sortable
+      Output: "column 2 button Title"
+    - voiceover + safari: aria/aria-sort_attribute / convey_value_ascending
+      Output: "Title, button"
+    - jaws + chrome: aria/grid_role / convey_name
+      Output: "Grid with 2 columns and 3 rows"
+    - jaws + edge: aria/grid_role / convey_name
+      Output: "Grid with 2 columns and 3 rows"
+    - jaws + ie: aria/grid_role / convey_name
+      Output: "grid with 2 columns and 3 rows"
+    - jaws + firefox: aria/grid_role / convey_name
+      Output: "grid with 2 columns and 3 rows"
+    - jaws + firefox: aria/gridcell_role / convey_position
+      Output: "target, target selected, type in text"
+    - nvda + chrome: aria/grid_role / convey_name
+      Output: "table with 3 rows and 2 columns, row 1, date, column 1 date"
+    - nvda + edge: aria/grid_role / convey_name
+      Output: "table with 3 rows and 2 columns, row 1, date, column 1 date"
+    - nvda + firefox: aria/grid_role / change_mode_interaction
+      Output: "table with 3 rows and 2 columns, row 1, column 1, editable, date"
+    - voiceover + safari: aria/columnheader_role / convey_role
+      Output: "name"
+    - voiceover + safari: aria/gridcell_role / convey_role
+      Output: "target"
+    - voiceover + safari: aria/heading_role / default_level_of_2
+      Output: "heading, <name>"
+    - jaws + chrome: aria/aria-level_attribute / convey_presence_and_value
+      Output: "heading level 2, <name>"
+    - jaws + edge: aria/aria-level_attribute / convey_presence_and_value
+      Output: "heading level 2, <name>"
+    - jaws + firefox: aria/aria-level_attribute / convey_presence_and_value
+      Output: "heading level 2, <name>"
+    - jaws + chrome: aria/log_role / convey_name_and_role_in_announcement_if_named
+      Output: "<1st announcement in full>, <2nd announcement in full>, bullet Me: where is the
+    - jaws + edge: aria/log_role / convey_name_and_role_in_announcement_if_named
+      Output: "<1st announcement in full>, <2nd announcement in full>, bullet Me: where is the
+    - jaws + firefox: aria/log_role / convey_name_and_role_in_announcement_if_named
+      Output: "<1st announcement in full>, <2nd announcement in full>, bullet Me: where is the
+    - nvda + firefox: aria/log_role / convey_name_and_role_in_announcement_if_named
+      Output: "<1st announcement in full>, <2nd announcement in full>, bullet me: where is the
+    - voiceover + safari: aria/log_role / convey_name_and_role_in_announcement_if_named
+      Output: "<1st announcement skipped>, <2nd announcement in full>, bullet me: where is the
+    - jaws + chrome: aria/note_role / convey_name
+      Output: "Example Note, note"
+    - jaws + edge: aria/note_role / convey_name
+      Output: "Example Note, note"
+    - nvda + chrome: aria/note_role / convey_role
+      Output: "Example Note, note"
+    - nvda + edge: aria/note_role / convey_role
+      Output: "Example Note, note"
+    - nvda + firefox: aria/note_role / convey_role
+      Output: "Example Note, note"
+    - jaws + chrome: aria/tooltip_role / convey_role
+      Output: "heading level 3, example tooltip"
+    - jaws + edge: aria/tooltip_role / convey_role
+      Output: "heading level 3, example tooltip"
+    - jaws + firefox: aria/tooltip_role / convey_role
+      Output: "heading level 3, example tooltip"
+    - nvda + chrome: aria/tooltip_role / convey_role
+      Output: "heading level 3, example tooltip"
+    - nvda + edge: aria/tooltip_role / convey_role
+      Output: "heading level 3, example tooltip"
+    - nvda + firefox: aria/tooltip_role / convey_role
+      Output: "heading level 3, example tooltip"
+    - jaws + chrome: aria/status_role / convey_name_and_role_if_named
+      Output: "existing content"
+    - jaws + edge: aria/status_role / convey_name_and_role_if_named
+      Output: "existing content"
+    - jaws + ie: aria/status_role / convey_aria_atomic_value_true
+      Output: "<1st announcement in full>, <2nd announcement in full>, polite message, I am no
+    - jaws + firefox: aria/status_role / convey_aria_atomic_value_true
+      Output: "<1st announcement in full>, <2nd announcement in full>, I am now populated"
+    - nvda + chrome: aria/status_role / convey_name_and_role_if_named
+      Output: "existing content"
+    - nvda + edge: aria/status_role / convey_name_and_role_if_named
+      Output: "existing content"
+    - nvda + firefox: aria/status_role / convey_aria_atomic_value_true
+      Output: "<1st announcement in full>, <2nd announcement in full>, I am now populated"
+
+  POTENTIALLY FIXED (12):
+    - voiceover-alert-no-role: VoiceOver on Chrome does not announce the 'alert' role for d…
+    - jaws-aria-describedby-browse: JAWS does not read aria-describedby content in virtual curso…
+    - nvda-combobox-expanded-not-announced: NVDA with Firefox sometimes does not announce the expanded/c…
+    - voiceover-table-not-announced: VoiceOver on Safari does not recognize elements with role='t…
+    - jaws-aria-current-missing: JAWS 2023 and earlier do not announce aria-current='step' or…
+    - orca-no-live-region: Orca does not automatically announce alert role live regions…
+    - voiceover-aria-expanded-button: VoiceOver announces expanded/collapsed state but uses incons…
+    - nvda-aria-required-not-announced: NVDA does not announce aria-required on custom controls (div…
+    - jaws-meter-not-supported: JAWS does not recognize role='meter'. The element is read as…
+    - voiceover-checkbox-mixed: VoiceOver on Chrome announces mixed-state checkboxes as 'mix…
+    - nvda-dialog-focus-loss: When a modal dialog opens, NVDA sometimes does not move focu…
+    - jaws-aria-roledescription-ignored: JAWS ignores aria-roledescription in Firefox, falling back t…
+
+  (Dry run — no files were modified)
