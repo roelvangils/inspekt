@@ -533,6 +533,9 @@ cli.add_lazy_command("plugin", "plugin", "plugin")
 # VM management commands (from vm.py)
 cli.add_lazy_command("vm", "vm", "vm")
 
+# Screen reader simulator commands (from screen_reader.py)
+cli.add_lazy_command("sr", "screen_reader", "sr")
+
 # PDF accessibility commands (from pdf.py)
 cli.add_lazy_command("pdf", "pdf", "pdf")
 

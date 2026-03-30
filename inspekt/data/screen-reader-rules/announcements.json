@@ -1,0 +1,1026 @@
+{
+  "_meta": {
+    "version": "1.0.0",
+    "description": "Screen reader announcement templates per ARIA role. Templates use {placeholders} for dynamic values.",
+    "sources": [
+      "https://github.com/accessibilitysupported/a11ysupport.io",
+      "https://github.com/w3c/aria-at",
+      "Manual curation from JAWS 2024, NVDA 2024.1, VoiceOver macOS 15"
+    ],
+    "screen_readers": ["jaws", "nvda", "voiceover"],
+    "template_variables": {
+      "{name}": "Computed accessible name (aria-label, aria-labelledby, or content)",
+      "{description}": "aria-describedby or aria-description content",
+      "{level}": "Heading level (1-6)",
+      "{value}": "Current value (for form controls, sliders, etc.)",
+      "{min}": "Minimum value (for range controls)",
+      "{max}": "Maximum value (for range controls)",
+      "{position}": "Position in set (aria-posinset)",
+      "{setsize}": "Total items in set (aria-setsize)",
+      "{rowcount}": "Number of rows in table/grid",
+      "{colcount}": "Number of columns in table/grid",
+      "{rowindex}": "Current row index",
+      "{colindex}": "Current column index"
+    }
+  },
+
+  "alert": {
+    "jaws": {
+      "enter": "Alert, {name}",
+      "live_announce": "{name}"
+    },
+    "nvda": {
+      "enter": "Alert, {name}",
+      "live_announce": "Alert, {name}"
+    },
+    "voiceover": {
+      "enter": "{name}, alert",
+      "live_announce": "{name}"
+    }
+  },
+
+  "alertdialog": {
+    "jaws": {
+      "enter": "Alert dialog, {name}"
+    },
+    "nvda": {
+      "enter": "Alert dialog, {name}"
+    },
+    "voiceover": {
+      "enter": "{name}, alert, dialog"
+    }
+  },
+
+  "application": {
+    "jaws": {
+      "enter": "Application, {name}"
+    },
+    "nvda": {
+      "enter": "Application, {name}"
+    },
+    "voiceover": {
+      "enter": "{name}, application"
+    }
+  },
+
+  "article": {
+    "jaws": {
+      "enter": "Article, {name}",
+      "exit": "End of article"
+    },
+    "nvda": {
+      "enter": "Article, {name}",
+      "exit": "Out of article"
+    },
+    "voiceover": {
+      "enter": "{name}, article"
+    }
+  },
+
+  "banner": {
+    "jaws": {
+      "enter": "Banner region, {name}",
+      "exit": "End of banner region"
+    },
+    "nvda": {
+      "enter": "Banner landmark, {name}",
+      "exit": "Out of banner landmark"
+    },
+    "voiceover": {
+      "enter": "{name}, banner"
+    }
+  },
+
+  "button": {
+    "jaws": {
+      "enter": "{name}, button"
+    },
+    "nvda": {
+      "enter": "{name}, button"
+    },
+    "voiceover": {
+      "enter": "{name}, button"
+    }
+  },
+
+  "cell": {
+    "jaws": {
+      "enter": "{name}, column {colindex}, row {rowindex}"
+    },
+    "nvda": {
+      "enter": "Column {colindex}, row {rowindex}, {name}"
+    },
+    "voiceover": {
+      "enter": "Column {colindex}, row {rowindex}, {name}"
+    }
+  },
+
+  "checkbox": {
+    "jaws": {
+      "enter": "{name}, checkbox, {state:checked}"
+    },
+    "nvda": {
+      "enter": "{name}, checkbox, {state:checked}"
+    },
+    "voiceover": {
+      "enter": "{name}, {state:checked}, tick box"
+    },
+    "_states": {
+      "checked": {
+        "true":  { "jaws": "checked", "nvda": "checked", "voiceover": "ticked" },
+        "false": { "jaws": "not checked", "nvda": "not checked", "voiceover": "unticked" },
+        "mixed": { "jaws": "partially checked", "nvda": "half checked", "voiceover": "mixed" }
+      }
+    }
+  },
+
+  "columnheader": {
+    "jaws": {
+      "enter": "Column header, {name}"
+    },
+    "nvda": {
+      "enter": "Column header, {name}"
+    },
+    "voiceover": {
+      "enter": "{name}, column header"
+    }
+  },
+
+  "combobox": {
+    "jaws": {
+      "enter": "{name}, combo box, {state:expanded}, {value}"
+    },
+    "nvda": {
+      "enter": "{name}, combo box, {state:expanded}, {value}"
+    },
+    "voiceover": {
+      "enter": "{name}, {value}, pop up button, {state:expanded}"
+    },
+    "_states": {
+      "expanded": {
+        "true":  { "jaws": "expanded", "nvda": "expanded", "voiceover": "expanded" },
+        "false": { "jaws": "collapsed", "nvda": "collapsed", "voiceover": "collapsed" }
+      }
+    }
+  },
+
+  "complementary": {
+    "jaws": {
+      "enter": "Complementary region, {name}",
+      "exit": "End of complementary region"
+    },
+    "nvda": {
+      "enter": "Complementary landmark, {name}",
+      "exit": "Out of complementary landmark"
+    },
+    "voiceover": {
+      "enter": "{name}, complementary"
+    }
+  },
+
+  "contentinfo": {
+    "jaws": {
+      "enter": "Content info region, {name}",
+      "exit": "End of content info region"
+    },
+    "nvda": {
+      "enter": "Content info landmark, {name}",
+      "exit": "Out of content info landmark"
+    },
+    "voiceover": {
+      "enter": "{name}, content information"
+    }
+  },
+
+  "definition": {
+    "jaws": {
+      "enter": "Definition, {name}"
+    },
+    "nvda": {
+      "enter": "Definition, {name}"
+    },
+    "voiceover": {
+      "enter": "{name}, definition"
+    }
+  },
+
+  "directory": {
+    "_notes": "Deprecated role. Equivalent to list.",
+    "jaws": {
+      "enter": "List, {name}",
+      "exit": "End of list"
+    },
+    "nvda": {
+      "enter": "List, {name}",
+      "exit": "Out of list"
+    },
+    "voiceover": {
+      "enter": "{name}, list"
+    }
+  },
+
+  "dialog": {
+    "jaws": {
+      "enter": "Dialog, {name}"
+    },
+    "nvda": {
+      "enter": "Dialog, {name}"
+    },
+    "voiceover": {
+      "enter": "{name}, dialog"
+    }
+  },
+
+  "document": {
+    "jaws": {
+      "enter": "Document, {name}"
+    },
+    "nvda": {
+      "enter": "Document, {name}"
+    },
+    "voiceover": {
+      "enter": "{name}"
+    }
+  },
+
+  "feed": {
+    "jaws": {
+      "enter": "Feed, {name}",
+      "exit": "End of feed"
+    },
+    "nvda": {
+      "enter": "Feed, {name}",
+      "exit": "Out of feed"
+    },
+    "voiceover": {
+      "enter": "{name}, feed"
+    }
+  },
+
+  "figure": {
+    "jaws": {
+      "enter": "Figure, {name}",
+      "exit": "End of figure"
+    },
+    "nvda": {
+      "enter": "Figure, {name}",
+      "exit": "Out of figure"
+    },
+    "voiceover": {
+      "enter": "{name}, figure"
+    }
+  },
+
+  "form": {
+    "jaws": {
+      "enter": "Form region, {name}",
+      "exit": "End of form region"
+    },
+    "nvda": {
+      "enter": "Form landmark, {name}",
+      "exit": "Out of form landmark"
+    },
+    "voiceover": {
+      "enter": "{name}, form"
+    }
+  },
+
+  "grid": {
+    "jaws": {
+      "enter": "Grid, {name}, with {rowcount} rows and {colcount} columns"
+    },
+    "nvda": {
+      "enter": "Grid, {name}, with {rowcount} rows and {colcount} columns"
+    },
+    "voiceover": {
+      "enter": "{name}, grid, {rowcount} rows, {colcount} columns"
+    }
+  },
+
+  "gridcell": {
+    "jaws": {
+      "enter": "{name}, column {colindex}, row {rowindex}"
+    },
+    "nvda": {
+      "enter": "Column {colindex}, row {rowindex}, {name}"
+    },
+    "voiceover": {
+      "enter": "{name}"
+    }
+  },
+
+  "group": {
+    "jaws": {
+      "enter": "Group, {name}",
+      "exit": "End of group"
+    },
+    "nvda": {
+      "enter": "Grouping, {name}",
+      "exit": "Out of grouping"
+    },
+    "voiceover": {
+      "enter": "{name}, group"
+    }
+  },
+
+  "heading": {
+    "jaws": {
+      "enter": "Heading level {level}, {name}"
+    },
+    "nvda": {
+      "enter": "Heading level {level}, {name}"
+    },
+    "voiceover": {
+      "enter": "Heading level {level}, {name}"
+    }
+  },
+
+  "img": {
+    "jaws": {
+      "enter": "Graphic, {name}"
+    },
+    "nvda": {
+      "enter": "Graphic, {name}"
+    },
+    "voiceover": {
+      "enter": "{name}, image"
+    },
+    "_notes": {
+      "empty_alt": "When alt=\"\", all three SRs skip the image entirely (no announcement).",
+      "missing_alt": "JAWS: 'Graphic, [filename]'. NVDA: 'Graphic, [filename]'. VoiceOver: 'Image'."
+    }
+  },
+
+  "link": {
+    "jaws": {
+      "enter": "Link, {name}"
+    },
+    "nvda": {
+      "enter": "Link, {name}"
+    },
+    "voiceover": {
+      "enter": "{name}, link"
+    },
+    "_states": {
+      "visited": {
+        "true":  { "jaws": "Visited link, {name}", "nvda": "Visited link, {name}", "voiceover": "{name}, visited, link" },
+        "false": { "jaws": "Link, {name}", "nvda": "Link, {name}", "voiceover": "{name}, link" }
+      }
+    }
+  },
+
+  "list": {
+    "jaws": {
+      "enter": "List of {setsize} items, {name}",
+      "exit": "End of list"
+    },
+    "nvda": {
+      "enter": "List with {setsize} items, {name}",
+      "exit": "Out of list"
+    },
+    "voiceover": {
+      "enter": "{name}, list, {setsize} items"
+    }
+  },
+
+  "listbox": {
+    "jaws": {
+      "enter": "{name}, list box"
+    },
+    "nvda": {
+      "enter": "{name}, list box"
+    },
+    "voiceover": {
+      "enter": "{name}, list box"
+    }
+  },
+
+  "listitem": {
+    "jaws": {
+      "enter": "Bullet, {name}"
+    },
+    "nvda": {
+      "enter": "Bullet, {name}"
+    },
+    "voiceover": {
+      "enter": "{name}"
+    }
+  },
+
+  "log": {
+    "jaws": {
+      "enter": "Log, {name}",
+      "live_announce": "{name}"
+    },
+    "nvda": {
+      "enter": "Log, {name}",
+      "live_announce": "{name}"
+    },
+    "voiceover": {
+      "enter": "{name}, log"
+    }
+  },
+
+  "main": {
+    "jaws": {
+      "enter": "Main region, {name}",
+      "exit": "End of main region"
+    },
+    "nvda": {
+      "enter": "Main landmark, {name}",
+      "exit": "Out of main landmark"
+    },
+    "voiceover": {
+      "enter": "{name}, main"
+    }
+  },
+
+  "marquee": {
+    "jaws": {
+      "enter": "Marquee, {name}"
+    },
+    "nvda": {
+      "enter": "Marquee, {name}"
+    },
+    "voiceover": {
+      "enter": "{name}, marquee"
+    }
+  },
+
+  "math": {
+    "jaws": {
+      "enter": "Math, {name}"
+    },
+    "nvda": {
+      "enter": "Math, {name}"
+    },
+    "voiceover": {
+      "enter": "{name}, math"
+    }
+  },
+
+  "menu": {
+    "jaws": {
+      "enter": "Menu, {name}"
+    },
+    "nvda": {
+      "enter": "Menu, {name}"
+    },
+    "voiceover": {
+      "enter": "{name}, menu"
+    }
+  },
+
+  "menubar": {
+    "jaws": {
+      "enter": "Menu bar, {name}"
+    },
+    "nvda": {
+      "enter": "Menu bar, {name}"
+    },
+    "voiceover": {
+      "enter": "{name}, menu bar"
+    }
+  },
+
+  "menuitem": {
+    "jaws": {
+      "enter": "{name}, menu item, {position} of {setsize}"
+    },
+    "nvda": {
+      "enter": "{name}, menu item, {position} of {setsize}"
+    },
+    "voiceover": {
+      "enter": "{name}, menu item, {position} of {setsize}"
+    }
+  },
+
+  "menuitemcheckbox": {
+    "jaws": {
+      "enter": "{name}, menu item checkbox, {state:checked}"
+    },
+    "nvda": {
+      "enter": "{name}, menu item, {state:checked}"
+    },
+    "voiceover": {
+      "enter": "{name}, {state:checked}, menu item"
+    },
+    "_states": {
+      "checked": {
+        "true":  { "jaws": "checked", "nvda": "checked", "voiceover": "ticked" },
+        "false": { "jaws": "not checked", "nvda": "not checked", "voiceover": "unticked" }
+      }
+    }
+  },
+
+  "menuitemradio": {
+    "jaws": {
+      "enter": "{name}, radio menu item, {state:checked}"
+    },
+    "nvda": {
+      "enter": "{name}, menu item, {state:checked}"
+    },
+    "voiceover": {
+      "enter": "{name}, {state:checked}, menu item"
+    },
+    "_states": {
+      "checked": {
+        "true":  { "jaws": "selected", "nvda": "checked", "voiceover": "ticked" },
+        "false": { "jaws": "not selected", "nvda": "not checked", "voiceover": "unticked" }
+      }
+    }
+  },
+
+  "meter": {
+    "jaws": {
+      "enter": "{name}, meter, {value}"
+    },
+    "nvda": {
+      "enter": "{name}, meter, {value}"
+    },
+    "voiceover": {
+      "enter": "{name}, {value}, level indicator"
+    }
+  },
+
+  "navigation": {
+    "jaws": {
+      "enter": "Navigation region, {name}",
+      "exit": "End of navigation region"
+    },
+    "nvda": {
+      "enter": "Navigation landmark, {name}",
+      "exit": "Out of navigation landmark"
+    },
+    "voiceover": {
+      "enter": "{name}, navigation"
+    }
+  },
+
+  "none": {
+    "_notes": "Elements with role=none/presentation have their role removed. Children are still announced normally.",
+    "jaws": { "enter": "{name}" },
+    "nvda": { "enter": "{name}" },
+    "voiceover": { "enter": "{name}" }
+  },
+
+  "note": {
+    "jaws": {
+      "enter": "Note, {name}"
+    },
+    "nvda": {
+      "enter": "Note, {name}"
+    },
+    "voiceover": {
+      "enter": "{name}, note"
+    }
+  },
+
+  "option": {
+    "jaws": {
+      "enter": "{name}, {position} of {setsize}, {state:selected}"
+    },
+    "nvda": {
+      "enter": "{name}, {position} of {setsize}"
+    },
+    "voiceover": {
+      "enter": "{name}, {position} of {setsize}"
+    },
+    "_states": {
+      "selected": {
+        "true":  { "jaws": "selected", "nvda": "selected", "voiceover": "selected" },
+        "false": { "jaws": "", "nvda": "", "voiceover": "" }
+      }
+    }
+  },
+
+  "paragraph": {
+    "_notes": "Paragraphs are typically read as text content, not announced as a role.",
+    "jaws": { "enter": "{name}" },
+    "nvda": { "enter": "{name}" },
+    "voiceover": { "enter": "{name}" }
+  },
+
+  "presentation": {
+    "_notes": "Same as none. Role is stripped, children still announced.",
+    "jaws": { "enter": "{name}" },
+    "nvda": { "enter": "{name}" },
+    "voiceover": { "enter": "{name}" }
+  },
+
+  "progressbar": {
+    "jaws": {
+      "enter": "{name}, progress bar, {value} percent"
+    },
+    "nvda": {
+      "enter": "{name}, progress bar, {value} percent"
+    },
+    "voiceover": {
+      "enter": "{name}, {value} percent, progress indicator"
+    }
+  },
+
+  "radio": {
+    "jaws": {
+      "enter": "{name}, radio button, {state:checked}, {position} of {setsize}"
+    },
+    "nvda": {
+      "enter": "{name}, radio button, {state:checked}, {position} of {setsize}"
+    },
+    "voiceover": {
+      "enter": "{name}, {state:checked}, radio button, {position} of {setsize}"
+    },
+    "_states": {
+      "checked": {
+        "true":  { "jaws": "selected", "nvda": "selected", "voiceover": "selected" },
+        "false": { "jaws": "not selected", "nvda": "not selected", "voiceover": "unselected" }
+      }
+    }
+  },
+
+  "radiogroup": {
+    "jaws": {
+      "enter": "Group, {name}",
+      "exit": "End of group"
+    },
+    "nvda": {
+      "enter": "Grouping, {name}",
+      "exit": "Out of grouping"
+    },
+    "voiceover": {
+      "enter": "{name}, radio group"
+    }
+  },
+
+  "region": {
+    "jaws": {
+      "enter": "Region, {name}",
+      "exit": "End of region"
+    },
+    "nvda": {
+      "enter": "Region landmark, {name}",
+      "exit": "Out of region landmark"
+    },
+    "voiceover": {
+      "enter": "{name}, region"
+    }
+  },
+
+  "row": {
+    "jaws": {
+      "enter": "Row {rowindex}"
+    },
+    "nvda": {
+      "enter": "Row {rowindex}"
+    },
+    "voiceover": {
+      "enter": "Row {rowindex}"
+    }
+  },
+
+  "rowgroup": {
+    "_notes": "Row group container (thead, tbody, tfoot). Typically not announced as its own element.",
+    "jaws": { "enter": "{name}" },
+    "nvda": { "enter": "{name}" },
+    "voiceover": { "enter": "{name}" }
+  },
+
+  "rowheader": {
+    "jaws": {
+      "enter": "Row header, {name}"
+    },
+    "nvda": {
+      "enter": "Row header, {name}"
+    },
+    "voiceover": {
+      "enter": "{name}, row header"
+    }
+  },
+
+  "scrollbar": {
+    "jaws": {
+      "enter": "{name}, scroll bar, {value}"
+    },
+    "nvda": {
+      "enter": "{name}, scroll bar, {value}"
+    },
+    "voiceover": {
+      "enter": "{name}, scroll bar, {value}"
+    }
+  },
+
+  "search": {
+    "jaws": {
+      "enter": "Search region, {name}",
+      "exit": "End of search region"
+    },
+    "nvda": {
+      "enter": "Search landmark, {name}",
+      "exit": "Out of search landmark"
+    },
+    "voiceover": {
+      "enter": "{name}, search"
+    }
+  },
+
+  "searchbox": {
+    "jaws": {
+      "enter": "{name}, search edit"
+    },
+    "nvda": {
+      "enter": "{name}, search edit, blank"
+    },
+    "voiceover": {
+      "enter": "{name}, search text field"
+    }
+  },
+
+  "section": {
+    "_notes": "Generic section. Only announced if it has an accessible name.",
+    "jaws": {
+      "enter": "Region, {name}",
+      "exit": "End of region"
+    },
+    "nvda": {
+      "enter": "Region, {name}",
+      "exit": "Out of region"
+    },
+    "voiceover": {
+      "enter": "{name}, region"
+    }
+  },
+
+  "separator": {
+    "jaws": {
+      "enter": "Separator"
+    },
+    "nvda": {
+      "enter": "Separator"
+    },
+    "voiceover": {
+      "enter": "Separator"
+    }
+  },
+
+  "slider": {
+    "jaws": {
+      "enter": "{name}, slider, {value}"
+    },
+    "nvda": {
+      "enter": "{name}, slider, {value}"
+    },
+    "voiceover": {
+      "enter": "{name}, {value}, slider"
+    }
+  },
+
+  "spinbutton": {
+    "jaws": {
+      "enter": "{name}, spin box, {value}"
+    },
+    "nvda": {
+      "enter": "{name}, spin button, {value}"
+    },
+    "voiceover": {
+      "enter": "{name}, stepper, {value}"
+    }
+  },
+
+  "status": {
+    "jaws": {
+      "enter": "Status, {name}",
+      "live_announce": "{name}"
+    },
+    "nvda": {
+      "enter": "Status, {name}",
+      "live_announce": "{name}"
+    },
+    "voiceover": {
+      "enter": "{name}, status",
+      "live_announce": "{name}"
+    }
+  },
+
+  "switch": {
+    "jaws": {
+      "enter": "{name}, switch, {state:checked}"
+    },
+    "nvda": {
+      "enter": "{name}, switch, {state:checked}"
+    },
+    "voiceover": {
+      "enter": "{name}, switch button, {state:checked}"
+    },
+    "_states": {
+      "checked": {
+        "true":  { "jaws": "on", "nvda": "on", "voiceover": "on" },
+        "false": { "jaws": "off", "nvda": "off", "voiceover": "off" }
+      }
+    }
+  },
+
+  "tab": {
+    "jaws": {
+      "enter": "{name}, tab, {state:selected}, {position} of {setsize}"
+    },
+    "nvda": {
+      "enter": "{name}, tab, {state:selected}, {position} of {setsize}"
+    },
+    "voiceover": {
+      "enter": "{name}, {state:selected}, tab, {position} of {setsize}"
+    },
+    "_states": {
+      "selected": {
+        "true":  { "jaws": "selected", "nvda": "selected", "voiceover": "selected" },
+        "false": { "jaws": "", "nvda": "", "voiceover": "" }
+      }
+    }
+  },
+
+  "table": {
+    "jaws": {
+      "enter": "Table, {name}, with {rowcount} rows and {colcount} columns",
+      "exit": "End of table"
+    },
+    "nvda": {
+      "enter": "Table with {rowcount} rows and {colcount} columns, {name}",
+      "exit": "Out of table"
+    },
+    "voiceover": {
+      "enter": "{name}, table, {rowcount} rows, {colcount} columns"
+    }
+  },
+
+  "tablist": {
+    "jaws": {
+      "enter": "Tab list, {name}"
+    },
+    "nvda": {
+      "enter": "Tab list, {name}"
+    },
+    "voiceover": {
+      "enter": "{name}, tab group"
+    }
+  },
+
+  "tabpanel": {
+    "jaws": {
+      "enter": "Tab panel, {name}"
+    },
+    "nvda": {
+      "enter": "Tab panel, {name}"
+    },
+    "voiceover": {
+      "enter": "{name}, tab panel"
+    }
+  },
+
+  "term": {
+    "jaws": {
+      "enter": "Term, {name}"
+    },
+    "nvda": {
+      "enter": "Term, {name}"
+    },
+    "voiceover": {
+      "enter": "{name}, term"
+    }
+  },
+
+  "textbox": {
+    "jaws": {
+      "enter": "{name}, edit, {value}"
+    },
+    "nvda": {
+      "enter": "{name}, edit, {value}"
+    },
+    "voiceover": {
+      "enter": "{name}, {value}, text field"
+    },
+    "_states": {
+      "required": {
+        "true":  { "jaws": "required", "nvda": "required", "voiceover": "required" }
+      },
+      "invalid": {
+        "true":  { "jaws": "invalid entry", "nvda": "invalid entry", "voiceover": "invalid data" }
+      },
+      "readonly": {
+        "true":  { "jaws": "read-only", "nvda": "read-only", "voiceover": "read only" }
+      },
+      "multiline": {
+        "true":  { "jaws": "edit, multiline", "nvda": "multi line edit", "voiceover": "text area" }
+      }
+    }
+  },
+
+  "timer": {
+    "jaws": {
+      "enter": "Timer, {name}"
+    },
+    "nvda": {
+      "enter": "Timer, {name}"
+    },
+    "voiceover": {
+      "enter": "{name}, timer"
+    }
+  },
+
+  "toolbar": {
+    "jaws": {
+      "enter": "Toolbar, {name}"
+    },
+    "nvda": {
+      "enter": "Toolbar, {name}"
+    },
+    "voiceover": {
+      "enter": "{name}, toolbar"
+    }
+  },
+
+  "tooltip": {
+    "jaws": {
+      "enter": "Tooltip, {name}"
+    },
+    "nvda": {
+      "enter": "Tooltip, {name}"
+    },
+    "voiceover": {
+      "enter": "{name}, help tag"
+    }
+  },
+
+  "tree": {
+    "jaws": {
+      "enter": "Tree view, {name}"
+    },
+    "nvda": {
+      "enter": "Tree view, {name}"
+    },
+    "voiceover": {
+      "enter": "{name}, tree"
+    }
+  },
+
+  "treegrid": {
+    "jaws": {
+      "enter": "Tree grid, {name}"
+    },
+    "nvda": {
+      "enter": "Tree grid, {name}"
+    },
+    "voiceover": {
+      "enter": "{name}, tree table"
+    }
+  },
+
+  "treeitem": {
+    "jaws": {
+      "enter": "{name}, tree item, level {level}, {state:expanded}, {position} of {setsize}"
+    },
+    "nvda": {
+      "enter": "{name}, tree item, level {level}, {state:expanded}, {position} of {setsize}"
+    },
+    "voiceover": {
+      "enter": "{name}, level {level}, {state:expanded}, {position} of {setsize}"
+    },
+    "_states": {
+      "expanded": {
+        "true":  { "jaws": "expanded", "nvda": "expanded", "voiceover": "expanded" },
+        "false": { "jaws": "collapsed", "nvda": "collapsed", "voiceover": "collapsed" }
+      }
+    }
+  },
+
+  "_global_states": {
+    "_description": "States that can apply to any role via ARIA attributes.",
+    "aria-disabled": {
+      "true":  { "jaws": "unavailable", "nvda": "unavailable", "voiceover": "dimmed" }
+    },
+    "aria-busy": {
+      "true":  { "jaws": "", "nvda": "", "voiceover": "" }
+    },
+    "aria-current": {
+      "page":     { "jaws": "current page", "nvda": "current page", "voiceover": "current page" },
+      "step":     { "jaws": "current step", "nvda": "current step", "voiceover": "current step" },
+      "location": { "jaws": "current location", "nvda": "current location", "voiceover": "current location" },
+      "date":     { "jaws": "current date", "nvda": "current date", "voiceover": "current date" },
+      "time":     { "jaws": "current time", "nvda": "current time", "voiceover": "current time" },
+      "true":     { "jaws": "current", "nvda": "current", "voiceover": "current" }
+    },
+    "aria-grabbed": {
+      "true":  { "jaws": "grabbed", "nvda": "grabbed", "voiceover": "grabbed" },
+      "false": { "jaws": "draggable", "nvda": "draggable", "voiceover": "draggable" }
+    },
+    "aria-haspopup": {
+      "true":     { "jaws": "has popup", "nvda": "sub menu", "voiceover": "has pop up" },
+      "menu":     { "jaws": "has popup menu", "nvda": "sub menu", "voiceover": "has pop up menu" },
+      "listbox":  { "jaws": "has popup listbox", "nvda": "sub menu", "voiceover": "has pop up" },
+      "tree":     { "jaws": "has popup tree", "nvda": "sub menu", "voiceover": "has pop up" },
+      "grid":     { "jaws": "has popup grid", "nvda": "sub menu", "voiceover": "has pop up" },
+      "dialog":   { "jaws": "has popup dialog", "nvda": "sub menu", "voiceover": "has pop up dialog" }
+    },
+    "aria-keyshortcuts": {
+      "_any": { "jaws": "", "nvda": "", "voiceover": "" }
+    }
+  }
+}
