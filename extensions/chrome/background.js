@@ -9,6 +9,34 @@
 
 console.log('[Inspekt Extension] Background service worker loaded');
 
+// Re-inject content scripts when extension is installed or updated
+// This ensures content scripts are available without requiring page refresh
+chrome.runtime.onInstalled.addListener(async (details) => {
+    console.log('[Inspekt] Extension installed/updated:', details.reason);
+
+    if (details.reason === 'install' || details.reason === 'update') {
+        // Get all open tabs
+        const tabs = await chrome.tabs.query({});
+
+        for (const tab of tabs) {
+            // Only inject into http/https pages (not chrome://, about:, etc.)
+            if (tab.url?.startsWith('http')) {
+                try {
+                    // Inject content scripts
+                    await chrome.scripting.executeScript({
+                        target: { tabId: tab.id },
+                        files: ['permissions.js', 'content.js', 'modules/hidden-elements.js']
+                    });
+                    console.log('[Inspekt] Re-injected content scripts into tab:', tab.id, tab.url);
+                } catch (e) {
+                    // Ignore errors for tabs we can't access
+                    console.log('[Inspekt] Could not inject into tab:', tab.id, e.message);
+                }
+            }
+        }
+    }
+});
+
 // VM detection: Check if running inside the Browser VM (Linux + Chromium)
 // In the VM, the bridge runs on port 8767 (HTTP) / 8768 (WebSocket) instead of 8765 / 8766
 const isVMEnvironment = navigator.userAgent.includes('Linux') &&
@@ -20,7 +48,7 @@ if (isVMEnvironment) {
     console.log('[Inspekt Extension] VM environment detected - using bridge port', BRIDGE_HTTP_PORT);
 }
 
-// Track which tabs have Zen Bridge active
+// Track which tabs have Inspekt active
 const activeTabs = new Set();
 
 // Replay mode state (stored in memory, cleared when extension restarts)
@@ -224,6 +252,68 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         return true; // Keep channel open for async response
     }
 
+    if (message.type === 'NAVIGATE') {
+        console.log('[Inspekt] NAVIGATE message received:', {
+            url: message.url,
+            requestId: message.requestId,
+            useCallback: message.useCallback,
+            timeout: message.timeout,
+            senderTabId: sender.tab?.id
+        });
+        // =============================================================================
+        // CHROME NAVIGATION - DESIGN DECISIONS
+        // =============================================================================
+        //
+        // Chrome uses a HYBRID approach for detecting navigation completion:
+        // 1. PRIMARY: Event listener on chrome.tabs.onUpdated (efficient, event-driven)
+        // 2. BACKUP: Polling via chrome.tabs.get() every 500ms (catches edge cases)
+        //
+        // Unlike Firefox, Chrome's onUpdated events ARE reliable when registered from
+        // message handlers. However, we keep polling as a backup for edge cases like
+        // certain redirects or slow-loading sites where events may be missed.
+        //
+        // CALLBACK vs STANDARD MODE:
+        // - Callback mode: Background POSTs result to bridge server (used when content
+        //   script will be destroyed, which is the case for cross-origin navigation)
+        // - Standard mode: Returns result to content script (for same-page nav)
+        //
+        // The websocket-client.js sets requestId and useCallback=true for navigations.
+        // =============================================================================
+
+        // Navigate to URL using chrome.tabs.update() - this properly handles page navigation
+        // The content script will be destroyed during navigation, so we use a callback
+        // approach where background POSTs the result directly to the bridge server
+        if (message.requestId && message.useCallback) {
+            // Callback mode: POST result directly to bridge (content script won't survive)
+            console.log('[Inspekt] Using callback mode for navigation, timeout:', message.timeout || 30);
+            handleNavigationWithCallback(
+                sender.tab?.id,
+                message.url,
+                message.waitFor,
+                message.timeout || 30,
+                message.requestId,
+                message.bridgePort || BRIDGE_HTTP_PORT
+            );
+            // Respond immediately - the actual result will be sent via HTTP callback
+            sendResponse({ ok: true, pending: true, message: 'Navigation started, result will be sent via callback' });
+        } else {
+            // Standard mode: return result to content script (for same-page navigations)
+            handleNavigation(sender.tab?.id, message.url, message.waitFor, message.timeout || 30)
+                .then(sendResponse)
+                .catch(error => sendResponse({ ok: false, error: String(error) }));
+        }
+        return true; // Keep channel open for async response
+    }
+
+    if (message.type === 'HIDE_INSPECTOR_OVERLAY') {
+        // Try to hide Chrome DevTools inspector overlay using CDP
+        // Works when DevTools is closed; when DevTools is open, the overlay can't be hidden
+        hideInspectorOverlay(sender.tab?.id)
+            .then(() => sendResponse({ ok: true }))
+            .catch(() => sendResponse({ ok: false }));  // Fail silently - DevTools is likely open
+        return true; // Keep channel open for async response
+    }
+
     if (message.type === 'CAPTURE_VISIBLE_TAB') {
         // Capture screenshot of visible tab (simple capture only, processing done in content script)
         chrome.tabs.captureVisibleTab(null, { format: 'png' })
@@ -235,6 +325,31 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message.type === 'CAPTURE_FULL_PAGE') {
         // Capture full page screenshot using Chrome DevTools Protocol
         captureFullPageWithCDP(sender.tab.id, message.options)
+            .then(sendResponse)
+            .catch(error => sendResponse({ ok: false, error: String(error) }));
+        return true; // Keep channel open for async response
+    }
+
+    if (message.type === 'CAPTURE_ELEMENT_CDP') {
+        // Capture specific element using Chrome DevTools Protocol with clip region
+        // Used for elements larger than viewport that can't be captured with captureVisibleTab
+        captureElementWithCDP(sender.tab.id, message.options)
+            .then(sendResponse)
+            .catch(error => sendResponse({ ok: false, error: String(error) }));
+        return true; // Keep channel open for async response
+    }
+
+    if (message.type === 'FORCE_PSEUDO_STATE') {
+        // Force CSS pseudo-state on element via CDP CSS.forcePseudoState
+        forcePseudoStateViaCDP(sender.tab.id, message.state, message.selector)
+            .then(sendResponse)
+            .catch(error => sendResponse({ ok: false, error: String(error) }));
+        return true; // Keep channel open for async response
+    }
+
+    if (message.type === 'CLEAR_PSEUDO_STATE') {
+        // Clear forced CSS pseudo-state
+        clearPseudoStateViaCDP(sender.tab.id)
             .then(sendResponse)
             .catch(error => sendResponse({ ok: false, error: String(error) }));
         return true; // Keep channel open for async response
@@ -329,6 +444,25 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             hasScript: !!replayVisualScript
         });
         return false;
+    }
+
+    // ========== CDP ACCESSIBILITY & EVENT LISTENERS ==========
+
+    if (message.type === 'GET_EVENT_LISTENERS') {
+        // Get event listeners via CDP DOMDebugger.getEventListeners
+        // Requires debugger attachment
+        getEventListenersViaCDP(sender.tab.id, message.source || 'inspected')
+            .then(sendResponse)
+            .catch(error => sendResponse({ ok: false, error: String(error) }));
+        return true; // Keep channel open for async response
+    }
+
+    if (message.type === 'GET_ACCESSIBILITY_TREE') {
+        // Get partial accessibility tree via CDP Accessibility.getPartialAXTree
+        getAccessibilityTreeViaCDP(sender.tab.id, message.source || 'inspected', message.depth || 10)
+            .then(sendResponse)
+            .catch(error => sendResponse({ ok: false, error: String(error) }));
+        return true; // Keep channel open for async response
     }
 
     // ========== DOWNLOAD MONITORING ==========
@@ -664,20 +798,17 @@ async function injectMainWorldVars(tabId) {
             world: 'MAIN',
             func: () => {
                 // Version and status variables
-                window.__ZEN_BRIDGE_VERSION__ = '4.2.1';
-                window.__ZEN_BRIDGE_EXTENSION__ = true;
-                window.__ZEN_BRIDGE_CSP_BLOCKED__ = false;
                 window.__INSPEKT_BRIDGE_VERSION__ = '4.2.1';
                 window.__INSPEKT_BRIDGE_EXTENSION__ = true;
                 window.__INSPEKT_WS_CONNECTED__ = false; // Will be updated by content script
 
                 // DevTools integration
-                if (typeof window.__ZEN_DEVTOOLS_MONITOR__ === 'undefined') {
-                    window.__ZEN_DEVTOOLS_MONITOR__ = true;
+                if (typeof window.__INSPEKT_DEVTOOLS_MONITOR__ === 'undefined') {
+                    window.__INSPEKT_DEVTOOLS_MONITOR__ = true;
 
                     window.inspektStore = function(element) {
                         if (element && element.nodeType === 1) {
-                            window.__ZEN_INSPECTED_ELEMENT__ = element;
+                            window.__INSPEKT_INSPECTED_ELEMENT__ = element;
                             const tag = element.tagName.toLowerCase();
                             const id = element.id ? '#' + element.id : '';
                             const cls = element.className && typeof element.className === 'string' ?
@@ -1258,6 +1389,231 @@ async function handleDomainSync(domains) {
             ok: false,
             error: String(error)
         };
+    }
+}
+
+// ============================================================================
+// NAVIGATION HANDLING
+// ============================================================================
+
+/**
+ * Navigate to a URL using chrome.tabs.update()
+ * Uses hybrid detection: event-driven (primary) + polling (backup) for maximum reliability.
+ *
+ * @param {number} tabId - The tab ID to navigate (or null for active tab)
+ * @param {string} url - The URL to navigate to
+ * @param {string|null} waitFor - Wait condition: 'load' or 'networkidle'
+ * @param {number} timeout - Timeout in seconds (default 30)
+ * @returns {Promise<{ok: boolean, url?: string, title?: string, error?: string}>}
+ *
+ * ARCHITECTURE NOTE: Chrome uses HYBRID detection (events + polling)
+ * -----------------------------------------------------------------
+ * Primary: chrome.tabs.onUpdated listener - fast, efficient, works 95% of the time
+ * Backup: Polling via chrome.tabs.get() - catches remaining 5% (some redirects, etc.)
+ *
+ * This differs from Firefox which uses POLLING ONLY because Firefox's onUpdated
+ * events don't fire reliably when registered from message handlers.
+ */
+async function handleNavigation(tabId, url, waitFor, timeout = 30) {
+    try {
+        // Validate URL
+        if (!url || (!url.startsWith('http://') && !url.startsWith('https://'))) {
+            return {
+                ok: false,
+                error: 'URL must start with http:// or https://'
+            };
+        }
+
+        // Get the tab to navigate (use active tab if not specified)
+        let targetTabId = tabId;
+        if (!targetTabId) {
+            const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
+            if (!activeTab) {
+                return { ok: false, error: 'No active tab found' };
+            }
+            targetTabId = activeTab.id;
+        }
+
+        // Get current URL before navigation (for same-origin detection)
+        const initialTab = await chrome.tabs.get(targetTabId);
+        const initialUrl = initialTab.url;
+        const targetUrl = new URL(url);
+
+        console.log('[Inspekt] Starting navigation:', { from: initialUrl, to: url, timeout });
+
+        return new Promise((resolve) => {
+            const timeoutMs = timeout * 1000;
+            const pollInterval = 500; // Backup polling every 500ms
+            let resolved = false;
+            let timeoutId;
+            let pollId;
+
+            const cleanup = () => {
+                if (timeoutId) clearTimeout(timeoutId);
+                if (pollId) clearInterval(pollId);
+                chrome.tabs.onUpdated.removeListener(listener);
+            };
+
+            const finish = (result) => {
+                if (resolved) return;
+                resolved = true;
+                cleanup();
+                resolve(result);
+            };
+
+            // Helper to normalize hostname (strip www.)
+            // REASON: Many sites redirect www.example.com → example.com or vice versa.
+            // Without normalization, github.com navigation would fail because it redirects
+            // from www.github.com to github.com, causing a hostname mismatch.
+            const normalizeHost = (host) => host.replace(/^www\./, '');
+
+            // Helper to check if navigation completed
+            const checkNavigationComplete = async (tab, source) => {
+                try {
+                    const currentUrl = new URL(tab.url);
+
+                    // Success conditions:
+                    // 1. Exact URL match, OR
+                    // 2. Origin matches target (with www normalization) AND page changed
+                    const exactMatch = tab.url === url;
+                    const hostsMatch = normalizeHost(currentUrl.hostname) === normalizeHost(targetUrl.hostname);
+                    const protocolMatches = currentUrl.protocol === targetUrl.protocol;
+                    const originMatches = hostsMatch && protocolMatches;
+                    const pageChanged = tab.url !== initialUrl;
+
+                    if (exactMatch || (originMatches && pageChanged)) {
+                        // Handle networkidle wait
+                        if (waitFor === 'networkidle') {
+                            console.log('[Inspekt] Waiting for network idle...');
+                            await new Promise(r => setTimeout(r, 1000));
+                        }
+
+                        console.log(`[Inspekt] Navigation complete (${source}):`, {
+                            targetUrl: url,
+                            finalUrl: tab.url,
+                            title: tab.title
+                        });
+
+                        return { ok: true, url: tab.url, title: tab.title };
+                    }
+                } catch (e) {
+                    // URL parse error, continue waiting
+                }
+                return null;
+            };
+
+            // Primary: Event-driven listener
+            const listener = async (updatedTabId, changeInfo, tab) => {
+                if (updatedTabId !== targetTabId) return;
+
+                if (changeInfo.status === 'complete') {
+                    const result = await checkNavigationComplete(tab, 'event');
+                    if (result) finish(result);
+                }
+            };
+
+            // Backup: Polling (catches cases where event doesn't fire)
+            // WHY: Some sites (like Amazon) have complex redirect chains where the
+            // onUpdated event fires before the final URL is reached. Polling ensures
+            // we catch the final state even if events are missed.
+            pollId = setInterval(async () => {
+                try {
+                    const tab = await chrome.tabs.get(targetTabId);
+                    if (tab.status === 'complete' && tab.url !== initialUrl) {
+                        const result = await checkNavigationComplete(tab, 'polling');
+                        if (result) finish(result);
+                    }
+                } catch (e) {
+                    // Tab may not exist anymore
+                }
+            }, pollInterval);
+
+            // Timeout handler
+            timeoutId = setTimeout(async () => {
+                try {
+                    const finalTab = await chrome.tabs.get(targetTabId);
+                    console.error('[Inspekt] Navigation timeout after', timeout, 's. Final URL:', finalTab.url);
+                    finish({
+                        ok: false,
+                        error: `Navigation timed out after ${timeout}s. Tab is at: ${finalTab.url}`,
+                        url: finalTab.url,
+                        title: finalTab.title
+                    });
+                } catch (e) {
+                    finish({
+                        ok: false,
+                        error: `Navigation timed out after ${timeout}s`
+                    });
+                }
+            }, timeoutMs);
+
+            // Register listener BEFORE starting navigation
+            chrome.tabs.onUpdated.addListener(listener);
+
+            // Start navigation
+            chrome.tabs.update(targetTabId, { url: url }).catch(err => {
+                console.error('[Inspekt] chrome.tabs.update failed:', err);
+                finish({ ok: false, error: `chrome.tabs.update failed: ${err.message}` });
+            });
+        });
+
+    } catch (error) {
+        console.error('[Inspekt] Navigation error:', error);
+        return {
+            ok: false,
+            error: String(error.message || error)
+        };
+    }
+}
+
+/**
+ * Handle navigation with direct HTTP callback to bridge server.
+ * This bypasses the content script which gets destroyed during navigation.
+ *
+ * @param {number} tabId - The tab ID to navigate
+ * @param {string} url - The URL to navigate to
+ * @param {string|null} waitFor - Wait condition
+ * @param {number} timeout - Timeout in seconds
+ * @param {string} requestId - Request ID for the callback
+ * @param {number} bridgePort - Bridge server port (uses BRIDGE_HTTP_PORT constant by default)
+ */
+async function handleNavigationWithCallback(tabId, url, waitFor, timeout, requestId, bridgePort = BRIDGE_HTTP_PORT) {
+    console.log('[Inspekt] handleNavigationWithCallback:', { url, timeout, requestId, bridgePort });
+
+    try {
+        // Perform the navigation with timeout parameter
+        const result = await handleNavigation(tabId, url, waitFor, timeout);
+
+        // POST result directly to bridge server (bypasses destroyed content script)
+        console.log('[Inspekt] POSTing callback to bridge:', `http://127.0.0.1:${bridgePort}/navigate/callback`);
+        await fetch(`http://127.0.0.1:${bridgePort}/navigate/callback`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                requestId: requestId,
+                response: result
+            })
+        });
+
+        return result;
+    } catch (error) {
+        console.error('[Inspekt] Navigation with callback error:', error);
+
+        // Try to notify bridge of failure
+        try {
+            await fetch(`http://127.0.0.1:${bridgePort}/navigate/callback`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    requestId: requestId,
+                    response: { ok: false, error: String(error.message || error) }
+                })
+            });
+        } catch (e) {
+            console.error('[Inspekt] Failed to POST error callback:', e);
+        }
+
+        return { ok: false, error: String(error.message || error) };
     }
 }
 
@@ -1870,6 +2226,13 @@ async function captureFullPageWithCDP(tabId, options = {}) {
 
         console.log('[Inspekt] CDP debugger attached for full page capture');
 
+        // Hide DevTools element highlight overlay (prevents dimension box in screenshots)
+        try {
+            await sendDebuggerCommand(tabId, 'Overlay.hideHighlight', {});
+        } catch (e) {
+            console.log('[Inspekt] Could not hide highlight overlay:', e.message);
+        }
+
         // Step 2: Get page layout metrics
         const metrics = await sendDebuggerCommand(tabId, 'Page.getLayoutMetrics', {});
         const contentSize = metrics.cssContentSize || metrics.contentSize;
@@ -1962,6 +2325,139 @@ async function captureFullPageWithCDP(tabId, options = {}) {
 }
 
 /**
+ * Capture a specific element using Chrome DevTools Protocol with clip region
+ *
+ * Used for elements that exceed viewport size and can't be captured
+ * with the standard captureVisibleTab method.
+ *
+ * @param {number} tabId - Tab ID to capture
+ * @param {Object} options - Capture options with clip region
+ * @returns {Promise<Object>} Screenshot result with base64 data
+ */
+async function captureElementWithCDP(tabId, options = {}) {
+    const debuggerVersion = '1.3';
+    let attached = false;
+
+    try {
+        // Step 1: Attach debugger
+        await new Promise((resolve, reject) => {
+            chrome.debugger.attach({ tabId }, debuggerVersion, () => {
+                if (chrome.runtime.lastError) {
+                    const error = chrome.runtime.lastError.message;
+                    if (error.includes('Another debugger')) {
+                        reject(new Error('Cannot capture: another debugger is attached. Close DevTools and try again.'));
+                    } else {
+                        reject(new Error(error));
+                    }
+                } else {
+                    attached = true;
+                    resolve();
+                }
+            });
+        });
+
+        console.log('[Inspekt] CDP debugger attached for element capture');
+
+        // Hide DevTools element highlight overlay (the dimension box shown when inspecting)
+        // This prevents the overlay from appearing in screenshots
+        try {
+            await sendDebuggerCommand(tabId, 'Overlay.hideHighlight', {});
+        } catch (e) {
+            // Overlay domain may not be available - not critical, continue
+            console.log('[Inspekt] Could not hide highlight overlay:', e.message);
+        }
+
+        // Extract clip region from options
+        const clip = options.clip;
+        if (!clip || typeof clip.x !== 'number' || typeof clip.y !== 'number' ||
+            typeof clip.width !== 'number' || typeof clip.height !== 'number') {
+            throw new Error('Invalid clip region: x, y, width, and height are required');
+        }
+
+        // Apply margin to clip region
+        const margin = options.margin || 0;
+        const clipWithMargin = {
+            x: Math.max(0, clip.x - margin),
+            y: Math.max(0, clip.y - margin),
+            width: clip.width + (margin * 2),
+            height: clip.height + (margin * 2),
+            scale: options.scale || 1
+        };
+
+        // Step 2: Set transparent background if isolate mode
+        if (options.isolate) {
+            // Set the browser's default background to transparent
+            await sendDebuggerCommand(tabId, 'Emulation.setDefaultBackgroundColorOverride', {
+                color: { r: 0, g: 0, b: 0, a: 0 }
+            });
+            // Brief pause for compositor to apply the change
+            await new Promise(resolve => setTimeout(resolve, 50));
+        }
+
+        // Step 3: Capture screenshot with clip
+        const format = options.format || 'png';
+        const screenshotParams = {
+            format: format,
+            captureBeyondViewport: true,
+            fromSurface: true,  // Chrome requires this - fromSurface: false is not allowed
+            clip: clipWithMargin,
+            // For isolated captures, omit the default background to get true transparency
+            ...(options.isolate ? { omitBackground: true } : {})
+        };
+
+        if (format === 'jpeg' || format === 'jpg') {
+            screenshotParams.format = 'jpeg';
+            screenshotParams.quality = Math.round((options.quality || 0.92) * 100);
+        }
+
+        const screenshotResult = await sendDebuggerCommand(tabId, 'Page.captureScreenshot', screenshotParams);
+
+        // Step 4: Reset background color override if we set it
+        if (options.isolate) {
+            await sendDebuggerCommand(tabId, 'Emulation.setDefaultBackgroundColorOverride', {});
+        }
+
+        console.log('[Inspekt] Element screenshot captured via CDP');
+
+        // Step 3: Detach debugger
+        await detachDebugger(tabId);
+        attached = false;
+
+        console.log('[Inspekt] CDP debugger detached');
+
+        // Build data URL
+        const mimeType = format === 'jpeg' || format === 'jpg' ? 'image/jpeg' :
+                         format === 'webp' ? 'image/webp' : 'image/png';
+
+        const scale = options.scale || 1;
+
+        return {
+            ok: true,
+            dataUrl: `data:${mimeType};base64,${screenshotResult.data}`,
+            width: Math.round(clipWithMargin.width * scale),
+            height: Math.round(clipWithMargin.height * scale),
+            selector: options.selector || 'element',
+            tagName: options.tagName || 'ELEMENT',
+            apiUsed: 'chrome.debugger (CDP)',
+            usedCDPFallback: true
+        };
+
+    } catch (error) {
+        console.error('[Inspekt] CDP element capture error:', error);
+
+        // Ensure debugger is detached on error
+        if (attached) {
+            try {
+                await detachDebugger(tabId);
+            } catch (detachError) {
+                console.error('[Inspekt] Failed to detach debugger:', detachError);
+            }
+        }
+        throw error;
+    }
+}
+
+/**
  * Send command to Chrome DevTools Protocol
  */
 function sendDebuggerCommand(tabId, method, params) {
@@ -1996,8 +2492,515 @@ function detachDebugger(tabId) {
     });
 }
 
+/**
+ * Try to hide the Chrome DevTools inspector overlay
+ *
+ * When an element is selected in DevTools (Elements panel), Chrome shows an overlay
+ * with dimensions (e.g., "1007px × 993px"). This overlay is captured by screenshots.
+ *
+ * This function attempts to hide the overlay using the CDP Overlay.hideHighlight command.
+ * It will fail silently if DevTools is already attached (which prevents us from using
+ * the debugger API), but the brief attempt often triggers the overlay to refresh/hide.
+ */
+async function hideInspectorOverlay(tabId) {
+    if (!tabId) {
+        return; // No tab ID, can't proceed
+    }
+
+    let attached = false;
+    try {
+        // Try to attach debugger
+        await new Promise((resolve, reject) => {
+            chrome.debugger.attach({ tabId }, '1.3', () => {
+                if (chrome.runtime.lastError) {
+                    // DevTools is likely already attached
+                    reject(new Error(chrome.runtime.lastError.message));
+                } else {
+                    resolve();
+                }
+            });
+        });
+        attached = true;
+
+        // Send the hide highlight command
+        await sendDebuggerCommand(tabId, 'Overlay.hideHighlight', {});
+
+        // Immediately detach to minimize disruption
+        await detachDebugger(tabId);
+        attached = false;
+
+    } catch (e) {
+        // Expected to fail when DevTools is open - that's OK
+        // The delay in the calling code will still help settle any overlays
+        if (attached) {
+            try {
+                await detachDebugger(tabId);
+            } catch (detachError) {
+                // Ignore detach errors
+            }
+        }
+    }
+}
+
 // Note: Screenshot processing is handled in content.js where DOM APIs are available
 // Background script only handles the raw capture via chrome.tabs.captureVisibleTab
+
+// ============================================================================
+// CDP PSEUDO-STATE FORCING (for :hover, :focus, etc. screenshots)
+// ============================================================================
+
+// Session state for pseudo-state management
+let pseudoStateSession = {
+    nodeId: null,
+    tabId: null,
+    attached: false
+};
+
+/**
+ * Force CSS pseudo-state on element via CDP CSS.forcePseudoState
+ *
+ * This is the same approach used by Chrome DevTools when you force element states
+ * in the Elements panel. It properly triggers all CSS rules including:
+ * - :hover, :focus, :focus-visible, :focus-within, :active, :target
+ * - Works with Shadow DOM
+ * - Works with dynamically-added styles
+ *
+ * @param {number} tabId - Tab ID
+ * @param {string} state - Pseudo-state without colon ('hover', 'focus', etc.)
+ * @param {string|null} selector - CSS selector or null for inspected element
+ */
+async function forcePseudoStateViaCDP(tabId, state, selector) {
+    const debuggerVersion = '1.3';
+
+    try {
+        // Attach debugger if not already attached
+        if (!pseudoStateSession.attached || pseudoStateSession.tabId !== tabId) {
+            await new Promise((resolve, reject) => {
+                chrome.debugger.attach({ tabId }, debuggerVersion, () => {
+                    if (chrome.runtime.lastError) {
+                        const error = chrome.runtime.lastError.message;
+                        if (error.includes('already attached')) {
+                            // Already attached is fine
+                            resolve();
+                        } else {
+                            reject(new Error(error));
+                        }
+                    } else {
+                        resolve();
+                    }
+                });
+            });
+            pseudoStateSession.attached = true;
+            pseudoStateSession.tabId = tabId;
+        }
+
+        // Enable required CDP domains
+        await sendDebuggerCommand(tabId, 'DOM.enable', {});
+        await sendDebuggerCommand(tabId, 'CSS.enable', {});
+
+        // Get document root
+        const doc = await sendDebuggerCommand(tabId, 'DOM.getDocument', { depth: 0 });
+        const rootNodeId = doc.root.nodeId;
+
+        // Get element nodeId
+        let nodeId;
+        if (selector) {
+            // Use provided CSS selector
+            const queryResult = await sendDebuggerCommand(tabId, 'DOM.querySelector', {
+                nodeId: rootNodeId,
+                selector: selector
+            });
+            nodeId = queryResult.nodeId;
+        } else {
+            // For inspected element, inject a temporary marker and query for it
+            const [result] = await chrome.scripting.executeScript({
+                target: { tabId },
+                func: () => {
+                    const el = window.__INSPEKT_INSPECTED_ELEMENT__;
+                    if (!el) return null;
+                    // Add temporary data attribute for identification
+                    el.dataset.inspektPseudoTarget = 'true';
+                    return '[data-inspekt-pseudo-target="true"]';
+                }
+            });
+
+            const tempSelector = result?.result;
+            if (!tempSelector) {
+                throw new Error('No inspected element available. Select an element in DevTools first.');
+            }
+
+            const queryResult = await sendDebuggerCommand(tabId, 'DOM.querySelector', {
+                nodeId: rootNodeId,
+                selector: tempSelector
+            });
+            nodeId = queryResult.nodeId;
+
+            // Clean up temp attribute
+            await chrome.scripting.executeScript({
+                target: { tabId },
+                func: () => {
+                    const el = document.querySelector('[data-inspekt-pseudo-target="true"]');
+                    if (el) delete el.dataset.inspektPseudoTarget;
+                }
+            });
+        }
+
+        if (!nodeId) {
+            throw new Error('Element not found in DOM');
+        }
+
+        // Store nodeId for cleanup later
+        pseudoStateSession.nodeId = nodeId;
+
+        // Apply pseudo-state
+        // CSS.forcePseudoState expects array of pseudo-classes without colons
+        await sendDebuggerCommand(tabId, 'CSS.forcePseudoState', {
+            nodeId: nodeId,
+            forcedPseudoClasses: [state]
+        });
+
+        console.log('[Inspekt] Forced pseudo-state:', state, 'on nodeId:', nodeId);
+
+        return { ok: true, nodeId: nodeId, method: 'cdp' };
+
+    } catch (error) {
+        console.error('[Inspekt] Failed to force pseudo-state via CDP:', error);
+        throw error;
+    }
+}
+
+/**
+ * Clear forced pseudo-state from element
+ */
+async function clearPseudoStateViaCDP(tabId) {
+    try {
+        if (pseudoStateSession.nodeId && pseudoStateSession.tabId === tabId) {
+            // Clear by setting empty array
+            await sendDebuggerCommand(tabId, 'CSS.forcePseudoState', {
+                nodeId: pseudoStateSession.nodeId,
+                forcedPseudoClasses: []
+            });
+
+            console.log('[Inspekt] Cleared pseudo-state for nodeId:', pseudoStateSession.nodeId);
+
+            pseudoStateSession.nodeId = null;
+        }
+
+        // Detach debugger to clean up
+        if (pseudoStateSession.attached && pseudoStateSession.tabId === tabId) {
+            try {
+                await detachDebugger(tabId);
+            } catch (e) {
+                // Ignore detach errors
+            }
+            pseudoStateSession.attached = false;
+            pseudoStateSession.tabId = null;
+        }
+
+        return { ok: true };
+    } catch (error) {
+        console.error('[Inspekt] Failed to clear pseudo-state:', error);
+        // Don't throw - clearing is best-effort
+        return { ok: true, warning: String(error) };
+    }
+}
+
+// ============================================================================
+// CDP EVENT LISTENERS (for getting addEventListener handlers)
+// ============================================================================
+
+/**
+ * Get event listeners attached to an element via CDP DOMDebugger.getEventListeners
+ * This retrieves all event listeners including those added via addEventListener().
+ *
+ * @param {number} tabId - Tab ID
+ * @param {string} source - 'inspected' or 'focused'
+ * @returns {Promise<Object>} Object with listeners array
+ */
+async function getEventListenersViaCDP(tabId, source) {
+    const debuggerVersion = '1.3';
+
+    try {
+        // Attach debugger
+        await new Promise((resolve, reject) => {
+            chrome.debugger.attach({ tabId }, debuggerVersion, () => {
+                if (chrome.runtime.lastError) {
+                    const error = chrome.runtime.lastError.message;
+                    if (error.includes('already attached')) {
+                        resolve();
+                    } else {
+                        reject(new Error(error));
+                    }
+                } else {
+                    resolve();
+                }
+            });
+        });
+
+        // Enable required CDP domains
+        await sendDebuggerCommand(tabId, 'DOM.enable', {});
+        await sendDebuggerCommand(tabId, 'DOMDebugger.enable', {});
+        await sendDebuggerCommand(tabId, 'Runtime.enable', {});
+
+        // Get the element's remote object ID
+        // First inject a marker to find the element (MAIN world to access window.__INSPEKT_INSPECTED_ELEMENT__)
+        const [result] = await chrome.scripting.executeScript({
+            target: { tabId },
+            world: 'MAIN',
+            func: (src) => {
+                let el;
+                if (src === 'inspected') {
+                    el = window.__INSPEKT_INSPECTED_ELEMENT__;
+                } else if (src === 'focused') {
+                    let active = document.activeElement;
+                    while (active && active.shadowRoot && active.shadowRoot.activeElement) {
+                        active = active.shadowRoot.activeElement;
+                    }
+                    el = active;
+                }
+                if (!el) return null;
+                // Store element temporarily for Runtime.evaluate access
+                window.__INSPEKT_CDP_TARGET_ELEMENT__ = el;
+                return true;
+            },
+            args: [source]
+        });
+
+        if (!result?.result) {
+            await detachDebugger(tabId);
+            return {
+                ok: false,
+                error: source === 'inspected' ? 'No element selected' : 'No element focused'
+            };
+        }
+
+        // Get remote object reference to the element
+        const evalResult = await sendDebuggerCommand(tabId, 'Runtime.evaluate', {
+            expression: 'window.__INSPEKT_CDP_TARGET_ELEMENT__',
+            returnByValue: false
+        });
+
+        if (!evalResult.result || !evalResult.result.objectId) {
+            await detachDebugger(tabId);
+            return { ok: false, error: 'Could not get element reference' };
+        }
+
+        const objectId = evalResult.result.objectId;
+
+        // Get event listeners
+        const listenersResult = await sendDebuggerCommand(tabId, 'DOMDebugger.getEventListeners', {
+            objectId: objectId,
+            depth: 1  // Only element itself, not ancestors
+        });
+
+        // Clean up temp variable (MAIN world)
+        await chrome.scripting.executeScript({
+            target: { tabId },
+            world: 'MAIN',
+            func: () => { delete window.__INSPEKT_CDP_TARGET_ELEMENT__; }
+        });
+
+        // Format listeners for output
+        const listeners = (listenersResult.listeners || []).map(listener => {
+            return {
+                type: listener.type,
+                useCapture: listener.useCapture,
+                passive: listener.passive,
+                once: listener.once,
+                handler: listener.handler ? {
+                    type: listener.handler.type,
+                    className: listener.handler.className,
+                    description: listener.handler.description ?
+                        (listener.handler.description.length > 200 ?
+                            listener.handler.description.substring(0, 200) + '...' :
+                            listener.handler.description) : null
+                } : null,
+                // Include source location if available
+                scriptId: listener.scriptId || null,
+                lineNumber: listener.lineNumber || null,
+                columnNumber: listener.columnNumber || null
+            };
+        });
+
+        // Detach debugger
+        await detachDebugger(tabId);
+
+        return {
+            ok: true,
+            listeners: listeners,
+            count: listeners.length
+        };
+
+    } catch (error) {
+        console.error('[Inspekt] Failed to get event listeners via CDP:', error);
+
+        // Try to detach debugger on error
+        try { await detachDebugger(tabId); } catch (e) { /* ignore */ }
+
+        return {
+            ok: false,
+            error: String(error),
+            hint: 'Event listener retrieval requires debugger access. This may fail if another debugger is attached.'
+        };
+    }
+}
+
+// ============================================================================
+// CDP ACCESSIBILITY TREE
+// ============================================================================
+
+/**
+ * Get partial accessibility tree for an element via CDP Accessibility.getPartialAXTree
+ *
+ * @param {number} tabId - Tab ID
+ * @param {string} source - 'inspected' or 'focused'
+ * @param {number} depth - Maximum depth to retrieve (default: 10)
+ * @returns {Promise<Object>} Object with nodes array
+ */
+async function getAccessibilityTreeViaCDP(tabId, source, depth = 10) {
+    const debuggerVersion = '1.3';
+
+    try {
+        // Attach debugger
+        await new Promise((resolve, reject) => {
+            chrome.debugger.attach({ tabId }, debuggerVersion, () => {
+                if (chrome.runtime.lastError) {
+                    const error = chrome.runtime.lastError.message;
+                    if (error.includes('already attached')) {
+                        resolve();
+                    } else {
+                        reject(new Error(error));
+                    }
+                } else {
+                    resolve();
+                }
+            });
+        });
+
+        // Enable required CDP domains
+        await sendDebuggerCommand(tabId, 'DOM.enable', {});
+        await sendDebuggerCommand(tabId, 'Accessibility.enable', {});
+
+        // Get document and find element's node ID
+        const doc = await sendDebuggerCommand(tabId, 'DOM.getDocument', { depth: 0 });
+        const rootNodeId = doc.root.nodeId;
+
+        // Get element via injected script (MAIN world to access window.__INSPEKT_INSPECTED_ELEMENT__)
+        const [result] = await chrome.scripting.executeScript({
+            target: { tabId },
+            world: 'MAIN',
+            func: (src) => {
+                let el;
+                if (src === 'inspected') {
+                    el = window.__INSPEKT_INSPECTED_ELEMENT__;
+                } else if (src === 'focused') {
+                    let active = document.activeElement;
+                    while (active && active.shadowRoot && active.shadowRoot.activeElement) {
+                        active = active.shadowRoot.activeElement;
+                    }
+                    el = active;
+                }
+                if (!el) return null;
+                // Add temporary marker
+                el.dataset.inspektAxTreeTarget = 'true';
+                return '[data-inspekt-ax-tree-target="true"]';
+            },
+            args: [source]
+        });
+
+        const tempSelector = result?.result;
+        if (!tempSelector) {
+            await detachDebugger(tabId);
+            return {
+                ok: false,
+                error: source === 'inspected' ? 'No element selected' : 'No element focused'
+            };
+        }
+
+        // Get DOM nodeId for element
+        const queryResult = await sendDebuggerCommand(tabId, 'DOM.querySelector', {
+            nodeId: rootNodeId,
+            selector: tempSelector
+        });
+        const nodeId = queryResult.nodeId;
+
+        // Clean up marker (MAIN world to access same element)
+        await chrome.scripting.executeScript({
+            target: { tabId },
+            world: 'MAIN',
+            func: () => {
+                const el = document.querySelector('[data-inspekt-ax-tree-target="true"]');
+                if (el) delete el.dataset.inspektAxTreeTarget;
+            }
+        });
+
+        if (!nodeId) {
+            await detachDebugger(tabId);
+            return { ok: false, error: 'Element not found in DOM' };
+        }
+
+        // Get partial accessibility tree for the element
+        // fetchRelatives: false to get only this element and its children
+        const axTreeResult = await sendDebuggerCommand(tabId, 'Accessibility.getPartialAXTree', {
+            nodeId: nodeId,
+            fetchRelatives: false,
+            depth: depth
+        });
+
+        // Detach debugger
+        await detachDebugger(tabId);
+
+        // Format nodes for output
+        const nodes = (axTreeResult.nodes || []).map(node => {
+            return {
+                nodeId: node.nodeId,
+                ignored: node.ignored,
+                ignoredReasons: node.ignoredReasons,
+                role: node.role ? { value: node.role.value, type: node.role.type } : null,
+                name: node.name ? {
+                    value: node.name.value,
+                    type: node.name.type,
+                    sources: node.name.sources ? node.name.sources.map(s => ({
+                        type: s.type,
+                        value: s.value ? s.value.value : null,
+                        attribute: s.attribute,
+                        attributeValue: s.attributeValue ? s.attributeValue.value : null,
+                        superseded: s.superseded,
+                        nativeSource: s.nativeSource,
+                        nativeSourceValue: s.nativeSourceValue ? s.nativeSourceValue.value : null
+                    })) : null
+                } : null,
+                description: node.description ? { value: node.description.value } : null,
+                value: node.value ? { value: node.value.value, type: node.value.type } : null,
+                properties: (node.properties || []).map(prop => ({
+                    name: prop.name,
+                    value: prop.value ? { value: prop.value.value, type: prop.value.type } : null
+                })),
+                childIds: node.childIds || [],
+                backendDOMNodeId: node.backendDOMNodeId
+            };
+        });
+
+        return {
+            ok: true,
+            nodes: nodes,
+            rootNodeId: nodes.length > 0 ? nodes[0].nodeId : null,
+            count: nodes.length
+        };
+
+    } catch (error) {
+        console.error('[Inspekt] Failed to get accessibility tree via CDP:', error);
+
+        // Try to detach debugger on error
+        try { await detachDebugger(tabId); } catch (e) { /* ignore */ }
+
+        return {
+            ok: false,
+            error: String(error),
+            hint: 'Accessibility tree retrieval requires debugger access.'
+        };
+    }
+}
 
 // ============================================================================
 // CDP KEY DISPATCH (for real keyboard events)
