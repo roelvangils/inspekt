@@ -5952,24 +5952,41 @@
         // ──────────────────────────────────────────────────────
         (function setupShiftTabFix() {
             let shiftHeld = false;
-            // Wait for canvas to exist (RFB creates it on connect)
+            // Wait for RFB to be ready, then monkey-patch its keyboard handler
             function attach() {
+                if (!rfb || !rfb._keyboard) { setTimeout(attach, 500); return; }
+
                 const canvas = document.querySelector('#vncContainer canvas');
                 if (!canvas) { setTimeout(attach, 500); return; }
 
+                // Track Shift state from canvas events (these always propagate)
                 canvas.addEventListener('keydown', (e) => {
                     if (e.key === 'Shift') shiftHeld = true;
                 }, true);
-
                 canvas.addEventListener('keyup', (e) => {
-                    if (e.key === 'Tab' && shiftHeld && rfb) {
-                        rfb._keyboard.ungrab();
-                        rfb.sendKey(0xFE20, 'Tab', true);  // XK_ISO_Left_Tab
-                        rfb.sendKey(0xFE20, 'Tab', false);
-                        setTimeout(() => { if (rfb) rfb._keyboard.grab(); }, 100);
-                    }
                     if (e.key === 'Shift') shiftHeld = false;
                 }, true);
+
+                // Monkey-patch noVNC's keyboard event handler to intercept
+                // Tab when Shift is held. We must replace the bound handler
+                // reference that's registered as the actual event listener.
+                const kb = rfb._keyboard;
+                const origHandler = kb._eventHandlers.keydown;
+                const patchedHandler = function(e) {
+                    if (e.code === 'Tab' && shiftHeld) {
+                        e.preventDefault();
+                        e.stopImmediatePropagation();
+                        rfb.sendKey(0xFE20, 'Tab', true);  // XK_ISO_Left_Tab
+                        rfb.sendKey(0xFE20, 'Tab', false);
+                        return;
+                    }
+                    return origHandler(e);
+                };
+                // Swap the listener: remove old, register new
+                canvas.removeEventListener('keydown', origHandler);
+                canvas.addEventListener('keydown', patchedHandler);
+                // Update the reference so ungrab/grab uses our version
+                kb._eventHandlers.keydown = patchedHandler;
             }
             attach();
         })();
