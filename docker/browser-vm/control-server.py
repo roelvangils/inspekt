@@ -13,6 +13,7 @@ import shlex
 import subprocess
 import threading
 import time
+import base64
 import urllib.request
 import urllib.error
 
@@ -2202,6 +2203,71 @@ class ControlHandler(BaseHTTPRequestHandler):
                 })
             except Exception:
                 self.send_json({'ok': True, 'selectedText': '', 'isImage': False})
+
+        elif path == '/image/fetch':
+            # Fetch an image URL and return base64 data for clipboard/download
+            query = parse_qs(urlparse(self.path).query)
+            image_url = query.get('url', [None])[0]
+            if not image_url:
+                self.send_json({'ok': False, 'error': 'Missing url parameter'}, 400)
+                return
+            if not image_url.startswith(('http://', 'https://', 'data:')):
+                self.send_json({'ok': False, 'error': 'Invalid URL scheme'}, 400)
+                return
+
+            tab = get_requested_tab(query) or get_active_tab()
+            ws_url = tab['webSocketDebuggerUrl']
+
+            def _format_from_content_type(ct):
+                ct = ct.lower()
+                if 'jpeg' in ct or 'jpg' in ct: return 'jpeg'
+                if 'gif' in ct: return 'gif'
+                if 'webp' in ct: return 'webp'
+                if 'svg' in ct: return 'svg+xml'
+                if 'png' in ct: return 'png'
+                return 'png'
+
+            # Strategy 1: CDP Page.getResourceContent — retrieves the original
+            # cached resource directly from Chromium, no re-fetching or re-encoding.
+            try:
+                # Get the frame ID for the main frame
+                tree = send_cdp_command(ws_url, 'Page.getResourceTree')
+                frame_id = tree['result']['frameTree']['frame']['id']
+                result = send_cdp_command(ws_url, 'Page.getResourceContent', {
+                    'frameId': frame_id, 'url': image_url
+                })
+                content = result.get('result', {}).get('content', '')
+                is_base64 = result.get('result', {}).get('base64Encoded', False)
+                if content:
+                    # Determine format from URL extension
+                    ext = image_url.rsplit('.', 1)[-1].lower().split('?')[0] if '.' in image_url else ''
+                    fmt = {'jpg': 'jpeg', 'jpeg': 'jpeg', 'gif': 'gif', 'webp': 'webp', 'svg': 'svg+xml'}.get(ext, 'png')
+                    if not is_base64:
+                        content = base64.b64encode(content.encode('utf-8')).decode('ascii')
+                    self.send_json({'ok': True, 'data': content, 'format': fmt, 'method': 'cache'})
+                    return
+            except Exception:
+                pass
+
+            # Strategy 2: Direct fetch from VM (fallback for CORS or cache misses)
+            try:
+                req = urllib.request.Request(image_url, headers={'User-Agent': 'Mozilla/5.0'})
+                with urllib.request.urlopen(req, timeout=10) as resp:
+                    data = resp.read()
+                    if len(data) > 50 * 1024 * 1024:
+                        self.send_json({'ok': False, 'error': 'Image too large (>50MB)'}, 413)
+                        return
+                    content_type = resp.headers.get('Content-Type', 'image/png')
+                    fmt = _format_from_content_type(content_type)
+                    self.send_json({
+                        'ok': True,
+                        'data': base64.b64encode(data).decode('ascii'),
+                        'format': fmt,
+                        'content_type': content_type,
+                        'method': 'fetch'
+                    })
+            except Exception as e:
+                self.send_json({'ok': False, 'error': f'Failed to fetch image: {e}'}, 500)
 
         elif path == '/resolution':
             # Return current X display resolution

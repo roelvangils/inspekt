@@ -6187,6 +6187,23 @@
             attach();
         })();
 
+        // Cmd/Ctrl+C: copy selected text from VM to host clipboard.
+        // Must be capture phase — noVNC calls stopPropagation() on all keys,
+        // so a bubbling listener on document never sees them.
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'c' && (e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey) {
+                // Only intercept when VNC canvas is active
+                const termOverlay = document.getElementById('terminalOverlay');
+                const inTerminal = termOverlay && termOverlay.classList.contains('open');
+                const inInput = ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName);
+                if (!inTerminal && !inInput && !srActive) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    runInspektForClipboard('selection text --raw', 'Text');
+                }
+            }
+        }, true);
+
         // SR Keyboard interception (capture phase — before VNC gets the keys)
         document.addEventListener('keydown', (e) => {
             if (!srActive) return;
@@ -7548,6 +7565,81 @@
                 showToast('Screenshot saved!', 'success');
             } catch (e) {
                 showToast('Screenshot failed: ' + e.message, 'error');
+            }
+        }
+
+        // Copy image data to host clipboard (converts to PNG since clipboard API requires it)
+        async function copyImageToClipboard(imageSrc) {
+            try {
+                showToast('Copying image\u2026', '', 15000);
+                const resp = await fetch(
+                    `http://${VNC_HOST}:${CONTROL_PORT}/image/fetch?url=${encodeURIComponent(imageSrc)}`
+                );
+                const data = await resp.json();
+                if (!data.ok) { showToast(data.error || 'Failed to fetch image', 'error'); return; }
+
+                const byteChars = atob(data.data);
+                const byteArray = new Uint8Array(byteChars.length);
+                for (let i = 0; i < byteChars.length; i++) byteArray[i] = byteChars.charCodeAt(i);
+
+                let pngBlob;
+                if (data.format === 'png') {
+                    pngBlob = new Blob([byteArray], { type: 'image/png' });
+                } else {
+                    // Clipboard API requires PNG — convert via canvas on the host
+                    const srcBlob = new Blob([byteArray], { type: `image/${data.format}` });
+                    const bitmap = await createImageBitmap(srcBlob);
+                    const canvas = document.createElement('canvas');
+                    canvas.width = bitmap.width;
+                    canvas.height = bitmap.height;
+                    canvas.getContext('2d').drawImage(bitmap, 0, 0);
+                    pngBlob = await new Promise(r => canvas.toBlob(r, 'image/png'));
+                    bitmap.close();
+                }
+
+                await navigator.clipboard.write([new ClipboardItem({ 'image/png': pngBlob })]);
+                showToast('Image copied!', 'success');
+            } catch (e) {
+                showToast('Failed to copy image: ' + e.message, 'error');
+            }
+        }
+
+        // Download image file to host
+        async function downloadImage(imageSrc) {
+            try {
+                showToast('Downloading image\u2026', '', 15000);
+                const resp = await fetch(
+                    `http://${VNC_HOST}:${CONTROL_PORT}/image/fetch?url=${encodeURIComponent(imageSrc)}`
+                );
+                const data = await resp.json();
+                if (!data.ok) { showToast(data.error || 'Failed to fetch image', 'error'); return; }
+
+                const byteChars = atob(data.data);
+                const byteArray = new Uint8Array(byteChars.length);
+                for (let i = 0; i < byteChars.length; i++) byteArray[i] = byteChars.charCodeAt(i);
+
+                // Determine filename from URL
+                let filename = 'image.png';
+                try {
+                    const basename = new URL(imageSrc).pathname.split('/').pop();
+                    if (basename && basename.includes('.')) filename = decodeURIComponent(basename);
+                    else if (basename) filename = basename + '.png';
+                } catch {}
+
+                const mimeType = data.format === 'jpeg' ? 'image/jpeg'
+                               : data.format === 'webp' ? 'image/webp'
+                               : data.format === 'gif' ? 'image/gif'
+                               : 'image/png';
+                const blob = new Blob([byteArray], { type: mimeType });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                a.click();
+                URL.revokeObjectURL(url);
+                showToast(`Downloaded: ${filename}`, 'success');
+            } catch (e) {
+                showToast('Download failed: ' + e.message, 'error');
             }
         }
 
@@ -9662,7 +9754,12 @@
 
             // --- Image section (only when right-clicking an image) ---
             if (hasImage) {
+                items.push({ label: 'Copy Image', action: () => copyImageToClipboard(info.imageSrc) });
                 items.push({ label: 'Copy Image URL', action: () => copyToClipboard(info.imageSrc) });
+                items.push({ label: 'Download Image', action: () => downloadImage(info.imageSrc) });
+                items.push({ label: 'Open Image in New Tab', action: () => openLinkInNewTab(info.imageSrc) });
+                items.push({ separator: true });
+                items.push({ label: 'Describe Image (AI)', action: () => runInspektAI('inspected describe', 'Analyzing image', 'Image description') });
                 items.push({ separator: true });
             }
 
@@ -9688,7 +9785,7 @@
                 }});
                 items.push({ label: 'Copy Element HTML', action: () => runInspektForClipboard('inspected html --raw', 'Element HTML') });
                 items.push({ label: 'Copy Element Text', action: () => runInspektForClipboard('inspected text --raw', 'Element text') });
-                items.push({ label: 'Describe Element', action: () => runInspektAI('inspected describe', 'Describing element', 'Element description') });
+                if (!hasImage) items.push({ label: 'Describe Element', action: () => runInspektAI('inspected describe', 'Describing element', 'Element description') });
                 items.push({ label: 'Ask About Element\u2026', action: () => showAskDialog('inspected') });
                 items.push({ separator: true });
             }
@@ -9705,6 +9802,7 @@
             items.push({ separator: true });
 
             // --- Utilities (always shown) ---
+            items.push({ label: 'Copy Page URL', action: () => copyToClipboard(currentUrl || '') });
             items.push({ label: 'Inspect (DevTools)', action: () => toggleDevToolsInVM() });
             items.push({ label: isTerminalOpen ? 'Hide Terminal' : 'Show Terminal', action: () => toggleTerminal() });
 
