@@ -1,0 +1,128 @@
+# Inspekt Browser VM — Restricted Shell
+# Owned by root in /etc/inspekt-shell/.zshrc — user cannot modify.
+
+# Lock PATH to only allowed commands
+export PATH="/opt/inspekt/commands:/opt/inspekt/allowed-bin"
+typeset -r PATH
+
+# Lock ZDOTDIR to prevent relocation of startup files
+typeset -r ZDOTDIR
+
+# Completion
+autoload -Uz compinit && compinit -u -d /tmp/.zcompdump-inspekt 2>/dev/null
+zstyle ':completion:*' menu select
+zstyle ':completion:*' matcher-list 'm:{a-zA-Z}={A-Za-z}'
+zstyle ':completion:*' list-colors ${(s.:.)LS_COLORS}
+zstyle ':completion:*' group-name ''  # Suppress "unsorted" group headers from Click completions
+zstyle ':completion:*:warnings' format '%F{red}No matches%f'
+bindkey '^[[Z' reverse-menu-complete
+
+# Inspekt tab completion (inspekt is in PATH via allowed-bin)
+eval "$(_INSPEKT_COMPLETE=zsh_source inspekt 2>/dev/null)"
+
+# Override compdump to suppress deferred exec errors — compinit lazily calls
+# compdump on first prompt, which uses exec for fd redirection. Since our exec
+# wrapper blocks it, we replace compdump with a no-op (completion still works,
+# it just won't cache to disk — negligible perf impact in a VM terminal).
+compdump() { : }
+
+# Restricted exec: block process replacement but allow fd redirection.
+# When zsh encounters `exec 2>/dev/null` or `exec {fd}>file`, it handles
+# redirections directly at the parser level — the exec function is NOT called.
+# Only `exec /some/command [args]` invokes this function, which we block.
+exec() {
+    if [[ $# -eq 0 ]]; then
+        # No args — pure fd redirection (exec 3>/dev/null), allow silently
+        return 0
+    fi
+    echo "exec: not permitted in the restricted terminal." >&2
+    return 1
+}
+# Restricted `command` — allow safe usage needed by completion system.
+# `command -v/-V` checks existence (harmless, used by compinit + Click).
+# `command <name>` is allowed only if <name> is in the restricted PATH.
+# Blocks: `command python3`, `command /usr/bin/python3`, etc.
+command() {
+    # Allow existence checks (used by completion system and scripts)
+    if [[ "$1" == -[vV]* ]]; then
+        builtin command "$@"
+        return
+    fi
+    # Allow running commands that are in our restricted PATH
+    local cmd="$1"
+    if [[ -n "$cmd" && ( -x "/opt/inspekt/commands/$cmd" || -x "/opt/inspekt/allowed-bin/$cmd" ) ]]; then
+        builtin command "$@"
+        return
+    fi
+    echo "command: not permitted in the restricted terminal." >&2
+    return 1
+}
+
+# Block common interpreter and system tool names via shell functions.
+# Functions take precedence over external commands in zsh, effectively
+# preventing "python3 -c 'import os; ...'" even if the user guesses a
+# full path. Combined with:
+#   - Locked PATH (only inspekt commands + curated utils)
+#   - chmod o-x on interpreters (python3, node, env, etc.)
+#   - iptables blocking outbound traffic
+# this provides defense-in-depth without breaking zsh internals.
+_restricted_msg() { echo "Not available in the restricted terminal." >&2; return 1; }
+python3()  { _restricted_msg; }
+python()   { _restricted_msg; }
+node()     { _restricted_msg; }
+wget()     { _restricted_msg; }
+sh()       { _restricted_msg; }
+bash()     { _restricted_msg; }
+ash()      { _restricted_msg; }
+apt()      { _restricted_msg; }
+apk()      { _restricted_msg; }
+pip()      { _restricted_msg; }
+pip3()     { _restricted_msg; }
+npm()      { _restricted_msg; }
+
+# Dynamic prompt (domain from active tab, same as root shell)
+_INSPEKT_DOMAIN_FILE="/tmp/.inspekt_domain"
+
+_refresh_inspekt_domain() {
+    {
+        local d
+        d=$(curl -sf --max-time 1 http://localhost:8888/url 2>/dev/null \
+            | jq -r '.url // empty' 2>/dev/null \
+            | sed -n 's|^https\?://\([^/:]*\).*|\1|p')
+        [[ -n "$d" ]] && echo "$d" > "$_INSPEKT_DOMAIN_FILE" 2>/dev/null
+    } &!
+}
+
+precmd() {
+    local domain
+    domain=$(<"$_INSPEKT_DOMAIN_FILE") 2>/dev/null
+    PROMPT="%F{green}${domain:-inspekt}%f:%F{blue}%~%f$ "
+    _refresh_inspekt_domain
+}
+
+# Aliases
+alias ls='ls --color=auto'
+alias grep='grep --color=auto'
+alias help='inspekt --help'
+
+# History
+HISTSIZE=1000
+SAVEHIST=1000
+HISTFILE=~/zsh_history
+
+# Welcome message (only for interactive terminals)
+if [[ -o interactive ]]; then
+    print -P ""
+    print -P "  %F{cyan}Inspekt Browser VM%f"
+    print -P "  %F{white}Type a command to inspect the current page.%f"
+    print -P ""
+    print -P "  %F{242}Examples:%f"
+    print -P "    %F{green}screenshot%f            Capture the viewport"
+    print -P "    %F{green}axe%f                   Run accessibility audit"
+    print -P "    %F{green}links%f                 Extract all links"
+    print -P "    %F{green}outline%f               Show heading structure"
+    print -P "    %F{green}ask%f %F{242}\"What is this page?\"%f    Ask AI about the page"
+    print -P ""
+    print -P "  %F{242}Tab completion is enabled. Type%f %F{green}help%f %F{242}for all commands.%f"
+    print -P ""
+fi

@@ -223,7 +223,12 @@ RUN mkdir -p /opt/inspekt/allowed-bin && \
     printf '#!/bin/zsh\nPATH=/usr/bin:/usr/local/bin:$PATH /usr/local/bin/lightningcss "$@"\n' \
         > /opt/inspekt/allowed-bin/lightningcss && chmod +x /opt/inspekt/allowed-bin/lightningcss && \
     printf '#!/bin/zsh\nPATH=/usr/bin:/usr/local/bin:$PATH /usr/local/bin/prettier "$@"\n' \
-        > /opt/inspekt/allowed-bin/prettier && chmod +x /opt/inspekt/allowed-bin/prettier
+        > /opt/inspekt/allowed-bin/prettier && chmod +x /opt/inspekt/allowed-bin/prettier && \
+    # Restricted env wrapper: only allows setting VAR=VALUE before running an allowed command.
+    # Needed by Click's shell completion (generates: env COMP_WORDS=... inspekt).
+    # Blocks: env /usr/bin/python3, env node, etc.
+    printf '#!/bin/zsh\nlocal -a env_args\nwhile [[ "$1" == *=* ]]; do env_args+=("$1"); shift; done\ncmd="$1"\nif [[ -z "$cmd" ]]; then /usr/bin/env "${env_args[@]}"; exit; fi\nif [[ -x "/opt/inspekt/commands/$cmd" || -x "/opt/inspekt/allowed-bin/$cmd" ]]; then\n  /usr/bin/env "${env_args[@]}" "$@"\nelse\n  echo "env: not permitted to run: $cmd" >&2; exit 1\nfi\n' \
+        > /opt/inspekt/allowed-bin/env && chmod +x /opt/inspekt/allowed-bin/env
 
 # Inspekt config must be copied before the permissions step that copies it to /home/inspekt
 COPY docker/browser-vm/inspekt-config.json /root/.config/inspekt.json

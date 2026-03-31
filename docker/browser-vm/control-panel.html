@@ -1501,29 +1501,67 @@
             bottom: 20px;
             left: 50%;
             transform: translateX(-50%) translateY(100px);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 16px;
+            border-radius: 10px;
+            font-size: 13px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            z-index: 10001;
+            pointer-events: none;
             background: var(--bg-bar);
             color: var(--text-bright);
-            padding: 12px 24px;
-            border-radius: 8px;
-            font-size: 14px;
-            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
-            transition: transform 0.3s ease;
-            z-index: 1000;
         }
 
         .toast.show {
             transform: translateX(-50%) translateY(0);
+            pointer-events: auto;
         }
 
-        .toast.success {
-            background: var(--success);
-            color: white;
-        }
+        /* Type variants */
+        .toast.success { background: var(--success); color: white; }
+        .toast.error   { background: var(--danger); color: white; }
+        .toast.dark    { background: #1a1a2e; color: rgba(255,255,255,0.9); border: 1px solid rgba(255,255,255,0.1); }
 
-        .toast.error {
-            background: var(--danger);
-            color: white;
+        .toast-message { flex: 1; min-width: 0; }
+
+        .toast-action {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 10px;
+            border-radius: 6px;
+            border: 1px solid rgba(255,255,255,0.2);
+            background: rgba(255,255,255,0.1);
+            color: inherit;
+            font: inherit;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: background 0.15s ease;
         }
+        .toast-action:hover { background: rgba(255,255,255,0.2); }
+
+        .toast-dismiss {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            border: none;
+            background: rgba(255,255,255,0.1);
+            color: rgba(255,255,255,0.6);
+            font-size: 14px;
+            cursor: pointer;
+            flex-shrink: 0;
+            transition: background 0.15s ease;
+        }
+        .toast-dismiss:hover { background: rgba(255,255,255,0.2); color: white; }
+
+        .toast.success .toast-action,
+        .toast.error .toast-action { border-color: rgba(255,255,255,0.3); }
 
         /* =============================================
          * Command Palette (ninja-keys)
@@ -3348,7 +3386,7 @@
     </div>
 
     <!-- Toast -->
-    <div class="toast" id="toast"></div>
+    <div class="toast" id="toast" role="alert" aria-live="polite"></div>
 
     <!-- Command Palette -->
     <ninja-keys id="commandPalette" placeholder="Type a command..." openHotkey="cmd+k,ctrl+k" hideBreadcrumbs></ninja-keys>
@@ -4141,12 +4179,65 @@
             }
         }
 
-        // Show toast notification
-        function showToast(message, type = '', duration = 3000) {
+        // Show toast notification (supports both old and new API)
+        // Old: showToast('msg', 'success', 3000)
+        // New: showToast('msg', { type: 'dark', duration: 10000, dismissible: true, action: { label, icon, onClick } })
+        function showToast(message, optionsOrType = '', duration) {
             const toast = document.getElementById('toast');
-            toast.textContent = message;
-            toast.className = 'toast show ' + type;
-            setTimeout(() => toast.classList.remove('show'), duration);
+
+            // Backward compatibility: string second arg = old API
+            let opts;
+            if (typeof optionsOrType === 'string') {
+                opts = { type: optionsOrType, duration: duration ?? 3000 };
+            } else {
+                opts = { type: '', duration: 3000, dismissible: false, action: null, ...optionsOrType };
+            }
+
+            // Clear any pending dismiss timer
+            clearTimeout(toast._dismissTimer);
+
+            // Build toast content
+            let html = `<span class="toast-message">${_esc(message)}</span>`;
+
+            if (opts.action) {
+                const iconHtml = opts.action.icon || '';
+                html += `<button class="toast-action" aria-label="${_esc(opts.action.label)}">${iconHtml} ${_esc(opts.action.label)}</button>`;
+            }
+
+            if (opts.dismissible) {
+                html += `<button class="toast-dismiss" aria-label="Dismiss">&times;</button>`;
+            }
+
+            toast.innerHTML = html;
+            toast.className = 'toast show' + (opts.type ? ' ' + opts.type : '');
+
+            // Wire up action button
+            if (opts.action?.onClick) {
+                toast.querySelector('.toast-action').addEventListener('click', async (e) => {
+                    e.stopPropagation();
+                    await opts.action.onClick();
+                    _dismissToast();
+                }, { once: true });
+            }
+
+            // Wire up dismiss button
+            if (opts.dismissible) {
+                toast.querySelector('.toast-dismiss').addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    _dismissToast();
+                }, { once: true });
+            }
+
+            // Auto-dismiss (0 = stay until manual dismiss)
+            if (opts.duration > 0) {
+                toast._dismissTimer = setTimeout(_dismissToast, opts.duration);
+            }
+        }
+
+        function _dismissToast() {
+            const toast = document.getElementById('toast');
+            toast.classList.remove('show');
+            clearTimeout(toast._dismissTimer);
         }
 
         // Toggle dropdown menu
@@ -5800,74 +5891,6 @@
         // When detected, show a floating copy button on the terminal
         const COPYABLE_SIGNAL_REGEX = /\x1b\]1337;copyable\x07/g;
 
-        let _copyButtonTimer = null;
-
-        function showTerminalCopyButton() {
-            let btn = document.getElementById('terminalCopyBtn');
-            if (!btn) {
-                btn = document.createElement('button');
-                btn.id = 'terminalCopyBtn';
-                btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg> Copy';
-                btn.style.cssText = `
-                    position: absolute; top: 52px; right: 16px; z-index: 10;
-                    display: flex; align-items: center; gap: 5px;
-                    padding: 5px 10px; border-radius: 6px;
-                    background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.15);
-                    color: rgba(255,255,255,0.7); font: 12px system-ui; cursor: pointer;
-                    backdrop-filter: blur(8px); transition: all 0.15s ease;
-                    opacity: 0; transform: translateY(-4px);
-                `;
-                btn.addEventListener('mouseenter', () => {
-                    btn.style.background = 'rgba(255,255,255,0.18)';
-                    btn.style.color = '#fff';
-                });
-                btn.addEventListener('mouseleave', () => {
-                    btn.style.background = 'rgba(255,255,255,0.1)';
-                    btn.style.color = 'rgba(255,255,255,0.7)';
-                });
-                btn.addEventListener('click', async () => {
-                    try {
-                        const resp = await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/copyable`);
-                        const data = await resp.json();
-                        if (data.ok && data.text) {
-                            await navigator.clipboard.writeText(data.text);
-                            btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> Copied!';
-                            btn.style.color = '#4ade80';
-                            setTimeout(() => hideTerminalCopyButton(), 1500);
-                        }
-                    } catch (e) {
-                        showToast('Failed to copy', 'error');
-                    }
-                });
-                document.getElementById('terminalOverlay').appendChild(btn);
-            }
-
-            // Reset appearance
-            btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg> Copy';
-            btn.style.color = 'rgba(255,255,255,0.7)';
-            btn.style.display = 'flex';
-
-            // Animate in
-            requestAnimationFrame(() => {
-                btn.style.opacity = '1';
-                btn.style.transform = 'translateY(0)';
-            });
-
-            // Auto-hide after 8 seconds
-            clearTimeout(_copyButtonTimer);
-            _copyButtonTimer = setTimeout(hideTerminalCopyButton, 8000);
-        }
-
-        function hideTerminalCopyButton() {
-            const btn = document.getElementById('terminalCopyBtn');
-            if (btn) {
-                btn.style.opacity = '0';
-                btn.style.transform = 'translateY(-4px)';
-                setTimeout(() => { btn.style.display = 'none'; }, 150);
-            }
-            clearTimeout(_copyButtonTimer);
-        }
-
         async function handleClipboardSignal() {
             try {
                 const resp = await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/clipboard`);
@@ -6305,8 +6328,8 @@
             let shiftHeld = false;
             const _isMac = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
             // Keys to translate from Cmd to Ctrl on macOS (NOT 'c' — clipboard copy is handled separately)
-            // Includes '=', '-', '0' for Chromium zoom (Cmd+Plus/Minus/Zero → Ctrl+Plus/Minus/Zero)
-            const _CMD_CTRL_KEYS = new Set(['a', 'v', 'x', 'z', 'f', 'r', 's', '=', '-', '0']);
+            // Zoom keys (=, -, 0) are handled separately to avoid native Chromium zoom widget
+            const _CMD_CTRL_KEYS = new Set(['a', 'v', 'x', 'z', 'f', 'r', 's']);
             const XK_Control_L = 0xFFE3;
             const XK_Shift_L = 0xFFE1;
 
@@ -6359,6 +6382,20 @@
                         return;
                     }
 
+                    // Zoom handling: intercept zoom shortcuts and use the extension
+                    // API instead of forwarding to Chromium (avoids native zoom widget)
+                    if (((_isMac && e.metaKey) || (!_isMac && e.ctrlKey)) && !e.altKey) {
+                        if (e.key === '=' || e.key === '+' || e.key === '-' || e.key === '0') {
+                            e.preventDefault();
+                            e.stopImmediatePropagation();
+                            // Release Meta/Ctrl that noVNC may have sent
+                            if (_isMac) rfb.sendKey(0xFFE7, 'MetaLeft', false);
+                            const action = (e.key === '=' || e.key === '+') ? 'in' : e.key === '-' ? 'out' : 'reset';
+                            handleZoom(action);
+                            return;
+                        }
+                    }
+
                     // macOS Cmd → Ctrl translation: intercept Cmd+key and send
                     // the Ctrl equivalent to the Linux VM via sendKey().
                     //
@@ -6395,6 +6432,21 @@
             }
             attach();
         })();
+
+        // Cmd+=/Cmd+-/Cmd+0: Zoom in/out/reset — intercept at document level
+        // (capture phase) to prevent both the local browser and noVNC from
+        // handling these shortcuts. Zoom is applied via the extension API.
+        document.addEventListener('keydown', (e) => {
+            const isMac = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
+            const modHeld = isMac ? e.metaKey : e.ctrlKey;
+            if (!modHeld || e.altKey) return;
+            if (e.key === '=' || e.key === '+' || e.key === '-' || (e.key === '0' && !e.shiftKey)) {
+                e.preventDefault();
+                e.stopImmediatePropagation();
+                const action = (e.key === '=' || e.key === '+') ? 'in' : e.key === '-' ? 'out' : 'reset';
+                handleZoom(action);
+            }
+        }, true);
 
         // Cmd+L: focus control panel address bar (macOS only).
         // This is at document level because it doesn't interact with VNC —
@@ -7096,6 +7148,19 @@
                         toggleTerminal();
                         return false;
                     }
+
+                    // Cmd+K (Mac) or Ctrl+K to clear terminal
+                    if (event.key === 'k' && event.type === 'keydown' && (event.metaKey || event.ctrlKey)) {
+                        event.stopPropagation();
+                        event.preventDefault();
+                        terminal.clear();  // Clear xterm.js scrollback
+                        // Send Ctrl+L to PTY to clear screen and redraw prompt
+                        if (terminalSocket && terminalSocket.readyState === WebSocket.OPEN) {
+                            terminalSocket.send('\x0c');
+                        }
+                        return false;
+                    }
+
                     // Allow all other keys to be processed normally (when terminal is open)
                     return true;
                 });
@@ -7158,10 +7223,26 @@
                     handleClipboardSignal();
                 }
 
-                // Check for copyable code block signal and show copy button
+                // Check for copyable code block signal and show interactive copy toast
                 COPYABLE_SIGNAL_REGEX.lastIndex = 0;
                 if (COPYABLE_SIGNAL_REGEX.test(data)) {
-                    showTerminalCopyButton();
+                    showToast('Code block ready to copy', {
+                        type: 'dark',
+                        duration: 10000,
+                        dismissible: true,
+                        action: {
+                            label: 'Copy',
+                            icon: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>',
+                            onClick: async () => {
+                                const resp = await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/copyable`);
+                                const d = await resp.json();
+                                if (d.ok && d.text) {
+                                    await navigator.clipboard.writeText(d.text);
+                                    showToast('Copied!', 'success');
+                                }
+                            }
+                        }
+                    });
                 }
 
                 // Check for hide-terminal escape sequence
@@ -7183,6 +7264,7 @@
                 let cleanData = data.replace(DOWNLOAD_MARKER_REGEX, '');
                 cleanData = cleanData.replace(HIDE_TERMINAL_REGEX, '');
                 cleanData = cleanData.replace(CLIPBOARD_SIGNAL_REGEX, '');
+                cleanData = cleanData.replace(COPYABLE_SIGNAL_REGEX, '');
                 terminal.write(cleanData);
             };
 
@@ -10525,6 +10607,63 @@
 
         // Check DevTools status on page load
         checkDevToolsStatus();
+
+        // =============================================
+        // Zoom Controller (programmatic zoom via extension API)
+        // =============================================
+        const ZOOM_STEPS = [0.25, 0.33, 0.5, 0.67, 0.75, 0.8, 0.9, 1.0, 1.1, 1.25, 1.5, 1.75, 2.0, 2.5, 3.0, 4.0, 5.0];
+        const ZOOM_MESSAGES = {
+            0.25: 'Minimum zoom level',
+            0.5:  'Good for seeing the full layout at a glance',
+            1.0:  'Default zoom level',
+            1.5:  'Common accessibility zoom level',
+            2.0:  'WCAG requires content to be usable at this level',
+            3.0:  'Tests extreme zoom for low-vision users',
+            4.0:  'WCAG 1.4.10 requires content reflow at this level',
+            5.0:  'Maximum zoom level',
+        };
+        let currentZoom = 1.0;
+
+        async function handleZoom(action) {
+            let targetZoom;
+            if (action === 'reset') {
+                targetZoom = 1.0;
+            } else if (action === 'in') {
+                const next = ZOOM_STEPS.find(s => s > currentZoom + 0.001);
+                targetZoom = next || ZOOM_STEPS[ZOOM_STEPS.length - 1];
+            } else {
+                const prev = [...ZOOM_STEPS].reverse().find(s => s < currentZoom - 0.001);
+                targetZoom = prev || ZOOM_STEPS[0];
+            }
+
+            try {
+                const resp = await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/zoom`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ level: targetZoom })
+                });
+                const data = await resp.json();
+                if (data.ok) {
+                    currentZoom = targetZoom;
+                    showZoomHUD(targetZoom);
+                }
+            } catch (e) {
+                console.warn('[Zoom] Failed:', e);
+            }
+        }
+
+        function showZoomHUD(level) {
+            const pct = Math.round(level * 100);
+            const msg = ZOOM_MESSAGES[level];
+            const text = msg ? `Zoom: ${pct}% — ${msg}` : `Zoom: ${pct}%`;
+            showToast(text, { type: 'dark', duration: 2000 });
+        }
+
+        // Fetch initial zoom level on load
+        fetch(`http://${VNC_HOST}:${CONTROL_PORT}/zoom`)
+            .then(r => r.json())
+            .then(data => { if (data.ok) currentZoom = data.zoom; })
+            .catch(() => {});
 
         // =============================================
         // Virtual Scrollbar Controller

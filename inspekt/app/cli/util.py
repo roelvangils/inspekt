@@ -18,7 +18,9 @@ import click
 
 from inspekt.app.cli.base import builtin_open, format_output
 from inspekt.app.cli.exec import _format_console_entry, _get_console_logs_since
+from inspekt.app.cli.url_builder import url_scheme
 from inspekt.client import BridgeClient
+from inspekt.services.formatting_utils import format_filesize
 
 
 def make_file_link(path: str | Path, display_text: str | None = None) -> str:
@@ -71,10 +73,8 @@ def _handle_vm_download(path: Path) -> bool:
         # VM but not in control panel (e.g., docker exec)
         # OSC 1337 won't work - inform user how to download
         click.echo(f'📁 {path}')
-        click.secho(
-            'Tip: Use the control panel terminal (port 6080) for automatic downloads.',
-            fg='yellow', dim=True
-        )
+        from inspekt.app.cli.table import print_hint
+        print_hint('Use the control panel terminal (port 6080) for automatic downloads.')
     return True
 
 
@@ -169,6 +169,58 @@ def reveal_or_download(path: str | Path) -> bool:
             return False
 
 
+def _vm_copyable_signal(text: str) -> None:
+    """Signal the control panel that a copyable code block was just printed.
+
+    Posts the raw (unformatted) text to the control server's /copyable endpoint,
+    then emits an OSC escape sequence so the control panel can show a copy button.
+    """
+    import json
+    import sys
+    import urllib.request
+
+    try:
+        req = urllib.request.Request(
+            "http://localhost:8888/copyable",
+            data=json.dumps({"text": text}).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        urllib.request.urlopen(req, timeout=2)
+        sys.stdout.write("\033]1337;copyable\007")
+        sys.stdout.flush()
+    except Exception:
+        pass  # Best-effort
+
+
+def _vm_clipboard_relay(text: str) -> None:
+    """Post clipboard text to the control server and signal the control panel.
+
+    In the VM, clipboard copying needs two hops:
+    1. HTTP POST to the control server (reliable, handles large payloads)
+    2. Short OSC escape sequence through the terminal to signal the control panel
+       to fetch the text and call navigator.clipboard.writeText()
+    """
+    import json
+    import sys
+    import urllib.request
+
+    try:
+        # Post text to control server clipboard relay
+        req = urllib.request.Request(
+            "http://localhost:8888/clipboard",
+            data=json.dumps({"text": text}).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        urllib.request.urlopen(req, timeout=2)
+        # Signal the control panel terminal to fetch and copy
+        sys.stdout.write("\033]1337;clipboard\007")
+        sys.stdout.flush()
+    except Exception:
+        pass  # Best-effort; xclip still handles VM-internal clipboard
+
+
 def copy_text_to_clipboard(text: str) -> bool:
     """
     Copy text to the system clipboard.
@@ -178,14 +230,27 @@ def copy_text_to_clipboard(text: str) -> bool:
     - Linux: Uses xclip (must be installed)
     - Windows: Uses clip
 
+    In the VM control panel terminal, also emits OSC 52 to bridge
+    the clipboard to the host browser.
+
     Args:
         text: Text string to copy
 
     Returns:
         True if successful, False otherwise
     """
+    import os
     import platform
     import subprocess
+
+    # In VM: relay via control server so the host browser gets the text.
+    # Skip xclip entirely — X11 clipboard semantics cause xclip to block
+    # indefinitely (it stays alive to serve paste requests as selection owner).
+    from inspekt.config import is_isolated_mode
+    if is_isolated_mode():
+        if os.environ.get("INSPEKT_TERMINAL") == "control-panel":
+            _vm_clipboard_relay(text)
+        return True
 
     system = platform.system()
 
@@ -206,8 +271,15 @@ def copy_text_to_clipboard(text: str) -> bool:
                     input=text.encode("utf-8"),
                     check=True,
                     capture_output=True,
+                    timeout=5,  # Prevent hanging if X display is unavailable
                 )
                 return True
+            except subprocess.TimeoutExpired:
+                click.echo(
+                    "Warning: xclip timed out (no X display?)",
+                    err=True,
+                )
+                return False
             except FileNotFoundError:
                 click.echo(
                     "Error: xclip not installed. Install with: sudo apt install xclip",
@@ -645,11 +717,7 @@ def download(output, list_only, output_json, timeout, open_after, reveal_after):
                     f.write(response.content)
 
                 file_size = len(response.content)
-                size_mb = file_size / (1024 * 1024)
-                if size_mb >= 1:
-                    size_str = f"{size_mb:.1f} MB"
-                else:
-                    size_str = f"{file_size / 1024:.1f} KB"
+                size_str = format_filesize(file_size)
 
                 click.echo(f"    Saved to {make_file_link(output_path)} ({size_str})")
                 success_count += 1
@@ -683,6 +751,7 @@ def download(output, list_only, output_json, timeout, open_after, reveal_after):
 
 
 @click.command(name="md-link")
+@url_scheme("md-link", defaults={"output_json": False})
 @click.option("--json", "output_json", is_flag=True, help="Output as JSON")
 def md_link(output_json):
     """

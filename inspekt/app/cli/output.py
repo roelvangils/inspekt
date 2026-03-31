@@ -660,7 +660,7 @@ def _wrap_ansi_line(
     return wrapped_lines if wrapped_lines else [line]
 
 
-def print_code_block(content: str, syntax_highlighted: bool = False) -> None:
+def print_code_block(content: str, syntax_highlighted: bool = False, raw_content: str | None = None) -> None:
     """
     Print content in a styled code block with dark background.
 
@@ -670,10 +670,15 @@ def print_code_block(content: str, syntax_highlighted: bool = False) -> None:
     - 1-line vertical padding above and below
     - Proper word wrapping for long lines
 
+    In the VM control panel terminal, also emits an OSC escape sequence
+    so the control panel can show an interactive "copy to clipboard" button.
+
     Args:
         content: The text content to display (can be multi-line)
         syntax_highlighted: If True, content already has ANSI codes;
                            preserve them but add background
+        raw_content: Optional raw text (without ANSI codes) for the copy button.
+                     If not provided, ANSI codes are stripped from content.
     """
     import re
     import shutil
@@ -722,3 +727,11 @@ def print_code_block(content: str, syntax_highlighted: bool = False) -> None:
 
     # Print bottom padding line (solid dark bar)
     click.echo(f"{bg_dark}{' ' * term_width}{reset}")
+
+    # In VM mode, signal the control panel to show a copy button
+    import os
+    if os.environ.get("INSPEKT_ISOLATED") == "1":
+        from inspekt.app.cli.util import _vm_copyable_signal
+        # Use provided raw content, or strip ANSI codes from displayed content
+        copyable_text = raw_content if raw_content is not None else ansi_pattern.sub('', content)
+        _vm_copyable_signal(copyable_text)

@@ -43,6 +43,8 @@ terminal_hidden = False
 
 # Clipboard relay: CLI posts text here, control panel fetches it
 clipboard_data = {'text': '', 'timestamp': 0}
+# Copyable block relay: CLI posts raw code block text, control panel shows copy button
+copyable_data = {'text': '', 'timestamp': 0}
 
 # Screen reader simulator state
 sr_state = {
@@ -889,6 +891,42 @@ class ControlHandler(BaseHTTPRequestHandler):
                     self.send_json({'ok': True, 'hasVerticalScroll': False, 'hasHorizontalScroll': False,
                                     'top': 0, 'left': 0, 'scrollHeight': 0, 'scrollWidth': 0,
                                     'clientHeight': 0, 'clientWidth': 0})
+            except Exception as e:
+                self.send_json({'ok': False, 'error': str(e)}, 500)
+
+        elif path == '/zoom':
+            # GET /zoom — query current zoom level via extension bridge
+            try:
+                tab = get_active_tab()
+                if not tab:
+                    self.send_json({'ok': False, 'error': 'No active tab found'}, 500)
+                    return
+                ws_url = tab['webSocketDebuggerUrl']
+                # Use the extension's postMessage bridge to get zoom level
+                js_code = '''
+                    new Promise((resolve) => {
+                        const rid = 'zoom_' + Date.now();
+                        function handler(e) {
+                            if (e.data && e.data.type === 'INSPEKT_ZOOM_LEVEL_RESPONSE' && e.data.requestId === rid) {
+                                window.removeEventListener('message', handler);
+                                resolve(e.data.response);
+                            }
+                        }
+                        window.addEventListener('message', handler);
+                        window.postMessage({ type: 'INSPEKT_GET_ZOOM_LEVEL', source: 'inspekt-page', requestId: rid }, '*');
+                        setTimeout(() => { window.removeEventListener('message', handler); resolve({ ok: false, error: 'timeout' }); }, 2000);
+                    })
+                '''
+                result = send_cdp_command(ws_url, 'Runtime.evaluate', {
+                    'expression': js_code,
+                    'returnByValue': True,
+                    'awaitPromise': True
+                })
+                value = result.get('result', {}).get('result', {}).get('value', {})
+                if value and value.get('ok'):
+                    self.send_json({'ok': True, 'zoom': value.get('zoomFactor', 1.0)})
+                else:
+                    self.send_json({'ok': False, 'error': value.get('error', 'Unknown error')}, 500)
             except Exception as e:
                 self.send_json({'ok': False, 'error': str(e)}, 500)
 
@@ -2327,6 +2365,10 @@ class ControlHandler(BaseHTTPRequestHandler):
             # Return the latest clipboard text posted by CLI commands
             self.send_json({'ok': True, 'text': clipboard_data['text'], 'timestamp': clipboard_data['timestamp']})
 
+        elif path == '/copyable':
+            # Return the latest copyable code block text
+            self.send_json({'ok': True, 'text': copyable_data['text'], 'timestamp': copyable_data['timestamp']})
+
         elif path == '/keys/send':
             # Send keystrokes via xdotool (bypasses VNC for modifier key issues)
             query = parse_qs(urlparse(self.path).query)
@@ -2398,6 +2440,46 @@ class ControlHandler(BaseHTTPRequestHandler):
         global auto_scan_enabled, terminal_hidden, clipboard_data
         path = urlparse(self.path).path
 
+        if path == '/zoom':
+            # POST /zoom — set zoom level via extension bridge
+            # Body: { "level": 1.5 }
+            try:
+                content_length = int(self.headers.get('Content-Length', 0))
+                body = json.loads(self.rfile.read(content_length).decode('utf-8'))
+                level = float(body.get('level', 1.0))
+                tab = get_active_tab()
+                if not tab:
+                    self.send_json({'ok': False, 'error': 'No active tab found'}, 500)
+                    return
+                ws_url = tab['webSocketDebuggerUrl']
+                js_code = f'''
+                    new Promise((resolve) => {{
+                        const rid = 'zoom_' + Date.now();
+                        function handler(e) {{
+                            if (e.data && e.data.type === 'INSPEKT_ZOOM_SET_RESPONSE' && e.data.requestId === rid) {{
+                                window.removeEventListener('message', handler);
+                                resolve(e.data.response);
+                            }}
+                        }}
+                        window.addEventListener('message', handler);
+                        window.postMessage({{ type: 'INSPEKT_SET_ZOOM_LEVEL', source: 'inspekt-page', requestId: rid, zoomFactor: {level} }}, '*');
+                        setTimeout(() => {{ window.removeEventListener('message', handler); resolve({{ ok: false, error: 'timeout' }}); }}, 2000);
+                    }})
+                '''
+                result = send_cdp_command(ws_url, 'Runtime.evaluate', {
+                    'expression': js_code,
+                    'returnByValue': True,
+                    'awaitPromise': True
+                })
+                value = result.get('result', {}).get('result', {}).get('value', {})
+                if value and value.get('ok'):
+                    self.send_json({'ok': True, 'zoom': level})
+                else:
+                    self.send_json({'ok': False, 'error': value.get('error', 'Unknown error')}, 500)
+            except Exception as e:
+                self.send_json({'ok': False, 'error': str(e)}, 500)
+            return
+
         if path == '/scroll-to':
             try:
                 content_length = int(self.headers.get('Content-Length', 0))
@@ -2423,6 +2505,19 @@ class ControlHandler(BaseHTTPRequestHandler):
                 body = self.rfile.read(content_length).decode('utf-8')
                 data = json.loads(body)
                 clipboard_data = {'text': data.get('text', ''), 'timestamp': time.time()}
+                self.send_json({'ok': True})
+            except Exception as e:
+                self.send_json({'ok': False, 'error': str(e)}, 500)
+            return
+
+        if path == '/copyable':
+            # CLI posts raw code block text here; control panel shows copy button
+            try:
+                content_length = int(self.headers.get('Content-Length', 0))
+                body = self.rfile.read(content_length).decode('utf-8')
+                data = json.loads(body)
+                copyable_data['text'] = data.get('text', '')
+                copyable_data['timestamp'] = time.time()
                 self.send_json({'ok': True})
             except Exception as e:
                 self.send_json({'ok': False, 'error': str(e)}, 500)
