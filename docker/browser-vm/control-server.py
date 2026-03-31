@@ -859,6 +859,39 @@ class ControlHandler(BaseHTTPRequestHandler):
             except Exception as e:
                 self.send_json({'ok': False, 'error': str(e)}, 500)
 
+        elif path == '/scroll-state':
+            try:
+                tab = get_active_tab()
+                if not tab:
+                    self.send_json({'ok': False, 'error': 'No active tab found'}, 500)
+                    return
+                result = send_cdp_command(tab['webSocketDebuggerUrl'], 'Runtime.evaluate', {
+                    'expression': 'window.__INSPEKT_SCROLL__',
+                    'returnByValue': True
+                })
+                value = result.get('result', {}).get('result', {}).get('value')
+                if value:
+                    has_vscroll = value.get('height', 0) > value.get('client', 0) + 1
+                    has_hscroll = value.get('width', 0) > value.get('clientW', 0) + 1
+                    self.send_json({
+                        'ok': True,
+                        'top': value.get('top', 0),
+                        'left': value.get('left', 0),
+                        'scrollHeight': value.get('height', 0),
+                        'scrollWidth': value.get('width', 0),
+                        'clientHeight': value.get('client', 0),
+                        'clientWidth': value.get('clientW', 0),
+                        'hasVerticalScroll': has_vscroll,
+                        'hasHorizontalScroll': has_hscroll,
+                        'bg': value.get('bg', '')
+                    })
+                else:
+                    self.send_json({'ok': True, 'hasVerticalScroll': False, 'hasHorizontalScroll': False,
+                                    'top': 0, 'left': 0, 'scrollHeight': 0, 'scrollWidth': 0,
+                                    'clientHeight': 0, 'clientWidth': 0})
+            except Exception as e:
+                self.send_json({'ok': False, 'error': str(e)}, 500)
+
         elif path == '/reload-page':
             try:
                 query = parse_qs(urlparse(self.path).query)
@@ -2364,6 +2397,24 @@ class ControlHandler(BaseHTTPRequestHandler):
     def do_POST(self):
         global auto_scan_enabled, terminal_hidden, clipboard_data
         path = urlparse(self.path).path
+
+        if path == '/scroll-to':
+            try:
+                content_length = int(self.headers.get('Content-Length', 0))
+                body = json.loads(self.rfile.read(content_length).decode('utf-8'))
+                top = int(body.get('top', 0))
+                tab = get_active_tab()
+                if not tab:
+                    self.send_json({'ok': False, 'error': 'No active tab found'}, 500)
+                    return
+                send_cdp_command(tab['webSocketDebuggerUrl'], 'Runtime.evaluate', {
+                    'expression': f'window.scrollTo({{top: {top}, behavior: "instant"}})',
+                    'returnByValue': True
+                })
+                self.send_json({'ok': True})
+            except Exception as e:
+                self.send_json({'ok': False, 'error': str(e)}, 500)
+            return
 
         if path == '/clipboard':
             # CLI posts clipboard text here; control panel fetches it via GET

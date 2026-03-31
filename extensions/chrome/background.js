@@ -51,6 +51,9 @@ if (isVMEnvironment) {
 // Track which tabs have Inspekt active
 const activeTabs = new Set();
 
+// Track which tabs have throttle prevention enabled
+const throttlePreventionTabs = new Set();
+
 // Replay mode state (stored in memory, cleared when extension restarts)
 let replayModeEnabled = false;
 let replayVisualScript = null;
@@ -105,6 +108,7 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
 chrome.tabs.onRemoved.addListener((tabId) => {
     activeTabs.delete(tabId);
     tabConnectionStatus.delete(tabId);
+    throttlePreventionTabs.delete(tabId);
 });
 
 // Listen for tab activation
@@ -419,6 +423,46 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         return true; // Keep channel open for async response
     }
 
+    if (message.type === 'THROTTLE_PREVENTION_ENABLE') {
+        // Enable throttle prevention for the current tab using CDP
+        const tabId = message.tabId || sender.tab?.id;
+        if (!tabId) {
+            sendResponse({ ok: false, error: 'No tab ID provided' });
+            return false;
+        }
+        handleThrottlePreventionEnable(tabId)
+            .then(sendResponse)
+            .catch(error => sendResponse({ ok: false, error: String(error) }));
+        return true; // Keep channel open for async response
+    }
+
+    if (message.type === 'THROTTLE_PREVENTION_DISABLE') {
+        // Disable throttle prevention for the current tab
+        const tabId = message.tabId || sender.tab?.id;
+        if (!tabId) {
+            sendResponse({ ok: false, error: 'No tab ID provided' });
+            return false;
+        }
+        handleThrottlePreventionDisable(tabId)
+            .then(sendResponse)
+            .catch(error => sendResponse({ ok: false, error: String(error) }));
+        return true; // Keep channel open for async response
+    }
+
+    if (message.type === 'THROTTLE_PREVENTION_STATUS') {
+        // Get throttle prevention status for the current tab
+        const tabId = message.tabId || sender.tab?.id;
+        if (!tabId) {
+            sendResponse({ ok: false, error: 'No tab ID provided' });
+            return false;
+        }
+        sendResponse({
+            ok: true,
+            enabled: throttlePreventionTabs.has(tabId)
+        });
+        return false;
+    }
+
     if (message.type === 'REPLAY_MODE_ENABLE') {
         // Enable replay mode - store visual script and inject on page loads
         console.log('[Inspekt] REPLAY_MODE_ENABLE received, script length:', message.visualScript?.length);
@@ -460,6 +504,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message.type === 'GET_ACCESSIBILITY_TREE') {
         // Get partial accessibility tree via CDP Accessibility.getPartialAXTree
         getAccessibilityTreeViaCDP(sender.tab.id, message.source || 'inspected', message.depth || 10)
+            .then(sendResponse)
+            .catch(error => sendResponse({ ok: false, error: String(error) }));
+        return true; // Keep channel open for async response
+    }
+
+    if (message.type === 'GET_AUTHORED_CSS') {
+        // Get authored CSS values via CDP CSS.getMatchedStylesForNode
+        getAuthoredCSSViaCDP(sender.tab.id, message.source || 'inspected', message.elementCount || 0)
             .then(sendResponse)
             .catch(error => sendResponse({ ok: false, error: String(error) }));
         return true; // Keep channel open for async response
@@ -1865,6 +1917,130 @@ async function getGlobalCspBypassStatus() {
 }
 
 // ============================================================================
+// THROTTLE PREVENTION (Background Tab Responsiveness)
+// ============================================================================
+
+/**
+ * Enable throttle prevention for a tab using CDP's Emulation.setCPUThrottlingRate
+ * This prevents Chrome from throttling the tab when it's in the background,
+ * keeping JavaScript timers and callbacks responsive.
+ */
+async function handleThrottlePreventionEnable(tabId) {
+    try {
+        // Check if already enabled
+        if (throttlePreventionTabs.has(tabId)) {
+            return {
+                ok: true,
+                enabled: true,
+                message: 'Throttle prevention already active for this tab.'
+            };
+        }
+
+        const debuggerVersion = '1.3';
+
+        // Attach debugger
+        await new Promise((resolve, reject) => {
+            chrome.debugger.attach({ tabId }, debuggerVersion, () => {
+                const error = chrome.runtime.lastError?.message;
+                if (error) {
+                    if (error.includes('Another debugger')) {
+                        reject(new Error('Cannot enable: DevTools or another debugger is attached. Close DevTools and try again.'));
+                    } else {
+                        reject(new Error(error));
+                    }
+                } else {
+                    resolve();
+                }
+            });
+        });
+
+        console.log('[Inspekt] CDP debugger attached for throttle prevention on tab:', tabId);
+
+        // Set CPU throttling rate to 1 (no throttling)
+        // Chrome uses higher rates (2-4) for background tabs
+        await new Promise((resolve, reject) => {
+            chrome.debugger.sendCommand(
+                { tabId },
+                'Emulation.setCPUThrottlingRate',
+                { rate: 1 },
+                (result) => {
+                    const error = chrome.runtime.lastError?.message;
+                    if (error) {
+                        reject(new Error(error));
+                    } else {
+                        resolve(result);
+                    }
+                }
+            );
+        });
+
+        console.log('[Inspekt] Throttle prevention enabled for tab:', tabId);
+
+        // Track this tab
+        throttlePreventionTabs.add(tabId);
+
+        return {
+            ok: true,
+            enabled: true,
+            message: 'Throttle prevention enabled. Tab will stay responsive in background.'
+        };
+    } catch (error) {
+        console.error('[Inspekt] Failed to enable throttle prevention:', error);
+        return {
+            ok: false,
+            error: String(error)
+        };
+    }
+}
+
+/**
+ * Disable throttle prevention for a tab
+ */
+async function handleThrottlePreventionDisable(tabId) {
+    try {
+        // Check if enabled
+        if (!throttlePreventionTabs.has(tabId)) {
+            return {
+                ok: true,
+                enabled: false,
+                message: 'Throttle prevention was not active for this tab.'
+            };
+        }
+
+        // Detach debugger (this automatically restores normal throttling behavior)
+        await new Promise((resolve, reject) => {
+            chrome.debugger.detach({ tabId }, () => {
+                const error = chrome.runtime.lastError?.message;
+                if (error) {
+                    // If already detached, that's fine
+                    console.log('[Inspekt] Debugger already detached:', error);
+                }
+                resolve();
+            });
+        });
+
+        console.log('[Inspekt] Throttle prevention disabled for tab:', tabId);
+
+        // Remove from tracking
+        throttlePreventionTabs.delete(tabId);
+
+        return {
+            ok: true,
+            enabled: false,
+            message: 'Throttle prevention disabled. Normal background tab throttling restored.'
+        };
+    } catch (error) {
+        console.error('[Inspekt] Failed to disable throttle prevention:', error);
+        // Still remove from tracking to avoid inconsistent state
+        throttlePreventionTabs.delete(tabId);
+        return {
+            ok: false,
+            error: String(error)
+        };
+    }
+}
+
+// ============================================================================
 // CONSOLE HOOKS INJECTION (for console capture feature)
 // ============================================================================
 
@@ -2998,6 +3174,155 @@ async function getAccessibilityTreeViaCDP(tabId, source, depth = 10) {
             ok: false,
             error: String(error),
             hint: 'Accessibility tree retrieval requires debugger access.'
+        };
+    }
+}
+
+// ============================================================================
+// CDP AUTHORED CSS (original CSS values via CSS.getMatchedStylesForNode)
+// ============================================================================
+
+/**
+ * Resolve the CSS cascade from CDP's getMatchedStylesForNode result.
+ *
+ * Returns a flat map of { propName: { value, selector, important } }
+ * representing the winning value for each property.
+ *
+ * @param {Object} matchedResult - Result from CSS.getMatchedStylesForNode
+ * @returns {Object} Flat map of winning property values
+ */
+function resolveCascade(matchedResult) {
+    const winning = {};  // { propName: { value, selector, important } }
+
+    // matchedCSSRules are ordered by specificity (lowest first, highest last)
+    for (const match of (matchedResult.matchedCSSRules || [])) {
+        const rule = match.rule;
+        if (rule.origin === 'user-agent' || rule.origin === 'injected') continue;
+
+        const selector = rule.selectorList?.text || '';
+
+        for (const prop of rule.style.cssProperties) {
+            if (prop.disabled) continue;
+            const isImportant = prop.important || false;
+            const existing = winning[prop.name];
+
+            // !important beats non-important; otherwise last rule wins (higher specificity)
+            if (!existing || isImportant || !existing.important) {
+                winning[prop.name] = { value: prop.value, selector, important: isImportant };
+            }
+        }
+
+        // Also capture shorthand entries (margin: 0 auto, etc.)
+        for (const sh of (rule.style.shorthandEntries || [])) {
+            if (!winning[sh.name] || !winning[sh.name].important) {
+                winning[sh.name] = { value: sh.value, selector, important: false };
+            }
+        }
+    }
+
+    // Inline style overrides everything (except !important in stylesheets)
+    if (matchedResult.inlineStyle) {
+        for (const prop of matchedResult.inlineStyle.cssProperties) {
+            if (prop.disabled) continue;
+            const existing = winning[prop.name];
+            // Inline always wins unless existing has !important from stylesheet
+            if (!existing || !existing.important || prop.important) {
+                winning[prop.name] = { value: prop.value, selector: 'inline', important: true };
+            }
+        }
+    }
+
+    return winning;
+}
+
+/**
+ * Get authored CSS values for marked elements via CDP CSS.getMatchedStylesForNode.
+ *
+ * Elements must already have data-inspekt-css-id="0", "1", etc. attributes
+ * set by the MAIN world script (get_authored_css_cdp.js).
+ *
+ * @param {number} tabId - Chrome tab ID
+ * @param {string} source - 'inspected' or 'focused'
+ * @param {number} elementCount - Number of marked elements
+ * @returns {Promise<Object>} { ok: true, elements: { "0": {...}, "1": {...} } }
+ */
+async function getAuthoredCSSViaCDP(tabId, source, elementCount) {
+    const debuggerVersion = '1.3';
+
+    try {
+        // Attach debugger
+        await new Promise((resolve, reject) => {
+            chrome.debugger.attach({ tabId }, debuggerVersion, () => {
+                if (chrome.runtime.lastError) {
+                    const error = chrome.runtime.lastError.message;
+                    if (error.includes('already attached')) {
+                        resolve();
+                    } else {
+                        reject(new Error(error));
+                    }
+                } else {
+                    resolve();
+                }
+            });
+        });
+
+        // Enable required CDP domains
+        await sendDebuggerCommand(tabId, 'DOM.enable', {});
+        await sendDebuggerCommand(tabId, 'CSS.enable', {});
+
+        // Get document root
+        const doc = await sendDebuggerCommand(tabId, 'DOM.getDocument', { depth: -1 });
+        const rootNodeId = doc.root.nodeId;
+
+        // Loop over all marked elements
+        const elements = {};
+
+        for (let i = 0; i < elementCount; i++) {
+            const selector = `[data-inspekt-css-id="${i}"]`;
+
+            try {
+                const queryResult = await sendDebuggerCommand(tabId, 'DOM.querySelector', {
+                    nodeId: rootNodeId,
+                    selector: selector
+                });
+
+                if (!queryResult || !queryResult.nodeId) {
+                    // Element not found — skip silently
+                    continue;
+                }
+
+                const matchedResult = await sendDebuggerCommand(tabId, 'CSS.getMatchedStylesForNode', {
+                    nodeId: queryResult.nodeId
+                });
+
+                if (matchedResult) {
+                    elements[String(i)] = resolveCascade(matchedResult);
+                }
+            } catch (elementError) {
+                // Skip individual element errors (e.g., cross-origin)
+                console.warn(`[Inspekt] CDP CSS error for element ${i}:`, elementError.message);
+            }
+        }
+
+        // Detach debugger
+        await detachDebugger(tabId);
+
+        return {
+            ok: true,
+            elements: elements,
+            count: Object.keys(elements).length
+        };
+
+    } catch (error) {
+        console.error('[Inspekt] Failed to get authored CSS via CDP:', error);
+
+        // Try to detach debugger on error
+        try { await detachDebugger(tabId); } catch (e) { /* ignore */ }
+
+        return {
+            ok: false,
+            error: String(error),
+            hint: 'Authored CSS retrieval requires debugger access. Close DevTools if open.'
         };
     }
 }
