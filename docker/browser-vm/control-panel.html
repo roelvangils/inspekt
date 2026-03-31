@@ -5796,6 +5796,78 @@
         // When detected, fetch clipboard text from control server and copy to host clipboard
         const CLIPBOARD_SIGNAL_REGEX = /\x1b\]1337;clipboard\x07/g;
 
+        // Regex to detect copyable code block signal: OSC 1337 ; copyable BEL
+        // When detected, show a floating copy button on the terminal
+        const COPYABLE_SIGNAL_REGEX = /\x1b\]1337;copyable\x07/g;
+
+        let _copyButtonTimer = null;
+
+        function showTerminalCopyButton() {
+            let btn = document.getElementById('terminalCopyBtn');
+            if (!btn) {
+                btn = document.createElement('button');
+                btn.id = 'terminalCopyBtn';
+                btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg> Copy';
+                btn.style.cssText = `
+                    position: absolute; top: 52px; right: 16px; z-index: 10;
+                    display: flex; align-items: center; gap: 5px;
+                    padding: 5px 10px; border-radius: 6px;
+                    background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.15);
+                    color: rgba(255,255,255,0.7); font: 12px system-ui; cursor: pointer;
+                    backdrop-filter: blur(8px); transition: all 0.15s ease;
+                    opacity: 0; transform: translateY(-4px);
+                `;
+                btn.addEventListener('mouseenter', () => {
+                    btn.style.background = 'rgba(255,255,255,0.18)';
+                    btn.style.color = '#fff';
+                });
+                btn.addEventListener('mouseleave', () => {
+                    btn.style.background = 'rgba(255,255,255,0.1)';
+                    btn.style.color = 'rgba(255,255,255,0.7)';
+                });
+                btn.addEventListener('click', async () => {
+                    try {
+                        const resp = await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/copyable`);
+                        const data = await resp.json();
+                        if (data.ok && data.text) {
+                            await navigator.clipboard.writeText(data.text);
+                            btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> Copied!';
+                            btn.style.color = '#4ade80';
+                            setTimeout(() => hideTerminalCopyButton(), 1500);
+                        }
+                    } catch (e) {
+                        showToast('Failed to copy', 'error');
+                    }
+                });
+                document.getElementById('terminalOverlay').appendChild(btn);
+            }
+
+            // Reset appearance
+            btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg> Copy';
+            btn.style.color = 'rgba(255,255,255,0.7)';
+            btn.style.display = 'flex';
+
+            // Animate in
+            requestAnimationFrame(() => {
+                btn.style.opacity = '1';
+                btn.style.transform = 'translateY(0)';
+            });
+
+            // Auto-hide after 8 seconds
+            clearTimeout(_copyButtonTimer);
+            _copyButtonTimer = setTimeout(hideTerminalCopyButton, 8000);
+        }
+
+        function hideTerminalCopyButton() {
+            const btn = document.getElementById('terminalCopyBtn');
+            if (btn) {
+                btn.style.opacity = '0';
+                btn.style.transform = 'translateY(-4px)';
+                setTimeout(() => { btn.style.display = 'none'; }, 150);
+            }
+            clearTimeout(_copyButtonTimer);
+        }
+
         async function handleClipboardSignal() {
             try {
                 const resp = await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/clipboard`);
@@ -6233,7 +6305,8 @@
             let shiftHeld = false;
             const _isMac = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
             // Keys to translate from Cmd to Ctrl on macOS (NOT 'c' — clipboard copy is handled separately)
-            const _CMD_CTRL_KEYS = new Set(['a', 'v', 'x', 'z', 'f', 'r', 's']);
+            // Includes '=', '-', '0' for Chromium zoom (Cmd+Plus/Minus/Zero → Ctrl+Plus/Minus/Zero)
+            const _CMD_CTRL_KEYS = new Set(['a', 'v', 'x', 'z', 'f', 'r', 's', '=', '-', '0']);
             const XK_Control_L = 0xFFE3;
             const XK_Shift_L = 0xFFE1;
 
@@ -7083,6 +7156,12 @@
                 CLIPBOARD_SIGNAL_REGEX.lastIndex = 0;
                 if (CLIPBOARD_SIGNAL_REGEX.test(data)) {
                     handleClipboardSignal();
+                }
+
+                // Check for copyable code block signal and show copy button
+                COPYABLE_SIGNAL_REGEX.lastIndex = 0;
+                if (COPYABLE_SIGNAL_REGEX.test(data)) {
+                    showTerminalCopyButton();
                 }
 
                 // Check for hide-terminal escape sequence
