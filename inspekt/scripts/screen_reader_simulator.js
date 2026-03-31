@@ -181,12 +181,14 @@
     // title attribute (last resort)
     if (el.hasAttribute('title')) return el.getAttribute('title');
 
-    // Text content (for elements that derive their name from content)
+    // Text content (for elements that derive their name from content).
+    // Use getVisibleText() instead of textContent to exclude hidden
+    // children (e.g., multi-language spans hidden via CSS :lang()).
     const role = getRole(el);
     if (['button', 'link', 'heading', 'tab', 'menuitem', 'option', 'treeitem', 'listitem',
          'paragraph', 'blockquote', 'cell', 'columnheader', 'rowheader', 'caption',
          'legend', 'term', 'definition', 'status', 'alert', 'note'].includes(role)) {
-      return normalizeWhitespace(el.textContent);
+      return normalizeWhitespace(getVisibleText(el));
     }
 
     return '';
@@ -308,6 +310,28 @@
   }
 
   /**
+   * Get visible text content from an element, excluding hidden children.
+   * Respects display:none, visibility:hidden, and aria-hidden.
+   * Mirrors the W3C AccName algorithm's visibility filtering.
+   *
+   * Use this instead of el.textContent when the element may contain
+   * hidden children (e.g., multi-language spans hidden via CSS :lang()).
+   */
+  function getVisibleText(el) {
+    let text = '';
+    for (const node of el.childNodes) {
+      if (node.nodeType === Node.TEXT_NODE) {
+        text += node.textContent;
+      } else if (node.nodeType === Node.ELEMENT_NODE) {
+        if (!isHidden(node)) {
+          text += getVisibleText(node);
+        }
+      }
+    }
+    return text;
+  }
+
+  /**
    * Check if an element should be a leaf node in the reading order
    * (i.e., announced as a whole, not walked into).
    */
@@ -373,8 +397,8 @@
       this.previousLanguage = lang;
 
       if (!role) {
-        // No role — just read text content
-        const text = normalizeWhitespace(el.textContent || '');
+        // No role — just read visible text content
+        const text = normalizeWhitespace(getVisibleText(el));
         return { text, role: 'generic', name: text, lang, langChanged };
       }
 
@@ -1331,6 +1355,25 @@
       case 'activate':
         result = SR.cursor.activate();
         break;
+      case 'point-at': {
+        // Move SR cursor to the element at the given coordinates.
+        // Walks up the DOM tree to find the nearest ancestor that
+        // exists in the virtual cursor's node list.
+        const targetEl = document.elementFromPoint(params.x, params.y);
+        if (targetEl) {
+          let el = targetEl;
+          let index = -1;
+          while (el && index === -1) {
+            index = SR.cursor.nodes.findIndex(n => n.element === el && !n.isExit);
+            if (index === -1) el = el.parentElement;
+          }
+          if (index !== -1 && index !== SR.cursor.position) {
+            SR.cursor.position = index;
+            result = SR.cursor._currentResult();
+          }
+        }
+        break;
+      }
       default:
         return { ok: false, error: `Unknown action: ${action}` };
     }
