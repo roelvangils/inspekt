@@ -1648,7 +1648,7 @@
                 inset 0 0 0 1px rgba(255, 255, 255, 0.05);
             transform: translateX(calc(100% + 20px));
             transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            z-index: 50;
+            z-index: 100;  /* Must be above SR focus indicator (51) and overlay container (50) */
             display: flex;
             flex-direction: column;
             overflow: hidden;
@@ -1750,7 +1750,7 @@
             align-items: center;
             justify-content: center;
             z-index: 11;
-            transition: all 0.15s ease;
+            transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
             padding: 0;
         }
         .split-flip-btn:hover {
@@ -1758,13 +1758,14 @@
             border-color: var(--accent);
             color: var(--text-bright);
         }
+        .split-flip-btn:active {
+            transform: translate(-50%, -50%);  /* Prevent position shift on click */
+        }
 
-        /* Blur both panels during drag */
+        /* Disable interaction on panels during drag */
         body.split-dragging .vnc-container,
         body.split-dragging .terminal-overlay {
-            filter: blur(3px);
             pointer-events: none;
-            transition: filter 0.1s ease;
         }
         body.split-dragging .split-drag-handle {
             pointer-events: auto;
@@ -3568,6 +3569,10 @@
         // =============================================
         let rfb = null;
         let _rfbReconnectAttempts = 0;
+        let _vncInitialized = false;
+        let _isCleaningUp = false;
+        let _isConnecting = false;  // Prevents overlapping connectVNC calls
+        let _lastConnectTime = 0;   // Timestamp of last successful connect
         const _RFB_MAX_RECONNECT_DELAY = 5000;
 
         // Convert parent-document client coordinates to VM pixel coordinates
@@ -3734,8 +3739,43 @@
             const splash = document.getElementById('splashScreen');
             if (splash) {
                 splash.classList.add('hidden');
-                setTimeout(() => splash.remove(), 500);
+                // Don't remove from DOM — we need it for reconnection
             }
+        }
+
+        function showSplash(message) {
+            const splash = document.getElementById('splashScreen');
+            if (splash) {
+                splash.classList.remove('hidden');
+                updateSplashStatus(message || 'Reconnecting...');
+            }
+        }
+
+        // Lightweight reconnection overlay — only covers the VNC canvas area
+        function showReconnectOverlay(message) {
+            let overlay = document.getElementById('vncReconnectOverlay');
+            if (!overlay) {
+                overlay = document.createElement('div');
+                overlay.id = 'vncReconnectOverlay';
+                overlay.style.cssText = `
+                    position: absolute; inset: 0; z-index: 60;
+                    display: flex; align-items: center; justify-content: center;
+                    background: var(--bg-page, #1a1a2e); color: #888;
+                    font-size: 14px; flex-direction: column; gap: 12px;
+                `;
+                document.getElementById('vncContainer').appendChild(overlay);
+            }
+            overlay.innerHTML = `
+                <div style="width:24px;height:24px;border:2px solid #555;border-top-color:#aaa;border-radius:50%;animation:spin 1s linear infinite"></div>
+                <div>${message || 'Reconnecting...'}</div>
+                <style>@keyframes spin{to{transform:rotate(360deg)}}</style>
+            `;
+            overlay.style.display = 'flex';
+        }
+
+        function hideReconnectOverlay() {
+            const overlay = document.getElementById('vncReconnectOverlay');
+            if (overlay) overlay.style.display = 'none';
         }
 
         // Dynamic viewport resize — matches VM resolution to host browser viewport
@@ -3823,35 +3863,84 @@
         }
 
         // Connect to VNC via direct RFB embedding (no iframe)
+        let _isReconnect = false;
+
         async function connectVNC() {
-            updateSplashStatus('Connecting to VM...');
+            // Prevent overlapping connection attempts
+            if (_isConnecting) return;
+            _isConnecting = true;
 
             const container = document.getElementById('vncContainer');
 
-            // Clean up previous RFB instance on reconnect
+            // Show appropriate UI: full splash on first load, canvas-only overlay on reconnect
+            if (_isReconnect) {
+                showReconnectOverlay('Reconnecting...');
+            } else {
+                updateSplashStatus('Connecting to VM...');
+            }
+
+            // Clean up previous RFB instance on reconnect.
+            // Set _isCleaningUp to prevent the old instance's disconnect event
+            // from queuing a duplicate connectVNC() call.
             if (rfb) {
+                _isCleaningUp = true;
                 try { rfb.disconnect(); } catch (_) {}
                 rfb = null;
+                _isCleaningUp = false;
             }
             // Remove any leftover noVNC DOM elements from a previous connection
             // RFB creates a <div class="noVNC_screen"> containing the canvas
             const oldScreen = container.querySelector('.noVNC_screen');
             if (oldScreen) oldScreen.remove();
 
-            // Dynamic import of RFB (ES module, cached by browser after first load)
-            const httpProtocol = window.location.protocol;
-            const { default: RFB } = await import(`${httpProtocol}//${VNC_HOST}:${VNC_PORT}/core/rfb.js`);
+            try {
+                // Dynamic import of RFB (ES module, cached by browser after first load)
+                const httpProtocol = window.location.protocol;
+                const { default: RFB } = await import(`${httpProtocol}//${VNC_HOST}:${VNC_PORT}/core/rfb.js`);
 
-            const wsProtocol = httpProtocol === 'https:' ? 'wss:' : 'ws:';
-            const wsUrl = `${wsProtocol}//${VNC_HOST}:${VNC_PORT}/websockify`;
+                const wsProtocol = httpProtocol === 'https:' ? 'wss:' : 'ws:';
+                const wsUrl = `${wsProtocol}//${VNC_HOST}:${VNC_PORT}/websockify`;
 
-            rfb = new RFB(container, wsUrl, { shared: true });
-            rfb.resizeSession = true;
-            rfb.scaleViewport = true;
-            rfb.showDotCursor = false;
+                rfb = new RFB(container, wsUrl, { shared: true });
+                rfb.resizeSession = true;
+                rfb.scaleViewport = true;
+                rfb.showDotCursor = false;
+            } catch (err) {
+                // RFB constructor or import failed (e.g. websockify not available yet)
+                console.warn('[VNC] Connection failed, retrying...', err);
+                _isConnecting = false;
+                const delay = Math.min(1000 * Math.pow(2, _rfbReconnectAttempts), _RFB_MAX_RECONNECT_DELAY);
+                _rfbReconnectAttempts++;
+                _isReconnect = true;
+                showReconnectOverlay(`Connection failed. Retrying in ${Math.round(delay/1000)}s...`);
+                setTimeout(connectVNC, delay);
+                return;
+            }
+
+            // Connection timeout: if RFB doesn't connect within 5 seconds,
+            // tear it down and retry. This handles cases where websockify
+            // accepts the WebSocket but can't reach x11vnc (hangs indefinitely).
+            const _connectTimeout = setTimeout(() => {
+                console.warn('[VNC] Connection timeout — retrying');
+                _isCleaningUp = true;
+                try { rfb.disconnect(); } catch (_) {}
+                rfb = null;
+                _isCleaningUp = false;
+                _isConnecting = false;
+                _isReconnect = true;
+                const delay = Math.min(1000 * Math.pow(2, _rfbReconnectAttempts), _RFB_MAX_RECONNECT_DELAY);
+                _rfbReconnectAttempts++;
+                showReconnectOverlay('Connection timed out. Retrying...');
+                setTimeout(connectVNC, delay);
+            }, 5000);
 
             rfb.addEventListener('connect', () => {
+                clearTimeout(_connectTimeout);
                 _rfbReconnectAttempts = 0;
+                _isReconnect = false;
+                _isConnecting = false;
+                _lastConnectTime = Date.now();
+                hideReconnectOverlay();
                 updateSplashStatus('VM ready!');
 
                 // Early check: if Chrome is on an internal URL, switch to native
@@ -3865,22 +3954,39 @@
                 setTimeout(() => {
                     hideSplash();
                     updateStatus(true);
-                    // Start dynamic viewport resizing
-                    setupViewportResize();
-                    // Initialize split mode drag handle
-                    initSplitDragHandle();
-                    // Check for saved tabs to restore (after restart)
-                    setTimeout(restoreTabsFromStorage, 2000);
+                    // Only initialize these once (not on every reconnect)
+                    if (!_vncInitialized) {
+                        _vncInitialized = true;
+                        setupViewportResize();
+                        initSplitDragHandle();
+                        setTimeout(restoreTabsFromStorage, 2000);
+                    }
                     rfb.focus();
                 }, 500);
             });
 
             rfb.addEventListener('disconnect', (e) => {
+                clearTimeout(_connectTimeout);
+                // Ignore disconnect events during cleanup (old instance being torn down)
+                if (_isCleaningUp) return;
+
+                // Ignore spurious disconnects in the first 3s after connecting.
+                // RFB resolution negotiation (resizeSession) can cause brief
+                // disconnects that resolve themselves — don't trigger a full
+                // reconnection cycle for these.
+                const timeSinceConnect = Date.now() - _lastConnectTime;
+                if (_lastConnectTime > 0 && timeSinceConnect < 3000) {
+                    console.log(`[VNC] Ignoring disconnect ${timeSinceConnect}ms after connect (stabilizing)`);
+                    return;
+                }
+
+                _isConnecting = false;
                 updateStatus(false);
-                if (e.detail.clean) return; // Clean disconnect — don't reconnect
+                _isReconnect = true;
                 const delay = Math.min(1000 * Math.pow(2, _rfbReconnectAttempts), _RFB_MAX_RECONNECT_DELAY);
                 _rfbReconnectAttempts++;
-                updateSplashStatus('Connection lost. Reconnecting...');
+                console.log(`[VNC] Disconnected after ${timeSinceConnect}ms, retrying in ${delay}ms`);
+                showReconnectOverlay('Connection lost. Reconnecting...');
                 setTimeout(connectVNC, delay);
             });
 
@@ -4340,6 +4446,8 @@
                 const response = await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/navigate?url=${encodeURIComponent(url)}&tab=${activeTabId}`);
                 const data = await response.json();
                 if (data.ok) {
+                    // Focus VNC canvas so Tab goes straight to the page
+                    if (rfb) rfb.focus();
                     setTimeout(() => {
                         updateCurrentUrl();
                         // Add to history after title has been captured
@@ -6036,21 +6144,36 @@
                 }, true);
 
                 // Monkey-patch noVNC's keyboard event handler to intercept
-                // Tab when Shift is held. We must replace the bound handler
-                // reference that's registered as the actual event listener.
+                // ALL Tab keys. We must replace the bound handler reference
+                // that's registered as the actual event listener.
+                //
+                // Why: noVNC's original handler doesn't generate key repeats
+                // for Tab (holding Tab down doesn't auto-advance focus).
+                // By intercepting Tab and sending explicit sendKey() pairs,
+                // each browser repeat event triggers a full Tab in the VM.
+                // Shift+Tab also needs interception because noVNC on Mac
+                // strips the Shift modifier from Tab during encoding.
                 const kb = rfb._keyboard;
                 const origHandler = kb._eventHandlers.keydown;
                 const patchedHandler = function(e) {
-                    // Note: this fix was written for Mac where noVNC strips
-                    // the Shift modifier from Tab. On Windows/Linux, noVNC
-                    // may handle Shift+Tab correctly natively. If this causes
-                    // issues on other platforms, add a guard:
-                    //   if (... && navigator.platform.includes('Mac'))
-                    if (e.code === 'Tab' && shiftHeld) {
+                    // When SR simulator is active, block ALL keys from reaching
+                    // VNC — the SR handler on document (capture phase) processes
+                    // keyboard input and translates it to accessibility navigation.
+                    if (srActive) {
                         e.preventDefault();
                         e.stopImmediatePropagation();
-                        rfb.sendKey(0xFE20, 'Tab', true);  // XK_ISO_Left_Tab
-                        rfb.sendKey(0xFE20, 'Tab', false);
+                        return;
+                    }
+                    if (e.code === 'Tab') {
+                        e.preventDefault();
+                        e.stopImmediatePropagation();
+                        if (shiftHeld) {
+                            rfb.sendKey(0xFE20, 'Tab', true);   // XK_ISO_Left_Tab
+                            rfb.sendKey(0xFE20, 'Tab', false);
+                        } else {
+                            rfb.sendKey(0xFF09, 'Tab', true);   // XK_Tab
+                            rfb.sendKey(0xFF09, 'Tab', false);
+                        }
                         return;
                     }
                     return origHandler(e);
@@ -6071,6 +6194,9 @@
             // Don't intercept when terminal is focused
             const termOverlay = document.getElementById('terminalOverlay');
             if (termOverlay && termOverlay.classList.contains('open')) return;
+
+            // Don't intercept when a UI input (address bar, search, etc.) is focused
+            if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) return;
 
             // Cheat sheet: dismiss on any key
             if (srCheatSheetVisible) {
@@ -7118,28 +7244,40 @@
             }
         }
 
-        function activateHoverInspect() {
-            isHoverInspectActive = true;
-            updateInspectButton();
-            // With direct RFB, hover-inspect is handled by capture-phase
-            // event interceptors on the VNC container (see _setupCanvasEventInterceptors)
-            document.getElementById('vncContainer').classList.add('hover-inspect-active');
-        }
-
-        function deactivateHoverInspect() {
-            isHoverInspectActive = false;
-            updateInspectButton();
-            document.getElementById('vncContainer').classList.remove('hover-inspect-active');
+        /**
+         * Clean up ALL inspect-related overlays and state.
+         * Call this whenever inspect mode fully exits to prevent orphaned outlines.
+         */
+        function _cleanupAllInspectState() {
             // Cancel any in-flight hover request
             if (_hoverAbortController) {
                 _hoverAbortController.abort();
                 _hoverAbortController = null;
             }
-            // Dismiss hover overlays (but not locked overlays)
-            if (!_inspectTrackingActive) {
-                vncOverlay.dismiss('inspect-highlight', true);
-                vncOverlay.dismiss('inspect-tooltip', true);
+            // Stop tracking (clears interval, dismisses info panel)
+            if (_inspectTrackingActive) {
+                _stopInspectTracking();
             }
+            // Dismiss all inspect overlays unconditionally
+            vncOverlay.dismiss('inspect-highlight', true);
+            vncOverlay.dismiss('inspect-tooltip', true);
+            vncOverlay.dismiss('inspect-info-panel', true);
+            // Reset button state
+            updateInspectButton();
+        }
+
+        function activateHoverInspect() {
+            // Clean up any orphaned overlays from a previous session
+            _cleanupAllInspectState();
+            isHoverInspectActive = true;
+            updateInspectButton();
+            document.getElementById('vncContainer').classList.add('hover-inspect-active');
+        }
+
+        function deactivateHoverInspect() {
+            isHoverInspectActive = false;
+            document.getElementById('vncContainer').classList.remove('hover-inspect-active');
+            _cleanupAllInspectState();
         }
 
         function updateInspectButton() {
@@ -9068,17 +9206,16 @@
 
             show(id, rect, options = {}) {
                 this._ensureContainer();
-                let entry = this._overlays[id];
-                if (!entry) {
-                    const el = document.createElement('div');
-                    el.dataset.overlayId = id;
-                    el.style.position = 'absolute';
-                    el.style.pointerEvents = 'none';
-                    this._container.appendChild(el);
-                    entry = { element: el };
-                    this._overlays[id] = entry;
-                }
-                const el = entry.element;
+                // Always dismiss existing overlay with same ID first to prevent
+                // race conditions with animated dismissals
+                this.dismiss(id, false);
+                const el = document.createElement('div');
+                el.dataset.overlayId = id;
+                el.style.position = 'absolute';
+                el.style.pointerEvents = 'none';
+                this._container.appendChild(el);
+                const entry = { element: el };
+                this._overlays[id] = entry;
                 if (rect) {
                     el.style.left = rect.left + 'px';
                     el.style.top = rect.top + 'px';
@@ -9107,22 +9244,25 @@
                 const entry = this._overlays[id];
                 if (!entry) return;
                 const el = entry.element;
+                // Always remove from tracking immediately to prevent races
+                delete this._overlays[id];
                 if (animate) {
                     el.style.transition = 'opacity 0.15s ease';
                     el.style.opacity = '0';
-                    setTimeout(() => {
-                        el.remove();
-                        delete this._overlays[id];
-                    }, 150);
+                    setTimeout(() => el.remove(), 150);
                 } else {
                     el.remove();
-                    delete this._overlays[id];
                 }
             },
 
             dismissAll(animate = false) {
                 for (const id of Object.keys(this._overlays)) {
                     this.dismiss(id, animate);
+                }
+                // Nuclear cleanup: remove any DOM orphans not tracked in _overlays
+                if (this._container) {
+                    const orphans = this._container.querySelectorAll('[data-overlay-id]');
+                    orphans.forEach(el => el.remove());
                 }
             },
 
@@ -9796,13 +9936,21 @@
                 }
             }, true);
 
-            // Hover-inspect: track pointer moves for element highlighting
-            container.addEventListener('pointermove', (e) => {
-                if (isHoverInspectActive) {
-                    const vm = _clientToVm(e.clientX, e.clientY);
-                    _handleHoverMove(vm.x, vm.y);
-                }
-            });
+            // Hover-inspect: track pointer moves for element highlighting.
+            // Listen on the canvas directly — noVNC may use setPointerCapture
+            // which redirects pointermove events to the canvas, bypassing
+            // ancestor capture-phase listeners.
+            function _attachHoverMoveListener() {
+                const canvas = container.querySelector('canvas');
+                if (!canvas) { setTimeout(_attachHoverMoveListener, 200); return; }
+                canvas.addEventListener('pointermove', (e) => {
+                    if (isHoverInspectActive) {
+                        const vm = _clientToVm(e.clientX, e.clientY);
+                        _handleHoverMove(vm.x, vm.y);
+                    }
+                }, true);
+            }
+            _attachHoverMoveListener();
         }
 
         // Note: Escape key dismissal for inspect overlay is handled in the
@@ -9855,20 +10003,15 @@
                     dismissContextMenu();
                     return;
                 }
-                // Dismiss hover-inspect mode (before locked inspect)
-                if (isHoverInspectActive) {
+                // Dismiss any inspect mode (hover or locked)
+                if (isHoverInspectActive || _inspectTrackingActive) {
                     e.preventDefault();
-                    deactivateHoverInspect();
-                    vncOverlay.dismiss('inspect-highlight', true);
-                    vncOverlay.dismiss('inspect-tooltip', true);
-                    return;
-                }
-                // Dismiss locked inspect overlay (before checking panels/modals)
-                if (_inspectTrackingActive) {
-                    e.preventDefault();
+                    if (isHoverInspectActive) {
+                        isHoverInspectActive = false;
+                        document.getElementById('vncContainer').classList.remove('hover-inspect-active');
+                    }
                     if (activeTabId) _tabInspectState[activeTabId] = { wasTracking: false };
-                    _stopInspectTracking();
-                    vncOverlay.dismissAll(true);
+                    _cleanupAllInspectState();
                     return;
                 }
                 // Close output panel

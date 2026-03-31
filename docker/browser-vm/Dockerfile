@@ -137,17 +137,21 @@ RUN wget -q "https://dl.filippo.io/mkcert/latest?for=linux/amd64" -O /usr/local/
     certutil -d sql:/root/.pki/nssdb -N --empty-password && \
     certutil -d sql:/root/.pki/nssdb -A -t "C,," -n "mkcert CA" -i "$(mkcert -CAROOT)/rootCA.pem"
 
-# Copy Inspekt source code
-COPY inspekt /opt/inspekt/inspekt
-COPY extensions /opt/inspekt/extensions
-COPY prompts /opt/inspekt/prompts
+# ── Phase 1: Install dependencies (cached unless pyproject.toml changes) ──
+# Copy only pyproject.toml first so pip can resolve and compile deps.
+# This layer is cached across builds — PyMuPDF (~160s compile) only rebuilds
+# when dependencies change, not on every source code edit.
 COPY pyproject.toml /opt/inspekt/
 
-# Install Inspekt from source
+# Create a minimal package stub so pip can install in editable mode.
+# The real source is copied in Phase 2 (and mounted in dev mode).
+RUN mkdir -p /opt/inspekt/inspekt && \
+    echo '__version__ = "0.0.0.dev0"' > /opt/inspekt/inspekt/__init__.py && \
+    touch /opt/inspekt/README.md
+
 # PyMuPDF has no pre-built musl/aarch64 wheel, so we need build tools to compile it.
 # Build deps are installed and removed in the same layer to keep image small.
-RUN chmod -R a+rX /opt/inspekt/extensions && \
-    apk add --no-cache --virtual .build-deps \
+RUN apk add --no-cache --virtual .build-deps \
         gcc g++ make swig \
         python3-dev musl-dev \
         freetype-dev harfbuzz-dev jpeg-dev openjpeg-dev jbig2dec-dev \
@@ -158,10 +162,18 @@ RUN chmod -R a+rX /opt/inspekt/extensions && \
     python3 -m venv .venv && \
     .venv/bin/pip install --no-cache-dir --upgrade pip && \
     .venv/bin/pip install --no-cache-dir -e . && \
-    printf '#!/bin/zsh\nsource /opt/inspekt/.venv/bin/activate\n/opt/inspekt/.venv/bin/inspekt "$@"\n' > /usr/local/bin/inspekt && \
-    chmod +x /usr/local/bin/inspekt && \
     rm -f /usr/local/bin/cc /usr/local/bin/c++ && \
     apk del .build-deps
+
+# ── Phase 2: Copy source code (changes frequently, but deps are cached) ──
+COPY inspekt /opt/inspekt/inspekt
+COPY extensions /opt/inspekt/extensions
+COPY prompts /opt/inspekt/prompts
+
+# Set permissions and create the inspekt wrapper script
+RUN chmod -R a+rX /opt/inspekt/extensions && \
+    printf '#!/bin/zsh\nsource /opt/inspekt/.venv/bin/activate\n/opt/inspekt/.venv/bin/inspekt "$@"\n' > /usr/local/bin/inspekt && \
+    chmod +x /usr/local/bin/inspekt
 
 # --- Restricted terminal user ---
 # The terminal runs as this user to prevent system modification
