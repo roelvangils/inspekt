@@ -825,12 +825,15 @@
 
     /**
      * Move to the next focusable element (Tab behavior).
+     * Calls element.focus() to trigger the page's focus management
+     * (including focus traps in modal dialogs).
      */
     moveToNextFocusable() {
       for (let i = this.position + 1; i < this.nodes.length; i++) {
         const node = this.nodes[i];
         if (!node.isExit && this._isFocusable(node.element)) {
           this.position = i;
+          node.element.focus({ preventScroll: true });
           return this._currentResult();
         }
       }
@@ -839,12 +842,14 @@
 
     /**
      * Move to the previous focusable element (Shift+Tab behavior).
+     * Calls element.focus() to trigger the page's focus management.
      */
     moveToPreviousFocusable() {
       for (let i = this.position - 1; i >= 0; i--) {
         const node = this.nodes[i];
         if (!node.isExit && this._isFocusable(node.element)) {
           this.position = i;
+          node.element.focus({ preventScroll: true });
           return this._currentResult();
         }
       }
@@ -1223,6 +1228,20 @@
     SR.liveMonitor.start();
     SR.active = true;
 
+    // Listen for page-driven focus changes (focus traps, skip links, etc.).
+    // When the page's JavaScript calls element.focus(), we detect it and
+    // move our virtual cursor to match — just like real screen readers do.
+    SR._focusHandler = function(e) {
+      if (!SR.active || !SR.cursor) return;
+      const el = e.target;
+      const index = SR.cursor.nodes.findIndex(n => n.element === el && !n.isExit);
+      if (index !== -1 && index !== SR.cursor.position) {
+        SR.cursor.position = index;
+        SR.lastAnnouncement = SR.cursor._currentResult();
+      }
+    };
+    document.addEventListener('focus', SR._focusHandler, true);
+
     // Start from currently focused element if requested
     if (SR.options.startFromFocus) {
       const focused = document.activeElement;
@@ -1248,6 +1267,10 @@
    */
   function stopSimulator() {
     if (SR.liveMonitor) SR.liveMonitor.stop();
+    if (SR._focusHandler) {
+      document.removeEventListener('focus', SR._focusHandler, true);
+      SR._focusHandler = null;
+    }
     SR.active = false;
     SR.engine = null;
     SR.cursor = null;
@@ -1342,9 +1365,16 @@
         break;
       case 'next-focusable':
         result = SR.cursor.moveToNextFocusable();
+        if (!result) {
+          // Focus trap may have moved us — check current position
+          result = SR.cursor._currentResult();
+        }
         break;
       case 'previous-focusable':
         result = SR.cursor.moveToPreviousFocusable();
+        if (!result) {
+          result = SR.cursor._currentResult();
+        }
         break;
       case 'top-of-page':
         result = SR.cursor.moveToTop();
