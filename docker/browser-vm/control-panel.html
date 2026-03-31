@@ -3174,9 +3174,6 @@
                 <svg viewBox="0 0 24 24"><path d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z"/></svg>
                 Restart
             </button>
-            <button onclick="toggleFullscreen()" title="Fullscreen (F)">
-                <svg viewBox="0 0 24 24"><path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/></svg>
-            </button>
         </div>
 
         <div class="status">
@@ -6128,6 +6125,12 @@
         // ──────────────────────────────────────────────────────
         (function setupShiftTabFix() {
             let shiftHeld = false;
+            const _isMac = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
+            // Keys to translate from Cmd to Ctrl on macOS (NOT 'c' — clipboard copy is handled separately)
+            const _CMD_CTRL_KEYS = new Set(['a', 'v', 'x', 'z', 'f', 'r', 's']);
+            const XK_Control_L = 0xFFE3;
+            const XK_Shift_L = 0xFFE1;
+
             // Wait for RFB to be ready, then monkey-patch its keyboard handler
             function attach() {
                 if (!rfb || !rfb._keyboard) { setTimeout(attach, 500); return; }
@@ -6143,16 +6146,14 @@
                     if (e.key === 'Shift') shiftHeld = false;
                 }, true);
 
-                // Monkey-patch noVNC's keyboard event handler to intercept
-                // ALL Tab keys. We must replace the bound handler reference
-                // that's registered as the actual event listener.
+                // Monkey-patch noVNC's keyboard event handler to intercept:
+                // 1. Tab keys (Shift+Tab fix for macOS noVNC bug)
+                // 2. Cmd+key → Ctrl+key translation for macOS users
                 //
-                // Why: noVNC's original handler doesn't generate key repeats
-                // for Tab (holding Tab down doesn't auto-advance focus).
-                // By intercepting Tab and sending explicit sendKey() pairs,
-                // each browser repeat event triggers a full Tab in the VM.
-                // Shift+Tab also needs interception because noVNC on Mac
-                // strips the Shift modifier from Tab during encoding.
+                // Both must live in this handler because it participates in
+                // noVNC's keyboard pipeline — sendKey() calls from here are
+                // proven to work (unlike from document-level handlers which
+                // are outside noVNC's event flow).
                 const kb = rfb._keyboard;
                 const origHandler = kb._eventHandlers.keydown;
                 const patchedHandler = function(e) {
@@ -6164,6 +6165,8 @@
                         e.stopImmediatePropagation();
                         return;
                     }
+
+                    // Tab handling: explicit sendKey for each repeat event
                     if (e.code === 'Tab') {
                         e.preventDefault();
                         e.stopImmediatePropagation();
@@ -6176,6 +6179,33 @@
                         }
                         return;
                     }
+
+                    // macOS Cmd → Ctrl translation: intercept Cmd+key and send
+                    // the Ctrl equivalent to the Linux VM via sendKey().
+                    //
+                    // Critical: noVNC already sent Meta_L (Cmd) keydown to the
+                    // VM when the user first pressed Cmd. We must release Meta
+                    // before sending Ctrl+key, otherwise the VM sees
+                    // Meta+Ctrl+key instead of just Ctrl+key.
+                    if (_isMac && e.metaKey && !e.altKey) {
+                        const key = e.key.toLowerCase();
+                        if (_CMD_CTRL_KEYS.has(key)) {
+                            e.preventDefault();
+                            e.stopImmediatePropagation();
+                            const keysym = key.charCodeAt(0);
+                            // Release Meta that noVNC sent when Cmd was pressed
+                            rfb.sendKey(0xFFE7, 'MetaLeft', false);   // XK_Meta_L up
+                            // Send the Ctrl+key equivalent
+                            rfb.sendKey(XK_Control_L, 'ControlLeft', true);
+                            if (e.shiftKey) rfb.sendKey(XK_Shift_L, 'ShiftLeft', true);
+                            rfb.sendKey(keysym, `Key${key.toUpperCase()}`, true);
+                            rfb.sendKey(keysym, `Key${key.toUpperCase()}`, false);
+                            if (e.shiftKey) rfb.sendKey(XK_Shift_L, 'ShiftLeft', false);
+                            rfb.sendKey(XK_Control_L, 'ControlLeft', false);
+                            return;
+                        }
+                    }
+
                     return origHandler(e);
                 };
                 // Swap the listener: remove old, register new
@@ -6186,6 +6216,28 @@
             }
             attach();
         })();
+
+        // Cmd+L: focus control panel address bar (macOS only).
+        // This is at document level because it doesn't interact with VNC —
+        // the Cmd→Ctrl translation for VNC keys lives in the patched noVNC
+        // keyboard handler above (setupShiftTabFix).
+        // Note: Cmd+T/W cannot be intercepted — Chrome handles them at the
+        // browser level before JavaScript sees them.
+        if (/Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent)) {
+            document.addEventListener('keydown', (e) => {
+                if (!e.metaKey || e.altKey) return;
+                if (e.key.toLowerCase() === 'l') {
+                    const termOverlay = document.getElementById('terminalOverlay');
+                    const inTerminal = termOverlay && termOverlay.classList.contains('open');
+                    const inInput = ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName);
+                    if (inTerminal || inInput || srActive) return;
+                    e.preventDefault();
+                    e.stopImmediatePropagation();
+                    document.getElementById('urlBar')?.focus();
+                    document.getElementById('urlBar')?.select();
+                }
+            }, true);
+        }
 
         // Cmd/Ctrl+C: copy selected text from VM to host clipboard.
         // Must be capture phase — noVNC calls stopPropagation() on all keys,
@@ -6541,7 +6593,13 @@
             document.body.classList.toggle('split-flipped', splitFlipped);
             localStorage.setItem('splitFlipped', splitFlipped);
 
-            // Refit after layout change
+            // Invert ratio so the divider bar stays in place visually —
+            // VNC gets the width the terminal previously had, and vice versa.
+            splitRatio = 1 - splitRatio;
+            document.body.style.setProperty('--split-vnc-width', (splitRatio * 100) + '%');
+            localStorage.setItem('splitRatio', splitRatio);
+
+            // Refit after layout change (VNC ResizeObserver fires automatically)
             requestAnimationFrame(() => {
                 if (fitAddon) {
                     fitAddon.fit();
@@ -7074,58 +7132,56 @@
                     mediaSource.addEventListener('error', reject, { once: true });
                 });
 
-                // Connect to audio WebSocket
+                // Connect to audio WebSocket.
+                // Specify 'binary' subprotocol — websockify requires it for
+                // raw binary data (without it, data may be base64-encoded).
                 const wsUrl = `ws://${VNC_HOST}:${AUDIO_PORT}`;
                 audioSocket = new WebSocket(wsUrl);
                 audioSocket.binaryType = 'arraybuffer';
 
-                audioSocket.addEventListener('open', () => {
-                    // Send handshake
-                    audioSocket.send('CD:opus\nBR:96000\n\n');
-                });
+                audioSocket.addEventListener('open', async () => {
+                    console.log('[Audio] WebSocket connected');
+                    isAudioEnabled = true;
+                    updateAudioButton();
 
-                audioSocket.addEventListener('message', async (event) => {
-                    const data = event.data;
-
-                    // Check for READY response
-                    if (typeof data === 'string' || data instanceof ArrayBuffer && data.byteLength < 20) {
-                        const text = typeof data === 'string' ? data : new TextDecoder().decode(data);
-                        if (text.trim() === 'READY') {
-                            isAudioEnabled = true;
-                            updateAudioButton();
-                            showToast('Audio enabled - click anywhere to start playback', 'success');
-
-                            // Auto-play on user interaction
+                    // Try to play immediately — the user's click on the audio
+                    // button counts as a user gesture for autoplay policy.
+                    audioElement.playbackRate = 1.003; // Slight speedup to reduce drift
+                    try {
+                        await audioElement.play();
+                        console.log('[Audio] Playback started');
+                        showToast('Audio enabled', 'success');
+                    } catch (e) {
+                        if (e.name === 'NotAllowedError') {
+                            // Autoplay blocked — wait for a user click
+                            console.log('[Audio] Autoplay blocked, waiting for click');
+                            showToast('Audio enabled — click anywhere to start playback', 'success');
                             document.body.addEventListener('click', async () => {
                                 try {
-                                    audioElement.playbackRate = 1.003; // Slight speedup to reduce drift
                                     await audioElement.play();
-                                } catch (e) {
-                                    if (e.name !== 'AbortError') {
-                                        console.error('[Audio] Playback error:', e);
-                                    }
+                                    console.log('[Audio] Playback started (after click)');
+                                } catch (err) {
+                                    console.error('[Audio] Playback error:', err);
                                 }
                             }, { capture: true, once: true });
-
-                            return;
-                        }
-                        if (text.startsWith('ERR:')) {
-                            showToast(`Audio error: ${text.substring(4)}`, 'error');
-                            await stopAudio();
-                            return;
+                        } else if (e.name !== 'AbortError') {
+                            console.error('[Audio] Playback error:', e);
                         }
                     }
+                });
 
-                    // Feed audio data
-                    feedAudioData(data);
+                audioSocket.addEventListener('message', (event) => {
+                    feedAudioData(event.data);
                 });
 
                 audioSocket.addEventListener('error', async () => {
+                    console.error('[Audio] WebSocket error');
                     showToast('Audio connection failed', 'error');
                     await stopAudio();
                 });
 
                 audioSocket.addEventListener('close', async () => {
+                    console.log('[Audio] WebSocket closed');
                     if (isAudioEnabled) {
                         showToast('Audio connection closed', 'info');
                         await stopAudio();
@@ -8958,6 +9014,19 @@
                     tabEl.classList.remove('has-theme-color');
                 }
             });
+
+            // Match VNC background to active tab's page color so resize
+            // gaps blend with the page instead of showing black.
+            // Must set rfb.background (the .noVNC_screen div) — that's the
+            // element behind the canvas where the black gaps actually appear.
+            const activeColor = activeTabId ? tabThemeColors[activeTabId] : null;
+            if (rfb) {
+                rfb.background = activeColor || '';
+            }
+            const vncEl = document.getElementById('vncContainer');
+            if (vncEl) {
+                vncEl.style.backgroundColor = activeColor || '';
+            }
         }
 
         // Render tabs in the tab bar (smart update to avoid flicker)
@@ -9661,6 +9730,7 @@
                 { label: 'Duplicate Tab', action: () => duplicateTab(tabId) },
                 { separator: true },
                 { label: 'Open in Host Browser', action: () => openInHostBrowser(tabId) },
+                { label: 'Open Fullscreen', action: () => toggleFullscreen() },
                 { separator: true },
                 { label: 'Close Tab', action: () => closeTab(tabId), disabled: tabs.length <= 1 },
                 { label: 'Close Other Tabs', action: () => closeOtherTabs(tabId), disabled: tabs.length <= 1 },
@@ -9992,10 +10062,17 @@
 
             const container = document.getElementById('vncContainer');
 
+            // Debounce guard: Safari may fire both mouse and pointer events for
+            // the same right-click, which could double-trigger the context menu.
+            let _lastContextMenuTime = 0;
+
             // Right-click: always intercept to show custom context menu
             container.addEventListener('contextmenu', (e) => {
                 e.preventDefault();
                 e.stopImmediatePropagation();
+                const now = Date.now();
+                if (now - _lastContextMenuTime < 200) return;
+                _lastContextMenuTime = now;
                 if (isHoverInspectActive) deactivateHoverInspect();
                 const vm = _clientToVm(e.clientX, e.clientY);
                 showVNCContextMenu(e.clientX, e.clientY, vm.x, vm.y);
@@ -10028,6 +10105,39 @@
             }, true);
 
             container.addEventListener('pointerup', (e) => {
+                if (e.button === 2) {
+                    e.preventDefault();
+                    e.stopImmediatePropagation();
+                }
+            }, true);
+
+            // Safari fallback: Safari may not reliably fire pointerdown/pointerup
+            // with button===2 on canvas elements. Mirror the pointer handlers with
+            // mouse event equivalents so right-click interception works cross-browser.
+            container.addEventListener('mousedown', (e) => {
+                if (e.button === 2) {
+                    e.preventDefault();
+                    e.stopImmediatePropagation();
+                    return;
+                }
+                if (isHoverInspectActive && e.button === 0) {
+                    e.preventDefault();
+                    e.stopImmediatePropagation();
+                    const vm = _clientToVm(e.clientX, e.clientY);
+                    _handleHoverLock(vm.x, vm.y);
+                    return;
+                }
+                if (e.button === 0) {
+                    if (activeContextMenu) dismissContextMenu();
+                    if (_inspectTrackingActive && activeTabId) {
+                        _tabInspectState[activeTabId] = { wasTracking: false };
+                    }
+                    _stopInspectTracking();
+                    vncOverlay.dismissAll(true);
+                }
+            }, true);
+
+            container.addEventListener('mouseup', (e) => {
                 if (e.button === 2) {
                     e.preventDefault();
                     e.stopImmediatePropagation();

@@ -26,6 +26,11 @@ A complete browser testing environment in Docker: Chromium with visual access vi
 - **Fast boot**: ~3-5 seconds to full browser
 - **Configurable**: Resolution, theme, home URL via env vars
 
+## Requirements
+
+- **Docker** (Docker Desktop or Docker Engine)
+- **Browser**: Google Chrome (recommended). The control panel uses advanced web APIs (WebSocket RFB, capture-phase pointer events, MediaSource) that are tested and optimized for Chrome. Safari has known issues (see [#11](https://github.com/roelvangils/inspekt/issues/11)).
+
 ## Quick Start
 
 ### Using the CLI (Recommended)

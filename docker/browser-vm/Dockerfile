@@ -252,6 +252,7 @@ COPY docker/browser-vm/xorg.conf /etc/X11/xorg.conf
 COPY docker/browser-vm/resize-display.sh /opt/resize-display.sh
 COPY docker/browser-vm/download.sh /usr/local/bin/download
 COPY docker/browser-vm/audio-proxy.sh /opt/audio-proxy.sh
+COPY docker/browser-vm/audio-server.py /opt/audio-server.py
 COPY docker/browser-vm/pulse-config.pa /etc/pulse/default.pa
 
 # Shell config with inspekt completion
