@@ -3115,7 +3115,7 @@
                 <div style="display: flex; flex-direction: column; gap: 4px; padding-top: 6px; border-top: 1px solid rgba(255,255,255,0.06); width: 100%;">
                     <label><input type="checkbox" id="srStartFromFocus" checked> Start from focus</label>
                     <label><input type="checkbox" id="srSyncFocus"> Sync browser focus</label>
-                    <label><input type="checkbox" id="srSyncMouse"> Mouse follows cursor</label>
+                    <label><input type="checkbox" id="srSyncMouse"> Mouse moves SR focus</label>
                 </div>
             </div>
         </div>
@@ -5730,6 +5730,11 @@
                 // Start resolution polling for coordinate mapping
                 startSRResolutionPolling();
 
+                // Start mouse tracking if enabled
+                if (document.getElementById('srSyncMouse').checked) {
+                    startSRMouseTracking();
+                }
+
                 // Update UI
                 document.getElementById('srBtn').classList.add('sr-active');
                 document.getElementById('srCaptions').style.display = 'flex';
@@ -5762,6 +5767,7 @@
             srScreenReader = null;
             srPreviousAnnouncement = '';
             stopSRResolutionPolling();
+            stopSRMouseTracking();
 
             // Hide UI
             document.getElementById('srBtn').classList.remove('sr-active');
@@ -5775,9 +5781,69 @@
             showToast('Screen reader simulation ended');
         }
 
+        // ── Mouse moves SR focus ─────────────────────────────
+        // When enabled, hovering over elements in the VNC canvas
+        // moves the SR cursor to that element and announces it.
+        // Mirrors VoiceOver's "Moves VoiceOver cursor" option.
+        // ──────────────────────────────────────────────────────
+        let _srMouseHandler = null;
+        let _srMouseDebounce = null;
+
+        function startSRMouseTracking() {
+            const canvas = document.querySelector('#vncContainer canvas');
+            if (!canvas) return;
+
+            _srMouseHandler = function(e) {
+                if (!srActive) return;
+
+                // Debounce: max 5 calls/second
+                if (_srMouseDebounce) return;
+                _srMouseDebounce = setTimeout(() => { _srMouseDebounce = null; }, 200);
+
+                const vm = _clientToVm(e.clientX, e.clientY);
+                if (!vm) return;
+
+                fetch(`http://${VNC_HOST}:${CONTROL_PORT}/sr/navigate`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'point-at', params: { x: vm.x, y: vm.y } })
+                })
+                .then(r => r.json())
+                .then(result => {
+                    if (result.ok && result.announcement) {
+                        updateSRUI(result);
+                        if (document.getElementById('srTTSCheckbox').checked) {
+                            fetch(`http://${VNC_HOST}:${CONTROL_PORT}/sr/speak`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ text: result.announcement, lang: result.language || 'en' })
+                            }).catch(() => {});
+                        }
+                    }
+                })
+                .catch(() => {});
+            };
+
+            canvas.addEventListener('mousemove', _srMouseHandler);
+        }
+
+        function stopSRMouseTracking() {
+            if (_srMouseHandler) {
+                const canvas = document.querySelector('#vncContainer canvas');
+                if (canvas) canvas.removeEventListener('mousemove', _srMouseHandler);
+                _srMouseHandler = null;
+            }
+            if (_srMouseDebounce) {
+                clearTimeout(_srMouseDebounce);
+                _srMouseDebounce = null;
+            }
+        }
+
         // Navigate (called by keyboard handler)
+        let _srNavigating = false;
         async function srNavigate(action, params) {
-            if (!srActive) return;
+            if (!srActive || _srNavigating) return;
+            _srNavigating = true;
 
             try {
                 const response = await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/sr/navigate`, {
@@ -5818,6 +5884,8 @@
                 }
             } catch (e) {
                 console.error('SR navigate error:', e);
+            } finally {
+                _srNavigating = false;
             }
         }
 

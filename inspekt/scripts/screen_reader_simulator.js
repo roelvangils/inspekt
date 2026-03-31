@@ -829,13 +829,27 @@
      * (including focus traps in modal dialogs).
      */
     moveToNextFocusable() {
+      SR._srNavigating = true;
       for (let i = this.position + 1; i < this.nodes.length; i++) {
         const node = this.nodes[i];
         if (!node.isExit && this._isFocusable(node.element)) {
           this.position = i;
           node.element.focus({ preventScroll: true });
+          SR._srNavigating = false;
           return this._currentResult();
         }
+      }
+      SR._srNavigating = false;
+      // No more focusable elements in our list.
+      // Dispatch a real Tab keydown on the current element to trigger
+      // any focus traps (their JS listens for keydown, not focus).
+      // The focus handler (with _srNavigating = false) will detect
+      // where the page's trap sends focus and update our position.
+      const current = this.nodes[this.position];
+      if (current && current.element) {
+        current.element.dispatchEvent(new KeyboardEvent('keydown', {
+          key: 'Tab', code: 'Tab', keyCode: 9, bubbles: true, cancelable: true,
+        }));
       }
       return null;
     }
@@ -845,13 +859,23 @@
      * Calls element.focus() to trigger the page's focus management.
      */
     moveToPreviousFocusable() {
+      SR._srNavigating = true;
       for (let i = this.position - 1; i >= 0; i--) {
         const node = this.nodes[i];
         if (!node.isExit && this._isFocusable(node.element)) {
           this.position = i;
           node.element.focus({ preventScroll: true });
+          SR._srNavigating = false;
           return this._currentResult();
         }
+      }
+      SR._srNavigating = false;
+      // Dispatch Shift+Tab to trigger reverse focus trap
+      const current = this.nodes[this.position];
+      if (current && current.element) {
+        current.element.dispatchEvent(new KeyboardEvent('keydown', {
+          key: 'Tab', code: 'Tab', keyCode: 9, shiftKey: true, bubbles: true, cancelable: true,
+        }));
       }
       return null;
     }
@@ -1231,8 +1255,12 @@
     // Listen for page-driven focus changes (focus traps, skip links, etc.).
     // When the page's JavaScript calls element.focus(), we detect it and
     // move our virtual cursor to match — just like real screen readers do.
+    // We use _srNavigating flag to ignore focus events that WE triggered
+    // (via element.focus() in moveToNextFocusable) — only follow focus
+    // changes from the PAGE's own JavaScript (focus traps, skip links, etc.).
+    SR._srNavigating = false;
     SR._focusHandler = function(e) {
-      if (!SR.active || !SR.cursor) return;
+      if (!SR.active || !SR.cursor || SR._srNavigating) return;
       const el = e.target;
       const index = SR.cursor.nodes.findIndex(n => n.element === el && !n.isExit);
       if (index !== -1 && index !== SR.cursor.position) {
