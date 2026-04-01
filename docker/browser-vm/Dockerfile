@@ -165,6 +165,49 @@ RUN apk add --no-cache --virtual .build-deps \
     rm -f /usr/local/bin/cc /usr/local/bin/c++ && \
     apk del .build-deps
 
+# ── Phase 1b: Stub out mitmproxy-linux (must be its own layer) ──
+# mitmproxy-linux is the eBPF transparent proxy redirector — NOT needed since we use
+# --mode regular with Chromium's --proxy-server flag. It requires bpf-linker (eBPF
+# toolchain) which is impractical to build on Alpine.
+#
+# Both mitmproxy-rs AND mitmproxy depend on mitmproxy-linux==0.12.9 on Linux.
+# By installing this stub in a committed layer BEFORE pip resolves those packages,
+# pip sees the dependency as already satisfied and skips the download/build.
+RUN mkdir -p /tmp/mitmproxy-linux-stub/mitmproxy_linux && \
+    printf '[project]\nname = "mitmproxy-linux"\nversion = "0.12.9"\n' \
+        > /tmp/mitmproxy-linux-stub/pyproject.toml && \
+    printf '"""Stub: eBPF transparent proxy not needed in regular proxy mode."""\n' \
+        > /tmp/mitmproxy-linux-stub/mitmproxy_linux/__init__.py && \
+    /opt/inspekt/.venv/bin/pip install --no-cache-dir /tmp/mitmproxy-linux-stub && \
+    rm -rf /tmp/mitmproxy-linux-stub
+
+# ── Phase 1c: Install mitmproxy (compiled deps + core in one shot) ──
+# mitmproxy-rs and aioquic need Rust/C compilation on Alpine/aarch64.
+# Uses rustup for Rust >= 1.85 (Alpine's Rust 1.83 is too old for edition2024).
+# The stub mitmproxy-linux from the previous layer satisfies that dependency.
+# Build tools are installed and removed in the same layer to keep image small.
+RUN apk add --no-cache --virtual .mitmproxy-build-deps \
+        gcc g++ make python3-dev musl-dev libffi-dev openssl-dev curl && \
+    ln -sf /usr/bin/gcc /usr/local/bin/cc && \
+    ln -sf /usr/bin/g++ /usr/local/bin/c++ && \
+    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal && \
+    export PATH="/root/.cargo/bin:$PATH" && \
+    /opt/inspekt/.venv/bin/pip install --no-cache-dir mitmproxy && \
+    rm -f /usr/local/bin/cc /usr/local/bin/c++ && \
+    rustup self uninstall -y && \
+    rm -rf /root/.cargo /root/.rustup && \
+    apk del .mitmproxy-build-deps
+
+# Generate mitmproxy CA certificate and trust it system-wide + in Chromium's NSS database.
+# We run mitmdump briefly to auto-generate the CA key pair in /root/.mitmproxy/,
+# then install the CA cert using the same pattern as the existing mkcert setup.
+RUN /opt/inspekt/.venv/bin/mitmdump --set confdir=/root/.mitmproxy -p 0 & \
+    sleep 2 && kill %1 2>/dev/null; \
+    cp /root/.mitmproxy/mitmproxy-ca-cert.pem /usr/local/share/ca-certificates/mitmproxy-ca.crt && \
+    update-ca-certificates && \
+    certutil -d sql:/root/.pki/nssdb -A -t "C,," -n "mitmproxy CA" \
+             -i /root/.mitmproxy/mitmproxy-ca-cert.pem
+
 # ── Phase 2: Copy source code (changes frequently, but deps are cached) ──
 COPY inspekt /opt/inspekt/inspekt
 COPY extensions /opt/inspekt/extensions
@@ -204,15 +247,18 @@ RUN for cmd in eval exec repl plugin yolo domain vm do mcp autostart; do \
         rm -f /opt/inspekt/commands/$cmd; \
     done
 
+# Copy proxy-scripts early (needed by allowed-bin setup below)
+COPY docker/browser-vm/proxy-scripts /opt/proxy-scripts
+
 # 2) Allowed system utilities — curated symlinks
 #    Removed dangerous utils: awk (system()), env (exec), less (!sh escape),
 #    xargs (runs commands), chmod (makes scripts executable)
 RUN mkdir -p /opt/inspekt/allowed-bin && \
     for cmd in \
         ls cat pwd mkdir touch rm cp mv \
-        head tail more grep wc sort uniq tr \
+        head tail more grep wc sort uniq tr diff \
         echo date file stat basename dirname realpath uname \
-        clear whoami which tee \
+        clear whoami which tee tree cal ps \
         curl jq sed; do \
         for dir in /usr/bin /bin; do \
             [ -x "$dir/$cmd" ] && ln -sf "$dir/$cmd" /opt/inspekt/allowed-bin/$cmd && break; \
@@ -224,11 +270,50 @@ RUN mkdir -p /opt/inspekt/allowed-bin && \
         > /opt/inspekt/allowed-bin/lightningcss && chmod +x /opt/inspekt/allowed-bin/lightningcss && \
     printf '#!/bin/zsh\nPATH=/usr/bin:/usr/local/bin:$PATH /usr/local/bin/prettier "$@"\n' \
         > /opt/inspekt/allowed-bin/prettier && chmod +x /opt/inspekt/allowed-bin/prettier && \
+    # macOS-style clipboard commands (delegate to xclip with DISPLAY for X11)
+    printf '#!/bin/zsh\nDISPLAY=:0 /usr/bin/xclip -selection clipboard\n' \
+        > /opt/inspekt/allowed-bin/pbcopy && chmod +x /opt/inspekt/allowed-bin/pbcopy && \
+    printf '#!/bin/zsh\nDISPLAY=:0 /usr/bin/xclip -selection clipboard -o\n' \
+        > /opt/inspekt/allowed-bin/pbpaste && chmod +x /opt/inspekt/allowed-bin/pbpaste && \
     # Restricted env wrapper: only allows setting VAR=VALUE before running an allowed command.
     # Needed by Click's shell completion (generates: env COMP_WORDS=... inspekt).
     # Blocks: env /usr/bin/python3, env node, etc.
     printf '#!/bin/zsh\nlocal -a env_args\nwhile [[ "$1" == *=* ]]; do env_args+=("$1"); shift; done\ncmd="$1"\nif [[ -z "$cmd" ]]; then /usr/bin/env "${env_args[@]}"; exit; fi\nif [[ -x "/opt/inspekt/commands/$cmd" || -x "/opt/inspekt/allowed-bin/$cmd" ]]; then\n  /usr/bin/env "${env_args[@]}" "$@"\nelse\n  echo "env: not permitted to run: $cmd" >&2; exit 1\nfi\n' \
-        > /opt/inspekt/allowed-bin/env && chmod +x /opt/inspekt/allowed-bin/env
+        > /opt/inspekt/allowed-bin/env && chmod +x /opt/inspekt/allowed-bin/env && \
+    # ── macOS-feel commands ──────────────────────────────────────────────
+    # open: macOS-compatible URL opener (supports -n for new tab, -g for background)
+    cp /opt/proxy-scripts/open /opt/inspekt/allowed-bin/open && \
+    chmod +x /opt/inspekt/allowed-bin/open && \
+    # screencapture: wrapper around inspekt screenshot
+    printf '#!/bin/zsh\nfull=""\nfilename=""\nwhile [[ $# -gt 0 ]]; do\n  case "$1" in\n    -f) full="--full-page"; shift ;;\n    -*) echo "screencapture: unknown option $1" >&2; exit 1 ;;\n    *) filename="$1"; shift ;;\n  esac\ndone\n/opt/inspekt/.venv/bin/inspekt screenshot $full ${filename:+--output "$filename"}\n' \
+        > /opt/inspekt/allowed-bin/screencapture && chmod +x /opt/inspekt/allowed-bin/screencapture && \
+    # say: text-to-speech via control server
+    printf '#!/bin/zsh\nif [[ -z "$*" ]]; then echo "Usage: say <text>" >&2; exit 1; fi\ncurl -sf -X POST http://localhost:8888/sr/speak \\\n  -H "Content-Type: application/json" \\\n  -d "{\"text\": $(printf '\''%%s'\'' "$*" | jq -Rs .)}" > /dev/null 2>&1\nif [[ $? -ne 0 ]]; then\n  echo "say: text-to-speech is not available in this VM session" >&2\n  exit 1\nfi\n' \
+        > /opt/inspekt/allowed-bin/say && chmod +x /opt/inspekt/allowed-bin/say && \
+    # sw_vers: macOS-style version info
+    printf '#!/bin/zsh\nv=$(/opt/inspekt/.venv/bin/inspekt --version 2>/dev/null | head -1)\necho "ProductName:       Inspekt Browser VM"\necho "ProductVersion:    ${v:-unknown}"\necho "BuildVersion:      Alpine $(cat /etc/alpine-release 2>/dev/null || echo unknown)"\necho "KernelVersion:     $(uname -r)"\n' \
+        > /opt/inspekt/allowed-bin/sw_vers && chmod +x /opt/inspekt/allowed-bin/sw_vers && \
+    # ── Friendly stubs for unavailable commands ──────────────────────────
+    printf '#!/bin/zsh\necho "The VM never sleeps — no need for caffeinate." >&2\n' \
+        > /opt/inspekt/allowed-bin/caffeinate && chmod +x /opt/inspekt/allowed-bin/caffeinate && \
+    printf '#!/bin/zsh\necho "ping: network access is restricted in the VM." >&2\necho "  Use \`curl -I <url>\` to test HTTP endpoints." >&2\nexit 1\n' \
+        > /opt/inspekt/allowed-bin/ping && chmod +x /opt/inspekt/allowed-bin/ping && \
+    printf '#!/bin/zsh\necho "ssh: not available in the VM terminal." >&2\necho "  Use \`inspekt\` commands to interact with web pages." >&2\nexit 1\n' \
+        > /opt/inspekt/allowed-bin/ssh && chmod +x /opt/inspekt/allowed-bin/ssh && \
+    printf '#!/bin/zsh\necho "scp: file transfer is not available in the VM." >&2\necho "  Use the Downloads panel to export files." >&2\nexit 1\n' \
+        > /opt/inspekt/allowed-bin/scp && chmod +x /opt/inspekt/allowed-bin/scp && \
+    printf '#!/bin/zsh\necho "$(basename $0): text editors are not available in the VM." >&2\necho "  Use \`cat\` to view files or \`echo > file\` to write." >&2\nexit 1\n' \
+        > /opt/inspekt/allowed-bin/nano && chmod +x /opt/inspekt/allowed-bin/nano && \
+    ln -sf /opt/inspekt/allowed-bin/nano /opt/inspekt/allowed-bin/vim && \
+    ln -sf /opt/inspekt/allowed-bin/nano /opt/inspekt/allowed-bin/vi && \
+    printf '#!/bin/zsh\necho "$(basename $0): package installation is not available in the VM." >&2\necho "  The tools you need are pre-installed." >&2\nexit 1\n' \
+        > /opt/inspekt/allowed-bin/brew && chmod +x /opt/inspekt/allowed-bin/brew && \
+    printf '#!/bin/zsh\necho "sudo: you don'\''t need sudo in the VM." >&2\necho "  inspekt commands already have the access they need." >&2\necho "  Try running your command without sudo." >&2\nexit 1\n' \
+        > /opt/inspekt/allowed-bin/sudo && chmod +x /opt/inspekt/allowed-bin/sudo && \
+    printf '#!/bin/zsh\necho "top: not available. Use \`uptime\` for system load or \`ps\` for processes." >&2\nexit 1\n' \
+        > /opt/inspekt/allowed-bin/top && chmod +x /opt/inspekt/allowed-bin/top && \
+    printf '#!/bin/zsh\nif [[ -n "$1" ]]; then\n  if [[ -x "/opt/inspekt/commands/$1" ]]; then\n    /opt/inspekt/.venv/bin/inspekt "$1" --help\n  else\n    echo "No manual entry for $1" >&2\n    echo "  Try: inspekt --help" >&2\n  fi\nelse\n  echo "Use \`inspekt <command> --help\` for documentation." >&2\n  echo "  Example: inspekt screenshot --help" >&2\nfi\n' \
+        > /opt/inspekt/allowed-bin/man && chmod +x /opt/inspekt/allowed-bin/man
 
 # Inspekt config must be copied before the permissions step that copies it to /home/inspekt
 COPY docker/browser-vm/inspekt-config.json /root/.config/inspekt.json
@@ -259,6 +344,7 @@ COPY docker/browser-vm/download.sh /usr/local/bin/download
 COPY docker/browser-vm/audio-proxy.sh /opt/audio-proxy.sh
 COPY docker/browser-vm/audio-server.py /opt/audio-server.py
 COPY docker/browser-vm/pulse-config.pa /etc/pulse/default.pa
+COPY docker/browser-vm/proxy-scripts /opt/proxy-scripts
 
 # Shell config with inspekt completion
 COPY docker/browser-vm/bashrc /root/.bashrc

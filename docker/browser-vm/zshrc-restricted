@@ -66,19 +66,21 @@ command() {
 #   - chmod o-x on interpreters (python3, node, env, etc.)
 #   - iptables blocking outbound traffic
 # this provides defense-in-depth without breaking zsh internals.
-_restricted_msg() { echo "Not available in the restricted terminal." >&2; return 1; }
-python3()  { _restricted_msg; }
-python()   { _restricted_msg; }
-node()     { _restricted_msg; }
-wget()     { _restricted_msg; }
-sh()       { _restricted_msg; }
-bash()     { _restricted_msg; }
-ash()      { _restricted_msg; }
-apt()      { _restricted_msg; }
-apk()      { _restricted_msg; }
-pip()      { _restricted_msg; }
-pip3()     { _restricted_msg; }
-npm()      { _restricted_msg; }
+_interpreter_msg() { echo "$1: interpreters are not available in the VM terminal for security reasons." >&2; return 1; }
+_pkg_msg()         { echo "$1: package installation is not available. The tools you need are pre-installed." >&2; return 1; }
+_shell_msg()       { echo "$1: alternative shells are not available. Use the current zsh session." >&2; return 1; }
+python3()  { _interpreter_msg python3; }
+python()   { _interpreter_msg python; }
+node()     { _interpreter_msg node; }
+wget()     { echo "wget: not available. Use \`curl\` instead." >&2; return 1; }
+sh()       { _shell_msg sh; }
+bash()     { _shell_msg bash; }
+ash()      { _shell_msg ash; }
+apt()      { _pkg_msg apt; }
+apk()      { _pkg_msg apk; }
+pip()      { _pkg_msg pip; }
+pip3()     { _pkg_msg pip3; }
+npm()      { _pkg_msg npm; }
 
 # Dynamic prompt (domain from active tab, same as root shell)
 _INSPEKT_DOMAIN_FILE="/tmp/.inspekt_domain"

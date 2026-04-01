@@ -1,0 +1,63 @@
+#!/bin/zsh
+# open — macOS-compatible URL opener for the Inspekt Browser VM
+# Supports: open <url>, open -n <url> (new tab), open -g <url> (background)
+
+new_tab=false
+background=false
+url=""
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        -n|--new)        new_tab=true; shift ;;
+        -g|--background) background=true; shift ;;
+        -u|--url)        shift; url="$1"; shift ;;
+        -h|--help)
+            echo "Usage: open [-n] [-g] [-u URL] <url>"
+            echo ""
+            echo "Opens a URL in the VM browser."
+            echo ""
+            echo "Options:"
+            echo "  -n, --new          Open in a new tab"
+            echo "  -g, --background   Open in background (don't switch to tab)"
+            echo "  -u, --url URL      Explicitly specify URL"
+            echo ""
+            echo "Examples:"
+            echo "  open https://example.com"
+            echo "  open example.com"
+            echo "  open -n https://example.com    # new tab"
+            echo "  open -g -n https://example.com # new background tab"
+            exit 0
+            ;;
+        -*)
+            echo "open: unrecognized option '$1'" >&2
+            echo "Usage: open [-n] [-g] [-u URL] <url>" >&2
+            exit 1
+            ;;
+        *)
+            url="$1"; shift ;;
+    esac
+done
+
+if [[ -z "$url" ]]; then
+    echo "Usage: open [-n] [-g] [-u URL] <url>" >&2
+    exit 1
+fi
+
+# Auto-prepend https:// if no scheme given
+if [[ "$url" != http://* && "$url" != https://* && "$url" != *://* ]]; then
+    url="https://$url"
+fi
+
+encoded=$(printf '%s' "$url" | jq -sRr @uri)
+
+if $new_tab; then
+    result=$(curl -sf "http://localhost:8888/tabs/new?url=$encoded" 2>/dev/null)
+    if $background; then
+        echo "Opened $url in a background tab"
+    else
+        echo "Opened $url in a new tab"
+    fi
+else
+    curl -sf "http://localhost:8888/navigate?url=$encoded" > /dev/null
+    echo "Navigating to $url"
+fi
