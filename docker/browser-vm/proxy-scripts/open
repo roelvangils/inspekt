@@ -1,9 +1,10 @@
 #!/bin/zsh
 # open — macOS-compatible URL opener for the Inspekt Browser VM
-# Supports: open <url>, open -n <url> (new tab), open -g <url> (background)
+# Uses the control server API for reliable navigation (no bridge dependency)
 
 new_tab=false
 background=false
+wait_flag=""
 url=""
 
 while [[ $# -gt 0 ]]; do
@@ -11,6 +12,7 @@ while [[ $# -gt 0 ]]; do
         -n|--new)        new_tab=true; shift ;;
         -g|--background) background=true; shift ;;
         -u|--url)        shift; url="$1"; shift ;;
+        --wait)          wait_flag="--wait"; shift ;;
         -h|--help)
             echo "Usage: open [-n] [-g] [-u URL] <url>"
             echo ""
@@ -22,10 +24,10 @@ while [[ $# -gt 0 ]]; do
             echo "  -u, --url URL      Explicitly specify URL"
             echo ""
             echo "Examples:"
-            echo "  open https://example.com"
             echo "  open example.com"
-            echo "  open -n https://example.com    # new tab"
-            echo "  open -g -n https://example.com # new background tab"
+            echo "  open https://example.com"
+            echo "  open -n example.com          # new tab"
+            echo "  open -g -n example.com       # new background tab"
             exit 0
             ;;
         -*)
@@ -52,12 +54,18 @@ encoded=$(printf '%s' "$url" | jq -sRr @uri)
 
 if $new_tab; then
     result=$(curl -sf "http://localhost:8888/tabs/new?url=$encoded" 2>/dev/null)
+    if [[ $? -ne 0 ]]; then
+        echo "open: failed to open new tab" >&2; exit 1
+    fi
     if $background; then
         echo "Opened $url in a background tab"
     else
         echo "Opened $url in a new tab"
     fi
 else
-    curl -sf "http://localhost:8888/navigate?url=$encoded" > /dev/null
+    result=$(curl -sf "http://localhost:8888/navigate?url=$encoded" 2>/dev/null)
+    if [[ $? -ne 0 ]]; then
+        echo "open: failed to navigate" >&2; exit 1
+    fi
     echo "Navigating to $url"
 fi

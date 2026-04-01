@@ -281,9 +281,10 @@ RUN mkdir -p /opt/inspekt/allowed-bin && \
     printf '#!/bin/zsh\nlocal -a env_args\nwhile [[ "$1" == *=* ]]; do env_args+=("$1"); shift; done\ncmd="$1"\nif [[ -z "$cmd" ]]; then /usr/bin/env "${env_args[@]}"; exit; fi\nif [[ -x "/opt/inspekt/commands/$cmd" || -x "/opt/inspekt/allowed-bin/$cmd" ]]; then\n  /usr/bin/env "${env_args[@]}" "$@"\nelse\n  echo "env: not permitted to run: $cmd" >&2; exit 1\nfi\n' \
         > /opt/inspekt/allowed-bin/env && chmod +x /opt/inspekt/allowed-bin/env && \
     # ── macOS-feel commands ──────────────────────────────────────────────
-    # open: macOS-compatible URL opener (supports -n for new tab, -g for background)
-    cp /opt/proxy-scripts/open /opt/inspekt/allowed-bin/open && \
-    chmod +x /opt/inspekt/allowed-bin/open && \
+    # open: macOS-compatible URL opener (replaces auto-generated inspekt open wrapper)
+    # Placed in commands/ to take priority; adds auto-https and -n/-g flags
+    cp /opt/proxy-scripts/open /opt/inspekt/commands/open && \
+    chmod +x /opt/inspekt/commands/open && \
     # screencapture: wrapper around inspekt screenshot
     printf '#!/bin/zsh\nfull=""\nfilename=""\nwhile [[ $# -gt 0 ]]; do\n  case "$1" in\n    -f) full="--full-page"; shift ;;\n    -*) echo "screencapture: unknown option $1" >&2; exit 1 ;;\n    *) filename="$1"; shift ;;\n  esac\ndone\n/opt/inspekt/.venv/bin/inspekt screenshot $full ${filename:+--output "$filename"}\n' \
         > /opt/inspekt/allowed-bin/screencapture && chmod +x /opt/inspekt/allowed-bin/screencapture && \
