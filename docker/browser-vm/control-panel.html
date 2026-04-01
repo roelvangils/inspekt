@@ -534,6 +534,80 @@
             font-size: 12px;
         }
 
+        .plugin-section-header {
+            font-size: 10px;
+            font-weight: 600;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            padding: 8px 14px 2px;
+        }
+
+        .plugin-section-header:not(:first-child) {
+            border-top: 1px solid var(--divider);
+            margin-top: 4px;
+            padding-top: 10px;
+        }
+
+        .plugin-config-inline {
+            padding: 4px 14px 8px 42px;
+            display: none;
+        }
+
+        .plugin-config-inline.open {
+            display: block;
+        }
+
+        .plugin-config-inline textarea {
+            width: 100%;
+            min-height: 48px;
+            max-height: 120px;
+            background: var(--bg-btn);
+            border: 1px solid var(--divider);
+            border-radius: 4px;
+            color: var(--text);
+            font-family: 'SF Mono', 'Menlo', monospace;
+            font-size: 10px;
+            padding: 6px 8px;
+            resize: vertical;
+            outline: none;
+        }
+
+        .plugin-config-inline textarea:focus {
+            border-color: var(--accent);
+        }
+
+        .plugin-config-inline .config-actions {
+            display: flex;
+            gap: 6px;
+            margin-top: 4px;
+            justify-content: flex-end;
+        }
+
+        .plugin-config-inline .config-actions button {
+            font-size: 10px;
+            padding: 2px 8px;
+            border-radius: 3px;
+            border: 1px solid var(--divider);
+            background: var(--bg-btn);
+            color: var(--text);
+            cursor: pointer;
+        }
+
+        .plugin-config-inline .config-actions button.apply {
+            background: var(--accent);
+            border-color: var(--accent);
+            color: #fff;
+        }
+
+        .plugin-action-btn.config-btn {
+            color: var(--text-dim);
+        }
+
+        .plugin-action-btn.config-btn.has-config {
+            color: var(--accent);
+        }
+
         /* URL Bar */
         .url-bar {
             width: 100%;
@@ -962,6 +1036,32 @@
             color: white;
         }
 
+        /* Pinned tabs: icon-only, fixed small width */
+        .tab.tab-pinned {
+            min-width: 36px;
+            max-width: 36px;
+            padding: 6px;
+            justify-content: center;
+        }
+
+        .tab.tab-pinned .tab-title {
+            display: none;
+        }
+
+        .tab.tab-pinned .tab-close {
+            display: none;
+        }
+
+        /* Separator between pinned and unpinned tabs */
+        .tab-pin-separator {
+            width: 1px;
+            height: 20px;
+            background: var(--divider);
+            margin: 0 6px;
+            flex-shrink: 0;
+            align-self: center;
+        }
+
         .new-tab-btn {
             width: 28px;
             height: 28px;
@@ -1075,6 +1175,48 @@
             opacity: 0.4;
             cursor: default;
         }
+        /* Checkbox menu items (e.g. reload clearing options) */
+        .context-menu [role="menuitemcheckbox"] {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 5px 12px 5px 20px;
+            color: var(--text);
+            cursor: pointer;
+            border: none;
+            background: none;
+            width: 100%;
+            text-align: left;
+            font: inherit;
+            font-size: 12px;
+        }
+
+        .context-menu [role="menuitemcheckbox"]:hover,
+        .context-menu [role="menuitemcheckbox"]:focus-visible {
+            background: var(--bg-btn-hover);
+            color: var(--text-bright);
+            border-radius: 0 !important;
+            outline: none;
+        }
+
+        .context-menu .check-icon {
+            width: 14px;
+            height: 14px;
+            flex-shrink: 0;
+            border: 1.5px solid var(--text-dim);
+            border-radius: 3px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.12s ease;
+        }
+
+        .context-menu [role="menuitemcheckbox"][aria-checked="true"] .check-icon {
+            background: var(--accent);
+            border-color: var(--accent);
+            color: white;
+        }
+
         .context-menu-nav button svg {
             width: 16px;
             height: 16px;
@@ -2213,7 +2355,7 @@
             justify-content: center;
             background: transparent;
             border: none;
-            color: var(--text-dim);
+            color: var(--text);
             cursor: pointer;
             transition: all 0.15s ease;
             margin-left: 8px;
@@ -3030,7 +3172,9 @@
             background: rgba(255, 255, 255, 0.5);
             border-radius: 4px;
             cursor: default;
-            transition: background 0.15s ease, top 0.15s ease, border-radius 0.15s ease;
+            transition: background 0.15s ease, top 0.15s ease, border-radius 0.15s ease, box-shadow 0.15s ease;
+            /* Dark inset outline ensures visibility over light page sections */
+            box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.3);
         }
 
         .virtual-scrollbar.vertical:hover .scrollbar-thumb,
@@ -3055,6 +3199,8 @@
         /* Light pages: dark thumb for contrast */
         .virtual-scrollbar.light-page .scrollbar-thumb {
             background: rgba(0, 0, 0, 0.5);
+            /* Light inset outline ensures visibility over dark page sections */
+            box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.3);
         }
         .virtual-scrollbar.light-page .scrollbar-thumb:hover {
             background: rgba(0, 0, 0, 0.6);
@@ -4552,12 +4698,27 @@
                 return;
             }
 
+            // Honor per-tab reload options (clear cache/cookies/storage)
+            const activeTab = tabs.find(t => t.id === activeTabId);
+            const opts = activeTab ? getReloadOptions(activeTab.url) : { clearCache: false, clearCookies: false, clearStorage: false };
+            const params = new URLSearchParams({ tab: activeTabId });
+            if (opts.clearCache) params.append('clearCache', '1');
+            if (opts.clearCookies) params.append('clearCookies', '1');
+            if (opts.clearStorage) params.append('clearStorage', '1');
+
             startLoading(currentUrl);
             try {
-                const response = await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/reload-page?tab=${activeTabId}`);
+                const response = await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/reload-page?${params.toString()}`);
                 const data = await response.json();
                 if (data.ok) {
-                    showToast('Page reloaded', 'success');
+                    const cleared = [];
+                    if (opts.clearCache) cleared.push('cache');
+                    if (opts.clearCookies) cleared.push('cookies');
+                    if (opts.clearStorage) cleared.push('storage');
+                    const msg = cleared.length
+                        ? `Reloaded (cleared ${cleared.join(', ')})`
+                        : 'Page reloaded';
+                    showToast(msg, 'success');
                     if (activeTabId) {
                         delete thumbnailCache[activeTabId];
                         setTimeout(() => captureTabThumbnail(activeTabId), 2000);
@@ -5132,12 +5293,14 @@
         let pluginDropdownOpen = false;
         let pluginsCache = [];
         const loadedPlugins = new Set();
+        const enabledProxyPlugins = new Set();
 
         const PUZZLE_OUTLINE_SVG = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19.439 7.85c-.049.322.059.648.289.878l1.568 1.568c.47.47.706 1.087.706 1.704s-.235 1.233-.706 1.704l-1.611 1.611a.98.98 0 0 1-.837.276c-.47-.07-.802-.48-.968-.925a2.501 2.501 0 1 0-3.214 3.214c.446.166.855.497.925.968a.979.979 0 0 1-.276.837l-1.611 1.611a2.404 2.404 0 0 1-1.704.706 2.402 2.402 0 0 1-1.704-.706l-1.568-1.568a1.026 1.026 0 0 0-.877-.29c-.493.074-.84.504-1.02.968a2.5 2.5 0 1 1-3.237-3.237c.464-.18.894-.527.967-1.02a1.026 1.026 0 0 0-.289-.877l-1.568-1.568A2.402 2.402 0 0 1 1.998 12c0-.617.236-1.234.706-1.704L4.16 8.74c.24-.24.33-.59.274-.862-.058-.284-.27-.546-.535-.728a2.5 2.5 0 1 1 3.258-3.258c.18.264.443.477.728.535.272.056.621-.034.862-.274l1.557-1.557c.47-.47 1.088-.706 1.704-.706.617 0 1.234.236 1.704.706l1.568 1.568c.23.23.556.338.877.29.493-.074.84-.504 1.02-.968a2.5 2.5 0 1 1 3.237 3.237c-.464.18-.894.527-.967 1.02Z"/></svg>';
         const PUZZLE_FILLED_SVG = '<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" stroke="none"><path d="M19.439 7.85c-.049.322.059.648.289.878l1.568 1.568c.47.47.706 1.087.706 1.704s-.235 1.233-.706 1.704l-1.611 1.611a.98.98 0 0 1-.837.276c-.47-.07-.802-.48-.968-.925a2.501 2.501 0 1 0-3.214 3.214c.446.166.855.497.925.968a.979.979 0 0 1-.276.837l-1.611 1.611a2.404 2.404 0 0 1-1.704.706 2.402 2.402 0 0 1-1.704-.706l-1.568-1.568a1.026 1.026 0 0 0-.877-.29c-.493.074-.84.504-1.02.968a2.5 2.5 0 1 1-3.237-3.237c.464-.18.894-.527.967-1.02a1.026 1.026 0 0 0-.289-.877l-1.568-1.568A2.402 2.402 0 0 1 1.998 12c0-.617.236-1.234.706-1.704L4.16 8.74c.24-.24.33-.59.274-.862-.058-.284-.27-.546-.535-.728a2.5 2.5 0 1 1 3.258-3.258c.18.264.443.477.728.535.272.056.621-.034.862-.274l1.557-1.557c.47-.47 1.088-.706 1.704-.706.617 0 1.234.236 1.704.706l1.568 1.568c.23.23.556.338.877.29.493-.074.84-.504 1.02-.968a2.5 2.5 0 1 1 3.237 3.237c-.464.18-.894.527-.967 1.02Z"/></svg>';
         const PLUGIN_PLAY_SVG = '<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>';
         const PLUGIN_UNLOAD_SVG = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>';
         const PLUGIN_EDIT_SVG = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>';
+        const PLUGIN_CONFIG_SVG = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>';
 
         function togglePluginDropdown() {
             if (pluginDropdownOpen) {
@@ -5159,6 +5322,8 @@
                 const data = await response.json();
                 if (data.ok) {
                     pluginsCache = data.plugins || [];
+                    // Sync proxy enabled state from proxy status endpoint
+                    await _syncProxyEnabledState();
                     renderPluginList();
                     updatePluginIconState();
                 } else {
@@ -5167,6 +5332,18 @@
             } catch (e) {
                 list.innerHTML = '<div class="plugin-empty">Connection error</div>';
             }
+        }
+
+        async function _syncProxyEnabledState() {
+            // Read the mitmproxy config to know which proxy scripts are currently enabled
+            try {
+                const resp = await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/proxy/status`);
+                const status = await resp.json();
+                enabledProxyPlugins.clear();
+                if (status.ok && status.active_scripts) {
+                    status.active_scripts.forEach(s => enabledProxyPlugins.add(s));
+                }
+            } catch (e) { /* ignore */ }
         }
 
         function closePluginDropdown() {
@@ -5180,34 +5357,172 @@
                 list.innerHTML = '<div class="plugin-empty">No plugins yet.<br>Click "Manage" to add some.</div>';
                 return;
             }
-            list.innerHTML = pluginsCache.map(p => {
-                const isLoaded = loadedPlugins.has(p.id);
-                const canUnload = isLoaded && p.unload_mode && p.unload_mode !== 'none';
-                const runCountHtml = p.run_count > 0 ? `<span class="plugin-run-count">×${p.run_count}</span>` : '';
-                const desc = p.description ? p.description.replace(/"/g, '&quot;') : p.name;
-                return `<div class="plugin-row" data-plugin-id="${p.id}">
-                    <button class="plugin-autorun-toggle"
-                            role="switch"
-                            aria-checked="${!!p.autorun}"
-                            aria-label="Autorun ${p.name.replace(/"/g, '&quot;')}"
-                            title="Auto-run on page load"
-                            onclick="togglePluginAutorun('${p.id}')"></button>
-                    <span class="plugin-name" title="${desc}">${p.name}${runCountHtml}</span>
-                    ${canUnload
-                        ? `<button class="plugin-action-btn unload-btn" aria-label="Unload ${p.name.replace(/"/g, '&quot;')}" title="Unload" onclick="unloadPlugin('${p.id}')">${PLUGIN_UNLOAD_SVG}</button>`
-                        : `<button class="plugin-action-btn run-btn" aria-label="Run ${p.name.replace(/"/g, '&quot;')}" title="Run" onclick="runPlugin('${p.id}')">${PLUGIN_PLAY_SVG}</button>`
-                    }
-                    <button class="plugin-action-btn" aria-label="Edit ${p.name.replace(/"/g, '&quot;')}" title="Edit" onclick="editPlugin('${p.id}')">${PLUGIN_EDIT_SVG}</button>
-                </div>`;
-            }).join('');
+
+            const proxyPlugins = pluginsCache.filter(p => p.engine === 'proxy');
+            const jsPlugins = pluginsCache.filter(p => p.engine !== 'proxy');
+
+            let html = '';
+
+            // Proxy section
+            if (proxyPlugins.length > 0) {
+                html += '<div class="plugin-section-header">Proxy</div>';
+                html += proxyPlugins.map(p => _renderProxyRow(p)).join('');
+            }
+
+            // JS section
+            if (jsPlugins.length > 0) {
+                html += '<div class="plugin-section-header">JavaScript</div>';
+                html += jsPlugins.map(p => _renderJsRow(p)).join('');
+            }
+
+            list.innerHTML = html;
+        }
+
+        function _renderProxyRow(p) {
+            const isEnabled = enabledProxyPlugins.has(p.code);
+            const desc = p.description ? p.description.replace(/"/g, '&quot;') : p.name;
+            const hasConfig = p.proxy_config && Object.keys(p.proxy_config).length > 0;
+            const configJson = JSON.stringify(p.proxy_config || {}, null, 2);
+            return `<div class="plugin-row" data-plugin-id="${p.id}">
+                <button class="plugin-autorun-toggle"
+                        role="switch"
+                        aria-checked="${isEnabled}"
+                        aria-label="Toggle ${p.name.replace(/"/g, '&quot;')}"
+                        title="${isEnabled ? 'Disable' : 'Enable'} proxy script"
+                        onclick="toggleProxyPlugin('${p.id}')"></button>
+                <span class="plugin-name" title="${desc}">${p.name}</span>
+                <button class="plugin-action-btn config-btn ${hasConfig ? 'has-config' : ''}"
+                        aria-label="Configure ${p.name.replace(/"/g, '&quot;')}"
+                        title="Configure"
+                        onclick="toggleProxyConfig('${p.id}')">${PLUGIN_CONFIG_SVG}</button>
+            </div>
+            <div class="plugin-config-inline" id="config-${p.id}">
+                <textarea id="config-textarea-${p.id}" spellcheck="false">${configJson}</textarea>
+                <div class="config-actions">
+                    <button onclick="toggleProxyConfig('${p.id}')">Cancel</button>
+                    <button class="apply" onclick="applyProxyConfig('${p.id}')">Apply</button>
+                </div>
+            </div>`;
+        }
+
+        function _renderJsRow(p) {
+            const isLoaded = loadedPlugins.has(p.id);
+            const canUnload = isLoaded && p.unload_mode && p.unload_mode !== 'none';
+            const runCountHtml = p.run_count > 0 ? `<span class="plugin-run-count">×${p.run_count}</span>` : '';
+            const desc = p.description ? p.description.replace(/"/g, '&quot;') : p.name;
+            return `<div class="plugin-row" data-plugin-id="${p.id}">
+                <button class="plugin-autorun-toggle"
+                        role="switch"
+                        aria-checked="${!!p.autorun}"
+                        aria-label="Autorun ${p.name.replace(/"/g, '&quot;')}"
+                        title="Auto-run on page load"
+                        onclick="togglePluginAutorun('${p.id}')"></button>
+                <span class="plugin-name" title="${desc}">${p.name}${runCountHtml}</span>
+                ${canUnload
+                    ? `<button class="plugin-action-btn unload-btn" aria-label="Unload ${p.name.replace(/"/g, '&quot;')}" title="Unload" onclick="unloadPlugin('${p.id}')">${PLUGIN_UNLOAD_SVG}</button>`
+                    : `<button class="plugin-action-btn run-btn" aria-label="Run ${p.name.replace(/"/g, '&quot;')}" title="Run" onclick="runPlugin('${p.id}')">${PLUGIN_PLAY_SVG}</button>`
+                }
+                <button class="plugin-action-btn" aria-label="Edit ${p.name.replace(/"/g, '&quot;')}" title="Edit" onclick="editPlugin('${p.id}')">${PLUGIN_EDIT_SVG}</button>
+            </div>`;
         }
 
         function updatePluginIconState() {
             const icon = document.getElementById('urlBarPluginIcon');
             if (!icon) return;
-            const hasAutorun = pluginsCache.some(p => p.autorun);
-            icon.classList.toggle('has-autorun', hasAutorun);
-            icon.innerHTML = hasAutorun ? PUZZLE_FILLED_SVG : PUZZLE_OUTLINE_SVG;
+            const hasAutorun = pluginsCache.some(p => p.engine !== 'proxy' && p.autorun);
+            const hasEnabledProxy = enabledProxyPlugins.size > 0;
+            const isActive = hasAutorun || hasEnabledProxy;
+            icon.classList.toggle('has-autorun', isActive);
+            icon.innerHTML = isActive ? PUZZLE_FILLED_SVG : PUZZLE_OUTLINE_SVG;
+        }
+
+        async function toggleProxyPlugin(pluginId) {
+            const plugin = pluginsCache.find(p => p.id === pluginId);
+            if (!plugin) return;
+
+            const isEnabled = enabledProxyPlugins.has(plugin.code);
+            const endpoint = isEnabled ? 'unload' : 'run';
+            // Auto-scope to current tab's domain
+            const currentDomain = _getCurrentDomain();
+            const domainParam = (!isEnabled && currentDomain) ? `?domain=${encodeURIComponent(currentDomain)}` : '';
+
+            try {
+                const response = await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/api/plugins/${pluginId}/${endpoint}${domainParam}`, { method: 'POST' });
+                const data = await response.json();
+
+                if (data.ok) {
+                    if (isEnabled) {
+                        enabledProxyPlugins.delete(plugin.code);
+                        showToast(`${plugin.name} disabled`, 'success');
+                    } else {
+                        enabledProxyPlugins.add(plugin.code);
+                        const scopeMsg = currentDomain ? ` on ${currentDomain}` : '';
+                        showToast(`${plugin.name} enabled${scopeMsg}`, 'success');
+                    }
+                    renderPluginList();
+                    updatePluginIconState();
+                } else {
+                    showToast(`✗ ${plugin.name}: ${data.error || data.detail || 'failed'}`, 'error');
+                }
+            } catch (e) {
+                showToast('Failed to toggle proxy plugin', 'error');
+            }
+        }
+
+        function _getCurrentDomain() {
+            try {
+                const urlBar = document.getElementById('urlBar');
+                if (urlBar && urlBar.value) {
+                    const url = new URL(urlBar.value);
+                    return url.hostname;
+                }
+            } catch (e) { }
+            return '';
+        }
+
+        function toggleProxyConfig(pluginId) {
+            const panel = document.getElementById(`config-${pluginId}`);
+            if (panel) panel.classList.toggle('open');
+        }
+
+        async function applyProxyConfig(pluginId) {
+            const textarea = document.getElementById(`config-textarea-${pluginId}`);
+            if (!textarea) return;
+
+            let newConfig;
+            try {
+                newConfig = JSON.parse(textarea.value);
+            } catch (e) {
+                showToast('Invalid JSON', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/api/plugins/${pluginId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ proxy_config: newConfig })
+                });
+                const data = await response.json();
+                if (data.ok) {
+                    // Update cache
+                    const plugin = pluginsCache.find(p => p.id === pluginId);
+                    if (plugin) plugin.proxy_config = newConfig;
+                    toggleProxyConfig(pluginId);
+                    showToast('Config updated', 'success');
+
+                    // If the proxy script is currently enabled, re-enable it with new config
+                    if (plugin && enabledProxyPlugins.has(plugin.code)) {
+                        const currentDomain = _getCurrentDomain();
+                        const domainParam = currentDomain ? `?domain=${encodeURIComponent(currentDomain)}` : '';
+                        await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/api/plugins/${pluginId}/run${domainParam}`, { method: 'POST' });
+                    }
+                } else {
+                    showToast(`Failed: ${data.error || data.detail || 'unknown error'}`, 'error');
+                }
+            } catch (e) {
+                showToast('Failed to update config', 'error');
+            }
         }
 
         async function runPlugin(pluginId) {
@@ -5222,18 +5537,15 @@
                 const name = plugin ? plugin.name : pluginId;
 
                 if (data.ok) {
-                    // Track loaded state for unload support
                     if (plugin && plugin.unload_mode && plugin.unload_mode !== 'none') {
                         loadedPlugins.add(pluginId);
                     }
-                    // Update run count in cache
                     if (plugin) plugin.run_count = (plugin.run_count || 0) + 1;
                     renderPluginList();
 
                     const timeMs = data.execution_time_ms || 0;
                     showToast(`✓ ${name} executed in ${timeMs}ms`, 'success');
 
-                    // Show console log output as toasts (cap at 3)
                     if (data.console_output && data.console_output.length > 0) {
                         const logs = data.console_output.filter(e => e.level === 'log');
                         const toShow = logs.slice(0, 3);
@@ -8374,9 +8686,37 @@
         // Restart Modal & Tab Persistence
         // =============================================
 
+        // Pinned tab persistence (stored by URL since tab IDs change across restarts)
+        function getPinnedUrls() {
+            try { return JSON.parse(localStorage.getItem('inspekt_pinned_tabs')) || []; }
+            catch { return []; }
+        }
+
+        function savePinnedUrls() {
+            const pinnedUrls = tabs.filter(t => t.pinned).map(t => t.url);
+            localStorage.setItem('inspekt_pinned_tabs', JSON.stringify(pinnedUrls));
+        }
+
+        // Per-tab reload options (clear cache/cookies/storage on reload)
+        function getReloadOptions(tabUrl) {
+            try {
+                const all = JSON.parse(localStorage.getItem('inspekt_tab_reload_options')) || {};
+                return all[tabUrl] || { clearCache: false, clearCookies: false, clearStorage: false };
+            } catch { return { clearCache: false, clearCookies: false, clearStorage: false }; }
+        }
+
+        function setReloadOption(tabUrl, key, value) {
+            try {
+                const all = JSON.parse(localStorage.getItem('inspekt_tab_reload_options')) || {};
+                if (!all[tabUrl]) all[tabUrl] = { clearCache: false, clearCookies: false, clearStorage: false };
+                all[tabUrl][key] = value;
+                localStorage.setItem('inspekt_tab_reload_options', JSON.stringify(all));
+            } catch (e) { console.warn('[ReloadOptions] Failed to save:', e); }
+        }
+
         // Save current tabs to localStorage (survives container restarts)
         function saveTabsToStorage() {
-            const tabData = tabs.map(t => ({ url: t.url, title: t.title }));
+            const tabData = tabs.map(t => ({ url: t.url, title: t.title, pinned: !!t.pinned }));
             localStorage.setItem('inspekt_saved_tabs', JSON.stringify(tabData));
             console.log('[Restart] Saved', tabData.length, 'tabs to localStorage');
         }
@@ -8395,6 +8735,9 @@
                 showToast(`Restoring ${tabData.length} tab(s)...`);
                 console.log('[Restart] Restoring tabs:', tabData);
 
+                // Collect pinned URLs to restore pinned state after tabs are created
+                const restoredPinnedUrls = tabData.filter(t => t.pinned).map(t => t.url);
+
                 for (let i = 0; i < tabData.length; i++) {
                     const tab = tabData[i];
                     // First tab: navigate current tab, rest: create new tabs
@@ -8404,6 +8747,11 @@
                         await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/tabs/new?url=${encodeURIComponent(tab.url)}`);
                     }
                     await new Promise(r => setTimeout(r, 500)); // Small delay between tabs
+                }
+
+                // Persist pinned URLs so fetchTabs can restore pinned state
+                if (restoredPinnedUrls.length > 0) {
+                    localStorage.setItem('inspekt_pinned_tabs', JSON.stringify(restoredPinnedUrls));
                 }
 
                 showToast('Tabs restored!', 'success');
@@ -9164,15 +9512,22 @@
                     // Remove tabs that no longer exist on server
                     tabs = tabs.filter(t => serverTabIds.has(t.id));
 
-                    // Update existing tabs with fresh data from server
+                    // Update existing tabs with fresh data from server (preserve local-only properties)
                     tabs = tabs.map(localTab => {
                         const serverTab = serverTabs.find(t => t.id === localTab.id);
-                        return serverTab || localTab;
+                        if (serverTab) {
+                            serverTab.pinned = localTab.pinned || false;
+                            return serverTab;
+                        }
+                        return localTab;
                     });
 
                     // Add new tabs from server (tabs we don't have locally)
+                    const pinnedUrls = getPinnedUrls();
                     serverTabs.forEach(serverTab => {
                         if (!localTabIds.has(serverTab.id)) {
+                            // Restore pinned state from localStorage for newly discovered tabs
+                            serverTab.pinned = pinnedUrls.includes(serverTab.url);
                             tabs.push(serverTab);
                         }
                     });
@@ -9298,6 +9653,9 @@
 
         // Render tabs in the tab bar (smart update to avoid flicker)
         function renderTabs() {
+            // Sort: pinned tabs first, then unpinned (stable sort preserves relative order)
+            tabs.sort((a, b) => (a.pinned ? 0 : 1) - (b.pinned ? 0 : 1));
+
             const container = document.getElementById('tabsContainer');
             const newTabBtn = container.querySelector('.new-tab-btn');
             const existingTabEls = container.querySelectorAll('.tab');
@@ -9321,7 +9679,7 @@
                 if (tabEl) {
                     // Update existing tab element (no DOM recreation = no flicker)
                     const wasLoading = tabEl.classList.contains('loading');
-                    tabEl.className = 'tab' + (tab.id === activeTabId ? ' active' : '') + (wasLoading ? ' loading' : '');
+                    tabEl.className = 'tab' + (tab.id === activeTabId ? ' active' : '') + (wasLoading ? ' loading' : '') + (tab.pinned ? ' tab-pinned' : '');
                     tabEl.dataset.index = index;
 
                     // Update title
@@ -9385,6 +9743,18 @@
                 }
             });
 
+            // Insert/remove separator between pinned and unpinned tabs
+            const oldSep = container.querySelector('.tab-pin-separator');
+            if (oldSep) oldSep.remove();
+            const pinnedCount = tabs.filter(t => t.pinned).length;
+            if (pinnedCount > 0 && pinnedCount < tabs.length) {
+                const sep = document.createElement('div');
+                sep.className = 'tab-pin-separator';
+                const pinnedTabEls = container.querySelectorAll('.tab.tab-pinned');
+                const lastPinned = pinnedTabEls[pinnedTabEls.length - 1];
+                if (lastPinned) lastPinned.after(sep);
+            }
+
             // Scroll active tab into view (e.g. when many tabs overflow)
             const activeEl = container.querySelector('.tab.active');
             if (activeEl) {
@@ -9395,7 +9765,7 @@
         // Create a new tab element
         function createTabElement(tab, index) {
             const tabEl = document.createElement('div');
-            tabEl.className = 'tab' + (tab.id === activeTabId ? ' active' : '');
+            tabEl.className = 'tab' + (tab.id === activeTabId ? ' active' : '') + (tab.pinned ? ' tab-pinned' : '');
             tabEl.draggable = true;
             tabEl.dataset.tabId = tab.id;
             tabEl.dataset.index = index;
@@ -9588,7 +9958,56 @@
         }
 
         // Close a tab
-        async function closeTab(tabId) {
+        async function closeTab(tabId, skipPinProtection) {
+            const tab = tabs.find(t => t.id === tabId);
+
+            // Pinned tab protection: show undo toast instead of closing immediately
+            if (tab && tab.pinned && !skipPinProtection) {
+                const pinnedUrl = tab.url;
+                const pinnedTitle = tab.title;
+                let undone = false;
+
+                // Proceed with actual close, but offer undo
+                await _doCloseTab(tabId);
+
+                showToast('Pinned tab closed', {
+                    type: 'warning',
+                    duration: 5000,
+                    action: {
+                        label: 'Undo',
+                        onClick: async () => {
+                            if (undone) return;
+                            undone = true;
+                            try {
+                                const resp = await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/tabs/new?url=${encodeURIComponent(pinnedUrl)}`);
+                                const data = await resp.json();
+                                if (data.ok) {
+                                    // Mark the new tab as pinned
+                                    const newTabId = data.tab?.id;
+                                    if (newTabId) {
+                                        await fetchTabs();
+                                        const newTab = tabs.find(t => t.id === newTabId);
+                                        if (newTab) {
+                                            newTab.pinned = true;
+                                            savePinnedUrls();
+                                            renderTabs();
+                                        }
+                                    }
+                                    showToast('Pinned tab restored', 'success');
+                                }
+                            } catch (e) {
+                                showToast('Failed to restore tab', 'error');
+                            }
+                        }
+                    }
+                });
+                return;
+            }
+
+            await _doCloseTab(tabId);
+        }
+
+        async function _doCloseTab(tabId) {
             delete thumbnailCache[tabId];
             delete lastKnownUrls[tabId];
             delete tabNavHistory[tabId];
@@ -9911,6 +10330,34 @@
                     menu.appendChild(row);
                     return;
                 }
+                // Checkbox menu item (toggle, does NOT dismiss menu)
+                if (item.checkbox) {
+                    const btn = document.createElement('button');
+                    btn.setAttribute('role', 'menuitemcheckbox');
+                    btn.setAttribute('aria-checked', item.checked ? 'true' : 'false');
+                    btn.tabIndex = -1;
+
+                    const checkIcon = document.createElement('span');
+                    checkIcon.className = 'check-icon';
+                    const checkSvg = '<svg width="10" height="10" viewBox="0 0 10 10"><path d="M2 5l2.5 2.5L8 3" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+                    checkIcon.innerHTML = item.checked ? checkSvg : '';
+                    btn.appendChild(checkIcon);
+
+                    const label = document.createElement('span');
+                    label.textContent = item.label;
+                    btn.appendChild(label);
+
+                    btn.onclick = (ev) => {
+                        ev.stopPropagation();
+                        const newState = btn.getAttribute('aria-checked') !== 'true';
+                        btn.setAttribute('aria-checked', newState ? 'true' : 'false');
+                        checkIcon.innerHTML = newState ? checkSvg : '';
+                        if (item.onToggle) item.onToggle(newState);
+                    };
+                    menu.appendChild(btn);
+                    return;
+                }
+
                 const btn = document.createElement('button');
                 btn.setAttribute('role', 'menuitem');
                 btn.textContent = item.label;
@@ -9948,8 +10395,14 @@
                 dismissContextMenu();
                 return;
             }
-            const items = Array.from(activeContextMenu.querySelectorAll('[role="menuitem"]:not(:disabled)'));
+            const items = Array.from(activeContextMenu.querySelectorAll('[role="menuitem"]:not(:disabled), [role="menuitemcheckbox"]:not(:disabled)'));
             const idx = items.indexOf(document.activeElement);
+            // Enter/Space on checkbox items: toggle instead of dismiss
+            if ((e.key === 'Enter' || e.key === ' ') && document.activeElement?.getAttribute('role') === 'menuitemcheckbox') {
+                e.preventDefault();
+                document.activeElement.click();
+                return;
+            }
             if (e.key === 'ArrowDown') {
                 e.preventDefault();
                 items[(idx + 1) % items.length].focus();
@@ -9990,11 +10443,20 @@
             e.preventDefault();
             const tab = tabs.find(t => t.id === tabId);
             if (!tab) return;
+            const opts = getReloadOptions(tab.url);
+            const anyClearing = opts.clearCache || opts.clearCookies || opts.clearStorage;
 
             const items = [
                 { label: tab.pinned ? 'Unpin Tab' : 'Pin Tab', action: () => togglePinTab(tabId) },
-                { label: 'Refresh Tab', action: () => refreshTab(tabId) },
                 { label: 'Duplicate Tab', action: () => duplicateTab(tabId) },
+                { separator: true },
+                { label: anyClearing ? 'Reload Page ✦' : 'Reload Page', action: () => reloadWithOptions(tabId) },
+                { checkbox: true, label: 'Clear cache', checked: opts.clearCache,
+                  onToggle: (v) => setReloadOption(tab.url, 'clearCache', v) },
+                { checkbox: true, label: 'Clear cookies', checked: opts.clearCookies,
+                  onToggle: (v) => setReloadOption(tab.url, 'clearCookies', v) },
+                { checkbox: true, label: 'Clear all storage', checked: opts.clearStorage,
+                  onToggle: (v) => setReloadOption(tab.url, 'clearStorage', v) },
                 { separator: true },
                 { label: 'Open in Host Browser', action: () => openInHostBrowser(tabId) },
                 { label: 'Open Fullscreen', action: () => toggleFullscreen() },
@@ -10150,6 +10612,7 @@
             const tab = tabs.find(t => t.id === tabId);
             if (tab) {
                 tab.pinned = !tab.pinned;
+                savePinnedUrls();
                 renderTabs();
                 showToast(tab.pinned ? 'Tab pinned' : 'Tab unpinned', 'success');
             }
@@ -10160,6 +10623,56 @@
                 await activateTab(tabId);
             }
             await reloadPage();
+        }
+
+        async function reloadWithOptions(tabId) {
+            const tab = tabs.find(t => t.id === tabId);
+            if (!tab) return;
+            if (tabId !== activeTabId) {
+                await activateTab(tabId);
+            }
+            const opts = getReloadOptions(tab.url);
+            const params = new URLSearchParams({ tab: activeTabId });
+            if (opts.clearCache) params.append('clearCache', '1');
+            if (opts.clearCookies) params.append('clearCookies', '1');
+            if (opts.clearStorage) params.append('clearStorage', '1');
+
+            // For internal pages, just reload the iframe
+            if (activeTabId && internalTabs[activeTabId]) {
+                const nativeIframe = document.querySelector('#nativeContainer iframe');
+                if (nativeIframe) {
+                    nativeIframe.src = resolveInternalUrl(internalTabs[activeTabId]);
+                    showToast('Page reloaded', 'success');
+                }
+                return;
+            }
+
+            startLoading(currentUrl);
+            try {
+                const response = await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/reload-page?${params.toString()}`);
+                const data = await response.json();
+                if (data.ok) {
+                    const cleared = [];
+                    if (opts.clearCache) cleared.push('cache');
+                    if (opts.clearCookies) cleared.push('cookies');
+                    if (opts.clearStorage) cleared.push('storage');
+                    const msg = cleared.length
+                        ? `Reloaded (cleared ${cleared.join(', ')})`
+                        : 'Page reloaded';
+                    showToast(msg, 'success');
+                    if (activeTabId) {
+                        delete thumbnailCache[activeTabId];
+                        setTimeout(() => captureTabThumbnail(activeTabId), 2000);
+                    }
+                    setTimeout(() => { if (loadingState === 'loading') completeLoading(); }, 400);
+                } else {
+                    errorLoading();
+                    showToast(data.error || 'Reload failed', 'error');
+                }
+            } catch (e) {
+                errorLoading();
+                showToast('Reload failed', 'error');
+            }
         }
 
         async function duplicateTab(tabId) {
@@ -10195,9 +10708,13 @@
         }
 
         async function closeOtherTabs(tabId) {
-            const othersToClose = tabs.filter(t => t.id !== tabId);
+            const othersToClose = tabs.filter(t => t.id !== tabId && !t.pinned);
+            const skippedPinned = tabs.filter(t => t.id !== tabId && t.pinned).length;
             for (const t of othersToClose) {
-                await closeTab(t.id);
+                await _doCloseTab(t.id);
+            }
+            if (skippedPinned > 0) {
+                showToast(`Pinned tab${skippedPinned > 1 ? 's' : ''} kept open`, 'info');
             }
         }
 
@@ -10238,12 +10755,27 @@
             if (targetTab && draggedTab && targetTab !== draggedTab) {
                 const draggedId = draggedTab.dataset.tabId;
                 const targetId = targetTab.dataset.tabId;
+                const draggedTabObj = tabs.find(t => t.id === draggedId);
+                const targetTabObj = tabs.find(t => t.id === targetId);
+
+                if (!draggedTabObj || !targetTabObj) return;
+
+                // Auto pin/unpin when dragging across the pinned/unpinned boundary
+                if (targetTabObj.pinned && !draggedTabObj.pinned) {
+                    draggedTabObj.pinned = true;
+                    showToast('Tab pinned', 'success');
+                } else if (!targetTabObj.pinned && draggedTabObj.pinned) {
+                    draggedTabObj.pinned = false;
+                    showToast('Tab unpinned', 'success');
+                }
+
                 const draggedIndex = tabs.findIndex(t => t.id === draggedId);
                 const targetIndex = tabs.findIndex(t => t.id === targetId);
 
                 // Reorder tabs array
                 const [removed] = tabs.splice(draggedIndex, 1);
                 tabs.splice(targetIndex, 0, removed);
+                savePinnedUrls();
                 renderTabs();
             }
             document.querySelectorAll('.tab').forEach(t => t.classList.remove('drag-over'));
