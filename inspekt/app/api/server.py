@@ -16,6 +16,7 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, HTMLResponse
+from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from inspekt.services.bridge_executor import get_executor
 from inspekt import __version__
@@ -130,6 +131,36 @@ async def health_check():
     }
 
 
+@app.get("/error/{page_name}")
+async def error_page(page_name: str, request: Request):
+    """Serve custom error pages (e.g. /error/dns?domain=example.com).
+
+    Templates live in /opt/pages/ with placeholders like {{DOMAIN}}.
+    Used by the control panel for DNS failures and blocked URLs.
+    """
+    import html as html_module
+
+    # Whitelist of known error pages — prevents path traversal and arbitrary file reads
+    ALLOWED_PAGES = {"dns", "connection", "http", "blocked"}
+    safe_name = page_name.replace("/", "").replace("..", "")
+    if safe_name not in ALLOWED_PAGES:
+        raise HTTPException(status_code=404, detail=f"Unknown error page: {safe_name}")
+
+    template_path = Path("/opt/pages") / f"error-{safe_name}.html"
+
+    if not template_path.exists():
+        raise HTTPException(status_code=404, detail=f"Error page template missing: {safe_name}")
+
+    html = template_path.read_text(encoding="utf-8")
+
+    # Fill placeholders from query params
+    for key in ("url", "domain", "status", "status_text", "error_code", "message"):
+        value = request.query_params.get(key, "")
+        html = html.replace("{{" + key.upper() + "}}", html_module.escape(value))
+
+    return HTMLResponse(content=html)
+
+
 @app.get("/")
 async def root():
     """API root endpoint with basic info and links."""
@@ -166,8 +197,9 @@ async def status_dashboard(request: Request):
     """Live status dashboard showing bridge and API server health."""
     try:
         return templates.TemplateResponse(
-            "dashboard.html",
-            {"request": request, "active_page": "dashboard"}
+            request=request,
+            name="dashboard.html",
+            context={"active_page": "dashboard"}
         )
     except Exception as e:
         return HTMLResponse(
@@ -219,8 +251,9 @@ async def plugins_ui(request: Request):
     """Plugin management UI."""
     try:
         return templates.TemplateResponse(
-            "plugins.html",
-            {"request": request, "active_page": "plugins"}
+            request=request,
+            name="plugins.html",
+            context={"active_page": "plugins"}
         )
     except Exception as e:
         return HTMLResponse(
@@ -234,11 +267,19 @@ async def commands_ui(request: Request):
     """Commands dashboard UI - view and manage all Inspekt commands."""
     try:
         return templates.TemplateResponse(
-            "commands.html",
-            {"request": request, "active_page": "commands"}
+            request=request,
+            name="commands.html",
+            context={"active_page": "commands"}
         )
     except Exception as e:
         return HTMLResponse(
             content=f"<h1>Commands UI not found</h1><p>Error: {e}</p>",
             status_code=500
         )
+
+
+# Mount static files for gallery assets (CSS, JS)
+# This serves files from inspekt/static/ at /static/
+static_dir = Path(__file__).parent.parent.parent / "static"
+if static_dir.exists():
+    app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")

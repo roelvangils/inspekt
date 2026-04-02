@@ -1237,7 +1237,7 @@
             overflow: hidden;
         }
 
-        /* Native iframe container for inspekt:// internal tool pages */
+        /* Native iframe container for http://inspekt/ internal tool pages */
         .native-container {
             flex: 1;
             position: relative;
@@ -3867,7 +3867,7 @@
             </div>
         </div>
 
-        <!-- Native Container for inspekt:// internal tool pages -->
+        <!-- Native Container for http://inspekt/ internal tool pages -->
         <div class="native-container" id="nativeContainer"></div>
 
         <!-- Split mode drag handle (hidden in floating mode) -->
@@ -5420,12 +5420,12 @@
             // instead of Chromium's default ERR_NAME_NOT_RESOLVED
             try {
                 const domain = new URL(url).hostname;
-                if (domain && domain !== 'localhost' && domain !== '127.0.0.1') {
+                if (domain && domain !== 'localhost' && domain !== '127.0.0.1' && domain !== 'inspekt') {
                     const dnsResp = await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/dns-check?domain=${encodeURIComponent(domain)}`);
                     const dnsData = await dnsResp.json();
                     if (dnsData.ok && !dnsData.resolves) {
                         // Navigate to our custom error page instead
-                        const errorUrl = `http://${VNC_HOST}:${CONTROL_PORT}/error-page/error-dns?domain=${encodeURIComponent(domain)}&url=${encodeURIComponent(url)}`;
+                        const errorUrl = `http://inspekt/error/dns?domain=${encodeURIComponent(domain)}`;
                         await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/navigate?url=${encodeURIComponent(errorUrl)}&tab=${activeTabId}`);
                         completeLoading();
                         return;

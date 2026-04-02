@@ -747,28 +747,6 @@ class ControlHandler(BaseHTTPRequestHandler):
             except _socket.gaierror:
                 self.send_json({'ok': True, 'resolves': False, 'domain': domain})
 
-        elif path.startswith('/error-page/'):
-            # Serve custom error page HTML with placeholder substitution
-            page_name = path.split('/error-page/')[1].split('?')[0]
-            query = parse_qs(urlparse(self.path).query)
-            safe_name = page_name.replace('/', '').replace('..', '')
-            page_path = f'/opt/pages/{safe_name}.html'
-            try:
-                with open(page_path, 'r') as f:
-                    html = f.read()
-                # Fill placeholders from query params
-                for key in ('url', 'domain', 'status', 'status_text', 'error_code', 'message'):
-                    value = query.get(key, [''])[0]
-                    html = html.replace('{{' + key.upper() + '}}', html_module.escape(value))
-                self.send_response(200)
-                self.send_header('Content-Type', 'text/html; charset=utf-8')
-                encoded = html.encode('utf-8')
-                self.send_header('Content-Length', str(len(encoded)))
-                self.end_headers()
-                self.wfile.write(encoded)
-            except FileNotFoundError:
-                self.send_json({'ok': False, 'error': f'Error page not found: {safe_name}'}, 404)
-
         elif path == '/api/tunnel-info':
             # Return bore tunnel server info for `inspekt tunnel` auto-discovery
             secret = ''
