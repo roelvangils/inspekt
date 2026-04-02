@@ -88,6 +88,7 @@ mcp-test/
 # Downloaded HTML files
 *.html
 !docker/browser-vm/*.html
+!docker/browser-vm/pages/*.html
 !extensions/**/*.html
 !docs/**/*.html
 

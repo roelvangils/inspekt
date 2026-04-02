@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{STATUS}} {{STATUS_TEXT}}</title>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0f0f1a;
+            color: #ccc;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 2rem;
+        }
+
+        .container {
+            max-width: 480px;
+            text-align: center;
+        }
+
+        .status-code {
+            font-size: 4rem;
+            font-weight: 700;
+            color: #fff;
+            opacity: 0.15;
+            margin-bottom: 1rem;
+            font-family: 'SF Mono', 'JetBrains Mono', monospace;
+        }
+
+        h1 {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: #fff;
+            margin-bottom: 0.75rem;
+        }
+
+        .domain {
+            font-family: 'SF Mono', 'JetBrains Mono', monospace;
+            color: #667eea;
+            word-break: break-all;
+        }
+
+        p {
+            font-size: 0.9rem;
+            line-height: 1.6;
+            color: #888;
+            margin-top: 1rem;
+        }
+
+        @media (prefers-color-scheme: light) {
+            body { background: #e8eef7; color: #444; }
+            .status-code { color: #1a1a1a; opacity: 0.1; }
+            h1 { color: #1a1a1a; }
+            .domain { color: #4a5cc5; }
+            p { color: #666; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="status-code">{{STATUS}}</div>
+        <h1>{{STATUS_TEXT}}</h1>
+        <p>
+            The server at <span class="domain">{{DOMAIN}}</span>
+            returned an error.
+        </p>
+    </div>
+</body>
+</html>

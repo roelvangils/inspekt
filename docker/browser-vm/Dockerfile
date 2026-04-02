@@ -87,6 +87,8 @@ RUN apk add --no-cache \
     gst-plugins-good \
     gst-plugins-bad \
     socat \
+    # Terminal editors (for `edit --nano` flag)
+    nano \
     # Firewall for user network restrictions
     iptables \
     # websockify (noVNC installed separately from GitHub for latest version)
@@ -119,6 +121,39 @@ RUN BORE_VERSION="0.5.2" && \
     tar xzf /tmp/bore.tar.gz -C /usr/local/bin/ bore && \
     chmod +x /usr/local/bin/bore && \
     rm /tmp/bore.tar.gz
+
+# Install micro editor (modern terminal editor with intuitive keybindings)
+RUN MICRO_VERSION="2.0.14" && \
+    ARCH="$(uname -m)" && \
+    if [ "$ARCH" = "aarch64" ]; then MICRO_ARCH="linux-arm64"; \
+    else MICRO_ARCH="linux64"; fi && \
+    wget -q "https://github.com/zyedidia/micro/releases/download/v${MICRO_VERSION}/micro-${MICRO_VERSION}-${MICRO_ARCH}.tar.gz" \
+        -O /tmp/micro.tar.gz && \
+    tar xzf /tmp/micro.tar.gz -C /tmp/ && \
+    mv /tmp/micro-${MICRO_VERSION}/micro /usr/local/bin/micro && \
+    chmod +x /usr/local/bin/micro && \
+    rm -rf /tmp/micro.tar.gz /tmp/micro-${MICRO_VERSION}
+
+# Install gum (interactive CLI prompts for upload rename flow)
+RUN GUM_VERSION="0.17.0" && \
+    ARCH="$(uname -m)" && \
+    if [ "$ARCH" = "aarch64" ]; then GUM_ARCH="Linux_arm64"; \
+    else GUM_ARCH="Linux_x86_64"; fi && \
+    wget -q "https://github.com/charmbracelet/gum/releases/download/v${GUM_VERSION}/gum_${GUM_VERSION}_${GUM_ARCH}.tar.gz" \
+        -O /tmp/gum.tar.gz && \
+    tar xzf /tmp/gum.tar.gz -C /tmp/ && \
+    mv /tmp/gum_${GUM_VERSION}_${GUM_ARCH}/gum /usr/local/bin/gum && \
+    chmod +x /usr/local/bin/gum && \
+    rm -rf /tmp/gum.tar.gz /tmp/gum_${GUM_VERSION}_*
+
+# Install vitetris (tiny terminal Tetris, ~50 KB)
+RUN apk add --no-cache --virtual .tetris-build gcc musl-dev make && \
+    wget -q https://github.com/vicgeralds/vitetris/archive/refs/tags/v0.59.1.tar.gz -O /tmp/vitetris.tar.gz && \
+    cd /tmp && tar xzf vitetris.tar.gz && cd vitetris-0.59.1 && \
+    ./configure --without-network && make CFLAGS="-O2 -Wno-implicit-int -Wno-implicit-function-declaration" -j$(nproc) && \
+    cp tetris /usr/local/bin/tetris && chmod +x /usr/local/bin/tetris && \
+    cd / && rm -rf /tmp/vitetris* && \
+    apk del .tetris-build
 
 # Install lightningcss-cli for CSS optimization (inspekt focused css)
 RUN npm install -g lightningcss-cli prettier --no-audit --no-fund
@@ -243,7 +278,7 @@ names = cli.list_commands(ctx); \
 print(f'Created {len(names)} command symlinks')"
 
 # Remove symlinks for restricted commands (prevents tab completion showing them)
-RUN for cmd in eval exec repl plugin yolo domain vm do mcp autostart; do \
+RUN for cmd in eval exec repl plugin yolo domain vm do mcp autostart open edit; do \
         rm -f /opt/inspekt/commands/$cmd; \
     done
 
@@ -258,7 +293,8 @@ RUN mkdir -p /opt/inspekt/allowed-bin && \
         ls cat pwd mkdir touch rm cp mv \
         head tail more grep wc sort uniq tr diff \
         echo date file stat basename dirname realpath uname \
-        clear whoami which tee tree cal ps \
+        clear whoami which tee tree cal ps sleep bc \
+        uptime base64 md5sum sha256sum watch xxd cut \
         curl jq sed; do \
         for dir in /usr/bin /bin; do \
             [ -x "$dir/$cmd" ] && ln -sf "$dir/$cmd" /opt/inspekt/allowed-bin/$cmd && break; \
@@ -281,10 +317,21 @@ RUN mkdir -p /opt/inspekt/allowed-bin && \
     printf '#!/bin/zsh\nlocal -a env_args\nwhile [[ "$1" == *=* ]]; do env_args+=("$1"); shift; done\ncmd="$1"\nif [[ -z "$cmd" ]]; then /usr/bin/env "${env_args[@]}"; exit; fi\nif [[ -x "/opt/inspekt/commands/$cmd" || -x "/opt/inspekt/allowed-bin/$cmd" ]]; then\n  /usr/bin/env "${env_args[@]}" "$@"\nelse\n  echo "env: not permitted to run: $cmd" >&2; exit 1\nfi\n' \
         > /opt/inspekt/allowed-bin/env && chmod +x /opt/inspekt/allowed-bin/env && \
     # ── macOS-feel commands ──────────────────────────────────────────────
-    # open: macOS-compatible URL opener (replaces auto-generated inspekt open wrapper)
-    # Placed in commands/ to take priority; adds auto-https and -n/-g flags
+    # open: macOS-compatible URL/file opener (replaces auto-generated inspekt open wrapper)
+    # Placed in commands/ to take priority; detects files vs URLs, adds auto-https and -n/-g flags
     cp /opt/proxy-scripts/open /opt/inspekt/commands/open && \
     chmod +x /opt/inspekt/commands/open && \
+    # edit: opens files in the control panel editor
+    cp /opt/proxy-scripts/edit /opt/inspekt/commands/edit && \
+    chmod +x /opt/inspekt/commands/edit && \
+    # upload: drag-drop file upload from host browser
+    cp /opt/proxy-scripts/upload /opt/inspekt/commands/upload && \
+    chmod +x /opt/inspekt/commands/upload && \
+    # about + easter eggs
+    for cmd in about shrug lenny motivate party cowsay; do \
+        cp /opt/proxy-scripts/$cmd /opt/inspekt/commands/$cmd && \
+        chmod +x /opt/inspekt/commands/$cmd; \
+    done && \
     # screencapture: wrapper around inspekt screenshot
     printf '#!/bin/zsh\nfull=""\nfilename=""\nwhile [[ $# -gt 0 ]]; do\n  case "$1" in\n    -f) full="--full-page"; shift ;;\n    -*) echo "screencapture: unknown option $1" >&2; exit 1 ;;\n    *) filename="$1"; shift ;;\n  esac\ndone\n/opt/inspekt/.venv/bin/inspekt screenshot $full ${filename:+--output "$filename"}\n' \
         > /opt/inspekt/allowed-bin/screencapture && chmod +x /opt/inspekt/allowed-bin/screencapture && \
@@ -303,10 +350,15 @@ RUN mkdir -p /opt/inspekt/allowed-bin && \
         > /opt/inspekt/allowed-bin/ssh && chmod +x /opt/inspekt/allowed-bin/ssh && \
     printf '#!/bin/zsh\necho "scp: file transfer is not available in the VM." >&2\necho "  Use the Downloads panel to export files." >&2\nexit 1\n' \
         > /opt/inspekt/allowed-bin/scp && chmod +x /opt/inspekt/allowed-bin/scp && \
-    printf '#!/bin/zsh\necho "$(basename $0): text editors are not available in the VM." >&2\necho "  Use \`cat\` to view files or \`echo > file\` to write." >&2\nexit 1\n' \
-        > /opt/inspekt/allowed-bin/nano && chmod +x /opt/inspekt/allowed-bin/nano && \
-    ln -sf /opt/inspekt/allowed-bin/nano /opt/inspekt/allowed-bin/vim && \
-    ln -sf /opt/inspekt/allowed-bin/nano /opt/inspekt/allowed-bin/vi && \
+    # Terminal editors: nano and micro are allowed (no shell escape capabilities)
+    ln -sf /usr/bin/nano /opt/inspekt/allowed-bin/nano && \
+    ln -sf /usr/local/bin/micro /opt/inspekt/allowed-bin/micro && \
+    ln -sf /usr/local/bin/gum /opt/inspekt/allowed-bin/gum && \
+    ln -sf /usr/local/bin/tetris /opt/inspekt/allowed-bin/tetris && \
+    # vim/vi stubs — point users to available editors
+    printf '#!/bin/zsh\necho "vim is not available in the VM. Try one of these instead:" >&2\necho "  nano $@" >&2\necho "  micro $@" >&2\necho "  edit $@    (opens in the graphical editor)" >&2\nexit 1\n' \
+        > /opt/inspekt/allowed-bin/vim && chmod +x /opt/inspekt/allowed-bin/vim && \
+    ln -sf /opt/inspekt/allowed-bin/vim /opt/inspekt/allowed-bin/vi && \
     printf '#!/bin/zsh\necho "$(basename $0): package installation is not available in the VM." >&2\necho "  The tools you need are pre-installed." >&2\nexit 1\n' \
         > /opt/inspekt/allowed-bin/brew && chmod +x /opt/inspekt/allowed-bin/brew && \
     printf '#!/bin/zsh\necho "sudo: you don'\''t need sudo in the VM." >&2\necho "  inspekt commands already have the access they need." >&2\necho "  Try running your command without sudo." >&2\nexit 1\n' \
@@ -317,7 +369,7 @@ RUN mkdir -p /opt/inspekt/allowed-bin && \
         > /opt/inspekt/allowed-bin/man && chmod +x /opt/inspekt/allowed-bin/man
 
 # Inspekt config must be copied before the permissions step that copies it to /home/inspekt
-COPY docker/browser-vm/inspekt-config.json /root/.config/inspekt.json
+COPY docker/browser-vm/inspekt-config.yaml /root/.config/inspekt.yaml
 
 # File permissions for restricted user
 RUN chmod -R a+rX /opt/inspekt/.venv && \
@@ -325,7 +377,7 @@ RUN chmod -R a+rX /opt/inspekt/.venv && \
     chmod -R a+rX /opt/inspekt/commands && \
     chmod -R a+rX /opt/inspekt/allowed-bin && \
     mkdir -p /home/inspekt/.config && \
-    cp /root/.config/inspekt.json /home/inspekt/.config/inspekt.json && \
+    cp /root/.config/inspekt.yaml /home/inspekt/.config/inspekt.yaml && \
     chown -R inspekt:inspekt /home/inspekt
 
 # Copy VM configuration files
@@ -337,6 +389,8 @@ COPY docker/browser-vm/control-server.py /opt/control-server.py
 COPY docker/browser-vm/terminal-server.py /opt/terminal-server.py
 COPY docker/browser-vm/control-panel.html /usr/share/novnc/control.html
 COPY docker/browser-vm/fonts /usr/share/novnc/fonts
+COPY docker/browser-vm/vendor/codemirror.min.js /usr/share/novnc/vendor/codemirror.min.js
+COPY docker/browser-vm/vendor/ninja-keys.min.js /usr/share/novnc/vendor/ninja-keys.min.js
 COPY docker/browser-vm/inspekt-chromium.sh /opt/inspekt-chromium.sh
 COPY docker/browser-vm/devtools-manager.sh /opt/devtools-manager.sh
 COPY docker/browser-vm/xorg.conf /etc/X11/xorg.conf
@@ -346,6 +400,7 @@ COPY docker/browser-vm/audio-proxy.sh /opt/audio-proxy.sh
 COPY docker/browser-vm/audio-server.py /opt/audio-server.py
 COPY docker/browser-vm/pulse-config.pa /etc/pulse/default.pa
 COPY docker/browser-vm/proxy-scripts /opt/proxy-scripts
+COPY docker/browser-vm/pages /opt/pages
 
 # Shell config with inspekt completion
 COPY docker/browser-vm/bashrc /root/.bashrc
@@ -388,6 +443,10 @@ RUN touch /etc/inspekt-shell/.zshenv && \
 
 # Replace noVNC base CSS with custom minimal theme
 COPY docker/browser-vm/novnc-base.css /usr/share/novnc/app/styles/base.css
+
+# Write version info for the `about` command (needs root to query chromium)
+RUN mkdir -p /etc/inspekt-versions && \
+    chromium --version 2>/dev/null | sed 's/Chromium \([0-9.]*\).*/\1/' | cut -d. -f1-3 > /etc/inspekt-versions/chromium
 
 # Customize noVNC HTML and set permissions
 RUN chmod +x /entrypoint.sh /root/.config/openbox/autostart /opt/inspekt-chromium.sh \

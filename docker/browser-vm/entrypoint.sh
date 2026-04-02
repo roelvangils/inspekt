@@ -34,6 +34,19 @@ echo "=========================="
 echo "Connect via browser: http://localhost:${NOVNC_PORT}"
 echo "=========================="
 
+# Sync inspekt config to the terminal user's home (bind-mounted → user-editable copy).
+# The bind-mounted root copy is read-only; we copy it to the inspekt user's home
+# where it can be edited from the terminal.
+if [ -f /root/.config/inspekt.yaml ]; then
+    mkdir -p /home/inspekt/.config
+    cp /root/.config/inspekt.yaml /home/inspekt/.config/inspekt.yaml
+    chown inspekt:inspekt /home/inspekt/.config /home/inspekt/.config/inspekt.yaml
+    chmod 644 /home/inspekt/.config/inspekt.yaml
+fi
+
+# Initialize mitmproxy config (proxy disabled by default, scripts loaded on demand)
+cp /opt/proxy-scripts/default_config.json /tmp/mitmproxy_config.json
+
 # Ensure shared temp files are writable by the restricted terminal user
 # Use group permissions instead of world-writable to prevent prompt injection
 touch /tmp/.inspekt_domain

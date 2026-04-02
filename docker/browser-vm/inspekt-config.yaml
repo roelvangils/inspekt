@@ -1,0 +1,111 @@
+# ============================================================
+# Inspekt VM Configuration
+# ============================================================
+# Edit this file and restart the browser (Cmd+K → "Restart Browser")
+# to apply changes. Some settings take effect immediately.
+
+# --------------------------------------------------
+# Appearance
+# --------------------------------------------------
+appearance:
+  # Theme for the control panel.
+  # Options: dark, light, auto (follows system preference)
+  theme: auto
+
+  # Color scheme for the terminal and code editor.
+  # Options: tokyo-night, dracula, nord, catppuccin-mocha,
+  #          gruvbox-dark, monokai-soda, tomorrow, github,
+  #          catppuccin-latte, solarized-light
+  editor-theme: tokyo-night
+
+# --------------------------------------------------
+# Browser
+# --------------------------------------------------
+browser:
+  # URL to load when opening a new tab.
+  homepage: http://inspekt/status
+
+  # Default search engine for address bar queries.
+  # The query is appended to this URL.
+  search-engine: https://duckduckgo.com/?q=
+
+  # Emulate prefers-reduced-motion: reduce.
+  # Tests how sites respond to motion-sensitive users.
+  force-reduced-motion: false
+
+  # Emulate prefers-contrast: more.
+  # Tests how sites respond to high-contrast preferences.
+  force-high-contrast: false
+
+  # Force dark color scheme on all web content,
+  # even sites that don't support dark mode.
+  force-dark-content: false
+
+  # Override DPI scaling (e.g. 1.5 or 2).
+  # Tests how sites respond to different zoom levels.
+  # Leave empty to use the default (1x).
+  device-scale-factor:
+
+  # Hide scrollbars for clean screenshots.
+  hide-scrollbars: false
+
+  # Deterministic rendering mode.
+  # Disables timer jitter for pixel-perfect reproducible screenshots.
+  deterministic-rendering: false
+
+  # Log TLS session keys to /tmp/sslkeys.log.
+  # Enables Wireshark HTTPS traffic decryption.
+  ssl-key-logging: false
+
+# --------------------------------------------------
+# Commands
+# --------------------------------------------------
+commands:
+  # Default accessibility audit level.
+  # Options: 2a, 2aa, 2aaa
+  default-a11y-level: 2aa
+
+  # Default screenshot settings.
+  screenshot:
+    format: png         # png, jpeg, webp
+    scale: 2            # 1 = standard, 2 = retina
+    quality: 0.92       # JPEG/WebP quality (0.0 – 1.0)
+
+  # Default screencast settings.
+  screencast:
+    format: mp4         # mp4, webm
+    quality: 80         # JPEG frame quality (50 – 100)
+
+# --------------------------------------------------
+# Terminal
+# --------------------------------------------------
+terminal:
+  # Default position when opening the floating terminal.
+  # Options: right, left
+  position: right
+
+  # Default split ratio (0.0 – 1.0).
+  # 0.5 = equal halves.
+  split-ratio: 0.5
+
+  # Shell history size (number of lines).
+  history-size: 1000
+
+  # Trigger words: when any of these appear in terminal output,
+  # a notification toast and subtle beep are shown.
+  # Useful for catching errors in long-running commands.
+  # Set to an empty list [] to disable.
+  trigger-words:
+    - error
+    - fail
+
+# --------------------------------------------------
+# Advanced
+# --------------------------------------------------
+advanced:
+  # Command execution timeout in seconds.
+  # AI-powered commands (ask, describe) use 2x this value.
+  command-timeout: 30
+
+  # Enable the command palette (Cmd+K / Ctrl+K).
+  command-palette: true

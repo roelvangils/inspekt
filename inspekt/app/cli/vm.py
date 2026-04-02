@@ -292,7 +292,7 @@ def _start_container(dev_mode: bool = False, vm_dir: Path = None) -> bool:
             "-v", f"{vm_dir}/icons:/usr/share/novnc/icons:ro",
             "-v", f"{vm_dir}/control-server.py:/opt/control-server.py:ro",
             "-v", f"{vm_dir}/terminal-server.py:/opt/terminal-server.py:ro",
-            "-v", f"{vm_dir}/inspekt-config.json:/root/.config/inspekt.json:ro",
+            "-v", f"{vm_dir}/inspekt-config.yaml:/root/.config/inspekt.yaml:ro",
         ])
 
         # Mount inspekt source for Python code changes
@@ -311,7 +311,7 @@ def _start_container(dev_mode: bool = False, vm_dir: Path = None) -> bool:
         click.echo("    • fonts/ → /usr/share/novnc/fonts/")
         click.echo("    • control-server.py → /opt/control-server.py")
         click.echo("    • terminal-server.py → /opt/terminal-server.py")
-        click.echo("    • inspekt-config.json → /root/.config/inspekt.json")
+        click.echo("    • inspekt-config.yaml → /root/.config/inspekt.yaml")
         click.echo("    • inspekt-vm-data → /root/.config/inspekt/ (persistent)")
         if inspekt_src.exists():
             click.echo("    • inspekt/ → /opt/inspekt/inspekt/")

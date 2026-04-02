@@ -18,6 +18,22 @@ router = APIRouter()
 register_all_commands()
 
 
+def _has_required_params(cmd) -> bool:
+    """Check if a command has required input parameters (safely)."""
+    try:
+        return bool(cmd.params_schema.model_json_schema().get("required"))
+    except Exception:
+        return False
+
+
+class SubcommandSummary(BaseModel):
+    """Summary of a subcommand within a command group."""
+
+    name: str
+    description: str
+    url_scheme_action: str | None = None
+
+
 class CommandSummary(BaseModel):
     """Summary of a command for listing."""
 
@@ -26,9 +42,19 @@ class CommandSummary(BaseModel):
     category: str
     description: str
     cli_name: str
-    api_path: str
+    cli_hidden: bool = False  # True if no direct CLI command (API/MCP only)
+    api_path: str | None  # None for CLI-only commands
     mcp_name: str
     mcp_enabled: bool
+    # URL scheme support
+    url_scheme: str | None = None
+    has_url_scheme: bool = False
+    # Command group info
+    is_group: bool = False
+    subcommand_count: int = 0
+    # Metadata completeness
+    has_handler: bool = False  # True if command has unified handler
+    has_required_params: bool = False  # True if command has required input fields
 
 
 class CommandDetail(BaseModel):
@@ -49,6 +75,17 @@ class CommandDetail(BaseModel):
     examples: list[str]
     deprecated: bool
     deprecated_message: str | None
+    # URL scheme support
+    url_scheme: str | None = None
+    url_scheme_params: dict[str, str] = {}
+    url_scheme_examples: list[str] = []
+    has_url_scheme: bool = False
+    # URL scheme output mode (only for URL scheme commands)
+    default_output_mode: str | None = None
+    available_output_modes: list[str] = []
+    # Command group support
+    is_group: bool = False
+    subcommands: list[SubcommandSummary] = []
     # Schema annotations (field-level customizations)
     schema_annotations: dict[str, Any] = {}
     # Customization flags
@@ -120,6 +157,31 @@ class ResetRequest(BaseModel):
     fields: list[str]  # ["description", "mcp_name", "examples"] or ["all"]
 
 
+class CLIOptionInfo(BaseModel):
+    """Information about a CLI option."""
+
+    name: str
+    short: str | None = None  # e.g., "-d"
+    type: str  # e.g., "INTEGER", "TEXT", "DIRECTORY"
+    required: bool = False
+    default: str | int | float | bool | None = None  # JSON-serializable types only
+    is_flag: bool = False
+    help: str = ""
+
+
+class CLIInfo(BaseModel):
+    """CLI-specific information for a command.
+
+    This is extracted at runtime from Click commands to ensure
+    perfect consistency with `inspekt <command> --help`.
+    """
+
+    full_help: str  # Complete help text as shown by --help
+    short_help: str  # First non-empty line
+    options: list[CLIOptionInfo]
+    examples: list[str]  # Extracted from docstring
+
+
 class ResetResponse(BaseModel):
     """Response from resetting fields."""
 
@@ -149,9 +211,19 @@ def list_commands():
                 category=cmd.category.value,
                 description=cmd.description.split("\n")[0],  # First line only
                 cli_name=cmd.get_cli_name(),
+                cli_hidden=cmd.cli_hidden,  # True = no direct CLI command
                 api_path=cmd.get_api_path(),
                 mcp_name=cmd.get_mcp_name(),
                 mcp_enabled=registry.is_mcp_enabled(cmd.id),
+                # URL scheme support
+                url_scheme=cmd.url_scheme,
+                has_url_scheme=cmd.has_url_scheme(),
+                # Command group info
+                is_group=cmd.is_group,
+                subcommand_count=len(cmd.subcommands),
+                # Handler status (CLI-only vs unified)
+                has_handler=cmd.handler is not None,
+                has_required_params=_has_required_params(cmd),
             )
         )
 
@@ -182,9 +254,19 @@ def list_commands_by_category():
                 category=cat_name,
                 description=cmd.description.split("\n")[0],
                 cli_name=cmd.get_cli_name(),
+                cli_hidden=cmd.cli_hidden,  # True = no direct CLI command
                 api_path=cmd.get_api_path(),
                 mcp_name=cmd.get_mcp_name(),
                 mcp_enabled=registry.is_mcp_enabled(cmd.id),
+                # URL scheme support
+                url_scheme=cmd.url_scheme,
+                has_url_scheme=cmd.has_url_scheme(),
+                # Command group info
+                is_group=cmd.is_group,
+                subcommand_count=len(cmd.subcommands),
+                # Handler status (CLI-only vs unified)
+                has_handler=cmd.handler is not None,
+                has_required_params=_has_required_params(cmd),
             )
             for cmd in cmds
         ]
@@ -216,6 +298,44 @@ def list_mcp_enabled():
     return {"commands": commands, "total": len(commands)}
 
 
+@router.get("/url-scheme/enabled")
+def list_url_scheme_enabled():
+    """
+    List all commands that have URL scheme support.
+
+    Returns commands that can be triggered via inspekt:// URLs,
+    including their default output mode from the registry (SINGLE SOURCE OF TRUTH).
+    """
+    registry = get_registry()
+    commands = []
+
+    for cmd in registry.get_for_url_scheme():
+        commands.append(
+            {
+                "id": cmd.id,
+                "name": cmd.name,
+                "url_scheme": cmd.url_scheme,
+                "url_scheme_params": cmd.url_scheme_params,
+                "url_scheme_examples": cmd.url_scheme_examples,
+                "description": cmd.description.split("\n")[0],
+                # Read from registry - SINGLE SOURCE OF TRUTH
+                "default_output_mode": cmd.url_scheme_output_mode,
+                "url_scheme_timeout": cmd.url_scheme_timeout,
+                "available_output_modes": cmd.url_scheme_allowed_output_modes or ["clipboard", "notification", "dialog", "both", "silent"],
+                "is_group": cmd.is_group,
+                "subcommands": [
+                    {
+                        "name": sub.name,
+                        "url_scheme_action": sub.url_scheme_action,
+                    }
+                    for sub in cmd.subcommands
+                ] if cmd.is_group else [],
+            }
+        )
+
+    return {"commands": commands, "total": len(commands)}
+
+
 @router.get("/{command_id}", response_model=CommandDetail)
 def get_command(command_id: str):
     """
@@ -234,6 +354,21 @@ def get_command(command_id: str):
     # Get customization status
     customized = registry.is_customized(command_id)
 
+    # Build subcommand summaries
+    subcommands = [
+        SubcommandSummary(
+            name=sub.name,
+            description=sub.description,
+            url_scheme_action=sub.url_scheme_action,
+        )
+        for sub in cmd.subcommands
+    ]
+
+    # Get output mode from registry if this is a URL scheme command (SINGLE SOURCE OF TRUTH)
+    default_output_mode = cmd.url_scheme_output_mode if cmd.has_url_scheme() else None
+    all_modes = ["clipboard", "notification", "dialog", "both", "silent"]
+    available_output_modes = (cmd.url_scheme_allowed_output_modes or all_modes) if cmd.has_url_scheme() else []
+
     return CommandDetail(
         id=cmd.id,
         name=cmd.name,
@@ -251,6 +386,17 @@ def get_command(command_id: str):
         examples=registry.get_effective_examples(cmd),
         deprecated=cmd.deprecated,
         deprecated_message=cmd.deprecated_message,
+        # URL scheme support
+        url_scheme=cmd.url_scheme,
+        url_scheme_params=cmd.url_scheme_params,
+        url_scheme_examples=cmd.url_scheme_examples,
+        has_url_scheme=cmd.has_url_scheme(),
+        # URL scheme output modes
+        default_output_mode=default_output_mode,
+        available_output_modes=available_output_modes,
+        # Command group support
+        is_group=cmd.is_group,
+        subcommands=subcommands,
         # Schema annotations
         schema_annotations=registry.get_schema_annotations(command_id),
         # Customization flags
@@ -391,4 +537,51 @@ def reset_command_config(command_id: str, request: ResetRequest):
         command_id=command_id,
         reset_fields=reset_fields,
         message=f"Reset {len(reset_fields)} field(s) to default for {cmd.name}",
+    )
+
+
+@router.get("/{command_id}/cli-info", response_model=CLIInfo)
+def get_cli_info(command_id: str):
+    """
+    Get CLI-specific information including options and help text.
+
+    This extracts the actual CLI details from Click at runtime, ensuring
+    the data shown in the UI matches exactly what users see in `--help`.
+
+    Returns options, help text, and examples as they appear in the terminal.
+    """
+    from inspekt.core.cli_introspection import get_cli_command_details
+
+    registry = get_registry()
+    cmd = registry.get(command_id)
+
+    if not cmd:
+        raise HTTPException(status_code=404, detail=f"Command '{command_id}' not found")
+
+    # Build the CLI path from command definition
+    cli_name = cmd.get_cli_name()
+    if not cli_name:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Command '{command_id}' has no CLI implementation",
+        )
+
+    # Handle grouped commands (e.g., "extract.images" vs "axe")
+    if cmd.cli_group:
+        cli_path = f"{cmd.cli_group}.{cli_name}"
+    else:
+        cli_path = cli_name
+
+    details = get_cli_command_details(cli_path)
+    if not details:
+        raise HTTPException(
+            status_code=404,
+            detail=f"CLI command '{cli_path}' not found or could not be loaded",
+        )
+
+    return CLIInfo(
+        full_help=details["full_help"],
+        short_help=details["short_help"],
+        options=[CLIOptionInfo(**opt) for opt in details["options"]],
+        examples=details["examples"],
     )

@@ -10,8 +10,10 @@
     <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.min.js" integrity="sha384-xjfWUeCWdMtvpAb/SmM6lMzS6pQGcQa0loOl1d97j6Odw0vjK9nW3+dTb/bn/mwH" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.min.js" integrity="sha384-dpjGwSSISUTz2taP54Bor7qkyMR20sSO9oe11UVYnGs2/YdUBf7HW30XKQx9PCzn" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/xterm-addon-web-links@0.9.0/lib/xterm-addon-web-links.min.js" integrity="sha384-iAAiqSZrWZz/YKZSTKOPNaRhVOg9JY14avg2EWEpYNnUsrnATA+Sg8pV7mak84/G" crossorigin="anonymous"></script>
-    <!-- ninja-keys command palette (pinned version) -->
-    <script type="module" src="https://unpkg.com/ninja-keys@1.2.2/dist/ninja-keys.js" integrity="sha384-mY15TPaxlubSsNXsJELAAD1vTAticpVNQadqtGcUFoHQGsKtps3edr4jCF36RRh/" crossorigin="anonymous"></script>
+    <!-- ninja-keys command palette (vendored v1.2.2, bundled with Lit) -->
+    <script type="module" src="/vendor/ninja-keys.min.js"></script>
+    <!-- CodeMirror 6 editor (bundled locally for the text editor panel) -->
+    <script src="/vendor/codemirror.min.js"></script>
     <style>
         /* JetBrains Mono Nerd Font for terminal */
         @font-face {
@@ -1360,6 +1362,7 @@
                         top 0.2s cubic-bezier(0.4, 0, 0.2, 1),
                         width 0.2s cubic-bezier(0.4, 0, 0.2, 1),
                         height 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+                        border-radius 0.2s ease,
                         opacity 0.15s ease-out;
             box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.25);
         }
@@ -1410,6 +1413,112 @@
         }
         .sr-captions-btn:hover { color: #fff; background: rgba(255, 255, 255, 0.1); }
         .sr-captions-btn.active { color: #667eea; }
+
+        /* VoiceOver-style floating caption panel
+           Mimics the real macOS VoiceOver caption window:
+           frosted glass, thick white border + black hairline, large radius */
+        .sr-floating-caption {
+            position: absolute;
+            z-index: 52;
+            background: rgba(30, 30, 30, 0.65);
+            -webkit-backdrop-filter: blur(40px) saturate(1.8);
+            backdrop-filter: blur(40px) saturate(1.8);
+            color: #fff;
+            /* Thick white border + 1px semi-transparent black hairline outside */
+            outline: 1px solid rgba(0, 0, 0, 0.35);
+            border: 4px solid #fff;
+            border-radius: 14px;
+            box-shadow: 0 6px 24px rgba(0, 0, 0, 0.5);
+            padding: 10px 14px;
+            font: 500 16px/1.3 system-ui, -apple-system, sans-serif;
+            min-width: 280px;
+            /* max-width set dynamically to 80% of canvas width */
+            resize: horizontal;
+            overflow: hidden;
+            user-select: none;
+            cursor: default;
+            animation: srFloatIn 0.2s ease-out;
+        }
+        @keyframes srFloatIn {
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .sr-floating-caption .sr-floating-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .sr-floating-caption .sr-floating-text {
+            flex: 1;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .sr-floating-caption .sr-floating-close {
+            background: none;
+            border: none;
+            color: #fff;
+            font-size: 18px;
+            line-height: 1;
+            cursor: pointer;
+            padding: 0 2px;
+            opacity: 0.7;
+            transition: opacity 0.15s;
+            flex-shrink: 0;
+            order: -1; /* Position close button before (left of) text */
+        }
+        .sr-floating-caption .sr-floating-close:hover { opacity: 1; }
+        .sr-floating-caption .sr-floating-meta {
+            font: 13px/1 system-ui;
+            color: rgba(255, 255, 255, 0.5);
+            margin-top: 4px;
+            font-variant-numeric: tabular-nums;
+        }
+
+        /* Speech log (generic, works for all SRs) */
+        .sr-speech-log {
+            background: rgba(15, 15, 25, 0.95);
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            max-height: 200px;
+            display: flex;
+            flex-direction: column;
+        }
+        .sr-speech-log-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 6px 12px;
+            font: 500 11px/1 system-ui;
+            color: rgba(255, 255, 255, 0.4);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+            flex-shrink: 0;
+        }
+        .sr-speech-log-header-actions { display: flex; gap: 6px; }
+        .sr-speech-log-btn {
+            background: none; border: none; color: rgba(255, 255, 255, 0.4);
+            cursor: pointer; font: 11px system-ui; padding: 2px 6px; border-radius: 3px;
+            transition: color 0.15s, background 0.15s;
+        }
+        .sr-speech-log-btn:hover { color: #fff; background: rgba(255, 255, 255, 0.1); }
+        .sr-speech-log-entries {
+            overflow-y: auto;
+            flex: 1;
+            font: 13px/1.5 'SF Mono', Menlo, Consolas, monospace;
+            color: rgba(255, 255, 255, 0.8);
+        }
+        .sr-speech-log-entry {
+            padding: 3px 12px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+        }
+        .sr-speech-log-entry .sr-log-role {
+            color: #667eea;
+            margin-right: 8px;
+            font-weight: 600;
+            font-size: 11px;
+            text-transform: uppercase;
+        }
 
         /* SR launcher popout — override base .url-bar-popout completely */
         .sr-popout {
@@ -1707,24 +1816,38 @@
 
         /* =============================================
          * Command Palette (ninja-keys)
+         * Uses existing theme variables — auto-adapts to dark/light mode.
+         * Frosted glass matches .url-bar-popout pattern.
          * ============================================= */
         ninja-keys {
-            --ninja-accent-color: var(--primary);
+            --ninja-accent-color: var(--accent);
             --ninja-font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            --ninja-font-size: 16px;
             --ninja-z-index: 2000;
-            /* Dark theme */
-            --ninja-modal-background: rgba(20, 20, 30, 0.95);
-            --ninja-backdrop-filter: blur(16px);
-            --ninja-overflow-background: rgba(20, 20, 30, 0.95);
-            --ninja-text-color: #e0e0e0;
-            --ninja-placeholder-color: #888;
-            --ninja-selected-background: rgba(102, 126, 234, 0.2);
-            --ninja-footer-background: rgba(30, 30, 40, 0.9);
+            /* Frosted glass background — matches .url-bar-popout */
+            --ninja-modal-background: color-mix(in srgb, var(--bg-bar) 85%, transparent);
+            --ninja-backdrop-filter: blur(20px) saturate(180%);
+            --ninja-modal-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+            /* No backdrop overlay */
+            --ninja-overflow-background: transparent;
+            /* Text colors from theme */
+            --ninja-text-color: var(--text-bright);
+            --ninja-placeholder-color: var(--text-dim);
+            --ninja-secondary-text-color: var(--text-dim);
+            --ninja-icon-color: var(--text-dim);
+            /* Selection & surfaces */
+            --ninja-selected-background: color-mix(in srgb, var(--accent) 20%, transparent);
+            --ninja-footer-background: color-mix(in srgb, var(--bg-bar) 90%, transparent);
+            --ninja-secondary-background-color: color-mix(in srgb, var(--bg-btn) 80%, transparent);
+            /* Layout */
             --ninja-key-border-radius: 6px;
-            --ninja-secondary-text-color: #888;
-            --ninja-icon-color: #888;
-            --ninja-secondary-background-color: rgba(40, 40, 50, 0.8);
             --ninja-actions-height: 400px;
+        }
+
+        /* Border & radius on the modal itself (shadow DOM part) */
+        ninja-keys::part(actions-list) {
+            border: 1px solid color-mix(in srgb, var(--divider) 60%, transparent);
+            border-radius: 0 0 12px 12px;
         }
 
         /* Output Panel for structured command results */
@@ -1910,7 +2033,8 @@
             cursor: col-resize;
             flex-shrink: 0;
             position: relative;
-            z-index: 10;
+            z-index: 20; /* Above upload overlay (z-index: 10) inside terminal panel */
+            isolation: isolate; /* Own stacking context so button always renders on top */
             transition: background 0.15s ease;
         }
         .split-drag-handle:hover,
@@ -2098,6 +2222,180 @@
         .terminal-container .xterm-screen {
             background: transparent !important;
         }
+
+        /* ── Panel tabs (Terminal | Editor) ── */
+        .panel-tabs { display: flex; gap: 2px; }
+        .panel-tab {
+            display: flex; align-items: center; gap: 6px;
+            padding: 5px 12px; background: none; border: none;
+            color: #888; font-size: 13px; cursor: pointer;
+            border-radius: 4px 4px 0 0; transition: all 0.15s ease;
+            white-space: nowrap;
+        }
+        .panel-tab:hover { color: #ccc; background: rgba(255,255,255,0.05); }
+        .panel-tab.active { color: #ccc; background: rgba(255,255,255,0.1); }
+        .panel-tab svg { width: 14px; height: 14px; fill: currentColor; opacity: 0.7; }
+        .dirty-indicator { color: var(--accent, #667eea); font-size: 10px; margin-left: 2px; }
+
+        /* ── Panel body (wraps terminal + editor containers) ── */
+        .panel-body { flex: 1; display: flex; overflow: hidden; position: relative; }
+
+        /* ── Editor container ── */
+        .editor-container { flex: 1; display: flex; overflow: hidden; }
+        .editor-instance { flex: 1; overflow: hidden; position: relative; }
+        .editor-instance .cm-editor {
+            height: 100%;
+            font-family: 'JetBrains Mono NF', monospace;
+            font-size: 13px;
+        }
+        .editor-instance .cm-editor .cm-scroller { overflow: auto; }
+        .editor-instance .cm-editor.cm-focused { outline: none; }
+
+        /* ── Editor toolbar ── */
+        .editor-toolbar {
+            display: flex; align-items: center; gap: 8px;
+            font-size: 12px; color: #888; flex: 1; min-width: 0;
+        }
+        .editor-filepath {
+            overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+            color: #aaa; font-family: 'JetBrains Mono NF', monospace; font-size: 11px;
+        }
+        .editor-readonly-badge {
+            padding: 1px 6px; border-radius: 3px;
+            background: rgba(255, 193, 7, 0.2); color: #ffc107;
+            font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; flex-shrink: 0;
+        }
+
+        /* ── File browser sidebar ── */
+        .file-browser-sidebar {
+            width: 200px; border-right: 1px solid rgba(255,255,255,0.1);
+            overflow-y: auto; flex-shrink: 0; background: rgba(0,0,0,0.15);
+        }
+        .file-browser-header {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 8px 12px; border-bottom: 1px solid rgba(255,255,255,0.1);
+            font-size: 12px; color: #888;
+        }
+        .file-browser-close {
+            background: none; border: none; color: #888; cursor: pointer;
+            font-size: 16px; line-height: 1; padding: 0 4px;
+        }
+        .file-browser-close:hover { color: #fff; }
+        .file-browser-tree { padding: 4px 0; }
+        .file-entry {
+            display: flex; align-items: center; gap: 6px;
+            padding: 4px 12px; cursor: pointer; font-size: 12px; color: #aaa;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        .file-entry:hover { background: rgba(255,255,255,0.05); color: #fff; }
+        .file-entry.dir { color: var(--accent, #667eea); }
+        .file-entry .file-icon { opacity: 0.6; font-size: 11px; flex-shrink: 0; }
+        .file-entry.active { background: rgba(255,255,255,0.08); color: #fff; }
+        .file-children { padding-left: 12px; }
+        .file-children.collapsed { display: none; }
+
+        /* ── Upload overlay (covers only the panel-body area) ── */
+        .upload-overlay {
+            position: absolute; inset: 0;
+            background: rgba(100, 100, 110, 0.3);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            flex-direction: column;
+            align-items: center; justify-content: center;
+            z-index: 10; border-radius: inherit;
+            /* Hidden by default — fade in/out via opacity + visibility */
+            display: flex;
+            opacity: 0; visibility: hidden; pointer-events: none;
+            transition: opacity 0.2s ease, visibility 0.2s ease;
+        }
+        .upload-overlay.active {
+            opacity: 1; visibility: visible; pointer-events: auto;
+        }
+        .upload-dropzone {
+            display: flex; flex-direction: column;
+            align-items: center; gap: 10px;
+            padding: 32px 40px; text-align: center;
+            border-radius: 12px;
+            /* Solid card so text is always readable over the frosted overlay */
+            background: rgba(30, 30, 38, 0.9);
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+            transition: background 0.2s;
+        }
+        .upload-dropzone.dragover {
+            background: rgba(40, 40, 55, 0.95);
+        }
+        .upload-browse-btn {
+            padding: 6px 16px; border-radius: 6px;
+            background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.5);
+            border: none; cursor: pointer; font-size: 13px;
+            transition: background 0.15s, color 0.15s;
+        }
+        .upload-browse-btn:hover, .upload-browse-btn:focus-visible {
+            background: rgba(255,255,255,0.15); color: rgba(255,255,255,0.8);
+            outline: none;
+        }
+        .upload-drop-hint { font-size: 16px; color: rgba(255,255,255,0.7); font-weight: 400; }
+        .upload-restrictions { font-size: 11px; color: rgba(255,255,255,0.25); margin-top: 4px; }
+        .upload-file-list { width: 100%; max-width: 320px; }
+        .upload-file-entry {
+            display: flex; align-items: center; gap: 8px;
+            padding: 6px 10px; border-radius: 6px;
+            background: rgba(255,255,255,0.05);
+            margin-bottom: 4px; font-size: 13px;
+        }
+        .upload-file-entry.rejected { opacity: 0.6; }
+        .upload-file-name {
+            color: rgba(255,255,255,0.8); flex: 1; min-width: 0;
+            overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+            font-family: 'JetBrains Mono NF', monospace; font-size: 12px;
+            background: none; border: none; outline: none;
+            padding: 0; margin: 0; cursor: text;
+        }
+        .upload-file-name:focus {
+            background: rgba(255,255,255,0.08); border-radius: 3px;
+            padding: 1px 4px; margin: -1px -4px;
+        }
+        .upload-file-name.rejected {
+            color: rgba(255,255,255,0.35); cursor: default;
+        }
+        .upload-file-badge {
+            font-size: 10px; padding: 1px 6px; border-radius: 3px;
+            flex-shrink: 0; white-space: nowrap;
+        }
+        .upload-file-badge.rejected {
+            background: rgba(255, 80, 80, 0.2); color: #f66;
+        }
+        .upload-file-size { color: rgba(255,255,255,0.3); font-size: 11px; flex-shrink: 0; }
+        .upload-file-remove {
+            background: none; border: none; color: rgba(255,255,255,0.3);
+            cursor: pointer; font-size: 16px; line-height: 1; padding: 0 2px; flex-shrink: 0;
+        }
+        .upload-file-remove:hover { color: rgba(255,100,100,0.8); }
+        .upload-submit-btn {
+            padding: 8px 24px; border-radius: 6px; margin-top: 4px;
+            background: var(--accent, #667eea); color: white;
+            border: none; cursor: pointer; font-size: 13px;
+            transition: filter 0.15s;
+        }
+        .upload-submit-btn:hover { filter: brightness(1.1); }
+        .upload-submit-btn:disabled { cursor: default; filter: none; }
+        .upload-progress { width: 200px; text-align: center; }
+        .upload-progress-bar {
+            height: 3px; background: rgba(255,255,255,0.08);
+            border-radius: 2px; overflow: hidden;
+        }
+        .upload-progress-fill {
+            height: 100%; width: 0%;
+            background: var(--accent, #667eea);
+            transition: width 0.3s ease;
+        }
+        .upload-progress-text { font-size: 12px; color: rgba(255,255,255,0.5); margin-top: 6px; }
+        .upload-cancel {
+            margin-top: 12px; border: none; cursor: pointer; font-size: 12px;
+            color: rgba(255,255,255,0.5);
+            background: rgba(0,0,0,0.3); padding: 4px 12px; border-radius: 4px;
+        }
+        .upload-cancel:hover { color: rgba(255,255,255,0.8); background: rgba(0,0,0,0.4); }
 
         /* Terminal button active state */
         button.terminal-active {
@@ -2634,7 +2932,7 @@
             border-color: var(--accent);
         }
 
-        .restart-option-hard:hover {
+        .restart-option-destructive:hover {
             background: rgba(239, 68, 68, 0.1);
             border-color: var(--danger);
         }
@@ -2723,6 +3021,66 @@
         .restart-cancel:hover {
             background: var(--bg-btn);
             color: var(--text-bright);
+        }
+
+        /* =============================================
+         * Image Preview Modal
+         * ============================================= */
+        .image-preview-overlay {
+            position: fixed; inset: 0;
+            background: rgba(15, 15, 26, 0.9);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            z-index: 200;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 40px;
+        }
+        .image-preview-overlay.open { display: flex; }
+
+        .image-preview-modal {
+            max-width: 90vw; max-height: 90vh;
+            display: flex; flex-direction: column;
+            border-radius: 12px; overflow: hidden;
+            background: rgba(30, 30, 40, 0.95);
+            box-shadow: 0 25px 50px rgba(0,0,0,0.5);
+        }
+        .image-preview-header {
+            display: flex; align-items: center; gap: 12px;
+            padding: 10px 16px;
+            border-bottom: 1px solid rgba(255,255,255,0.08);
+            min-width: 0;
+        }
+        .image-preview-filename {
+            font-family: 'JetBrains Mono NF', monospace;
+            font-size: 13px; color: #ccc;
+            overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        }
+        .image-preview-meta {
+            font-size: 11px; color: #888;
+            white-space: nowrap; flex-shrink: 0;
+        }
+        .image-preview-actions {
+            margin-left: auto; display: flex; gap: 4px; flex-shrink: 0;
+        }
+        .image-preview-body {
+            overflow: auto; display: flex;
+            align-items: center; justify-content: center;
+            padding: 16px;
+        }
+        .image-preview-body img {
+            max-width: 100%; max-height: calc(90vh - 60px);
+            object-fit: contain;
+            border-radius: 4px;
+            /* Checkerboard background for transparency */
+            background-image: linear-gradient(45deg, #2a2a2a 25%, transparent 25%),
+                              linear-gradient(-45deg, #2a2a2a 25%, transparent 25%),
+                              linear-gradient(45deg, transparent 75%, #2a2a2a 75%),
+                              linear-gradient(-45deg, transparent 75%, #2a2a2a 75%);
+            background-size: 16px 16px;
+            background-position: 0 0, 0 8px, 8px -8px, -8px 0px;
+            background-color: #222;
         }
 
         /* =============================================
@@ -3326,6 +3684,12 @@
             Terminal
         </button>
 
+        <!-- Command Palette Button -->
+        <button id="cmdPaletteBtn" onclick="document.getElementById('commandPalette')?.open()" title="Command Palette (⌘K)">
+            <svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27a6.5 6.5 0 0 0 1.48-5.34c-.47-2.78-2.79-5-5.59-5.34A6.505 6.505 0 0 0 3.03 9.8c0 3.22 2.34 5.9 5.42 6.44a6.5 6.5 0 0 0 2.66-.13l.27.28v.79l4.26 4.25c.41.41 1.07.41 1.48 0l.01-.01c.41-.41.41-1.07 0-1.48L15.5 14zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+            Commands
+        </button>
+
         <!-- DevTools Button -->
         <button id="devtoolsBtn" onclick="toggleDevTools()" title="Toggle DevTools (D)">
             <svg viewBox="0 0 24 24"><path d="M22.7 19l-9.1-9.1c.9-2.3.4-5-1.5-6.9-2-2-5-2.4-7.4-1.3L9 6 6 9 1.6 4.7C.4 7.1.9 10.1 2.9 12.1c1.9 1.9 4.6 2.4 6.9 1.5l9.1 9.1c.4.4 1 .4 1.4 0l2.3-2.3c.5-.4.5-1.1.1-1.4z"/></svg>
@@ -3396,6 +3760,7 @@
                     <label><input type="checkbox" id="srStartFromFocus" checked> Start from focus</label>
                     <label><input type="checkbox" id="srSyncFocus"> Sync browser focus</label>
                     <label><input type="checkbox" id="srSyncMouse"> Mouse moves SR focus</label>
+                    <label><input type="checkbox" id="srVOCursor" onchange="onVOCursorToggle()"> VoiceOver-style cursor</label>
                 </div>
             </div>
         </div>
@@ -3512,20 +3877,6 @@
             </button>
         </div>
 
-    <!-- SR Caption Bar (appears when simulation is active) -->
-    <div id="srCaptions" class="sr-captions" style="display: none;">
-        <div class="sr-captions-current">
-            <span class="sr-captions-indicator">▸</span>
-            <span id="srCaptionText" class="sr-captions-text"></span>
-        </div>
-        <div class="sr-captions-meta">
-            <span id="srCaptionHistory" class="sr-captions-history"></span>
-            <span id="srPosition" class="sr-captions-position"></span>
-            <button id="srTTSBtn" class="sr-captions-btn" onclick="toggleSRTTS()" title="Toggle speech (T)">🔊</button>
-            <button class="sr-captions-btn" onclick="stopSRSimulation()" title="Stop simulation (Escape)">✕</button>
-        </div>
-    </div>
-
     <!-- Click-to-focus overlay (appears when terminal closes) -->
     <div class="focus-overlay" id="focusOverlay" onclick="hideFocusOverlay()">
         <div class="focus-overlay-hint">Click anywhere to interact with browser</div>
@@ -3570,39 +3921,67 @@
         </div>
     </div>
 
-    <!-- Terminal Overlay -->
+    <!-- Terminal / Editor Panel -->
     <div class="terminal-overlay" id="terminalOverlay">
         <div class="terminal-header">
-            <div class="terminal-title">
-                <svg viewBox="0 0 24 24"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 14H4V8h16v10z"/><path d="M7 15l4-4-4-4"/></svg>
-                Terminal
+            <!-- Tab bar: Terminal | Editor -->
+            <div class="panel-tabs">
+                <button class="panel-tab active" id="tabTerminal" onclick="switchPanel('terminal')">
+                    <svg viewBox="0 0 24 24"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 14H4V8h16v10z"/><path d="M7 15l4-4-4-4"/></svg>
+                    Terminal
+                </button>
+                <button class="panel-tab" id="tabEditor" onclick="switchPanel('editor')">
+                    <svg viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zM6 20V4h7v5h5v11H6z"/></svg>
+                    Editor
+                    <span class="dirty-indicator" id="editorDirtyDot" style="display:none">●</span>
+                </button>
             </div>
-            <div class="terminal-link-settings">
-                <label for="terminalTheme">Theme</label>
-                <select id="terminalTheme" onchange="applyTerminalTheme(this.value)">
-                    <optgroup label="Dark">
-                        <option value="tokyo-night">Tokyo Night</option>
-                        <option value="dracula">Dracula</option>
-                        <option value="nord">Nord</option>
-                        <option value="catppuccin-mocha">Catppuccin Mocha</option>
-                        <option value="gruvbox-dark">Gruvbox Dark</option>
-                        <option value="monokai-soda">Monokai Soda</option>
-                    </optgroup>
-                    <optgroup label="Light">
-                        <option value="tomorrow">Tomorrow</option>
-                        <option value="github">GitHub</option>
-                        <option value="catppuccin-latte">Catppuccin Latte</option>
-                        <option value="solarized-light">Solarized Light</option>
-                    </optgroup>
-                </select>
+            <!-- Terminal settings (visible when Terminal tab active) -->
+            <div id="terminalSettings" style="display:flex; align-items:center; gap:8px;">
+                <div class="terminal-link-settings">
+                    <label for="terminalTheme">Theme</label>
+                    <select id="terminalTheme" onchange="applyTerminalTheme(this.value)">
+                        <optgroup label="Dark">
+                            <option value="tokyo-night">Tokyo Night</option>
+                            <option value="dracula">Dracula</option>
+                            <option value="nord">Nord</option>
+                            <option value="catppuccin-mocha">Catppuccin Mocha</option>
+                            <option value="gruvbox-dark">Gruvbox Dark</option>
+                            <option value="monokai-soda">Monokai Soda</option>
+                        </optgroup>
+                        <optgroup label="Light">
+                            <option value="tomorrow">Tomorrow</option>
+                            <option value="github">GitHub</option>
+                            <option value="catppuccin-latte">Catppuccin Latte</option>
+                            <option value="solarized-light">Solarized Light</option>
+                        </optgroup>
+                    </select>
+                </div>
+                <div class="terminal-link-settings">
+                    <label for="linkTarget">Open links in</label>
+                    <select id="linkTarget">
+                        <option value="vm" selected>Virtual Machine</option>
+                        <option value="host">Host Browser</option>
+                        <option value="auto">Auto-decide</option>
+                    </select>
+                </div>
+                <button class="terminal-header-btn" onclick="triggerUploadFromToolbar()" title="Upload files">
+                    <svg viewBox="0 0 24 24"><path d="M9 16h6v-6h4l-7-7-7 7h4zm-4 2h14v2H5z"/></svg>
+                </button>
             </div>
-            <div class="terminal-link-settings">
-                <label for="linkTarget">Open links in</label>
-                <select id="linkTarget">
-                    <option value="vm" selected>Virtual Machine</option>
-                    <option value="host">Host Browser</option>
-                    <option value="auto">Auto-decide</option>
-                </select>
+            <!-- Editor toolbar (visible when Editor tab active) -->
+            <div class="editor-toolbar" id="editorToolbar" style="display:none">
+                <span class="editor-filepath" id="editorFilePath"></span>
+                <span class="editor-readonly-badge" id="editorReadonlyBadge" style="display:none">Read-only</span>
+                <button class="terminal-header-btn" id="editorFileBrowserBtn" onclick="toggleFileBrowser()" title="File browser">
+                    <svg viewBox="0 0 24 24"><path d="M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/></svg>
+                </button>
+                <button class="terminal-header-btn" id="editorSaveBtn" onclick="saveEditorFile()" title="Save (Cmd+S)">
+                    <svg viewBox="0 0 24 24"><path d="M17 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z"/></svg>
+                </button>
+                <button class="terminal-header-btn" id="editorDownloadBtn" onclick="downloadEditorFile()" title="Download to host">
+                    <svg viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
+                </button>
             </div>
             <div style="display:flex; align-items:center; gap:4px;">
                 <button class="terminal-header-btn" id="terminalPositionBtn" onclick="toggleTerminalPosition()" title="Move to left side">
@@ -3614,46 +3993,144 @@
                 <button class="terminal-close" onclick="toggleTerminal()">Close ✕</button>
             </div>
         </div>
-        <div class="terminal-container" id="terminalContainer"></div>
-    </div>
+        <div class="panel-body">
+            <div class="terminal-container" id="terminalContainer"></div>
+            <div class="editor-container" id="editorContainer" style="display:none">
+                <div class="file-browser-sidebar" id="fileBrowserSidebar" style="display:none">
+                    <div class="file-browser-header">
+                        <span>Files</span>
+                        <button class="file-browser-close" onclick="toggleFileBrowser()">×</button>
+                    </div>
+                    <div class="file-browser-tree" id="fileBrowserTree"></div>
+                </div>
+                <div class="editor-instance" id="editorInstance"></div>
+            </div>
+            <!-- Upload Overlay (covers only the panel-body area, not the header) -->
+            <div class="upload-overlay" id="uploadOverlay">
+                <div class="upload-dropzone" id="uploadDropzone">
+                    <div class="upload-drop-hint" id="uploadDropHint">Drop files here</div>
+                    <div class="upload-file-list" id="uploadFileList" style="display:none"></div>
+                    <button class="upload-browse-btn" id="uploadBrowseBtn" onclick="document.getElementById('uploadFileInput').click()">
+                        or browse…
+                    </button>
+                    <input type="file" id="uploadFileInput" multiple style="display:none" onchange="stageFiles(this.files)">
+                    <button class="upload-submit-btn" id="uploadSubmitBtn" style="display:none" onclick="submitUpload()">Upload</button>
+                    <div class="upload-progress" id="uploadProgress" style="display:none">
+                        <div class="upload-progress-bar"><div class="upload-progress-fill" id="uploadProgressFill"></div></div>
+                        <div class="upload-progress-text" id="uploadProgressText">Uploading…</div>
+                    </div>
+                    <div class="upload-restrictions">
+                        Text files only · Max 1 MB per file · Up to 5 files
+                    </div>
+                </div>
+                <button class="upload-cancel" onclick="cancelUpload()">Cancel (Esc)</button>
+            </div>
+        </div><!-- /panel-body -->
+    </div><!-- /terminalOverlay -->
     </div><!-- /split-content-row -->
+
+    <!-- SR Caption Bar (appears when simulation is active) -->
+    <div id="srCaptions" class="sr-captions" style="display: none;">
+        <div class="sr-captions-current">
+            <span class="sr-captions-indicator">▸</span>
+            <span id="srCaptionText" class="sr-captions-text"></span>
+        </div>
+        <div class="sr-captions-meta">
+            <span id="srCaptionHistory" class="sr-captions-history"></span>
+            <span id="srPosition" class="sr-captions-position"></span>
+            <button id="srTTSBtn" class="sr-captions-btn" onclick="toggleSRTTS()" title="Toggle speech (T)">🔊</button>
+            <button id="srLogBtn" class="sr-captions-btn" onclick="SRCaptionManager.toggleSpeechLog()" title="Speech log">📋</button>
+            <button class="sr-captions-btn" onclick="stopSRSimulation()" title="Stop simulation (Escape)">✕</button>
+        </div>
+    </div>
+
+    <!-- SR Speech Log (generic, works for all SRs) -->
+    <div id="srSpeechLog" class="sr-speech-log" style="display: none;">
+        <div class="sr-speech-log-header">
+            <span>Speech Log</span>
+            <div class="sr-speech-log-header-actions">
+                <button class="sr-speech-log-btn" onclick="SRCaptionManager.clearSpeechLog()">Clear</button>
+                <button class="sr-speech-log-btn" onclick="SRCaptionManager.toggleSpeechLog()">✕</button>
+            </div>
+        </div>
+        <div class="sr-speech-log-entries" id="srSpeechLogEntries"></div>
+    </div>
 
     <!-- Restart Modal -->
     <div class="restart-modal-overlay" id="restartModalOverlay">
         <div class="restart-modal">
-            <h2>Restart Environment</h2>
+            <h2>Restart</h2>
 
-            <button class="restart-option" onclick="performSoftRestart()">
+            <button class="restart-option" onclick="performRestartBrowser()">
                 <div class="restart-option-header">
-                    <span class="restart-icon">↻</span>
-                    <span class="restart-title">Soft Restart</span>
-                    <span class="restart-time">~2 seconds</span>
+                    <span class="restart-icon">
+                        <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
+                    </span>
+                    <span class="restart-title">Restart Browser</span>
+                    <span class="restart-time">~2s</span>
                 </div>
                 <p class="restart-desc">
-                    Restarts all services (VNC, window manager, browser).<br>
-                    Browser cache, cookies, and history are preserved.
+                    Restarts Chromium only. Applies config changes.
+                    VNC, terminal, and proxy stay connected.
                 </p>
             </button>
 
-            <button class="restart-option restart-option-hard" onclick="performHardRestart()">
+            <button class="restart-option" onclick="performRestartAll()">
                 <div class="restart-option-header">
-                    <span class="restart-icon">⟳</span>
-                    <span class="restart-title">Hard Restart</span>
-                    <span class="restart-time">~10 seconds</span>
+                    <span class="restart-icon">
+                        <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z"/></svg>
+                    </span>
+                    <span class="restart-title">Restart All Services</span>
+                    <span class="restart-time">~5s</span>
                 </div>
                 <p class="restart-desc">
-                    Destroys and recreates the entire environment.<br>
-                    Fresh browser with no cache, cookies, or history.
+                    Restarts everything (browser, VNC, proxy, terminal).
+                    Cache, cookies, and history are preserved.
+                </p>
+            </button>
+
+            <button class="restart-option restart-option-destructive" onclick="performResetEnvironment()">
+                <div class="restart-option-header">
+                    <span class="restart-icon">
+                        <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.42 0-8-3.58-8-8 0-1.85.63-3.55 1.69-4.9L16.9 18.31C15.55 19.37 13.85 20 12 20zm6.31-3.1L7.1 5.69C8.45 4.63 10.15 4 12 4c4.42 0 8 3.58 8 8 0 1.85-.63 3.55-1.69 4.9z"/></svg>
+                    </span>
+                    <span class="restart-title">Reset Environment</span>
+                    <span class="restart-time">~10s</span>
+                </div>
+                <p class="restart-desc">
+                    Fresh start. Clears all browsing data, cookies, cache, and history.
+                    Plugins and settings are preserved.
                 </p>
             </button>
 
             <label class="keep-tabs-option">
                 <input type="checkbox" id="keepTabsCheckbox" checked>
                 <span class="keep-tabs-label">Keep Tabs</span>
-                <small>Your open tabs will be restored after restart.</small>
+                <small>Restore your open tabs after the restart.</small>
             </label>
 
             <button class="restart-cancel" onclick="closeRestartModal()">Cancel</button>
+        </div>
+    </div>
+
+    <!-- Image Preview Modal -->
+    <div class="image-preview-overlay" id="imagePreviewOverlay" onclick="if(event.target===this)closeImagePreview()">
+        <div class="image-preview-modal">
+            <div class="image-preview-header">
+                <span class="image-preview-filename" id="imagePreviewFilename"></span>
+                <span class="image-preview-meta" id="imagePreviewMeta"></span>
+                <div class="image-preview-actions">
+                    <button class="terminal-header-btn" onclick="downloadPreviewImage()" title="Download to host">
+                        <svg viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
+                    </button>
+                    <button class="terminal-header-btn" onclick="closeImagePreview()" title="Close">
+                        <svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+                    </button>
+                </div>
+            </div>
+            <div class="image-preview-body">
+                <img id="imagePreviewImg" alt="">
+            </div>
         </div>
     </div>
 
@@ -3849,6 +4326,108 @@
         console.log('[Inspekt] Port config:', { pagePort, VNC_PORT, CONTROL_PORT, TERMINAL_PORT });
 
         // =============================================
+        // VM Configuration (from inspekt-config.yaml)
+        // =============================================
+        let _vmConfig = {};
+
+        async function loadVMConfig() {
+            try {
+                const resp = await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/config`, {
+                    signal: AbortSignal.timeout(3000),
+                });
+                const data = await resp.json();
+                if (data.ok) {
+                    _vmConfig = data.config || {};
+                    console.log('[Config] Loaded:', Object.keys(_vmConfig).join(', '));
+                }
+            } catch (e) {
+                console.warn('[Config] Failed to load:', e.message);
+            }
+        }
+
+        // Helper: read a dotted key path from the loaded config.
+        // Returns defaultValue if key is missing, null, empty, or wrong type.
+        function getConfig(path, defaultValue) {
+            let obj = _vmConfig;
+            for (const key of path.split('.')) {
+                if (obj == null || typeof obj !== 'object') return defaultValue;
+                obj = obj[key];
+            }
+            if (obj == null || obj === '') return defaultValue;
+            // Type check: if a default is provided, ensure the value matches its type
+            if (defaultValue !== undefined && typeof obj !== typeof defaultValue) {
+                console.warn(`[Config] Type mismatch for "${path}": expected ${typeof defaultValue}, got ${typeof obj}`);
+                return defaultValue;
+            }
+            return obj;
+        }
+
+        // Load config early — store the promise so other init code can await it
+        const _configReady = loadVMConfig();
+
+        // =============================================
+        // Terminal Trigger Words
+        // =============================================
+        // Scans terminal output for configurable keywords and shows a
+        // notification toast + plays a subtle sound when detected.
+        // Debounced to avoid flooding during stack traces.
+
+        let _triggerWordRegex = null;
+        let _triggerLastFired = 0;
+        const _TRIGGER_DEBOUNCE_MS = 3000;
+
+        // Build the regex after config loads
+        _configReady.then(() => {
+            const words = getConfig('terminal.trigger-words', ['error', 'fail']);
+            if (Array.isArray(words) && words.length > 0) {
+                // Build a case-insensitive regex matching any of the words at word boundaries
+                const escaped = words.map(w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+                _triggerWordRegex = new RegExp('\\b(' + escaped.join('|') + ')\\b', 'i');
+                console.log(`[TriggerWords] Watching for: ${words.join(', ')}`);
+            }
+        });
+
+        // Notification beep via Web Audio API (no external sound file needed)
+        let _audioCtx = null;
+        function playNotificationBeep() {
+            try {
+                if (!_audioCtx) _audioCtx = new AudioContext();
+                const osc = _audioCtx.createOscillator();
+                const gain = _audioCtx.createGain();
+                osc.connect(gain);
+                gain.connect(_audioCtx.destination);
+                osc.frequency.value = 880; // A5 note
+                gain.gain.value = 0.08;    // Subtle volume
+                osc.start();
+                gain.gain.exponentialRampToValueAtTime(0.001, _audioCtx.currentTime + 0.15);
+                osc.stop(_audioCtx.currentTime + 0.15);
+            } catch { /* Audio not available */ }
+        }
+
+        // Scan a chunk of terminal output for trigger words
+        function checkTriggerWords(text) {
+            if (!_triggerWordRegex) return;
+
+            // Strip ANSI escape codes for clean matching
+            const plain = text.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '');
+            const match = plain.match(_triggerWordRegex);
+            if (!match) return;
+
+            // Debounce — don't fire again within 3 seconds
+            const now = Date.now();
+            if (now - _triggerLastFired < _TRIGGER_DEBOUNCE_MS) return;
+            _triggerLastFired = now;
+
+            // Extract the line containing the match for context
+            const lines = plain.split(/\r?\n/);
+            const matchedLine = lines.find(l => _triggerWordRegex.test(l)) || match[0];
+            const trimmedLine = matchedLine.trim().substring(0, 120);
+
+            playNotificationBeep();
+            showToast(trimmedLine, { type: 'error', duration: 5000, dismissible: true });
+        }
+
+        // =============================================
         // RFB (noVNC) — direct embedding (no iframe)
         // =============================================
         let rfb = null;
@@ -3962,6 +4541,14 @@
         let isTerminalOpen = false;
         let hasTerminalSession = false; // Track if we have an active terminal session
         let _terminalPromptDomain = 'inspekt'; // Tracks domain shown in terminal prompt
+
+        // ── Editor state ──
+        let editorView = null;          // CodeMirror EditorView instance
+        let editorCurrentPath = null;   // Absolute path of open file
+        let editorIsReadOnly = false;   // true for files outside /home/inspekt/
+        let editorIsDirty = false;      // Unsaved changes exist
+        let activePanel = 'terminal';   // 'terminal' | 'editor'
+        const editorThemeCompartment = typeof CM !== 'undefined' ? new CM.Compartment() : null;
 
         // Split mode & position state
         let terminalPosition = localStorage.getItem('terminalPosition') || 'right';
@@ -4192,6 +4779,11 @@
                 // Override noVNC's overflow:auto on _screen wrapper to prevent
                 // a visible scrollbar gutter shadow on the right edge
                 if (rfb._screen) rfb._screen.style.overflow = 'hidden';
+
+                // Auto-focus VNC on hover so keyboard input works immediately
+                container.addEventListener('mouseenter', () => {
+                    if (rfb) rfb.focus();
+                });
             } catch (err) {
                 // RFB constructor or import failed (e.g. websockify not available yet)
                 console.warn('[VNC] Connection failed, retrying...', err);
@@ -4456,6 +5048,23 @@
                 iframe = document.createElement('iframe');
                 // No sandbox — these are trusted internal pages from our own API server
                 nativeContainer.appendChild(iframe);
+                // Forward Cmd+K from iframe to parent so the command palette works
+                // when an internal tab (iframe) has focus
+                iframe.addEventListener('load', () => {
+                    try {
+                        iframe.contentWindow.addEventListener('keydown', (e) => {
+                            if (e.key === 'k' && (e.metaKey || e.ctrlKey)) {
+                                e.preventDefault();
+                                const ninja = document.getElementById('commandPalette');
+                                if (ninja) ninja.visible ? ninja.close() : ninja.open();
+                            }
+                            if (e.key === 'Escape') {
+                                const ninja = document.getElementById('commandPalette');
+                                if (ninja?.visible) { ninja.close(); e.preventDefault(); }
+                            }
+                        });
+                    } catch { /* cross-origin iframe — can't inject */ }
+                });
             }
             iframe.src = httpUrl;
         }
@@ -4749,6 +5358,15 @@
             if (!url) return;
             dismissHistoryDropdown();
 
+            // Block internal browser URLs (chrome://, file://, about:, etc.)
+            const trimmed = url.trim().toLowerCase();
+            if (trimmed.startsWith('chrome://') || trimmed.startsWith('chrome-extension://') ||
+                trimmed.startsWith('file://') || trimmed.startsWith('about:') ||
+                trimmed.startsWith('javascript:') || trimmed.startsWith('data:text/html')) {
+                showToast('This URL is not available in the browser VM', 'error', 3000);
+                return;
+            }
+
             // --- Handle http://inspekt/ internal URLs ---
             if (isInternalUrl(url.trim())) {
                 const inspektUrl = url.trim();
@@ -4774,7 +5392,8 @@
 
             // Search query → DuckDuckGo; URL-like input → navigate directly
             if (!looksLikeUrl(url.trim())) {
-                url = 'https://duckduckgo.com/?q=' + encodeURIComponent(url.trim());
+                const searchEngine = getConfig('browser.search-engine', 'https://duckduckgo.com/?q=');
+                url = searchEngine + encodeURIComponent(url.trim());
             } else if (!url.startsWith('http://') && !url.startsWith('https://')) {
                 url = 'https://' + url;
             }
@@ -4796,6 +5415,23 @@
             } else {
                 startLoading(url);
             }
+
+            // Pre-check DNS — if domain doesn't resolve, show branded error page
+            // instead of Chromium's default ERR_NAME_NOT_RESOLVED
+            try {
+                const domain = new URL(url).hostname;
+                if (domain && domain !== 'localhost' && domain !== '127.0.0.1') {
+                    const dnsResp = await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/dns-check?domain=${encodeURIComponent(domain)}`);
+                    const dnsData = await dnsResp.json();
+                    if (dnsData.ok && !dnsData.resolves) {
+                        // Navigate to our custom error page instead
+                        const errorUrl = `http://${VNC_HOST}:${CONTROL_PORT}/error-page/error-dns?domain=${encodeURIComponent(domain)}&url=${encodeURIComponent(url)}`;
+                        await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/navigate?url=${encodeURIComponent(errorUrl)}&tab=${activeTabId}`);
+                        completeLoading();
+                        return;
+                    }
+                }
+            } catch { /* DNS check failed — proceed with normal navigation */ }
 
             try {
                 const response = await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/navigate?url=${encodeURIComponent(url)}&tab=${activeTabId}`);
@@ -6192,6 +6828,12 @@
         // Regex to detect download escape sequences: OSC 1337 ; download=<path> BEL
         const DOWNLOAD_MARKER_REGEX = /\x1b\]1337;download=([^\x07]+)\x07/g;
 
+        // Regex to detect edit-file escape sequence: OSC 1337 ; edit=<path> BEL
+        const EDIT_MARKER_REGEX = /\x1b\]1337;edit=([^\x07]+)\x07/g;
+
+        // Regex to detect upload-ready escape sequence: OSC 1337 ; upload BEL
+        const UPLOAD_MARKER_REGEX = /\x1b\]1337;upload\x07/g;
+
         // Regex to detect hide-terminal escape sequence: OSC 1337 ; hide-terminal BEL
         const HIDE_TERMINAL_REGEX = /\x1b\]1337;hide-terminal\x07/g;
 
@@ -6289,6 +6931,391 @@
         let srCheatSheetVisible = false;
         let srPreviousAnnouncement = '';
 
+        // ── SR Profiles ─────────────────────────────────
+        // Per-screen-reader configuration for visual presentation,
+        // focus indicators, and caption style. Shared navigation
+        // engine reads these to render the appropriate UI.
+        // ─────────────────────────────────────────────────
+        const SR_PROFILES = {
+            jaws: {
+                id: 'jaws',
+                name: 'JAWS',
+                fullName: 'Job Access With Speech',
+                platform: 'Windows',
+                captionStyle: 'docked',
+                accentColor: '#2196f3',
+                focusIndicator: {
+                    style: 'colored-border',
+                    borderColor: '#2196f3',
+                    borderWidth: 3,
+                    borderRadius: 2,
+                    backgroundColor: 'rgba(33, 150, 243, 0.06)',
+                    shadowColor: 'rgba(33, 150, 243, 0.25)',
+                },
+                caption: {
+                    showTTSButton: true,
+                    showLogButton: true,
+                },
+                // Future: specialWindows, modes, remediationHints
+            },
+            nvda: {
+                id: 'nvda',
+                name: 'NVDA',
+                fullName: 'NonVisual Desktop Access',
+                platform: 'Windows',
+                captionStyle: 'docked',
+                accentColor: '#9c27b0',
+                focusIndicator: {
+                    style: 'colored-border',
+                    borderColor: '#9c27b0',
+                    borderWidth: 3,
+                    borderRadius: 2,
+                    backgroundColor: 'rgba(156, 39, 176, 0.06)',
+                    shadowColor: 'rgba(156, 39, 176, 0.25)',
+                },
+                caption: {
+                    showTTSButton: true,
+                    showLogButton: true,
+                },
+            },
+            voiceover: {
+                id: 'voiceover',
+                name: 'VoiceOver',
+                fullName: 'VoiceOver for macOS',
+                platform: 'macOS',
+                captionStyle: 'floating',
+                accentColor: '#333',
+                focusIndicator: {
+                    style: 'colored-border',
+                    borderColor: '#333',
+                    borderWidth: 3,
+                    borderRadius: 2,
+                    backgroundColor: 'rgba(0, 0, 0, 0.06)',
+                    shadowColor: 'rgba(0, 0, 0, 0.25)',
+                    // Alternative: VoiceOver-style cursor (togglable)
+                    altStyle: 'voiceover-cursor',
+                    altBorderColor: '#333',
+                    altBorderWidth: 4,
+                    altBorderRadius: 8,
+                    altBackgroundColor: 'rgba(0, 0, 0, 0.08)',
+                    altShadowColor: 'rgba(0, 0, 0, 0.35)',
+                },
+                caption: {
+                    showTTSButton: false,
+                    showLogButton: true,
+                },
+                floating: {
+                    defaultPosition: { left: 20, bottom: 60 },
+                    minWidth: 280,
+                    minHeight: 48,
+                    defaultWidth: 480,
+                    opacity: 0.95,
+                },
+            },
+        };
+
+        // ── SR Caption Manager ────────────────────────
+        // Manages per-SR caption UI (docked bar vs floating
+        // panel), focus indicators, and speech log.
+        // ─────────────────────────────────────────────────
+        const SRCaptionManager = {
+            _profile: null,
+            _floatingPanel: null,
+            _dragState: null,
+            _resizeObserver: null,
+            _speechLogVisible: false,
+
+            start(srId) {
+                this._profile = SR_PROFILES[srId];
+                if (!this._profile) return;
+
+                const profile = this._profile;
+
+                // Show focus indicator with profile-driven styling
+                const indicator = document.getElementById('srFocusIndicator');
+                indicator.style.display = 'block';
+                this._applyFocusIndicatorStyle();
+
+                // Caption: docked or floating
+                if (profile.captionStyle === 'floating') {
+                    this._createFloatingCaption();
+                    document.getElementById('srCaptions').style.display = 'none';
+                } else {
+                    document.getElementById('srCaptions').style.display = 'flex';
+                    // Configure docked bar based on profile
+                    const ttsBtn = document.getElementById('srTTSBtn');
+                    if (ttsBtn) ttsBtn.style.display = profile.caption.showTTSButton ? '' : 'none';
+                }
+            },
+
+            stop() {
+                // Remove floating panel if present
+                if (this._floatingPanel) {
+                    this._saveFloatingPosition();
+                    this._floatingPanel.remove();
+                    this._floatingPanel = null;
+                    if (this._resizeObserver) {
+                        this._resizeObserver.disconnect();
+                        this._resizeObserver = null;
+                    }
+                }
+                // Hide docked caption
+                document.getElementById('srCaptions').style.display = 'none';
+                // Hide focus indicator
+                document.getElementById('srFocusIndicator').style.display = 'none';
+                // Hide speech log
+                this._hideSpeechLog();
+                this._profile = null;
+            },
+
+            update(result) {
+                const profile = this._profile;
+                if (!profile) return;
+
+                const announcement = result.announcement || '';
+                const role = result.role || '';
+
+                if (profile.captionStyle === 'floating' && this._floatingPanel) {
+                    // Update floating panel
+                    srPreviousAnnouncement = this._floatingPanel.querySelector('.sr-floating-text')?.textContent || '';
+                    const textEl = this._floatingPanel.querySelector('.sr-floating-text');
+                    if (textEl) textEl.textContent = announcement;
+                    const posEl = this._floatingPanel.querySelector('.sr-floating-position');
+                    if (posEl && result.position) {
+                        posEl.textContent = `${result.position.index + 1} / ${result.position.total}`;
+                    }
+                } else {
+                    // Update docked bar
+                    srPreviousAnnouncement = document.getElementById('srCaptionText').textContent;
+                    document.getElementById('srCaptionText').textContent = announcement;
+                    document.getElementById('srCaptionHistory').textContent = srPreviousAnnouncement || '';
+                    if (result.position) {
+                        document.getElementById('srPosition').textContent =
+                            `${result.position.index + 1} / ${result.position.total}`;
+                    }
+                }
+
+                // Focus indicator position
+                if (result.rect) {
+                    this.updateFocusIndicator(result.rect);
+                }
+
+                // Focus label (role)
+                document.getElementById('srFocusLabel').textContent = role;
+
+                // Speech log
+                if (announcement) {
+                    this.appendToLog(announcement, role);
+                }
+            },
+
+            updateFocusIndicator(vmRect) {
+                const indicator = document.getElementById('srFocusIndicator');
+                const vncContainer = document.getElementById('vncContainer');
+                const canvas = vncContainer.querySelector('canvas');
+                if (!canvas) return;
+
+                const canvasRect = canvas.getBoundingClientRect();
+                const containerRect = vncContainer.getBoundingClientRect();
+                const resolution = currentResolution || { width: canvasRect.width, height: canvasRect.height };
+                const scaleX = canvasRect.width / resolution.width;
+                const scaleY = canvasRect.height / resolution.height;
+                const offsetX = canvasRect.left - containerRect.left;
+                const offsetY = canvasRect.top - containerRect.top;
+
+                indicator.style.left = (offsetX + vmRect.x * scaleX) + 'px';
+                indicator.style.top = (offsetY + vmRect.y * scaleY) + 'px';
+                indicator.style.width = (vmRect.width * scaleX) + 'px';
+                indicator.style.height = (vmRect.height * scaleY) + 'px';
+            },
+
+            // ── Focus indicator styling ──────────────────
+            _applyFocusIndicatorStyle() {
+                const profile = this._profile;
+                if (!profile) return;
+                const fi = profile.focusIndicator;
+                const useAlt = fi.altStyle && localStorage.getItem('sr-vo-cursor') === 'true';
+                const indicator = document.getElementById('srFocusIndicator');
+                const label = document.getElementById('srFocusLabel');
+
+                indicator.style.borderColor = useAlt ? fi.altBorderColor : fi.borderColor;
+                indicator.style.borderWidth = (useAlt ? fi.altBorderWidth : fi.borderWidth) + 'px';
+                indicator.style.borderRadius = (useAlt ? fi.altBorderRadius : fi.borderRadius) + 'px';
+                indicator.style.backgroundColor = useAlt ? fi.altBackgroundColor : fi.backgroundColor;
+                indicator.style.boxShadow = `0 0 0 2px ${useAlt ? fi.altShadowColor : fi.shadowColor}`;
+                if (label) label.style.background = useAlt ? fi.altBorderColor : fi.borderColor;
+            },
+
+            // ── Floating caption ─────────────────────────
+            _createFloatingCaption() {
+                if (this._floatingPanel) return; // Already exists
+
+                const profile = this._profile;
+                const floating = profile.floating;
+
+                const panel = document.createElement('div');
+                panel.className = 'sr-floating-caption';
+                panel.id = 'srFloatingCaption';
+
+                panel.innerHTML = `
+                    <div class="sr-floating-header">
+                        <span class="sr-floating-text"></span>
+                        <button class="sr-floating-close" title="Stop simulation (Escape)">&times;</button>
+                    </div>
+                    <div class="sr-floating-meta">
+                        <span class="sr-floating-position"></span>
+                    </div>
+                `;
+
+                // Restore saved position or use defaults
+                const saved = this._loadFloatingPosition();
+                if (saved) {
+                    panel.style.left = saved.left + 'px';
+                    panel.style.top = saved.top + 'px';
+                    if (saved.width) panel.style.width = saved.width + 'px';
+                    if (saved.height) panel.style.height = saved.height + 'px';
+                } else {
+                    panel.style.left = floating.defaultPosition.left + 'px';
+                    panel.style.bottom = floating.defaultPosition.bottom + 'px';
+                    panel.style.width = floating.defaultWidth + 'px';
+                }
+
+                panel.style.minWidth = floating.minWidth + 'px';
+                panel.style.minHeight = floating.minHeight + 'px';
+
+                // Max width = 80% of canvas
+                const canvas = document.querySelector('#vncContainer canvas');
+                if (canvas) {
+                    panel.style.maxWidth = Math.round(canvas.offsetWidth * 0.8) + 'px';
+                }
+
+                // Close button
+                panel.querySelector('.sr-floating-close').addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    stopSRSimulation();
+                });
+
+                // Insert into VNC container (overlays the canvas)
+                document.getElementById('vncContainer').appendChild(panel);
+                this._floatingPanel = panel;
+
+                // Setup drag
+                this._setupDrag(panel);
+
+                // Track resize for persistence
+                this._resizeObserver = new ResizeObserver(() => {
+                    this._saveFloatingPosition();
+                });
+                this._resizeObserver.observe(panel);
+            },
+
+            _setupDrag(panel) {
+                let isDragging = false, startX, startY, startLeft, startTop;
+
+                // Entire panel surface is draggable (like real VoiceOver)
+                panel.addEventListener('mousedown', (e) => {
+                    if (e.target.closest('.sr-floating-close')) return;
+                    isDragging = true;
+                    startX = e.clientX;
+                    startY = e.clientY;
+                    startLeft = panel.offsetLeft;
+                    startTop = panel.offsetTop;
+                    e.preventDefault();
+                });
+
+                // Attach to document so dragging continues even when cursor leaves the panel
+                const onMove = (e) => {
+                    if (!isDragging) return;
+                    panel.style.left = (startLeft + e.clientX - startX) + 'px';
+                    panel.style.top = (startTop + e.clientY - startY) + 'px';
+                    panel.style.bottom = 'auto'; // Clear bottom positioning once manually moved
+                };
+
+                const onUp = () => {
+                    if (isDragging) {
+                        isDragging = false;
+                        this._saveFloatingPosition();
+                    }
+                };
+
+                document.addEventListener('mousemove', onMove);
+                document.addEventListener('mouseup', onUp);
+
+                // Store cleanup refs
+                panel._dragCleanup = () => {
+                    document.removeEventListener('mousemove', onMove);
+                    document.removeEventListener('mouseup', onUp);
+                };
+            },
+
+            _saveFloatingPosition() {
+                if (!this._floatingPanel) return;
+                const p = this._floatingPanel;
+                localStorage.setItem('sr-voiceover-caption-pos', JSON.stringify({
+                    left: p.offsetLeft, top: p.offsetTop,
+                    width: p.offsetWidth, height: p.offsetHeight,
+                }));
+            },
+
+            _loadFloatingPosition() {
+                try {
+                    const raw = localStorage.getItem('sr-voiceover-caption-pos');
+                    return raw ? JSON.parse(raw) : null;
+                } catch { return null; }
+            },
+
+            // ── Speech log ───────────────────────────────
+            appendToLog(text, role) {
+                const entries = document.getElementById('srSpeechLogEntries');
+                if (!entries) return;
+
+                const entry = document.createElement('div');
+                entry.className = 'sr-speech-log-entry';
+                if (role) {
+                    entry.innerHTML = `<span class="sr-log-role">${role}</span>${this._escapeHtml(text)}`;
+                } else {
+                    entry.textContent = text;
+                }
+                entries.appendChild(entry);
+
+                // Cap at 200 entries
+                while (entries.children.length > 200) {
+                    entries.removeChild(entries.firstChild);
+                }
+
+                // Auto-scroll
+                entries.scrollTop = entries.scrollHeight;
+            },
+
+            _escapeHtml(str) {
+                const div = document.createElement('div');
+                div.textContent = str;
+                return div.innerHTML;
+            },
+
+            toggleSpeechLog() {
+                const log = document.getElementById('srSpeechLog');
+                if (!log) return;
+                this._speechLogVisible = !this._speechLogVisible;
+                log.style.display = this._speechLogVisible ? 'flex' : 'none';
+                const btn = document.getElementById('srLogBtn');
+                if (btn) btn.classList.toggle('active', this._speechLogVisible);
+            },
+
+            clearSpeechLog() {
+                const entries = document.getElementById('srSpeechLogEntries');
+                if (entries) entries.innerHTML = '';
+            },
+
+            _hideSpeechLog() {
+                this._speechLogVisible = false;
+                const log = document.getElementById('srSpeechLog');
+                if (log) log.style.display = 'none';
+                const btn = document.getElementById('srLogBtn');
+                if (btn) btn.classList.remove('active');
+            },
+        };
+
         // SR Popout (launcher dropdown)
         function toggleSRPopout() {
             if (srActive) {
@@ -6353,12 +7380,9 @@
                     startSRMouseTracking();
                 }
 
-                // Update UI
+                // Update UI via caption manager
                 document.getElementById('srBtn').classList.add('sr-active');
-                document.getElementById('srCaptions').style.display = 'flex';
-                document.getElementById('srFocusIndicator').style.display = 'block';
-                document.getElementById('srFocusIndicator').className =
-                    'sr-focus-indicator sr-' + screenReader;
+                SRCaptionManager.start(screenReader);
 
                 // Show first element
                 if (result.announcement) {
@@ -6387,10 +7411,9 @@
             stopSRResolutionPolling();
             stopSRMouseTracking();
 
-            // Hide UI
+            // Hide UI via caption manager
             document.getElementById('srBtn').classList.remove('sr-active');
-            document.getElementById('srCaptions').style.display = 'none';
-            document.getElementById('srFocusIndicator').style.display = 'none';
+            SRCaptionManager.stop();
             document.getElementById('srCheatSheet').style.display = 'none';
             srCheatSheetVisible = false;
 
@@ -6508,53 +7531,14 @@
         }
 
         // Update all SR UI elements
+        // Delegates to SRCaptionManager for per-SR UI updates
         function updateSRUI(result) {
-            // Caption text
-            srPreviousAnnouncement = document.getElementById('srCaptionText').textContent;
-            document.getElementById('srCaptionText').textContent = result.announcement || '';
-
-            // History (previous announcement, dimmed)
-            document.getElementById('srCaptionHistory').textContent = srPreviousAnnouncement || '';
-
-            // Position counter
-            const pos = result.position;
-            if (pos) {
-                document.getElementById('srPosition').textContent =
-                    `${pos.index + 1} / ${pos.total}`;
-            }
-
-            // Focus indicator
-            if (result.rect) {
-                updateSRFocusIndicator(result.rect);
-            }
-
-            // Focus label (role)
-            document.getElementById('srFocusLabel').textContent = result.role || '';
+            SRCaptionManager.update(result);
         }
 
-        // Position the focus indicator over the VNC canvas
+        // Delegates to SRCaptionManager for focus indicator positioning
         function updateSRFocusIndicator(vmRect) {
-            const indicator = document.getElementById('srFocusIndicator');
-            const vncContainer = document.getElementById('vncContainer');
-            const canvas = vncContainer.querySelector('canvas');
-            if (!canvas) return;
-
-            const canvasRect = canvas.getBoundingClientRect();
-            const containerRect = vncContainer.getBoundingClientRect();
-
-            // Get VM resolution for coordinate mapping
-            const resolution = currentResolution || { width: canvasRect.width, height: canvasRect.height };
-            const scaleX = canvasRect.width / resolution.width;
-            const scaleY = canvasRect.height / resolution.height;
-
-            // Position relative to the VNC container
-            const offsetX = canvasRect.left - containerRect.left;
-            const offsetY = canvasRect.top - containerRect.top;
-
-            indicator.style.left = (offsetX + vmRect.x * scaleX) + 'px';
-            indicator.style.top = (offsetY + vmRect.y * scaleY) + 'px';
-            indicator.style.width = (vmRect.width * scaleX) + 'px';
-            indicator.style.height = (vmRect.height * scaleY) + 'px';
+            SRCaptionManager.updateFocusIndicator(vmRect);
         }
 
         // TTS toggle
@@ -6564,6 +7548,20 @@
             const btn = document.getElementById('srTTSBtn');
             btn.classList.toggle('active', cb.checked);
         }
+
+        // VoiceOver cursor toggle — persists preference and re-applies focus style
+        function onVOCursorToggle() {
+            const checked = document.getElementById('srVOCursor').checked;
+            localStorage.setItem('sr-vo-cursor', checked ? 'true' : 'false');
+            if (srActive && srScreenReader === 'voiceover') {
+                SRCaptionManager._applyFocusIndicatorStyle();
+            }
+        }
+        // Restore VO cursor checkbox from localStorage on page load
+        (function() {
+            const cb = document.getElementById('srVOCursor');
+            if (cb && localStorage.getItem('sr-vo-cursor') === 'true') cb.checked = true;
+        })();
 
         // Cheat sheet
         function toggleSRCheatSheet() {
@@ -6691,6 +7689,18 @@
                             rfb.sendKey(0xFF09, 'Tab', true);   // XK_Tab
                             rfb.sendKey(0xFF09, 'Tab', false);
                         }
+                        return;
+                    }
+
+                    // Cmd/Ctrl+K: open command palette (intercept before noVNC
+                    // forwards the keystroke to the VM)
+                    if (e.key === 'k' && !e.altKey && ((_isMac && e.metaKey) || (!_isMac && e.ctrlKey))) {
+                        e.preventDefault();
+                        e.stopImmediatePropagation();
+                        // Release Meta that noVNC sent when Cmd was pressed
+                        if (_isMac) rfb.sendKey(0xFFE7, 'MetaLeft', false);
+                        const ninja = document.getElementById('commandPalette');
+                        if (ninja) ninja.visible ? ninja.close() : ninja.open();
                         return;
                     }
 
@@ -6932,6 +7942,731 @@
         }
 
         // =============================================
+        // =============================================
+        // Upload Overlay
+        // =============================================
+
+        let _uploadActive = false;
+        let _stagedFiles = [];  // Array of { file: File, id: number, rejected?: string }
+        let _uploadIdCounter = 0;
+        const MAX_UPLOAD_FILES = 5;
+        const MAX_UPLOAD_SIZE = 1_048_576; // 1 MB
+        // Binary/disallowed file extensions
+        const BINARY_EXTENSIONS = new Set([
+            'png','jpg','jpeg','gif','webp','bmp','ico','avif','svg',
+            'pdf','zip','gz','tar','7z','rar','bz2',
+            'exe','dll','so','dylib','bin','dmg','iso','img',
+            'mp3','mp4','wav','ogg','flac','avi','mkv','mov','webm',
+            'woff','woff2','ttf','otf','eot',
+            'class','pyc','pyo','o','a','wasm',
+            'db','sqlite','sqlite3',
+        ]);
+
+        /** Check if a file is likely binary based on extension */
+        function _isBinaryExtension(name) {
+            const ext = (name.split('.').pop() || '').toLowerCase();
+            return BINARY_EXTENSIONS.has(ext);
+        }
+
+        /** Show the upload overlay on the terminal panel */
+        /** Trigger upload from the toolbar button (no CLI tool involved) */
+        function triggerUploadFromToolbar() {
+            // Reset server state and show the overlay
+            fetch(`http://${VNC_HOST}:${CONTROL_PORT}/file/upload-reset`, { method: 'POST' }).catch(() => {});
+            showUploadOverlay();
+        }
+
+        /** Show the upload overlay on the terminal panel */
+        function showUploadOverlay() {
+            const overlay = document.getElementById('uploadOverlay');
+            const dropzone = document.getElementById('uploadDropzone');
+            const fileInput = document.getElementById('uploadFileInput');
+
+            // Reset state
+            _stagedFiles = [];
+            _uploadIdCounter = 0;
+            fileInput.value = '';
+            dropzone.classList.remove('dragover');
+            _uploadActive = true;
+            _renderUploadUI();
+
+            overlay.classList.add('active');
+
+            // Make terminal/editor inert so keystrokes don't pass through
+            document.getElementById('terminalContainer').inert = true;
+            document.getElementById('editorContainer').inert = true;
+
+            // Focus the browse button after fade-in completes so Enter opens file chooser
+            setTimeout(() => {
+                document.getElementById('uploadBrowseBtn').focus();
+            }, 220);
+
+            // Drag-and-drop handlers
+            dropzone.ondragover = (e) => { e.preventDefault(); dropzone.classList.add('dragover'); };
+            dropzone.ondragleave = (e) => {
+                if (!dropzone.contains(e.relatedTarget)) dropzone.classList.remove('dragover');
+            };
+            dropzone.ondrop = (e) => {
+                e.preventDefault();
+                dropzone.classList.remove('dragover');
+                stageFiles(e.dataTransfer.files);
+            };
+        }
+
+        /** Stage files for upload (don't upload yet) */
+        function stageFiles(fileList) {
+            for (const file of fileList) {
+                if (_stagedFiles.length >= MAX_UPLOAD_FILES) {
+                    showToast(`Maximum ${MAX_UPLOAD_FILES} files allowed`, 'error');
+                    break;
+                }
+                const entry = { file, id: ++_uploadIdCounter };
+                // Check for rejection reasons
+                if (file.size > MAX_UPLOAD_SIZE) {
+                    entry.rejected = 'Too large';
+                } else if (_isBinaryExtension(file.name)) {
+                    entry.rejected = 'Not allowed';
+                }
+                _stagedFiles.push(entry);
+            }
+            _renderUploadUI();
+        }
+
+        /** Remove a staged file by id */
+        function unstageFile(id) {
+            _stagedFiles = _stagedFiles.filter(f => f.id !== id);
+            document.getElementById('uploadFileInput').value = '';
+            _renderUploadUI();
+        }
+
+        /** Rename a staged file (called from inline input) */
+        function renameStaged(id, newName) {
+            const entry = _stagedFiles.find(f => f.id === id);
+            if (!entry || entry.rejected) return;
+            newName = (newName || '').replace(/[/\\]/g, '').trim();
+            entry.rename = newName || entry.file.name;
+        }
+
+        /** Select only the filename part (not extension) in an input */
+        function _selectFilenameStem(input) {
+            const val = input.value;
+            const dotIndex = val.lastIndexOf('.');
+            if (dotIndex > 0) {
+                input.setSelectionRange(0, dotIndex);
+            } else {
+                input.select();
+            }
+        }
+
+        /** Render the upload overlay UI based on current staged files */
+        function _renderUploadUI() {
+            const list = document.getElementById('uploadFileList');
+            const progress = document.getElementById('uploadProgress');
+            const uploadBtn = document.getElementById('uploadSubmitBtn');
+            const dropHint = document.getElementById('uploadDropHint');
+            const browseBtn = document.getElementById('uploadBrowseBtn');
+
+            progress.style.display = 'none';
+
+            const validFiles = _stagedFiles.filter(f => !f.rejected);
+
+            if (_stagedFiles.length === 0) {
+                list.innerHTML = '';
+                list.style.display = 'none';
+                dropHint.style.display = '';
+                browseBtn.style.display = '';
+                uploadBtn.style.display = 'none';
+            } else {
+                dropHint.style.display = 'none';
+                list.style.display = '';
+                browseBtn.style.display = _stagedFiles.length < MAX_UPLOAD_FILES ? '' : 'none';
+
+                // Only show upload button if there are valid files
+                uploadBtn.style.display = validFiles.length > 0 ? '' : 'none';
+
+                list.innerHTML = _stagedFiles.map(f => {
+                    const fSize = f.file.size > 1024 ? `${(f.file.size / 1024).toFixed(1)} KB` : `${f.file.size} B`;
+                    const displayName = f.rename || f.file.name;
+
+                    if (f.rejected) {
+                        // Rejected file: non-editable name + red badge
+                        return `<div class="upload-file-entry rejected">
+                            <span class="upload-file-name rejected">${_esc(displayName)}</span>
+                            <span class="upload-file-badge rejected">${_esc(f.rejected)}</span>
+                            <button class="upload-file-remove" onclick="unstageFile(${f.id})" title="Remove">×</button>
+                        </div>`;
+                    }
+
+                    return `<div class="upload-file-entry">
+                        <input class="upload-file-name" value="${_esc(displayName)}" data-upload-id="${f.id}" spellcheck="false"
+                               onfocus="_selectFilenameStem(this)" onchange="renameStaged(${f.id}, this.value)" onblur="renameStaged(${f.id}, this.value)">
+                        <span class="upload-file-size">${fSize}</span>
+                        <button class="upload-file-remove" onclick="unstageFile(${f.id})" title="Remove">×</button>
+                    </div>`;
+                }).join('');
+
+                if (validFiles.length > 0) {
+                    const totalSize = validFiles.reduce((s, f) => s + f.file.size, 0);
+                    const sizeStr = totalSize > 1024 ? `${(totalSize / 1024).toFixed(1)} KB` : `${totalSize} B`;
+                    uploadBtn.textContent = `Upload ${validFiles.length} file${validFiles.length > 1 ? 's' : ''} (${sizeStr})`;
+                }
+            }
+        }
+
+        /** Actually upload all staged files */
+        async function submitUpload() {
+            if (_stagedFiles.length === 0) return;
+
+            const progress = document.getElementById('uploadProgress');
+            const progressFill = document.getElementById('uploadProgressFill');
+            const progressText = document.getElementById('uploadProgressText');
+            const uploadBtn = document.getElementById('uploadSubmitBtn');
+
+            progress.style.display = '';
+            uploadBtn.disabled = true;
+            uploadBtn.style.opacity = '0.5';
+            progressFill.style.width = '0%';
+            progressText.textContent = `Reading files…`;
+
+            try {
+                // Read valid (non-rejected) files as base64
+                const validStaged = _stagedFiles.filter(f => !f.rejected);
+                const filesData = [];
+                for (let i = 0; i < validStaged.length; i++) {
+                    const staged = validStaged[i];
+                    const f = staged.file;
+                    const uploadName = staged.rename || f.name;
+                    progressText.textContent = `Reading ${uploadName}…`;
+                    const data = await f.arrayBuffer();
+                    const bytes = new Uint8Array(data);
+
+                    // Check for binary content (null bytes in first 512)
+                    const sample = bytes.slice(0, 512);
+                    if (sample.includes(0)) {
+                        showToast(`${uploadName}: binary files are not allowed`, 'error');
+                        continue;
+                    }
+
+                    // Convert to base64
+                    let binary = '';
+                    for (let j = 0; j < bytes.length; j++) binary += String.fromCharCode(bytes[j]);
+                    const b64 = btoa(binary);
+
+                    filesData.push({ name: uploadName, data: b64, size: f.size });
+                    progressFill.style.width = Math.round(((i + 1) / validStaged.length) * 50) + '%';
+                }
+
+                if (filesData.length === 0) {
+                    progressText.textContent = 'No valid files to upload';
+                    uploadBtn.disabled = false;
+                    uploadBtn.style.opacity = '';
+                    return;
+                }
+
+                progressText.textContent = `Uploading ${filesData.length} file(s)…`;
+                progressFill.style.width = '50%';
+
+                const resp = await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/file/upload`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ files: filesData })
+                });
+                const result = await resp.json();
+
+                if (result.ok) {
+                    progressFill.style.width = '100%';
+                    const count = (result.uploaded || []).length;
+                    progressText.textContent = `Uploaded ${count} file(s) ✓`;
+
+                    await new Promise(r => setTimeout(r, 800));
+                    _closeUploadOverlay();
+
+                    if (result.errors && result.errors.length > 0) {
+                        showToast(result.errors.join('; '), 'error', 5000);
+                    }
+                } else {
+                    progressText.textContent = result.error || 'Upload failed';
+                    progressFill.style.width = '0%';
+                    uploadBtn.disabled = false;
+                    uploadBtn.style.opacity = '';
+                }
+            } catch (err) {
+                progressText.textContent = `Error: ${_esc(err.message)}`;
+                uploadBtn.disabled = false;
+                uploadBtn.style.opacity = '';
+            }
+        }
+
+        /** Cancel the upload and close the overlay */
+        /** Close the upload overlay and return focus to terminal */
+        function _closeUploadOverlay() {
+            _uploadActive = false;
+            _stagedFiles = [];
+            document.getElementById('uploadOverlay').classList.remove('active');
+            // Restore terminal/editor interaction and return focus after fade-out
+            document.getElementById('terminalContainer').inert = false;
+            document.getElementById('editorContainer').inert = false;
+            setTimeout(() => { if (terminal) terminal.focus(); }, 220);
+        }
+
+        function cancelUpload() {
+            _closeUploadOverlay();
+            fetch(`http://${VNC_HOST}:${CONTROL_PORT}/file/upload-reset`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status: 'cancelled' })
+            }).catch(() => {});
+        }
+
+        // Escape key closes upload overlay (capture phase, before other handlers)
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape' && _uploadActive) {
+                e.preventDefault();
+                e.stopImmediatePropagation();
+                cancelUpload();
+            }
+        }, true);
+
+        // =============================================
+        // Image Preview
+        // =============================================
+
+        const IMAGE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp', 'ico', 'avif']);
+        let _previewImagePath = null;
+
+        /** Check if a file path is an image based on extension */
+        function isImageFile(filePath) {
+            const ext = (filePath.split('.').pop() || '').toLowerCase();
+            return IMAGE_EXTENSIONS.has(ext);
+        }
+
+        /** Open an image in the preview modal */
+        function previewImage(filePath) {
+            _previewImagePath = filePath;
+            const overlay = document.getElementById('imagePreviewOverlay');
+            const img = document.getElementById('imagePreviewImg');
+            const filename = document.getElementById('imagePreviewFilename');
+            const meta = document.getElementById('imagePreviewMeta');
+
+            filename.textContent = filePath.split('/').pop();
+
+            // Load image via the /download endpoint (serves with correct Content-Type)
+            const url = `http://${VNC_HOST}:${CONTROL_PORT}/download?path=${encodeURIComponent(filePath)}`;
+            img.onload = function() {
+                meta.textContent = `${this.naturalWidth} × ${this.naturalHeight}`;
+            };
+            img.onerror = function() {
+                meta.textContent = 'Failed to load';
+            };
+            img.src = url;
+
+            overlay.classList.add('open');
+        }
+
+        /** Close the image preview modal */
+        function closeImagePreview() {
+            const overlay = document.getElementById('imagePreviewOverlay');
+            overlay.classList.remove('open');
+            // Clear src to stop loading
+            document.getElementById('imagePreviewImg').src = '';
+            _previewImagePath = null;
+        }
+
+        /** Download the currently previewed image */
+        function downloadPreviewImage() {
+            if (_previewImagePath) triggerFileDownload(_previewImagePath);
+        }
+
+        // Escape key closes image preview
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape' && document.getElementById('imagePreviewOverlay').classList.contains('open')) {
+                e.preventDefault();
+                e.stopImmediatePropagation();
+                closeImagePreview();
+            }
+        }, true); // capture phase — before other Escape handlers
+
+        // =============================================
+        // Editor Panel
+        // =============================================
+
+        /** Check for unsaved editor changes before navigating away */
+        function confirmEditorClose() {
+            if (editorIsDirty && activePanel === 'editor') {
+                return confirm('You have unsaved changes. Discard them?');
+            }
+            return true;
+        }
+
+        /** Switch between Terminal and Editor tabs */
+        function switchPanel(panel) {
+            if (panel === 'terminal' && !confirmEditorClose()) return;
+            activePanel = panel;
+            const termContainer = document.getElementById('terminalContainer');
+            const editorContainer = document.getElementById('editorContainer');
+            const termTab = document.getElementById('tabTerminal');
+            const editorTab = document.getElementById('tabEditor');
+            const termSettings = document.getElementById('terminalSettings');
+            const editorToolbar = document.getElementById('editorToolbar');
+
+            if (panel === 'terminal') {
+                termContainer.style.display = '';
+                editorContainer.style.display = 'none';
+                termTab.classList.add('active');
+                editorTab.classList.remove('active');
+                if (termSettings) termSettings.style.display = 'flex';
+                if (editorToolbar) editorToolbar.style.display = 'none';
+                if (terminal && fitAddon) {
+                    requestAnimationFrame(() => { fitAddon.fit(); sendTerminalSize(); });
+                    terminal.focus();
+                }
+            } else {
+                termContainer.style.display = 'none';
+                editorContainer.style.display = 'flex';
+                termTab.classList.remove('active');
+                editorTab.classList.add('active');
+                if (termSettings) termSettings.style.display = 'none';
+                if (editorToolbar) editorToolbar.style.display = 'flex';
+                if (editorView) editorView.focus();
+            }
+        }
+
+        /**
+         * Build a CodeMirror 6 theme from an xterm.js terminal theme.
+         * Maps the terminal's ANSI color palette to syntax highlighting roles:
+         *   red → keywords/errors, green → strings, yellow → types,
+         *   blue → functions, cyan → constants, magenta → tags/regex
+         * Returns an array of CM6 extensions: [editorTheme, syntaxHighlighting]
+         */
+        function buildEditorTheme(xtermTheme) {
+            if (typeof CM === 'undefined' || !xtermTheme) return CM.oneDark;
+
+            // Strip alpha from rgba backgrounds — CM6 needs opaque backgrounds
+            const bg = (xtermTheme.background || '#1a1b26').replace(/rgba?\((\d+),\s*(\d+),\s*(\d+)[\s,]*[\d.]*\)/, 'rgb($1,$2,$3)');
+            const fg = xtermTheme.foreground || '#c0caf5';
+            const sel = xtermTheme.selectionBackground || 'rgba(102,126,234,0.4)';
+            const cursor = xtermTheme.cursor || fg;
+            const isDark = isThemeDark(xtermTheme);
+
+            // Slightly lighter/darker variant for gutters and active lines
+            const gutterBg = isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.03)';
+            const activeLine = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)';
+            const lineNum = isDark ? 'rgba(255,255,255,0.25)' : 'rgba(0,0,0,0.3)';
+            const lineNumActive = isDark ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.7)';
+
+            const editorTheme = CM.EditorView.theme({
+                '&': { color: fg, backgroundColor: bg },
+                '.cm-content': { caretColor: cursor },
+                '.cm-cursor, .cm-dropCursor': { borderLeftColor: cursor },
+                '&.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground, .cm-selectionBackground, .cm-content ::selection': { backgroundColor: sel },
+                '.cm-gutters': { backgroundColor: gutterBg, color: lineNum, borderRight: 'none' },
+                '.cm-activeLineGutter': { color: lineNumActive, backgroundColor: 'transparent' },
+                '.cm-activeLine': { backgroundColor: activeLine },
+                '.cm-foldPlaceholder': { backgroundColor: 'transparent', border: 'none', color: xtermTheme.brightBlack || '#666' },
+                '.cm-tooltip': { backgroundColor: bg, color: fg, border: `1px solid ${isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.15)'}` },
+                '.cm-tooltip-autocomplete > ul > li[aria-selected]': { backgroundColor: sel },
+                '.cm-searchMatch': { backgroundColor: isDark ? 'rgba(255,200,0,0.25)' : 'rgba(255,200,0,0.4)', borderRadius: '2px' },
+                '.cm-searchMatch.cm-searchMatch-selected': { backgroundColor: isDark ? 'rgba(255,200,0,0.45)' : 'rgba(255,200,0,0.6)' },
+            }, { dark: isDark });
+
+            // Map ANSI colors to syntax roles
+            const t = CM.tags;
+            const syntaxHL = CM.syntaxHighlighting(CM.HighlightStyle.define([
+                { tag: [t.keyword, t.operatorKeyword, t.modifier, t.controlKeyword],
+                  color: xtermTheme.red || '#f7768e' },
+                { tag: [t.string, t.special(t.string), t.character],
+                  color: xtermTheme.green || '#9ece6a' },
+                { tag: [t.typeName, t.className, t.changed, t.annotation, t.self, t.namespace],
+                  color: xtermTheme.yellow || '#e0af68' },
+                { tag: [t.function(t.variableName), t.function(t.propertyName), t.labelName],
+                  color: xtermTheme.blue || '#7aa2f7' },
+                { tag: [t.number, t.bool, t.null, t.atom, t.unit],
+                  color: xtermTheme.cyan || '#7dcfff' },
+                { tag: [t.tagName, t.regexp, t.special(t.brace)],
+                  color: xtermTheme.magenta || '#bb9af7' },
+                { tag: [t.propertyName],
+                  color: xtermTheme.brightBlue || xtermTheme.blue || '#7aa2f7' },
+                { tag: [t.attributeName],
+                  color: xtermTheme.brightCyan || xtermTheme.cyan || '#7dcfff' },
+                { tag: [t.attributeValue],
+                  color: xtermTheme.green || '#9ece6a' },
+                { tag: [t.comment, t.lineComment, t.blockComment],
+                  color: xtermTheme.brightBlack || '#666', fontStyle: 'italic' },
+                { tag: [t.meta, t.documentMeta],
+                  color: xtermTheme.brightBlack || '#666' },
+                { tag: [t.definition(t.variableName)],
+                  color: fg },
+                { tag: t.strong, fontWeight: 'bold' },
+                { tag: t.emphasis, fontStyle: 'italic' },
+                { tag: t.link, textDecoration: 'underline', color: xtermTheme.blue || '#7aa2f7' },
+                { tag: t.heading, fontWeight: 'bold', color: xtermTheme.red || '#f7768e' },
+                { tag: t.invalid, color: xtermTheme.brightRed || '#ff0000', textDecoration: 'line-through' },
+            ]));
+
+            return [editorTheme, syntaxHL];
+        }
+
+        /** Check if a terminal theme is dark (based on background luminance) */
+        function isThemeDark(xtermTheme) {
+            const bg = xtermTheme.background || '';
+            // Parse rgba(r,g,b,a) or rgb(r,g,b) or #hex
+            let r = 0, g = 0, b = 0;
+            const rgbMatch = bg.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+            if (rgbMatch) {
+                r = parseInt(rgbMatch[1]); g = parseInt(rgbMatch[2]); b = parseInt(rgbMatch[3]);
+            } else {
+                const hex = bg.replace('#', '');
+                if (hex.length >= 6) {
+                    r = parseInt(hex.substr(0, 2), 16);
+                    g = parseInt(hex.substr(2, 2), 16);
+                    b = parseInt(hex.substr(4, 2), 16);
+                }
+            }
+            // Relative luminance (simplified)
+            return (r * 0.299 + g * 0.587 + b * 0.114) < 128;
+        }
+
+        /** Apply the current terminal theme to the editor (called on theme change) */
+        function syncEditorTheme() {
+            if (!editorView || !editorThemeCompartment) return;
+            const themeName = localStorage.getItem('terminalTheme') || 'tokyo-night';
+            const xtermTheme = TERMINAL_THEMES[themeName];
+            if (!xtermTheme) return;
+            const cmTheme = buildEditorTheme(xtermTheme);
+            editorView.dispatch({
+                effects: editorThemeCompartment.reconfigure(cmTheme)
+            });
+        }
+
+        /** Detect CM6 language extension from file extension */
+        function getLanguageExtension(ext) {
+            if (typeof CM === 'undefined') return null;
+            const map = {
+                'js': CM.javascript, 'mjs': CM.javascript, 'ts': CM.javascript,
+                'jsx': CM.javascript, 'tsx': CM.javascript,
+                'html': CM.html, 'htm': CM.html, 'svg': CM.html,
+                'css': CM.css, 'scss': CM.css,
+                'json': CM.json,
+                'py': CM.python,
+                'md': CM.markdown, 'markdown': CM.markdown,
+            };
+            return map[ext] ? map[ext]() : null;
+        }
+
+        /** Open a file in the editor panel */
+        async function openFileInEditor(filePath) {
+            // Route image files to the preview modal instead of the editor
+            if (isImageFile(filePath)) {
+                previewImage(filePath);
+                return;
+            }
+
+            if (typeof CM === 'undefined') {
+                showToast('Editor not available (CodeMirror failed to load)', 'error');
+                return;
+            }
+
+            // If path is a directory, open file browser at that location
+            // (detected by trailing / or by the control server returning 'Not a file')
+            // For now, try to open as file — server will return appropriate error
+
+            // Ensure the panel is visible and in split mode
+            if (!isTerminalOpen) {
+                toggleTerminal();
+                // Wait a tick for the panel to render
+                await new Promise(r => requestAnimationFrame(r));
+            }
+            // Force split mode if floating
+            if (terminalMode !== 'split') {
+                enterSplitMode();
+                await new Promise(r => requestAnimationFrame(r));
+            }
+
+            // Switch to editor tab
+            switchPanel('editor');
+
+            // Fetch file content
+            try {
+                const resp = await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/file/read?path=${encodeURIComponent(filePath)}`);
+                if (!resp.ok && resp.status >= 500) {
+                    showToast(`Server error (HTTP ${resp.status})`, 'error');
+                    return;
+                }
+                const data = await resp.json();
+                if (!data.ok) {
+                    // If it's a directory, open file browser instead
+                    if (data.error === 'Not a file' || data.error === 'File not found') {
+                        toggleFileBrowser(filePath);
+                        return;
+                    }
+                    showToast(`Cannot open: ${data.error}`, 'error');
+                    return;
+                }
+
+                editorCurrentPath = data.path;
+                editorIsReadOnly = !data.writable;
+                editorIsDirty = false;
+
+                // Update toolbar
+                document.getElementById('editorFilePath').textContent = data.path;
+                document.getElementById('editorFilePath').title = data.path;
+                document.getElementById('editorReadonlyBadge').style.display = editorIsReadOnly ? '' : 'none';
+                document.getElementById('editorSaveBtn').disabled = editorIsReadOnly;
+                document.getElementById('editorSaveBtn').style.opacity = editorIsReadOnly ? '0.3' : '';
+                document.getElementById('editorDirtyDot').style.display = 'none';
+
+                // Detect language from extension
+                const ext = (data.filename.split('.').pop() || '').toLowerCase();
+                const langExtension = getLanguageExtension(ext);
+
+                // Destroy previous editor
+                if (editorView) {
+                    editorView.destroy();
+                    editorView = null;
+                }
+                document.getElementById('editorInstance').innerHTML = '';
+
+                // Build extensions
+                const extensions = [
+                    CM.lineNumbers(),
+                    CM.highlightActiveLineGutter(),
+                    CM.highlightSpecialChars(),
+                    CM.history(),
+                    CM.foldGutter(),
+                    CM.drawSelection(),
+                    CM.dropCursor(),
+                    CM.indentOnInput(),
+                    CM.syntaxHighlighting(CM.defaultHighlightStyle, { fallback: true }),
+                    CM.bracketMatching(),
+                    CM.closeBrackets(),
+                    CM.autocompletion(),
+                    CM.rectangularSelection(),
+                    CM.crosshairCursor(),
+                    CM.highlightActiveLine(),
+                    CM.highlightSelectionMatches(),
+                    CM.keymap.of([
+                        ...CM.closeBracketsKeymap,
+                        ...CM.defaultKeymap,
+                        ...CM.searchKeymap,
+                        ...CM.historyKeymap,
+                        ...CM.foldKeymap,
+                        ...CM.completionKeymap,
+                        CM.indentWithTab,
+                        { key: 'Mod-s', run: () => { saveEditorFile(); return true; } },
+                    ]),
+                    CM.EditorView.updateListener.of((update) => {
+                        if (update.docChanged && !editorIsDirty) {
+                            editorIsDirty = true;
+                            document.getElementById('editorDirtyDot').style.display = '';
+                        }
+                    }),
+                    editorThemeCompartment.of(buildEditorTheme(TERMINAL_THEMES[localStorage.getItem('terminalTheme') || 'tokyo-night'])),
+                ];
+                if (langExtension) extensions.push(langExtension);
+                if (editorIsReadOnly) extensions.push(CM.EditorState.readOnly.of(true));
+
+                editorView = new CM.EditorView({
+                    doc: data.content,
+                    extensions,
+                    parent: document.getElementById('editorInstance'),
+                });
+
+                editorView.focus();
+            } catch (err) {
+                showToast(`Error opening file: ${err.message}`, 'error');
+            }
+        }
+
+        /** Save the current editor file back to the container */
+        let _editorSaving = false;
+        async function saveEditorFile() {
+            if (!editorView || !editorCurrentPath || editorIsReadOnly || _editorSaving) return;
+            _editorSaving = true;
+            const content = editorView.state.doc.toString();
+            try {
+                const resp = await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/file/write`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ path: editorCurrentPath, content })
+                });
+                const data = await resp.json();
+                if (data.ok) {
+                    editorIsDirty = false;
+                    document.getElementById('editorDirtyDot').style.display = 'none';
+                    showToast(`Saved ${editorCurrentPath.split('/').pop()}`, 'success');
+                } else {
+                    showToast(`Save failed: ${data.error}`, 'error');
+                }
+            } catch (err) {
+                showToast(`Save failed: ${err.message}`, 'error');
+            } finally {
+                _editorSaving = false;
+            }
+        }
+
+        /** Download the current editor file to the host machine */
+        function downloadEditorFile() {
+            if (!editorCurrentPath) return;
+            triggerFileDownload(editorCurrentPath);
+        }
+
+        /** Toggle file browser sidebar */
+        async function toggleFileBrowser(dirPath) {
+            const sidebar = document.getElementById('fileBrowserSidebar');
+            if (sidebar.style.display === 'none' || dirPath) {
+                sidebar.style.display = '';
+                await loadFileTree(dirPath || '/home/inspekt');
+            } else {
+                sidebar.style.display = 'none';
+            }
+        }
+
+        /** Load directory listing into file browser */
+        async function loadFileTree(dirPath) {
+            const tree = document.getElementById('fileBrowserTree');
+            try {
+                const resp = await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/file/list?path=${encodeURIComponent(dirPath)}`);
+                const data = await resp.json();
+                if (!data.ok) {
+                    tree.innerHTML = `<div class="file-entry" style="color:#f66">${_esc(data.error)}</div>`;
+                    return;
+                }
+
+                // Build breadcrumb for current path
+                let breadcrumb = '';
+                if (data.path !== '/home/inspekt') {
+                    const parentPath = _esc(data.path.replace(/\/[^/]+$/, '') || '/home/inspekt');
+                    breadcrumb = `<div class="file-entry dir" data-path="${parentPath}" onclick="loadFileTree(this.dataset.path)"><span class="file-icon">..</span> <span>← Back</span></div>`;
+                }
+
+                const entries = data.entries.map(e => {
+                    const full = _esc(data.path + '/' + e.name);
+                    const name = _esc(e.name);
+                    if (e.type === 'dir') {
+                        return `<div class="file-entry dir" data-path="${full}" onclick="loadFileTree(this.dataset.path)"><span class="file-icon">📁</span> <span>${name}</span></div>`;
+                    }
+                    const sizeStr = e.size > 1024 ? `${(e.size / 1024).toFixed(1)}K` : `${e.size}B`;
+                    const active = editorCurrentPath === (data.path + '/' + e.name) ? ' active' : '';
+                    return `<div class="file-entry${active}" data-path="${full}" onclick="openFileInEditor(this.dataset.path)"><span class="file-icon">📄</span> <span>${name}</span> <span style="margin-left:auto;font-size:10px;color:#666">${sizeStr}</span></div>`;
+                }).join('');
+
+                tree.innerHTML = breadcrumb + entries;
+            } catch (err) {
+                tree.innerHTML = `<div class="file-entry" style="color:#f66">Error: ${_esc(err.message)}</div>`;
+            }
+        }
+
+        // Intercept Cmd+S globally when editor is active to prevent browser save dialog.
+        // The actual save is handled by the CM6 keymap — this only does preventDefault().
+        document.addEventListener('keydown', function(e) {
+            if ((e.metaKey || e.ctrlKey) && e.key === 's' && activePanel === 'editor') {
+                e.preventDefault();
+                // Don't call saveEditorFile() here — CM6's keymap already handles it.
+                // This handler only prevents the browser's "Save Page" dialog.
+            }
+        });
+
+        // =============================================
         // Terminal Management
         // =============================================
 
@@ -6940,6 +8675,9 @@
             const termBtn = document.querySelector('button[onclick="toggleTerminal()"]');
 
             if (isTerminalOpen) {
+                // Check for unsaved editor changes before closing
+                if (!confirmEditorClose()) return;
+
                 // If in split mode, exit split first then close
                 if (terminalMode === 'split') {
                     exitSplitMode();
@@ -6950,6 +8688,16 @@
                 overlay.inert = true; // Make overlay non-interactive while hidden
                 if (termBtn) termBtn.classList.remove('terminal-active');
                 isTerminalOpen = false;
+
+                // Reset to terminal tab so next open shows terminal
+                // (bypass confirm since we already confirmed above)
+                if (activePanel === 'editor') {
+                    activePanel = 'terminal';
+                    document.getElementById('terminalContainer').style.display = '';
+                    document.getElementById('editorContainer').style.display = 'none';
+                    document.getElementById('tabTerminal').classList.add('active');
+                    document.getElementById('tabEditor').classList.remove('active');
+                }
 
                 // Try to auto-focus VNC (best effort, no blocking overlay)
                 setTimeout(() => tryFocusVNC(), 100);
@@ -7254,6 +9002,8 @@
             if (theme) {
                 terminal.options.theme = theme;
                 localStorage.setItem('terminalTheme', themeName);
+                // Sync editor theme with terminal
+                syncEditorTheme();
             }
         }
 
@@ -7412,19 +9162,11 @@
                                         const checkResp = await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/file-exists?path=${encodeURIComponent(text)}`);
                                         const data = await checkResp.json();
                                         if (data.exists) {
-                                            showToast(`Downloading: ${data.filename}`, 'success');
-                                            // Use fetch + blob to avoid cross-origin navigation
-                                            const downloadUrl = `http://${VNC_HOST}:${CONTROL_PORT}/download?path=${encodeURIComponent(text)}`;
-                                            const downloadResp = await fetch(downloadUrl);
-                                            if (!downloadResp.ok) throw new Error(`HTTP ${downloadResp.status}`);
-
-                                            const blob = await downloadResp.blob();
-                                            const blobUrl = URL.createObjectURL(blob);
-                                            const a = document.createElement('a');
-                                            a.href = blobUrl;
-                                            a.download = data.filename;
-                                            a.click();
-                                            setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+                                            if (data.size > 1048576) {
+                                                showToast('File too large for editor (max 1 MB)', 'error');
+                                                return;
+                                            }
+                                            openFileInEditor(text);
                                         } else {
                                             showToast(`File not found: ${text}`, 'error');
                                         }
@@ -7445,6 +9187,13 @@
                 console.log('[Terminal] Terminal opened');
                 fitAddon.fit();
 
+                // Auto-focus terminal on hover so users can type immediately
+                container.addEventListener('mouseenter', () => {
+                    if (activePanel === 'terminal' && !_uploadActive) {
+                        terminal.focus();
+                    }
+                });
+
                 // Intercept Escape key to close terminal instead of sending to shell
                 terminal.attachCustomKeyEventHandler((event) => {
                     // Only capture keys when terminal is actually open/visible
@@ -7461,8 +9210,9 @@
                         return false;
                     }
 
-                    // Cmd+K (Mac) or Ctrl+K to clear terminal
-                    if (event.key === 'k' && event.type === 'keydown' && (event.metaKey || event.ctrlKey)) {
+                    // Cmd+Shift+K (Mac) or Ctrl+Shift+K to clear terminal
+                    // (Cmd/Ctrl+K without Shift opens the command palette)
+                    if (event.key === 'k' && event.type === 'keydown' && event.shiftKey && (event.metaKey || event.ctrlKey)) {
                         event.stopPropagation();
                         event.preventDefault();
                         terminal.clear();  // Clear xterm.js scrollback
@@ -7470,6 +9220,15 @@
                         if (terminalSocket && terminalSocket.readyState === WebSocket.OPEN) {
                             terminalSocket.send('\x0c');
                         }
+                        return false;
+                    }
+
+                    // Cmd+K (Mac) or Ctrl+K to toggle command palette
+                    if (event.key === 'k' && event.type === 'keydown' && !event.shiftKey && (event.metaKey || event.ctrlKey)) {
+                        event.stopPropagation();
+                        event.preventDefault();
+                        const ninja = document.getElementById('commandPalette');
+                        if (ninja) ninja.visible ? ninja.close() : ninja.open();
                         return false;
                     }
 
@@ -7529,6 +9288,19 @@
                     triggerFileDownload(filePath);
                 }
 
+                // Check for edit escape sequences and open in editor
+                EDIT_MARKER_REGEX.lastIndex = 0;
+                let editMatch;
+                while ((editMatch = EDIT_MARKER_REGEX.exec(data)) !== null) {
+                    openFileInEditor(editMatch[1]);
+                }
+
+                // Check for upload signal and show upload overlay
+                UPLOAD_MARKER_REGEX.lastIndex = 0;
+                if (UPLOAD_MARKER_REGEX.test(data)) {
+                    showUploadOverlay();
+                }
+
                 // Check for clipboard signal and relay to host clipboard
                 CLIPBOARD_SIGNAL_REGEX.lastIndex = 0;
                 if (CLIPBOARD_SIGNAL_REGEX.test(data)) {
@@ -7574,10 +9346,15 @@
 
                 // Strip escape sequences before writing to terminal
                 let cleanData = data.replace(DOWNLOAD_MARKER_REGEX, '');
+                cleanData = cleanData.replace(EDIT_MARKER_REGEX, '');
+                cleanData = cleanData.replace(UPLOAD_MARKER_REGEX, '');
                 cleanData = cleanData.replace(HIDE_TERMINAL_REGEX, '');
                 cleanData = cleanData.replace(CLIPBOARD_SIGNAL_REGEX, '');
                 cleanData = cleanData.replace(COPYABLE_SIGNAL_REGEX, '');
                 terminal.write(cleanData);
+
+                // Scan for trigger words (debounced)
+                checkTriggerWords(cleanData);
             };
 
             terminalSocket.onclose = () => {
@@ -8319,109 +10096,370 @@
         // Command Palette (ninja-keys)
         // =============================================
 
-        // Output types: 'toast' (quick), 'panel' (structured data), 'terminal' (interactive)
-        const inspektCommands = [
+        // --- UI Commands: control panel actions (not from Inspekt registry) ---
+        // `content` can be a string (static) or a function (resolved each time the palette opens).
+        // For tab commands, it shows the active tab's page title.
+
+        function _activeTabContent() {
+            const tab = tabs.find(t => t.id === activeTabId);
+            if (!tab || !tab.title) return '';
+            const title = tab.title;
+            // Truncate title at ~30 chars with ellipsis, wrapped in typographic quotes
+            const maxLen = 40;
+            const truncated = title.length > maxLen ? title.substring(0, maxLen) + '\u2026' : title;
+            const quoted = `\u201C${truncated}\u201D`;
+            // Extract domain from URL
+            try {
+                const domain = new URL(tab.url).hostname.replace(/^www\./, '');
+                return `${quoted} (${domain})`;
+            } catch {
+                return quoted;
+            }
+        }
+
+        const UI_COMMANDS = [
+            // Tabs
+            { id: 'ui:new-tab',       title: 'New Tab',                  section: 'Tabs',           keywords: 'create add open',         handler: () => createNewTab(),                                                       content: () => `${tabs.length} tab${tabs.length !== 1 ? 's' : ''} open` },
+            { id: 'ui:close-tab',     title: 'Close Tab',                section: 'Tabs',           keywords: 'remove delete',            handler: () => closeTab(activeTabId),                                                content: _activeTabContent },
+            { id: 'ui:duplicate-tab', title: 'Duplicate Tab',            section: 'Tabs',           keywords: 'copy clone',               handler: () => duplicateTab(activeTabId),                                            content: _activeTabContent },
+            { id: 'ui:pin-tab',       title: 'Pin/Unpin Tab',            section: 'Tabs',           keywords: 'lock stick',               handler: () => togglePinTab(activeTabId),                                            content: _activeTabContent },
+            { id: 'ui:close-others',  title: 'Close Other Tabs',         section: 'Tabs',           keywords: 'close all other',          handler: () => closeOtherTabs(activeTabId),                                          content: () => `${tabs.length - 1} other tab${tabs.length - 1 !== 1 ? 's' : ''}` },
+            { id: 'ui:host-browser',  title: 'Open in Host Browser',     section: 'Tabs',           keywords: 'external open outside',    handler: () => openInHostBrowser(activeTabId),                                       content: _activeTabContent },
+            { id: 'ui:tab-grid',      title: 'Tab Overview',             section: 'Tabs',           keywords: 'grid overview all tabs',    handler: () => toggleTabGrid(),                                                      content: () => `${tabs.length} tab${tabs.length !== 1 ? 's' : ''}` },
+            // Terminal
+            { id: 'ui:terminal',      title: 'Toggle Terminal',          section: 'Terminal',       keywords: 'shell console cli',         handler: () => toggleTerminal(),                                                     content: 'Open terminal overlay' },
+            { id: 'ui:split-view',    title: 'Toggle Split View',        section: 'Terminal',       keywords: 'split side by side layout', handler: () => toggleSplitMode(),                                                    content: 'Side-by-side terminal and browser' },
+            { id: 'ui:flip-split',    title: 'Flip Split Layout',        section: 'Terminal',       keywords: 'swap flip position',        handler: () => { if (terminalMode !== 'split') enterSplitMode(); flipSplitLayout(); }, content: 'Swap terminal and browser positions' },
+            { id: 'ui:move-terminal', title: 'Move Terminal Left/Right', section: 'Terminal',       keywords: 'move position left right',  handler: () => toggleTerminalPosition(),                                             content: 'Move terminal to opposite side' },
+            // View
+            { id: 'ui:devtools',      title: 'Toggle DevTools',          section: 'View',           keywords: 'developer tools debug',     handler: () => toggleDevTools(),                                                     content: 'Chrome DevTools' },
+            { id: 'ui:inspect',       title: 'Toggle Element Inspector', section: 'View',           keywords: 'inspect hover highlight',   handler: () => toggleHoverInspect(),                                                 content: 'Highlight elements on hover' },
+            { id: 'ui:fullscreen',    title: 'Toggle Fullscreen',        section: 'View',           keywords: 'fullscreen maximize',       handler: () => toggleFullscreen(),                                                   content: 'Enter or exit fullscreen' },
+            { id: 'ui:zoom-in',       title: 'Zoom In',                  section: 'View',           keywords: 'enlarge bigger',            handler: () => handleZoom('in'),                                                     content: 'Increase page zoom' },
+            { id: 'ui:zoom-out',      title: 'Zoom Out',                 section: 'View',           keywords: 'shrink smaller',            handler: () => handleZoom('out'),                                                    content: 'Decrease page zoom' },
+            { id: 'ui:zoom-reset',    title: 'Reset Zoom',               section: 'View',           keywords: 'zoom default 100%',         handler: () => handleZoom('reset'),                                                  content: 'Reset to 100%' },
+            { id: 'ui:page-info',     title: 'Page Info',                section: 'View',           keywords: 'meta seo performance',      handler: () => togglePageInfo(),                                                     content: 'SEO, meta, performance' },
+            { id: 'ui:audio',         title: 'Toggle Audio',             section: 'View',           keywords: 'sound mute unmute',         handler: () => toggleAudio(),                                                        content: 'Stream audio from VM' },
+            { id: 'ui:screen-reader', title: 'Screen Reader Simulator',  section: 'Accessibility',  keywords: 'sr voiceover jaws nvda',    handler: () => toggleSRPopout(),                                                     content: 'JAWS, NVDA, VoiceOver' },
             // Navigation
-            { id: 'open', title: 'Open URL', icon: '🌐', section: 'Navigation', output: 'toast', keywords: 'navigate go to' },
-            { id: 'back', title: 'Go Back', icon: '←', section: 'Navigation', output: 'toast', keywords: 'previous history' },
-            { id: 'forward', title: 'Go Forward', icon: '→', section: 'Navigation', output: 'toast', keywords: 'next history' },
-            { id: 'reload', title: 'Reload Page', icon: '🔄', section: 'Navigation', output: 'toast', keywords: 'refresh' },
-            { id: 'top', title: 'Scroll to Top', icon: '⬆', section: 'Navigation', output: 'toast', keywords: 'beginning start' },
-            { id: 'bottom', title: 'Scroll to Bottom', icon: '⬇', section: 'Navigation', output: 'toast', keywords: 'end' },
-
-            // Extraction
-            { id: 'outline', title: 'Extract Page Outline', icon: '📋', section: 'Extraction', output: 'panel', keywords: 'headings structure h1 h2 h3' },
-            { id: 'links', title: 'Extract Links', icon: '🔗', section: 'Extraction', output: 'panel', keywords: 'urls hrefs' },
-            { id: 'info', title: 'Page Information', icon: 'ℹ️', section: 'Extraction', output: 'panel', keywords: 'metadata title' },
-            { id: 'selection', title: 'Get Selected Text', icon: '✂️', section: 'Extraction', output: 'panel', keywords: 'copy highlight' },
-            { id: 'describe', title: 'Describe Page (AI)', icon: '📝', section: 'Extraction', output: 'panel', keywords: 'summarize ai claude' },
-            { id: 'summarize', title: 'Summarize Page (AI)', icon: '📄', section: 'Extraction', output: 'panel', keywords: 'summary ai claude' },
-            { id: 'ask', title: 'Ask About Page (AI)', icon: '💬', section: 'Extraction', output: 'terminal', keywords: 'question ai claude chat' },
-
-            // Accessibility
-            { id: 'axe', title: 'Run Accessibility Audit', icon: '♿', section: 'Accessibility', output: 'panel', keywords: 'wcag a11y violations' },
-            { id: 'axe --level 2aaa', title: 'Audit (WCAG AAA)', icon: '♿', section: 'Accessibility', output: 'panel', keywords: 'wcag aaa strict' },
-            { id: 'autocomplete', title: 'Check Autocomplete', icon: '📝', section: 'Accessibility', output: 'panel', keywords: 'forms inputs' },
-
-            // Interaction
-            { id: 'click', title: 'Click Element', icon: '👆', section: 'Interaction', output: 'toast', keywords: 'tap press' },
-            { id: 'type', title: 'Type Text', icon: '⌨️', section: 'Interaction', output: 'toast', keywords: 'input keyboard' },
-            { id: 'focus', title: 'Focus Element', icon: '🎯', section: 'Interaction', output: 'toast', keywords: 'select' },
-            { id: 'screenshot', title: 'Take Screenshot', icon: '📷', section: 'Interaction', output: 'toast', keywords: 'capture image' },
-            { id: 'screenshot --full', title: 'Full Page Screenshot', icon: '📷', section: 'Interaction', output: 'toast', keywords: 'capture full' },
-
-            // Recording
-            { id: 'record', title: 'Start Recording', icon: '🔴', section: 'Recording', output: 'terminal', keywords: 'capture actions' },
-            { id: 'replay', title: 'Replay Recording', icon: '▶️', section: 'Recording', output: 'terminal', keywords: 'playback' },
-
-            // Storage
-            { id: 'cookies list', title: 'List Cookies', icon: '🍪', section: 'Storage', output: 'panel', keywords: 'storage' },
-            { id: 'storage list', title: 'List Local Storage', icon: '💾', section: 'Storage', output: 'panel', keywords: 'localstorage' },
-
-            // Network
-            { id: 'network', title: 'Network Requests', icon: '🌍', section: 'Network', output: 'panel', keywords: 'requests fetch xhr' },
-            { id: 'har', title: 'HAR Export', icon: '📦', section: 'Network', output: 'panel', keywords: 'archive http' },
-            { id: 'robots', title: 'Check robots.txt', icon: '🤖', section: 'Network', output: 'panel', keywords: 'crawl seo' },
-
-            // Console
-            { id: 'console', title: 'Browser Console', icon: '💻', section: 'Console', output: 'panel', keywords: 'logs errors' },
-            { id: 'console --errors', title: 'Console Errors Only', icon: '❌', section: 'Console', output: 'panel', keywords: 'errors exceptions' },
-            { id: 'js', title: 'Execute JavaScript', icon: '📜', section: 'Console', output: 'terminal', keywords: 'eval run code' },
-
-            // Domain Analysis
-            { id: 'domain whois', title: 'WHOIS Lookup', icon: '🔍', section: 'Domain', output: 'panel', keywords: 'ownership registrar' },
-            { id: 'domain dns', title: 'DNS Records', icon: '🌐', section: 'Domain', output: 'panel', keywords: 'nameserver mx' },
-            { id: 'domain ssl', title: 'SSL Certificate', icon: '🔒', section: 'Domain', output: 'panel', keywords: 'https tls' },
+            { id: 'ui:back',          title: 'Go Back',                  section: 'Navigation',     keywords: 'previous history back',     handler: () => goBack(),                                                             content: 'Navigate to previous page' },
+            { id: 'ui:forward',       title: 'Go Forward',               section: 'Navigation',     keywords: 'next history forward',      handler: () => goForward(),                                                          content: 'Navigate to next page' },
+            { id: 'ui:reload',        title: 'Reload Page',              section: 'Navigation',     keywords: 'refresh reload',            handler: () => reloadPage(),                                                         content: _activeTabContent },
+            // Restart
+            { id: 'ui:restart-browser', title: 'Restart Browser',          section: 'Restart',        keywords: 'restart chromium refresh config', handler: () => performRestartBrowser(),                                          content: 'Apply config changes' },
+            { id: 'ui:restart-all',     title: 'Restart All Services',     section: 'Restart',        keywords: 'restart reboot vnc proxy terminal', handler: () => performRestartAll(),                                            content: 'Browser, VNC, proxy, terminal' },
+            { id: 'ui:reset-env',       title: 'Reset Environment',        section: 'Restart',        keywords: 'reset fresh clean destroy',   handler: () => performResetEnvironment(),                                             content: 'Clear all browsing data' },
         ];
 
-        // Convert to ninja-keys format
-        function buildCommandPaletteData() {
-            const items = inspektCommands.map(cmd => ({
-                id: cmd.id,
-                title: cmd.title,
-                icon: cmd.icon,
-                section: cmd.section,
-                keywords: cmd.keywords,
-                handler: () => executeCommand(cmd)
-            }));
+        // --- Inspekt command configuration ---
 
-            // Terminal layout commands
-            items.push({
-                id: 'split-terminal',
-                title: terminalMode === 'split' ? 'Exit Split View' : 'Split Terminal View',
-                icon: '◫',
-                section: 'Terminal',
-                keywords: 'split side by side layout terminal',
-                hotkey: 'cmd+\\',
-                handler: () => {
-                    if (isTerminalOpen || terminalMode === 'split') {
-                        toggleSplitMode();
-                    } else {
-                        enterSplitMode();
+        // Categories that get nested submenus in the palette
+        const NESTED_CATEGORIES = new Set([
+            'Extraction', 'Interaction', 'Accessibility', 'Inspection', 'Selection', 'Storage'
+        ]);
+
+        // Categories hidden from the palette (not useful in VM context)
+        const HIDDEN_CATEGORIES = new Set(['Control']);
+
+        // No icons — emojis look unprofessional. Commands are identified by title only.
+        const CATEGORY_ICONS = {};
+
+        // Output routing overrides (command cli_name → output mode)
+        // Default: 'panel' for most commands, 'toast' for navigation-like commands
+        const OUTPUT_OVERRIDES = {
+            // Toast (quick, no structured output)
+            'open': 'toast', 'back': 'toast', 'forward': 'toast', 'reload': 'toast',
+            'top': 'toast', 'bottom': 'toast', 'click': 'toast', 'type': 'toast',
+            'focus': 'toast', 'page-up': 'toast', 'page-down': 'toast',
+            'paste': 'toast', 'press': 'toast',
+            // Terminal (interactive)
+            'ask': 'terminal', 'js': 'terminal', 'record': 'terminal', 'replay': 'terminal',
+            'do': 'terminal',
+        };
+
+        // Commands that need argument prompts before execution
+        // Value is array of field definitions, or 'terminal' to route to terminal for input
+        const PARAM_PROMPTS = {
+            'open': [{ name: 'url', label: 'URL', placeholder: 'https://example.com' }],
+            'click': [{ name: 'selector', label: 'CSS Selector', placeholder: '.button, #submit' }],
+            'type': [{ name: 'text', label: 'Text to type', placeholder: 'Hello world' }],
+            'focus': [{ name: 'selector', label: 'CSS Selector', placeholder: '#email, .input' }],
+            'press': [{ name: 'keys', label: 'Keys', placeholder: 'Tab, Enter, Ctrl+A' }],
+            'ask': [{ name: 'question', label: 'Question', placeholder: 'What color is the logo?' }],
+            'do': [{ name: 'action', label: 'Action', placeholder: 'Click the login button' }],
+            'js': 'terminal',
+        };
+
+        // --- Pinned commands (localStorage-backed) ---
+
+        function getPinnedCommandIds() {
+            try { return JSON.parse(localStorage.getItem('inspekt_pinned_commands')) || []; }
+            catch { return []; }
+        }
+        function savePinnedCommandIds(ids) {
+            localStorage.setItem('inspekt_pinned_commands', JSON.stringify(ids));
+        }
+        function togglePinCommand(id) {
+            const ids = getPinnedCommandIds();
+            const idx = ids.indexOf(id);
+            if (idx >= 0) ids.splice(idx, 1); else ids.push(id);
+            savePinnedCommandIds(ids);
+            return idx < 0; // true = just pinned, false = just unpinned
+        }
+
+        // --- Registry fetch ---
+
+        let _registryData = null;
+
+        async function fetchRegistryCommands() {
+            try {
+                const resp = await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/api/commands/by-category`, {
+                    signal: AbortSignal.timeout(5000),
+                });
+                if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                const data = await resp.json();
+                _registryData = data;
+                return data;
+            } catch (err) {
+                console.warn('[CommandPalette] Failed to load registry:', err.message);
+                return null;
+            }
+        }
+
+        // --- Build palette data ---
+
+        function getOutputMode(cliName, category) {
+            if (OUTPUT_OVERRIDES[cliName]) return OUTPUT_OVERRIDES[cliName];
+            // Convention: Navigation-like categories default to toast, others to panel
+            if (category === 'Navigation') return 'toast';
+            return 'panel';
+        }
+
+        function buildCommandPaletteData(registryData) {
+            const items = [];
+
+            // === UI Commands (always available, sync) ===
+            for (const cmd of UI_COMMANDS) {
+                // Resolve content: string stays as-is, function is called for dynamic values
+                const content = typeof cmd.content === 'function' ? cmd.content() : (cmd.content || '');
+                items.push({
+                    id: cmd.id,
+                    title: cmd.title,
+                    section: cmd.section,
+                    keywords: cmd.keywords || '',
+                    hotkey: cmd.hotkey,
+                    handler: cmd.handler,
+                    content,
+                });
+            }
+
+            // === Inspekt Commands (from registry API) ===
+            if (registryData && registryData.categories) {
+                for (const [category, commands] of Object.entries(registryData.categories)) {
+                    if (HIDDEN_CATEGORIES.has(category)) continue;
+
+                    const isNested = NESTED_CATEGORIES.has(category);
+                    const parentId = `cat:${category.toLowerCase().replace(/\s+/g, '-')}`;
+                    const catIcon = CATEGORY_ICONS[category] || '';
+
+                    if (isNested && commands.length > 2) {
+                        // Add parent item for nested category
+                        items.push({
+                            id: parentId,
+                            title: category,
+                            icon: catIcon,
+                            section: 'Inspekt',
+                            keywords: category.toLowerCase(),
+                            children: commands.map(c => `inspekt:${c.id}`),
+                        });
+                    }
+
+                    for (const cmd of commands) {
+                        const cliName = cmd.cli_name;
+                        const outputMode = getOutputMode(cliName, category);
+                        const useNesting = isNested && commands.length > 2;
+
+                        items.push({
+                            id: `inspekt:${cmd.id}`,
+                            title: cmd.name,
+                            icon: catIcon,
+                            section: useNesting ? undefined : category,
+                            parent: useNesting ? parentId : undefined,
+                            keywords: `${cliName} ${cmd.description || ''} ${category}`.toLowerCase(),
+                            handler: () => executeInspektCommand(cmd, outputMode),
+                            content: cmd.description || '',
+                        });
                     }
                 }
-            });
-            items.push({
-                id: 'flip-split',
-                title: 'Flip Split Layout',
-                icon: '⇄',
-                section: 'Terminal',
-                keywords: 'swap flip terminal canvas position',
-                handler: () => {
-                    if (terminalMode !== 'split') enterSplitMode();
-                    flipSplitLayout();
+            }
+
+            // === Pinned Commands (prepend "Pinned" section at top) ===
+            const pinnedIds = getPinnedCommandIds();
+            if (pinnedIds.length > 0) {
+                const pinnedItems = [];
+                for (const pinnedId of pinnedIds) {
+                    const original = items.find(i => i.id === pinnedId);
+                    if (original) {
+                        pinnedItems.push({
+                            ...original,
+                            id: `pinned:${original.id}`,  // Unique ID to avoid ninja-keys dedup
+                            section: 'Pinned',
+                            parent: undefined,             // Always show at top level
+                            content: original.content,
+                        });
+                    }
                 }
-            });
-            items.push({
-                id: 'move-terminal',
-                title: terminalPosition === 'left' ? 'Move Terminal Right' : 'Move Terminal Left',
-                icon: '↔',
-                section: 'Terminal',
-                keywords: 'move terminal position left right',
-                handler: () => toggleTerminalPosition()
-            });
+                // Pinned section first, then everything else
+                return [...pinnedItems, ...items];
+            }
 
             return items;
+        }
+
+        // --- Helpers ---
+
+        // Shell-escape a single argument (POSIX single-quote wrapping)
+        function shellQuote(s) {
+            return "'" + s.replace(/'/g, "'\\''") + "'";
+        }
+
+        // --- Argument prompt overlay ---
+
+        let _activePromptOverlay = null;
+
+        function promptForArgs(title, fields) {
+            // Dismiss any existing prompt to prevent stacking
+            if (_activePromptOverlay) { _activePromptOverlay.remove(); _activePromptOverlay = null; }
+
+            return new Promise((resolve) => {
+                // Create overlay
+                const overlay = document.createElement('div');
+                overlay.style.cssText = 'position:fixed;inset:0;z-index:3000;background:rgba(0,0,0,0.5);display:flex;align-items:flex-start;justify-content:center;padding-top:15vh;';
+
+                const dialog = document.createElement('div');
+                dialog.style.cssText = 'background:rgba(20,20,30,0.95);backdrop-filter:blur(16px);border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:20px;width:500px;max-width:90vw;color:#e0e0e0;font-family:-apple-system,BlinkMacSystemFont,sans-serif;';
+
+                const titleEl = document.createElement('div');
+                titleEl.textContent = title;
+                titleEl.style.cssText = 'font-size:14px;font-weight:600;margin-bottom:16px;color:#aaa;';
+                dialog.appendChild(titleEl);
+
+                const input = document.createElement('input');
+                input.type = 'text';
+                input.placeholder = fields[0].placeholder || '';
+                input.style.cssText = 'width:100%;padding:10px 14px;border:1px solid rgba(255,255,255,0.15);border-radius:8px;background:rgba(255,255,255,0.05);color:#fff;font-size:15px;outline:none;box-sizing:border-box;';
+                input.addEventListener('focus', () => { input.style.borderColor = '#667eea'; });
+                input.addEventListener('blur', () => { input.style.borderColor = 'rgba(255,255,255,0.15)'; });
+                dialog.appendChild(input);
+
+                const hint = document.createElement('div');
+                hint.textContent = 'Press Enter to run, Escape to cancel';
+                hint.style.cssText = 'font-size:11px;color:#666;margin-top:10px;text-align:center;';
+                dialog.appendChild(hint);
+
+                overlay.appendChild(dialog);
+                document.body.appendChild(overlay);
+                _activePromptOverlay = overlay;
+
+                function cleanup(value) {
+                    overlay.remove();
+                    _activePromptOverlay = null;
+                    resolve(value);
+                }
+
+                input.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        const val = input.value.trim();
+                        cleanup(val || null);
+                    } else if (e.key === 'Escape') {
+                        e.preventDefault();
+                        cleanup(null);
+                    }
+                });
+
+                overlay.addEventListener('click', (e) => {
+                    if (e.target === overlay) cleanup(null);
+                });
+
+                // Focus after a tick (palette may still be closing)
+                requestAnimationFrame(() => input.focus());
+            });
+        }
+
+        // --- Execute Inspekt command ---
+
+        async function executeInspektCommand(cmd, outputMode) {
+            const cliName = cmd.cli_name;
+            const title = cmd.name;
+            const icon = CATEGORY_ICONS[cmd.category] || '';
+
+            // Check if command needs arguments
+            const promptDef = PARAM_PROMPTS[cliName];
+
+            if (promptDef === 'terminal') {
+                // Interactive command — open terminal and let user type
+                toggleTerminal();
+                showToast(`Opening terminal for ${title}...`);
+                setTimeout(() => {
+                    if (terminalSocket && terminalSocket.readyState === WebSocket.OPEN) {
+                        terminalSocket.send(`inspekt ${cliName} `);
+                    }
+                }, 400);
+                return;
+            }
+
+            let commandStr = cliName;
+
+            if (promptDef && Array.isArray(promptDef)) {
+                const value = await promptForArgs(title, promptDef);
+                if (value === null) return; // Cancelled
+                commandStr = `${cliName} ${shellQuote(value)}`;
+            }
+
+            if (outputMode === 'terminal') {
+                toggleTerminal();
+                showToast(`Running ${title}...`);
+                setTimeout(() => {
+                    if (terminalSocket && terminalSocket.readyState === WebSocket.OPEN) {
+                        terminalSocket.send(`inspekt ${commandStr}\n`);
+                    }
+                }, 400);
+                return;
+            }
+
+            if (outputMode === 'toast') {
+                showToast(`Running ${title}...`);
+                try {
+                    const response = await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/inspekt/${encodeURIComponent(commandStr)}`);
+                    const data = await response.json();
+                    if (data.ok) {
+                        showToast(`${title} completed`, 'success');
+                    } else {
+                        showToast(`Error: ${data.error}`, 'error', 5000);
+                    }
+                } catch (error) {
+                    showToast(`Failed: ${error.message}`, 'error');
+                }
+                return;
+            }
+
+            // Default: panel output
+            showToast(`Running ${title}...`);
+            try {
+                const response = await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/inspekt/${encodeURIComponent(commandStr)}`);
+                const data = await response.json();
+
+                if (data.ok) {
+                    const content = formatOutputForPanel(cliName, data.output);
+                    openOutputPanel(title, icon, content);
+                    showToast(`${title} completed`, 'success');
+                } else {
+                    showToast(`Error: ${data.error}`, 'error', 5000);
+                }
+            } catch (error) {
+                showToast(`Failed: ${error.message}`, 'error');
+            }
         }
 
         // Output Panel Functions
@@ -8435,62 +10473,6 @@
 
         function closeOutputPanel() {
             document.getElementById('outputPanel').classList.remove('open');
-        }
-
-        // Execute command based on output type
-        async function executeCommand(cmd) {
-            const { id, title, icon, output } = cmd;
-
-            if (output === 'terminal') {
-                // Open terminal and run command
-                openTerminal();
-                setTimeout(() => {
-                    if (window.term) {
-                        // Send command to terminal
-                        fetch(`http://${VNC_HOST}:${CONTROL_PORT}/inspekt/${encodeURIComponent(id)}`);
-                    }
-                }, 300);
-                showToast(`Running ${title}...`);
-                return;
-            }
-
-            if (output === 'toast') {
-                // Simple command - just show toast
-                showToast(`Running ${title}...`);
-                try {
-                    const response = await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/inspekt/${encodeURIComponent(id)}`);
-                    const data = await response.json();
-                    if (data.ok) {
-                        showToast(`${title} completed`, 'success');
-                    } else {
-                        showToast(`Error: ${data.error}`, 'error', 5000);
-                    }
-                } catch (error) {
-                    showToast(`Failed: ${error.message}`, 'error');
-                }
-                return;
-            }
-
-            if (output === 'panel') {
-                // Structured output - show in panel
-                showToast(`Running ${title}...`);
-                try {
-                    const response = await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/inspekt/${encodeURIComponent(id)}`);
-                    const data = await response.json();
-
-                    if (data.ok) {
-                        // Format output for panel
-                        let content = formatOutputForPanel(id, data.output);
-                        openOutputPanel(title, icon, content);
-                        showToast(`${title} completed`, 'success');
-                    } else {
-                        showToast(`Error: ${data.error}`, 'error', 5000);
-                    }
-                } catch (error) {
-                    showToast(`Failed: ${error.message}`, 'error');
-                }
-                return;
-            }
         }
 
         // Format command output for panel display
@@ -8661,25 +10643,127 @@
         }
 
         // Initialize command palette
-        function initCommandPalette() {
+        async function initCommandPalette() {
+            // Wait for config to load before checking if palette is disabled
+            await _configReady;
+
+            // Check if command palette is disabled in config
+            if (getConfig('advanced.command-palette', true) === false) {
+                console.log('[CommandPalette] Disabled via config');
+                const btn = document.getElementById('cmdPaletteBtn');
+                if (btn) btn.style.display = 'none';
+                return;
+            }
+
             const ninja = document.getElementById('commandPalette');
-            if (ninja) {
-                // Wait for custom element to be defined
-                customElements.whenDefined('ninja-keys').then(() => {
-                    ninja.data = buildCommandPaletteData();
-                    console.log('[CommandPalette] Initialized with', inspektCommands.length, 'commands');
-                }).catch(err => {
-                    console.error('[CommandPalette] Failed to initialize:', err);
+            if (!ninja) {
+                console.error('[CommandPalette] <ninja-keys> element not found in DOM');
+                return;
+            }
+
+            // Wait for web component to be defined (5s timeout)
+            const timeout = new Promise((_, reject) =>
+                setTimeout(() => reject(new Error('ninja-keys not defined after 5s')), 5000)
+            );
+            try {
+                await Promise.race([customElements.whenDefined('ninja-keys'), timeout]);
+            } catch (err) {
+                console.error('[CommandPalette]', err.message);
+                return;
+            }
+
+            // Fetch Inspekt commands from registry API
+            const registryData = await fetchRegistryCommands();
+            const items = buildCommandPaletteData(registryData);
+
+            // If registry failed, add a retry action
+            if (!registryData) {
+                items.push({
+                    id: 'meta:retry-load',
+                    title: 'Retry Loading Inspekt Commands',
+                    icon: '🔄',
+                    section: 'System',
+                    handler: async () => {
+                        const data = await fetchRegistryCommands();
+                        if (data) {
+                            ninja.data = buildCommandPaletteData(data);
+                            showToast(`Loaded ${Object.values(data.categories).flat().length} Inspekt commands`, 'success');
+                        } else {
+                            showToast('Inspekt API not available', 'error');
+                        }
+                    },
                 });
             }
+
+            ninja.data = items;
+
+            const uiCount = UI_COMMANDS.length;
+            const pinnedCount = getPinnedCommandIds().length;
+            const inspektCount = items.length - uiCount - pinnedCount;
+            console.log(`[CommandPalette] Initialized: ${uiCount} UI + ${inspektCount} Inspekt` + (pinnedCount ? ` + ${pinnedCount} pinned` : '') + ` = ${items.length} total`);
         }
 
         // Initialize on DOM ready
         if (document.readyState === 'loading') {
             document.addEventListener('DOMContentLoaded', initCommandPalette);
         } else {
-            // Give time for the module to load
             setTimeout(initCommandPalette, 500);
+        }
+
+        // Refresh dynamic content (tab titles, counts) each time the palette opens.
+        // Monkey-patch ninja.open() to rebuild data before showing — Lit's `visible`
+        // is an internal @state() that doesn't reflect to attributes, so we can't
+        // use MutationObserver. This is the cleanest alternative.
+        {
+            const ninja = document.getElementById('commandPalette');
+            if (ninja) {
+                customElements.whenDefined('ninja-keys').then(() => {
+                    const origOpen = ninja.open.bind(ninja);
+                    ninja.open = function(options) {
+                        ninja.data = buildCommandPaletteData(_registryData);
+                        return origOpen(options);
+                    };
+
+                    // Track the currently selected action for pinning
+                    let _paletteSelectedAction = null;
+                    ninja.addEventListener('change', (e) => {
+                        const actions = e.detail?.actions || [];
+                        const idx = ninja._selected ?? 0;
+                        _paletteSelectedAction = actions[idx] || null;
+                    });
+
+                    // Cmd/Ctrl+D to pin/unpin the selected command.
+                    // Listens on document because ninja-keys uses Shadow DOM —
+                    // keydown events from the internal input don't bubble to the host.
+                    document.addEventListener('keydown', (e) => {
+                        if (!ninja.visible) return;
+                        if (e.key === 'd' && (e.metaKey || e.ctrlKey)) {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            if (!_paletteSelectedAction) return;
+                            // Resolve the real ID (strip "pinned:" prefix if selecting from Pinned section)
+                            let actionId = _paletteSelectedAction.id;
+                            if (actionId.startsWith('pinned:')) actionId = actionId.slice(7);
+                            const wasPinned = togglePinCommand(actionId);
+                            const title = _paletteSelectedAction.title;
+                            showToast(wasPinned ? `Pinned: ${title}` : `Unpinned: ${title}`, 'success', 2000);
+                            // Rebuild data to reflect pin change (palette stays open)
+                            ninja.data = buildCommandPaletteData(_registryData);
+                        }
+                    });
+
+                    // Handle pin button clicks from ninja-action component
+                    ninja.addEventListener('togglePin', (e) => {
+                        const action = e.detail;
+                        if (!action) return;
+                        let actionId = action.id;
+                        if (actionId.startsWith('pinned:')) actionId = actionId.slice(7);
+                        const wasPinned = togglePinCommand(actionId);
+                        showToast(wasPinned ? `Pinned: ${action.title}` : `Unpinned: ${action.title}`, 'success', 2000);
+                        ninja.data = buildCommandPaletteData(_registryData);
+                    });
+                });
+            }
         }
 
         // =============================================
@@ -8902,50 +10986,79 @@
         }
 
         // Perform soft restart (supervisorctl restart all)
-        async function performSoftRestart() {
+        // Tier 1: Restart just the browser (Chromium).
+        // VNC stays connected, terminal stays open, proxy keeps running.
+        async function performRestartBrowser() {
             const keepTabs = document.getElementById('keepTabsCheckbox').checked;
-
-            if (keepTabs) {
-                saveTabsToStorage();
-            }
+            if (keepTabs) saveTabsToStorage();
 
             closeRestartModal();
-            showToast('Performing soft restart...');
+            showToast('Restarting browser...');
+
+            try {
+                await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/restart-browser`);
+            } catch (e) { /* expected */ }
+
+            // Browser restart is quick — just poll for CDP to come back
+            let attempts = 0;
+            const interval = setInterval(async () => {
+                attempts++;
+                try {
+                    const resp = await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/tabs`, {
+                        signal: AbortSignal.timeout(2000)
+                    });
+                    if (resp.ok) {
+                        clearInterval(interval);
+                        showToast('Browser restarted', 'success');
+                        // Re-fetch tabs and restore if needed
+                        await fetchTabs();
+                        if (keepTabs) await restoreTabsFromStorage();
+                    }
+                } catch {
+                    if (attempts >= 15) {
+                        clearInterval(interval);
+                        showToast('Browser restart timed out — try Restart All Services', 'error');
+                    }
+                }
+            }, 1000);
+        }
+
+        // Tier 2: Restart all services (VNC, browser, proxy, terminal).
+        // VNC disconnects briefly, then auto-reconnects.
+        async function performRestartAll() {
+            const keepTabs = document.getElementById('keepTabsCheckbox').checked;
+            if (keepTabs) saveTabsToStorage();
+
+            closeRestartModal();
+            showToast('Restarting all services...');
             updateStatus(false);
             document.getElementById('statusDot').classList.add('connecting');
             document.getElementById('statusText').textContent = 'Restarting...';
 
             try {
                 await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/reboot`);
-            } catch (e) {
-                // Expected - connection will drop
-            }
+            } catch (e) { /* expected — connection drops */ }
 
-            // Poll for reconnection
             pollForReconnection();
         }
 
-        // Perform hard restart (container destruction + recreation)
-        async function performHardRestart() {
+        // Tier 3: Reset the entire environment (container restart).
+        // Fresh Chromium profile, no cookies/cache/history.
+        // Plugins and bind-mounted data survive.
+        async function performResetEnvironment() {
             const keepTabs = document.getElementById('keepTabsCheckbox').checked;
-
-            if (keepTabs) {
-                saveTabsToStorage();
-            }
+            if (keepTabs) saveTabsToStorage();
 
             closeRestartModal();
-            showToast('Performing hard restart... This may take ~10 seconds.');
+            showToast('Resetting environment... This may take ~10 seconds.');
             updateStatus(false);
             document.getElementById('statusDot').classList.add('connecting');
-            document.getElementById('statusText').textContent = 'Hard restarting...';
+            document.getElementById('statusText').textContent = 'Resetting...';
 
             try {
                 await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/hard-reboot`);
-            } catch (e) {
-                // Expected - connection drops immediately
-            }
+            } catch (e) { /* expected — connection drops */ }
 
-            // Poll for reconnection
             pollForReconnection();
         }
 
@@ -10263,6 +12376,11 @@
         document.addEventListener('keydown', (e) => {
             if (!_inspectTrackingActive || activeContextMenu) return;
 
+            // Don't intercept keys when terminal or editor is active
+            const termOverlay = document.getElementById('terminalOverlay');
+            if (termOverlay && termOverlay.classList.contains('open')) return;
+            if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) return;
+
             // Copy selector with 'c' key
             if (e.key === 'c' && !e.metaKey && !e.ctrlKey) {
                 e.preventDefault();
@@ -10992,6 +13110,8 @@
         document.addEventListener('keydown', (e) => {
             // Escape to close overlays or toggle terminal
             if (e.key === 'Escape') {
+                // Let ninja-keys handle Escape when palette is open — don't close anything else
+                { const ninja = document.getElementById('commandPalette'); if (ninja?.visible) return; }
                 // Close page info popout first
                 if (pageInfoOpen) {
                     e.preventDefault();
@@ -11063,12 +13183,12 @@
                 return;
             }
 
-            // Cmd/Ctrl+K for command palette (works everywhere)
+            // Cmd/Ctrl+K to toggle command palette (works everywhere)
             if (e.key === 'k' && (e.ctrlKey || e.metaKey)) {
                 e.preventDefault();
                 const ninja = document.getElementById('commandPalette');
                 if (ninja) {
-                    ninja.open();
+                    ninja.visible ? ninja.close() : ninja.open();
                 }
                 return;
             }
@@ -11101,8 +13221,9 @@
                 return;
             }
 
-            // Skip other shortcuts if typing in input fields
+            // Skip other shortcuts if typing in input fields or command palette is open
             if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+            { const ninja = document.getElementById('commandPalette'); if (ninja?.visible) return; }
 
             // G for grid view (when not in terminal or grid)
             if (e.key === 'g' && !e.ctrlKey && !e.metaKey && !isTerminalOpen && !gridState.isOpen) {

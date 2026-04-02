@@ -43,8 +43,73 @@ terminal_hidden = False
 
 # Clipboard relay: CLI posts text here, control panel fetches it
 clipboard_data = {'text': '', 'timestamp': 0}
+upload_state = {'status': 'idle', 'files': [], 'errors': [], 'timestamp': 0}
 # Copyable block relay: CLI posts raw code block text, control panel shows copy button
 copyable_data = {'text': '', 'timestamp': 0}
+
+# Dynamic command allowlist (populated from registry API on first use)
+_dynamic_allowlist = None
+_dynamic_allowlist_last_attempt = 0
+_ALLOWLIST_RETRY_INTERVAL = 30  # seconds between retry attempts
+
+
+def _build_dynamic_allowlist():
+    """Fetch command registry and build allowlist dynamically.
+
+    Returns a dict compatible with the static allowlist format:
+    {cli_name: {} for simple commands, cli_name: {subcommand: [flags]} for groups}
+    Returns None if the API is not available (retries after cooldown).
+    """
+    global _dynamic_allowlist, _dynamic_allowlist_last_attempt
+    if _dynamic_allowlist is not None:
+        return _dynamic_allowlist
+
+    # Cooldown: don't hammer the API on every request
+    now = time.time()
+    if now - _dynamic_allowlist_last_attempt < _ALLOWLIST_RETRY_INTERVAL:
+        return None
+    _dynamic_allowlist_last_attempt = now
+
+    try:
+        req = urllib.request.Request(
+            'http://localhost:80/api/commands/',
+            headers={'Accept': 'application/json'},
+        )
+        resp = urllib.request.urlopen(req, timeout=5)
+        raw = resp.read(1_000_000)  # Max 1MB to prevent OOM
+        data = json.loads(raw)
+        if not isinstance(data.get('commands'), list):
+            raise ValueError('Invalid API response: missing "commands" list')
+        allowlist = {}
+        for cmd in data['commands']:
+            if not isinstance(cmd, dict):
+                continue
+            cli_name = cmd.get('cli_name', '')
+            if not cli_name:
+                continue
+            if cmd.get('is_group'):
+                # Groups need subcommand entries — allow common flags
+                # Subcommands will be validated loosely (any token allowed as subcommand)
+                allowlist[cli_name] = '__group__'
+            elif cmd.get('has_required_params'):
+                # Commands with required params accept a positional arg + common flags
+                allowlist[cli_name] = {
+                    '__positional__': True,
+                    '__flags__': ['--json', '--raw', '--debug', '--verbose', '--no-cache'],
+                }
+            else:
+                # Simple commands — allow common output flags
+                allowlist[cli_name] = {
+                    '__flags__': ['--json', '--raw', '--verbose', '--debug', '--level',
+                                  '--show-badges', '--interactive', '--full'],
+                }
+        _dynamic_allowlist = allowlist
+        print(f'[Control] Dynamic allowlist loaded: {len(allowlist)} commands')
+        return allowlist
+    except Exception as e:
+        print(f'[Control] Dynamic allowlist unavailable (will retry in {_ALLOWLIST_RETRY_INTERVAL}s): {e}')
+        return None
+
 
 # Screen reader simulator state
 sr_state = {
@@ -417,15 +482,167 @@ def get_tab_theme_color(tab):
         return None
 
 
+# ── Proxy (mitmproxy) management functions ────────────────────────────
+
+PROXY_CONFIG_PATH = '/tmp/mitmproxy_config.json'
+PROXY_SCRIPTS_DIR = '/opt/proxy-scripts/available'
+PROXY_LOG_PATH = '/tmp/mitmproxy_activity.jsonl'
+
+
+def _proxy_read_config():
+    """Read the current mitmproxy config."""
+    try:
+        with open(PROXY_CONFIG_PATH) as f:
+            return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {'enabled': False, 'scripts': {}}
+
+
+def _proxy_write_config(config):
+    """Write updated config (mitmproxy master addon picks up changes via mtime)."""
+    with open(PROXY_CONFIG_PATH, 'w') as f:
+        json.dump(config, f, indent=2)
+
+
+def _proxy_get_status():
+    """Return proxy status: enabled, active scripts, request count."""
+    config = _proxy_read_config()
+    active = [
+        name for name, sc in config.get('scripts', {}).items()
+        if sc.get('enabled', False)
+    ]
+    return {
+        'ok': True,
+        'enabled': config.get('enabled', False),
+        'active_scripts': active,
+        'total_scripts': len(list(_proxy_iter_available_scripts())),
+    }
+
+
+def _proxy_iter_available_scripts():
+    """Yield (name, description) for each available proxy script."""
+    import ast
+    scripts_dir = PROXY_SCRIPTS_DIR
+    if not os.path.isdir(scripts_dir):
+        return
+    for fname in sorted(os.listdir(scripts_dir)):
+        if not fname.endswith('.py') or fname.startswith('_'):
+            continue
+        name = fname[:-3]
+        # Extract docstring from the script
+        fpath = os.path.join(scripts_dir, fname)
+        description = ''
+        try:
+            with open(fpath) as f:
+                tree = ast.parse(f.read())
+            docstring = ast.get_docstring(tree)
+            if docstring:
+                # Use first line as description
+                description = docstring.strip().split('\n')[0]
+        except Exception:
+            pass
+        yield name, description
+
+
+def _proxy_list_scripts():
+    """List available scripts with their enabled state and config."""
+    config = _proxy_read_config()
+    scripts_config = config.get('scripts', {})
+    scripts = []
+    for name, description in _proxy_iter_available_scripts():
+        sc = scripts_config.get(name, {})
+        scripts.append({
+            'name': name,
+            'description': description,
+            'enabled': sc.get('enabled', False),
+            'config': sc.get('config', {}),
+        })
+    return {'ok': True, 'scripts': scripts}
+
+
+def _proxy_toggle(enabled=None):
+    """Enable or disable the proxy. If enabled is None, toggle current state."""
+    config = _proxy_read_config()
+    if enabled is None:
+        enabled = not config.get('enabled', False)
+    config['enabled'] = bool(enabled)
+    _proxy_write_config(config)
+    return {'ok': True, 'enabled': config['enabled']}
+
+
+def _proxy_toggle_script(script_name, enabled=None):
+    """Enable or disable a specific proxy script."""
+    # Verify script exists
+    script_path = os.path.join(PROXY_SCRIPTS_DIR, f'{script_name}.py')
+    if not os.path.exists(script_path):
+        return {'ok': False, 'error': f'Script not found: {script_name}'}
+
+    config = _proxy_read_config()
+    if 'scripts' not in config:
+        config['scripts'] = {}
+    if script_name not in config['scripts']:
+        config['scripts'][script_name] = {'enabled': False, 'config': {}}
+
+    if enabled is None:
+        enabled = not config['scripts'][script_name].get('enabled', False)
+    config['scripts'][script_name]['enabled'] = bool(enabled)
+
+    _proxy_write_config(config)
+    return {
+        'ok': True,
+        'script': script_name,
+        'enabled': config['scripts'][script_name]['enabled'],
+    }
+
+
+def _proxy_configure_script(script_name, script_config):
+    """Update a proxy script's configuration."""
+    script_path = os.path.join(PROXY_SCRIPTS_DIR, f'{script_name}.py')
+    if not os.path.exists(script_path):
+        return {'ok': False, 'error': f'Script not found: {script_name}'}
+
+    config = _proxy_read_config()
+    if 'scripts' not in config:
+        config['scripts'] = {}
+    if script_name not in config['scripts']:
+        config['scripts'][script_name] = {'enabled': False, 'config': {}}
+
+    config['scripts'][script_name]['config'] = script_config
+    _proxy_write_config(config)
+    return {
+        'ok': True,
+        'script': script_name,
+        'config': script_config,
+    }
+
+
+def _proxy_get_log(limit=50):
+    """Return recent proxy activity log entries."""
+    entries = []
+    try:
+        with open(PROXY_LOG_PATH) as f:
+            lines = f.readlines()
+        for line in lines[-limit:]:
+            try:
+                entries.append(json.loads(line.strip()))
+            except json.JSONDecodeError:
+                pass
+    except FileNotFoundError:
+        pass
+    return {'ok': True, 'entries': entries}
+
+
 class ControlHandler(BaseHTTPRequestHandler):
     def send_json(self, data, status=200):
+        body = json.dumps(data).encode()
         self.send_response(status)
         self.send_header('Content-Type', 'application/json')
+        self.send_header('Content-Length', str(len(body)))
         self.send_header('Access-Control-Allow-Origin', '*')
-        self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+        self.send_header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
         self.send_header('Access-Control-Allow-Headers', 'Content-Type')
         self.end_headers()
-        self.wfile.write(json.dumps(data).encode())
+        self.wfile.write(body)
 
     def _proxy_to_api(self, method='GET'):
         """Reverse proxy request to the Inspekt API server (port 80).
@@ -516,6 +733,42 @@ class ControlHandler(BaseHTTPRequestHandler):
         elif path == '/health':
             self.send_json({'ok': True, 'service': 'control-server'})
 
+        elif path == '/dns-check':
+            # Pre-check DNS resolution for a domain before navigating
+            query = parse_qs(urlparse(self.path).query)
+            domain = query.get('domain', [None])[0]
+            if not domain:
+                self.send_json({'ok': False, 'error': 'Missing domain parameter'}, 400)
+                return
+            import socket as _socket
+            try:
+                _socket.getaddrinfo(domain, None, _socket.AF_UNSPEC, _socket.SOCK_STREAM)
+                self.send_json({'ok': True, 'resolves': True, 'domain': domain})
+            except _socket.gaierror:
+                self.send_json({'ok': True, 'resolves': False, 'domain': domain})
+
+        elif path.startswith('/error-page/'):
+            # Serve custom error page HTML with placeholder substitution
+            page_name = path.split('/error-page/')[1].split('?')[0]
+            query = parse_qs(urlparse(self.path).query)
+            safe_name = page_name.replace('/', '').replace('..', '')
+            page_path = f'/opt/pages/{safe_name}.html'
+            try:
+                with open(page_path, 'r') as f:
+                    html = f.read()
+                # Fill placeholders from query params
+                for key in ('url', 'domain', 'status', 'status_text', 'error_code', 'message'):
+                    value = query.get(key, [''])[0]
+                    html = html.replace('{{' + key.upper() + '}}', html_module.escape(value))
+                self.send_response(200)
+                self.send_header('Content-Type', 'text/html; charset=utf-8')
+                encoded = html.encode('utf-8')
+                self.send_header('Content-Length', str(len(encoded)))
+                self.end_headers()
+                self.wfile.write(encoded)
+            except FileNotFoundError:
+                self.send_json({'ok': False, 'error': f'Error page not found: {safe_name}'}, 404)
+
         elif path == '/api/tunnel-info':
             # Return bore tunnel server info for `inspekt tunnel` auto-discovery
             secret = ''
@@ -529,6 +782,30 @@ class ControlHandler(BaseHTTPRequestHandler):
                 'secret': secret,
                 'port': 7835,
             })
+
+        elif path == '/config':
+            # Serve the parsed YAML config as JSON for the control panel.
+            # The control server runs on system Python (no PyYAML), so we
+            # shell out to the venv Python which has it.
+            try:
+                config_path = '/home/inspekt/.config/inspekt.yaml'
+                if not os.path.exists(config_path):
+                    config_path = '/root/.config/inspekt.yaml'
+                result = subprocess.run(
+                    ['/opt/inspekt/.venv/bin/python3', '-c',
+                     'import yaml, json, sys; print(json.dumps(yaml.safe_load(open(sys.argv[1])) or {}))',
+                     config_path],
+                    capture_output=True, text=True, timeout=5
+                )
+                if result.returncode == 0:
+                    config = json.loads(result.stdout.strip())
+                    self.send_json({'ok': True, 'config': config})
+                else:
+                    self.send_json({'ok': True, 'config': {}, 'error': result.stderr.strip()})
+            except subprocess.TimeoutExpired:
+                self.send_json({'ok': True, 'config': {}, 'error': 'Config load timed out'})
+            except Exception as e:
+                self.send_json({'ok': True, 'config': {}, 'error': str(e)})
 
         elif path == '/dev-mode':
             # Check if running in development mode (source files mounted from host)
@@ -614,31 +891,26 @@ class ControlHandler(BaseHTTPRequestHandler):
             except Exception as e:
                 self.send_json({'ok': False, 'error': str(e)}, 500)
 
-        elif path == '/restart':
+        elif path == '/restart-browser':
+            # Tier 1: Restart just Chromium via supervisord.
+            # Picks up config changes (inspekt-config.json flags).
+            # VNC, proxy, terminal, all other services stay running.
             try:
-                # Kill and restart Chrome
-                subprocess.run(['pkill', '-f', 'chromium'], capture_output=True)
-
-                # Restart Chrome
+                self.send_json({'ok': True, 'message': 'Restarting browser...'})
                 subprocess.Popen(
-                    ['/usr/bin/chromium',
-                     '--no-sandbox', '--disable-gpu', '--disable-dev-shm-usage',
-                     '--no-first-run', '--start-maximized',
-                     '--load-extension=/opt/inspekt/extensions/chrome',
-                     'https://example.com'],
-                    env={**os.environ, 'DISPLAY': DISPLAY},
+                    ['supervisorctl', 'restart', 'chromium'],
                     stdout=subprocess.DEVNULL,
                     stderr=subprocess.DEVNULL
                 )
-                self.send_json({'ok': True, 'message': 'Services restarted'})
             except Exception as e:
                 self.send_json({'ok': False, 'error': str(e)}, 500)
 
-        elif path == '/reboot':
+        elif path == '/restart' or path == '/reboot':
+            # Tier 2: Restart all services inside the container.
+            # VNC disconnects briefly, then auto-reconnects.
+            # Container stays running, all data preserved.
             try:
-                # Send response first, then reboot
-                self.send_json({'ok': True, 'message': 'VM rebooting...'})
-                # Use supervisorctl to restart all services (soft reboot)
+                self.send_json({'ok': True, 'message': 'Restarting all services...'})
                 subprocess.Popen(
                     ['supervisorctl', 'restart', 'all'],
                     stdout=subprocess.DEVNULL,
@@ -648,12 +920,11 @@ class ControlHandler(BaseHTTPRequestHandler):
                 self.send_json({'ok': False, 'error': str(e)}, 500)
 
         elif path == '/hard-reboot':
+            # Tier 3: Stop the container entirely. Docker's --restart policy
+            # will recreate it with a fresh filesystem (clean Chromium profile).
+            # Bind-mounted volumes and persistent data survive.
             try:
-                # Send response first
-                self.send_json({'ok': True, 'message': 'Hard reboot initiated...'})
-                # Use supervisorctl shutdown to gracefully stop all services
-                # This causes supervisord to exit → shell exits → tini exits → container stops
-                # Docker will restart the container if run with --restart unless-stopped
+                self.send_json({'ok': True, 'message': 'Resetting environment...'})
                 subprocess.Popen(
                     ['supervisorctl', 'shutdown'],
                     stdout=subprocess.DEVNULL,
@@ -665,11 +936,9 @@ class ControlHandler(BaseHTTPRequestHandler):
         elif path.startswith('/inspekt/'):
             raw_command = unquote(path.split('/inspekt/')[1])
 
-            # Structured allowlist: base_command -> {subcommand -> [flags]}
-            # Simple commands (no subcommands) use an empty dict.
-            # Flag '__positional__' means the subcommand accepts one positional argument
-            # (e.g. `ask "what color is it?"`) — the first non-flag token is treated as that arg.
-            allowed_commands = {
+            # Static allowlist for commands with specific subcommand/flag rules.
+            # Used as fallback when the dynamic allowlist (from registry API) is unavailable.
+            static_allowlist = {
                 'info': {},
                 'axe': {},
                 'links': {},
@@ -698,6 +967,11 @@ class ControlHandler(BaseHTTPRequestHandler):
                 },
             }
 
+            # Try dynamic allowlist from registry API, fall back to static
+            dynamic = _build_dynamic_allowlist()
+            allowed_commands = dynamic if dynamic else static_allowlist
+            use_dynamic = dynamic is not None
+
             # Parse and validate each token
             tokens = shlex.split(raw_command)
             if not tokens or tokens[0] not in allowed_commands:
@@ -707,33 +981,37 @@ class ControlHandler(BaseHTTPRequestHandler):
             base_cmd = tokens[0]
             subcmds = allowed_commands[base_cmd]
 
-            if isinstance(subcmds, dict) and subcmds.get('__positional__'):
-                # Simple command that takes an optional positional argument (e.g. describe, ask)
-                # Allow: `describe`, `describe --json`, `ask "question" --debug`
-                allowed_flags = subcmds.get('__flags__', ['--json'])
-                extra_tokens = tokens[1:]
-                # Separate positional arg from flags
-                positional_found = False
-                for t in extra_tokens:
-                    if not t.startswith('--'):
-                        if positional_found:
-                            self.send_json({'ok': False, 'error': 'Too many positional arguments'}, 400)
+            if use_dynamic:
+                # Dynamic allowlist: looser validation — the CLI itself validates args.
+                # We just ensure the base command is known and tokens are safe (no shell injection).
+                if subcmds == '__group__':
+                    # Group command — allow any subcommands and flags
+                    pass
+                elif isinstance(subcmds, dict) and subcmds.get('__positional__'):
+                    # Command with positional arg — allow up to 1 positional + known flags
+                    allowed_flags = subcmds.get('__flags__', [])
+                    positional_found = False
+                    for t in tokens[1:]:
+                        if not t.startswith('--'):
+                            if positional_found:
+                                self.send_json({'ok': False, 'error': 'Too many positional arguments'}, 400)
+                                return
+                            positional_found = True
+                        elif allowed_flags and t not in allowed_flags:
+                            self.send_json({'ok': False, 'error': f'Flag not allowed: {t}'}, 400)
                             return
-                        positional_found = True
-                    elif t not in allowed_flags:
-                        self.send_json({'ok': False, 'error': 'Flag not allowed'}, 400)
-                        return
-            elif subcmds:
-                # Command requires a subcommand
-                if len(tokens) < 2 or tokens[1] not in subcmds:
-                    self.send_json({'ok': False, 'error': 'Subcommand not allowed'}, 400)
-                    return
-                allowed_flags = subcmds[tokens[1]]
-                extra_tokens = tokens[2:]
-
-                if '__positional__' in allowed_flags:
-                    # This subcommand accepts a positional argument (e.g. `selection ask "question" --raw`)
-                    flag_list = [f for f in allowed_flags if f != '__positional__']
+                else:
+                    # Simple command — allow known flags only
+                    allowed_flags = subcmds.get('__flags__', []) if isinstance(subcmds, dict) else []
+                    for t in tokens[1:]:
+                        if t.startswith('--') and allowed_flags and t not in allowed_flags:
+                            self.send_json({'ok': False, 'error': f'Flag not allowed: {t}'}, 400)
+                            return
+            else:
+                # Static allowlist: strict validation (original logic)
+                if isinstance(subcmds, dict) and subcmds.get('__positional__'):
+                    allowed_flags = subcmds.get('__flags__', ['--json'])
+                    extra_tokens = tokens[1:]
                     positional_found = False
                     for t in extra_tokens:
                         if not t.startswith('--'):
@@ -741,20 +1019,38 @@ class ControlHandler(BaseHTTPRequestHandler):
                                 self.send_json({'ok': False, 'error': 'Too many positional arguments'}, 400)
                                 return
                             positional_found = True
-                        elif t not in flag_list:
+                        elif t not in allowed_flags:
+                            self.send_json({'ok': False, 'error': 'Flag not allowed'}, 400)
+                            return
+                elif subcmds:
+                    if len(tokens) < 2 or tokens[1] not in subcmds:
+                        self.send_json({'ok': False, 'error': 'Subcommand not allowed'}, 400)
+                        return
+                    allowed_flags = subcmds[tokens[1]]
+                    extra_tokens = tokens[2:]
+
+                    if '__positional__' in allowed_flags:
+                        flag_list = [f for f in allowed_flags if f != '__positional__']
+                        positional_found = False
+                        for t in extra_tokens:
+                            if not t.startswith('--'):
+                                if positional_found:
+                                    self.send_json({'ok': False, 'error': 'Too many positional arguments'}, 400)
+                                    return
+                                positional_found = True
+                            elif t not in flag_list:
+                                self.send_json({'ok': False, 'error': 'Flag not allowed'}, 400)
+                                return
+                    else:
+                        if any(t not in allowed_flags for t in extra_tokens):
                             self.send_json({'ok': False, 'error': 'Flag not allowed'}, 400)
                             return
                 else:
+                    allowed_flags = []
+                    extra_tokens = tokens[1:]
                     if any(t not in allowed_flags for t in extra_tokens):
                         self.send_json({'ok': False, 'error': 'Flag not allowed'}, 400)
                         return
-            else:
-                # Simple command — no subcommands expected, no extra tokens allowed
-                allowed_flags = []
-                extra_tokens = tokens[1:]
-                if any(t not in allowed_flags for t in extra_tokens):
-                    self.send_json({'ok': False, 'error': 'Flag not allowed'}, 400)
-                    return
 
             # Build safe command string from validated tokens
             safe_command = ' '.join(shlex.quote(t) for t in tokens)
@@ -937,7 +1233,39 @@ class ControlHandler(BaseHTTPRequestHandler):
                 if not tab:
                     self.send_json({'ok': False, 'error': 'No active tab found'}, 500)
                     return
-                send_cdp_command(tab['webSocketDebuggerUrl'], 'Page.reload')
+
+                ws_url = tab['webSocketDebuggerUrl']
+                clear_cache = query.get('clearCache', [''])[0] == '1'
+                clear_cookies = query.get('clearCookies', [''])[0] == '1'
+                clear_storage = query.get('clearStorage', [''])[0] == '1'
+                any_clearing = clear_cache or clear_cookies or clear_storage
+
+                # Extract origin for scoped clearing
+                tab_url = tab.get('url', '')
+                origin = ''
+                if tab_url:
+                    parsed_tab = urlparse(tab_url)
+                    if parsed_tab.scheme and parsed_tab.netloc:
+                        origin = f"{parsed_tab.scheme}://{parsed_tab.netloc}"
+
+                if clear_cache:
+                    send_cdp_command(ws_url, 'Network.enable')
+                    send_cdp_command(ws_url, 'Network.clearBrowserCache')
+
+                if clear_cookies:
+                    send_cdp_command(ws_url, 'Network.enable')
+                    send_cdp_command(ws_url, 'Network.clearBrowserCookies')
+
+                if clear_storage and origin:
+                    send_cdp_command(ws_url, 'Storage.clearDataForOrigin', {
+                        'origin': origin,
+                        'storageTypes': 'appcache,cache_storage,cookies,indexeddb,local_storage,service_workers,websql'
+                    })
+
+                # Hard reload (ignoreCache) when any clearing option is set
+                send_cdp_command(ws_url, 'Page.reload', {
+                    'ignoreCache': any_clearing
+                })
                 self.send_json({'ok': True, 'message': 'Page reloaded'})
             except Exception as e:
                 self.send_json({'ok': False, 'error': str(e)}, 500)
@@ -2020,6 +2348,103 @@ class ControlHandler(BaseHTTPRequestHandler):
                 self.send_json({'ok': False, 'error': str(e)}, 500)
 
         # =============================================
+        # File Editor Endpoints
+        # =============================================
+
+        elif path == '/file/read':
+            # Read file contents for the editor panel
+            query = parse_qs(urlparse(self.path).query)
+            file_path = query.get('path', [None])[0]
+
+            if not file_path:
+                self.send_json({'ok': False, 'error': 'Missing path parameter'}, 400)
+                return
+
+            # Resolve symlinks BEFORE validation to prevent symlink escapes
+            file_path = os.path.realpath(file_path)
+
+            # Restrict reads to user-accessible paths only
+            allowed_prefixes = ['/home/inspekt/', '/tmp/']
+            if not any(file_path.startswith(p) for p in allowed_prefixes):
+                self.send_json({'ok': False, 'error': 'Path not allowed'}, 403)
+                return
+
+            if not os.path.isfile(file_path):
+                self.send_json({'ok': False, 'error': 'File not found'}, 404)
+                return
+
+            try:
+                stat = os.stat(file_path)
+                if stat.st_size > 1_048_576:  # 1 MB
+                    self.send_json({'ok': False, 'error': 'File too large (max 1 MB)'}, 413)
+                    return
+
+                # Reject binary files (contain null bytes)
+                with open(file_path, 'rb') as f:
+                    sample = f.read(512)
+                if b'\x00' in sample:
+                    self.send_json({'ok': False, 'error': 'Cannot edit binary files'}, 400)
+                    return
+
+                writable_prefixes = ['/home/inspekt/', '/tmp/']
+                is_writable = any(file_path.startswith(p) for p in writable_prefixes)
+
+                with open(file_path, 'r', encoding='utf-8', errors='replace') as f:
+                    content = f.read()
+
+                self.send_json({
+                    'ok': True,
+                    'path': file_path,
+                    'content': content,
+                    'size': stat.st_size,
+                    'writable': is_writable,
+                    'filename': os.path.basename(file_path)
+                })
+            except Exception as e:
+                self.send_json({'ok': False, 'error': str(e)}, 500)
+
+        elif path == '/file/list':
+            # List directory contents for the file browser
+            query = parse_qs(urlparse(self.path).query)
+            dir_path = query.get('path', ['/home/inspekt'])[0]
+            # Resolve symlinks BEFORE validation
+            dir_path = os.path.realpath(dir_path)
+
+            # Allow /home/inspekt itself and subdirs, plus /tmp/
+            allowed_prefixes = ['/home/inspekt/', '/home/inspekt', '/tmp/']
+            if dir_path != '/home/inspekt' and not any(dir_path.startswith(p) for p in allowed_prefixes):
+                self.send_json({'ok': False, 'error': 'Path not allowed'}, 403)
+                return
+
+            if not os.path.isdir(dir_path):
+                self.send_json({'ok': False, 'error': 'Not a directory'}, 404)
+                return
+
+            try:
+                entries = []
+                for name in sorted(os.listdir(dir_path)):
+                    if name.startswith('.'):
+                        continue
+                    full = os.path.join(dir_path, name)
+                    # Resolve symlinks for each entry to prevent listing outside allowed dirs
+                    real_full = os.path.realpath(full)
+                    is_dir = os.path.isdir(real_full)
+                    entry = {'name': name, 'type': 'dir' if is_dir else 'file'}
+                    if not is_dir:
+                        try:
+                            entry['size'] = os.path.getsize(real_full)
+                        except OSError:
+                            entry['size'] = 0
+                    entries.append(entry)
+                self.send_json({'ok': True, 'path': dir_path, 'entries': entries})
+            except Exception as e:
+                self.send_json({'ok': False, 'error': str(e)}, 500)
+
+        elif path == '/file/upload-status':
+            # Poll endpoint for the upload CLI tool to check if files have been uploaded
+            self.send_json(upload_state)
+
+        # =============================================
         # Recordings Management Endpoints
         # =============================================
 
@@ -2429,6 +2854,19 @@ class ControlHandler(BaseHTTPRequestHandler):
             except Exception as e:
                 self.send_json({'ok': False, 'error': str(e)}, 500)
 
+        # ── Proxy (mitmproxy) GET endpoints ───────────────────────
+
+        elif path == '/proxy/status':
+            self.send_json(_proxy_get_status())
+
+        elif path == '/proxy/scripts':
+            self.send_json(_proxy_list_scripts())
+
+        elif path == '/proxy/log':
+            params = parse_qs(urlparse(self.path).query)
+            limit = int(params.get('limit', ['50'])[0])
+            self.send_json(_proxy_get_log(limit))
+
         elif path.startswith('/internal/') or path.startswith('/api/'):
             # Reverse proxy to Inspekt API server (port 80)
             self._proxy_to_api('GET')
@@ -2437,10 +2875,141 @@ class ControlHandler(BaseHTTPRequestHandler):
             self.send_json({'error': 'Not found'}, 404)
 
     def do_POST(self):
-        global auto_scan_enabled, terminal_hidden, clipboard_data
+        global auto_scan_enabled, terminal_hidden, clipboard_data, upload_state
         path = urlparse(self.path).path
 
-        if path == '/zoom':
+        if path == '/file/write':
+            # POST /file/write — save file contents from the editor panel
+            # Body: { "path": "/home/inspekt/file.json", "content": "..." }
+            try:
+                content_length = int(self.headers.get('Content-Length', 0))
+                if content_length > 1_100_000:  # ~1 MB + JSON overhead
+                    self.send_json({'ok': False, 'error': 'Content too large (max 1 MB)'}, 413)
+                    return
+                body = json.loads(self.rfile.read(content_length).decode('utf-8'))
+                file_path = body.get('path')
+                content = body.get('content', '')
+
+                if not file_path:
+                    self.send_json({'ok': False, 'error': 'Missing path'}, 400)
+                    return
+
+                # Resolve symlinks BEFORE validation to prevent symlink escapes
+                file_path = os.path.realpath(file_path)
+                writable_prefixes = ['/home/inspekt/', '/tmp/']
+                if not any(file_path.startswith(p) for p in writable_prefixes):
+                    self.send_json({'ok': False, 'error': 'Write not permitted'}, 403)
+                    return
+
+                # Create parent dirs, then re-validate realpath to prevent TOCTOU
+                os.makedirs(os.path.dirname(file_path), exist_ok=True)
+                file_path = os.path.realpath(file_path)
+                if not any(file_path.startswith(p) for p in writable_prefixes):
+                    self.send_json({'ok': False, 'error': 'Write not permitted'}, 403)
+                    return
+
+                with open(file_path, 'w', encoding='utf-8') as f:
+                    f.write(content)
+                self.send_json({'ok': True, 'path': file_path, 'size': len(content.encode('utf-8'))})
+            except json.JSONDecodeError:
+                self.send_json({'ok': False, 'error': 'Invalid JSON body'}, 400)
+            except Exception as e:
+                self.send_json({'ok': False, 'error': str(e)}, 500)
+
+        elif path == '/file/upload':
+            # POST /file/upload — receive files as JSON with base64 data
+            # Body: { "files": [{ "name": "file.txt", "data": "<base64>", "size": 123 }] }
+            import base64
+
+            try:
+                content_length = int(self.headers.get('Content-Length', 0))
+                if content_length > 6_000_000:  # ~5 MB for 5 × 1 MB base64-encoded files
+                    self.send_json({'ok': False, 'error': 'Request too large'}, 413)
+                    return
+
+                body = json.loads(self.rfile.read(content_length).decode('utf-8'))
+                files = body.get('files', [])
+
+                upload_dir = '/home/inspekt/Uploads'
+                os.makedirs(upload_dir, exist_ok=True)
+                max_file_size = 1_048_576  # 1 MB
+
+                uploaded = []
+                errors = []
+
+                for item in files[:5]:  # Max 5 files
+                    filename = os.path.basename(item.get('name', ''))
+                    filename = filename.replace('\x00', '').strip()
+                    if not filename:
+                        errors.append('Empty filename')
+                        continue
+
+                    try:
+                        data = base64.b64decode(item.get('data', ''))
+                    except Exception:
+                        errors.append(f'{filename}: invalid file data')
+                        continue
+
+                    if len(data) > max_file_size:
+                        errors.append(f'{filename}: exceeds 1 MB limit')
+                        continue
+
+                    # Reject binary files (null byte in first 512 bytes)
+                    if b'\x00' in data[:512]:
+                        errors.append(f'{filename}: binary files are not allowed')
+                        continue
+
+                    # Validate destination path
+                    dest = os.path.realpath(os.path.join(upload_dir, filename))
+                    if not dest.startswith(upload_dir + '/'):
+                        errors.append(f'{filename}: invalid path')
+                        continue
+
+                    # Handle name collisions
+                    base_name, ext = os.path.splitext(dest)
+                    counter = 0
+                    while os.path.exists(dest):
+                        counter += 1
+                        dest = f'{base_name} ({counter}){ext}'
+
+                    with open(dest, 'wb') as f:
+                        f.write(data)
+
+                    uploaded.append({
+                        'original': item.get('name', filename),
+                        'saved': os.path.basename(dest),
+                        'path': dest,
+                        'size': len(data)
+                    })
+
+                upload_state = {
+                    'status': 'done',
+                    'files': uploaded,
+                    'errors': errors,
+                    'timestamp': time.time()
+                }
+
+                self.send_json({'ok': True, 'uploaded': uploaded, 'errors': errors})
+            except json.JSONDecodeError:
+                self.send_json({'ok': False, 'error': 'Invalid JSON'}, 400)
+            except Exception as e:
+                self.send_json({'ok': False, 'error': str(e)}, 500)
+
+        elif path == '/file/upload-reset':
+            # Reset upload state (called by CLI tool or cancel button)
+            try:
+                content_length = int(self.headers.get('Content-Length', 0))
+                if content_length > 0:
+                    body = json.loads(self.rfile.read(content_length).decode('utf-8'))
+                    new_status = body.get('status', 'waiting')
+                else:
+                    new_status = 'waiting'
+            except Exception:
+                new_status = 'waiting'
+            upload_state = {'status': new_status, 'files': [], 'errors': [], 'timestamp': time.time()}
+            self.send_json({'ok': True})
+
+        elif path == '/zoom':
             # POST /zoom — set zoom level via extension bridge
             # Body: { "level": 1.5 }
             try:
@@ -2798,6 +3367,40 @@ class ControlHandler(BaseHTTPRequestHandler):
                 })
                 value = result.get('result', {}).get('result', {}).get('value', {})
                 self.send_json(value if value else {'ok': False})
+            except Exception as e:
+                self.send_json({'ok': False, 'error': str(e)}, 500)
+
+        # ── Proxy (mitmproxy) POST endpoints ──────────────────────
+
+        elif path == '/proxy/toggle':
+            try:
+                content_length = int(self.headers.get('Content-Length', 0))
+                body = json.loads(self.rfile.read(content_length).decode()) if content_length > 0 else {}
+                enabled = body.get('enabled')
+                self.send_json(_proxy_toggle(enabled))
+            except Exception as e:
+                self.send_json({'ok': False, 'error': str(e)}, 500)
+
+        elif path.startswith('/proxy/scripts/') and path.endswith('/toggle'):
+            # POST /proxy/scripts/<name>/toggle — enable/disable a script
+            parts = path.split('/')
+            script_name = parts[3] if len(parts) >= 5 else ''
+            try:
+                content_length = int(self.headers.get('Content-Length', 0))
+                body = json.loads(self.rfile.read(content_length).decode()) if content_length > 0 else {}
+                enabled = body.get('enabled')
+                self.send_json(_proxy_toggle_script(script_name, enabled))
+            except Exception as e:
+                self.send_json({'ok': False, 'error': str(e)}, 500)
+
+        elif path.startswith('/proxy/scripts/') and path.endswith('/config'):
+            # POST /proxy/scripts/<name>/config — update script config
+            parts = path.split('/')
+            script_name = parts[3] if len(parts) >= 5 else ''
+            try:
+                content_length = int(self.headers.get('Content-Length', 0))
+                body = json.loads(self.rfile.read(content_length).decode()) if content_length > 0 else {}
+                self.send_json(_proxy_configure_script(script_name, body))
             except Exception as e:
                 self.send_json({'ok': False, 'error': str(e)}, 500)
 
