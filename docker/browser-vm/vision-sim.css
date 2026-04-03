@@ -1,0 +1,339 @@
+/* =============================================
+   Vision Simulator
+   ============================================= */
+
+/* ---- Canvas-only filter targeting ----
+   Filters are applied to the canvas element ONLY, not to the container.
+   This ensures all overlays (SR focus indicator, custom scrollbar, inspekt
+   outlines, resize dimensions, reconnect overlay, HUD pill) remain unfiltered.
+   The --vision-filter custom property is set by vision-sim.js. */
+.vnc-container.vision-filter-active canvas {
+    filter: var(--vision-filter);
+}
+
+/* Visual field overlay — sits on top of the VNC canvas.
+   backdrop-filter blurs the canvas underneath, mask-image controls
+   where the blur is visible (transparent center = sharp, opaque edges = blurred). */
+.vision-field-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 55; /* above VNC canvas (z-index: auto) but below overlays (z-index: 60+) */
+    pointer-events: none;
+}
+
+/* ---- Animated floaters (diabetic retinopathy) ---- */
+.vision-floaters {
+    position: absolute;
+    inset: 0;
+    z-index: 56; /* above field overlays (55) */
+    pointer-events: none;
+    overflow: hidden;
+}
+
+.vision-floater {
+    position: absolute;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(20, 10, 5, 0.9) 0%, rgba(30, 15, 5, 0.6) 40%, transparent 70%);
+    transform: translate(-50%, -50%);
+    animation: floaterDrift linear infinite;
+}
+
+/* Slow, organic drift path — a figure-eight-like Lissajous curve */
+@keyframes floaterDrift {
+    0%   { transform: translate(-50%, -50%) translate(0px, 0px); }
+    15%  { transform: translate(-50%, -50%) translate(12px, -18px); }
+    30%  { transform: translate(-50%, -50%) translate(-8px, -30px); }
+    45%  { transform: translate(-50%, -50%) translate(-20px, -12px); }
+    60%  { transform: translate(-50%, -50%) translate(-10px, 15px); }
+    75%  { transform: translate(-50%, -50%) translate(15px, 22px); }
+    90%  { transform: translate(-50%, -50%) translate(18px, 8px); }
+    100% { transform: translate(-50%, -50%) translate(0px, 0px); }
+}
+
+/* ---- Vision dropdown menu ---- */
+
+.vision-dropdown > button {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+/* Active state on the toolbar button when a simulation is running */
+.vision-dropdown > button.active {
+    color: var(--accent);
+}
+
+.vision-menu {
+    max-height: 420px;
+    overflow-y: auto;
+    min-width: 220px;
+}
+
+/* Section labels within the dropdown */
+.dropdown-section-label {
+    padding: 6px 14px 2px;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-dim);
+    pointer-events: none;
+}
+
+/* Checkmark indicator for active simulation */
+.vision-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.vision-check {
+    width: 14px;
+    height: 14px;
+    fill: var(--accent);
+    flex-shrink: 0;
+}
+
+.vision-check-spacer {
+    display: inline-block;
+    width: 14px;
+    flex-shrink: 0;
+}
+
+/* Active item highlight */
+.vision-item.active {
+    color: var(--accent);
+}
+
+
+/* =============================================
+   Simulator HUD — Floating pill + info overlay
+   Generic (not vision-specific) so future
+   simulators (dyslexia, motor) can reuse it.
+   ============================================= */
+
+/* ---- Floating pill ---- */
+.simulator-hud {
+    position: fixed;
+    z-index: 10000; /* above all VNC overlays, below toasts (10001) */
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 7px 14px 7px 11px;
+    background: color-mix(in srgb, var(--bg-bar) 90%, transparent);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    backdrop-filter: blur(20px) saturate(180%);
+    border: 1px solid color-mix(in srgb, var(--divider) 60%, transparent);
+    border-radius: 20px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+    pointer-events: auto;
+    user-select: none;
+    /* Hidden by default — slides up on activation */
+    opacity: 0;
+    transform: translateY(10px);
+    transition: opacity 0.25s ease, transform 0.25s ease;
+}
+
+.simulator-hud.visible {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.simulator-hud.paused {
+    opacity: 0.55;
+}
+
+.simulator-hud-icon {
+    width: 16px;
+    height: 16px;
+    fill: currentColor;
+    color: var(--text-dim);
+    flex-shrink: 0;
+}
+
+.simulator-hud-label {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-bright);
+    white-space: nowrap;
+}
+
+.simulator-hud.paused .simulator-hud-label {
+    text-decoration: line-through;
+    color: var(--text-dim);
+}
+
+/* ---- Toggle switch (macOS-style) ---- */
+.simulator-hud-toggle {
+    position: relative;
+    width: 32px;
+    height: 18px;
+    background: var(--bg-btn);
+    border: 1px solid var(--divider);
+    border-radius: 9px;
+    cursor: pointer;
+    transition: background 0.2s, border-color 0.2s;
+    padding: 0;
+    flex-shrink: 0;
+}
+
+.simulator-hud-toggle.on {
+    background: var(--accent);
+    border-color: var(--accent);
+}
+
+.simulator-hud-toggle::after {
+    content: '';
+    position: absolute;
+    top: 1px;
+    left: 1px;
+    width: 14px;
+    height: 14px;
+    background: #fff;
+    border-radius: 50%;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+    transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.simulator-hud-toggle.on::after {
+    transform: translateX(14px);
+}
+
+/* ---- Info button (?) ---- */
+.simulator-hud-info-btn {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    border: 1px solid var(--divider);
+    background: transparent;
+    color: var(--text-dim);
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    flex-shrink: 0;
+    transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+
+.simulator-hud-info-btn:hover {
+    color: var(--text-bright);
+    border-color: var(--text-dim);
+    background: var(--bg-btn);
+}
+
+
+/* ---- Info overlay ---- */
+.simulator-info-overlay {
+    position: fixed;
+    z-index: 10000; /* matches HUD pill */
+    display: none;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.55);
+    pointer-events: auto;
+}
+
+.simulator-info-overlay.show {
+    display: flex;
+    animation: simInfoFadeIn 0.2s ease;
+}
+
+@keyframes simInfoFadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+/* ---- Info card (glassmorphism) ---- */
+.simulator-info-card {
+    position: relative;
+    max-width: 480px;
+    width: 90%;
+    max-height: 80%;
+    overflow-y: auto;
+    background: color-mix(in srgb, var(--bg-bar) 92%, transparent);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    backdrop-filter: blur(20px) saturate(180%);
+    border: 1px solid color-mix(in srgb, var(--divider) 60%, transparent);
+    border-radius: 16px;
+    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.4);
+    padding: 28px;
+    color: var(--text);
+    animation: simCardSlideUp 0.25s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+@keyframes simCardSlideUp {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.simulator-info-close {
+    position: absolute;
+    top: 14px;
+    right: 14px;
+    width: 28px;
+    height: 28px;
+    border: none;
+    background: var(--bg-btn);
+    color: var(--text-dim);
+    border-radius: 50%;
+    font-size: 16px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s, color 0.15s;
+}
+
+.simulator-info-close:hover {
+    background: var(--bg-btn-hover, var(--bg-btn));
+    color: var(--text-bright);
+}
+
+.simulator-info-header {
+    margin-bottom: 20px;
+    padding-right: 36px; /* space for close button */
+}
+
+.simulator-info-header h2 {
+    margin: 0 0 6px;
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text-bright);
+}
+
+.simulator-info-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    background: color-mix(in srgb, var(--accent) 20%, transparent);
+    color: var(--accent);
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 500;
+}
+
+.simulator-info-section {
+    margin-bottom: 16px;
+}
+
+.simulator-info-section:last-child {
+    margin-bottom: 0;
+}
+
+.simulator-info-section h3 {
+    margin: 0 0 4px;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    color: var(--text-dim);
+}
+
+.simulator-info-section p {
+    margin: 0;
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--text-bright);
+}

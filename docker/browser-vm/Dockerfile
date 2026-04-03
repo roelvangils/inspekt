@@ -388,9 +388,14 @@ COPY docker/browser-vm/entrypoint.sh /entrypoint.sh
 COPY docker/browser-vm/control-server.py /opt/control-server.py
 COPY docker/browser-vm/terminal-server.py /opt/terminal-server.py
 COPY docker/browser-vm/control-panel.html /usr/share/novnc/control.html
+COPY docker/browser-vm/toolbar.css /usr/share/novnc/toolbar.css
+COPY docker/browser-vm/toolbar.js /usr/share/novnc/toolbar.js
+COPY docker/browser-vm/vision-sim.js /usr/share/novnc/vision-sim.js
+COPY docker/browser-vm/vision-sim.css /usr/share/novnc/vision-sim.css
 COPY docker/browser-vm/fonts /usr/share/novnc/fonts
 COPY docker/browser-vm/vendor/codemirror.min.js /usr/share/novnc/vendor/codemirror.min.js
 COPY docker/browser-vm/vendor/ninja-keys.min.js /usr/share/novnc/vendor/ninja-keys.min.js
+COPY docker/browser-vm/vendor/sortable.min.js /usr/share/novnc/vendor/sortable.min.js
 COPY docker/browser-vm/inspekt-chromium.sh /opt/inspekt-chromium.sh
 COPY docker/browser-vm/devtools-manager.sh /opt/devtools-manager.sh
 COPY docker/browser-vm/xorg.conf /etc/X11/xorg.conf

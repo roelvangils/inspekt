@@ -288,6 +288,11 @@ def _start_container(dev_mode: bool = False, vm_dir: Path = None) -> bool:
         # Mount control panel, fonts, and servers for UI/server development
         cmd.extend([
             "-v", f"{vm_dir}/control-panel.html:/usr/share/novnc/control.html:ro",
+            "-v", f"{vm_dir}/toolbar.css:/usr/share/novnc/toolbar.css:ro",
+            "-v", f"{vm_dir}/toolbar.js:/usr/share/novnc/toolbar.js:ro",
+            "-v", f"{vm_dir}/vision-sim.js:/usr/share/novnc/vision-sim.js:ro",
+            "-v", f"{vm_dir}/vision-sim.css:/usr/share/novnc/vision-sim.css:ro",
+            "-v", f"{vm_dir}/vendor/sortable.min.js:/usr/share/novnc/vendor/sortable.min.js:ro",
             "-v", f"{vm_dir}/fonts:/usr/share/novnc/fonts:ro",
             "-v", f"{vm_dir}/icons:/usr/share/novnc/icons:ro",
             "-v", f"{vm_dir}/control-server.py:/opt/control-server.py:ro",
@@ -564,12 +569,12 @@ def restart(rebuild, dev, no_dev):
 
     click.echo("Restarting Inspekt Browser VM...\n")
 
-    # Stop if running
-    if _is_container_running():
+    # Stop and remove all VM containers (running, stopped, or orphaned)
+    all_containers = _get_all_vm_containers()
+    if all_containers:
         click.echo("  • Stopping VM...")
-        _stop_container()
-        _remove_container()
-        click.echo("  ✓ VM stopped")
+        stopped = _stop_all_vm_containers(verbose=False)
+        click.echo(f"  ✓ Cleaned up {stopped} container(s)")
 
     # Get VM directory
     vm_dir = get_vm_dir()
