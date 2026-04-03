@@ -297,7 +297,7 @@
         .url-bar-wrapper {
             position: relative;
             flex: 1;
-            max-width: 500px;
+            min-width: 180px;
         }
 
         /* Cloud Icon Button */
@@ -684,7 +684,7 @@
             .url-bar-progress { transition-duration: 0.01ms !important; }
             .tab-favicon-spinner { animation: none; }
             .splash-spinner { animation: none; }
-            .status-dot.success, .status-dot.connecting { animation: none; }
+
         }
 
         /* URL History Dropdown */
@@ -867,38 +867,6 @@
             justify-content: center;
             height: 100px;
             color: var(--text-dim);
-        }
-
-        .status {
-            margin-left: auto;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            font-size: 12px;
-            color: var(--text-dim);
-        }
-
-        .status-dot {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            background: var(--success);
-            animation: pulse 2s infinite;
-        }
-
-        .status-dot.disconnected {
-            background: var(--danger);
-            animation: none;
-        }
-
-        .status-dot.connecting {
-            background: #ffc107;
-            animation: pulse 0.5s infinite;
-        }
-
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
         }
 
         /* =============================================
@@ -3490,10 +3458,16 @@
          * ============================================= */
         .virtual-scrollbar {
             position: absolute;
-            z-index: 52;
+            z-index: 53;
             pointer-events: auto;
             opacity: 0;
             transition: opacity 0.3s ease;
+            /* Blend the entire scrollbar group against the canvas behind it.
+               Must be here (not on .scrollbar-thumb) because z-index creates
+               a stacking context — children can only blend within their group.
+               Using a gray thumb base (not white) minimizes color artifacts:
+               gray difference any-color → muted result vs white → full inversion. */
+            mix-blend-mode: difference;
         }
 
         .virtual-scrollbar.visible {
@@ -3527,12 +3501,10 @@
             position: absolute;
             width: 100%;
             min-height: 30px;
-            background: rgba(255, 255, 255, 0.5);
+            background: rgba(160, 160, 160, 0.7);
             border-radius: 4px;
             cursor: default;
-            transition: background 0.15s ease, top 0.15s ease, border-radius 0.15s ease, box-shadow 0.15s ease;
-            /* Dark inset outline ensures visibility over light page sections */
-            box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.3);
+            transition: top 0.15s ease, border-radius 0.15s ease;
         }
 
         .virtual-scrollbar.vertical:hover .scrollbar-thumb,
@@ -3542,43 +3514,35 @@
 
         /* Disable smooth top transition during drag for instant feedback */
         .scrollbar-thumb.dragging {
-            transition: background 0.15s ease, border-radius 0.15s ease;
+            transition: border-radius 0.15s ease;
         }
 
         .scrollbar-thumb:hover {
-            background: rgba(255, 255, 255, 0.6);
+            background: rgba(160, 160, 160, 0.85);
         }
 
         .scrollbar-thumb:active,
         .scrollbar-thumb.dragging {
-            background: rgba(255, 255, 255, 0.8);
-        }
-
-        /* Light pages: dark thumb for contrast */
-        .virtual-scrollbar.light-page .scrollbar-thumb {
-            background: rgba(0, 0, 0, 0.5);
-            /* Light inset outline ensures visibility over dark page sections */
-            box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.3);
-        }
-        .virtual-scrollbar.light-page .scrollbar-thumb:hover {
-            background: rgba(0, 0, 0, 0.6);
-        }
-        .virtual-scrollbar.light-page .scrollbar-thumb:active,
-        .virtual-scrollbar.light-page .scrollbar-thumb.dragging {
-            background: rgba(0, 0, 0, 0.8);
+            background: rgba(160, 160, 160, 0.95);
         }
 
         /* Invisible hover zone along right edge to trigger scrollbar */
         .virtual-scrollbar-hover-zone {
             position: absolute;
-            z-index: 52;
+            z-index: 53;
             right: 0;
             top: 0;
             bottom: 0;
             width: 30px;
             pointer-events: auto;
         }
+
     </style>
+    <link rel="stylesheet" href="/toolbar.css">
+    <link rel="stylesheet" href="/vision-sim.css">
+    <script src="/vendor/sortable.min.js"></script>
+    <script src="/toolbar.js" defer></script>
+    <script src="/vision-sim.js" defer></script>
 </head>
 <body>
     <!-- Splash Screen -->
@@ -3594,14 +3558,6 @@
 
     <!-- Control Bar -->
     <div class="control-bar" id="controlBar">
-        <div class="logo">
-            <div class="logo-icon">I</div>
-            <span class="logo-text">Inspekt</span>
-            <span class="logo-badge">VM</span>
-        </div>
-
-        <div class="divider"></div>
-
         <!-- Navigation Buttons -->
         <div class="btn-group">
             <button class="nav-btn" id="reloadBtn" title="Reload page" aria-label="Reload page">
@@ -3678,45 +3634,11 @@
 
         <div class="divider"></div>
 
-        <!-- Terminal Button -->
-        <button onclick="toggleTerminal()" title="Open terminal">
-            <svg viewBox="0 0 24 24"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 14H4V8h16v10z"/><path d="M7 15l4-4-4-4"/></svg>
-            Terminal
-        </button>
+        <!-- Dynamic Toolbar Buttons (rendered by renderToolbarButtons()) -->
+        <div id="toolbarButtons" class="toolbar-buttons"></div>
 
-        <!-- Command Palette Button -->
-        <button id="cmdPaletteBtn" onclick="document.getElementById('commandPalette')?.open()" title="Command Palette (⌘K)">
-            <svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27a6.5 6.5 0 0 0 1.48-5.34c-.47-2.78-2.79-5-5.59-5.34A6.505 6.505 0 0 0 3.03 9.8c0 3.22 2.34 5.9 5.42 6.44a6.5 6.5 0 0 0 2.66-.13l.27.28v.79l4.26 4.25c.41.41 1.07.41 1.48 0l.01-.01c.41-.41.41-1.07 0-1.48L15.5 14zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
-            Commands
-        </button>
-
-        <!-- DevTools Button -->
-        <button id="devtoolsBtn" onclick="toggleDevTools()" title="Toggle DevTools (D)">
-            <svg viewBox="0 0 24 24"><path d="M22.7 19l-9.1-9.1c.9-2.3.4-5-1.5-6.9-2-2-5-2.4-7.4-1.3L9 6 6 9 1.6 4.7C.4 7.1.9 10.1 2.9 12.1c1.9 1.9 4.6 2.4 6.9 1.5l9.1 9.1c.4.4 1 .4 1.4 0l2.3-2.3c.5-.4.5-1.1.1-1.4z"/></svg>
-            DevTools
-        </button>
-
-        <!-- Element Inspect Button -->
-        <button id="inspectBtn" onclick="toggleHoverInspect()" title="Toggle Element Inspector (I)">
-            <svg viewBox="0 0 24 24"><path d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3A8.994 8.994 0 0 0 13 3.06V1h-2v2.06A8.994 8.994 0 0 0 3.06 11H1v2h2.06A8.994 8.994 0 0 0 11 20.94V23h2v-2.06A8.994 8.994 0 0 0 20.94 13H23v-2h-2.06zM12 19c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"/></svg>
-            Inspect
-        </button>
-
-        <!-- Audio Toggle Button -->
-        <button id="audioBtn" onclick="toggleAudio()" title="Toggle Audio (A)">
-            <svg id="audioIconOff" viewBox="0 0 24 24"><path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/></svg>
-            <svg id="audioIconOn" viewBox="0 0 24 24" style="display:none;"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
-            Audio
-        </button>
-
-        <!-- Screen Reader Simulator Button + Popout wrapper -->
-        <div style="position: relative;">
-        <button id="srBtn" onclick="toggleSRPopout()" title="Screen Reader Simulator">
-            <svg viewBox="0 0 24 24"><path d="M17 20c-.29 0-.56-.06-.76-.15-.71-.37-1.21-.88-1.71-2.38-.51-1.56-1.47-2.29-2.39-3-.79-.61-1.61-1.24-2.32-2.53C9.29 10.98 9 9.93 9 9c0-2.8 2.2-5 5-5s5 2.2 5 5h2c0-3.93-3.07-7-7-7S7 5.07 7 9c0 1.26.38 2.65 1.07 3.9.91 1.65 1.98 2.48 2.85 3.15.81.62 1.39 1.07 1.71 2.05.6 1.82 1.37 2.84 2.73 3.55A3.999 3.999 0 0 0 21 18h-2c0 1.1-.9 2-2 2zM7.64 2.64L6.22 1.22C4.23 3.21 3 5.96 3 9s1.23 5.79 3.22 7.78l1.41-1.41C6.01 13.74 5 11.49 5 9s1.01-4.74 2.64-6.36zM11.5 9a2.5 2.5 0 0 0 5 0 2.5 2.5 0 0 0-5 0z" fill="currentColor"/></svg>
-            SR
-        </button>
-
-        <!-- SR Popout Dropdown -->
+        <!-- SR Popout lives here, gets re-parented into SR button wrapper during render -->
+        <div id="srPopoutContainer" style="display:none;">
         <div id="srPopout" class="url-bar-popout sr-popout">
             <div class="sr-popout-header">Screen Reader Simulator</div>
             <div class="sr-selector">
@@ -3764,65 +3686,28 @@
                 </div>
             </div>
         </div>
-        </div><!-- end SR wrapper -->
+        </div><!-- end srPopoutContainer -->
 
-        <div class="divider"></div>
+    </div>
 
-        <!-- Auto-Scan Toggle -->
-        <label class="auto-scan-toggle" id="autoScanToggle" title="Auto-scan tabs for accessibility issues after 5 seconds">
-            <input type="checkbox" id="autoScanCheckbox" onchange="toggleAutoScan(this.checked)">
-            <span>Auto-scan</span>
-        </label>
-
-        <div class="btn-group">
-            <div class="dropdown">
-                <button onclick="toggleDropdown(this)" title="Run Inspekt commands">
-                    <svg viewBox="0 0 24 24"><path d="M9.4 16.6L4.8 12l4.6-4.6L8 6l-6 6 6 6 1.4-1.4zm5.2 0l4.6-4.6-4.6-4.6L16 6l6 6-6 6-1.4-1.4z"/></svg>
-                    Inspekt
-                    <svg viewBox="0 0 24 24" style="width:12px;height:12px;margin-left:2px;"><path d="M7 10l5 5 5-5z"/></svg>
-                </button>
-                <div class="dropdown-menu">
-                    <button class="dropdown-item" onclick="runInspekt('info')">
-                        <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
-                        Page Info
-                    </button>
-                    <button class="dropdown-item" onclick="runInspekt('axe')">
-                        <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
-                        Accessibility Audit
-                    </button>
-                    <button class="dropdown-item" onclick="runInspekt('links')">
-                        <svg viewBox="0 0 24 24"><path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"/></svg>
-                        Extract Links
-                    </button>
-                    <button class="dropdown-item" onclick="runInspekt('outline')">
-                        <svg viewBox="0 0 24 24"><path d="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V7H7z"/></svg>
-                        Page Outline
-                    </button>
-                    <div class="dropdown-divider"></div>
-                    <button class="dropdown-item" onclick="runInspekt('screenshot')">
-                        <svg viewBox="0 0 24 24"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>
-                        Screenshot
-                    </button>
-                </div>
+    <!-- Customize Toolbar Sheet -->
+    <div class="customize-sheet-backdrop" id="customizeSheetBackdrop"></div>
+    <div class="customize-sheet" id="customizeSheet">
+        <div class="customize-sheet-header">
+            <h3>Customize Toolbar</h3>
+            <button class="customize-sheet-done" onclick="closeCustomizeSheet()">Done</button>
+        </div>
+        <p class="customize-sheet-hint">Drag items into the toolbar to add them, or drag them out to remove them.</p>
+        <div class="customize-sheet-buttons" id="customizeSheetButtons"></div>
+        <div class="customize-sheet-footer">
+            <div class="customize-sheet-footer-left">
+                <button onclick="resetToolbarToDefaults()">Restore Default Set</button>
             </div>
-        </div>
-
-        <div class="divider"></div>
-
-        <div class="btn-group">
-            <button onclick="openRecordingsModal()" title="Recordings">
-                <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="4" fill="currentColor"/></svg>
-                Recordings
-            </button>
-            <button onclick="openRestartModal()" title="Restart environment">
-                <svg viewBox="0 0 24 24"><path d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z"/></svg>
-                Restart
-            </button>
-        </div>
-
-        <div class="status">
-            <span class="status-dot connecting" id="statusDot"></span>
-            <span id="statusText">Connecting...</span>
+            <div class="customize-display-modes" id="customizeDisplayModes">
+                <button data-mode="icon-and-text" onclick="_setDisplayMode('icon-and-text')">Icon & Text</button>
+                <button data-mode="icon-only" onclick="_setDisplayMode('icon-only')">Icon Only</button>
+                <button data-mode="text-only" onclick="_setDisplayMode('text-only')">Text Only</button>
+            </div>
         </div>
     </div>
 
@@ -4552,7 +4437,7 @@
 
         // Split mode & position state
         let terminalPosition = localStorage.getItem('terminalPosition') || 'right';
-        let terminalMode = 'floating';  // 'floating' | 'split'
+        let terminalMode = localStorage.getItem('terminalMode') || 'floating';  // 'floating' | 'split'
         let splitRatio = parseFloat(localStorage.getItem('splitRatio')) || 0.5;
         let splitFlipped = localStorage.getItem('splitFlipped') === 'true';
         let isDraggingSplitHandle = false;
@@ -4709,7 +4594,7 @@
                     fetch(`http://${VNC_HOST}:${CONTROL_PORT}/resize`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ width, height })
+                        body: JSON.stringify({ width, height, source: 'auto' })
                     })
                     .then(r => r.json())
                     .then(data => {
@@ -4841,11 +4726,13 @@
                         setTimeout(restoreTabsFromStorage, 2000);
                     }
                     rfb.focus();
+                    if (window.startScrollbarPolling) window.startScrollbarPolling();
                 }, 500);
             });
 
             rfb.addEventListener('disconnect', (e) => {
                 clearTimeout(_connectTimeout);
+                if (window.stopScrollbarPolling) window.stopScrollbarPolling();
                 // Ignore disconnect events during cleanup (old instance being torn down)
                 if (_isCleaningUp) return;
 
@@ -4901,19 +4788,22 @@
         }
         let _pendingInternalUrl = null;
 
-        // Update connection status
+        // Update connection status (shown via toast — no persistent UI element)
+        let _lastStatusConnected = null;
         function updateStatus(connected) {
-            const dot = document.getElementById('statusDot');
-            const text = document.getElementById('statusText');
             isConnected = connected;
-
-            dot.classList.remove('connecting', 'disconnected');
+            // Only show toasts on actual state changes to avoid spam
+            const wasConnected = _lastStatusConnected;
+            if (connected === wasConnected) return;
+            _lastStatusConnected = connected;
 
             if (connected) {
-                text.textContent = 'Connected';
+                // Only show "reconnected" toast if we were previously disconnected (not on initial load)
+                if (wasConnected === false) {
+                    showToast('Connected', 'success');
+                }
             } else {
-                dot.classList.add('disconnected');
-                text.textContent = 'Disconnected';
+                showToast('Connection lost', 'error', 5000);
             }
         }
 
@@ -6844,6 +6734,22 @@
         // Regex to detect copyable code block signal: OSC 1337 ; copyable BEL
         // When detected, show a floating copy button on the terminal
         const COPYABLE_SIGNAL_REGEX = /\x1b\]1337;copyable\x07/g;
+
+        // Regex to detect toast signal: OSC 1337 ; toast BEL
+        // When detected, fetch toast message from control server and show it
+        const TOAST_SIGNAL_REGEX = /\x1b\]1337;toast\x07/g;
+
+        async function handleToastSignal() {
+            try {
+                const resp = await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/toast`);
+                const data = await resp.json();
+                if (data.ok && data.message) {
+                    showToast(data.message, { type: data.type || 'dark', duration: 2500 });
+                }
+            } catch (err) {
+                console.warn('[Terminal] Toast relay failed:', err);
+            }
+        }
 
         async function handleClipboardSignal() {
             try {
@@ -9202,10 +9108,15 @@
                     }
 
                     if (event.key === 'Escape' && event.type === 'keydown') {
-                        // Stop the event from bubbling to document handler
+                        // In split mode, Escape should not close the terminal —
+                        // it's a persistent panel, not a dismissible overlay.
+                        // Let the key pass through to the shell (e.g. cancel a command).
+                        if (terminalMode === 'split') {
+                            return true; // Let xterm.js handle it normally
+                        }
+                        // Floating mode: close the terminal overlay
                         event.stopPropagation();
                         event.preventDefault();
-                        // Use toggleTerminal() to close so focus logic runs
                         toggleTerminal();
                         return false;
                     }
@@ -9329,6 +9240,12 @@
                     });
                 }
 
+                // Check for toast signal and show toast in control panel
+                TOAST_SIGNAL_REGEX.lastIndex = 0;
+                if (TOAST_SIGNAL_REGEX.test(data)) {
+                    handleToastSignal();
+                }
+
                 // Check for hide-terminal escape sequence
                 // CLI tools emit this to request terminal auto-hide (e.g., when recording starts)
                 const hasHideSignal = HIDE_TERMINAL_REGEX.test(data);
@@ -9351,6 +9268,7 @@
                 cleanData = cleanData.replace(HIDE_TERMINAL_REGEX, '');
                 cleanData = cleanData.replace(CLIPBOARD_SIGNAL_REGEX, '');
                 cleanData = cleanData.replace(COPYABLE_SIGNAL_REGEX, '');
+                cleanData = cleanData.replace(TOAST_SIGNAL_REGEX, '');
                 terminal.write(cleanData);
 
                 // Scan for trigger words (debounced)
@@ -10141,11 +10059,26 @@
             { id: 'ui:page-info',     title: 'Page Info',                section: 'View',           keywords: 'meta seo performance',      handler: () => togglePageInfo(),                                                     content: 'SEO, meta, performance' },
             { id: 'ui:audio',         title: 'Toggle Audio',             section: 'View',           keywords: 'sound mute unmute',         handler: () => toggleAudio(),                                                        content: 'Stream audio from VM' },
             { id: 'ui:screen-reader', title: 'Screen Reader Simulator',  section: 'Accessibility',  keywords: 'sr voiceover jaws nvda',    handler: () => toggleSRPopout(),                                                     content: 'JAWS, NVDA, VoiceOver' },
+            { id: 'ui:vision-off',        title: 'Vision: Normal',           section: 'Accessibility',  keywords: 'vision simulate clear reset',       handler: () => clearVisionSimulation(),                                      content: 'Remove vision simulation' },
+            { id: 'ui:vision-protanopia',  title: 'Vision: Protanopia',       section: 'Accessibility',  keywords: 'vision color blind red',            handler: () => setVisionSimulation('protanopia'),                            content: 'Red-blind simulation' },
+            { id: 'ui:vision-deuteranopia',title: 'Vision: Deuteranopia',     section: 'Accessibility',  keywords: 'vision color blind green',          handler: () => setVisionSimulation('deuteranopia'),                          content: 'Green-blind simulation' },
+            { id: 'ui:vision-tritanopia',  title: 'Vision: Tritanopia',       section: 'Accessibility',  keywords: 'vision color blind blue',           handler: () => setVisionSimulation('tritanopia'),                            content: 'Blue-blind simulation' },
+            { id: 'ui:vision-achromatopsia',title:'Vision: Achromatopsia',    section: 'Accessibility',  keywords: 'vision color blind gray monochrome',handler: () => setVisionSimulation('achromatopsia'),                         content: 'Total color blindness' },
+            { id: 'ui:vision-tunnel',      title: 'Vision: Tunnel Vision',    section: 'Accessibility',  keywords: 'vision tunnel peripheral field',    handler: () => setVisionSimulation('tunnel-vision'),                         content: 'Peripheral vision loss' },
+            { id: 'ui:vision-scotoma',     title: 'Vision: Central Scotoma',  section: 'Accessibility',  keywords: 'vision scotoma macular central blind spot', handler: () => setVisionSimulation('central-scotoma'),                  content: 'Central vision loss (AMD)' },
+            { id: 'ui:vision-cataracts',   title: 'Vision: Cataracts',        section: 'Accessibility',  keywords: 'vision cataracts blur yellow',      handler: () => setVisionSimulation('cataracts'),                             content: 'Cloudy lens simulation' },
+            { id: 'ui:vision-low',         title: 'Vision: Low Vision',       section: 'Accessibility',  keywords: 'vision blur acuity low',            handler: () => setVisionSimulation('low-vision-moderate'),                   content: 'Blurred vision (20/100)' },
+            { id: 'ui:vision-keratoconus', title: 'Vision: Keratoconus',      section: 'Accessibility',  keywords: 'vision keratoconus distortion cornea warp',  handler: () => setVisionSimulation('keratoconus'),                  content: 'Corneal distortion + ghosting' },
+            { id: 'ui:vision-metamorphopsia',title:'Vision: Metamorphopsia',   section: 'Accessibility',  keywords: 'vision wavy distortion lines bent',          handler: () => setVisionSimulation('metamorphopsia'),               content: 'Wavy/bent line distortion' },
+            { id: 'ui:vision-diplopia',    title: 'Vision: Diplopia',          section: 'Accessibility', keywords: 'vision double diplopia ghost strabismus',     handler: () => setVisionSimulation('diplopia'),                     content: 'Double vision (mouse-reactive)' },
+            { id: 'ui:vision-floaters',    title: 'Vision: Diabetic Floaters', section: 'Accessibility', keywords: 'vision floaters dark spots diabetic drift',   handler: () => setVisionSimulation('diabetic-floaters'),            content: 'Drifting dark blobs' },
+            { id: 'ui:vision-scarring',    title: 'Vision: Corneal Scarring', section: 'Accessibility',  keywords: 'vision scar cornea blur patch opacity',      handler: () => setVisionSimulation('corneal-scarring'),             content: 'Localized blur + distortion' },
             // Navigation
             { id: 'ui:back',          title: 'Go Back',                  section: 'Navigation',     keywords: 'previous history back',     handler: () => goBack(),                                                             content: 'Navigate to previous page' },
             { id: 'ui:forward',       title: 'Go Forward',               section: 'Navigation',     keywords: 'next history forward',      handler: () => goForward(),                                                          content: 'Navigate to next page' },
             { id: 'ui:reload',        title: 'Reload Page',              section: 'Navigation',     keywords: 'refresh reload',            handler: () => reloadPage(),                                                         content: _activeTabContent },
             // Restart
+            { id: 'ui:customize-toolbar', title: 'Customize Toolbar',       section: 'View',           keywords: 'toolbar buttons customize rearrange', handler: () => openCustomizeSheet(),                                           content: 'Add, remove, and reorder buttons' },
             { id: 'ui:restart-browser', title: 'Restart Browser',          section: 'Restart',        keywords: 'restart chromium refresh config', handler: () => performRestartBrowser(),                                          content: 'Apply config changes' },
             { id: 'ui:restart-all',     title: 'Restart All Services',     section: 'Restart',        keywords: 'restart reboot vnc proxy terminal', handler: () => performRestartAll(),                                            content: 'Browser, VNC, proxy, terminal' },
             { id: 'ui:reset-env',       title: 'Reset Environment',        section: 'Restart',        keywords: 'reset fresh clean destroy',   handler: () => performResetEnvironment(),                                             content: 'Clear all browsing data' },
@@ -11032,8 +10965,6 @@
             closeRestartModal();
             showToast('Restarting all services...');
             updateStatus(false);
-            document.getElementById('statusDot').classList.add('connecting');
-            document.getElementById('statusText').textContent = 'Restarting...';
 
             try {
                 await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/reboot`);
@@ -11052,8 +10983,6 @@
             closeRestartModal();
             showToast('Resetting environment... This may take ~10 seconds.');
             updateStatus(false);
-            document.getElementById('statusDot').classList.add('connecting');
-            document.getElementById('statusText').textContent = 'Resetting...';
 
             try {
                 await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/hard-reboot`);
@@ -11567,7 +11496,7 @@
         // Auto-scan toggle
         async function toggleAutoScan(enabled) {
             autoScanEnabled = enabled;
-            const toggle = document.getElementById('autoScanToggle');
+            const toggle = document.querySelector('.toolbar-auto-scan');
             if (toggle) {
                 toggle.classList.toggle('active', enabled);
             }
@@ -13087,6 +13016,8 @@
         // Initialize
         window.addEventListener('load', () => {
             updateSplashStatus('Loading...');
+            initToolbar();
+            initVisionSimulator();
             setTimeout(connectVNC, 500);
             setInterval(checkHealth, 5000);
 
@@ -13112,6 +13043,12 @@
             if (e.key === 'Escape') {
                 // Let ninja-keys handle Escape when palette is open — don't close anything else
                 { const ninja = document.getElementById('commandPalette'); if (ninja?.visible) return; }
+                // Close customize sheet if open
+                if (_toolbarCustomizing) {
+                    e.preventDefault();
+                    closeCustomizeSheet();
+                    return;
+                }
                 // Close page info popout first
                 if (pageInfoOpen) {
                     e.preventDefault();
@@ -13328,7 +13265,6 @@
             const container = document.getElementById('vncContainer');
 
             let scrollState = { top: 0, scrollHeight: 0, clientHeight: 0, hasVerticalScroll: false };
-            let lastIsLight = null; // track to avoid class thrashing
             let isDragging = false;
             let dragOffsetY = 0;
             let hideTimer = null;
@@ -13336,36 +13272,23 @@
             let pollInterval = 500;       // idle rate
             const activePollInterval = 80; // during/after scroll
             const hideDelay = 1500;        // ms before auto-hide
+            let activePollResetTimer = null;
+            let lastScrollSendTime = 0;
+            const scrollSendThrottle = 50; // ms between scroll-to requests during drag
 
-            // --- Adaptive thumb color ---
-            function isLightBackground(bg) {
-                if (!bg) return true; // most pages are light
-                const m = bg.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
-                if (!m) return true;
-                const r = parseInt(m[1]) / 255;
-                const g = parseInt(m[2]) / 255;
-                const b = parseInt(m[3]) / 255;
-                return (0.2126 * r + 0.7152 * g + 0.0722 * b) > 0.5;
-            }
+            // Thumb color adapts automatically via CSS mix-blend-mode: difference
+            // combined with filter: grayscale(1) — no JS needed for color logic.
 
             // --- Polling scroll state from control server ---
             function pollScrollState() {
-                if (isDragging) {
-                    pollTimer = setTimeout(pollScrollState, activePollInterval);
-                    return;
-                }
+                // During drag, thumb position is updated optimistically — no need to poll
+                if (isDragging) return;
                 fetch(`http://${VNC_HOST}:${CONTROL_PORT}/scroll-state`)
                     .then(r => r.json())
                     .then(data => {
                         if (data.ok) {
                             scrollState = data;
                             updateThumb();
-                            // Adaptive thumb color based on page background
-                            const isLight = isLightBackground(data.bg);
-                            if (isLight !== lastIsLight) {
-                                lastIsLight = isLight;
-                                scrollbar.classList.toggle('light-page', isLight);
-                            }
                         }
                     })
                     .catch(() => {})
@@ -13373,6 +13296,16 @@
                         pollTimer = setTimeout(pollScrollState, pollInterval);
                     });
             }
+
+            // --- Lifecycle: allow VNC connect/disconnect to control polling ---
+            window.stopScrollbarPolling = function() {
+                clearTimeout(pollTimer);
+                pollTimer = null;
+            };
+            window.startScrollbarPolling = function() {
+                if (pollTimer) return; // already running
+                pollTimer = setTimeout(pollScrollState, 500);
+            };
 
             // --- Thumb positioning ---
             function updateThumb() {
@@ -13411,14 +13344,17 @@
             function setActivePollRate() {
                 pollInterval = activePollInterval;
                 // Return to idle rate after 2s of no further triggers
-                clearTimeout(setActivePollRate._timer);
-                setActivePollRate._timer = setTimeout(() => {
+                clearTimeout(activePollResetTimer);
+                activePollResetTimer = setTimeout(() => {
                     pollInterval = 500;
                 }, 2000);
             }
 
-            // --- Send scroll command to VM ---
-            function sendScrollTo(targetTop) {
+            // --- Send scroll command to VM (throttled) ---
+            function sendScrollTo(targetTop, force) {
+                const now = Date.now();
+                if (!force && now - lastScrollSendTime < scrollSendThrottle) return;
+                lastScrollSendTime = now;
                 fetch(`http://${VNC_HOST}:${CONTROL_PORT}/scroll-to`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -13457,6 +13393,15 @@
             }
 
             function onDragEnd(e) {
+                // Send final position unthrottled to ensure exact landing
+                const trackRect = track.getBoundingClientRect();
+                const thumbHeight = thumb.offsetHeight;
+                const maxY = trackRect.height - thumbHeight;
+                const currentY = Math.max(0, Math.min(e.clientY - trackRect.top - dragOffsetY, maxY));
+                const scrollRatio = maxY > 0 ? currentY / maxY : 0;
+                const targetScrollTop = scrollRatio * (scrollState.scrollHeight - scrollState.clientHeight);
+                sendScrollTo(targetScrollTop, true);
+
                 isDragging = false;
                 scrollbar.classList.remove('dragging');
                 thumb.classList.remove('dragging');
@@ -13464,7 +13409,8 @@
                 thumb.removeEventListener('pointermove', onDragMove);
                 thumb.removeEventListener('pointerup', onDragEnd);
                 scheduleHide();
-                // Refocus VNC canvas
+                // Restart polling (was paused during drag) and refocus VNC
+                pollScrollState();
                 if (rfb) rfb.focus();
             }
 

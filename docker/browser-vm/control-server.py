@@ -46,6 +46,10 @@ clipboard_data = {'text': '', 'timestamp': 0}
 upload_state = {'status': 'idle', 'files': [], 'errors': [], 'timestamp': 0}
 # Copyable block relay: CLI posts raw code block text, control panel shows copy button
 copyable_data = {'text': '', 'timestamp': 0}
+# Canvas size: last known VNC container dimensions (set by control panel auto-resize)
+canvas_size = {'width': 0, 'height': 0}
+# Toast relay: CLI posts toast message here, control panel fetches and shows it
+toast_data = {'message': '', 'type': 'dark', 'timestamp': 0}
 
 # Dynamic command allowlist (populated from registry API on first use)
 _dynamic_allowlist = None
@@ -1158,8 +1162,7 @@ class ControlHandler(BaseHTTPRequestHandler):
                         'clientHeight': value.get('client', 0),
                         'clientWidth': value.get('clientW', 0),
                         'hasVerticalScroll': has_vscroll,
-                        'hasHorizontalScroll': has_hscroll,
-                        'bg': value.get('bg', '')
+                        'hasHorizontalScroll': has_hscroll
                     })
                 else:
                     self.send_json({'ok': True, 'hasVerticalScroll': False, 'hasHorizontalScroll': False,
@@ -2757,8 +2760,10 @@ class ControlHandler(BaseHTTPRequestHandler):
                         current = line.split()[0]
                         break
                 if current:
-                    w, h = current.split('x')
-                    self.send_json({'ok': True, 'resolution': current, 'width': int(w), 'height': int(h)})
+                    # Strip cvt suffix (e.g. "1916x1228_60.00" → "1916x1228")
+                    clean = current.split('_')[0] if '_' in current else current
+                    w, h = clean.split('x')
+                    self.send_json({'ok': True, 'resolution': clean, 'width': int(w), 'height': int(h)})
                 else:
                     self.send_json({'ok': False, 'error': 'Could not parse current resolution'}, 500)
             except Exception as e:
@@ -2771,6 +2776,10 @@ class ControlHandler(BaseHTTPRequestHandler):
         elif path == '/copyable':
             # Return the latest copyable code block text
             self.send_json({'ok': True, 'text': copyable_data['text'], 'timestamp': copyable_data['timestamp']})
+
+        elif path == '/toast':
+            # Return the latest toast message posted by CLI commands
+            self.send_json({'ok': True, 'message': toast_data['message'], 'type': toast_data['type'], 'timestamp': toast_data['timestamp']})
 
         elif path == '/keys/send':
             # Send keystrokes via xdotool (bypasses VNC for modifier key issues)
@@ -3070,6 +3079,20 @@ class ControlHandler(BaseHTTPRequestHandler):
                 self.send_json({'ok': False, 'error': str(e)}, 500)
             return
 
+        if path == '/toast':
+            # CLI posts toast message here; control panel fetches and shows it
+            try:
+                content_length = int(self.headers.get('Content-Length', 0))
+                body = self.rfile.read(content_length).decode('utf-8')
+                data = json.loads(body)
+                toast_data['message'] = data.get('message', '')
+                toast_data['type'] = data.get('type', 'dark')
+                toast_data['timestamp'] = time.time()
+                self.send_json({'ok': True})
+            except Exception as e:
+                self.send_json({'ok': False, 'error': str(e)}, 500)
+            return
+
         # Auto-scan settings endpoint
         if path == '/settings/auto-scan':
             try:
@@ -3145,8 +3168,31 @@ class ControlHandler(BaseHTTPRequestHandler):
                 if width < 320 or height < 240:
                     self.send_json({'ok': False, 'error': 'Width and height must be positive integers (min 320x240)'}, 400)
                     return
+                # Track canvas size when sent by control panel auto-resize
+                if data.get('source') == 'auto':
+                    canvas_size['width'] = width
+                    canvas_size['height'] = height
                 result = subprocess.run(
                     ['/opt/resize-display.sh', str(width), str(height)],
+                    capture_output=True, text=True, timeout=10,
+                    env={**os.environ, 'DISPLAY': DISPLAY}
+                )
+                try:
+                    response = json.loads(result.stdout.strip())
+                except (json.JSONDecodeError, ValueError):
+                    response = {'ok': False, 'error': result.stderr.strip() or result.stdout.strip() or 'Unknown error'}
+                self.send_json(response, 200 if response.get('ok') else 500)
+            except Exception as e:
+                self.send_json({'ok': False, 'error': str(e)}, 500)
+
+        elif path == '/fit':
+            # Resize X display to fit the VNC canvas (last known auto-resize dimensions)
+            try:
+                if canvas_size['width'] < 320 or canvas_size['height'] < 240:
+                    self.send_json({'ok': False, 'error': 'No canvas size available yet. Resize the browser window first.'}, 400)
+                    return
+                result = subprocess.run(
+                    ['/opt/resize-display.sh', str(canvas_size['width']), str(canvas_size['height'])],
                     capture_output=True, text=True, timeout=10,
                     env={**os.environ, 'DISPLAY': DISPLAY}
                 )

@@ -23,6 +23,10 @@ class NavigateToUrlParams(BaseModel):
         default=None,
         description="Wait condition: 'load' (DOMContentLoaded), 'networkidle' (no network activity)",
     )
+    timeout: Optional[int] = Field(
+        default=30,
+        description="Navigation timeout in seconds (default: 30)",
+    )
 
 
 class NavigateResponse(BaseModel):
@@ -216,16 +220,37 @@ class TakeScreenshotParams(BaseModel):
     quality: Optional[int] = Field(
         default=90, description="JPEG quality (1-100, ignored for PNG)"
     )
+    output_path: Optional[str] = Field(
+        default=None,
+        description="Path to save screenshot file. If not provided, saves to a temp file in /tmp/inspekt/screenshots/.",
+    )
+    timeout: Optional[int] = Field(
+        default=30,
+        description="Maximum time in seconds to wait for screenshot (default: 30, max: 30)",
+        ge=1,
+        le=30,
+    )
 
 
 class TakeScreenshotResponse(BaseModel):
     """Response from take_screenshot tool."""
 
     success: bool = Field(..., description="Whether screenshot succeeded")
-    data: Optional[str] = Field(default=None, description="Base64-encoded image data")
+    data: Optional[str] = Field(
+        default=None,
+        description="Deprecated - always None. Screenshots are saved to files.",
+    )
+    path: Optional[str] = Field(
+        default=None,
+        description="Absolute path to the saved screenshot file",
+    )
     format: str = Field(..., description="Image format (png or jpeg)")
     width: int = Field(..., description="Image width in pixels")
     height: int = Field(..., description="Image height in pixels")
+    size: Optional[int] = Field(
+        default=None,
+        description="File size in bytes",
+    )
     message: Optional[str] = Field(default=None, description="Success or error message")
 
 
@@ -601,4 +626,60 @@ class PluginExecuteResponse(BaseModel):
         description="Captured console messages during execution"
     )
     execution_time_ms: int = Field(..., description="Execution time in milliseconds")
+    message: Optional[str] = Field(default=None, description="Success or error message")
+
+
+# ============================================================================
+# Display Schemas (Zoom & Viewport)
+# ============================================================================
+
+
+class SetZoomParams(BaseModel):
+    """Parameters for set_zoom tool."""
+
+    level: Optional[int] = Field(
+        default=None,
+        description="Zoom level as percentage (25–500). E.g., 150 for 150%. Mutually exclusive with action.",
+    )
+    action: Optional[Literal["in", "out", "reset"]] = Field(
+        default=None,
+        description="Zoom action: 'in' (next step), 'out' (previous step), 'reset' (100%). Mutually exclusive with level.",
+    )
+
+
+class ZoomResponse(BaseModel):
+    """Response from zoom tools."""
+
+    success: bool = Field(..., description="Whether the operation succeeded")
+    zoom: float = Field(..., description="Current zoom factor (e.g., 1.5 for 150%)")
+    percentage: int = Field(..., description="Current zoom as percentage (e.g., 150)")
+    wcag_note: Optional[str] = Field(default=None, description="WCAG guidance for the zoom level")
+    previous_zoom: Optional[float] = Field(default=None, description="Previous zoom factor (set operations only)")
+    message: Optional[str] = Field(default=None, description="Success or error message")
+
+
+class SetViewportParams(BaseModel):
+    """Parameters for set_viewport tool."""
+
+    width: int = Field(..., description="Viewport width in CSS pixels (320–3840)", ge=320, le=3840)
+    height: Optional[int] = Field(
+        default=None,
+        description="Viewport height in CSS pixels (240–2160). If omitted, only width changes.",
+        ge=240,
+        le=2160,
+    )
+    auto_height: bool = Field(
+        default=False,
+        description="Automatically set height to fill available display (VM only). Overrides height.",
+    )
+
+
+class ViewportResponse(BaseModel):
+    """Response from viewport tools."""
+
+    success: bool = Field(..., description="Whether the operation succeeded")
+    width: int = Field(..., description="Current viewport width in pixels")
+    height: int = Field(..., description="Current viewport height in pixels")
+    previous_width: Optional[int] = Field(default=None, description="Previous width (set operations only)")
+    previous_height: Optional[int] = Field(default=None, description="Previous height (set operations only)")
     message: Optional[str] = Field(default=None, description="Success or error message")

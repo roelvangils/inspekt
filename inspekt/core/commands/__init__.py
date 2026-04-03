@@ -35,6 +35,7 @@ from inspekt.core.commands.selection import SELECTION_COMMANDS
 from inspekt.core.commands.utilities import UTILITIES_COMMANDS
 from inspekt.core.commands.vm import VM_COMMANDS
 from inspekt.core.commands.screen_reader import SCREEN_READER_COMMANDS
+from inspekt.core.commands.display import DISPLAY_COMMANDS
 from inspekt.core.commands.watch import WATCH_COMMANDS
 
 __all__ = ["CommandDefinition", "Category", "register_all_commands"]
@@ -79,6 +80,7 @@ def register_all_commands() -> None:
     registry.register_many(MCP_MANAGEMENT_COMMANDS)
     registry.register_many(PLUGIN_COMMANDS)
     registry.register_many(SCREEN_READER_COMMANDS)
+    registry.register_many(DISPLAY_COMMANDS)
 
     # Mark as registered to prevent re-registration
     _commands_registered = True

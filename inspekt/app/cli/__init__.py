@@ -545,6 +545,10 @@ cli.add_lazy_command("autostart", "autostart", "autostart")
 # Tunnel command (expose local port to VM)
 cli.add_lazy_command("tunnel", "tunnel", "tunnel")
 
+# Display commands: zoom and viewport (from display.py)
+cli.add_lazy_command("zoom", "display", "zoom")
+cli.add_lazy_command("viewport", "display", "viewport")
+
 
 # ============================================================================
 # VM Restricted Mode

@@ -226,6 +226,7 @@ from inspekt.app.api.routers import (
     plugins,
     browser,
     commands,
+    display,
 )
 
 app.include_router(navigation.router, prefix="/api/navigation", tags=["Navigation"])
@@ -244,6 +245,7 @@ app.include_router(network.router, prefix="/api/network", tags=["Network"])
 app.include_router(plugins.router, prefix="/api/plugins", tags=["Plugins"])
 app.include_router(browser.router, prefix="/api/browser", tags=["Browser"])
 app.include_router(commands.router, prefix="/api/commands", tags=["Commands"])
+app.include_router(display.router, prefix="/api/display", tags=["Display"])
 
 
 @app.get("/plugins", response_class=HTMLResponse)

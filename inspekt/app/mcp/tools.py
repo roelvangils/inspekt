@@ -6,8 +6,10 @@ Tools are async functions that accept Pydantic models and return Pydantic respon
 """
 
 import asyncio
+import base64
 import json
 import logging
+from pathlib import Path
 from typing import Any
 
 from inspekt.app.mcp import schemas
@@ -41,7 +43,11 @@ class ToolProvider:
         self, params: schemas.NavigateToUrlParams
     ) -> schemas.NavigateResponse:
         """
-        Navigate to a URL.
+        Navigate to a URL using the unified navigation service.
+
+        Uses chrome.tabs.update() in the extension background script instead of
+        window.location.href JavaScript, which properly handles navigation without
+        destroying the execution context (which would cause timeouts).
 
         Args:
             params: Navigation parameters
@@ -49,75 +55,15 @@ class ToolProvider:
         Returns:
             NavigateResponse with success status and page info
         """
-        try:
-            # Validate URL
-            if not params.url.startswith(("http://", "https://")):
-                return schemas.NavigateResponse(
-                    success=False,
-                    url=params.url,
-                    title="",
-                    message="URL must start with http:// or https://",
-                )
+        from inspekt.services.navigation import navigate
 
-            # Build navigation code
-            wait_condition = ""
-            if params.wait_for == "load":
-                wait_condition = "await new Promise(resolve => window.addEventListener('DOMContentLoaded', resolve, {once: true}));"
-            elif params.wait_for == "networkidle":
-                # Simple network idle detection (wait for no requests for 500ms)
-                wait_condition = """
-                await new Promise(resolve => {
-                    let timeout;
-                    const resetTimeout = () => {
-                        clearTimeout(timeout);
-                        timeout = setTimeout(resolve, 500);
-                    };
-                    resetTimeout();
-                    // Monitor fetch/xhr (simplified)
-                    const origFetch = window.fetch;
-                    window.fetch = function(...args) {
-                        resetTimeout();
-                        return origFetch.apply(this, args).finally(resetTimeout);
-                    };
-                });
-                """
-
-            code = f"""
-            (async () => {{
-                window.location.href = {json.dumps(params.url)};
-                {wait_condition}
-                return {{
-                    url: window.location.href,
-                    title: document.title
-                }};
-            }})()
-            """
-
-            result = await asyncio.to_thread(
-            self.executor.execute, code, 30.0
+        result = await navigate(
+            url=params.url,
+            wait_for=params.wait_for,
+            timeout=params.timeout or 30,
         )
 
-            if result.get("ok"):
-                data = result.get("result", {})
-                return schemas.NavigateResponse(
-                    success=True,
-                    url=data.get("url", params.url),
-                    title=data.get("title", ""),
-                    message="Navigation successful",
-                )
-            else:
-                return schemas.NavigateResponse(
-                    success=False,
-                    url=params.url,
-                    title="",
-                    message=f"Navigation failed: {result.get('error', 'Unknown error')}",
-                )
-
-        except Exception as e:
-            logger.error(f"Navigation error: {e}")
-            return schemas.NavigateResponse(
-                success=False, url=params.url, title="", message=f"Error: {str(e)}"
-            )
+        return schemas.NavigateResponse(**result)
 
     async def go_back(self) -> schemas.NavigateResponse:
         """Navigate browser history backward."""
@@ -206,34 +152,24 @@ class ToolProvider:
     async def execute_javascript(
         self, params: schemas.ExecuteJavaScriptParams
     ) -> schemas.ExecuteJavaScriptResponse:
-        """Execute arbitrary JavaScript code."""
-        try:
-            result = await asyncio.to_thread(
+        """Execute arbitrary JavaScript code.
 
-                self.executor.execute, params.code, params.timeout or 30
+        Uses the async execution service (aiohttp) instead of the synchronous
+        BridgeExecutor to avoid blocking the MCP event loop.
+        """
+        from inspekt.services.execution import execute_javascript as async_execute
 
-            )
+        result = await async_execute(
+            code=params.code,
+            timeout=params.timeout or 30,
+        )
 
-            if result.get("ok"):
-                return schemas.ExecuteJavaScriptResponse(
-                    success=True,
-                    result=result.get("result"),
-                    console_output=result.get("console_output"),
-                    error=None,
-                )
-            else:
-                return schemas.ExecuteJavaScriptResponse(
-                    success=False,
-                    result=None,
-                    console_output=None,
-                    error=result.get("error", "Execution failed"),
-                )
-
-        except Exception as e:
-            logger.error(f"JavaScript execution error: {e}")
-            return schemas.ExecuteJavaScriptResponse(
-                success=False, result=None, console_output=None, error=str(e)
-            )
+        return schemas.ExecuteJavaScriptResponse(
+            success=result["success"],
+            result=result.get("result"),
+            console_output=result.get("console_output"),
+            error=result.get("error"),
+        )
 
     # ========================================================================
     # Data Extraction Tools
@@ -592,16 +528,25 @@ class ToolProvider:
         self, params: schemas.TakeScreenshotParams
     ) -> schemas.TakeScreenshotResponse:
         """Take a screenshot of viewport, page, or element."""
+        import tempfile
+        from datetime import datetime
+
+        # Hard limit: 30 seconds max for screenshots
+        timeout_seconds = min(params.timeout or 30, 30)
+        img_format = params.format or "png"
+
         try:
-            # Load screenshot script (check if screenshot_unified.js exists)
+            # Load screenshot script
             try:
-                script = await self.script_loader.load_script_async("screenshot_unified.js")
-            except FileNotFoundError:
-                # Fallback: simple screenshot implementation
+                script = await asyncio.wait_for(
+                    self.script_loader.load_script_async("screenshot_unified.js"),
+                    timeout=5.0
+                )
+            except (FileNotFoundError, asyncio.TimeoutError):
                 return schemas.TakeScreenshotResponse(
                     success=False,
                     data=None,
-                    format=params.format or "png",
+                    format=img_format,
                     width=0,
                     height=0,
                     message="Screenshot script not available",
@@ -613,30 +558,108 @@ class ToolProvider:
                 {
                     "TARGET": params.target or "viewport",
                     "SELECTOR": params.selector or "",
-                    "FORMAT": params.format or "png",
+                    "FORMAT": img_format,
                     "QUALITY": params.quality or 90,
                 },
             )
 
-            result = await asyncio.to_thread(
-            self.executor.execute, script, 30.0
-        )
+            # Execute with strict timeout using the client directly
+            # This avoids BridgeExecutor's sys.exit() calls
+            try:
+                result = await asyncio.wait_for(
+                    asyncio.to_thread(
+                        self.executor.client.execute,
+                        script,
+                        float(timeout_seconds)
+                    ),
+                    timeout=timeout_seconds + 2  # Small buffer for thread overhead
+                )
+            except asyncio.TimeoutError:
+                return schemas.TakeScreenshotResponse(
+                    success=False,
+                    data=None,
+                    format=img_format,
+                    width=0,
+                    height=0,
+                    message=f"Screenshot timed out after {timeout_seconds} seconds",
+                )
+            except Exception as e:
+                return schemas.TakeScreenshotResponse(
+                    success=False,
+                    data=None,
+                    format=img_format,
+                    width=0,
+                    height=0,
+                    message=f"Bridge error: {str(e)}",
+                )
 
             if result.get("ok"):
                 data = result.get("result", {})
-                return schemas.TakeScreenshotResponse(
-                    success=True,
-                    data=data.get("data"),
-                    format=data.get("format", params.format or "png"),
-                    width=data.get("width", 0),
-                    height=data.get("height", 0),
-                    message="Screenshot captured",
-                )
+                data_url = data.get("dataUrl") or data.get("data")
+
+                # If we got ok=True but no actual data, something went wrong
+                # (e.g., element picker was cancelled or timed out)
+                if not data_url:
+                    error_msg = data.get("error") or data.get("message") or "No screenshot data returned"
+                    return schemas.TakeScreenshotResponse(
+                        success=False,
+                        data=None,
+                        format=img_format,
+                        width=0,
+                        height=0,
+                        message=error_msg,
+                    )
+
+                img_format = data.get("format", params.format or "png")
+                width = data.get("width", 0)
+                height = data.get("height", 0)
+
+                # Determine output path - use provided path or generate temp file
+                if params.output_path:
+                    output_path = Path(params.output_path)
+                else:
+                    # Generate temp file in cache directory
+                    cache_dir = Path(tempfile.gettempdir()) / "inspekt" / "screenshots"
+                    cache_dir.mkdir(parents=True, exist_ok=True)
+                    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                    output_path = cache_dir / f"screenshot_{timestamp}.{img_format}"
+
+                try:
+                    # Strip data URL prefix to get raw base64
+                    if data_url.startswith("data:"):
+                        base64_data = data_url.split(",", 1)[1] if "," in data_url else data_url
+                    else:
+                        base64_data = data_url
+
+                    # Decode and save
+                    image_bytes = base64.b64decode(base64_data)
+                    output_path.parent.mkdir(parents=True, exist_ok=True)
+                    output_path.write_bytes(image_bytes)
+
+                    return schemas.TakeScreenshotResponse(
+                        success=True,
+                        data=None,
+                        path=str(output_path.resolve()),
+                        format=img_format,
+                        width=width,
+                        height=height,
+                        size=len(image_bytes),
+                        message=f"Screenshot saved to {output_path}",
+                    )
+                except Exception as e:
+                    return schemas.TakeScreenshotResponse(
+                        success=False,
+                        data=None,
+                        format=img_format,
+                        width=0,
+                        height=0,
+                        message=f"Failed to save screenshot: {e}",
+                    )
             else:
                 return schemas.TakeScreenshotResponse(
                     success=False,
                     data=None,
-                    format=params.format or "png",
+                    format=img_format,
                     width=0,
                     height=0,
                     message=result.get("error", "Screenshot failed"),
@@ -647,7 +670,7 @@ class ToolProvider:
             return schemas.TakeScreenshotResponse(
                 success=False,
                 data=None,
-                format=params.format or "png",
+                format=img_format,
                 width=0,
                 height=0,
                 message=f"Error: {str(e)}",
@@ -1384,3 +1407,91 @@ class ToolProvider:
                 success=False,
                 message=f"Error: {str(e)}",
             )
+
+    # ========================================================================
+    # Display Tools (Zoom & Viewport)
+    # ========================================================================
+
+    async def get_zoom(self) -> schemas.ZoomResponse:
+        """
+        Get the current browser zoom level.
+
+        Returns zoom factor (e.g., 1.5), percentage (e.g., 150), and
+        WCAG guidance when the level matches a WCAG threshold.
+        """
+        from inspekt.core.commands.base import EmptyParams
+        from inspekt.core.handlers.display import get_zoom
+
+        result = await get_zoom(EmptyParams())
+        return schemas.ZoomResponse(
+            success=result.success,
+            zoom=result.zoom,
+            percentage=result.percentage,
+            wcag_note=result.wcag_note,
+            message=result.message,
+        )
+
+    async def set_zoom(self, params: schemas.SetZoomParams) -> schemas.ZoomResponse:
+        """
+        Set the browser zoom level.
+
+        Accepts a percentage (25–500) or an action (in/out/reset).
+        Predefined zoom steps: 25%, 33%, 50%, 67%, 75%, 80%, 90%, 100%,
+        110%, 125%, 150%, 175%, 200%, 250%, 300%, 400%, 500%.
+
+        WCAG testing: use level=200 for WCAG 1.4.4 (Resize Text) or
+        level=400 for WCAG 1.4.10 (Reflow).
+        """
+        from inspekt.core.handlers.display import set_zoom
+        from inspekt.core.schemas.display import ZoomSetParams
+
+        core_params = ZoomSetParams(level=params.level, action=params.action)
+        result = await set_zoom(core_params)
+        return schemas.ZoomResponse(
+            success=result.success,
+            zoom=result.zoom,
+            percentage=result.percentage,
+            wcag_note=result.wcag_note,
+            previous_zoom=result.previous_zoom,
+            message=result.message,
+        )
+
+    async def get_viewport(self) -> schemas.ViewportResponse:
+        """
+        Get the current browser viewport dimensions.
+
+        Returns width and height in CSS pixels.
+        """
+        from inspekt.core.commands.base import EmptyParams
+        from inspekt.core.handlers.display import get_viewport
+
+        result = await get_viewport(EmptyParams())
+        return schemas.ViewportResponse(
+            success=result.success,
+            width=result.width,
+            height=result.height,
+            message=result.message,
+        )
+
+    async def set_viewport(self, params: schemas.SetViewportParams) -> schemas.ViewportResponse:
+        """
+        Set the browser viewport dimensions.
+
+        On macOS, resizes the browser window via AppleScript.
+        In the Inspekt VM, changes the X display resolution.
+
+        Common presets: mobile=375, tablet=768, desktop=1280, wide=1920.
+        """
+        from inspekt.core.handlers.display import set_viewport
+        from inspekt.core.schemas.display import ViewportSetParams
+
+        core_params = ViewportSetParams(width=params.width, height=params.height, auto_height=params.auto_height)
+        result = await set_viewport(core_params)
+        return schemas.ViewportResponse(
+            success=result.success,
+            width=result.width,
+            height=result.height,
+            previous_width=result.previous_width,
+            previous_height=result.previous_height,
+            message=result.message,
+        )
