@@ -135,14 +135,29 @@ For the full VM deployment workflow, invoke the `/vm` skill.
 | `terminal-server.py` | `make vm-restart-terminal` |
 | `control-panel.html` | `make vm-restart` |
 | Chrome extension | `make vm-restart-chromium` |
+| `proxy-scripts/*` | `make vm-restart-proxy` |
 | Dockerfile / supervisord / entrypoint | `make vm-rebuild` |
 
-**Key ports:** Control server = **8888**, noVNC = 6080, Terminal WS = 8889, CDP = 9222
+**Key ports:** Control server = **8888**, noVNC = 6080, Terminal WS = 8889, CDP = 9222, mitmproxy = 8080
 
 - Always use `get_bridge_port()` from `inspekt/config.py`, never hardcode ports
 - Dev mode auto-enables when running from source repo
 
 See [docs/development/vm.md](docs/development/vm.md) for full documentation.
+
+---
+
+## Command Palette Output Modes
+
+Commands launched from the VM command palette (Cmd+K) use one of three output modes:
+
+| Mode | When to use | How it works |
+|------|-------------|--------------|
+| **toast** | Fire-and-forget (no output) | Calls API, shows brief notification |
+| **panel** | Structured output to scan | Calls API, shows flyout panel |
+| **terminal** | Long output, interactive, or needs flags | Opens terminal, types and runs the command |
+
+Defaults: Navigation → `toast`, everything else → `panel`. Override in `OUTPUT_OVERRIDES` in `control-panel.html`. Commands needing user input before execution go in `PARAM_PROMPTS`.
 
 ---
 
