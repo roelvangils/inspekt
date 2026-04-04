@@ -14,6 +14,12 @@
     <script type="module" src="/vendor/ninja-keys.min.js"></script>
     <!-- CodeMirror 6 editor (bundled locally for the text editor panel) -->
     <script src="/vendor/codemirror.min.js"></script>
+    <script>
+        // Detect host OS for platform-specific styling (must run before CSS renders)
+        var _platform = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent) ? 'macos'
+            : /Win/.test(navigator.platform || navigator.userAgent) ? 'windows' : 'other';
+        document.documentElement.classList.add('os-' + _platform);
+    </script>
     <style>
         /* JetBrains Mono Nerd Font for terminal */
         @font-face {
@@ -1097,7 +1103,10 @@
             right: 0;
         }
 
-        /* Tab Context Menu */
+        /* =============================================
+         * Context Menu — Section A: Common (all platforms)
+         * Structural styles that read from --menu-* variables
+         * ============================================= */
         @keyframes contextMenuIn {
             from { opacity: 0; transform: scale(0.96); }
             to   { opacity: 1; transform: scale(1); }
@@ -1106,57 +1115,94 @@
             from { opacity: 1; transform: scale(1); }
             to   { opacity: 0; transform: scale(0.96); }
         }
+        @keyframes menuItemFlicker {
+            0%   { background: var(--menu-accent); color: var(--menu-text-selected); }
+            25%  { background: transparent; color: var(--menu-text); }
+            50%  { background: var(--menu-accent); color: var(--menu-text-selected); }
+            75%  { background: transparent; color: var(--menu-text); }
+            100% { background: var(--menu-accent); color: var(--menu-text-selected); }
+        }
 
         .context-menu {
             position: fixed;
             z-index: 10000;
-            background: var(--bg-page);
-            border: 1px solid var(--divider);
-            border-radius: 8px;
-            padding: 4px 0;
-            min-width: 180px;
-            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
-            font-size: 13px;
+            display: flex;
+            flex-direction: column;
+            background: var(--menu-bg);
+            backdrop-filter: var(--menu-blur);
+            -webkit-backdrop-filter: var(--menu-blur);
+            border: var(--menu-border);
+            outline: var(--menu-outline, none);
+            border-radius: var(--menu-radius);
+            corner-shape: var(--menu-corner-shape, round);
+            padding: var(--menu-padding) 0;
+            min-width: var(--menu-min-width);
+            box-shadow: var(--menu-shadow);
+            font-family: var(--menu-font-family, inherit);
+            font-size: var(--menu-font-size);
+            font-weight: var(--menu-font-weight);
             animation: contextMenuIn 120ms ease-out;
         }
         .context-menu.closing {
             animation: contextMenuOut 100ms ease-in forwards;
         }
 
-        .context-menu [role="menuitem"] {
+        /* Shared base styles for all interactive menu items */
+        .context-menu [role="menuitem"],
+        .context-menu [role="menuitemcheckbox"] {
+            all: unset;                         /* Full reset — removes all UA button styles */
             display: flex;
             align-items: center;
             gap: 8px;
-            padding: 6px 12px;
-            color: var(--text);
+            height: var(--menu-item-height, auto);
+            padding: var(--menu-item-padding);
+            color: var(--menu-text);
             cursor: pointer;
-            border: none;
-            background: none;
-            width: 100%;
-            text-align: left;
-            font: inherit;
+            font-family: inherit;
+            font-size: var(--menu-font-size);
+            font-weight: var(--menu-font-weight);
+            box-sizing: border-box;             /* Re-apply after unset */
         }
 
-        .context-menu [role="menuitem"]:hover,
-        .context-menu [role="menuitem"]:focus-visible {
-            background: var(--bg-btn-hover);
-            color: var(--text-bright);
-            border-radius: 0 !important;
+        /* Menu item highlight: use :focus only (not :hover) as the single
+           selection indicator. Items are focused on both mouse enter and keyboard
+           navigation, ensuring exactly one item is highlighted at all times.
+           This also makes screen readers announce the active item correctly. */
+        .context-menu [role="menuitem"]:focus,
+        .context-menu [role="menuitem"]:focus-visible,
+        .context-menu [role="menuitemcheckbox"]:focus,
+        .context-menu [role="menuitemcheckbox"]:focus-visible {
+            background: var(--menu-accent);
+            color: var(--menu-text-selected);
             outline: none;
         }
 
-        .context-menu [role="menuitem"]:disabled {
-            color: var(--text-dim);
-            cursor: default;
+        .context-menu [role="menuitem"]:active,
+        .context-menu [role="menuitemcheckbox"]:active,
+        .context-menu-nav button:active {
+            /* Suppress browser default "depressed" flash on click */
+            background: var(--menu-accent);
         }
-        .context-menu [role="menuitem"]:disabled:hover {
-            background: none;
+
+        .context-menu [role="menuitem"][aria-disabled="true"],
+        .context-menu-nav button[aria-disabled="true"] {
+            color: var(--menu-text-disabled);
+            cursor: default;
+            pointer-events: none;
+        }
+
+        /* Suppress browser focus ring on menu container (keyboard capture only).
+           The decorative --menu-outline is always applied; this just prevents
+           an additional focus ring from appearing on top of it. */
+        .context-menu:focus,
+        .context-menu:focus-visible {
+            outline: var(--menu-outline, none);
         }
 
         .context-menu [role="separator"] {
             height: 1px;
-            background: var(--divider);
-            margin: 4px 0;
+            background: var(--menu-separator-color);
+            margin: var(--menu-separator-margin);
         }
 
         /* Navigation icon row (Reload / Back / Forward) */
@@ -1174,47 +1220,37 @@
             height: 28px;
             border: none;
             background: none;
-            color: var(--text);
+            color: var(--menu-text);
             cursor: pointer;
-            border-radius: 4px;
+            border-radius: var(--menu-item-radius);
         }
-        .context-menu-nav button:hover:not(:disabled) {
-            background: var(--bg-btn-hover);
-            color: var(--text-bright);
-        }
-        .context-menu-nav button:disabled {
-            opacity: 0.4;
-            cursor: default;
-        }
-        /* Checkbox menu items (e.g. reload clearing options) */
-        .context-menu [role="menuitemcheckbox"] {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            padding: 5px 12px 5px 20px;
-            color: var(--text);
-            cursor: pointer;
-            border: none;
-            background: none;
-            width: 100%;
-            text-align: left;
-            font: inherit;
-            font-size: 12px;
-        }
-
-        .context-menu [role="menuitemcheckbox"]:hover,
-        .context-menu [role="menuitemcheckbox"]:focus-visible {
-            background: var(--bg-btn-hover);
-            color: var(--text-bright);
-            border-radius: 0 !important;
+        .context-menu-nav button:focus:not([aria-disabled="true"]),
+        .context-menu-nav button:focus-visible:not([aria-disabled="true"]) {
+            background: var(--menu-accent);
+            color: var(--menu-text-selected);
             outline: none;
         }
 
+        /* Submenu chevron (right-aligned SF Symbol indicator).
+           Native macOS reserves a fixed 25 CSS px (50 physical) right column for chevrons
+           when any menu item has a submenu. The chevron sits right-aligned in that column. */
+        .context-menu .submenu-chevron {
+            margin-left: auto;
+            width: 25px;                        /* Fixed chevron column: 50 physical px / 2 */
+            text-align: right;
+            font-size: 12px;                    /* Sized to match native macOS chevron */
+            font-weight: 500;                   /* Medium weight to match native stroke */
+            color: var(--menu-text);
+        }
+        .context-menu [role="menuitem"]:focus .submenu-chevron {
+            color: var(--menu-text-selected);
+        }
+
         .context-menu .check-icon {
-            width: 14px;
-            height: 14px;
+            width: var(--menu-check-width);
+            height: var(--menu-check-width);
             flex-shrink: 0;
-            border: 1.5px solid var(--text-dim);
+            border: 1.5px solid var(--menu-text-disabled);
             border-radius: 3px;
             display: flex;
             align-items: center;
@@ -1223,8 +1259,8 @@
         }
 
         .context-menu [role="menuitemcheckbox"][aria-checked="true"] .check-icon {
-            background: var(--accent);
-            border-color: var(--accent);
+            background: var(--menu-accent);
+            border-color: var(--menu-accent);
             color: white;
         }
 
@@ -1234,6 +1270,165 @@
             min-width: 16px;
             min-height: 16px;
             fill: currentColor;
+        }
+
+        /* Flicker animation class (macOS selection feedback) */
+        .context-menu [role="menuitem"].flickering,
+        .context-menu-nav button.flickering {
+            animation: menuItemFlicker 150ms steps(1) forwards;
+        }
+
+        /* =============================================
+         * Context Menu — Section B: macOS Sequoia
+         * ============================================= */
+        .os-macos .context-menu {
+            /* === BACKGROUND & BLUR === */
+            /* macOS uses vibrancy: translucent background + blur + saturation boost */
+            --menu-bg: rgba(30, 30, 30, 0.78);           /* Dark translucent panel */
+            --menu-blur: blur(50px) saturate(190%);        /* Vibrancy blur effect */
+
+            /* === BORDER === */
+            /* Double border: inner white stroke (via border) + outer dark stroke (via outline).
+               Both are semi-transparent, creating the characteristic macOS layered border effect. */
+            --menu-border: 1px solid rgba(255, 255, 255, 0.5);
+            --menu-outline: 0.5px solid rgba(0, 0, 0, 0.7);
+
+            /* === CORNER RADIUS === */
+            /* Continuous/squircle curvature (Chrome 139+) creates the smooth G2-continuous
+               curve used in native macOS menus, avoiding the "kink" of circular border-radius.
+               Fallback: 6px looks correct with standard circular border-radius.
+               The 21px value is tuned for squircle mode where it produces the native macOS curve. */
+            --menu-radius: 6px;
+            --menu-corner-shape: round;
+
+            /* === SHADOW === */
+            /* Two-layer shadow for depth. Double border is handled by border (inner white)
+               + outline (outer dark) — not by box-shadow inset. */
+            --menu-shadow:
+                0 10px 38px rgba(0, 0, 0, 0.5),                /* Large soft ambient shadow */
+                0 2px 8px rgba(0, 0, 0, 0.3);                  /* Tight close shadow for depth */
+
+            /* === SPACING === */
+            /* Menu padding top/bottom creates breathing room above first / below last item.
+               Item margin creates the inset "pill" highlight effect. */
+            --menu-padding: 4px;                           /* Top/bottom space before first/after last item */
+            --menu-item-padding: 0 11px;                   /* Horizontal text inset inside each item */
+            --menu-item-margin: 0 4px;                     /* Left/right inset for pill highlight */
+            --menu-item-height: 24px;                      /* Fixed item height (matches native) */
+            --menu-item-radius: 7px;                       /* Pill highlight corner radius */
+
+            /* === COLORS === */
+            /* System accent color — AccentColor CSS keyword reads the user's macOS
+               accent color preference. Falls back to macOS default blue if unsupported. */
+            --menu-accent: AccentColor;
+            --menu-text: rgba(255, 255, 255, 0.85);        /* Normal item text */
+            --menu-text-selected: #fff;                     /* Text on focused/selected item */
+            --menu-text-disabled: rgba(255, 255, 255, 0.3); /* Greyed-out disabled items */
+
+            /* === SEPARATORS === */
+            /* Thin horizontal lines with reduced vertical spacing.
+               Horizontal inset keeps a small gap from the menu edges. */
+            --menu-separator-color: rgba(255, 255, 255, 0.1);
+            --menu-separator-margin: 5px 15px;             /* Horizontal inset flush with text (4px margin + 11px padding) */
+
+            /* === TYPOGRAPHY === */
+            /* SF Pro Text is the native macOS menu font at small sizes (<20pt).
+               It has wider letter spacing than SF Pro Display for readability.
+               Also needed to access SF Symbols glyphs (chevron.forward etc.) */
+            --menu-font-family: "SF Pro Text", "SF Pro", -apple-system, system-ui, sans-serif;
+            --menu-font-size: 13.75px;                     /* Fine-tuned to match native rendering */
+            --menu-font-weight: 400;
+
+            /* === DIMENSIONS === */
+            --menu-min-width: 326px;                       /* Measured from native menu */
+
+            /* === CHECKBOX === */
+            /* macOS uses a simple checkmark (no box), left-aligned before label text */
+            --menu-check-width: 16px;
+        }
+
+        /* macOS Sequoia Light Mode Overrides */
+        @media (prefers-color-scheme: light) {
+            .os-macos .context-menu {
+                --menu-bg: rgba(246, 246, 246, 0.78);
+                --menu-border: 1px solid rgba(255, 255, 255, 0.5);
+                --menu-outline: 0.5px solid rgba(0, 0, 0, 0.5);
+                --menu-shadow:
+                    0 10px 38px rgba(0, 0, 0, 0.12),               /* Soft ambient */
+                    0 2px 10px rgba(0, 0, 0, 0.06);                /* Tight close shadow */
+                --menu-text: rgba(0, 0, 0, 0.85);
+                --menu-text-disabled: rgba(0, 0, 0, 0.3);
+                --menu-separator-color: rgba(0, 0, 0, 0.1);
+            }
+        }
+
+        /* AccentColor fallback for browsers that don't support it */
+        @supports not (color: AccentColor) {
+            .os-macos .context-menu {
+                --menu-accent: #0A82FF;    /* macOS default blue accent */
+            }
+        }
+
+        /* Squircle upgrade for Chrome 139+ — use the native macOS continuous curve */
+        @supports (corner-shape: squircle) {
+            .os-macos .context-menu {
+                --menu-radius: 21px;
+                --menu-corner-shape: squircle;
+            }
+        }
+
+        /* macOS: pill-shaped item highlight (inset from menu edge) */
+        .os-macos .context-menu [role="menuitem"],
+        .os-macos .context-menu [role="menuitemcheckbox"] {
+            margin: var(--menu-item-margin);
+            border-radius: var(--menu-item-radius);
+        }
+
+        /* macOS: checkmarks are simple marks, not boxed checkboxes */
+        .os-macos .context-menu .check-icon {
+            border: none;
+            background: none;
+            width: var(--menu-check-width);
+        }
+        .os-macos .context-menu [role="menuitemcheckbox"][aria-checked="true"] .check-icon {
+            background: none;
+            border: none;
+            color: var(--menu-text);
+        }
+        .os-macos .context-menu [role="menuitemcheckbox"][aria-checked="true"]:focus .check-icon {
+            color: var(--menu-text-selected);
+        }
+
+        /* macOS: nav row buttons get pill shape too */
+        .os-macos .context-menu-nav button {
+            border-radius: var(--menu-item-radius);
+        }
+
+        /* =============================================
+         * Context Menu — Section C: Windows / Other
+         * Preserves current appearance for non-macOS
+         * ============================================= */
+        .os-windows .context-menu,
+        .os-other .context-menu {
+            --menu-bg: var(--bg-page);
+            --menu-blur: none;
+            --menu-border: 1px solid var(--divider);
+            --menu-radius: 8px;
+            --menu-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+            --menu-padding: 4px;
+            --menu-item-padding: 6px 12px;
+            --menu-item-margin: 0;
+            --menu-item-radius: 0;
+            --menu-accent: var(--bg-btn-hover);
+            --menu-text: var(--text);
+            --menu-text-selected: var(--text-bright);
+            --menu-text-disabled: var(--text-dim);
+            --menu-separator-color: var(--divider);
+            --menu-separator-margin: 4px 0;
+            --menu-font-size: 13px;
+            --menu-font-weight: 400;
+            --menu-min-width: 180px;
+            --menu-check-width: 14px;
         }
 
         /* =============================================
@@ -3800,7 +3995,7 @@
     </div>
 
     <!-- Tab Bar -->
-    <div class="tab-bar" id="tabBar">
+    <div class="tab-bar" id="tabBar" oncontextmenu="if (event.target === this || event.target === document.getElementById('tabsContainer')) showTabBarContextMenu(event)">
         <div class="tabs-container" id="tabsContainer">
             <!-- Tabs will be dynamically inserted here -->
             <button class="new-tab-btn" onclick="createNewTab()" title="New tab (Ctrl+T)">+</button>
@@ -4518,6 +4713,14 @@
         let hasTerminalSession = false; // Track if we have an active terminal session
         let _terminalPromptDomain = 'inspekt'; // Tracks domain shown in terminal prompt
 
+        // Global mouse position tracking (needed for keyboard-triggered context menus).
+        // Uses both document-level and pointermove on VNC container because noVNC may
+        // use setPointerCapture which redirects events away from document listeners.
+        let _lastMouseX = window.innerWidth / 2, _lastMouseY = window.innerHeight / 2;
+        function _trackMouse(e) { _lastMouseX = e.clientX; _lastMouseY = e.clientY; }
+        document.addEventListener('mousemove', _trackMouse, { passive: true });
+        document.addEventListener('pointermove', _trackMouse, { passive: true });
+
         // ── Editor state ──
         let editorView = null;          // CodeMirror EditorView instance
         let editorCurrentPath = null;   // Absolute path of open file
@@ -4995,9 +5198,142 @@
 
         // Track which tabs are "local" (iframe loaded from host network, not VM)
         const localTabs = {};  // { tabId: { url, title } }
+        const closedTabs = []; // Stack of recently closed tabs (max 10)
+        const MAX_CLOSED_TABS = 10;
 
         function isLocalTab(tabId) {
             return !!localTabs[tabId];
+        }
+
+        /**
+         * Create a local tab and add it to the tabs array.
+         * @param {string} url - URL to load in the iframe
+         * @param {string} [title] - Tab title (defaults to hostname)
+         * @param {number} [insertAfterIndex] - Insert after this index (-1 = append to end)
+         * @returns {string} The new tab ID
+         */
+        function _addLocalTab(url, title, insertAfterIndex = -1) {
+            const tabId = 'local-' + Date.now();
+            const tabTitle = title || (url !== 'about:blank' ? new URL(url).hostname : 'Local Tab');
+            localTabs[tabId] = { url, title: tabTitle };
+            const tabObj = { id: tabId, url, title: tabTitle, favicon: null, pinned: false, _isLocal: true };
+            if (insertAfterIndex >= 0 && insertAfterIndex < tabs.length) {
+                tabs.splice(insertAfterIndex + 1, 0, tabObj);
+            } else {
+                tabs.push(tabObj);
+            }
+            return tabId;
+        }
+
+        /**
+         * Create a cloud tab via the server and optionally insert it after a source tab.
+         * @param {string} url - URL to open
+         * @param {string} [insertAfterTabId] - Insert after this tab (null = append to end)
+         * @returns {Promise<string|null>} The new tab ID, or null on failure
+         */
+        async function _addCloudTab(url, insertAfterTabId = null) {
+            const response = await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/tabs/new?url=${encodeURIComponent(url)}`);
+            const data = await response.json();
+            if (!data.ok) return null;
+
+            const newTabId = data.tab.id;
+            await fetchTabs();
+
+            // Reorder: move new tab to right after the source tab
+            if (insertAfterTabId) {
+                const newTab = tabs.find(t => t.id === newTabId);
+                const sourceIndex = tabs.findIndex(t => t.id === insertAfterTabId);
+                if (newTab && sourceIndex >= 0) {
+                    tabs = tabs.filter(t => t.id !== newTabId);
+                    tabs.splice(sourceIndex + 1, 0, newTab);
+                    renderTabs();
+                }
+            }
+
+            return newTabId;
+        }
+
+        // --- Tab persistence ---
+        const TAB_STORAGE_KEY = 'inspekt_tab_session';
+
+        let _saveTabSessionTimer = null;
+        function _scheduleSaveTabSession() {
+            clearTimeout(_saveTabSessionTimer);
+            _saveTabSessionTimer = setTimeout(saveTabSession, 500);
+        }
+
+        function saveTabSession() {
+            clearTimeout(_saveTabSessionTimer);
+            const session = {
+                localTabs: { ...localTabs },
+                closedTabs: [...closedTabs],
+                tabOrder: tabs.map(t => t.id),
+                activeTabId,
+            };
+            try {
+                localStorage.setItem(TAB_STORAGE_KEY, JSON.stringify(session));
+            } catch { /* storage full or unavailable */ }
+        }
+
+        function restoreTabSession() {
+            try {
+                const raw = localStorage.getItem(TAB_STORAGE_KEY);
+                if (!raw) return;
+                const session = JSON.parse(raw);
+
+                // Restore closed tabs
+                if (Array.isArray(session.closedTabs)) {
+                    closedTabs.push(...session.closedTabs.slice(-MAX_CLOSED_TABS));
+                }
+
+                // Restore local tabs
+                if (session.localTabs && typeof session.localTabs === 'object') {
+                    for (const [id, data] of Object.entries(session.localTabs)) {
+                        if (data?.url) {
+                            localTabs[id] = { url: data.url, title: data.title || 'Local Tab' };
+                            tabs.push({
+                                id,
+                                url: data.url,
+                                title: data.title || 'Local Tab',
+                                favicon: null,
+                                pinned: false,
+                                _isLocal: true,
+                            });
+                        }
+                    }
+                }
+
+                // Store the saved order and active tab for applying after fetchTabs
+                _savedTabOrder = session.tabOrder || null;
+                _savedActiveTabId = session.activeTabId || null;
+            } catch { /* corrupt data, start fresh */ }
+        }
+
+        // Apply saved tab order after fetchTabs merges server tabs with local tabs
+        let _savedTabOrder = null;
+        let _savedActiveTabId = null;
+
+        function applySavedTabOrder() {
+            if (!_savedTabOrder) return;
+            const order = _savedTabOrder;
+            _savedTabOrder = null;
+
+            // Sort tabs to match saved order; unknown tabs go to the end
+            const orderMap = new Map(order.map((id, i) => [id, i]));
+            tabs.sort((a, b) => {
+                const ai = orderMap.has(a.id) ? orderMap.get(a.id) : 9999;
+                const bi = orderMap.has(b.id) ? orderMap.get(b.id) : 9999;
+                return ai - bi;
+            });
+
+            // Restore active tab if it still exists
+            if (_savedActiveTabId && tabs.find(t => t.id === _savedActiveTabId)) {
+                activeTabId = _savedActiveTabId;
+            }
+            _savedActiveTabId = null;
+
+            renderTabs();
+            syncViewport();
         }
 
         /**
@@ -5072,12 +5408,32 @@
                     } else {
                         const bar = document.createElement('div');
                         bar.className = 'local-tab-info-bar';
-                        const tabId = activeTabId;
-                        const safeUrl = httpUrl.replace(/'/g, "\\'");
-                        bar.innerHTML = `
-                            <span>Inspekt respects this website's Content-Security-Policy. If it refuses to load, you can open it in a <a href="#" onclick="event.preventDefault(); convertToCloudTab('${tabId}', '${safeUrl}')">Cloud Tab</a> or your <a href="#" onclick="event.preventDefault(); window.open('${safeUrl}', '_blank')">default browser</a>.</span>
-                            <button class="dismiss" onclick="this.parentElement.remove()" title="Dismiss">✕</button>
-                        `;
+                        const capturedTabId = activeTabId;
+                        const capturedUrl = httpUrl;
+
+                        const span = document.createElement('span');
+                        span.append('Inspekt respects this website\u2019s Content-Security-Policy. If it refuses to load, you can open it in a ');
+                        const cloudLink = document.createElement('a');
+                        cloudLink.href = '#';
+                        cloudLink.textContent = 'Cloud Tab';
+                        cloudLink.addEventListener('click', (ev) => { ev.preventDefault(); convertToCloudTab(capturedTabId, capturedUrl); });
+                        span.append(cloudLink);
+                        span.append(' or your ');
+                        const browserLink = document.createElement('a');
+                        browserLink.href = '#';
+                        browserLink.textContent = 'default browser';
+                        browserLink.addEventListener('click', (ev) => { ev.preventDefault(); window.open(capturedUrl, '_blank'); });
+                        span.append(browserLink);
+                        span.append('.');
+                        bar.append(span);
+
+                        const dismiss = document.createElement('button');
+                        dismiss.className = 'dismiss';
+                        dismiss.title = 'Dismiss';
+                        dismiss.textContent = '\u2715';
+                        dismiss.addEventListener('click', () => bar.remove());
+                        bar.append(dismiss);
+
                         nativeContainer.appendChild(bar);
                     }
                 } catch { /* invalid URL, skip bar */ }
@@ -9113,6 +9469,16 @@
             }
         }
 
+        /** Adjust terminal font size and persist to localStorage */
+        function adjustTerminalFontSize(delta) {
+            if (!terminal) return;
+            const current = terminal.options.fontSize || 14;
+            const next = Math.max(8, Math.min(24, current + delta));
+            terminal.options.fontSize = next;
+            localStorage.setItem('terminalFontSize', next);
+            if (fitAddon) fitAddon.fit();
+        }
+
         let terminalInitialized = false; // Ensure we only connect ONCE
 
         function connectTerminal() {
@@ -9131,7 +9497,7 @@
                 const savedTheme = localStorage.getItem('terminalTheme') || 'tokyo-night';
                 terminal = new Terminal({
                     cursorBlink: true,
-                    fontSize: 14,
+                    fontSize: parseInt(localStorage.getItem('terminalFontSize')) || 14,
                     fontFamily: "'JetBrains Mono NF', 'JetBrains Mono', Menlo, Monaco, monospace",
                     theme: TERMINAL_THEMES[savedTheme] || TERMINAL_THEMES['tokyo-night'],
                     lineHeight: 1.2,
@@ -11661,7 +12027,9 @@
 
                 return `
                     <div class="tab-grid-card ${isActive ? 'active' : ''}"
-                         onclick="onGridCardClick('${tab.id}')" data-tab-id="${tab.id}">
+                         onclick="onGridCardClick('${tab.id}')"
+                         oncontextmenu="event.preventDefault(); event.stopPropagation(); showTabContextMenu(event, '${tab.id}')"
+                         data-tab-id="${tab.id}">
                         <div class="card-thumbnail">
                             ${data.thumbnail
                                 ? `<img src="data:image/jpeg;base64,${data.thumbnail}" alt="">`
@@ -11915,6 +12283,9 @@
             // Sort: pinned tabs first, then unpinned (stable sort preserves relative order)
             tabs.sort((a, b) => (a.pinned ? 0 : 1) - (b.pinned ? 0 : 1));
 
+            // Persist tab session to localStorage (debounced to avoid thrashing on rapid updates)
+            _scheduleSaveTabSession();
+
             const container = document.getElementById('tabsContainer');
             const newTabBtn = container.querySelector('.new-tab-btn');
             const existingTabEls = container.querySelectorAll('.tab');
@@ -12126,8 +12497,9 @@
         // Show dropdown menu next to the "+" button
         function showNewTabMenu(e) {
             e.stopPropagation();
+            // Position the menu below the dropdown arrow button
             const rect = e.currentTarget.getBoundingClientRect();
-            showContextMenu({ clientX: rect.left, clientY: rect.bottom + 4, preventDefault: () => {} }, [
+            showContextMenu({ clientX: rect.left, clientY: rect.bottom + 4 }, [
                 { label: 'New Cloud Tab', action: () => createNewTab() },
                 { label: 'New Local Tab', action: () => createLocalTab() },
                 { separator: true },
@@ -12158,19 +12530,7 @@
 
         // Create a new local tab (iframe loaded from host network)
         function createLocalTab() {
-            const tabId = 'local-' + Date.now();
-            localTabs[tabId] = { url: 'about:blank', title: 'Local Tab' };
-
-            tabs.push({
-                id: tabId,
-                url: 'about:blank',
-                title: 'Local Tab',
-                favicon: null,
-                pinned: false,
-                _isLocal: true,
-            });
-
-            activeTabId = tabId;
+            activeTabId = _addLocalTab('about:blank');
             renderTabs();
             syncViewport();
             showToast('Local tab — type a URL to load', 'info');
@@ -12364,6 +12724,22 @@
         }
 
         async function _doCloseTab(tabId) {
+            // Save to closed tabs stack before removing
+            const closingTab = tabs.find(t => t.id === tabId);
+            if (closingTab) {
+                const isLocal = !!localTabs[tabId];
+                const url = isLocal ? localTabs[tabId].url : closingTab.url;
+                if (url && url !== 'about:blank') {
+                    closedTabs.push({
+                        url,
+                        title: closingTab.title || url,
+                        isLocal,
+                        closedAt: Date.now(),
+                    });
+                    if (closedTabs.length > MAX_CLOSED_TABS) closedTabs.shift();
+                }
+            }
+
             delete thumbnailCache[tabId];
             delete lastKnownUrls[tabId];
             delete tabNavHistory[tabId];
@@ -12672,6 +13048,38 @@
         // =============================================
 
         let activeContextMenu = null;
+        let _lastMenuItemIdx = -1; // Track last focused item for keyboard resume after mouse leave
+
+        // Scroll lock: prevent page scrolling while a context menu is open
+        let _menuScrollLock = null;
+        function _lockScroll() {
+            _menuScrollLock = (e) => { e.preventDefault(); };
+            document.addEventListener('wheel', _menuScrollLock, { passive: false });
+            document.addEventListener('touchmove', _menuScrollLock, { passive: false });
+        }
+        function _unlockScroll() {
+            if (_menuScrollLock) {
+                document.removeEventListener('wheel', _menuScrollLock);
+                document.removeEventListener('touchmove', _menuScrollLock);
+                _menuScrollLock = null;
+            }
+        }
+
+        // macOS: flicker the item highlight before dismissing, matching native behavior.
+        // Captures the active menu reference so a stale timeout can't dismiss a newer menu.
+        function _flickerAndDismiss(btn, action) {
+            if (_platform === 'macos') {
+                const menuRef = activeContextMenu;
+                btn.classList.add('flickering');
+                setTimeout(() => {
+                    if (activeContextMenu === menuRef) dismissContextMenu();
+                    action();
+                }, 160);
+            } else {
+                dismissContextMenu();
+                action();
+            }
+        }
 
         function showContextMenu(e, items) {
             dismissContextMenu(true);  // skip animation when replacing
@@ -12679,9 +13087,16 @@
             const menu = document.createElement('div');
             menu.className = 'context-menu';
             menu.setAttribute('role', 'menu');
+            menu.setAttribute('aria-label', 'Context menu');
 
             // Suppress real browser context menu inside our menu
             menu.addEventListener('contextmenu', ev => ev.preventDefault());
+
+            // When mouse leaves the menu entirely, return focus to the container
+            // so no item appears highlighted but keyboard still works.
+            menu.addEventListener('mouseleave', () => {
+                menu.focus({ preventScroll: true });
+            });
 
             items.forEach((item, i) => {
                 if (item.hidden) return;
@@ -12695,15 +13110,21 @@
                 if (item.navRow) {
                     const row = document.createElement('div');
                     row.className = 'context-menu-nav';
+                    row.setAttribute('role', 'group');
                     item.navRow.forEach(nav => {
                         const btn = document.createElement('button');
+                        btn.setAttribute('role', 'menuitem');
                         const tpl = document.createElement('template');
                         tpl.innerHTML = nav.icon;
                         btn.appendChild(tpl.content.firstChild);
                         btn.setAttribute('aria-label', nav.label);
                         btn.title = nav.label;
-                        btn.disabled = !!nav.disabled;
-                        btn.onclick = () => { dismissContextMenu(); nav.action(); };
+                        btn.tabIndex = -1;
+                        if (nav.disabled) btn.setAttribute('aria-disabled', 'true');
+                        btn.onclick = () => {
+                            if (nav.disabled) return;
+                            _flickerAndDismiss(btn, nav.action);
+                        };
                         row.appendChild(btn);
                     });
                     menu.appendChild(row);
@@ -12739,15 +13160,43 @@
 
                 const btn = document.createElement('button');
                 btn.setAttribute('role', 'menuitem');
-                btn.textContent = item.label;
-                btn.disabled = !!item.disabled;
                 btn.tabIndex = -1;
-                btn.onclick = () => { dismissContextMenu(); item.action(); };
+                if (item.submenu) {
+                    // Submenu indicator: label on left, SF Symbol chevron on right
+                    const labelSpan = document.createElement('span');
+                    labelSpan.textContent = item.label;
+                    labelSpan.style.flex = '1';
+                    btn.appendChild(labelSpan);
+                    const chevron = document.createElement('span');
+                    chevron.className = 'submenu-chevron';
+                    // U+100BFB = SF Symbols "chevron.forward"
+                    // Requires SF Pro font (installed on macOS by default)
+                    chevron.textContent = String.fromCodePoint(0x100BFB);
+                    btn.appendChild(chevron);
+                } else {
+                    btn.textContent = item.label;
+                }
+                if (item.title) btn.title = item.title;
+                if (item.disabled) {
+                    btn.setAttribute('aria-disabled', 'true');
+                } else {
+                    btn.onclick = () => _flickerAndDismiss(btn, item.action);
+                }
                 menu.appendChild(btn);
             });
 
             document.body.appendChild(menu);
             activeContextMenu = menu;
+
+            // Focus items on mouse enter — this is the single source of truth for
+            // which item is "selected". Both mouse and keyboard use focus, so there's
+            // never a dual-highlight and screen readers always announce the active item.
+            _getMenuItems().forEach((item, i) => {
+                item.addEventListener('mouseenter', () => {
+                    item.focus({ preventScroll: true });
+                    _lastMenuItemIdx = i;
+                });
+            });
 
             // Position: keep within viewport
             const rect = menu.getBoundingClientRect();
@@ -12758,6 +13207,14 @@
             menu.style.left = x + 'px';
             menu.style.top = y + 'px';
 
+            // Lock scrolling while menu is open
+            _lockScroll();
+
+            // Focus the menu container itself (not an item) so keydown events
+            // reach handleMenuKeydown. The first ArrowDown will focus the first item.
+            menu.tabIndex = -1;
+            menu.focus({ preventScroll: true });
+
             // Dismiss on outside click, Escape, or window blur
             // Next tick to avoid the originating right-click from immediately dismissing
             requestAnimationFrame(() => {
@@ -12767,27 +13224,65 @@
             });
         }
 
+        function _getMenuItems() {
+            if (!activeContextMenu) return [];
+            return Array.from(activeContextMenu.querySelectorAll(
+                '[role="menuitem"]:not([aria-disabled="true"]), [role="menuitemcheckbox"]:not([aria-disabled="true"])'
+            ));
+        }
+
+        function _focusMenuItem(items, i) {
+            items[i].focus({ preventScroll: true });
+            _lastMenuItemIdx = i;
+        }
+
         function handleMenuKeydown(e) {
             if (!activeContextMenu) return;
-            if (e.key === 'Escape') {
+
+            // Always prevent default for menu keys to stop events reaching the page
+            if (['Escape', 'ArrowDown', 'ArrowUp', 'Home', 'End', 'PageUp', 'PageDown', 'Enter', ' ', 'Tab'].includes(e.key)) {
                 e.preventDefault();
+                e.stopPropagation();
+            }
+
+            if (e.key === 'Escape' || e.key === 'Tab') {
                 dismissContextMenu();
                 return;
             }
-            const items = Array.from(activeContextMenu.querySelectorAll('[role="menuitem"]:not(:disabled), [role="menuitemcheckbox"]:not(:disabled)'));
+
+            const items = _getMenuItems();
+            if (items.length === 0) return;
             const idx = items.indexOf(document.activeElement);
-            // Enter/Space on checkbox items: toggle instead of dismiss
-            if ((e.key === 'Enter' || e.key === ' ') && document.activeElement?.getAttribute('role') === 'menuitemcheckbox') {
-                e.preventDefault();
-                document.activeElement.click();
+
+            // Enter/Space: activate focused item.
+            // This calls .click() which triggers the onclick handler set in showContextMenu,
+            // which calls _flickerAndDismiss() — so the macOS flicker animation plays on
+            // keyboard activation too, not just mouse clicks.
+            if (e.key === 'Enter' || e.key === ' ') {
+                if (idx >= 0) document.activeElement.click();
                 return;
             }
+
+            // If no item is focused (e.g. after mouse left the menu), use the
+            // last known index so arrow keys resume from where the user left off.
+            let ei = idx; // effective index
+            if (ei < 0 && _lastMenuItemIdx >= 0 && _lastMenuItemIdx < items.length) {
+                ei = _lastMenuItemIdx;
+            }
+
             if (e.key === 'ArrowDown') {
-                e.preventDefault();
-                items[(idx + 1) % items.length].focus();
+                _focusMenuItem(items, ei < 0 ? 0 : Math.min(ei + 1, items.length - 1));
             } else if (e.key === 'ArrowUp') {
-                e.preventDefault();
-                items[(idx - 1 + items.length) % items.length].focus();
+                _focusMenuItem(items, ei < 0 ? items.length - 1 : Math.max(ei - 1, 0));
+            } else if (e.key === 'Home' || e.key === 'PageUp') {
+                _focusMenuItem(items, 0);
+            } else if (e.key === 'End' || e.key === 'PageDown') {
+                _focusMenuItem(items, items.length - 1);
+            } else if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+                // Type-ahead: jump to first item starting with the typed character
+                const char = e.key.toLowerCase();
+                const i = items.findIndex(item => item.textContent.trim().toLowerCase().startsWith(char));
+                if (i >= 0) _focusMenuItem(items, i);
             }
         }
 
@@ -12803,6 +13298,8 @@
 
         function dismissContextMenu(immediate) {
             if (!activeContextMenu) return;
+            _unlockScroll();
+            _lastMenuItemIdx = -1;
             document.removeEventListener('mousedown', onMenuOutsideClick);
             document.removeEventListener('keydown', handleMenuKeydown);
             window.removeEventListener('blur', onMenuBlur);
@@ -12823,36 +13320,54 @@
             const tab = tabs.find(t => t.id === tabId);
             if (!tab) return;
 
-            // Reduced context menu for local tabs
+            const otherCount = tabs.length - 1;
+            const closeOthersLabel = otherCount === 1 ? 'Close Other Tab' : `Close ${otherCount} Other Tabs`;
+            const tabIndex = tabs.findIndex(t => t.id === tabId);
+            const tabsToLeft = tabs.slice(0, tabIndex).filter(t => !t.pinned).length;
+            const tabsToRight = tabs.slice(tabIndex + 1).filter(t => !t.pinned).length;
+
+            // Context menu for local tabs
             if (localTabs[tabId]) {
                 const localUrl = localTabs[tabId].url;
-                showContextMenu(e, [
+                const localItems = [
                     { label: tab.pinned ? 'Unpin Tab' : 'Pin Tab', action: () => togglePinTab(tabId) },
-                    { label: 'Duplicate Tab', action: () => duplicateTab(tabId) },
+                    { label: 'Duplicate this Local Tab', action: () => duplicateTab(tabId) },
+                    { label: 'Duplicate as Cloud Tab', action: () => duplicateAsCloudTab(tabId) },
                     { separator: true },
                     { label: 'Reload Page', action: () => {
                         const iframe = document.querySelector('#nativeContainer iframe');
                         if (iframe) { iframe.src = 'about:blank'; setTimeout(() => iframe.src = localUrl, 50); }
                     }},
-                    { label: 'Copy URL', action: () => {
-                        navigator.clipboard.writeText(localUrl);
-                        showToast('URL copied', 'success');
-                    }},
-                    { label: 'Open in Host Browser', action: () => window.open(localUrl, '_blank') },
-                    { label: 'Open as Cloud Tab', action: () => convertToCloudTab(tabId, localUrl) },
                     { separator: true },
-                    { label: 'Close Tab', action: () => closeTab(tabId), disabled: tabs.length <= 1 },
-                    { label: 'Close Other Tabs', action: () => closeOtherTabs(tabId), disabled: tabs.length <= 1 },
-                ]);
+                    { label: 'Copy URL', action: () => copyTabUrl(tabId) },
+                    { label: 'Copy as Markdown Link', action: () => copyTabAsMarkdownLink(tabId) },
+                    { label: 'Open in Host Browser', action: () => window.open(localUrl, '_blank') },
+                    { separator: true },
+                ];
+                if (tabs.length > 1) {
+                    localItems.push({ label: 'Close this Tab', action: () => closeTab(tabId) });
+                }
+                if (otherCount > 1) {
+                    localItems.push({ label: closeOthersLabel, action: () => closeOtherTabs(tabId) });
+                }
+                if (tabsToLeft > 0) {
+                    localItems.push({ label: `Close ${tabsToLeft === 1 ? 'Tab' : tabsToLeft + ' Tabs'} to the Left`, action: () => closeTabsToLeft(tabId) });
+                }
+                if (tabsToRight > 0) {
+                    localItems.push({ label: `Close ${tabsToRight === 1 ? 'Tab' : tabsToRight + ' Tabs'} to the Right`, action: () => closeTabsToRight(tabId) });
+                }
+                showContextMenu(e, localItems);
                 return;
             }
 
+            // Context menu for cloud tabs
             const opts = getReloadOptions(tab.url);
             const anyClearing = opts.clearCache || opts.clearCookies || opts.clearStorage;
 
             const items = [
                 { label: tab.pinned ? 'Unpin Tab' : 'Pin Tab', action: () => togglePinTab(tabId) },
-                { label: 'Duplicate Tab', action: () => duplicateTab(tabId) },
+                { label: 'Duplicate this Cloud Tab', action: () => duplicateTab(tabId) },
+                { label: 'Duplicate as Local Tab', action: () => duplicateAsLocalTab(tabId) },
                 { separator: true },
                 { label: anyClearing ? 'Reload Page ✦' : 'Reload Page', action: () => reloadWithOptions(tabId) },
                 { checkbox: true, label: 'Clear cache', checked: opts.clearCache,
@@ -12862,12 +13377,24 @@
                 { checkbox: true, label: 'Clear all storage', checked: opts.clearStorage,
                   onToggle: (v) => setReloadOption(tab.url, 'clearStorage', v) },
                 { separator: true },
+                { label: 'Copy URL', action: () => copyTabUrl(tabId) },
+                { label: 'Copy as Markdown Link', action: () => copyTabAsMarkdownLink(tabId) },
                 { label: 'Open in Host Browser', action: () => openInHostBrowser(tabId) },
                 { label: 'Open Fullscreen', action: () => toggleFullscreen() },
                 { separator: true },
-                { label: 'Close Tab', action: () => closeTab(tabId), disabled: tabs.length <= 1 },
-                { label: 'Close Other Tabs', action: () => closeOtherTabs(tabId), disabled: tabs.length <= 1 },
             ];
+            if (tabs.length > 1) {
+                items.push({ label: 'Close this Tab', action: () => closeTab(tabId) });
+            }
+            if (otherCount > 1) {
+                items.push({ label: closeOthersLabel, action: () => closeOtherTabs(tabId) });
+            }
+            if (tabsToLeft > 0) {
+                items.push({ label: `Close ${tabsToLeft === 1 ? 'Tab' : tabsToLeft + ' Tabs'} to the Left`, action: () => closeTabsToLeft(tabId) });
+            }
+            if (tabsToRight > 0) {
+                items.push({ label: `Close ${tabsToRight === 1 ? 'Tab' : tabsToRight + ' Tabs'} to the Right`, action: () => closeTabsToRight(tabId) });
+            }
 
             showContextMenu(e, items);
         }
@@ -13083,24 +13610,37 @@
             const tab = tabs.find(t => t.id === tabId);
             if (!tab) return;
 
-            // Duplicate a local tab as another local tab
             if (localTabs[tabId]) {
-                const newId = 'local-' + Date.now();
-                const url = localTabs[tabId].url;
-                localTabs[newId] = { url, title: localTabs[tabId].title };
-                tabs.push({ id: newId, url, title: localTabs[tabId].title, favicon: null, pinned: false, _isLocal: true });
-                activeTabId = newId;
-                renderTabs();
-                syncViewport();
-                return;
+                duplicateAsLocalTab(tabId);
+            } else if (tab.url) {
+                try {
+                    const newTabId = await _addCloudTab(tab.url, tabId);
+                    if (newTabId) await activateTab(newTabId);
+                } catch (err) {
+                    console.warn('[tabs] Failed to duplicate tab:', err);
+                }
             }
+        }
 
-            if (!tab.url) return;
+        function duplicateAsLocalTab(tabId) {
+            const tab = tabs.find(t => t.id === tabId);
+            if (!tab) return;
+            const url = localTabs[tabId] ? localTabs[tabId].url : tab.url;
+            const title = localTabs[tabId] ? localTabs[tabId].title : null;
+            const sourceIndex = tabs.findIndex(t => t.id === tabId);
+            activeTabId = _addLocalTab(url, title, sourceIndex);
+            renderTabs();
+            syncViewport();
+        }
+
+        async function duplicateAsCloudTab(tabId) {
+            const url = localTabs[tabId]?.url;
+            if (!url || url === 'about:blank') return;
             try {
-                await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/tabs/new?url=${encodeURIComponent(tab.url)}`);
-                await refreshTabs();
+                const newTabId = await _addCloudTab(url, tabId);
+                if (newTabId) await activateTab(newTabId);
             } catch (err) {
-                console.warn('[tabs] Failed to duplicate tab:', err);
+                console.warn('[tabs] Failed to duplicate as cloud tab:', err);
             }
         }
 
@@ -13134,6 +13674,181 @@
             if (skippedPinned > 0) {
                 showToast(`Pinned tab${skippedPinned > 1 ? 's' : ''} kept open`, 'info');
             }
+        }
+
+        async function closeTabsToRight(tabId) {
+            const tabIndex = tabs.findIndex(t => t.id === tabId);
+            if (tabIndex < 0) return;
+            const toClose = tabs.slice(tabIndex + 1).filter(t => !t.pinned);
+            const skippedPinned = tabs.slice(tabIndex + 1).filter(t => t.pinned).length;
+            for (const t of toClose) {
+                await _doCloseTab(t.id);
+            }
+            if (skippedPinned > 0) {
+                showToast(`Pinned tab${skippedPinned > 1 ? 's' : ''} kept open`, 'info');
+            }
+        }
+
+        async function closeTabsToLeft(tabId) {
+            const tabIndex = tabs.findIndex(t => t.id === tabId);
+            if (tabIndex <= 0) return;
+            const toClose = tabs.slice(0, tabIndex).filter(t => !t.pinned);
+            const skippedPinned = tabs.slice(0, tabIndex).filter(t => t.pinned).length;
+            for (const t of toClose) {
+                await _doCloseTab(t.id);
+            }
+            if (skippedPinned > 0) {
+                showToast(`Pinned tab${skippedPinned > 1 ? 's' : ''} kept open`, 'info');
+            }
+        }
+
+        function copyTabUrl(tabId) {
+            const tab = tabs.find(t => t.id === tabId);
+            const url = localTabs[tabId] ? localTabs[tabId].url : tab?.url;
+            if (url) {
+                navigator.clipboard.writeText(url);
+                showToast('URL copied', 'success');
+            }
+        }
+
+        function copyTabAsMarkdownLink(tabId) {
+            const tab = tabs.find(t => t.id === tabId);
+            const url = localTabs[tabId] ? localTabs[tabId].url : tab?.url;
+            const title = tab?.title || url || 'Untitled';
+            if (url) {
+                navigator.clipboard.writeText(`[${title}](${url})`);
+                showToast('Markdown link copied', 'success');
+            }
+        }
+
+        // --- Tab bar context menu actions ---
+
+        async function reopenClosedTab() {
+            const entry = closedTabs.pop();
+            if (!entry) return;
+            if (entry.isLocal) {
+                activeTabId = _addLocalTab(entry.url, entry.title);
+                renderTabs();
+                syncViewport();
+            } else {
+                try {
+                    const newTabId = await _addCloudTab(entry.url);
+                    if (newTabId) await activateTab(newTabId);
+                } catch {}
+            }
+        }
+
+        async function reopenAllClosedTabs() {
+            const toReopen = closedTabs.splice(0);
+            for (const entry of toReopen) {
+                if (entry.isLocal) {
+                    _addLocalTab(entry.url, entry.title);
+                } else {
+                    try {
+                        await _addCloudTab(entry.url);
+                    } catch {}
+                }
+            }
+            renderTabs();
+            showToast(`Reopened ${toReopen.length} tab${toReopen.length > 1 ? 's' : ''}`, 'success');
+        }
+
+        async function reloadAllTabs() {
+            let reloaded = 0;
+            for (const tab of tabs) {
+                if (localTabs[tab.id]) {
+                    // Local tab: reload the iframe (only if it's the active tab)
+                    if (tab.id === activeTabId) {
+                        const iframe = document.querySelector('#nativeContainer iframe');
+                        if (iframe) {
+                            const url = localTabs[tab.id].url;
+                            iframe.src = 'about:blank';
+                            setTimeout(() => iframe.src = url, 50);
+                        }
+                    }
+                    reloaded++;
+                } else if (internalTabs[tab.id]) {
+                    // Internal tab: reload the iframe (only if it's the active tab)
+                    if (tab.id === activeTabId) {
+                        const iframe = document.querySelector('#nativeContainer iframe');
+                        if (iframe) iframe.src = resolveInternalUrl(internalTabs[tab.id]);
+                    }
+                    reloaded++;
+                } else {
+                    // Cloud tab: reload via server (activates tab first for CDP)
+                    try {
+                        const params = new URLSearchParams({ tab: tab.id });
+                        await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/reload-page?${params.toString()}`);
+                        reloaded++;
+                    } catch {}
+                }
+            }
+            showToast(`Reloaded ${reloaded} tab${reloaded > 1 ? 's' : ''}`, 'success');
+        }
+
+        async function closeAllTabs() {
+            const toClose = tabs.filter(t => !t.pinned);
+            const pinnedCount = tabs.filter(t => t.pinned).length;
+            for (const t of toClose) {
+                await _doCloseTab(t.id);
+            }
+            if (pinnedCount > 0) {
+                showToast(`Pinned tab${pinnedCount > 1 ? 's' : ''} kept open`, 'info');
+            }
+            // If all tabs closed, create a new one
+            if (tabs.length === 0) {
+                await createNewTab();
+            }
+        }
+
+        function copyAllUrls() {
+            const urls = tabs.map(t => localTabs[t.id] ? localTabs[t.id].url : t.url).filter(Boolean);
+            navigator.clipboard.writeText(urls.join('\n'));
+            showToast(`${urls.length} URL${urls.length > 1 ? 's' : ''} copied`, 'success');
+        }
+
+        function copyAllUrlsAsMarkdown() {
+            const links = tabs.map(t => {
+                const url = localTabs[t.id] ? localTabs[t.id].url : t.url;
+                const title = t.title || url || 'Untitled';
+                return url ? `- [${title}](${url})` : null;
+            }).filter(Boolean);
+            navigator.clipboard.writeText(links.join('\n'));
+            showToast(`${links.length} Markdown link${links.length > 1 ? 's' : ''} copied`, 'success');
+        }
+
+        function showTabBarContextMenu(e) {
+            e.preventDefault();
+            const items = [
+                { label: 'New Cloud Tab', action: () => createNewTab() },
+                { label: 'New Local Tab', action: () => createLocalTab() },
+                { label: 'Open URLs from Clipboard', action: () => openUrlsFromClipboard() },
+            ];
+
+            if (closedTabs.length > 0) {
+                const last = closedTabs[closedTabs.length - 1];
+                const label = last.title.length > 30 ? last.title.slice(0, 30) + '...' : last.title;
+                items.push({ separator: true });
+                items.push({ label: `Reopen Closed Tab (${label})`, action: () => reopenClosedTab() });
+                if (closedTabs.length > 1) {
+                    items.push({ label: `Reopen All ${closedTabs.length} Closed Tabs`, action: () => reopenAllClosedTabs() });
+                }
+            }
+
+            if (tabs.length >= 2) {
+                items.push({ separator: true });
+                items.push({ label: 'Reload All Tabs', action: () => reloadAllTabs() });
+                items.push({ separator: true });
+                items.push({ label: 'Copy All URLs', action: () => copyAllUrls() });
+                items.push({ label: 'Copy All URLs as Markdown', action: () => copyAllUrlsAsMarkdown() });
+                const unpinnedCount = tabs.filter(t => !t.pinned).length;
+                if (unpinnedCount >= 2) {
+                    items.push({ separator: true });
+                    items.push({ label: `Close All ${unpinnedCount} Tabs`, action: () => closeAllTabs() });
+                }
+            }
+
+            showContextMenu(e, items);
         }
 
         // Drag and drop handlers
@@ -13369,6 +14084,8 @@
                 const canvas = container.querySelector('canvas');
                 if (!canvas) { setTimeout(_attachHoverMoveListener, 200); return; }
                 canvas.addEventListener('pointermove', (e) => {
+                    // Always track mouse position — even when noVNC has pointer capture
+                    _trackMouse(e);
                     if (isHoverInspectActive) {
                         const vm = _clientToVm(e.clientX, e.clientY);
                         _handleHoverMove(vm.x, vm.y);
@@ -13402,12 +14119,334 @@
             // Sync theme on initial load (with small delay to let VM start)
             setTimeout(() => syncColorScheme(getColorScheme()), 2000);
 
+            // Restore local tabs and closed tabs from localStorage
+            restoreTabSession();
+
             // Fetch tabs on load (with small delay to let Chrome start)
-            setTimeout(fetchTabs, 1500);
+            // After first fetch, apply saved tab order
+            setTimeout(async () => {
+                await fetchTabs();
+                applySavedTabOrder();
+            }, 1500);
 
             // Seed URL history from Chrome's navigation history
             setTimeout(seedHistoryFromServer, 2000);
         });
+
+        // Global context menu suppression: prevent the native macOS context menu
+        // ("Inspect Element", "View Page Source", etc.) from appearing anywhere in the
+        // control panel. It targets the control panel page, not the VM browser, so it's
+        // confusing. We allow the native menu only on text inputs (for Cut/Copy/Paste).
+        // Areas with custom context menus (VNC, tabs, toolbar) handle their own preventDefault.
+        document.addEventListener('contextmenu', (e) => {
+            const tag = e.target.tagName;
+            // Allow native menu on text inputs and textareas (Cut/Copy/Paste needed)
+            if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+            // Allow native menu inside contenteditable elements
+            if (e.target.isContentEditable) return;
+            // Suppress everywhere else
+            e.preventDefault();
+        });
+
+        // Terminal buffer parsing: extract last command, output, and working directory
+        // by scanning backwards for prompt lines matching the zsh prompt format:
+        // domain:/path$ command
+        // Match any prompt in the format: something:/path$ command
+        // The domain part can be any hostname (stad.gent, inspekt, localhost, etc.)
+        // We use a generic regex rather than matching a specific domain, because
+        // the domain changes as the user navigates between sites.
+        // Match zsh prompt: domain:/path$ command
+        // Allows optional leading whitespace (xterm.js buffer quirk) and
+        // any hostname characters. The path is non-greedy up to "$ ".
+        const _PROMPT_REGEX = /^\s*([a-zA-Z0-9._-]+):(\S*)\$\s?(.*?)$/;
+
+        function _parseTerminalHistory() {
+            if (!terminal) return null;
+            const buffer = terminal.buffer.active;
+            const totalRows = buffer.baseY + buffer.cursorY;
+
+            // Scan backwards to find the two most recent prompt lines
+            let prompts = []; // [{ row, path, command }]
+            for (let row = totalRows; row >= 0 && prompts.length < 2; row--) {
+                const line = buffer.getLine(row);
+                if (!line) continue;
+                const text = line.translateToString(true);
+                const match = text.match(_PROMPT_REGEX);
+                if (match) {
+                    prompts.push({ row, path: match[2], command: match[3].trim() });
+                }
+            }
+
+            if (prompts.length === 0) return null;
+
+            const lastPrompt = prompts[0]; // Most recent prompt
+            const prevPrompt = prompts[1]; // Previous prompt (has the last executed command)
+
+            // Current working directory from the most recent prompt
+            const cwd = lastPrompt.path.replace(/^~/, '/home/inspekt') || '/home/inspekt';
+            const cwdDisplay = lastPrompt.path || '~';
+
+            // If there's no previous prompt, we can't extract command/output
+            if (!prevPrompt || !prevPrompt.command) {
+                return { cwd, cwdDisplay, command: null, output: null };
+            }
+
+            // Extract output: lines between previous prompt and current prompt
+            const outputLines = [];
+            for (let row = prevPrompt.row + 1; row < lastPrompt.row; row++) {
+                const line = buffer.getLine(row);
+                if (line) outputLines.push(line.translateToString(true));
+            }
+            // Trim trailing empty lines
+            while (outputLines.length > 0 && outputLines[outputLines.length - 1].trim() === '') {
+                outputLines.pop();
+            }
+
+            return {
+                cwd,
+                cwdDisplay,
+                command: prevPrompt.command,
+                output: outputLines.join('\n'),
+            };
+        }
+
+        // Terminal context menu
+        document.getElementById('terminalContainer')?.addEventListener('contextmenu', async (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            const hasSelection = terminal?.hasSelection?.();
+            const history = _parseTerminalHistory();
+            const hasCommand = history?.command;
+            const hasOutput = history?.output;
+            const cwd = history?.cwd || '/home/inspekt';
+
+            // Fetch folder info for smart download items (~5ms localhost)
+            let folderInfo = null;
+            try {
+                const resp = await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/file/folder-info?path=${encodeURIComponent(cwd)}`);
+                const data = await resp.json();
+                if (data.ok) folderInfo = data;
+            } catch {}
+
+            // Build smart download items
+            const downloadItems = [];
+            if (folderInfo) {
+                const recent = folderInfo.most_recent;
+                if (recent) {
+                    const sizeStr = recent.size > 1024 ? `${(recent.size / 1024).toFixed(1)} KB` : `${recent.size} B`;
+                    downloadItems.push({
+                        label: `Download ${recent.name} (${sizeStr})`,
+                        action: () => triggerFileDownload(recent.path)
+                    });
+                }
+                if (folderInfo.file_count > 0) {
+                    const totalStr = folderInfo.total_size > 1024 * 1024
+                        ? `${(folderInfo.total_size / 1024 / 1024).toFixed(1)} MB`
+                        : `${(folderInfo.total_size / 1024).toFixed(1)} KB`;
+                    const zipLabel = `Download all files as .zip (${folderInfo.file_count} files, ${totalStr})`;
+
+                    if (folderInfo.can_zip) {
+                        downloadItems.push({
+                            label: zipLabel,
+                            action: async () => {
+                                showToast('Creating zip…', 'info');
+                                try {
+                                    const resp = await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/file/download-zip?path=${encodeURIComponent(cwd)}`);
+                                    if (!resp.ok) {
+                                        const err = await resp.json().catch(() => ({}));
+                                        throw new Error(err.error || `HTTP ${resp.status}`);
+                                    }
+                                    const blob = await resp.blob();
+                                    const url = URL.createObjectURL(blob);
+                                    const a = document.createElement('a');
+                                    a.href = url;
+                                    a.download = `${cwd.split('/').pop() || 'files'}.zip`;
+                                    a.click();
+                                    setTimeout(() => URL.revokeObjectURL(url), 1000);
+                                    showToast('Zip downloaded', 'success');
+                                } catch (err) {
+                                    showToast(`Zip failed: ${err.message}`, 'error');
+                                }
+                            }
+                        });
+                    } else {
+                        downloadItems.push({
+                            label: zipLabel,
+                            disabled: true,
+                            title: folderInfo.exceeded_limits
+                                ? 'Folder exceeds limits (max 50 files or 50 MB)'
+                                : 'No downloadable files'
+                        });
+                    }
+                }
+            }
+
+            const items = [
+                { label: 'Copy', action: () => {
+                    if (hasSelection) {
+                        navigator.clipboard.writeText(terminal.getSelection());
+                        terminal.clearSelection();
+                    }
+                }, disabled: !hasSelection },
+                { label: 'Paste', action: async () => {
+                    try {
+                        const text = await navigator.clipboard.readText();
+                        if (terminalSocket?.readyState === WebSocket.OPEN) {
+                            terminalSocket.send(text);
+                        }
+                    } catch {}
+                }},
+                { separator: true },
+                { label: 'Copy Last Command', action: () => {
+                    navigator.clipboard.writeText(history.command);
+                    showToast('Command copied', 'success');
+                }, disabled: !hasCommand },
+                { label: 'Copy Last Output', action: () => {
+                    navigator.clipboard.writeText(history.output);
+                    showToast('Output copied', 'success');
+                }, disabled: !hasOutput },
+                { label: 'Copy Last Command & Output', action: () => {
+                    navigator.clipboard.writeText(`$ ${history.command}\n${history.output}`);
+                    showToast('Command & output copied', 'success');
+                }, disabled: !hasCommand || !hasOutput },
+                { separator: true },
+                { label: `Copy Working Directory`, action: () => {
+                    navigator.clipboard.writeText(cwd);
+                    showToast(`Copied: ${history?.cwdDisplay || '~'}`, 'success');
+                }},
+                { separator: true },
+                ...(downloadItems.length > 0 ? [...downloadItems, { separator: true }] : []),
+                { label: 'Select All', action: () => terminal?.selectAll?.() },
+                { label: 'Clear Terminal', action: () => {
+                    terminal?.clear();
+                    if (terminalSocket?.readyState === WebSocket.OPEN) {
+                        terminalSocket.send('\x0c');
+                    }
+                }},
+                { label: 'Upload File(s)…', action: () => triggerUploadFromToolbar() },
+                { separator: true },
+                { label: 'Increase Font Size', action: () => adjustTerminalFontSize(1) },
+                { label: 'Decrease Font Size', action: () => adjustTerminalFontSize(-1) },
+                { separator: true },
+                { label: terminalMode === 'split' ? 'Switch to Floating Terminal' : 'Switch to Split View',
+                  action: () => {
+                    if (terminalMode === 'split') {
+                        exitSplitMode();
+                    } else {
+                        enterSplitMode();
+                    }
+                }},
+                { label: 'Edit Trigger Words', action: () => {
+                    openFileInEditor('/home/inspekt/.config/inspekt.yaml');
+                }},
+            ];
+
+            showContextMenu(e, items);
+        });
+
+        // Output panel context menu
+        document.getElementById('outputPanelContent')?.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            const content = document.getElementById('outputPanelContent');
+            const hasContent = content && content.textContent.trim().length > 0;
+            showContextMenu(e, [
+                { label: 'Copy All', action: () => {
+                    navigator.clipboard.writeText(content.textContent);
+                    showToast('Output copied', 'success');
+                }, disabled: !hasContent },
+                { label: 'Export as Text', action: () => {
+                    const blob = new Blob([content.textContent], { type: 'text/plain' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `inspekt-output-${Date.now()}.txt`;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                }, disabled: !hasContent },
+                { separator: true },
+                { label: 'Clear', action: () => {
+                    content.innerHTML = '';
+                    closeOutputPanel();
+                }},
+            ]);
+        });
+
+        // Capture-phase Escape handler: fires BEFORE noVNC's keyboard handler
+        // can swallow the event. Without this, moving the mouse over the VNC
+        // canvas gives it focus, and noVNC intercepts Escape before it bubbles
+        // to our context menu dismiss handler.
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && activeContextMenu) {
+                e.preventDefault();
+                e.stopImmediatePropagation();
+                dismissContextMenu();
+            }
+        }, true);  // true = capture phase
+
+        // Capture-phase keyboard context menu handler.
+        // Detects platform-specific shortcuts for "show context menu" and routes
+        // to the appropriate custom context menu based on what's under the cursor.
+        // Must be capture-phase to intercept before noVNC swallows the key event.
+        document.addEventListener('keydown', (e) => {
+            const isContextMenuKey =
+                e.key === 'ContextMenu' ||                                        // Windows/Linux Menu key
+                (e.key === 'F10' && e.shiftKey) ||                                // Windows/Linux Shift+F10
+                (e.key === 'Enter' && e.ctrlKey && !e.metaKey && !e.altKey);      // macOS Sequoia Control+Return
+
+            if (!isContextMenuKey) return;
+
+            // Don't intercept when typing in inputs or the terminal
+            const tag = document.activeElement?.tagName;
+            if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+            if (document.activeElement?.isContentEditable) return;
+            if (document.activeElement?.closest('#terminalContainer')) return;
+
+            e.preventDefault();
+            e.stopImmediatePropagation();
+
+            // Find the UI area under the cursor and dispatch to the right handler
+            const el = document.elementFromPoint(_lastMouseX, _lastMouseY);
+            if (!el) return;
+
+            const syntheticEvent = { clientX: _lastMouseX, clientY: _lastMouseY, preventDefault() {}, stopPropagation() {} };
+
+            // VNC canvas
+            if (el.closest('#vncContainer')) {
+                const vm = _clientToVm(_lastMouseX, _lastMouseY);
+                showVNCContextMenu(_lastMouseX, _lastMouseY, vm.x, vm.y);
+                return;
+            }
+
+            // Individual tab
+            const tabEl = el.closest('.tab');
+            if (tabEl?.dataset?.tabId) {
+                showTabContextMenu(syntheticEvent, tabEl.dataset.tabId);
+                return;
+            }
+
+            // Tab bar empty area
+            if (el.closest('#tabBar')) {
+                showTabBarContextMenu(syntheticEvent);
+                return;
+            }
+
+            // Terminal
+            if (el.closest('#terminalContainer')) {
+                document.getElementById('terminalContainer').dispatchEvent(
+                    new MouseEvent('contextmenu', { clientX: _lastMouseX, clientY: _lastMouseY, bubbles: true })
+                );
+                return;
+            }
+
+            // Output panel
+            if (el.closest('#outputPanelContent')) {
+                document.getElementById('outputPanelContent').dispatchEvent(
+                    new MouseEvent('contextmenu', { clientX: _lastMouseX, clientY: _lastMouseY, bubbles: true })
+                );
+                return;
+            }
+        }, true);  // true = capture phase
 
         // Keyboard shortcuts
         document.addEventListener('keydown', (e) => {
