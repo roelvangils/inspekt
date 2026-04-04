@@ -415,6 +415,11 @@ def _navigate_to(url: str):
         print_error(f"Navigation failed: {result.get('error', 'Unknown error')}")
 
 
+# Schemes and hostnames that indicate internal/non-web pages
+_INTERNAL_SCHEMES = {"inspekt", "chrome", "chrome-error", "about", "data", "blob", "file"}
+_INTERNAL_HOSTS = {"inspekt", "localhost"}
+
+
 def _get_origin(override_url: str | None) -> str:
     """Get the origin from the browser or an override URL."""
     if override_url:
@@ -431,15 +436,22 @@ def _get_origin(override_url: str | None) -> str:
         click.echo(f"Error: Could not get current page URL: {result.get('error')}", err=True)
         sys.exit(1)
 
-    origin = result.get("result")
-    if isinstance(origin, dict):
-        origin = origin.get("result", "")
+    origin = str(result.get("result", ""))
+    if isinstance(result.get("result"), dict):
+        origin = str(result["result"].get("result", ""))
 
     if not origin or origin == "null":
         click.echo("Error: No page loaded in the browser", err=True)
         sys.exit(1)
 
-    return str(origin)
+    # Check for internal/non-web URLs (inspekt://, chrome://, http://inspekt, etc.)
+    parsed = urlparse(origin)
+    if parsed.scheme in _INTERNAL_SCHEMES or parsed.hostname in _INTERNAL_HOSTS:
+        print_error("This command requires a real website (http/https)")
+        print_hint("Navigate to a website first, then try again")
+        sys.exit(0)
+
+    return origin
 
 
 # ============================================================================
