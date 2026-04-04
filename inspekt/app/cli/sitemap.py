@@ -524,12 +524,12 @@ def sitemap(url, flat, filter_path, lang, open_index, interactive, stats, no_fla
     # Fetch if no cache hit
     if result is None:
         if direct_sitemap_url:
-            sitemap_url = direct_sitemap_url
+            sitemap_urls = [direct_sitemap_url]
             discovery_method = "direct"
         else:
-            # Auto-discover
-            sitemap_url, discovery_method = discover_sitemap(origin)
-            if not sitemap_url:
+            # Auto-discover (may return multiple URLs for multilingual sites)
+            sitemap_urls, discovery_method = discover_sitemap(origin)
+            if not sitemap_urls:
                 if output_json:
                     click.echo(json.dumps({"error": "No sitemap found", "origin": origin}))
                 else:
@@ -537,7 +537,17 @@ def sitemap(url, flat, filter_path, lang, open_index, interactive, stats, no_fla
                     print_hint("Try specifying the URL directly: `inspekt sitemap https://example.com/sitemap.xml`")
                 sys.exit(1)
 
-        result = fetch_sitemap(sitemap_url, flatten=not no_flatten)
+        # Fetch all discovered sitemaps and merge entries
+        result = fetch_sitemap(sitemap_urls[0], flatten=not no_flatten)
+        for extra_url in sitemap_urls[1:]:
+            extra = fetch_sitemap(extra_url, flatten=not no_flatten)
+            result.entries.extend(extra.entries)
+            result.errors.extend(extra.errors)
+            result.child_sitemaps.extend(extra.child_sitemaps)
+
+        if len(sitemap_urls) > 1:
+            result.source_url = f"{sitemap_urls[0]} (+{len(sitemap_urls) - 1} more)"
+
         result.discovered_via = discovery_method
 
         if result.errors and not result.entries and not result.child_sitemaps:

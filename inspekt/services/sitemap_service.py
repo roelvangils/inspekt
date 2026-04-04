@@ -106,19 +106,23 @@ class TreeNode:
         return self.entry is not None
 
 
-def discover_sitemap(origin: str) -> tuple[str, str]:
+def discover_sitemap(origin: str) -> tuple[list[str], str]:
     """
-    Auto-discover sitemap URL for an origin.
+    Auto-discover sitemap URLs for an origin.
 
-    Checks robots.txt first, then falls back to /sitemap.xml.
+    Collects ALL Sitemap: directives from robots.txt, then probes
+    common fallback locations. Returns multiple URLs when a site
+    has per-language or per-section sitemaps.
 
     Args:
         origin: The site origin (e.g., "https://example.com")
 
     Returns:
-        Tuple of (sitemap_url, discovery_method)
+        Tuple of (list_of_sitemap_urls, discovery_method)
     """
-    # Step 1: Check robots.txt for Sitemap: directives
+    found: list[str] = []
+
+    # Step 1: Collect ALL Sitemap: directives from robots.txt
     robots_url = f"{origin}/robots.txt"
     try:
         response = http_client.get(
@@ -131,43 +135,52 @@ def discover_sitemap(origin: str) -> tuple[str, str]:
             for line in response.text.splitlines():
                 stripped = line.strip()
                 if stripped.lower().startswith("sitemap:"):
-                    # Use partition to split on "Sitemap:" prefix, preserving the full URL
                     _, _, sitemap_url = stripped.partition(":")
                     sitemap_url = sitemap_url.strip()
-                    if sitemap_url:
-                        return sitemap_url, "robots.txt"
+                    if sitemap_url and sitemap_url not in found:
+                        found.append(sitemap_url)
     except requests.RequestException:
         pass
 
-    # Step 2: Fall back to /sitemap.xml
-    sitemap_url = f"{origin}/sitemap.xml"
-    try:
-        response = http_client.get(
-            sitemap_url,
-            timeout=5,
-            headers={"User-Agent": "Inspekt-CLI-Sitemap"},
-            allow_redirects=True,
-        )
-        if response.status_code == 200:
-            return sitemap_url, "/sitemap.xml"
-    except requests.RequestException:
-        pass
+    if found:
+        return found, "robots.txt"
 
-    # Step 3: Try /sitemap_index.xml
-    index_url = f"{origin}/sitemap_index.xml"
-    try:
-        response = http_client.get(
-            index_url,
-            timeout=5,
-            headers={"User-Agent": "Inspekt-CLI-Sitemap"},
-            allow_redirects=True,
-        )
-        if response.status_code == 200:
-            return index_url, "/sitemap_index.xml"
-    except requests.RequestException:
-        pass
+    # Step 2: Fall back to well-known paths
+    for path in ["/sitemap.xml", "/sitemap_index.xml"]:
+        probe_url = f"{origin}{path}"
+        try:
+            response = http_client.get(
+                probe_url,
+                timeout=5,
+                headers={"User-Agent": "Inspekt-CLI-Sitemap"},
+                allow_redirects=True,
+            )
+            if response.status_code == 200:
+                return [probe_url], path
+        except requests.RequestException:
+            pass
 
-    return "", "not found"
+    # Step 3: Probe for language-prefixed sitemaps (common CMS pattern)
+    # Try a few common language codes — only add those that exist
+    common_langs = ["en", "nl", "fr", "de", "es", "it", "pt"]
+    for lang in common_langs:
+        probe_url = f"{origin}/{lang}/sitemap.xml"
+        try:
+            response = http_client.get(
+                probe_url,
+                timeout=3,
+                headers={"User-Agent": "Inspekt-CLI-Sitemap"},
+                allow_redirects=True,
+            )
+            if response.status_code == 200:
+                found.append(probe_url)
+        except requests.RequestException:
+            pass
+
+    if found:
+        return found, "language probe"
+
+    return [], "not found"
 
 
 def fetch_sitemap(
