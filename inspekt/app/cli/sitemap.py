@@ -55,6 +55,31 @@ def _format_date(iso_str: str) -> str:
         return iso_str[:10]
 
 
+# ISO 639-1 language code → English name (for display in tree)
+_LANG_NAMES = {
+    "af": "Afrikaans", "am": "Amharic", "ar": "Arabic", "az": "Azerbaijani",
+    "be": "Belarusian", "bg": "Bulgarian", "bn": "Bengali", "bs": "Bosnian",
+    "ca": "Catalan", "cs": "Czech", "cy": "Welsh",
+    "da": "Danish", "de": "German",
+    "el": "Greek", "en": "English", "eo": "Esperanto", "es": "Spanish", "et": "Estonian", "eu": "Basque",
+    "fa": "Persian", "fi": "Finnish", "fr": "French", "fy": "Frisian",
+    "ga": "Irish", "gd": "Scottish Gaelic", "gl": "Galician", "gu": "Gujarati",
+    "ha": "Hausa", "he": "Hebrew", "hi": "Hindi", "hr": "Croatian", "hu": "Hungarian", "hy": "Armenian",
+    "id": "Indonesian", "is": "Icelandic", "it": "Italian",
+    "ja": "Japanese", "jv": "Javanese",
+    "ka": "Georgian", "kk": "Kazakh", "km": "Khmer", "kn": "Kannada", "ko": "Korean", "ku": "Kurdish", "ky": "Kyrgyz",
+    "la": "Latin", "lb": "Luxembourgish", "lo": "Lao", "lt": "Lithuanian", "lv": "Latvian",
+    "mk": "Macedonian", "ml": "Malayalam", "mn": "Mongolian", "mr": "Marathi", "ms": "Malay", "mt": "Maltese", "my": "Burmese",
+    "nb": "Norwegian Bokmål", "ne": "Nepali", "nl": "Dutch", "nn": "Norwegian Nynorsk", "no": "Norwegian",
+    "pa": "Punjabi", "pl": "Polish", "ps": "Pashto", "pt": "Portuguese",
+    "ro": "Romanian", "ru": "Russian", "rw": "Kinyarwanda",
+    "si": "Sinhala", "sk": "Slovak", "sl": "Slovenian", "so": "Somali", "sq": "Albanian", "sr": "Serbian", "sv": "Swedish", "sw": "Swahili",
+    "ta": "Tamil", "te": "Telugu", "tg": "Tajik", "th": "Thai", "tk": "Turkmen", "tl": "Tagalog", "tr": "Turkish",
+    "uk": "Ukrainian", "ur": "Urdu", "uz": "Uzbek",
+    "vi": "Vietnamese",
+    "zh": "Chinese", "zu": "Zulu",
+}
+
 # Known ISO 639-1 language codes (2-letter) for detection
 _LANG_CODES = {
     "aa", "ab", "af", "ak", "am", "an", "ar", "as", "av", "ay", "az",
@@ -178,8 +203,17 @@ def _render_tree(node, prefix: str = "", is_last: bool = True, filter_path: str 
         label = f"{prefix}{connector}{idx_str} {name_str}{meta_str}"
     else:
         # Directory node (no URL, just a path segment)
-        name_str = click.style(f"{node.name}/", fg="blue")
-        label = f"{prefix}{connector}{name_str}"
+        # Show language name for language-code directories (e.g., "en/" → "English (21 pages)")
+        lang_name = _LANG_NAMES.get(node.name.lower())
+        if lang_name:
+            page_count = _count_entries(node)
+            name_str = click.style(lang_name, fg="blue", bold=True)
+            pages_word = "page" if page_count == 1 else "pages"
+            count_str = click.style(f"({page_count} {pages_word})", fg="bright_black")
+            label = f"{prefix}{connector}{name_str} {count_str}"
+        else:
+            name_str = click.style(f"{node.name}/", fg="blue")
+            label = f"{prefix}{connector}{name_str}"
 
     lines.append(label)
 
@@ -210,6 +244,14 @@ def _filtered_children(node, filter_path: str) -> list[tuple]:
     # Sort: directories first (nodes with children), then leaves, alphabetically
     children.sort(key=lambda x: (not x[1].children, x[0].lower()))
     return children
+
+
+def _count_entries(node) -> int:
+    """Count total URL entries in a subtree."""
+    count = 1 if node.has_entry else 0
+    for child in node.children.values():
+        count += _count_entries(child)
+    return count
 
 
 def _subtree_matches(node, filter_path: str) -> bool:
@@ -537,11 +579,15 @@ def sitemap(url, flat, filter_path, lang, open_index, interactive, stats, no_fla
                     print_hint("Try specifying the URL directly: `inspekt sitemap https://example.com/sitemap.xml`")
                 sys.exit(1)
 
-        # Fetch all discovered sitemaps and merge entries
+        # Fetch all discovered sitemaps and merge entries (deduplicate by URL)
         result = fetch_sitemap(sitemap_urls[0], flatten=not no_flatten)
+        seen_urls = {e.loc for e in result.entries}
         for extra_url in sitemap_urls[1:]:
             extra = fetch_sitemap(extra_url, flatten=not no_flatten)
-            result.entries.extend(extra.entries)
+            for entry in extra.entries:
+                if entry.loc not in seen_urls:
+                    result.entries.append(entry)
+                    seen_urls.add(entry.loc)
             result.errors.extend(extra.errors)
             result.child_sitemaps.extend(extra.child_sitemaps)
 

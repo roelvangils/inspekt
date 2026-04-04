@@ -428,14 +428,15 @@ def _extract_title(text: str) -> str:
     return title
 
 
-def _fetch_single_title(url: str, timeout: float = 3.0) -> str:
+def _fetch_single_title(url: str, timeout: float = 3.0) -> tuple[str, str]:
     """
     Fetch a page progressively until the <title> tag is found.
 
-    In streaming mode (direct requests), reads in expanding steps
-    (16 KB → 32 → 64 → 128 → 512 KB), stopping as soon as the title
-    is found. In proxy mode (VM), sends max_bytes to limit the server-side
-    download to 512 KB instead of the full page.
+    Also captures the Last-Modified header as a fallback date for sitemaps
+    that don't include lastmod.
+
+    Returns:
+        Tuple of (title, last_modified_header). Either may be empty.
     """
     try:
         response = http_client.get(
@@ -448,40 +449,39 @@ def _fetch_single_title(url: str, timeout: float = 3.0) -> str:
             },
             allow_redirects=True,
             stream=True,
-            # Limit proxy-side download to the max step size
             max_bytes=_TITLE_CHUNK_SIZES[-1],
         )
 
         if response.status_code != 200:
-            return ""
+            return "", ""
+
+        # Capture Last-Modified header as fallback date
+        last_modified = response.headers.get("Last-Modified", "")
 
         # Use a single iterator — can't restart iter_content after breaking
         stream = response.iter_content(chunk_size=4096)
         content = b""
 
         for limit in _TITLE_CHUNK_SIZES:
-            # Read from stream until we reach this step's limit
             for chunk in stream:
                 content += chunk
                 if len(content) >= limit:
                     break
 
-            # Try to extract title from what we have so far
             title = _extract_title(content.decode("utf-8", errors="replace"))
             if title:
                 response.close()
-                return title
+                return title, last_modified
 
-            # If the server sent less than we asked for, we have everything
             if len(content) < limit:
                 break
 
         response.close()
-        return ""
+        return "", last_modified
 
     except (requests.RequestException, OSError) as e:
         logger.debug(f"Title fetch failed for {url}: {type(e).__name__}: {e}")
-        return ""
+        return "", ""
 
 
 def debug_title_fetch(url: str) -> dict:
@@ -547,6 +547,22 @@ def debug_title_fetch(url: str) -> dict:
     return info
 
 
+def _parse_http_date(http_date: str) -> str:
+    """Convert an HTTP Last-Modified date to ISO 8601 format.
+
+    'Thu, 03 Apr 2026 12:00:00 GMT' → '2026-04-03T12:00:00+00:00'
+    Returns empty string if unparseable.
+    """
+    from datetime import datetime, timezone
+    from email.utils import parsedate_to_datetime
+
+    try:
+        dt = parsedate_to_datetime(http_date)
+        return dt.isoformat()
+    except Exception:
+        return ""
+
+
 def fetch_titles(
     entries: list[SitemapEntry],
     max_concurrent: int = 30,
@@ -589,10 +605,13 @@ def fetch_titles(
             idx = futures[future]
             completed += 1
             try:
-                title = future.result()
+                title, last_modified = future.result()
                 if title:
                     entries[idx].title = title
                     fetched += 1
+                # Use Last-Modified header as fallback when sitemap has no lastmod
+                if last_modified and not entries[idx].lastmod:
+                    entries[idx].lastmod = _parse_http_date(last_modified)
             except Exception:
                 pass
 
