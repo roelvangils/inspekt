@@ -386,25 +386,12 @@ async def get_sitemap(params: "SitemapParams") -> "SitemapResponse":
     )
 
     # Determine origin
-    if params.url:
-        parsed = urlparse(params.url)
-        if parsed.scheme and parsed.netloc:
-            origin = f"{parsed.scheme}://{parsed.netloc}"
-        else:
-            origin = f"https://{params.url}"
-    else:
-        # Get origin from browser
-        executor = get_executor()
-        result = await asyncio.to_thread(
-            executor.execute, "window.location.origin", 5.0
-        )
-        if not result.get("ok"):
-            return SitemapResponse(
-                success=False, message=f"Could not get page origin: {result.get('error')}"
-            )
-        origin = str(result.get("result", ""))
-        if not origin or origin == "null":
-            return SitemapResponse(success=False, message="No page loaded in browser")
+    from inspekt.services.browser_url import BrowserURLError, InternalURLError, resolve_origin
+
+    try:
+        origin = await asyncio.to_thread(resolve_origin, params.url)
+    except (BrowserURLError, InternalURLError) as e:
+        return SitemapResponse(success=False, message=str(e))
 
     # Check cache
     sitemap_result = None

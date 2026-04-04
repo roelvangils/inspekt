@@ -156,17 +156,13 @@ class ResourceProvider:
 
     async def _get_current_url(self) -> str:
         """Get current page URL."""
+        from inspekt.services.browser_url import BrowserURLError, InternalURLError, resolve_url
+
         try:
-            result = await asyncio.to_thread(
-                self.executor.execute, "window.location.href", 5.0
-            )
-            if result.get("ok"):
-                return result.get("result", "")
-            else:
-                raise RuntimeError(f"Failed to get URL: {result.get('error', 'Unknown error')}")
-        except Exception as e:
+            return await asyncio.to_thread(resolve_url)
+        except (BrowserURLError, InternalURLError) as e:
             logger.error(f"Error getting current URL: {e}")
-            raise RuntimeError(f"Failed to read current URL: {e}")
+            raise RuntimeError(str(e))
 
     async def _get_page_title(self) -> str:
         """Get current page title."""

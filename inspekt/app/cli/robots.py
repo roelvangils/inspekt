@@ -20,6 +20,7 @@ import click
 import requests
 
 from inspekt.app.cli.icons import get_icon
+from inspekt.services import http_client
 from inspekt.app.cli.table import Table, format_status_icon
 from inspekt.services.bridge_executor import get_executor
 
@@ -52,35 +53,20 @@ def robots(output_json, validate, override_url):
         inspekt robots --validate
         inspekt robots --url https://example.com
     """
-    executor = get_executor()
+    from inspekt.services.browser_url import BrowserURLError, InternalURLError, resolve_origin
+    from inspekt.app.cli.table import print_error as _print_error, print_hint as _print_hint
 
-    # Get current URL from browser or use override
-    if override_url:
-        current_url = override_url
-    else:
-        result = executor.execute("window.location.href", timeout=5.0)
-
-        if not result.get("ok"):
-            click.echo(f"Error: {result.get('error')}", err=True)
-            sys.exit(1)
-
-        response = result.get("result")
-        if isinstance(response, dict):
-            current_url = response
-        else:
-            current_url = response
-
-    # Construct robots.txt URL from origin
     try:
-        parsed = urlparse(str(current_url))
-        if not parsed.scheme or not parsed.netloc:
-            click.echo(f"Error: Invalid URL: {current_url}", err=True)
-            sys.exit(1)
-
-        robots_url = f"{parsed.scheme}://{parsed.netloc}/robots.txt"
-    except Exception as e:
-        click.echo(f"Error parsing URL: {e}", err=True)
+        origin = resolve_origin(override_url)
+    except InternalURLError:
+        _print_error("This command requires a real website (http/https)")
+        _print_hint("Navigate to a website first, then try again")
+        sys.exit(0)
+    except BrowserURLError as e:
+        click.echo(f"Error: {e}", err=True)
         sys.exit(1)
+
+    robots_url = f"{origin}/robots.txt"
 
     # Fetch robots.txt
     robots_data = _fetch_robots_txt(robots_url)
@@ -132,7 +118,7 @@ def _fetch_robots_txt(robots_url: str) -> dict[str, Any]:
         Dictionary with fetch results including status, metadata, and content
     """
     try:
-        response = requests.get(
+        response = http_client.get(
             robots_url,
             timeout=5,
             headers={"User-Agent": "Inspekt-CLI-RobotsTxt-Checker"},
