@@ -18,6 +18,7 @@ import json
 import logging
 import re
 import time
+import unicodedata
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -405,11 +406,7 @@ def _extract_title(text: str) -> str:
     title = match.group(1).strip()
     title = re.sub(r"\s+", " ", title)
     title = html.unescape(title)
-    # Strip ALL invisible/control Unicode characters that can corrupt terminal output.
-    # Uses unicodedata to catch every format (Cf) and control (Cc) character,
-    # including zero-width spaces, soft hyphens, BOM, direction markers,
-    # variation selectors, interlinear annotations, etc.
-    import unicodedata
+    # Strip ALL invisible/control Unicode characters that can corrupt terminal output
     title = "".join(
         c for c in title
         if unicodedata.category(c) not in ("Cf", "Cc") or c in ("\n", "\t")

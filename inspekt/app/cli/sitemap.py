@@ -548,7 +548,9 @@ def sitemap(url, flat, filter_path, lang, open_index, interactive, stats, no_fla
                     print_error(error)
             sys.exit(1)
 
-        # Cache the result
+        # Cache under the browser's origin so lookups match
+        # (sitemap origin may differ, e.g., elevenways.be vs www.elevenways.be)
+        result.origin = origin
         save_to_cache(result)
 
     # Debug title fetching — test one URL and report diagnostics
