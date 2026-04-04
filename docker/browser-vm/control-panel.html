@@ -1022,6 +1022,28 @@
             display: none;
         }
 
+        .tab.tab-local {
+            border-bottom: 2px solid var(--accent-blue, #4a9eff);
+        }
+
+        .tab.tab-local .tab-favicon-placeholder {
+            font-size: 11px;
+        }
+
+        /* Feature gating: disable VNC-dependent toolbar buttons for local tabs */
+        body.local-tab-active .toolbar-btn-wrapper[data-button-key="inspect"] button,
+        body.local-tab-active .toolbar-btn-wrapper[data-button-key="devtools"] button,
+        body.local-tab-active .toolbar-btn-wrapper[data-button-key="sr"] button,
+        body.local-tab-active .toolbar-btn-wrapper[data-button-key="audio"] button,
+        body.local-tab-active .toolbar-btn-wrapper[data-button-key="auto-scan"] button,
+        body.local-tab-active .toolbar-btn-wrapper[data-button-key="vision"] button,
+        body.local-tab-active .toolbar-btn-wrapper[data-button-key="recordings"] button,
+        body.local-tab-active .toolbar-btn-wrapper[data-button-key="screenshot"] button,
+        body.local-tab-active .toolbar-btn-wrapper[data-button-key="inspekt"] button {
+            opacity: 0.35;
+            pointer-events: none;
+        }
+
         /* Separator between pinned and unpinned tabs */
         .tab-pin-separator {
             width: 1px;
@@ -1051,9 +1073,28 @@
             right: 0;
         }
 
-        .new-tab-btn:hover {
+        .new-tab-btn:hover,
+        .new-tab-dropdown-btn:hover {
             background: var(--bg-btn);
             color: var(--text-bright);
+        }
+
+        .new-tab-dropdown-btn {
+            width: 18px;
+            height: 28px;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--bg-bar);
+            border: none;
+            color: var(--text-dim);
+            cursor: pointer;
+            transition: all 0.15s ease;
+            margin-left: 1px;
+            flex-shrink: 0;
+            position: sticky;
+            right: 0;
         }
 
         /* Tab Context Menu */
@@ -1223,6 +1264,51 @@
             height: 100%;
             border: none;
             background: #fff;
+        }
+
+        .local-tab-info-bar {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(30, 30, 30, 0.92);
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 6px 14px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            z-index: 10;
+            color: var(--text-dim, #999);
+            font-size: 12px;
+            backdrop-filter: blur(8px);
+        }
+
+        .local-tab-info-bar span {
+            flex: 1;
+        }
+
+        .local-tab-info-bar a {
+            color: var(--accent-blue, #4a9eff);
+            text-decoration: none;
+            font-weight: 500;
+        }
+
+        .local-tab-info-bar a:hover {
+            text-decoration: underline;
+        }
+
+        .local-tab-info-bar button.dismiss {
+            background: transparent;
+            border: none;
+            color: var(--text-dim, #999);
+            font-size: 13px;
+            padding: 4px 6px;
+            cursor: pointer;
+            flex-shrink: 0;
+        }
+
+        .local-tab-info-bar button.dismiss:hover {
+            color: var(--text-bright, #e0e0e0);
         }
 
         /* When native view is active, hide the VNC container */
@@ -3543,6 +3629,8 @@
     <script src="/vendor/sortable.min.js"></script>
     <script src="/toolbar.js" defer></script>
     <script src="/vision-sim.js" defer></script>
+    <link rel="stylesheet" href="/motor-sim.css">
+    <script src="/motor-sim.js" defer></script>
 </head>
 <body>
     <!-- Splash Screen -->
@@ -3716,6 +3804,9 @@
         <div class="tabs-container" id="tabsContainer">
             <!-- Tabs will be dynamically inserted here -->
             <button class="new-tab-btn" onclick="createNewTab()" title="New tab (Ctrl+T)">+</button>
+            <button class="new-tab-dropdown-btn" onclick="showNewTabMenu(event)" title="More tab options">
+                <svg width="8" height="5" viewBox="0 0 8 5"><path d="M1 1l3 3 3-3" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
         </div>
         <button class="grid-view-btn" id="gridViewBtn" onclick="toggleTabGrid()" title="Tab overview">
             <svg width="16" height="16" viewBox="0 0 16 16">
@@ -4902,6 +4993,13 @@
         // Track which tabs are showing internal content
         const internalTabs = {};  // { tabId: inspektUrl }
 
+        // Track which tabs are "local" (iframe loaded from host network, not VM)
+        const localTabs = {};  // { tabId: { url, title } }
+
+        function isLocalTab(tabId) {
+            return !!localTabs[tabId];
+        }
+
         /**
          * Check if a URL points to the internal Inspekt web interface.
          * These are URLs like http://inspekt/status, http://inspekt/commands, etc.
@@ -4957,6 +5055,57 @@
                 });
             }
             iframe.src = httpUrl;
+
+            // For local tabs: show persistent info bar with "Open as Cloud Tab" escape hatch.
+            // We can't reliably detect X-Frame-Options blocking from JS (Chrome shows a
+            // cross-origin chrome-error:// page that's indistinguishable from a loaded site),
+            // so we always show the bar and let the user dismiss it if the page loaded fine.
+            const existingBar = nativeContainer.querySelector('.local-tab-info-bar');
+            if (existingBar) existingBar.remove();
+
+            if (activeTabId && localTabs[activeTabId] && httpUrl !== 'about:blank') {
+                // Skip the info bar for localhost/127.0.0.1 — those won't have CSP issues
+                try {
+                    const host = new URL(httpUrl).hostname;
+                    if (host === 'localhost' || host === '127.0.0.1' || host === '::1') {
+                        // No bar needed
+                    } else {
+                        const bar = document.createElement('div');
+                        bar.className = 'local-tab-info-bar';
+                        const tabId = activeTabId;
+                        const safeUrl = httpUrl.replace(/'/g, "\\'");
+                        bar.innerHTML = `
+                            <span>Inspekt respects this website's Content-Security-Policy. If it refuses to load, you can open it in a <a href="#" onclick="event.preventDefault(); convertToCloudTab('${tabId}', '${safeUrl}')">Cloud Tab</a> or your <a href="#" onclick="event.preventDefault(); window.open('${safeUrl}', '_blank')">default browser</a>.</span>
+                            <button class="dismiss" onclick="this.parentElement.remove()" title="Dismiss">✕</button>
+                        `;
+                        nativeContainer.appendChild(bar);
+                    }
+                } catch { /* invalid URL, skip bar */ }
+            }
+        }
+
+        /**
+         * Convert a local tab to a cloud tab by creating a server-side tab.
+         */
+        async function convertToCloudTab(tabId, url) {
+            try {
+                const response = await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/tabs/new?url=${encodeURIComponent(url)}`);
+                const data = await response.json();
+                if (data.ok) {
+                    // Remove the local tab
+                    delete localTabs[tabId];
+                    tabs = tabs.filter(t => t.id !== tabId);
+                    // Switch to the new cloud tab — use activateTab to properly
+                    // swap the viewport back to VNC and update all state
+                    await fetchTabs();
+                    await activateTab(data.tab.id);
+                    showToast('Opened as Cloud Tab', 'success');
+                } else {
+                    showToast('Failed to open as Cloud Tab', 'error');
+                }
+            } catch {
+                showToast('Failed to open as Cloud Tab', 'error');
+            }
         }
 
         /**
@@ -4979,11 +5128,37 @@
          * Called on tab switch and after navigation.
          */
         function syncViewport() {
-            if (activeTabId && internalTabs[activeTabId]) {
+            if (activeTabId && localTabs[activeTabId]) {
+                showNativeView(localTabs[activeTabId].url);
+            } else if (activeTabId && internalTabs[activeTabId]) {
                 showNativeView(resolveInternalUrl(internalTabs[activeTabId]));
             } else {
                 showVncView();
             }
+            updateFeatureGating();
+        }
+
+        /**
+         * Enable/disable VNC-dependent toolbar features based on active tab type.
+         */
+        function updateFeatureGating() {
+            const isLocal = activeTabId && isLocalTab(activeTabId);
+            document.body.classList.toggle('local-tab-active', !!isLocal);
+
+            // Update tooltips on gated toolbar buttons
+            const gatedKeys = ['inspect', 'devtools', 'sr', 'audio', 'auto-scan', 'vision', 'recordings', 'screenshot', 'inspekt'];
+            gatedKeys.forEach(key => {
+                const wrapper = document.querySelector(`.toolbar-btn-wrapper[data-button-key="${key}"]`);
+                if (!wrapper) return;
+                const btn = wrapper.querySelector('button');
+                if (!btn) return;
+                if (isLocal) {
+                    btn._originalTitle = btn._originalTitle || btn.title;
+                    btn.title = `${btn._originalTitle} (unavailable for local tabs)`;
+                } else if (btn._originalTitle) {
+                    btn.title = btn._originalTitle;
+                }
+            });
         }
 
         // =============================================
@@ -5254,6 +5429,30 @@
                 trimmed.startsWith('file://') || trimmed.startsWith('about:') ||
                 trimmed.startsWith('javascript:') || trimmed.startsWith('data:text/html')) {
                 showToast('This URL is not available in the browser VM', 'error', 3000);
+                return;
+            }
+
+            // --- Handle local tab navigation (update iframe directly) ---
+            if (activeTabId && localTabs[activeTabId]) {
+                let localUrl = url.trim();
+                if (!localUrl.startsWith('http://') && !localUrl.startsWith('https://')) {
+                    localUrl = 'https://' + localUrl;
+                }
+                try { new URL(localUrl); } catch {
+                    showToast('Invalid URL', 'error');
+                    return;
+                }
+                const urlBar = document.getElementById('urlBar');
+                urlBar.value = localUrl;
+                urlBar.blur();
+                currentUrl = localUrl;
+                localTabs[activeTabId].url = localUrl;
+                localTabs[activeTabId].title = new URL(localUrl).hostname;
+                // Update tab title in tabs array
+                const tab = tabs.find(t => t.id === activeTabId);
+                if (tab) { tab.url = localUrl; tab.title = localTabs[activeTabId].title; }
+                renderTabs();
+                showNativeView(localUrl);
                 return;
             }
 
@@ -8245,7 +8444,8 @@
          * Returns an array of CM6 extensions: [editorTheme, syntaxHighlighting]
          */
         function buildEditorTheme(xtermTheme) {
-            if (typeof CM === 'undefined' || !xtermTheme) return CM.oneDark;
+            if (typeof CM === 'undefined') return [];
+            if (!xtermTheme) return [CM.oneDark];
 
             // Strip alpha from rgba backgrounds — CM6 needs opaque backgrounds
             const bg = (xtermTheme.background || '#1a1b26').replace(/rgba?\((\d+),\s*(\d+),\s*(\d+)[\s,]*[\d.]*\)/, 'rgb($1,$2,$3)');
@@ -9248,8 +9448,8 @@
 
                 // Check for hide-terminal escape sequence
                 // CLI tools emit this to request terminal auto-hide (e.g., when recording starts)
+                HIDE_TERMINAL_REGEX.lastIndex = 0; // Reset before test (global regex)
                 const hasHideSignal = HIDE_TERMINAL_REGEX.test(data);
-                HIDE_TERMINAL_REGEX.lastIndex = 0; // Reset regex state
                 console.log('[Terminal] Message received, isTerminalOpen:', isTerminalOpen, 'hasHideSignal:', hasHideSignal);
                 if (hasHideSignal) {
                     console.log('[Terminal] Hide signal detected! Raw data:', JSON.stringify(data.slice(0, 100)));
@@ -10037,7 +10237,9 @@
 
         const UI_COMMANDS = [
             // Tabs
-            { id: 'ui:new-tab',       title: 'New Tab',                  section: 'Tabs',           keywords: 'create add open',         handler: () => createNewTab(),                                                       content: () => `${tabs.length} tab${tabs.length !== 1 ? 's' : ''} open` },
+            { id: 'ui:new-tab',       title: 'New Cloud Tab',            section: 'Tabs',           keywords: 'create add open cloud',   handler: () => createNewTab(),                                                       content: () => `${tabs.length} tab${tabs.length !== 1 ? 's' : ''} open` },
+            { id: 'ui:new-local-tab', title: 'New Local Tab',            section: 'Tabs',           keywords: 'local iframe host embed', handler: () => createLocalTab(),                                                     content: 'Load a URL in an iframe (bypasses VM)' },
+            { id: 'ui:open-urls-clipboard', title: 'Open URLs from Clipboard', section: 'Tabs',     keywords: 'clipboard paste urls bulk batch', handler: () => openUrlsFromClipboard(),                                        content: 'Parse URLs from clipboard, open as cloud tabs' },
             { id: 'ui:close-tab',     title: 'Close Tab',                section: 'Tabs',           keywords: 'remove delete',            handler: () => closeTab(activeTabId),                                                content: _activeTabContent },
             { id: 'ui:duplicate-tab', title: 'Duplicate Tab',            section: 'Tabs',           keywords: 'copy clone',               handler: () => duplicateTab(activeTabId),                                            content: _activeTabContent },
             { id: 'ui:pin-tab',       title: 'Pin/Unpin Tab',            section: 'Tabs',           keywords: 'lock stick',               handler: () => togglePinTab(activeTabId),                                            content: _activeTabContent },
@@ -10068,11 +10270,23 @@
             { id: 'ui:vision-scotoma',     title: 'Vision: Central Scotoma',  section: 'Accessibility',  keywords: 'vision scotoma macular central blind spot', handler: () => setVisionSimulation('central-scotoma'),                  content: 'Central vision loss (AMD)' },
             { id: 'ui:vision-cataracts',   title: 'Vision: Cataracts',        section: 'Accessibility',  keywords: 'vision cataracts blur yellow',      handler: () => setVisionSimulation('cataracts'),                             content: 'Cloudy lens simulation' },
             { id: 'ui:vision-low',         title: 'Vision: Low Vision',       section: 'Accessibility',  keywords: 'vision blur acuity low',            handler: () => setVisionSimulation('low-vision-moderate'),                   content: 'Blurred vision (20/100)' },
+            { id: 'ui:vision-near-total',  title: 'Vision: Near-Total Loss',  section: 'Accessibility',  keywords: 'vision blur profound blind screen reader',    handler: () => setVisionSimulation('near-total-loss'),              content: 'Profound low vision — shapes only' },
+            { id: 'ui:vision-light-only',  title: 'Vision: Light Perception', section: 'Accessibility',  keywords: 'vision light perception blind dark total',    handler: () => setVisionSimulation('light-perception'),             content: 'Light/dark only — screen reader essential' },
             { id: 'ui:vision-keratoconus', title: 'Vision: Keratoconus',      section: 'Accessibility',  keywords: 'vision keratoconus distortion cornea warp',  handler: () => setVisionSimulation('keratoconus'),                  content: 'Corneal distortion + ghosting' },
             { id: 'ui:vision-metamorphopsia',title:'Vision: Metamorphopsia',   section: 'Accessibility',  keywords: 'vision wavy distortion lines bent',          handler: () => setVisionSimulation('metamorphopsia'),               content: 'Wavy/bent line distortion' },
             { id: 'ui:vision-diplopia',    title: 'Vision: Diplopia',          section: 'Accessibility', keywords: 'vision double diplopia ghost strabismus',     handler: () => setVisionSimulation('diplopia'),                     content: 'Double vision (mouse-reactive)' },
             { id: 'ui:vision-floaters',    title: 'Vision: Diabetic Floaters', section: 'Accessibility', keywords: 'vision floaters dark spots diabetic drift',   handler: () => setVisionSimulation('diabetic-floaters'),            content: 'Drifting dark blobs' },
             { id: 'ui:vision-scarring',    title: 'Vision: Corneal Scarring', section: 'Accessibility',  keywords: 'vision scar cornea blur patch opacity',      handler: () => setVisionSimulation('corneal-scarring'),             content: 'Localized blur + distortion' },
+            { id: 'ui:vision-nystagmus',   title: 'Vision: Nystagmus',        section: 'Accessibility',  keywords: 'vision nystagmus jitter shake oscillation',   handler: () => setVisionSimulation('nystagmus'),                    content: 'Involuntary eye oscillation' },
+            { id: 'ui:vision-snow',        title: 'Vision: Visual Snow',      section: 'Accessibility',  keywords: 'vision snow static noise grain flicker',      handler: () => setVisionSimulation('visual-snow'),                  content: 'Persistent TV-static overlay' },
+            { id: 'ui:vision-glaucoma',    title: 'Vision: Glaucoma',         section: 'Accessibility',  keywords: 'vision glaucoma peripheral scotoma patchy',   handler: () => setVisionSimulation('glaucoma'),                     content: 'Patchy peripheral scotomas' },
+            { id: 'ui:vision-hemianopia',  title: 'Vision: Hemianopia',       section: 'Accessibility',  keywords: 'vision hemianopia half field stroke left',    handler: () => setVisionSimulation('hemianopia'),                   content: 'Left visual field loss' },
+            // Motor impairment simulators
+            { id: 'ui:motor-parkinsons',   title: "Motor: Parkinson's Tremor", section: 'Accessibility', keywords: 'motor parkinson tremor shake cursor hand',    handler: () => setMotorSimulation('parkinsons'),                    content: 'Resting tremor (4-6 Hz)' },
+            { id: 'ui:motor-essential',    title: 'Motor: Essential Tremor',   section: 'Accessibility', keywords: 'motor essential tremor action intention',     handler: () => setMotorSimulation('essential-tremor'),              content: 'Action tremor — worsens on reach' },
+            { id: 'ui:motor-spasm',        title: 'Motor: Muscle Spasms',      section: 'Accessibility', keywords: 'motor spasm jerk involuntary cerebral palsy', handler: () => setMotorSimulation('muscle-spasm'),                  content: 'Sudden involuntary cursor jumps' },
+            { id: 'ui:motor-limited',      title: 'Motor: Limited Fine Motor', section: 'Accessibility', keywords: 'motor limited dexterity arthritis precision', handler: () => setMotorSimulation('limited-mobility'),              content: 'Reduced cursor precision' },
+            { id: 'ui:motor-off',          title: 'Motor: Normal',             section: 'Accessibility', keywords: 'motor clear reset normal off',                 handler: () => clearMotorSimulation(),                              content: 'Remove motor simulation' },
             // Navigation
             { id: 'ui:back',          title: 'Go Back',                  section: 'Navigation',     keywords: 'previous history back',     handler: () => goBack(),                                                             content: 'Navigate to previous page' },
             { id: 'ui:forward',       title: 'Go Forward',               section: 'Navigation',     keywords: 'next history forward',      handler: () => goForward(),                                                          content: 'Navigate to next page' },
@@ -10105,9 +10319,9 @@
             'top': 'toast', 'bottom': 'toast', 'click': 'toast', 'type': 'toast',
             'focus': 'toast', 'page-up': 'toast', 'page-down': 'toast',
             'paste': 'toast', 'press': 'toast',
-            // Terminal (interactive)
+            // Terminal (interactive or long output)
             'ask': 'terminal', 'js': 'terminal', 'record': 'terminal', 'replay': 'terminal',
-            'do': 'terminal',
+            'do': 'terminal', 'sitemap': 'terminal',
         };
 
         // Commands that need argument prompts before execution
@@ -11551,8 +11765,11 @@
                     const serverTabIds = new Set(serverTabs.map(t => t.id));
                     const localTabIds = new Set(tabs.map(t => t.id));
 
-                    // Remove tabs that no longer exist on server
-                    tabs = tabs.filter(t => serverTabIds.has(t.id));
+                    // Preserve local tabs (client-only, not on server)
+                    const preservedLocalTabs = tabs.filter(t => localTabs[t.id]);
+
+                    // Remove tabs that no longer exist on server (excluding local tabs)
+                    tabs = tabs.filter(t => serverTabIds.has(t.id) || localTabs[t.id]);
 
                     // Update existing tabs with fresh data from server (preserve local-only properties)
                     tabs = tabs.map(localTab => {
@@ -11597,9 +11814,9 @@
                         if (!tabActivationTimes[activeTabId]) {
                             onTabActivated(activeTabId);
                         }
-                        // Don't overwrite URL bar when viewing an internal page —
+                        // Don't overwrite URL bar when viewing an internal or local page —
                         // Chrome's URL may differ from the native iframe's URL.
-                        if (!internalTabs[activeTabId]) {
+                        if (!internalTabs[activeTabId] && !localTabs[activeTabId]) {
                             const urlBar = document.getElementById('urlBar');
                             if (document.activeElement !== urlBar) {
                                 const urlChanged = activeTab.url !== currentUrl;
@@ -11721,7 +11938,7 @@
                 if (tabEl) {
                     // Update existing tab element (no DOM recreation = no flicker)
                     const wasLoading = tabEl.classList.contains('loading');
-                    tabEl.className = 'tab' + (tab.id === activeTabId ? ' active' : '') + (wasLoading ? ' loading' : '') + (tab.pinned ? ' tab-pinned' : '');
+                    tabEl.className = 'tab' + (tab.id === activeTabId ? ' active' : '') + (wasLoading ? ' loading' : '') + (tab.pinned ? ' tab-pinned' : '') + (localTabs[tab.id] ? ' tab-local' : '');
                     tabEl.dataset.index = index;
 
                     // Update title
@@ -11807,7 +12024,7 @@
         // Create a new tab element
         function createTabElement(tab, index) {
             const tabEl = document.createElement('div');
-            tabEl.className = 'tab' + (tab.id === activeTabId ? ' active' : '') + (tab.pinned ? ' tab-pinned' : '');
+            tabEl.className = 'tab' + (tab.id === activeTabId ? ' active' : '') + (tab.pinned ? ' tab-pinned' : '') + (localTabs[tab.id] ? ' tab-local' : '');
             tabEl.draggable = true;
             tabEl.dataset.tabId = tab.id;
             tabEl.dataset.index = index;
@@ -11829,6 +12046,10 @@
                 const placeholder = document.createElement('div');
                 placeholder.className = 'tab-favicon-placeholder';
                 placeholder.textContent = '🌐';
+                if (localTabs[tab.id]) {
+                    placeholder.textContent = '';
+                    placeholder.innerHTML = '<svg width="12" height="12" viewBox="0 0 16 16"><rect x="1" y="3" width="14" height="9" rx="1.5" stroke="currentColor" stroke-width="1.5" fill="none"/><line x1="5" y1="14" x2="11" y2="14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>';
+                }
                 tabEl.appendChild(placeholder);
             }
 
@@ -11902,7 +12123,19 @@
             return tabEl;
         }
 
-        // Create a new tab
+        // Show dropdown menu next to the "+" button
+        function showNewTabMenu(e) {
+            e.stopPropagation();
+            const rect = e.currentTarget.getBoundingClientRect();
+            showContextMenu({ clientX: rect.left, clientY: rect.bottom + 4, preventDefault: () => {} }, [
+                { label: 'New Cloud Tab', action: () => createNewTab() },
+                { label: 'New Local Tab', action: () => createLocalTab() },
+                { separator: true },
+                { label: 'Open URLs from Clipboard', action: () => openUrlsFromClipboard() },
+            ]);
+        }
+
+        // Create a new cloud tab
         async function createNewTab() {
             try {
                 const response = await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/tabs/new?url=http://inspekt/status`);
@@ -11920,6 +12153,75 @@
                 }
             } catch (e) {
                 showToast('Failed to create tab', 'error');
+            }
+        }
+
+        // Create a new local tab (iframe loaded from host network)
+        function createLocalTab() {
+            const tabId = 'local-' + Date.now();
+            localTabs[tabId] = { url: 'about:blank', title: 'Local Tab' };
+
+            tabs.push({
+                id: tabId,
+                url: 'about:blank',
+                title: 'Local Tab',
+                favicon: null,
+                pinned: false,
+                _isLocal: true,
+            });
+
+            activeTabId = tabId;
+            renderTabs();
+            syncViewport();
+            showToast('Local tab — type a URL to load', 'info');
+
+            // Focus address bar for immediate URL entry
+            const urlBar = document.getElementById('urlBar');
+            urlBar.value = '';
+            urlBar.focus();
+            urlBar.select();
+        }
+
+        // Open URLs from clipboard as cloud tabs
+        async function openUrlsFromClipboard() {
+            try {
+                const text = await navigator.clipboard.readText();
+                const urlRegex = /https?:\/\/[^\s<>"')\]]+/gi;
+                const matches = text.match(urlRegex);
+                if (!matches || matches.length === 0) {
+                    showToast('No URLs found in clipboard', 'warning');
+                    return;
+                }
+
+                // Deduplicate and validate
+                const unique = [...new Set(matches)].filter(u => {
+                    try { new URL(u); return true; } catch { return false; }
+                });
+
+                if (unique.length === 0) {
+                    showToast('No valid URLs found in clipboard', 'warning');
+                    return;
+                }
+
+                const urls = unique.slice(0, 15);
+                const truncated = unique.length > 15 ? ` (capped at 15 of ${unique.length})` : '';
+                showToast(`Opening ${urls.length} tab${urls.length > 1 ? 's' : ''}${truncated}...`, 'success');
+
+                for (const url of urls) {
+                    try {
+                        await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/tabs/new?url=${encodeURIComponent(url)}`);
+                    } catch {
+                        // Silently skip failed tabs
+                    }
+                }
+
+                await fetchTabs();
+            } catch (e) {
+                if (e.name === 'NotAllowedError') {
+                    showToast('Clipboard access denied — click the page first', 'warning');
+                } else {
+                    showToast('Failed to read clipboard', 'error');
+                }
             }
         }
 
@@ -11941,6 +12243,18 @@
             if (activeTabId && shouldCaptureThumbnail(activeTabId)) {
                 // Fire and forget - don't wait for screenshot
                 captureTabThumbnail(activeTabId);
+            }
+
+            // If switching to a local tab, skip CDP activation — just swap viewport
+            if (localTabs[tabId]) {
+                activeTabId = tabId;
+                onTabActivated(tabId);
+                renderTabs();
+                currentUrl = localTabs[tabId].url;
+                document.getElementById('urlBar').value = currentUrl;
+                updateCloudIconState(currentUrl);
+                syncViewport();
+                return;
             }
 
             // If switching to an internal tab, skip CDP activation — just swap viewport
@@ -12055,6 +12369,24 @@
             delete tabNavHistory[tabId];
             delete _tabInspectState[tabId];
             delete internalTabs[tabId];
+
+            const isLocal = !!localTabs[tabId];
+            delete localTabs[tabId];
+
+            if (isLocal) {
+                // Local tab — no server-side tab to close
+                tabs = tabs.filter(t => t.id !== tabId);
+                if (tabId === activeTabId) {
+                    const next = tabs[0];
+                    if (next) {
+                        activeTabId = next.id;
+                        await activateTab(activeTabId);
+                    }
+                }
+                renderTabs();
+                return;
+            }
+
             try {
                 const response = await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/tabs/${tabId}/close`);
                 const data = await response.json();
@@ -12490,6 +12822,31 @@
             e.preventDefault();
             const tab = tabs.find(t => t.id === tabId);
             if (!tab) return;
+
+            // Reduced context menu for local tabs
+            if (localTabs[tabId]) {
+                const localUrl = localTabs[tabId].url;
+                showContextMenu(e, [
+                    { label: tab.pinned ? 'Unpin Tab' : 'Pin Tab', action: () => togglePinTab(tabId) },
+                    { label: 'Duplicate Tab', action: () => duplicateTab(tabId) },
+                    { separator: true },
+                    { label: 'Reload Page', action: () => {
+                        const iframe = document.querySelector('#nativeContainer iframe');
+                        if (iframe) { iframe.src = 'about:blank'; setTimeout(() => iframe.src = localUrl, 50); }
+                    }},
+                    { label: 'Copy URL', action: () => {
+                        navigator.clipboard.writeText(localUrl);
+                        showToast('URL copied', 'success');
+                    }},
+                    { label: 'Open in Host Browser', action: () => window.open(localUrl, '_blank') },
+                    { label: 'Open as Cloud Tab', action: () => convertToCloudTab(tabId, localUrl) },
+                    { separator: true },
+                    { label: 'Close Tab', action: () => closeTab(tabId), disabled: tabs.length <= 1 },
+                    { label: 'Close Other Tabs', action: () => closeOtherTabs(tabId), disabled: tabs.length <= 1 },
+                ]);
+                return;
+            }
+
             const opts = getReloadOptions(tab.url);
             const anyClearing = opts.clearCache || opts.clearCookies || opts.clearStorage;
 
@@ -12724,7 +13081,21 @@
 
         async function duplicateTab(tabId) {
             const tab = tabs.find(t => t.id === tabId);
-            if (!tab || !tab.url) return;
+            if (!tab) return;
+
+            // Duplicate a local tab as another local tab
+            if (localTabs[tabId]) {
+                const newId = 'local-' + Date.now();
+                const url = localTabs[tabId].url;
+                localTabs[newId] = { url, title: localTabs[tabId].title };
+                tabs.push({ id: newId, url, title: localTabs[tabId].title, favicon: null, pinned: false, _isLocal: true });
+                activeTabId = newId;
+                renderTabs();
+                syncViewport();
+                return;
+            }
+
+            if (!tab.url) return;
             try {
                 await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/tabs/new?url=${encodeURIComponent(tab.url)}`);
                 await refreshTabs();
@@ -13018,6 +13389,7 @@
             updateSplashStatus('Loading...');
             initToolbar();
             initVisionSimulator();
+            initMotorSimulator();
             setTimeout(connectVNC, 500);
             setInterval(checkHealth, 5000);
 
