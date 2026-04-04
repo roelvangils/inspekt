@@ -428,15 +428,66 @@ def _extract_title(text: str) -> str:
     return title
 
 
+# Patterns for extracting dates from HTML (ordered by reliability)
+_DATE_META_PATTERNS = [
+    # Open Graph / article dates (most reliable)
+    re.compile(r'<meta[^>]*property="article:modified_time"[^>]*content="([^"]+)"', re.I),
+    re.compile(r'<meta[^>]*property="article:published_time"[^>]*content="([^"]+)"', re.I),
+    re.compile(r'<meta[^>]*property="og:updated_time"[^>]*content="([^"]+)"', re.I),
+    # Reversed attribute order (some CMSs do this)
+    re.compile(r'<meta[^>]*content="([^"]+)"[^>]*property="article:modified_time"', re.I),
+    re.compile(r'<meta[^>]*content="([^"]+)"[^>]*property="article:published_time"', re.I),
+    # Dublin Core
+    re.compile(r'<meta[^>]*name="dcterms\.modified"[^>]*content="([^"]+)"', re.I),
+    re.compile(r'<meta[^>]*name="DC\.date"[^>]*content="([^"]+)"', re.I),
+    # Generic
+    re.compile(r'<meta[^>]*name="date"[^>]*content="([^"]+)"', re.I),
+    re.compile(r'<meta[^>]*name="last-modified"[^>]*content="([^"]+)"', re.I),
+]
+
+_JSON_LD_RE = re.compile(
+    r'<script[^>]*type="application/ld\+json"[^>]*>(.*?)</script>', re.I | re.DOTALL
+)
+
+
+def _extract_date_from_html(text: str) -> str:
+    """Extract a publication/modification date from HTML meta tags or JSON-LD.
+
+    Returns an ISO date string, or empty if not found.
+    """
+    # Try meta tags first
+    for pattern in _DATE_META_PATTERNS:
+        match = pattern.search(text)
+        if match:
+            return match.group(1).strip()
+
+    # Try JSON-LD structured data
+    for match in _JSON_LD_RE.finditer(text):
+        try:
+            data = json.loads(match.group(1))
+            items = data if isinstance(data, list) else [data]
+            for item in items:
+                if not isinstance(item, dict):
+                    continue
+                # Prefer dateModified over datePublished
+                for key in ("dateModified", "datePublished"):
+                    if key in item and isinstance(item[key], str):
+                        return item[key]
+        except (json.JSONDecodeError, TypeError):
+            continue
+
+    return ""
+
+
 def _fetch_single_title(url: str, timeout: float = 3.0) -> tuple[str, str]:
     """
     Fetch a page progressively until the <title> tag is found.
 
-    Also captures the Last-Modified header as a fallback date for sitemaps
-    that don't include lastmod.
+    Also captures dates from (in order): Last-Modified header, HTML meta
+    tags, JSON-LD structured data — as fallback for sitemaps without lastmod.
 
     Returns:
-        Tuple of (title, last_modified_header). Either may be empty.
+        Tuple of (title, date). Either may be empty.
     """
     try:
         response = http_client.get(
@@ -468,16 +519,21 @@ def _fetch_single_title(url: str, timeout: float = 3.0) -> tuple[str, str]:
                 if len(content) >= limit:
                     break
 
-            title = _extract_title(content.decode("utf-8", errors="replace"))
+            text = content.decode("utf-8", errors="replace")
+            title = _extract_title(text)
             if title:
                 response.close()
-                return title, last_modified
+                # Fallback chain: Last-Modified header → HTML meta/JSON-LD dates
+                date = last_modified or _extract_date_from_html(text)
+                return title, date
 
             if len(content) < limit:
                 break
 
         response.close()
-        return "", last_modified
+        text = content.decode("utf-8", errors="replace")
+        date = last_modified or _extract_date_from_html(text)
+        return "", date
 
     except (requests.RequestException, OSError) as e:
         logger.debug(f"Title fetch failed for {url}: {type(e).__name__}: {e}")
@@ -609,9 +665,11 @@ def fetch_titles(
                 if title:
                     entries[idx].title = title
                     fetched += 1
-                # Use Last-Modified header as fallback when sitemap has no lastmod
+                # Use extracted date as fallback when sitemap has no lastmod
                 if last_modified and not entries[idx].lastmod:
-                    entries[idx].lastmod = _parse_http_date(last_modified)
+                    # Could be HTTP date format or already ISO — normalize it
+                    parsed = _parse_http_date(last_modified)
+                    entries[idx].lastmod = parsed if parsed else last_modified
             except Exception:
                 pass
 
