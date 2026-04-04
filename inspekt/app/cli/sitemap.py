@@ -80,56 +80,6 @@ _LANG_NAMES = {
     "zh": "Chinese", "zu": "Zulu",
 }
 
-# Known ISO 639-1 language codes (2-letter) for detection
-_LANG_CODES = {
-    "aa", "ab", "af", "ak", "am", "an", "ar", "as", "av", "ay", "az",
-    "ba", "be", "bg", "bh", "bi", "bm", "bn", "bo", "br", "bs",
-    "ca", "ce", "ch", "co", "cr", "cs", "cu", "cv", "cy",
-    "da", "de", "dv", "dz",
-    "ee", "el", "en", "eo", "es", "et", "eu",
-    "fa", "ff", "fi", "fj", "fo", "fr", "fy",
-    "ga", "gd", "gl", "gn", "gu", "gv",
-    "ha", "he", "hi", "ho", "hr", "ht", "hu", "hy", "hz",
-    "ia", "id", "ie", "ig", "ii", "ik", "io", "is", "it", "iu",
-    "ja", "jv",
-    "ka", "kg", "ki", "kj", "kk", "kl", "km", "kn", "ko", "kr", "ks", "ku", "kv", "kw", "ky",
-    "la", "lb", "lg", "li", "ln", "lo", "lt", "lu", "lv",
-    "mg", "mh", "mi", "mk", "ml", "mn", "mr", "ms", "mt", "my",
-    "na", "nb", "nd", "ne", "ng", "nl", "nn", "no", "nr", "nv", "ny",
-    "oc", "oj", "om", "or", "os",
-    "pa", "pi", "pl", "ps", "pt",
-    "qu",
-    "rm", "rn", "ro", "ru", "rw",
-    "sa", "sc", "sd", "se", "sg", "si", "sk", "sl", "sm", "sn", "so", "sq", "sr", "ss", "st", "su", "sv", "sw",
-    "ta", "te", "tg", "th", "ti", "tk", "tl", "tn", "to", "tr", "ts", "tt", "tw", "ty",
-    "ug", "uk", "ur", "uz",
-    "ve", "vi", "vo",
-    "wa", "wo",
-    "xh",
-    "yi", "yo",
-    "za", "zh", "zu",
-}
-
-
-def _detect_languages(entries) -> set[str]:
-    """
-    Detect language prefixes in sitemap URLs.
-
-    Looks for 2-letter ISO 639-1 codes as the first path segment
-    (e.g., /en/about, /nl/contact). Only returns languages that
-    appear in a significant number of URLs.
-    """
-    lang_counts: dict[str, int] = {}
-    for entry in entries:
-        parsed = urlparse(entry.loc)
-        parts = [p for p in parsed.path.split("/") if p]
-        if parts and parts[0].lower() in _LANG_CODES:
-            lang = parts[0].lower()
-            lang_counts[lang] = lang_counts.get(lang, 0) + 1
-
-    # Require at least 2 languages with at least 3 URLs each (filters noise)
-    candidates = {lang for lang, count in lang_counts.items() if count >= 3}
-    return candidates if len(candidates) >= 2 else set()
 
 
 # ============================================================================
@@ -769,7 +719,8 @@ def _display_sitemap(result, flat: bool, filter_path: str, from_cache: bool = Fa
 
     # Detect available languages from URL path prefixes
     if not filter_path:
-        langs = _detect_languages(result.entries)
+        from inspekt.services.sitemap_service import detect_languages
+        langs = detect_languages(result.entries)
         if langs:
             lang_str = ", ".join(f"`{l}`" for l in sorted(langs))
             print_hint(f"Languages detected: {lang_str}. Use `--lang nl` to filter by language")

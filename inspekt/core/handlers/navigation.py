@@ -364,7 +364,7 @@ async def page_down(params: EmptyParams) -> NavigateResponse:
 # ── Sitemap handler ──────────────────────────────────────────────────
 
 
-async def get_sitemap(params) -> "SitemapResponse":
+async def get_sitemap(params: "SitemapParams") -> "SitemapResponse":
     """
     Fetch and return a site's sitemap with page titles.
 
@@ -455,8 +455,8 @@ async def get_sitemap(params) -> "SitemapResponse":
         entries = [e for e in entries if lang_prefix in urlparse(e.loc).path]
 
     # Detect languages
-    from inspekt.app.cli.sitemap import _detect_languages
-    languages = sorted(_detect_languages(sitemap_result.entries))
+    from inspekt.services.sitemap_service import detect_languages
+    languages = sorted(detect_languages(sitemap_result.entries))
 
     # Build response
     items = []
