@@ -514,6 +514,9 @@ cli.add_lazy_command("md-link", "util", "md_link")
 # Robots.txt inspection (from robots.py)
 cli.add_lazy_command("robots", "robots", "robots")
 
+# Sitemap inspection and navigation (from sitemap.py)
+cli.add_lazy_command("sitemap", "sitemap", "sitemap")
+
 # Network inspection commands (from network.py)
 cli.add_lazy_command("network", "network", "network")
 

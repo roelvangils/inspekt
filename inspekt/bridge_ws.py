@@ -98,6 +98,7 @@ audio_cues: list[dict] = []  # List of {timestamp_ms, action} dicts
 audio_recording_active: bool = False
 audio_recording_start_time: float = 0.0  # time.time() when recording started
 
+
 # Server tracking
 server_start_time = time.time()  # Track server uptime
 connection_times: dict = {}  # Track when each connection was established
@@ -112,6 +113,41 @@ last_command_per_connection: dict = {}  # Track last command execution time per 
 instance_ids: dict[str, Any] = {}  # Maps instance_id (str) -> WebSocket
 instance_aliases: dict[str, str] = {}  # Maps alias (str) -> instance_id
 instance_id_to_ws: dict[str, Any] = {}  # Reverse lookup: instance_id -> WebSocket
+
+
+async def _run_autorun_plugins(ws, url: str) -> None:
+    """Run autorun plugins for a page load event."""
+    try:
+        if ws.closed or ws not in active_connections:
+            return
+
+        from inspekt.services.plugin_service import get_plugin_service, matches_autorun_pattern
+
+        plugin_service = get_plugin_service()
+        autorun_plugins = plugin_service.get_autorun_plugins()
+
+        if not autorun_plugins:
+            return
+
+        for plugin in autorun_plugins:
+            if not matches_autorun_pattern(url, plugin.get("autorun_domains")):
+                continue
+
+            try:
+                request_id = str(uuid.uuid4())
+                msg = json.dumps({
+                    "type": "execute",
+                    "requestId": request_id,
+                    "code": plugin["code"],
+                })
+                await ws.send_str(msg)
+                plugin_service.increment_run_count(plugin["id"])
+                print(f"[Autorun] Executed plugin '{plugin['name']}' on {url[:60]}")
+            except Exception as e:
+                print(f"[Autorun] Failed to execute plugin '{plugin['name']}': {e}")
+
+    except Exception as e:
+        print(f"[Autorun] Error: {e}")
 
 
 def generate_instance_id() -> str:
@@ -1129,6 +1165,14 @@ async def websocket_handler(request):
                         ext_version = data.get("extensionVersion", "unknown")
                         visible_status = "visible" if data.get("visible", True) else "hidden"
                         print(f"Browser info received: {browser_name} v{ext_version} ({visible_status}) - {page_title}")
+
+                        # Trigger autorun plugins after a short delay
+                        page_url = data.get("url", "")
+                        if page_url.startswith("http"):
+                            loop = asyncio.get_running_loop()
+                            loop.call_later(
+                                0.5, lambda w=ws, u=page_url: asyncio.ensure_future(_run_autorun_plugins(w, u))
+                            )
 
                     elif message_type == "visibility_change":
                         # Update visibility state for this browser
@@ -3525,6 +3569,117 @@ async def handle_audio_status(request):
     })
 
 
+async def handle_http_proxy(request):
+    """Proxy HTTP requests for the restricted VM terminal.
+
+    Accepts a JSON payload with:
+        url: Target URL (required)
+        method: HTTP method (default: GET)
+        headers: Request headers (default: {})
+        body: Request body — dict for JSON or str for raw (default: None)
+        timeout: Request timeout in seconds (default: 30)
+
+    Only requests to domains in PROXY_ALLOWED_DOMAINS are permitted.
+    """
+    try:
+        data = await request.json()
+    except Exception:
+        return web.json_response({"ok": False, "error": "invalid JSON"}, status=400)
+
+    url = data.get("url")
+    method = data.get("method", "GET").upper()
+    headers = data.get("headers", {})
+    body = data.get("body")
+    timeout = data.get("timeout", 30)
+    max_bytes = data.get("max_bytes")  # Optional: limit response body size
+
+    if not url:
+        return web.json_response({"ok": False, "error": "missing url"}, status=400)
+
+    try:
+        import aiohttp as _aiohttp
+
+        ct = _aiohttp.ClientTimeout(total=timeout)
+        async with _aiohttp.ClientSession(timeout=ct) as session:
+            kwargs = {"headers": headers}
+            if body is not None:
+                if isinstance(body, dict):
+                    kwargs["json"] = body
+                else:
+                    kwargs["data"] = body
+
+            async with session.request(method, url, **kwargs) as resp:
+                content_type = resp.headers.get("Content-Type", "")
+                is_binary = not (
+                    content_type.startswith("text/")
+                    or "json" in content_type
+                    or "xml" in content_type
+                    or "javascript" in content_type
+                )
+
+                resp_headers = {k: v for k, v in resp.headers.items()}
+
+                final_url = str(resp.url)
+
+                if is_binary:
+                    import base64
+                    if max_bytes:
+                        chunks = []
+                        total = 0
+                        while total < max_bytes:
+                            chunk = await resp.content.read(min(65536, max_bytes - total))
+                            if not chunk:
+                                break
+                            chunks.append(chunk)
+                            total += len(chunk)
+                        raw = b"".join(chunks)
+                    else:
+                        raw = await resp.read()
+                    return web.json_response({
+                        "ok": True,
+                        "status": resp.status,
+                        "headers": resp_headers,
+                        "body": base64.b64encode(raw).decode(),
+                        "binary": True,
+                        "url": final_url,
+                    })
+                else:
+                    if max_bytes:
+                        # Read up to max_bytes — loop because chunked responses
+                        # may return partial data from a single read() call
+                        chunks = []
+                        total = 0
+                        while total < max_bytes:
+                            chunk = await resp.content.read(min(65536, max_bytes - total))
+                            if not chunk:
+                                break
+                            chunks.append(chunk)
+                            total += len(chunk)
+                        raw = b"".join(chunks)
+                        text = raw.decode(resp.get_encoding() or "utf-8", errors="replace")
+                    else:
+                        text = await resp.text()
+                    return web.json_response({
+                        "ok": True,
+                        "status": resp.status,
+                        "headers": resp_headers,
+                        "body": text,
+                        "binary": False,
+                        "url": final_url,
+                    })
+
+    except asyncio.TimeoutError:
+        return web.json_response(
+            {"ok": False, "error": "upstream timeout", "error_type": "timeout"},
+            status=504,
+        )
+    except Exception as e:
+        return web.json_response(
+            {"ok": False, "error": str(e), "error_type": "connection"},
+            status=502,
+        )
+
+
 async def main(enable_socket: bool = True, socket_path_override: Optional[str] = None):
     """Start HTTP, WebSocket, and Unix socket servers.
 
@@ -3633,6 +3788,9 @@ async def main(enable_socket: bool = True, socket_path_override: Optional[str] =
     app.router.add_post("/audio/cue", handle_audio_cue)
     app.router.add_get("/audio/cues", handle_audio_cues)
     app.router.add_get("/audio/status", handle_audio_status)
+
+    # HTTP proxy for restricted VM terminal
+    app.router.add_post("/proxy", handle_http_proxy)
 
     # WebSocket endpoint for browser
     app.router.add_get("/ws", websocket_handler)

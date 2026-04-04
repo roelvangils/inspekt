@@ -72,6 +72,8 @@ RUN apk add --no-cache \
     bash \
     zsh \
     jq \
+    # PTY allocation (needed by gum for interactive TUI in non-login terminals)
+    util-linux \
     # Git needed for pip to install Click from GitHub (until 8.3.2 is released)
     git \
     # Video recording for inspekt replay --video
@@ -392,6 +394,8 @@ COPY docker/browser-vm/toolbar.css /usr/share/novnc/toolbar.css
 COPY docker/browser-vm/toolbar.js /usr/share/novnc/toolbar.js
 COPY docker/browser-vm/vision-sim.js /usr/share/novnc/vision-sim.js
 COPY docker/browser-vm/vision-sim.css /usr/share/novnc/vision-sim.css
+COPY docker/browser-vm/motor-sim.js /usr/share/novnc/motor-sim.js
+COPY docker/browser-vm/motor-sim.css /usr/share/novnc/motor-sim.css
 COPY docker/browser-vm/fonts /usr/share/novnc/fonts
 COPY docker/browser-vm/vendor/codemirror.min.js /usr/share/novnc/vendor/codemirror.min.js
 COPY docker/browser-vm/vendor/ninja-keys.min.js /usr/share/novnc/vendor/ninja-keys.min.js
