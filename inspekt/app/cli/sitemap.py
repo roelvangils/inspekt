@@ -1170,10 +1170,9 @@ def sitemap(url, flat, filter_path, lang, open_target, interactive, where, neigh
         # Cache with raw titles (site name stripping happens below for display)
         save_to_cache(result)
 
-    # Strip the common site name from titles for display. This runs on both
-    # fresh and cached results so titles collected by the API (which stores
-    # raw titles) are also cleaned. strip_site_name is idempotent.
-    if not no_titles and result.entries:
+    # Strip the common site name from titles for display. Runs regardless of
+    # no_titles since it operates on already-cached titles (no network calls).
+    if result.entries:
         site_name = detect_site_name(result.entries)
         if site_name:
             for entry in result.entries:
