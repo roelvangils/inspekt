@@ -332,13 +332,16 @@ def get_sitemap_tree(
             # Enrich the ancestor's title if needed
             if enrich:
                 _enrich_nodes([nearest], origin, result)
-            site_name = sitemap_service.detect_site_name(
-                [nearest.entry] if nearest.entry and nearest.entry.title else []
-            )
+            # Strip site name using all cached entries for detection,
+            # but only modifying the ancestor's title
+            if nearest.entry and nearest.entry.title:
+                titled = [e for e in result.entries if e.title]
+                if len(titled) >= 3:
+                    sitemap_service.strip_site_names_from_entries(titled)
             return SitemapTreeResponse(
                 ok=True,
                 in_sitemap=False,
-                parent=_node_to_info(nearest, origin, site_name),
+                parent=_node_to_info(nearest, origin),
             )
         return SitemapTreeResponse(ok=True, in_sitemap=False)
 
@@ -375,24 +378,26 @@ def get_sitemap_tree(
         nodes_to_enrich.extend(sibling_nodes[:10])
         _enrich_nodes(nodes_to_enrich, origin, result)
 
-    # Detect site name from enriched nodes to strip from titles
+    # Strip common site name fragments from enriched titles (in-place).
+    # Uses multi-pass stripping to handle "Page | Brand | Tagline" patterns.
     enriched_entries = [
         n.entry for n in nodes_to_enrich
         if n.entry and n.entry.title
     ]
-    site_name = sitemap_service.detect_site_name(enriched_entries)
+    sitemap_service.strip_site_names_from_entries(enriched_entries)
 
     # Build recursive children (up to 4 levels, 25 per level)
-    recursive_children = _build_recursive_children(node, origin, site_name)
+    # Titles are already stripped, so no site_name needed
+    recursive_children = _build_recursive_children(node, origin, site_name="")
 
     return SitemapTreeResponse(
         ok=True,
         in_sitemap=True,
-        current=_node_to_info(node, origin, site_name),
-        parent=_node_to_info(parent, origin, site_name) if parent else None,
+        current=_node_to_info(node, origin),
+        parent=_node_to_info(parent, origin) if parent else None,
         children=recursive_children,
         children_total=total_children,
-        siblings=[_node_to_info(s, origin, site_name) for s in sibling_nodes[:25]],
+        siblings=[_node_to_info(s, origin) for s in sibling_nodes[:25]],
     )
 
 

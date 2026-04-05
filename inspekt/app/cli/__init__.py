@@ -16,9 +16,23 @@ from inspekt import __version__
 from inspekt.app.cli.base import CustomGroup
 
 
+def _no_tips_callback(ctx, param, value):
+    """Eager callback for --no-tips: sets INSPEKT_NO_TIPS env var.
+
+    Used by both the top-level cli group and by CustomGroup._inject_global_options()
+    which adds --no-tips to every subcommand. The env var is checked by
+    tips_enabled() in config.py, which gates print_hint() and _print_tips_section().
+    """
+    if value:
+        import os
+        os.environ['INSPEKT_NO_TIPS'] = '1'
+
+
 @click.group(cls=CustomGroup)
 @click.version_option(version=__version__)
 @click.option('--verbose', '-v', is_flag=True, help='Enable verbose output (timing, requests, state changes)')
+@click.option('--no-tips', is_flag=True, is_eager=True, expose_value=False,
+              callback=_no_tips_callback, help='Suppress tips and hints in output')
 @click.option('--instance', '-i', 'instance_id', default=None, metavar='ID',
               help='Target specific browser instance by ID, alias, or index (e.g., "b7x2", "homepage", "0")')
 @click.pass_context

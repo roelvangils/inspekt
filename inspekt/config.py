@@ -44,6 +44,18 @@ def is_dev_mode() -> bool:
     return (repo_root / "Makefile").exists()
 
 
+def tips_enabled() -> bool:
+    """Check if tips/hints should be displayed.
+
+    Disabled via --no-tips flag (INSPEKT_NO_TIPS=1) or config tips.enabled=false.
+    Flag takes precedence over config.
+    """
+    if os.environ.get("INSPEKT_NO_TIPS") == "1":
+        return False
+    config = load_config()
+    return config.get("tips", {}).get("enabled", True)
+
+
 # Bridge server ports
 # In isolated mode (VM), the bridge runs on different ports to avoid conflicts
 BRIDGE_HTTP_PORT_DEFAULT = 8765
@@ -148,6 +160,9 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "record": {
         "max-actions-per-second": 15,  # Rate limit to prevent runaway recordings
         "synthetic-dialogs": False,  # Use non-blocking HTML overlays instead of native dialogs
+    },
+    "tips": {
+        "enabled": True,  # Show contextual tips and hints in CLI output
     },
     "nerdfont": False,  # Enable Nerdfont glyphs in terminal output
     "show-milliseconds": True,  # Show milliseconds in record/replay timestamps
@@ -418,6 +433,11 @@ def load_config() -> dict[str, Any]:
                             config["tts"][tts_key] = tts_value
                 else:
                     config["tts"] = user_config["tts"]
+            elif key == "tips" and isinstance(user_config["tips"], dict):
+                if isinstance(config.get("tips"), dict):
+                    config["tips"].update(user_config["tips"])
+                else:
+                    config["tips"] = user_config["tips"]
             else:
                 # Root-level properties like ai-language - overwrite
                 config[key] = user_config[key]

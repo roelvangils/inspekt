@@ -165,6 +165,9 @@ class CustomGroup(click.Group):
         This overrides Click's default get_command to support lazy loading.
         Commands registered via add_lazy_command() are only imported when
         they are actually invoked.
+
+        After loading, global options (like --no-tips) are injected into
+        the command so they work in any position. See _inject_global_options().
         """
         # Check if it's a lazy command
         if cmd_name in self._lazy_commands:
@@ -177,10 +180,52 @@ class CustomGroup(click.Group):
 
             # Cache it in the commands dict for future access
             self.commands[cmd_name] = cmd
+            self._inject_global_options(cmd)
             return cmd
 
         # Fall back to default behavior
-        return super().get_command(ctx, cmd_name)
+        cmd = super().get_command(ctx, cmd_name)
+        if cmd is not None:
+            self._inject_global_options(cmd)
+        return cmd
+
+    @staticmethod
+    def _inject_global_options(cmd):
+        """Inject global options into every command so they work in any position.
+
+        Click only allows group-level options BEFORE the subcommand name:
+
+            inspekt --no-tips sitemap    ← works (group option)
+            inspekt sitemap --no-tips    ← would fail without this
+
+        Users naturally put flags after the subcommand, so we inject shared
+        options into every command at load time. Each option uses:
+        - is_eager=True:       fires before the command's own logic
+        - expose_value=False:  doesn't add a parameter to the command function
+        - callback:            sets an env var that the feature checks at runtime
+
+        This is the single place where global options are defined for injection.
+        The same options are also on the top-level `cli` group (in __init__.py)
+        so they appear in `inspekt --help` too.
+
+        To add a new global option: define it here AND on the cli group.
+        """
+        # Avoid duplicates if command is loaded multiple times
+        existing_names = {opt.name for opt in cmd.params if isinstance(opt, click.Option)}
+        if "no_tips" in existing_names:
+            return
+
+        from inspekt.app.cli import _no_tips_callback
+        opt = click.Option(
+            ['--no-tips'], is_flag=True, is_eager=True, expose_value=False,
+            callback=_no_tips_callback, hidden=True,
+        )
+        cmd.params.append(opt)
+
+        # Recurse into subcommands of groups (e.g. `inspekt sr walk --no-tips`)
+        if isinstance(cmd, click.Group):
+            for sub_cmd in cmd.commands.values():
+                CustomGroup._inject_global_options(sub_cmd)
 
     def resolve_command(self, ctx: click.Context, args: list[str]):
         """
@@ -262,8 +307,8 @@ class CustomGroup(click.Group):
                 if help_text:
                     formatter.write_text(f"    {help_text}")
 
-                # Write command options
-                params = [p for p in cmd.params if isinstance(p, click.Option)]
+                # Write command options (skip hidden ones like injected --no-tips)
+                params = [p for p in cmd.params if isinstance(p, click.Option) and not p.hidden]
                 if params:
                     for param in params:
                         opts = ", ".join(param.opts)

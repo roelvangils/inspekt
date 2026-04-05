@@ -984,8 +984,16 @@ def detect_languages(entries: list[SitemapEntry]) -> set[str]:
     return candidates if len(candidates) >= 2 else set()
 
 
-# Common title separators (ordered by frequency in the wild)
-_TITLE_SEPARATORS = [" | ", " - ", " — ", " · ", " :: ", " // ", " – "]
+# Common title separators (ordered by frequency in the wild).
+# Includes Unicode variants of the pipe character that some sites use
+# (e.g., iodigital.com uses U+23B8 LEFT VERTICAL BOX LINE instead of |).
+_TITLE_SEPARATORS = [
+    " | ", " - ", " — ", " · ", " :: ", " // ", " – ",
+    " ⎸ ",   # U+23B8 LEFT VERTICAL BOX LINE (used by e.g. iodigital.com)
+    " │ ",   # U+2502 BOX DRAWINGS LIGHT VERTICAL
+    " ｜ ",  # U+FF5C FULLWIDTH VERTICAL LINE
+    " l ",   # Lowercase L — seen in the wild as a mistyped pipe (iodigital.com/fr)
+]
 
 
 def detect_site_name(
@@ -1092,6 +1100,21 @@ def strip_site_name(title: str, site_name: str | list[str]) -> str:
                     return cleaned
 
     return title
+
+
+def strip_site_names_from_entries(entries: list[SitemapEntry]) -> None:
+    """Strip all common site name fragments from entry titles (in-place).
+
+    Runs detect+strip in a loop to handle multi-part titles like
+    "Page Title | Site Name | Tagline". Each pass strips one fragment.
+    """
+    for _ in range(3):  # at most 3 passes (page | brand | tagline)
+        site_name = detect_site_name(entries)
+        if not site_name:
+            break
+        for entry in entries:
+            if entry.title:
+                entry.title = strip_site_name(entry.title, site_name)
 
 
 # ============================================================================

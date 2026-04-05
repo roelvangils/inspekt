@@ -352,7 +352,7 @@ def _render_tree(node, prefix: str = "", is_last: bool = True, filter_path: str 
         else:
             name_str = click.style(node.name, fg="white")
 
-        meta_str = _build_entry_meta(node.entry)
+        meta_str = _lang_suffix(node) + _build_entry_meta(node.entry)
 
         # Continuation prefix: pipes from ancestors + spaces to align with title
         idx_plain_len = len(f"[{node.entry_index}]")
@@ -964,7 +964,6 @@ def sitemap(url, flat, filter_path, lang, open_target, interactive, where, neigh
         inspekt sitemap https://example.com/sitemap.xml  # Specific sitemap URL
     """
     from inspekt.services.sitemap_service import (
-        detect_site_name,
         discover_sitemap,
         fetch_sitemap,
         fetch_titles,
@@ -972,7 +971,7 @@ def sitemap(url, flat, filter_path, lang, open_target, interactive, where, neigh
         load_from_cache,
         merge_titles_from_stale_cache,
         save_to_cache,
-        strip_site_name,
+        strip_site_names_from_entries,
     )
 
     # Determine if URL is a direct sitemap URL or an origin
@@ -1067,8 +1066,14 @@ def sitemap(url, flat, filter_path, lang, open_target, interactive, where, neigh
     # --- Size guardrails and title fetching ---
     total = len(result.entries)
 
+    # --where and --neighbors only display a handful of nodes — skip bulk
+    # title fetch entirely and enrich just the visible nodes on demand
+    needs_targeted_only = where or neighbors
+    if needs_targeted_only:
+        no_titles = True
+
     # Skip bulk title fetch for targeted operations on huge sitemaps
-    has_targeted_flag = stats or where or neighbors or open_target is not None or from_here or interactive or output_json or filter_path
+    has_targeted_flag = stats or open_target is not None or from_here or interactive or output_json or filter_path
     if total > 50_000 and has_targeted_flag:
         no_titles = True
 
@@ -1181,14 +1186,9 @@ def sitemap(url, flat, filter_path, lang, open_target, interactive, where, neigh
         # Cache with raw titles (site name stripping happens below for display)
         save_to_cache(result)
 
-    # Strip the common site name from titles for display. Runs regardless of
-    # no_titles since it operates on already-cached titles (no network calls).
+    # Strip common site name fragments from titles for display
     if result.entries:
-        site_name = detect_site_name(result.entries)
-        if site_name:
-            for entry in result.entries:
-                if entry.title:
-                    entry.title = strip_site_name(entry.title, site_name)
+        strip_site_names_from_entries(result.entries)
 
     # Handle sitemap index (not flattened)
     if result.is_index and not result.entries:
@@ -1343,11 +1343,59 @@ def _resolve_current_node(result, origin: str):
     return tree, node, parent, current_path
 
 
+def _lang_suffix(node) -> str:
+    """Return a styled language suffix like ' (Dutch)' if node is a language root, else ''."""
+    lang_name = _LANG_NAMES.get(node.name.lower())
+    if lang_name:
+        return click.style(f" ({lang_name})", fg="bright_black", italic=True)
+    return ""
+
+
 def _node_display_name(node) -> str:
     """Get the display name for a node: title if available, else slug (unstyled)."""
     if node.entry and node.entry.title:
         return node.entry.title
     return node.name
+
+
+def _enrich_visible_nodes(ancestors, mode: str = "compact"):
+    """Fetch titles only for nodes that will be displayed in --where/--neighbors.
+
+    This avoids fetching thousands of titles when only a handful are shown.
+    Collects entries from ancestors, their siblings, and children of the
+    current node, then batch-fetches titles and strips site names.
+    """
+    from inspekt.services.sitemap_service import fetch_titles, strip_site_names_from_entries
+
+    # Collect all visible entries in one pass
+    seen = set()
+    all_entries = []
+
+    def _add(node):
+        if node.entry and id(node.entry) not in seen:
+            seen.add(id(node.entry))
+            all_entries.append(node.entry)
+
+    for i, ancestor in enumerate(ancestors):
+        _add(ancestor)
+        # In nearby/full modes, siblings at each level are shown
+        if mode != "compact" and i > 0:
+            for sibling in ancestors[i - 1].children.values():
+                _add(sibling)
+
+    # Children of the current (last) node
+    for child in ancestors[-1].children.values():
+        _add(child)
+
+    # Fetch titles for entries that don't have one yet
+    to_fetch = [e for e in all_entries if not e.title]
+    if to_fetch:
+        fetch_titles(to_fetch, max_concurrent=10, timeout=5.0)
+
+    # Strip site names from all titled entries
+    titled = [e for e in all_entries if e.title]
+    if titled:
+        strip_site_names_from_entries(titled)
 
 
 def _display_where(result, origin: str, mode: str = "compact"):
@@ -1364,6 +1412,9 @@ def _display_where(result, origin: str, mode: str = "compact"):
     ancestors = find_ancestors(tree, current_path)
     max_width = shutil.get_terminal_size().columns - 2
 
+    # Fetch titles only for the nodes we'll display (not the entire sitemap)
+    _enrich_visible_nodes(ancestors, mode)
+
     if mode == "compact":
         _display_where_compact(ancestors, max_width)
     elif mode == "full":
@@ -1377,46 +1428,15 @@ def _display_where(result, origin: str, mode: str = "compact"):
 
 
 def _display_where_compact(ancestors, max_width: int):
-    """Compact breadcrumb: single path from root to current node + children."""
-    click.echo()
+    """Compact breadcrumb: single path from root to current node + children.
 
-    current_node = ancestors[-1]
-    max_children_shown = 8
-
-    for depth, ancestor in enumerate(ancestors):
-        indent = "  " + "     " * depth
-        is_current = ancestor is current_node
-
-        if depth == 0:
-            click.echo(f"{indent}{click.style(ancestor.name, fg='cyan', bold=True)}")
-        else:
-            connector = click.style(f"{ELBOW}{DASH}{DASH} ", fg="bright_black")
-            cont = indent + "    "
-            if is_current:
-                style = {"fg": "white", "bold": True}
-                suffix = click.style("  \u2190 you are here", fg="green")
-            else:
-                style = {"fg": "blue", "bold": True}
-                suffix = ""
-            for line in wrap_styled_line(
-                prefix=f"{indent}{connector}",
-                text=click.style(_node_display_name(ancestor), **style),
-                suffix=suffix,
-                cont_prefix=cont,
-                text_style=style,
-                max_width=max_width,
-            ):
-                click.echo(line)
-
-    # Children of current node
-    _render_where_children(current_node, len(ancestors), max_width, max_children_shown)
-
-    click.echo()
-    print_hint("Use `--where=nearby` to see surrounding pages at each level")
-    print_hint("Use `--open parent` to navigate up, or `--open first-child` to go deeper")
+    Reuses the same tree rendering as nearby/full but only shows the followed
+    path (no siblings), producing consistent spacing across all --where modes.
+    """
+    _render_where_levels(ancestors, max_width, windowed=False, compact=True)
 
 
-def _compute_window(total: int, followed_idx: int, radius: int = 2):
+def _compute_window(total: int, followed_idx: int, radius: int = 1):
     """Compute an anchored sibling window around the followed node.
 
     Always includes the first and last sibling for context, plus a window
@@ -1462,12 +1482,17 @@ def _compute_window(total: int, followed_idx: int, radius: int = 2):
     return items
 
 
-def _render_where_levels(ancestors, max_width: int, windowed: bool):
-    """Render a proper nested tree showing windowed siblings at each level.
+def _render_where_levels(ancestors, max_width: int, windowed: bool, compact: bool = False):
+    """Render a proper nested tree showing siblings at each level.
 
     At each branching point, the followed ancestor's children are rendered
     inline (nested under it with pipe characters), not after all siblings.
     This produces a real tree structure like _render_tree does.
+
+    Modes:
+        compact=True:   Only the followed path (no siblings shown)
+        windowed=True:  Windowed siblings (~1 before/after) at each level
+        windowed=False: All siblings at every level
     """
     click.echo()
 
@@ -1480,21 +1505,24 @@ def _render_where_levels(ancestors, max_width: int, windowed: bool):
         _render_where_children_inline(root, "", max_width)
     else:
         click.echo(f"{click.style(root.name, fg='cyan', bold=True)}")
-        _render_where_branch(ancestors, depth=1, prefix="", max_width=max_width, windowed=windowed)
+        _render_where_branch(ancestors, depth=1, prefix="", max_width=max_width, windowed=windowed, compact=compact)
 
     click.echo()
-    if windowed:
+    if compact:
+        print_hint("Use `--where=nearby` to see surrounding pages at each level")
+    elif windowed:
         print_hint("Use `--where=full` to show all siblings at every level")
     else:
         print_hint("Use `--where=nearby` for a more compact view")
     print_hint("Use `--open parent` to navigate up, or `--open first-child` to go deeper")
 
 
-def _render_where_branch(ancestors, depth: int, prefix: str, max_width: int, windowed: bool):
+def _render_where_branch(ancestors, depth: int, prefix: str, max_width: int, windowed: bool, compact: bool = False):
     """Recursively render one level of the --where tree.
 
     Shows a windowed set of siblings at this level. For the followed sibling,
     recurses to render the next level nested underneath with pipe continuation.
+    In compact mode, only the followed sibling is shown (no surrounding context).
     """
     ancestor = ancestors[depth]
     is_final = depth == len(ancestors) - 1
@@ -1503,7 +1531,9 @@ def _render_where_branch(ancestors, depth: int, prefix: str, max_width: int, win
     siblings = sorted(parent_node.children.values(), key=lambda n: n.name.lower())
     followed_idx = next((i for i, s in enumerate(siblings) if s is ancestor), 0)
 
-    if windowed:
+    if compact:
+        items = [("node", followed_idx)]
+    elif windowed:
         items = _compute_window(len(siblings), followed_idx)
     else:
         items = [("node", i) for i in range(len(siblings))]
@@ -1524,13 +1554,15 @@ def _render_where_branch(ancestors, depth: int, prefix: str, max_width: int, win
             is_followed = sibling is ancestor
             name = _node_display_name(sibling)
 
+            lang = _lang_suffix(sibling)
+
             if is_followed:
                 if is_final:
                     style = {"fg": "white", "bold": True}
-                    suffix = click.style("  \u2190 you are here", fg="green")
+                    suffix = lang + click.style("  \u2190 you are here", fg="green")
                 else:
                     style = {"fg": "blue", "bold": True}
-                    suffix = ""
+                    suffix = lang
                 for line in wrap_styled_line(
                     prefix=f"{prefix}{conn}",
                     text=click.style(name, **style),
@@ -1543,7 +1575,7 @@ def _render_where_branch(ancestors, depth: int, prefix: str, max_width: int, win
 
                 # Recurse: render children of the followed node inline
                 if not is_final:
-                    _render_where_branch(ancestors, depth + 1, child_prefix, max_width, windowed)
+                    _render_where_branch(ancestors, depth + 1, child_prefix, max_width, windowed, compact=compact)
                 else:
                     _render_where_children_inline(ancestor, child_prefix, max_width)
             else:
@@ -1551,6 +1583,7 @@ def _render_where_branch(ancestors, depth: int, prefix: str, max_width: int, win
                 for line in wrap_styled_line(
                     prefix=f"{prefix}{conn}",
                     text=click.style(name, fg=242),
+                    suffix=lang,
                     cont_prefix=cont,
                     text_style={"fg": 242},
                     max_width=max_width,
@@ -1615,39 +1648,17 @@ def _render_where_children_inline(node, prefix: str, max_width: int):
                 _render_subpage_hint(child, child_prefix)
 
 
-def _render_where_children(node, depth: int, max_width: int, max_shown: int = 8):
-    """Render children of a node at the given depth (shared by all --where modes)."""
-    if not node.children:
-        return
-
-    child_indent = "  " + "     " * depth
-    cont = child_indent + "    "
-    child_nodes = sorted(node.children.values(), key=lambda n: n.name.lower())
-    shown = child_nodes[:max_shown]
-    remaining = len(child_nodes) - len(shown)
-
-    for i, child in enumerate(shown):
-        is_last = (i == len(shown) - 1) and remaining == 0
-        conn = click.style(f"{ELBOW}{DASH}{DASH} " if is_last else f"{TEE}{DASH}{DASH} ", fg="bright_black")
-        for line in wrap_styled_line(
-            prefix=f"{child_indent}{conn}",
-            text=click.style(_node_display_name(child), fg="bright_black"),
-            cont_prefix=cont,
-            text_style={"fg": "bright_black"},
-            max_width=max_width,
-        ):
-            click.echo(line)
-
-    if remaining > 0:
-        conn = click.style(f"{ELBOW}{DASH}{DASH} ", fg="bright_black")
-        more = click.style(f"({remaining} more)", fg="bright_black")
-        click.echo(f"{child_indent}{conn}{more}")
-
 
 def _display_neighbors(result, origin: str):
     """Show parent, siblings, and children of the current page (--neighbors)."""
+    from inspekt.services.sitemap_service import find_ancestors
+
     tree, node, parent, current_path = _resolve_current_node(result, origin)
+    ancestors = find_ancestors(tree, current_path)
     max_width = shutil.get_terminal_size().columns - 2
+
+    # Enrich visible nodes — use "nearby" mode to include siblings
+    _enrich_visible_nodes(ancestors, mode="nearby")
 
     click.echo()
 
@@ -1661,6 +1672,7 @@ def _display_neighbors(result, origin: str):
         for line in wrap_styled_line(
             prefix=f"  {arrow} Parent: ",
             text=click.style(_node_display_name(parent), **pstyle),
+            suffix=_lang_suffix(parent),
             cont_prefix="             ",
             text_style=pstyle,
             max_width=max_width,
@@ -1673,11 +1685,12 @@ def _display_neighbors(result, origin: str):
         siblings = sorted(parent.children.values(), key=lambda n: n.name.lower())
         click.echo(click.style("  Siblings:", fg="bright_black"))
         for sibling in siblings:
+            lang = _lang_suffix(sibling)
             if sibling is node:
                 for line in wrap_styled_line(
                     prefix=f"  {click.style("► ", fg='green')}",
                     text=click.style(_node_display_name(sibling), fg="white", bold=True),
-                    suffix=click.style("  \u2190 you are here", fg="green"),
+                    suffix=lang + click.style("  \u2190 you are here", fg="green"),
                     cont_prefix="    ",
                     text_style={"fg": "white", "bold": True},
                     max_width=max_width,
@@ -1687,6 +1700,7 @@ def _display_neighbors(result, origin: str):
                 for line in wrap_styled_line(
                     prefix="    ",
                     text=click.style(_node_display_name(sibling), fg="bright_black"),
+                    suffix=lang,
                     cont_prefix="    ",
                     text_style={"fg": "bright_black"},
                     max_width=max_width,
@@ -1705,6 +1719,7 @@ def _display_neighbors(result, origin: str):
             for line in wrap_styled_line(
                 prefix="    ",
                 text=click.style(_node_display_name(child), fg="bright_black"),
+                suffix=_lang_suffix(child),
                 cont_prefix="    ",
                 text_style={"fg": "bright_black"},
                 max_width=max_width,
