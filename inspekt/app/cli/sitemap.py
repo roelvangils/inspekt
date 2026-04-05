@@ -1098,11 +1098,13 @@ def sitemap(url, flat, filter_path, lang, open_target, interactive, where, neigh
         # Progress bar with throttle notification
         bar = click.progressbar(
             length=needs_title,
-            label="  Fetching titles",
             show_eta=True,
             show_percent=True,
             fill_char=click.style("\u2588", fg="cyan"),
             empty_char=click.style("\u2591", fg="bright_black"),
+            bar_template="  %(bar)s %(info)s",
+            info_sep=click.style(" \u2022 ", fg="bright_black"),
+            width=36,
             file=sys.stderr if err else None,
         )
         _reassured = False
