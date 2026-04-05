@@ -23,7 +23,8 @@
     "downloads",
     "tabs",
     "notifications",
-    "webRequest"
+    "webRequest",
+    "webNavigation"
   ],
 
   "host_permissions": [
@@ -37,8 +38,15 @@
   "content_scripts": [
     {
       "matches": ["http://*/*", "https://*/*"],
-      "js": ["console-hooks.js"],
+      "js": ["scrollbar-hider.js", "console-hooks.js"],
       "run_at": "document_start",
+      "all_frames": false
+    },
+    {
+      "matches": ["http://*/*", "https://*/*"],
+      "js": ["scroll-tracker.js"],
+      "run_at": "document_start",
+      "world": "MAIN",
       "all_frames": false
     },
     {
@@ -61,7 +69,7 @@
   "devtools_page": "devtools.html",
 
   "web_accessible_resources": [{
-    "resources": ["fonts/*", "css/*", "scripts/console-hooks-inject.js"],
+    "resources": ["fonts/*", "css/*", "scripts/console-hooks-inject.js", "element_picker.js"],
     "matches": ["<all_urls>"]
   }]
 }
