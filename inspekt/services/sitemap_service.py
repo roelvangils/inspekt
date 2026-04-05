@@ -1135,6 +1135,54 @@ def save_to_cache(result: SitemapResult) -> Path:
     return cache_file
 
 
+def merge_titles_from_stale_cache(result: SitemapResult) -> int:
+    """Transfer titles and HTTP metadata from an expired cache into new entries.
+
+    Called after re-fetching sitemap XML. Matches entries by URL (loc).
+    Only copies metadata for entries that exist in both old and new results.
+    New entries (not in old cache) keep their empty fields.
+    Removed entries (in old cache but not new) are discarded.
+
+    Returns:
+        Number of titles transferred.
+    """
+    cache_file = CACHE_DIR / f"{_cache_key(result.origin)}.json"
+    if not cache_file.exists():
+        return 0
+
+    try:
+        data = json.loads(cache_file.read_text())
+        old_entries = data.get("result", {}).get("entries", [])
+    except (json.JSONDecodeError, KeyError, OSError):
+        return 0
+
+    # Build lookup: URL → old entry data (only entries that have a title)
+    old_by_url: dict[str, dict] = {}
+    for e in old_entries:
+        if e.get("title"):
+            old_by_url[e["loc"]] = e
+
+    if not old_by_url:
+        return 0
+
+    # Transfer metadata to matching new entries
+    transferred = 0
+    for entry in result.entries:
+        old = old_by_url.get(entry.loc)
+        if old and not entry.title:
+            entry.title = old.get("title", "")
+            entry.http_status = old.get("http_status", 0)
+            entry.final_url = old.get("final_url", "")
+            entry.canonical_url = old.get("canonical_url", "")
+            entry.content_length = old.get("content_length", 0)
+            entry.etag = old.get("etag", "")
+            entry.lang = old.get("lang", "")
+            if entry.title:
+                transferred += 1
+
+    return transferred
+
+
 def load_from_cache(origin: str) -> Optional[SitemapResult]:
     """
     Load a sitemap result from cache if it exists and is fresh.

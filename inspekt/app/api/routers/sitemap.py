@@ -288,6 +288,9 @@ def fetch_sitemap(request: SitemapFetchRequest):
     if result.total_urls > 50_000:
         logger.info(f"Large sitemap ({result.total_urls} entries) — caching but navigation may be slow")
 
+    # Preserve titles from expired cache before saving
+    sitemap_service.merge_titles_from_stale_cache(result)
+
     # Cache the result
     sitemap_service.save_to_cache(result)
 

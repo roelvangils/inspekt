@@ -970,6 +970,7 @@ def sitemap(url, flat, filter_path, lang, open_target, interactive, where, neigh
         fetch_titles,
         get_stats,
         load_from_cache,
+        merge_titles_from_stale_cache,
         save_to_cache,
         strip_site_name,
     )
@@ -1040,6 +1041,12 @@ def sitemap(url, flat, filter_path, lang, open_target, interactive, where, neigh
         # Cache under the browser's origin so lookups match
         # (sitemap origin may differ, e.g., elevenways.be vs www.elevenways.be)
         result.origin = origin
+
+        # Preserve titles from expired cache (avoids re-fetching unchanged pages)
+        transferred = merge_titles_from_stale_cache(result)
+        if transferred > 0 and not output_json:
+            click.echo(f"  {transferred:,} titles preserved from previous cache")
+
         save_to_cache(result)
 
     # Debug title fetching — test one URL and report diagnostics
