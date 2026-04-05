@@ -1057,7 +1057,7 @@ def sitemap(url, flat, filter_path, lang, open_target, interactive, where, neigh
     if lang and not filter_path:
         filter_path = f"/{lang.strip('/')}/"
 
-    # --- Size guardrails ---
+    # --- Size guardrails and title fetching ---
     total = len(result.entries)
 
     if total > 50_000 and not output_json:
@@ -1065,51 +1065,46 @@ def sitemap(url, flat, filter_path, lang, open_target, interactive, where, neigh
         print_hint("Use `--filter /section` to work with a subset, or `--stats` for an overview")
         sys.exit(0)
 
-    if total > 10_000 and not no_titles and not output_json:
-        already_titled = sum(1 for e in result.entries if e.title)
-        needs = total - already_titled
-        if needs > 1000:
-            print_warning(f"This sitemap has {total:,} pages — fetching titles for {needs:,} pages may take several minutes")
+    # Count title status once (used by both guardrails and fetch logic)
+    already_titled = sum(1 for e in result.entries if e.title)
+    already_checked = sum(1 for e in result.entries if not e.title and e.http_status != 0)
+    needs_title = sum(1 for e in result.entries if not e.title and e.http_status == 0)
+
+    # Warn before expensive title fetching
+    if not no_titles and needs_title > 0 and not output_json:
+        if needs_title > 1000 and total > 10_000:
+            print_warning(f"This sitemap has {total:,} pages — fetching titles for {needs_title:,} pages may take several minutes")
             if not click.confirm("  Continue?", default=True):
                 print_hint("Use `--no-titles` to skip title fetching, or `--filter /section` to limit scope")
                 return
+        elif needs_title > 500:
+            print_warning(f"Fetching titles for {needs_title:,} pages — this may take a while")
 
-    if total > 1000 and not no_titles and not output_json:
-        already_titled = sum(1 for e in result.entries if e.title)
-        needs = total - already_titled
-        if needs > 500:
-            print_warning(f"Fetching titles for {needs:,} pages — this may take a while")
+    # Fetch page titles
+    if not no_titles and needs_title > 0:
+        # Send progress to stderr so it doesn't corrupt --json output
+        err = output_json
 
-    # Fetch page titles (skip entries that already have titles or were already checked)
-    if not no_titles and result.entries:
-        already_titled = sum(1 for e in result.entries if e.title)
-        already_checked = sum(1 for e in result.entries if not e.title and e.http_status != 0)
-        needs_title = sum(1 for e in result.entries if not e.title and e.http_status == 0)
+        if already_titled > 0 or already_checked > 0:
+            parts = []
+            if already_titled > 0:
+                parts.append(f"{already_titled} titles cached")
+            if already_checked > 0:
+                parts.append(f"{already_checked} unreachable")
+            click.echo(f"  {', '.join(parts)} (of {total} total)", err=err)
+        click.echo(f"  Fetching titles for {needs_title} pages\u2026", err=err)
 
-        if needs_title > 0:
-            # Send progress to stderr so it doesn't corrupt --json output
-            err = output_json
+        def _progress(completed, total):
+            pct = completed * 100 // total
+            click.echo(f"\r  Fetching titles\u2026 {completed}/{total} ({pct}%)", nl=False, err=err)
 
-            if already_titled > 0 or already_checked > 0:
-                parts = []
-                if already_titled > 0:
-                    parts.append(f"{already_titled} titles cached")
-                if already_checked > 0:
-                    parts.append(f"{already_checked} unreachable")
-                click.echo(f"  {', '.join(parts)} (of {len(result.entries)} total)", err=err)
-            click.echo(f"  Fetching titles for {needs_title} pages\u2026", err=err)
+        fetched = fetch_titles(
+            result.entries, max_concurrent=20, timeout=10.0, progress_callback=_progress
+        )
+        click.echo(f"\r  Fetching titles\u2026 {fetched}/{needs_title} found" + " " * 10, err=err)
 
-            def _progress(completed, total):
-                pct = completed * 100 // total
-                click.echo(f"\r  Fetching titles\u2026 {completed}/{total} ({pct}%)", nl=False, err=err)
-
-            fetched = fetch_titles(
-                result.entries, max_concurrent=20, timeout=10.0, progress_callback=_progress
-            )
-            click.echo(f"\r  Fetching titles\u2026 {fetched}/{needs_title} found" + " " * 10, err=err)
-
-            # Cache with raw titles (site name stripping happens below for display)
-            save_to_cache(result)
+        # Cache with raw titles (site name stripping happens below for display)
+        save_to_cache(result)
 
     # Strip the common site name from titles for display. This runs on both
     # fresh and cached results so titles collected by the API (which stores
