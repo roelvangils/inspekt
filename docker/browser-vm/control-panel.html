@@ -12751,13 +12751,25 @@
                     onTabActivated(tabId);  // Track when this tab became active
                     renderTabs();
                     applyThemeColors();
-                    // Update URL bar
-                    const tab = tabs.find(t => t.id === tabId);
-                    if (tab) {
-                        currentUrl = tab.url;
-                        document.getElementById('urlBar').value = displayUrl(currentUrl, false);
-                        updateCloudIconState(currentUrl);
-                        updateTerminalPrompt(currentUrl);
+                    // Fetch the actual URL from Chrome (not from stale tabs array)
+                    try {
+                        const urlResp = await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/url?tab=${tabId}`);
+                        const urlData = await urlResp.json();
+                        if (urlData.ok && urlData.url) {
+                            currentUrl = urlData.url;
+                            document.getElementById('urlBar').value = displayUrl(currentUrl, false);
+                            updateCloudIconState(currentUrl);
+                            updateTerminalPrompt(currentUrl);
+                        }
+                    } catch (e) {
+                        // Fallback to tabs array if URL fetch fails
+                        const tab = tabs.find(t => t.id === tabId);
+                        if (tab) {
+                            currentUrl = tab.url;
+                            document.getElementById('urlBar').value = displayUrl(currentUrl, false);
+                            updateCloudIconState(currentUrl);
+                            updateTerminalPrompt(currentUrl);
+                        }
                     }
                     fetchHistoryState();  // Refresh back/forward buttons for this tab
 
@@ -13400,8 +13412,14 @@
                 const response = await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/tabs/new?url=${encodeURIComponent(url)}`);
                 const data = await response.json();
                 if (data.ok) {
-                    activeTabId = data.tab.id;
+                    // Refresh tabs first, then set activeTabId — prevents the
+                    // URL polling from reading a stale tabs array for the new tab
                     await fetchTabs();
+                    activeTabId = data.tab.id;
+                    currentUrl = url;
+                    document.getElementById('urlBar').value = displayUrl(url, false);
+                    updateCloudIconState(url);
+                    renderTabs();
                 } else {
                     showToast(data.error || 'Failed to open link', 'error');
                 }
