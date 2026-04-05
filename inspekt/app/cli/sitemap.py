@@ -2053,7 +2053,17 @@ def _display_stats(result, stats: dict):
     # Priority distribution
     prio_dist = stats.get("priority_distribution", {})
     if prio_dist:
-        prio_rows = [[prio, str(count)] for prio, count in prio_dist.items()]
+        # Clean up priority values: round floats, sanitize strings
+        prio_rows = []
+        for prio, count in sorted(prio_dist.items(), key=lambda x: -float(x[0]) if x[0].replace('.', '', 1).isdigit() else 0):
+            # Round ugly floating-point values (e.g., 0.21749999999999997 → 0.217)
+            try:
+                clean_prio = f"{float(prio):g}"
+            except (ValueError, TypeError):
+                clean_prio = str(prio)
+            # Strip any non-printable characters
+            clean_prio = "".join(c for c in clean_prio if c.isprintable())
+            prio_rows.append([clean_prio, str(count)])
         prio_table = Table(["Priority", "URL Count"], title="Priority", icon=get_icon("Summary"))
         prio_table.set_data(prio_rows)
         prio_table.print_header()
