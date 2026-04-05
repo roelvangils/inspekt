@@ -1931,11 +1931,13 @@ def _large_sitemap_menu(result, needs_title: int) -> str:
     last_offered = 0
     for d in sorted(depths.keys()):
         cumulative += depths.get(d, 0)
+        if d == 0:
+            continue  # skip depth 0 (just the root page)
         if cumulative >= total:
             break  # don't offer a tier that includes everything
-        # Offer this tier if it's meaningfully larger than the last one offered
-        # and doesn't exceed half the total (above that, "fetch all" is close enough)
-        if cumulative > last_offered * 2 and cumulative < total * 0.5:
+        # Offer this tier if it's meaningfully larger than the last one,
+        # stays under 10k pages (keep it practical), and under half the total
+        if cumulative > max(last_offered * 2, 10) and cumulative <= 10_000 and cumulative < total * 0.5:
             levels = f"level{'s' if d > 1 else ''}"
             _add_option(f"depth:{d}", f"Top {d} {levels} ({cumulative:,} pages)", _estimate_time(cumulative))
             last_offered = cumulative
