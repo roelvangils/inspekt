@@ -911,7 +911,7 @@ def sitemap(url, flat, filter_path, lang, open_index, interactive, stats, no_fla
 
             click.echo(f"  Fetching titles for {total} pages\u2026", err=err)
             fetched = fetch_titles(
-                result.entries, max_concurrent=30, timeout=10.0, progress_callback=_progress
+                result.entries, max_concurrent=20, timeout=10.0, progress_callback=_progress
             )
             click.echo(f"\r  Fetching titles\u2026 {fetched}/{total} found" + " " * 10, err=err)
 

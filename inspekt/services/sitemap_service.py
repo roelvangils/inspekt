@@ -27,6 +27,7 @@ from urllib.parse import urlparse
 
 import requests
 
+from inspekt.config import get_data_dir, is_isolated_mode
 from inspekt.services import http_client
 
 logger = logging.getLogger(__name__)
@@ -34,8 +35,15 @@ logger = logging.getLogger(__name__)
 # Sitemap XML namespace
 NS = "{http://www.sitemaps.org/schemas/sitemap/0.9}"
 
-# Cache directory
-CACHE_DIR = Path.home() / ".cache" / "inspekt" / "sitemaps"
+
+# Cache directory — use persistent Docker volume in VM, standard cache dir otherwise.
+def _get_cache_dir() -> Path:
+    if is_isolated_mode():
+        return get_data_dir() / "sitemaps"  # /root/.config/inspekt/sitemaps/
+    return Path.home() / ".cache" / "inspekt" / "sitemaps"
+
+
+CACHE_DIR = _get_cache_dir()
 
 # Cache TTL: 1 hour
 CACHE_TTL = 3600
@@ -696,7 +704,7 @@ def _parse_http_date(http_date: str) -> str:
 
 def fetch_titles(
     entries: list[SitemapEntry],
-    max_concurrent: int = 30,
+    max_concurrent: int = 20,
     timeout: float = 3.0,
     progress_callback=None,
 ) -> int:
