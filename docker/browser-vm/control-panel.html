@@ -12303,7 +12303,11 @@
                                 const urlChanged = activeTab.url !== currentUrl;
                                 currentUrl = activeTab.url;
                                 urlBar.value = displayUrl(currentUrl, false);
-                                if (urlChanged) updateTerminalPrompt(currentUrl);
+                                if (urlChanged) {
+                                    updateTerminalPrompt(currentUrl);
+                                    maybeFetchSitemap(currentUrl);
+                                    refreshSitemapNav(currentUrl);
+                                }
                             }
 
                             // Detect internal URLs on tab sync (including startup).
