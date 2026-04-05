@@ -36,14 +36,11 @@ logger = logging.getLogger(__name__)
 NS = "{http://www.sitemaps.org/schemas/sitemap/0.9}"
 
 
-# Cache directory — use the persistent Docker volume in VM (survives rebuilds),
+# Cache directory — use a shared, world-accessible path in VM,
 # standard user cache dir otherwise.
 def _get_cache_dir() -> Path:
     if is_isolated_mode():
-        # /root/.config/inspekt/sitemaps/ is on the inspekt-vm-data Docker volume.
-        # The entrypoint makes it world-writable so both root (API server) and
-        # the inspekt user (terminal) can read/write.
-        return Path("/root/.config/inspekt/sitemaps")
+        return Path("/var/cache/inspekt/sitemaps")
     return Path.home() / ".cache" / "inspekt" / "sitemaps"
 
 

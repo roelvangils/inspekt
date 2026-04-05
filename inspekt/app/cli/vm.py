@@ -272,6 +272,7 @@ def _start_container(dev_mode: bool = False, vm_dir: Path = None) -> bool:
         "--cap-add=NET_BIND_SERVICE", # Bind to privileged ports (API on 80, HTTPS)
         # Persist data directory (plugins, caches) across container restarts
         "-v", "inspekt-vm-data:/root/.config/inspekt",
+        "-v", "inspekt-vm-sitemaps:/var/cache/inspekt/sitemaps",
     ]
 
     # Add volume mounts for development mode
@@ -292,6 +293,8 @@ def _start_container(dev_mode: bool = False, vm_dir: Path = None) -> bool:
             "-v", f"{vm_dir}/toolbar.js:/usr/share/novnc/toolbar.js:ro",
             "-v", f"{vm_dir}/vision-sim.js:/usr/share/novnc/vision-sim.js:ro",
             "-v", f"{vm_dir}/vision-sim.css:/usr/share/novnc/vision-sim.css:ro",
+            "-v", f"{vm_dir}/motor-sim.js:/usr/share/novnc/motor-sim.js:ro",
+            "-v", f"{vm_dir}/motor-sim.css:/usr/share/novnc/motor-sim.css:ro",
             "-v", f"{vm_dir}/vendor/sortable.min.js:/usr/share/novnc/vendor/sortable.min.js:ro",
             "-v", f"{vm_dir}/fonts:/usr/share/novnc/fonts:ro",
             "-v", f"{vm_dir}/icons:/usr/share/novnc/icons:ro",
