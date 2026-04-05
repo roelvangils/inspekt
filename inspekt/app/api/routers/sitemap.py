@@ -93,6 +93,30 @@ def _find_node_by_path(
     return sitemap_service.find_node_by_path(root, path)
 
 
+def _find_nearest_ancestor(
+    root: sitemap_service.TreeNode, path: str
+) -> sitemap_service.TreeNode | None:
+    """Walk up the path to find the deepest ancestor that exists in the tree.
+
+    For example, /news/articles/abc123 → tries /news/articles, then /news,
+    then /. Returns the deepest match, including root (shown as "Home").
+    """
+    path = path.rstrip("/") or "/"
+    segments = [s for s in path.strip("/").split("/") if s]
+    if not segments:
+        return None  # already at root
+
+    # Try progressively shorter paths, deepest first
+    while segments:
+        segments.pop()
+        candidate_path = "/" + "/".join(segments) if segments else "/"
+        node, _ = sitemap_service.find_node_by_path(root, candidate_path)
+        if node:
+            return node
+
+    return None
+
+
 def _node_to_info(
     node: sitemap_service.TreeNode, origin: str, site_name: str | list[str] = ""
 ) -> SitemapNodeInfo:
@@ -298,6 +322,15 @@ def get_sitemap_tree(
     node, parent = _find_node_by_path(tree, path)
 
     if node is None:
+        # Page isn't in the sitemap — find the nearest ancestor that IS,
+        # so we can still offer a "parent" button to navigate up
+        nearest = _find_nearest_ancestor(tree, path)
+        if nearest:
+            return SitemapTreeResponse(
+                ok=True,
+                in_sitemap=False,
+                parent=_node_to_info(nearest, origin),
+            )
         return SitemapTreeResponse(ok=True, in_sitemap=False)
 
     total_children = len(node.children)

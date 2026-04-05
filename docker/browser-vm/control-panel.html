@@ -10549,6 +10549,9 @@
             }
         }
 
+        // Last captured region for "Repeat Last Region" in screenshot submenu
+        let _lastScreenshotRegion = null;  // { x, y, w, h } in VM CSS pixels
+
         // Download a screenshot from the given endpoint
         async function screenshotToDownload(endpoint, filename) {
             try {
@@ -10573,6 +10576,128 @@
             } catch (e) {
                 showToast('Screenshot failed: ' + e.message, 'error');
             }
+        }
+
+        // Interactive region selection for screenshots.
+        // Shows a crosshair overlay on the VNC canvas and lets the user drag to select a region.
+        function startRegionSelection() {
+            const container = document.getElementById('vncContainer');
+            if (!container) return;
+
+            // Disable VNC keyboard while selecting
+            if (typeof rfb !== 'undefined' && rfb && rfb._keyboard) rfb._keyboard.ungrab();
+
+            const overlay = document.createElement('div');
+            Object.assign(overlay.style, {
+                position: 'absolute', inset: '0', zIndex: '9999',
+                cursor: 'crosshair', background: 'rgba(0,0,0,0.08)',
+            });
+            container.style.position = 'relative';
+            container.appendChild(overlay);
+
+            const selBox = document.createElement('div');
+            Object.assign(selBox.style, {
+                position: 'absolute', border: '2px dashed #0066ff',
+                background: 'rgba(0, 102, 255, 0.12)', borderRadius: '2px',
+                pointerEvents: 'none', display: 'none',
+            });
+            overlay.appendChild(selBox);
+
+            const sizeLabel = document.createElement('div');
+            Object.assign(sizeLabel.style, {
+                position: 'absolute', padding: '2px 6px', borderRadius: '3px',
+                background: 'rgba(0,0,0,0.7)', color: '#fff', fontSize: '11px',
+                fontFamily: 'system-ui, sans-serif', pointerEvents: 'none',
+                whiteSpace: 'nowrap', display: 'none',
+            });
+            overlay.appendChild(sizeLabel);
+
+            showToast('Drag to select a region', '', 4000);
+
+            let startX = 0, startY = 0, dragging = false;
+
+            function onKey(e) {
+                if (e.key === 'Escape') {
+                    cleanup();
+                    showToast('Selection cancelled', '', 2000);
+                }
+            }
+
+            function cleanup() {
+                overlay.remove();
+                document.removeEventListener('keydown', onKey);
+                if (typeof rfb !== 'undefined' && rfb && rfb._keyboard) rfb._keyboard.grab();
+            }
+
+            overlay.addEventListener('mousedown', (e) => {
+                if (e.button !== 0) return;
+                startX = e.clientX;
+                startY = e.clientY;
+                dragging = true;
+                selBox.style.display = 'block';
+                sizeLabel.style.display = 'block';
+                selBox.style.left = (e.clientX - overlay.getBoundingClientRect().left) + 'px';
+                selBox.style.top = (e.clientY - overlay.getBoundingClientRect().top) + 'px';
+                selBox.style.width = '0';
+                selBox.style.height = '0';
+            });
+
+            overlay.addEventListener('mousemove', (e) => {
+                if (!dragging) return;
+                const rect = overlay.getBoundingClientRect();
+                const x = Math.min(startX, e.clientX) - rect.left;
+                const y = Math.min(startY, e.clientY) - rect.top;
+                const w = Math.abs(e.clientX - startX);
+                const h = Math.abs(e.clientY - startY);
+                Object.assign(selBox.style, {
+                    left: x + 'px', top: y + 'px',
+                    width: w + 'px', height: h + 'px',
+                });
+                // Show size label near bottom-right of selection
+                const vm1 = _clientToVm(Math.min(startX, e.clientX), Math.min(startY, e.clientY));
+                const vm2 = _clientToVm(Math.max(startX, e.clientX), Math.max(startY, e.clientY));
+                const vmW = Math.round(vm2.x - vm1.x);
+                const vmH = Math.round(vm2.y - vm1.y);
+                sizeLabel.textContent = `${vmW}\u00d7${vmH}`;
+                sizeLabel.style.left = (x + w + 6) + 'px';
+                sizeLabel.style.top = (y + h - 2) + 'px';
+            });
+
+            overlay.addEventListener('mouseup', async (e) => {
+                if (!dragging) return;
+                dragging = false;
+
+                // Convert both corners to VM coordinates
+                const vm1 = _clientToVm(Math.min(startX, e.clientX), Math.min(startY, e.clientY));
+                const vm2 = _clientToVm(Math.max(startX, e.clientX), Math.max(startY, e.clientY));
+                const regionW = vm2.x - vm1.x;
+                const regionH = vm2.y - vm1.y;
+
+                cleanup();
+
+                if (regionW < 4 || regionH < 4) {
+                    showToast('Selection too small', 'error');
+                    return;
+                }
+
+                // Send viewport-relative coords; server adds scroll offset automatically
+                const region = { x: vm1.x, y: vm1.y, w: regionW, h: regionH };
+                _lastScreenshotRegion = region;
+
+                const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+                screenshotToDownload(
+                    `/screenshot/region?x=${region.x}&y=${region.y}&w=${region.w}&h=${region.h}`,
+                    `region-${Math.round(region.w)}x${Math.round(region.h)}-${ts}.png`
+                );
+            });
+
+            document.addEventListener('keydown', onKey);
+
+            // Also cancel if overlay is right-clicked
+            overlay.addEventListener('contextmenu', (e) => {
+                e.preventDefault();
+                cleanup();
+            });
         }
 
         // Copy image data to host clipboard (converts to PNG since clipboard API requires it)
@@ -13113,29 +13238,28 @@
             ] });
 
             // Sitemap structural navigation (Up = parent, Down = children)
-            // Only shown when we have sitemap data for this page
-            if (_sitemapReady && _sitemapNav && _sitemapNav.in_sitemap) {
-                items.push({ separator: true });
+            if (_sitemapReady && _sitemapNav) {
+                const hasSitemapContent = _sitemapNav.in_sitemap || _sitemapNav.parent;
+                if (hasSitemapContent) {
+                    items.push({ separator: true });
 
-                // Up: navigate to parent page
-                const parentInfo = _sitemapNav.parent;
-                items.push({
-                    label: parentInfo
-                        ? `\u2191 ${parentInfo.title || parentInfo.path.split('/').filter(Boolean).pop() || '/'}`
-                        : '\u2191 Parent page',
-                    action: parentInfo ? () => _sitemapGoUp() : null,
-                    disabled: !parentInfo,
-                    title: parentInfo ? parentInfo.url : 'Already at the top',
-                });
+                    // Up: navigate to parent (or nearest ancestor if page isn't in sitemap)
+                    const parentInfo = _sitemapNav.parent;
+                    if (parentInfo) {
+                        items.push({
+                            label: `\u2191 ${parentInfo.title || parentInfo.path.split('/').filter(Boolean).pop() || 'Home'}`,
+                            action: () => _sitemapGoUp(),
+                            title: parentInfo.url,
+                        });
+                    }
 
-                // Down: recursive submenu with child pages (up to 4 levels deep)
-                if (_sitemapNav.children_total > 0) {
-                    items.push({
-                        label: `\u2193 Child pages (${_sitemapNav.children_total})`,
-                        children: _buildSitemapSubmenuItems(_sitemapNav.children, _sitemapNav.children_total),
-                    });
-                } else {
-                    items.push({ label: '\u2193 Child pages', disabled: true, title: 'No child pages' });
+                    // Down: recursive submenu with child pages (only when page is in sitemap)
+                    if (_sitemapNav.in_sitemap && _sitemapNav.children_total > 0) {
+                        items.push({
+                            label: `\u2193 Child pages (${_sitemapNav.children_total})`,
+                            children: _buildSitemapSubmenuItems(_sitemapNav.children, _sitemapNav.children_total),
+                        });
+                    }
                 }
             }
             items.push({ separator: true });
@@ -13186,14 +13310,35 @@
                 items.push({ label: 'Ask About Element\u2026', action: () => showAskDialog('inspected') });
                 items.push({ separator: true });
             }
-            items.push({ label: 'Screenshot Viewport', action: () => {
-                const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-                screenshotToDownload('/screenshot/viewport', `viewport-${timestamp}.png`);
-            }});
-            items.push({ label: 'Screenshot Full Page', action: () => {
-                const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-                screenshotToDownload('/screenshot/page', `fullpage-${timestamp}.png`);
-            }});
+            // Screenshot submenu with all capture modes
+            const _ts = () => new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+            const screenshotChildren = [
+                { label: 'Viewport', action: () => screenshotToDownload('/screenshot/viewport', `viewport-${_ts()}.png`) },
+                { label: 'Full Page', action: () => screenshotToDownload('/screenshot/page', `fullpage-${_ts()}.png`) },
+            ];
+            if (hasElement) {
+                const shortSelector = (info.elementSelector || info.elementTag).slice(0, 30);
+                screenshotChildren.push({ separator: true });
+                screenshotChildren.push({ label: `Element \u2039${shortSelector}\u203a`, action: () => {
+                    screenshotToDownload('/screenshot/element', `element-${(info.elementSelector || 'el').replace(/[^a-z0-9_-]/gi, '_').slice(0, 30)}-${_ts()}.png`);
+                }});
+            }
+            screenshotChildren.push({ separator: true });
+            screenshotChildren.push({ label: 'Select Region\u2026', action: () => startRegionSelection() });
+            if (_lastScreenshotRegion) {
+                const r = _lastScreenshotRegion;
+                screenshotChildren.push({ label: `Repeat Last Region (${Math.round(r.w)}\u00d7${Math.round(r.h)})`, action: () => {
+                    screenshotToDownload(`/screenshot/region?x=${r.x}&y=${r.y}&w=${r.w}&h=${r.h}`, `region-${Math.round(r.w)}x${Math.round(r.h)}-${_ts()}.png`);
+                }});
+            }
+            screenshotChildren.push({ separator: true });
+            screenshotChildren.push({ label: 'Redacted', children: [
+                { label: 'Viewport (Blurred)', action: () => screenshotToDownload('/screenshot/redacted?mode=viewport&style=blur', `redacted-viewport-blur-${_ts()}.png`) },
+                { label: 'Viewport (Bars \u2588\u2588\u2588\u2588)', action: () => screenshotToDownload('/screenshot/redacted?mode=viewport&style=bar', `redacted-viewport-bar-${_ts()}.png`) },
+                { label: 'Full Page (Blurred)', action: () => screenshotToDownload('/screenshot/redacted?mode=page&style=blur', `redacted-fullpage-blur-${_ts()}.png`) },
+                { label: 'Full Page (Bars \u2588\u2588\u2588\u2588)', action: () => screenshotToDownload('/screenshot/redacted?mode=page&style=bar', `redacted-fullpage-bar-${_ts()}.png`) },
+            ]});
+            items.push({ label: 'Screenshot', children: screenshotChildren });
             items.push({ separator: true });
             items.push({ label: 'Copy Page URL', action: () => copyToClipboard(currentUrl || '') });
             items.push({ label: 'Inspect (DevTools)', action: () => toggleDevToolsInVM() });
