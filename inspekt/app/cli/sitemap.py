@@ -1062,7 +1062,7 @@ def sitemap(url, flat, filter_path, lang, open_target, interactive, where, neigh
 
     # Block full title fetch + tree render for very large sitemaps, but allow
     # targeted operations (--stats, --where, --neighbors, --from-here, --open, -i, --json)
-    has_targeted_flag = stats or where or neighbors or open_target is not None or from_here or interactive or output_json
+    has_targeted_flag = stats or where or neighbors or open_target is not None or from_here or interactive or output_json or filter_path
     if total > 50_000 and not has_targeted_flag:
         print_error(f"This sitemap has {total:,} pages — too large to display")
         click.echo()
