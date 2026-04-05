@@ -181,9 +181,19 @@ def _build_recursive_children(
     if _depth >= max_depth:
         return []
 
-    child_nodes = sorted(
-        node.children.values(), key=lambda n: _sort_key(n, site_name)
-    )[:per_level]
+    total = len(node.children)
+
+    # For huge child lists (e.g., BBC /news with 131k), use partial sort
+    if total > 1000:
+        import heapq
+        child_nodes = heapq.nsmallest(
+            per_level, node.children.values(),
+            key=lambda n: _sort_key(n, site_name),
+        )
+    else:
+        child_nodes = sorted(
+            node.children.values(), key=lambda n: _sort_key(n, site_name)
+        )[:per_level]
 
     result = []
     for child in child_nodes:
@@ -191,9 +201,11 @@ def _build_recursive_children(
         grandchild_count = len(child.children)
         if grandchild_count > 0:
             info.children_total = grandchild_count
-            info.children = _build_recursive_children(
-                child, origin, site_name, max_depth, per_level, _depth + 1
-            )
+            # Don't recurse into children that themselves have huge child lists
+            if grandchild_count <= 1000:
+                info.children = _build_recursive_children(
+                    child, origin, site_name, max_depth, per_level, _depth + 1
+                )
         result.append(info)
 
     return result
@@ -246,6 +258,11 @@ def fetch_sitemap(request: SitemapFetchRequest):
         return SitemapFetchResponse(
             ok=False, error="Sitemap was empty", source_url=result.source_url
         )
+
+    # Cap: don't auto-fetch massive sitemaps beyond the first index
+    # (the CLI handles these interactively with depth/language options)
+    if result.total_urls > 50_000:
+        logger.info(f"Large sitemap ({result.total_urls} entries) — caching but navigation may be slow")
 
     # Cache the result
     sitemap_service.save_to_cache(result)
@@ -305,10 +322,13 @@ def get_sitemap_tree(
         queue = [node]
         while queue and len(nodes_to_enrich) < 60:
             current = queue.pop(0)
+            # Skip enrichment for nodes with huge child lists (e.g., 131k)
+            if len(current.children) > 1000:
+                continue
             children = sorted(current.children.values(), key=lambda n: n.name)[:25]
             nodes_to_enrich.extend(children)
             for child in children:
-                if child.children:
+                if child.children and len(child.children) <= 1000:
                     queue.append(child)
         nodes_to_enrich.extend(sibling_nodes[:10])
         _enrich_nodes(nodes_to_enrich, origin, result)
