@@ -326,10 +326,16 @@ def get_sitemap_tree(
         # so we can still offer a "parent" button to navigate up
         nearest = _find_nearest_ancestor(tree, path)
         if nearest:
+            # Enrich the ancestor's title if needed
+            if enrich:
+                _enrich_nodes([nearest], origin, result)
+            site_name = sitemap_service.detect_site_name(
+                [nearest.entry] if nearest.entry and nearest.entry.title else []
+            )
             return SitemapTreeResponse(
                 ok=True,
                 in_sitemap=False,
-                parent=_node_to_info(nearest, origin),
+                parent=_node_to_info(nearest, origin, site_name),
             )
         return SitemapTreeResponse(ok=True, in_sitemap=False)
 
