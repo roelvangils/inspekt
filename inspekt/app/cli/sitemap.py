@@ -1065,9 +1065,7 @@ def sitemap(url, flat, filter_path, lang, open_target, interactive, where, neigh
     if total > 50_000 and has_targeted_flag:
         no_titles = True
 
-    # Count title status once (used by both guardrails and fetch logic)
-    already_titled = sum(1 for e in result.entries if e.title)
-    already_checked = sum(1 for e in result.entries if not e.title and e.http_status != 0)
+    # Count how many titles still need fetching (used by menu threshold)
     needs_title = sum(1 for e in result.entries if not e.title and e.http_status == 0)
 
     # For large sitemaps, offer an interactive menu instead of blindly fetching
