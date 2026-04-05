@@ -849,13 +849,16 @@ def fetch_titles(
                 active_count -= 1
                 gate_ready.notify()
 
+    _should_abort = False
+
     def _maybe_adjust(success: bool):
         """Adjust concurrency based on rolling failure rate.
 
         Backs off (halve concurrency) when failure rate exceeds 30%.
         Recovers (increase by 2) when failure rate drops below 10%.
+        Signals abort when failure rate exceeds 80% (server is blocking us).
         """
-        nonlocal concurrency_limit
+        nonlocal concurrency_limit, _should_abort
         with backoff_lock:
             recent_results.append(success)
             if len(recent_results) > 50:
@@ -864,7 +867,10 @@ def fetch_titles(
                 return
 
             failure_rate = 1 - sum(recent_results) / len(recent_results)
-            if failure_rate > 0.3 and concurrency_limit > min_concurrency:
+            if failure_rate > 0.8:
+                _should_abort = True
+                logger.debug(f"Aborting: failure rate {failure_rate:.0%}")
+            elif failure_rate > 0.3 and concurrency_limit > min_concurrency:
                 new_limit = max(concurrency_limit // 2, min_concurrency)
                 if new_limit < concurrency_limit:
                     concurrency_limit = new_limit
@@ -909,6 +915,12 @@ def fetch_titles(
 
             if progress_callback:
                 progress_callback(completed, total, concurrency_limit)
+
+            if _should_abort:
+                # Cancel remaining futures and stop — server is blocking us
+                for f in futures:
+                    f.cancel()
+                break
 
     return fetched
 

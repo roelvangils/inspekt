@@ -1158,7 +1158,18 @@ def sitemap(url, flat, filter_path, lang, open_target, interactive, where, neigh
                 bar.update(remaining)
             bar.__exit__(None, None, None)
 
-        click.echo(f"  {fetched} of {needs_title} titles found", err=err)
+        if fetched < needs_title and _last_pos < needs_title:
+            # Early abort — server blocked most requests
+            click.echo(err=err)
+            print_warning(
+                f"Server is blocking most requests \u2014 stopped early ({fetched} of {needs_title} titles found)"
+            )
+            print_hint(
+                "This website limits automated access. "
+                "The titles that were found are cached and will be available next time."
+            )
+        else:
+            click.echo(f"  {fetched} of {needs_title} titles found", err=err)
 
         # Cache with raw titles (site name stripping happens below for display)
         save_to_cache(result)
