@@ -1060,10 +1060,23 @@ def sitemap(url, flat, filter_path, lang, open_target, interactive, where, neigh
     # --- Size guardrails and title fetching ---
     total = len(result.entries)
 
-    if total > 50_000 and not output_json:
-        print_error(f"This sitemap has {total:,} pages — too large to process")
-        print_hint("Use `--filter /section` to work with a subset, or `--stats` for an overview")
+    # Block full title fetch + tree render for very large sitemaps, but allow
+    # targeted operations (--stats, --where, --neighbors, --from-here, --open, -i, --json)
+    has_targeted_flag = stats or where or neighbors or open_target is not None or from_here or interactive or output_json
+    if total > 50_000 and not has_targeted_flag:
+        print_error(f"This sitemap has {total:,} pages — too large to display")
+        click.echo()
+        print_hint("Use one of these to explore the sitemap:")
+        click.echo(f"    {'`--stats`':22s} sitemap statistics")
+        click.echo(f"    {'`--where`':22s} show your position in the tree")
+        click.echo(f"    {'`--neighbors`':22s} show surrounding pages")
+        click.echo(f"    {'`--from-here`':22s} subtree from current page")
+        click.echo(f"    {'`-i`':22s} interactive fuzzy search")
+        click.echo(f"    {'`--filter /path`':22s} show only a section")
+        click.echo(f"    {'`--lang en`':22s} show only one language")
         sys.exit(0)
+    if total > 50_000 and has_targeted_flag:
+        no_titles = True  # skip bulk title fetch for targeted operations on huge sitemaps
 
     # Count title status once (used by both guardrails and fetch logic)
     already_titled = sum(1 for e in result.entries if e.title)
