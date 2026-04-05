@@ -12726,6 +12726,8 @@
                 currentUrl = localTabs[tabId].url;
                 document.getElementById('urlBar').value = currentUrl;
                 updateCloudIconState(currentUrl);
+                maybeFetchSitemap(currentUrl);
+                refreshSitemapNav(currentUrl);
                 syncViewport();
                 return;
             }
@@ -12771,6 +12773,9 @@
                             updateTerminalPrompt(currentUrl);
                         }
                     }
+                    // Refresh sitemap nav for the newly active tab
+                    maybeFetchSitemap(currentUrl);
+                    refreshSitemapNav(currentUrl);
                     fetchHistoryState();  // Refresh back/forward buttons for this tab
 
                     // Switching to a normal tab — ensure VNC is visible
@@ -13420,6 +13425,8 @@
                     document.getElementById('urlBar').value = displayUrl(url, false);
                     updateCloudIconState(url);
                     renderTabs();
+                    maybeFetchSitemap(currentUrl);
+                    refreshSitemapNav(currentUrl);
                 } else {
                     showToast(data.error || 'Failed to open link', 'error');
                 }
