@@ -50,6 +50,13 @@ class SitemapEntry:
     changefreq: str = ""
     priority: str = ""
     title: str = ""
+    # HTTP response metadata (populated during title fetch)
+    http_status: int = 0
+    final_url: str = ""       # After redirects — differs from loc if redirected
+    canonical_url: str = ""   # From <link rel="canonical">
+    content_length: int = 0
+    etag: str = ""
+    lang: str = ""            # From <html lang="...">
 
 
 @dataclass
@@ -84,6 +91,12 @@ class SitemapResult:
                     **({"changefreq": e.changefreq} if e.changefreq else {}),
                     **({"priority": e.priority} if e.priority else {}),
                     **({"title": e.title} if e.title else {}),
+                    **({"http_status": e.http_status} if e.http_status else {}),
+                    **({"final_url": e.final_url} if e.final_url else {}),
+                    **({"canonical_url": e.canonical_url} if e.canonical_url else {}),
+                    **({"content_length": e.content_length} if e.content_length else {}),
+                    **({"etag": e.etag} if e.etag else {}),
+                    **({"lang": e.lang} if e.lang else {}),
                 }
                 for e in self.entries
             ],
@@ -387,6 +400,16 @@ def get_stats(result: SitemapResult) -> dict[str, Any]:
     # Lastmod stats
     has_lastmod = sum(1 for e in entries if e.lastmod)
 
+    # Duplicate title stats
+    title_counts: dict[str, int] = {}
+    for e in entries:
+        if e.title:
+            title_counts[e.title] = title_counts.get(e.title, 0) + 1
+    dupe_groups = {t: c for t, c in title_counts.items() if c >= 2}
+
+    # HTTP status stats
+    non_200 = sum(1 for e in entries if e.http_status and e.http_status != 200)
+
     return {
         "total_urls": len(entries),
         "child_sitemaps": len(result.child_sitemaps),
@@ -397,6 +420,9 @@ def get_stats(result: SitemapResult) -> dict[str, Any]:
         ),
         "urls_with_lastmod": has_lastmod,
         "urls_without_lastmod": len(entries) - has_lastmod,
+        "duplicate_title_groups": len(dupe_groups),
+        "duplicate_title_entries": sum(dupe_groups.values()),
+        "non_200_urls": non_200,
     }
 
 
@@ -409,6 +435,8 @@ def get_stats(result: SitemapResult) -> dict[str, Any]:
 _TITLE_CHUNK_SIZES = [16_384, 32_768, 65_536, 131_072, 524_288]
 
 _TITLE_RE = re.compile(r"<title[^>]*>(.*?)</title>", re.IGNORECASE | re.DOTALL)
+_CANONICAL_RE = re.compile(r'<link[^>]*rel="canonical"[^>]*href="([^"]+)"', re.I)
+_HTML_LANG_RE = re.compile(r'<html[^>]*\blang="([^"]+)"', re.I)
 
 
 def _extract_title(text: str) -> str:
@@ -479,16 +507,21 @@ def _extract_date_from_html(text: str) -> str:
     return ""
 
 
-def _fetch_single_title(url: str, timeout: float = 3.0) -> tuple[str, str]:
+def _fetch_single_title(url: str, timeout: float = 3.0) -> dict:
     """
     Fetch a page progressively until the <title> tag is found.
 
-    Also captures dates from (in order): Last-Modified header, HTML meta
-    tags, JSON-LD structured data — as fallback for sitemaps without lastmod.
+    Also captures HTTP metadata: status code, final URL (after redirects),
+    canonical URL, ETag, Content-Length, and lang attribute.
 
     Returns:
-        Tuple of (title, date). Either may be empty.
+        Dict with keys: title, date, http_status, final_url,
+        canonical_url, content_length, etag, lang.
     """
+    empty = {
+        "title": "", "date": "", "http_status": 0, "final_url": "",
+        "canonical_url": "", "content_length": 0, "etag": "", "lang": "",
+    }
     try:
         response = http_client.get(
             url,
@@ -503,8 +536,16 @@ def _fetch_single_title(url: str, timeout: float = 3.0) -> tuple[str, str]:
             max_bytes=_TITLE_CHUNK_SIZES[-1],
         )
 
+        # Capture response metadata from headers
+        meta = {
+            "http_status": response.status_code,
+            "final_url": str(response.url) if str(response.url) != url else "",
+            "etag": response.headers.get("ETag", ""),
+            "content_length": _safe_int(response.headers.get("Content-Length", "")),
+        }
+
         if response.status_code != 200:
-            return "", ""
+            return {**empty, **meta}
 
         # Capture Last-Modified header as fallback date
         last_modified = response.headers.get("Last-Modified", "")
@@ -523,9 +564,14 @@ def _fetch_single_title(url: str, timeout: float = 3.0) -> tuple[str, str]:
             title = _extract_title(text)
             if title:
                 response.close()
-                # Fallback chain: Last-Modified header → HTML meta/JSON-LD dates
                 date = last_modified or _extract_date_from_html(text)
-                return title, date
+                return {
+                    **meta,
+                    "title": title,
+                    "date": date,
+                    "canonical_url": _extract_canonical(text),
+                    "lang": _extract_lang(text),
+                }
 
             if len(content) < limit:
                 break
@@ -533,11 +579,40 @@ def _fetch_single_title(url: str, timeout: float = 3.0) -> tuple[str, str]:
         response.close()
         text = content.decode("utf-8", errors="replace")
         date = last_modified or _extract_date_from_html(text)
-        return "", date
+        return {
+            **meta,
+            "title": "",
+            "date": date,
+            "canonical_url": _extract_canonical(text),
+            "lang": _extract_lang(text),
+        }
 
     except (requests.RequestException, OSError) as e:
         logger.debug(f"Title fetch failed for {url}: {type(e).__name__}: {e}")
-        return "", ""
+        return empty
+
+
+def _safe_int(value: str) -> int:
+    """Parse an integer from a string, returning 0 on failure."""
+    try:
+        return int(value)
+    except (ValueError, TypeError):
+        return 0
+
+
+def _extract_canonical(text: str) -> str:
+    """Extract canonical URL from <link rel="canonical"> tag."""
+    m = _CANONICAL_RE.search(text)
+    return html.unescape(m.group(1).strip()) if m else ""
+
+
+def _extract_lang(text: str) -> str:
+    """Extract language from <html lang="..."> attribute. Normalizes to base code."""
+    m = _HTML_LANG_RE.search(text)
+    if not m:
+        return ""
+    # "nl-BE" → "nl", "en-US" → "en"
+    return m.group(1).split("-")[0].lower()
 
 
 def debug_title_fetch(url: str) -> dict:
@@ -661,15 +736,22 @@ def fetch_titles(
             idx = futures[future]
             completed += 1
             try:
-                title, last_modified = future.result()
-                if title:
-                    entries[idx].title = title
+                result = future.result()
+                if result["title"]:
+                    entries[idx].title = result["title"]
                     fetched += 1
                 # Use extracted date as fallback when sitemap has no lastmod
+                last_modified = result["date"]
                 if last_modified and not entries[idx].lastmod:
-                    # Could be HTTP date format or already ISO — normalize it
                     parsed = _parse_http_date(last_modified)
                     entries[idx].lastmod = parsed if parsed else last_modified
+                # Apply HTTP response metadata
+                entries[idx].http_status = result["http_status"]
+                entries[idx].final_url = result["final_url"]
+                entries[idx].canonical_url = result["canonical_url"]
+                entries[idx].content_length = result["content_length"]
+                entries[idx].etag = result["etag"]
+                entries[idx].lang = result["lang"]
             except Exception:
                 pass
 
@@ -716,12 +798,19 @@ LANG_CODES = {
 
 def detect_languages(entries: list[SitemapEntry]) -> set[str]:
     """
-    Detect language prefixes in sitemap URLs.
+    Detect languages in sitemap entries.
 
-    Looks for 2-letter ISO 639-1 codes as the first path segment
-    (e.g., /en/about, /nl/contact). Returns languages that appear
-    in at least 3 URLs, and only when 2+ languages are found.
+    Prefers the HTML lang attribute (from title fetch) when available.
+    Falls back to detecting 2-letter ISO 639-1 codes as the first path
+    segment (e.g., /en/about, /nl/contact). Returns languages only when
+    2+ languages are found.
     """
+    # Prefer HTML lang attribute when entries have been enriched
+    html_langs = {e.lang for e in entries if e.lang}
+    if len(html_langs) >= 2:
+        return html_langs
+
+    # Fallback: detect from URL path prefixes
     lang_counts: dict[str, int] = {}
     for entry in entries:
         parsed = urlparse(entry.loc)
@@ -888,6 +977,12 @@ def load_from_cache(origin: str) -> Optional[SitemapResult]:
                     changefreq=entry_data.get("changefreq", ""),
                     priority=entry_data.get("priority", ""),
                     title=entry_data.get("title", ""),
+                    http_status=entry_data.get("http_status", 0),
+                    final_url=entry_data.get("final_url", ""),
+                    canonical_url=entry_data.get("canonical_url", ""),
+                    content_length=entry_data.get("content_length", 0),
+                    etag=entry_data.get("etag", ""),
+                    lang=entry_data.get("lang", ""),
                 )
             )
 

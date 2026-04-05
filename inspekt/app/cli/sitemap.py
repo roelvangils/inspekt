@@ -9,7 +9,11 @@ filtering, and direct navigation to any listed URL.
 from __future__ import annotations
 
 import json
+import re
+import shutil
 import sys
+from collections import Counter
+from dataclasses import dataclass, field
 from urllib.parse import urlparse
 
 import click
@@ -25,11 +29,12 @@ from inspekt.services.bridge_executor import get_executor
 
 def _format_date(iso_str: str) -> str:
     """
-    Format an ISO date string as a human-friendly relative date.
+    Format an ISO date string as a compact relative date.
 
-    '2025-03-17T12:48:04+00:00'   → '1 year ago'
-    '2026-01-08T07:29:42.204Z'    → '3 months ago'
-    '2026-04-01'                   → '3 days ago'
+    '2025-03-17T12:48:04+00:00'   → '1y ago'
+    '2026-01-08T07:29:42.204Z'    → '3m ago'
+    '2026-04-01'                   → '3d ago'
+    '2025-10-20'                   → '1y, 5m ago'
     """
     from datetime import datetime, timezone
 
@@ -49,10 +54,52 @@ def _format_date(iso_str: str) -> str:
         if dt.tzinfo is None:
             dt = dt.replace(tzinfo=timezone.utc)
         humanize.deactivate()  # Ensure English
-        return humanize.naturaltime(dt)
+        return _shorten_relative_date(humanize.naturaltime(dt))
 
     except ImportError:
         return iso_str[:10]
+
+
+def _shorten_relative_date(text: str) -> str:
+    """
+    Shorten humanize output to compact notation.
+
+    'a day ago'                → '1d ago'
+    '11 days ago'              → '11d ago'
+    'a month ago'              → '1m ago'
+    '3 months ago'             → '3m ago'
+    '1 year, 5 months ago'     → '1y, 5m ago'
+    'a year ago'               → '1y ago'
+    'an hour ago'              → '1h ago'
+    '2 hours ago'              → '2h ago'
+    'a minute ago'             → '1min ago'
+    """
+    # Strip trailing " ago" and reattach after shortening
+    if not text.endswith(" ago"):
+        return text
+    core = text[:-4]  # remove " ago"
+
+    # Replace units in each comma-separated part
+    units = {"year": "y", "month": "m", "week": "w", "day": "d", "hour": "h", "minute": "min", "second": "s"}
+    parts = [p.strip() for p in core.split(",")]
+    short_parts = []
+    for part in parts:
+        # "a day" / "an hour" → "1d" / "1h"
+        m = re.match(r"^an?\s+(\w+)s?$", part)
+        if m:
+            unit = units.get(m.group(1), m.group(1))
+            short_parts.append(f"1{unit}")
+            continue
+        # "11 days" / "3 months" → "11d" / "3m"
+        m = re.match(r"^(\d+)\s+(\w+?)s?$", part)
+        if m:
+            num, unit_word = m.group(1), m.group(2)
+            unit = units.get(unit_word, unit_word)
+            short_parts.append(f"{num}{unit}")
+            continue
+        short_parts.append(part)
+
+    return ", ".join(short_parts) + " ago"
 
 
 # ISO 639-1 language code → English name (for display in tree)
@@ -89,11 +136,93 @@ _LANG_NAMES = {
 # Box-drawing characters for tree view
 PIPE = "\u2502"      # │
 TEE = "\u251c"       # ├
-ELBOW = "\u2514"     # └
+ELBOW = "\u2570"     # ╰
 DASH = "\u2500"      # ─
 
 
-def _render_tree(node, prefix: str = "", is_last: bool = True, filter_path: str = "", lines: list | None = None, is_root: bool = True) -> list[str]:
+def _build_entry_meta(entry) -> str:
+    """Build styled metadata string (HTTP status, date, priority) for a sitemap entry."""
+    meta_parts = []
+    if entry.http_status and entry.http_status != 200:
+        color = "red" if entry.http_status >= 400 else "yellow"
+        meta_parts.append(click.style(f"({entry.http_status})", fg=color))
+    if entry.lastmod:
+        meta_parts.append(click.style(f"({_format_date(entry.lastmod)})", fg="bright_black"))
+    if entry.priority and entry.priority != "0.5":
+        meta_parts.append(click.style(f"(p={entry.priority})", fg="yellow"))
+    return f" {' '.join(meta_parts)}" if meta_parts else ""
+
+
+def _wrap_tree_label(
+    head: str, title: str, meta: str, max_width: int, cont_prefix: str
+) -> list[str]:
+    """
+    Wrap a tree label, keeping the meta (date/priority) as an atomic unit.
+
+    Args:
+        head: Styled prefix+connector+index+space (never wrapped)
+        title: Styled title text (may be wrapped at word boundaries)
+        meta: Styled metadata like "(3d ago)" (never split — moves to next line if needed)
+        max_width: Maximum visible line width
+        cont_prefix: Pipe-preserving prefix for continuation lines (e.g., "│       ")
+
+    Returns:
+        List of formatted lines
+    """
+    head_w = len(click.unstyle(head))
+    title_plain = click.unstyle(title)
+    meta_w = len(click.unstyle(meta)) if meta else 0
+
+    # Everything fits on one line
+    if head_w + len(title_plain) + meta_w <= max_width:
+        return [f"{head}{title}{meta}"]
+
+    # Title alone fits — put meta on next line
+    if head_w + len(title_plain) <= max_width:
+        return [
+            f"{head}{title}",
+            f"{cont_prefix}{meta.lstrip()}",
+        ]
+
+    # Title needs wrapping — break at word boundaries
+    avail = max_width - head_w
+    title_lines = _wrap_text(title_plain, avail, max_width - len(cont_prefix))
+    result = [f"{head}{click.style(title_lines[0], fg='white')}"]
+    for extra in title_lines[1:]:
+        result.append(f"{cont_prefix}{click.style(extra, fg='white')}")
+
+    # Append meta to the last line if it fits, otherwise on its own line
+    last_plain_len = len(click.unstyle(result[-1]))
+    if meta and last_plain_len + meta_w <= max_width:
+        result[-1] += meta
+    elif meta:
+        result.append(f"{cont_prefix}{meta.lstrip()}")
+
+    return result
+
+
+def _wrap_text(text: str, first_width: int, next_width: int) -> list[str]:
+    """Split plain text into lines fitting the given widths."""
+    lines = []
+    remaining = text
+    width = first_width
+
+    while remaining:
+        if len(remaining) <= width:
+            lines.append(remaining)
+            break
+        # Find word boundary
+        break_at = remaining.rfind(" ", 0, width)
+        if break_at <= 0:
+            break_at = width  # forced break
+        lines.append(remaining[:break_at])
+        remaining = remaining[break_at:].lstrip()
+        width = next_width  # subsequent lines get the continuation width
+
+    return lines or [text]
+
+
+def _render_tree(node, prefix: str = "", is_last: bool = True, filter_path: str = "", lines: list | None = None, is_root: bool = True, max_width: int = 0) -> list[str]:
     """
     Render a tree node and its children as styled text lines.
 
@@ -111,6 +240,10 @@ def _render_tree(node, prefix: str = "", is_last: bool = True, filter_path: str 
     if lines is None:
         lines = []
 
+    # Determine max width on first call (account for 2-space margin in _display_tree)
+    if max_width <= 0:
+        max_width = shutil.get_terminal_size().columns - 2
+
     # Root node
     if is_root:
         # Show root entry index if the root itself is a URL in the sitemap
@@ -121,20 +254,32 @@ def _render_tree(node, prefix: str = "", is_last: bool = True, filter_path: str 
             root_label = click.style(node.name, fg="cyan", bold=True)
         lines.append(root_label)
 
-        # Render children
+        # Render children (with duplicate title grouping)
         children = _filtered_children(node, filter_path)
-        for i, (name, child) in enumerate(children):
+        children = _group_duplicate_titles(children)
+
+        for i, (name, child_or_group) in enumerate(children):
             is_last_child = i == len(children) - 1
-            _render_tree(child, "", is_last_child, filter_path, lines, is_root=False)
+            if isinstance(child_or_group, TitleGroup):
+                _render_title_group(
+                    child_or_group, prefix="", is_last=is_last_child,
+                    lines=lines, max_width=max_width,
+                )
+            else:
+                _render_tree(child_or_group, "", is_last_child, filter_path, lines, is_root=False, max_width=max_width)
 
         return lines
 
     # Build connector
     connector = f"{ELBOW}{DASH}{DASH} " if is_last else f"{TEE}{DASH}{DASH} "
 
+    # Prepare child prefix early — also used for continuation lines
+    child_prefix = prefix + ("    " if is_last else f"{PIPE}   ")
+
     # Format the node name
     if node.has_entry:
         idx_str = click.style(f"[{node.entry_index}]", fg="bright_black")
+        head = f"{prefix}{connector}{idx_str} "
 
         # Show title instead of slug when available
         if node.entry.title:
@@ -142,41 +287,84 @@ def _render_tree(node, prefix: str = "", is_last: bool = True, filter_path: str 
         else:
             name_str = click.style(node.name, fg="white")
 
-        # Add metadata hints (relative date, priority) in dim grey
-        meta_parts = []
-        if node.entry.lastmod:
-            meta_parts.append(click.style(f"({_format_date(node.entry.lastmod)})", fg="bright_black"))
-        if node.entry.priority and node.entry.priority != "0.5":
-            meta_parts.append(click.style(f"(p={node.entry.priority})", fg="yellow"))
+        meta_str = _build_entry_meta(node.entry)
 
-        meta_str = f" {' '.join(meta_parts)}" if meta_parts else ""
-        label = f"{prefix}{connector}{idx_str} {name_str}{meta_str}"
+        # Continuation prefix: pipes from ancestors + spaces to align with title
+        idx_plain_len = len(f"[{node.entry_index}]")
+        cont_prefix = child_prefix + " " * (idx_plain_len + 1)
+
+        lines.extend(_wrap_tree_label(head, name_str, meta_str, max_width, cont_prefix))
     else:
         # Directory node (no URL, just a path segment)
-        # Show language name for language-code directories (e.g., "en/" → "English (21 pages)")
+        head = f"{prefix}{connector}"
         lang_name = _LANG_NAMES.get(node.name.lower())
         if lang_name:
             page_count = _count_entries(node)
             name_str = click.style(lang_name, fg="blue", bold=True)
             pages_word = "page" if page_count == 1 else "pages"
-            count_str = click.style(f"({page_count} {pages_word})", fg="bright_black")
-            label = f"{prefix}{connector}{name_str} {count_str}"
+            meta_str = f" {click.style(f'({page_count} {pages_word})', fg='bright_black')}"
         else:
             name_str = click.style(f"{node.name}/", fg="blue")
-            label = f"{prefix}{connector}{name_str}"
+            meta_str = ""
+        # Directory labels are short — no wrapping needed
+        lines.append(f"{head}{name_str}{meta_str}")
 
-    lines.append(label)
-
-    # Prepare child prefix (must align with the 4-char connector "├── ")
-    child_prefix = prefix + ("    " if is_last else f"{PIPE}   ")
-
-    # Render children
+    # Render children (with duplicate title grouping)
     children = _filtered_children(node, filter_path)
-    for i, (name, child) in enumerate(children):
+    children = _group_duplicate_titles(children)
+
+    for i, (name, child_or_group) in enumerate(children):
         is_last_child = i == len(children) - 1
-        _render_tree(child, child_prefix, is_last_child, filter_path, lines, is_root=False)
+
+        if isinstance(child_or_group, TitleGroup):
+            _render_title_group(
+                child_or_group, prefix=child_prefix, is_last=is_last_child,
+                lines=lines, max_width=max_width,
+            )
+        else:
+            _render_tree(child_or_group, child_prefix, is_last_child, filter_path, lines, is_root=False, max_width=max_width)
 
     return lines
+
+
+def _render_title_group(group: TitleGroup, prefix: str, is_last: bool, lines: list, max_width: int):
+    """Render a group of pages that share the same title."""
+    connector = f"{ELBOW}{DASH}{DASH} " if is_last else f"{TEE}{DASH}{DASH} "
+    child_prefix = prefix + ("    " if is_last else f"{PIPE}   ")
+
+    # Group header: title + (N pages) or (N pages, M aliases)
+    count = len(group.members)
+    pages_word = "page" if count == 1 else "pages"
+    title_str = click.style(group.title, fg="white")
+
+    if group.alias_locs:
+        alias_count = len(group.alias_locs)
+        alias_word = "alias" if alias_count == 1 else "aliases"
+        count_str = click.style(f"({count} {pages_word}, ", fg="bright_black")
+        alias_str = click.style(f"{alias_count} {alias_word}", fg="yellow")
+        count_end = click.style(")", fg="bright_black")
+        meta_str = f" {count_str}{alias_str}{count_end}"
+    else:
+        meta_str = f" {click.style(f'({count} {pages_word})', fg='bright_black')}"
+
+    lines.append(f"{prefix}{connector}{title_str}{meta_str}")
+
+    # Sort members by lastmod (most recent first), then render with distinguishing slugs
+    members = sorted(group.members, key=lambda x: x[1].entry.lastmod or "", reverse=True)
+    slugs = _distinguishing_slug(members)
+
+    for j, (name, node) in enumerate(members):
+        is_last_member = j == len(members) - 1
+        member_connector = f"{ELBOW}{DASH}{DASH} " if is_last_member else f"{TEE}{DASH}{DASH} "
+
+        idx_str = click.style(f"[{node.entry_index}]", fg="bright_black")
+        slug_str = click.style(slugs[node.entry.loc], fg="cyan")
+
+        # Alias indicator
+        alias_indicator = click.style(" \u2192 alias", fg="yellow") if node.entry.loc in group.alias_locs else ""
+
+        member_meta = _build_entry_meta(node.entry)
+        lines.append(f"{child_prefix}{member_connector}{idx_str} {slug_str}{alias_indicator}{member_meta}")
 
 
 def _filtered_children(node, filter_path: str) -> list[tuple]:
@@ -212,8 +400,145 @@ def _subtree_matches(node, filter_path: str) -> bool:
 
 
 # ============================================================================
+# Duplicate title grouping
+# ============================================================================
+
+
+@dataclass
+class TitleGroup:
+    """Virtual group node for sibling pages that share the same title."""
+    title: str
+    members: list[tuple[str, object]]  # (name, TreeNode) pairs
+    alias_locs: set[str] = field(default_factory=set)  # URLs detected as aliases
+
+
+def _group_duplicate_titles(children: list[tuple]) -> list:
+    """
+    Group sibling leaf nodes that share the same title.
+
+    Returns a mixed list of (name, TreeNode) tuples and (group_key, TitleGroup) tuples.
+    Only groups titles that appear 2+ times among leaf nodes.
+    """
+    # Count titles among leaf nodes (nodes with entries and no children)
+    title_counts = Counter()
+    for name, child in children:
+        if child.has_entry and not child.children and child.entry.title:
+            title_counts[child.entry.title] += 1
+
+    # Titles appearing 2+ times get grouped
+    dupe_titles = {t for t, c in title_counts.items() if c >= 2}
+    if not dupe_titles:
+        return children
+
+    # Build groups and passthrough list
+    groups: dict[str, TitleGroup] = {}
+    result = []
+    for name, child in children:
+        title = child.entry.title if child.has_entry and not child.children else None
+        if title and title in dupe_titles:
+            if title not in groups:
+                group = TitleGroup(title=title, members=[])
+                groups[title] = group
+                result.append((f"__group__{title}", group))
+            groups[title].members.append((name, child))
+        else:
+            result.append((name, child))
+
+    # Detect aliases within each group
+    for group in groups.values():
+        group.alias_locs = _detect_aliases([node.entry for _, node in group.members])
+
+    return result
+
+
+def _detect_aliases(entries: list) -> set[str]:
+    """
+    Detect which entries in a group are aliases of each other.
+
+    Returns set of entry.loc URLs that are aliases (all but the "primary").
+    Detection layers:
+      1. Same canonical URL
+      2. Redirect to same final URL
+      3. Same ETag
+    """
+    if len(entries) < 2:
+        return set()
+
+    alias_locs: set[str] = set()
+    all_locs = {e.loc for e in entries}
+
+    # Layer 1: Same canonical URL
+    canonical_groups: dict[str, list] = {}
+    for e in entries:
+        if e.canonical_url:
+            canonical_groups.setdefault(e.canonical_url, []).append(e)
+    for canonical, group in canonical_groups.items():
+        if len(group) >= 2:
+            # The entry whose loc matches the canonical is the primary
+            primary = next((e for e in group if e.loc == canonical), group[0])
+            for e in group:
+                if e is not primary:
+                    alias_locs.add(e.loc)
+        elif len(group) == 1 and canonical in all_locs and group[0].loc != canonical:
+            alias_locs.add(group[0].loc)
+
+    # Layer 2: Redirect to same target (another entry's loc or shared final_url)
+    final_groups: dict[str, list] = {}
+    for e in entries:
+        if e.final_url:
+            final_groups.setdefault(e.final_url, []).append(e)
+    for final, group in final_groups.items():
+        if len(group) >= 2:
+            for e in group[1:]:
+                alias_locs.add(e.loc)
+        # Single entry redirecting to another entry's loc = alias
+        elif len(group) == 1 and final in all_locs and group[0].loc != final:
+            alias_locs.add(group[0].loc)
+
+    # Layer 3: Same ETag
+    etag_groups: dict[str, list] = {}
+    for e in entries:
+        if e.etag:
+            etag_groups.setdefault(e.etag, []).append(e)
+    for etag, group in etag_groups.items():
+        if len(group) >= 2:
+            for e in group[1:]:
+                alias_locs.add(e.loc)
+
+    return alias_locs
+
+
+def _distinguishing_slug(members: list[tuple[str, object]]) -> dict[str, str]:
+    """
+    Find the minimal distinguishing slug for each member in a title group.
+
+    Returns dict mapping entry.loc to display slug (e.g., "/contact" or "/nl/page").
+    """
+    paths = {}
+    for name, node in members:
+        parsed = urlparse(node.entry.loc)
+        paths[node.entry.loc] = parsed.path.rstrip("/") or "/"
+
+    # Try last segment first
+    last_segments = {loc: "/" + p.split("/")[-1] for loc, p in paths.items()}
+    if len(set(last_segments.values())) == len(last_segments):
+        return last_segments
+
+    # Last segments aren't unique — use full path
+    return paths
+
+
+# ============================================================================
 # Interactive mode
 # ============================================================================
+
+def _sort_by_lastmod(items: list[dict]) -> list[dict]:
+    """Sort items by lastmod, most recent first. Items without lastmod go last."""
+    with_date = [i for i in items if i.get("lastmod")]
+    without_date = [i for i in items if not i.get("lastmod")]
+    with_date.sort(key=lambda i: i["lastmod"], reverse=True)
+    return with_date + without_date
+
 
 def _has_gum() -> bool:
     """Check if gum (charmbracelet/gum) is available."""
@@ -243,17 +568,21 @@ def _gum_picker(items: list[dict]) -> str | None:
     """Fuzzy search picker using gum filter."""
     import subprocess
 
-    # Build lines for gum: "title  (slug)" — gum searches the full line,
+    # Sort by last modified date (most recent first)
+    items = _sort_by_lastmod(items)
+
+    # Build lines for gum: "title  (slug)  (date)" — gum searches the full line,
     # so both title and slug are searchable. We map the selected line back to its URL.
     lines = []
     line_to_url = {}
     for item in items:
         title = item.get("title") or item["path"]
         slug = item["path"]
+        date_str = f"  ({_format_date(item['lastmod'])})" if item.get("lastmod") else ""
         if item.get("title"):
-            display = f"{title}  ({slug})"
+            display = f"{title}  ({slug}){date_str}"
         else:
-            display = slug
+            display = f"{slug}{date_str}"
         lines.append(display)
         line_to_url[display] = item["url"]
 
@@ -382,6 +711,9 @@ def _simple_picker(items: list[dict]) -> str | None:
                 print_warning(f"No URLs matching `{user_input}`")
                 continue
 
+            # Sort by last modified date (most recent first)
+            matches = _sort_by_lastmod(matches)
+
             if len(matches) == 1:
                 return matches[0]["url"]
 
@@ -389,7 +721,9 @@ def _simple_picker(items: list[dict]) -> str | None:
             for item in matches[:20]:
                 idx_str = click.style(f"[{item['index']}]", fg="bright_black")
                 display = item.get("title") or item["path"]
-                click.echo(f"  {idx_str} {display}")
+                lastmod = item.get("lastmod")
+                date_str = f"  {click.style(f'({_format_date(lastmod)})', fg='bright_black')}" if lastmod else ""
+                click.echo(f"  {idx_str} {display}{date_str}")
 
             if len(matches) > 20:
                 click.echo(click.style(f"  \u2026and {len(matches) - 20} more", fg="bright_black"))
@@ -715,7 +1049,7 @@ def _display_sitemap(result, flat: bool, filter_path: str, from_cache: bool = Fa
 
     if not filter_path and result.total_urls > 50:
         print_hint("Use `--filter /path` to narrow down the tree")
-    print_hint("Use `--open N` to navigate to a URL by its number (e.g., `inspekt sitemap --open 5`)")
+    print_hint("Use `--open N` to navigate to any URL by its number, including within groups")
     print_hint("Use `--interactive` for a searchable picker")
 
 
@@ -796,6 +1130,11 @@ def _display_stats(result, stats: dict):
         ["URLs with lastmod", str(stats.get("urls_with_lastmod", 0))],
         ["URLs without lastmod", str(stats.get("urls_without_lastmod", 0))],
     ]
+    if stats.get("duplicate_title_groups"):
+        summary_rows.append(["Duplicate title groups", str(stats["duplicate_title_groups"])])
+        summary_rows.append(["Pages with duplicate titles", str(stats["duplicate_title_entries"])])
+    if stats.get("non_200_urls"):
+        summary_rows.append(["Non-200 HTTP status", str(stats["non_200_urls"])])
 
     summary_table = Table(["Metric", "Value"], title="Summary", icon=get_icon("Summary"))
     summary_table.set_data(summary_rows)
