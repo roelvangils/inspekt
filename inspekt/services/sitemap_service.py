@@ -273,6 +273,13 @@ def fetch_sitemap(
         result.fetch_time = time.time() - start
         return result
 
+    # Detect HTML responses (SPAs often serve index.html for any URL including /sitemap.xml)
+    stripped = xml_text.lstrip()
+    if stripped[:15].lower().startswith(("<!doctype", "<html")):
+        result.errors.append(f"Not a sitemap (received HTML instead of XML from {url})")
+        result.fetch_time = time.time() - start
+        return result
+
     # Parse XML
     try:
         root = ET.fromstring(xml_text)
@@ -659,7 +666,8 @@ def _fetch_single_title(url: str, timeout: float = 3.0) -> dict:
 
     except (requests.RequestException, OSError) as e:
         logger.debug(f"Title fetch failed for {url}: {type(e).__name__}: {e}")
-        return empty
+        # Mark as attempted (-1) so we don't retry on the next run
+        return {**empty, "http_status": -1}
 
 
 def _safe_int(value: str) -> int:
@@ -793,9 +801,10 @@ def fetch_titles(
     import threading
     from concurrent.futures import ThreadPoolExecutor, as_completed
 
-    # Filter to entries that need titles
-    # Skip entries that already have a title, and entries that were already
-    # checked but got no title (e.g., 404 pages) — don't retry those.
+    # Filter to entries that need titles.
+    # Skip entries that already have a title, and entries that were previously
+    # attempted (http_status != 0): positive = HTTP response (e.g., 404),
+    # negative = network failure (e.g., -1). Use --refresh to retry.
     to_fetch = [(i, e) for i, e in enumerate(entries) if not e.title and e.http_status == 0]
     if not to_fetch:
         return 0
@@ -877,6 +886,8 @@ def fetch_titles(
                 entries[idx].lang = result["lang"]
             except Exception:
                 _maybe_backoff(False)
+                # Mark as attempted so we don't retry on the next run
+                entries[idx].http_status = -1
 
             if progress_callback:
                 progress_callback(completed, total)
@@ -1044,6 +1055,14 @@ def _cache_key(origin: str) -> str:
 def save_to_cache(result: SitemapResult) -> Path:
     """Save a sitemap result to the cache directory."""
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    # In VM, make the directory world-writable so both root (API server)
+    # and the inspekt user (terminal) can create/update files
+    if is_isolated_mode():
+        try:
+            CACHE_DIR.chmod(0o777)
+        except OSError:
+            pass
+
     cache_file = CACHE_DIR / f"{_cache_key(result.origin)}.json"
 
     data = {
@@ -1052,6 +1071,12 @@ def save_to_cache(result: SitemapResult) -> Path:
     }
 
     cache_file.write_text(json.dumps(data, indent=2))
+    # Make the file world-writable so the other user can update it
+    if is_isolated_mode():
+        try:
+            cache_file.chmod(0o666)
+        except OSError:
+            pass
     return cache_file
 
 
