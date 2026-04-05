@@ -78,6 +78,13 @@ iptables -A OUTPUT -m owner --uid-owner $INSPEKT_UID -j DROP
 
 echo "Network restrictions applied for inspekt user (uid=$INSPEKT_UID)"
 
+# Make the sitemap cache directory world-writable so both root (API server)
+# and the inspekt user (terminal) can read/write cache files
+mkdir -p /root/.config/inspekt/sitemaps
+chmod 777 /root/.config/inspekt/sitemaps
+# Also fix permissions on any existing cache files from previous runs
+chmod 666 /root/.config/inspekt/sitemaps/*.json 2>/dev/null || true
+
 # Clear Chromium caches on every start for privacy and to ensure
 # the extension loads fresh code from the bind-mounted source files
 CHROMIUM_PROFILE="/root/.config/chromium"
