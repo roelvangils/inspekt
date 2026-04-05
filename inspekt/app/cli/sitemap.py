@@ -1057,6 +1057,29 @@ def sitemap(url, flat, filter_path, lang, open_target, interactive, where, neigh
     if lang and not filter_path:
         filter_path = f"/{lang.strip('/')}/"
 
+    # --- Size guardrails ---
+    total = len(result.entries)
+
+    if total > 50_000 and not output_json:
+        print_error(f"This sitemap has {total:,} pages — too large to process")
+        print_hint("Use `--filter /section` to work with a subset, or `--stats` for an overview")
+        sys.exit(0)
+
+    if total > 10_000 and not no_titles and not output_json:
+        already_titled = sum(1 for e in result.entries if e.title)
+        needs = total - already_titled
+        if needs > 1000:
+            print_warning(f"This sitemap has {total:,} pages — fetching titles for {needs:,} pages may take several minutes")
+            if not click.confirm("  Continue?", default=True):
+                print_hint("Use `--no-titles` to skip title fetching, or `--filter /section` to limit scope")
+                return
+
+    if total > 1000 and not no_titles and not output_json:
+        already_titled = sum(1 for e in result.entries if e.title)
+        needs = total - already_titled
+        if needs > 500:
+            print_warning(f"Fetching titles for {needs:,} pages — this may take a while")
+
     # Fetch page titles (skip entries that already have titles or were already checked)
     if not no_titles and result.entries:
         already_titled = sum(1 for e in result.entries if e.title)
@@ -1200,6 +1223,28 @@ def sitemap(url, flat, filter_path, lang, open_target, interactive, where, neigh
     # Display
     if not result.entries:
         print_warning("Sitemap contains no URLs")
+        return
+
+    # For very large sitemaps, skip the tree display and show guidance instead
+    if len(result.entries) > 5000 and not flat and not filter_path and not output_json:
+        click.echo()
+        icon = get_icon("Sitemaps") or ""
+        if icon:
+            icon += " "
+        click.echo(f"  {icon}{click.style('Sitemap', fg='cyan', bold=True)}  {click.style(result.source_url, fg='bright_black')}")
+        click.echo(f"  {click.style(f'{len(result.entries):,} URLs', fg='bright_black')}")
+        click.echo()
+        print_warning(f"This sitemap has {len(result.entries):,} pages — too large to display as a tree")
+        click.echo()
+        print_hint("Use one of these to explore the sitemap:")
+        click.echo(f"    {'`--filter /path`':22s} show only a section")
+        click.echo(f"    {'`--lang nl`':22s} show only one language")
+        click.echo(f"    {'`-i`':22s} interactive fuzzy search")
+        click.echo(f"    {'`--from-here`':22s} subtree from current page")
+        click.echo(f"    {'`--where`':22s} show your position in the tree")
+        click.echo(f"    {'`--neighbors`':22s} show surrounding pages")
+        click.echo(f"    {'`--flat`':22s} flat URL list (scrollable)")
+        click.echo(f"    {'`--stats`':22s} sitemap statistics")
         return
 
     _display_sitemap(result, flat, filter_path, from_cache)
