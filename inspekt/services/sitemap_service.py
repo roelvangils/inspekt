@@ -1147,13 +1147,10 @@ def merge_titles_from_stale_cache(result: SitemapResult) -> int:
         Number of titles transferred.
     """
     cache_file = CACHE_DIR / f"{_cache_key(result.origin)}.json"
-    if not cache_file.exists():
-        return 0
-
     try:
         data = json.loads(cache_file.read_text())
         old_entries = data.get("result", {}).get("entries", [])
-    except (json.JSONDecodeError, KeyError, OSError):
+    except (json.JSONDecodeError, KeyError, OSError, FileNotFoundError):
         return 0
 
     # Build lookup: URL → old entry data (only entries that have a title)
