@@ -36,12 +36,14 @@ logger = logging.getLogger(__name__)
 NS = "{http://www.sitemaps.org/schemas/sitemap/0.9}"
 
 
-# Cache directory — use the Docker volume in VM (shared between root API server
-# and inspekt terminal user), standard cache dir otherwise.
+# Cache directory — use a shared path in VM (accessible to both root API server
+# and the restricted inspekt terminal user), standard cache dir otherwise.
 def _get_cache_dir() -> Path:
     if is_isolated_mode():
-        # Fixed path on the inspekt-vm-data Docker volume, accessible to all users
-        return Path("/root/.config/inspekt/sitemaps")
+        # /tmp/inspekt-sitemaps is world-writable and shared between all users.
+        # Not persistent across container restarts, but the sitemap cache is
+        # cheap to rebuild (XML fetch < 1s, titles re-enrich lazily).
+        return Path("/tmp/inspekt-sitemaps")
     return Path.home() / ".cache" / "inspekt" / "sitemaps"
 
 
@@ -1062,7 +1064,12 @@ def load_from_cache(origin: str) -> Optional[SitemapResult]:
     """
     cache_file = CACHE_DIR / f"{_cache_key(origin)}.json"
 
-    if not cache_file.exists():
+    try:
+        if not cache_file.exists():
+            return None
+    except OSError:
+        # Permission errors, stale volume mounts, etc. — treat as cache miss
+        logger.debug("Cannot access cache file %s", cache_file)
         return None
 
     try:
@@ -1109,7 +1116,7 @@ def load_from_cache(origin: str) -> Optional[SitemapResult]:
 
         return result
 
-    except (json.JSONDecodeError, KeyError, TypeError):
+    except (json.JSONDecodeError, KeyError, TypeError, OSError):
         return None
 
 
