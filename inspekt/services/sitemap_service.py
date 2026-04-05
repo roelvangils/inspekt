@@ -36,10 +36,12 @@ logger = logging.getLogger(__name__)
 NS = "{http://www.sitemaps.org/schemas/sitemap/0.9}"
 
 
-# Cache directory — use persistent Docker volume in VM, standard cache dir otherwise.
+# Cache directory — use the Docker volume in VM (shared between root API server
+# and inspekt terminal user), standard cache dir otherwise.
 def _get_cache_dir() -> Path:
     if is_isolated_mode():
-        return get_data_dir() / "sitemaps"  # /root/.config/inspekt/sitemaps/
+        # Fixed path on the inspekt-vm-data Docker volume, accessible to all users
+        return Path("/root/.config/inspekt/sitemaps")
     return Path.home() / ".cache" / "inspekt" / "sitemaps"
 
 
@@ -371,6 +373,64 @@ def build_tree(entries: list[SitemapEntry], origin: str) -> TreeNode:
         idx += 1
 
     return root
+
+
+def find_node_by_path(
+    root: TreeNode, path: str
+) -> tuple[TreeNode | None, TreeNode | None]:
+    """Find a node and its parent by URL path. Returns (node, parent).
+
+    Args:
+        root: The root TreeNode (from build_tree)
+        path: URL path, e.g. "/blog/my-post" or "/"
+
+    Returns:
+        Tuple of (node, parent). Both are None if the path doesn't exist in the tree.
+        Parent is None when the node is the root.
+    """
+    path = path.rstrip("/") or "/"
+
+    if path == "/":
+        return root, None
+
+    segments = [s for s in path.strip("/").split("/") if s]
+    parent = None
+    current = root
+    for seg in segments:
+        if seg in current.children:
+            parent = current
+            current = current.children[seg]
+        else:
+            return None, None
+    return current, parent
+
+
+def find_ancestors(root: TreeNode, path: str) -> list[TreeNode]:
+    """Return the list of TreeNodes from root to the node at the given path.
+
+    Args:
+        root: The root TreeNode
+        path: URL path to trace, e.g. "/a/b/c"
+
+    Returns:
+        List of TreeNodes [root, child_a, child_b, child_c].
+        Empty list if the path doesn't exist in the tree.
+    """
+    path = path.rstrip("/") or "/"
+
+    if path == "/":
+        return [root]
+
+    segments = [s for s in path.strip("/").split("/") if s]
+    ancestors = [root]
+    current = root
+    for seg in segments:
+        if seg in current.children:
+            current = current.children[seg]
+            ancestors.append(current)
+        else:
+            return []
+    return ancestors
 
 
 def get_stats(result: SitemapResult) -> dict[str, Any]:
@@ -732,7 +792,9 @@ def fetch_titles(
     from concurrent.futures import ThreadPoolExecutor, as_completed
 
     # Filter to entries that need titles
-    to_fetch = [(i, e) for i, e in enumerate(entries) if not e.title]
+    # Skip entries that already have a title, and entries that were already
+    # checked but got no title (e.g., 404 pages) — don't retry those.
+    to_fetch = [(i, e) for i, e in enumerate(entries) if not e.title and e.http_status == 0]
     if not to_fetch:
         return 0
 

@@ -749,6 +749,86 @@ def _navigate_to(url: str):
         print_error(f"Navigation failed: {result.get('error', 'Unknown error')}")
 
 
+# Named targets for --open
+_NAMED_TARGETS = {"parent", "up", "next", "prev", "first-child"}
+
+
+def _get_current_path() -> str:
+    """Get the path portion of the current browser URL."""
+    from inspekt.services.browser_url import BrowserURLError, resolve_url
+
+    try:
+        full_url = resolve_url()
+    except BrowserURLError as e:
+        print_error(f"Cannot determine current page: {e}")
+        sys.exit(1)
+
+    return urlparse(full_url).path or "/"
+
+
+def _handle_open_target(target: str, result, origin: str):
+    """Handle --open with either a numeric index or a named target."""
+    from inspekt.services.sitemap_service import build_tree, find_node_by_path
+
+    # Numeric index — existing behavior
+    if target.isdigit():
+        index = int(target)
+        if index < 1 or index > len(result.entries):
+            print_error(f"Index {index} out of range (1-{len(result.entries)})")
+            sys.exit(1)
+        entry = result.entries[index - 1]
+        _navigate_to(entry.loc)
+        return
+
+    target = target.lower().strip()
+    if target not in _NAMED_TARGETS:
+        print_error(f"Unknown target `{target}`. Use a number or one of: {', '.join(sorted(_NAMED_TARGETS))}")
+        sys.exit(1)
+
+    # Named targets require knowing where we are in the sitemap tree
+    current_path = _get_current_path()
+    tree = build_tree(result.entries, origin)
+    node, parent = find_node_by_path(tree, current_path)
+
+    if node is None:
+        print_error("Current page is not in the sitemap")
+        print_hint("Try `inspekt sitemap --refresh` to update the sitemap cache")
+        sys.exit(1)
+
+    if target in ("parent", "up"):
+        if parent is None:
+            print_error("Already at the root of the sitemap")
+            sys.exit(0)
+        url = f"{origin}{parent.full_path}"
+        _navigate_to(url)
+
+    elif target in ("next", "prev"):
+        if parent is None:
+            print_error("Root has no siblings")
+            sys.exit(0)
+        siblings = sorted(parent.children.values(), key=lambda n: n.name.lower())
+        current_idx = next((i for i, s in enumerate(siblings) if s is node), -1)
+        if target == "next":
+            if current_idx == len(siblings) - 1:
+                print_error("Already at the last sibling")
+                sys.exit(0)
+            sibling_node = siblings[current_idx + 1]
+        else:
+            if current_idx == 0:
+                print_error("Already at the first sibling")
+                sys.exit(0)
+            sibling_node = siblings[current_idx - 1]
+        _navigate_to(f"{origin}{sibling_node.full_path}")
+
+    elif target == "first-child":
+        if not node.children:
+            print_error("This page has no child pages")
+            sys.exit(0)
+        first = sorted(node.children.values(), key=lambda n: n.name.lower())[0]
+        url = f"{origin}{first.full_path}"
+        _navigate_to(url)
+
+
 def _get_origin(override_url: str | None) -> str:
     """Get the origin from the browser or an override URL."""
     from inspekt.services.browser_url import BrowserURLError, InternalURLError, resolve_origin
@@ -773,15 +853,18 @@ def _get_origin(override_url: str | None) -> str:
 @click.option("--flat", is_flag=True, help="Show flat URL list instead of tree")
 @click.option("--filter", "filter_path", type=str, help="Filter URLs by path (e.g., /blog)")
 @click.option("--lang", type=str, help="Filter by language path prefix (e.g., nl, en, fr)")
-@click.option("--open", "open_index", type=int, help="Navigate to URL by index number")
+@click.option("--open", "open_target", type=str, help="Navigate by index (5) or target (parent, up, next, prev, first-child)")
 @click.option("--interactive", "-i", is_flag=True, help="Interactive fuzzy search picker")
+@click.option("--where", is_flag=True, help="Show breadcrumb from root to current page")
+@click.option("--neighbors", is_flag=True, help="Show parent, siblings, and children of current page")
+@click.option("--from-here", "from_here", is_flag=True, help="Show subtree from current browser page")
 @click.option("--stats", is_flag=True, help="Show sitemap statistics")
 @click.option("--no-flatten", is_flag=True, help="Show sitemap index without expanding child sitemaps")
 @click.option("--refresh", is_flag=True, help="Force re-fetch (bypass cache)")
 @click.option("--no-titles", is_flag=True, help="Skip fetching page titles")
 @click.option("--debug-titles", is_flag=True, hidden=True, help="Debug title fetching")
 @click.option("--json", "output_json", is_flag=True, help="Output as JSON")
-def sitemap(url, flat, filter_path, lang, open_index, interactive, stats, no_flatten, refresh, no_titles, debug_titles, output_json):
+def sitemap(url, flat, filter_path, lang, open_target, interactive, where, neighbors, from_here, stats, no_flatten, refresh, no_titles, debug_titles, output_json):
     """
     Discover and browse a site's sitemap.
 
@@ -795,6 +878,14 @@ def sitemap(url, flat, filter_path, lang, open_index, interactive, stats, no_fla
         inspekt sitemap --filter /blog           # Only show /blog/* URLs
         inspekt sitemap --lang nl                # Only show Dutch pages
         inspekt sitemap --open 5                 # Navigate to URL #5
+        inspekt sitemap --open parent            # Navigate to parent page
+        inspekt sitemap --open next              # Navigate to next sibling
+        inspekt sitemap --open prev              # Navigate to previous sibling
+        inspekt sitemap --open first-child       # Navigate to first child page
+        inspekt sitemap --where                  # Breadcrumb to current page
+        inspekt sitemap --neighbors              # Parent, siblings, and children
+        inspekt sitemap --from-here              # Subtree from current page
+        inspekt sitemap --from-here -i           # Fuzzy search within subtree
         inspekt sitemap --interactive            # Fuzzy search picker
         inspekt sitemap --stats                  # Show statistics
         inspekt sitemap --no-flatten             # Show sitemap index without expanding
@@ -896,17 +987,23 @@ def sitemap(url, flat, filter_path, lang, open_index, interactive, stats, no_fla
     if lang and not filter_path:
         filter_path = f"/{lang.strip('/')}/"
 
-    # Fetch page titles (skip entries that already have titles from cache)
+    # Fetch page titles (skip entries that already have titles or were already checked)
     if not no_titles and result.entries:
         already_titled = sum(1 for e in result.entries if e.title)
-        needs_title = sum(1 for e in result.entries if not e.title)
+        already_checked = sum(1 for e in result.entries if not e.title and e.http_status > 0)
+        needs_title = sum(1 for e in result.entries if not e.title and e.http_status == 0)
 
         if needs_title > 0:
             # Send progress to stderr so it doesn't corrupt --json output
             err = output_json
 
-            if already_titled > 0:
-                click.echo(f"  {already_titled} of {len(result.entries)} titles already cached", err=err)
+            if already_titled > 0 or already_checked > 0:
+                parts = []
+                if already_titled > 0:
+                    parts.append(f"{already_titled} titles cached")
+                if already_checked > 0:
+                    parts.append(f"{already_checked} unreachable")
+                click.echo(f"  {', '.join(parts)} (of {len(result.entries)} total)", err=err)
             click.echo(f"  Fetching titles for {needs_title} pages\u2026", err=err)
 
             def _progress(completed, total):
@@ -979,13 +1076,24 @@ def sitemap(url, flat, filter_path, lang, open_index, interactive, stats, no_fla
         _display_stats(result, get_stats(result))
         return
 
-    # Navigate to a specific URL by index
-    if open_index is not None:
-        if open_index < 1 or open_index > len(result.entries):
-            print_error(f"Index {open_index} out of range (1-{len(result.entries)})")
-            sys.exit(1)
-        entry = result.entries[open_index - 1]
-        _navigate_to(entry.loc)
+    # --where: breadcrumb from root to current page
+    if where:
+        _display_where(result, origin)
+        return
+
+    # --neighbors: parent, siblings, children of current page
+    if neighbors:
+        _display_neighbors(result, origin)
+        return
+
+    # Navigate by index or named target
+    if open_target is not None:
+        _handle_open_target(open_target, result, origin)
+        return
+
+    # --from-here: subtree or scoped interactive from current page
+    if from_here:
+        _display_from_here(result, origin, flat, interactive)
         return
 
     # Interactive mode
@@ -1018,6 +1126,208 @@ def sitemap(url, flat, filter_path, lang, open_index, interactive, stats, no_fla
         return
 
     _display_sitemap(result, flat, filter_path, from_cache)
+
+
+# ============================================================================
+# Page-centric display functions
+# ============================================================================
+
+
+def _resolve_current_node(result, origin: str):
+    """Resolve the current browser page in the sitemap tree.
+
+    Returns (tree, node, parent, current_path) or exits with an error.
+    """
+    from inspekt.services.sitemap_service import build_tree, find_node_by_path
+
+    current_path = _get_current_path()
+    tree = build_tree(result.entries, origin)
+    node, parent = find_node_by_path(tree, current_path)
+
+    if node is None:
+        print_error("Current page is not in the sitemap")
+        print_hint("Try `inspekt sitemap --refresh` to update the sitemap cache")
+        sys.exit(1)
+
+    return tree, node, parent, current_path
+
+
+def _node_display_name(node) -> str:
+    """Get the display name for a node: title if available, else slug (unstyled)."""
+    if node.entry and node.entry.title:
+        return node.entry.title
+    return node.name
+
+
+def _display_where(result, origin: str):
+    """Show a vertical breadcrumb from root to current page (--where)."""
+    from inspekt.services.sitemap_service import find_ancestors
+
+    # _resolve_current_node handles the not-found error for us
+    tree, node, parent, current_path = _resolve_current_node(result, origin)
+    ancestors = find_ancestors(tree, current_path)
+
+    click.echo()
+
+    # The last ancestor is the current node
+    current_node = ancestors[-1]
+    max_children_shown = 8
+
+    for depth, ancestor in enumerate(ancestors):
+        indent = "  " + "     " * depth
+        is_current = ancestor is current_node
+
+        if depth == 0:
+            # Root node — show hostname
+            name = click.style(ancestor.name, fg="cyan", bold=True)
+        elif is_current:
+            name = click.style(_node_display_name(ancestor), fg="white", bold=True)
+        else:
+            name = click.style(_node_display_name(ancestor, dim_slug=True), fg="blue")
+
+        # Draw connector
+        if depth == 0:
+            click.echo(f"{indent}{name}")
+        else:
+            connector = click.style(f"{ELBOW}{DASH}{DASH} ", fg="bright_black")
+            marker = click.style("  \u2190 you are here", fg="green") if is_current else ""
+            click.echo(f"{indent}{connector}{name}{marker}")
+
+    # Show children of the current node
+    if current_node.children:
+        child_indent = "  " + "     " * len(ancestors)
+        connector_style = lambda c: click.style(c, fg="bright_black")
+        child_nodes = sorted(current_node.children.values(), key=lambda n: n.name.lower())
+        shown = child_nodes[:max_children_shown]
+        remaining = len(child_nodes) - len(shown)
+
+        for i, child in enumerate(shown):
+            is_last = (i == len(shown) - 1) and remaining == 0
+            conn = connector_style(f"{ELBOW}{DASH}{DASH} " if is_last else f"{TEE}{DASH}{DASH} ")
+            name = click.style(_node_display_name(child, dim_slug=True), fg="bright_black")
+            click.echo(f"{child_indent}{conn}{name}")
+
+        if remaining > 0:
+            conn = connector_style(f"{ELBOW}{DASH}{DASH} ")
+            more = click.style(f"({remaining} more)", fg="bright_black")
+            click.echo(f"{child_indent}{conn}{more}")
+
+    click.echo()
+    print_hint("Use `--open parent` to navigate up, or `--open first-child` to go deeper")
+
+
+def _display_neighbors(result, origin: str):
+    """Show parent, siblings, and children of the current page (--neighbors)."""
+    tree, node, parent, current_path = _resolve_current_node(result, origin)
+
+    click.echo()
+
+    # Parent section
+    if parent:
+        arrow = click.style("\u2191", fg="blue")
+        parent_name = _node_display_name(parent, dim_slug=True)
+        if parent.full_path == "/":
+            parent_name = click.style(parent.name, fg="cyan")
+        click.echo(f"  {arrow} Parent: {parent_name}")
+        click.echo()
+
+    # Siblings section (includes current node, highlighted)
+    if parent:
+        siblings = sorted(parent.children.values(), key=lambda n: n.name.lower())
+    else:
+        # At root — no siblings
+        siblings = [node]
+
+    if len(siblings) > 1 or parent is None:
+        if parent:
+            click.echo(click.style("  Siblings:", fg="bright_black"))
+        for sibling in siblings:
+            is_current = sibling is node
+            name = _node_display_name(sibling, dim_slug=True)
+            if is_current:
+                marker = click.style("\u25b8 ", fg="green")
+                name = click.style(_node_display_name(sibling), fg="white", bold=True)
+                tag = click.style("  \u2190 you are here", fg="green")
+                click.echo(f"  {marker}{name}{tag}")
+            else:
+                click.echo(f"    {name}")
+        click.echo()
+
+    # Children section
+    if node.children:
+        child_nodes = sorted(node.children.values(), key=lambda n: n.name.lower())
+        arrow = click.style("\u2193", fg="blue")
+        count = len(child_nodes)
+        label = "Child" if count == 1 else "Children"
+        click.echo(f"  {arrow} {label} ({count}):")
+        for child in child_nodes:
+            name = _node_display_name(child, dim_slug=True)
+            click.echo(f"    {name}")
+    else:
+        click.echo(click.style("  No child pages", fg="bright_black"))
+
+    click.echo()
+    print_hint("Use `--open next/prev` to move between siblings, `--open parent` to go up")
+
+
+def _collect_subtree_entries(node) -> list:
+    """Recursively collect all SitemapEntry objects in a subtree."""
+    entries = []
+    if node.entry:
+        entries.append(node.entry)
+    for child in node.children.values():
+        entries.extend(_collect_subtree_entries(child))
+    return entries
+
+
+def _display_from_here(result, origin: str, flat: bool, interactive: bool):
+    """Show the subtree from the current page (--from-here)."""
+    tree, node, parent, current_path = _resolve_current_node(result, origin)
+
+    subtree_entries = _collect_subtree_entries(node)
+    if not subtree_entries:
+        print_warning("No pages found under the current page")
+        return
+
+    # Scoped interactive picker
+    if interactive:
+        selected = _interactive_picker([
+            {
+                "index": i + 1,
+                "path": urlparse(e.loc).path or "/",
+                "title": e.title,
+                "url": e.loc,
+                "lastmod": e.lastmod,
+            }
+            for i, e in enumerate(subtree_entries)
+        ])
+        if selected:
+            _navigate_to(selected)
+        return
+
+    # Display the subtree
+    click.echo()
+    count = len(subtree_entries)
+    pages_word = "page" if count == 1 else "pages"
+    current_name = _node_display_name(node)
+    click.echo(f"  {click.style('Subtree from', fg='bright_black')} {click.style(current_name, fg='cyan', bold=True)}  {click.style(f'({count} {pages_word})', fg='bright_black')}")
+    click.echo()
+
+    if flat:
+        for entry in subtree_entries:
+            path = urlparse(entry.loc).path or "/"
+            title = entry.title
+            if title:
+                click.echo(f"  {click.style(title, fg='white')}  {click.style(path, fg='bright_black')}")
+            else:
+                click.echo(f"  {path}")
+    else:
+        lines = _render_tree(node, is_root=True)
+        for line in lines:
+            click.echo(f"  {line}")
+
+    click.echo()
+    print_hint("Combine with `--interactive` to fuzzy search within this subtree")
 
 
 def _display_sitemap(result, flat: bool, filter_path: str, from_cache: bool = False):
@@ -1055,7 +1365,7 @@ def _display_sitemap(result, flat: bool, filter_path: str, from_cache: bool = Fa
 
     if not filter_path and result.total_urls > 50:
         print_hint("Use `--filter /path` to narrow down the tree")
-    print_hint("Use `--open N` to navigate to any URL by its number, including within groups")
+    print_hint("Use `--open N` to navigate by index, or `--open parent/next/prev` for structural navigation")
     print_hint("Use `--interactive` for a searchable picker")
 
 
