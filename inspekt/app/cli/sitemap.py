@@ -1092,30 +1092,52 @@ def sitemap(url, flat, filter_path, lang, open_target, interactive, where, neigh
             if already_checked > 0:
                 parts.append(f"{already_checked} unreachable")
             click.echo(f"  {', '.join(parts)} (of {total} total)", err=err)
-        click.echo(f"  Fetching titles for {needs_title} pages\u2026", err=err)
 
         import time as _time
+
+        # Progress bar with throttle notification
+        bar = click.progressbar(
+            length=needs_title,
+            label="  Fetching titles",
+            show_eta=True,
+            show_percent=True,
+            fill_char=click.style("\u2588", fg="cyan"),
+            empty_char=click.style("\u2591", fg="bright_black"),
+            file=sys.stderr if err else None,
+        )
         _fetch_start = _time.time()
         _reassured = False
+        _last_pos = 0
 
         def _progress(completed, total):
-            nonlocal _reassured
-            pct = completed * 100 // total
-            # Only estimate remaining time after 10% is done (enough data for a reliable rate)
+            nonlocal _reassured, _last_pos
+            increment = completed - _last_pos
+            if increment > 0:
+                bar.update(increment)
+                _last_pos = completed
+            # Show throttle message once after 10% is done and ETA > 60s
             if not _reassured and completed >= max(total // 10, 20):
                 elapsed = _time.time() - _fetch_start
                 rate = completed / elapsed
                 remaining = (total - completed) / rate
                 if remaining > 60:
                     _reassured = True
-                    click.echo(f"\r  Fetching titles\u2026 {completed}/{total} ({pct}%) — throttling to be gentle to the server" + " " * 5, err=err)
-                    return
-            click.echo(f"\r  Fetching titles\u2026 {completed}/{total} ({pct}%)", nl=False, err=err)
+                    click.echo(err=err)
+                    print_hint("Throttling to be gentle to the server — this may take a few minutes")
 
-        fetched = fetch_titles(
-            result.entries, max_concurrent=20, timeout=10.0, progress_callback=_progress
-        )
-        click.echo(f"\r  Fetching titles\u2026 {fetched}/{needs_title} found" + " " * 10, err=err)
+        bar.__enter__()
+        try:
+            fetched = fetch_titles(
+                result.entries, max_concurrent=20, timeout=10.0, progress_callback=_progress
+            )
+        finally:
+            # Ensure bar completes to 100%
+            remaining = needs_title - _last_pos
+            if remaining > 0:
+                bar.update(remaining)
+            bar.__exit__(None, None, None)
+
+        click.echo(f"  {fetched} of {needs_title} titles found", err=err)
 
         # Cache with raw titles (site name stripping happens below for display)
         save_to_cache(result)
