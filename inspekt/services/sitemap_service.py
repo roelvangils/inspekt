@@ -802,7 +802,9 @@ def fetch_titles(
         entries: List of SitemapEntry objects to enrich
         max_concurrent: Maximum number of concurrent requests
         timeout: Timeout per request in seconds
-        progress_callback: Optional callable(completed, total) for progress
+        progress_callback: Optional callable(completed, total, concurrency) for progress.
+            The third argument is the current concurrency limit (may be lower
+            than max_concurrent if the server is struggling).
 
     Returns:
         Number of titles successfully fetched
@@ -906,7 +908,7 @@ def fetch_titles(
                 entries[idx].http_status = -1
 
             if progress_callback:
-                progress_callback(completed, total)
+                progress_callback(completed, total, concurrency_limit)
 
     return fetched
 

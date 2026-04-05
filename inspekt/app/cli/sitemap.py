@@ -1109,21 +1109,19 @@ def sitemap(url, flat, filter_path, lang, open_target, interactive, where, neigh
         _reassured = False
         _last_pos = 0
 
-        def _progress(completed, total):
+        _max_concurrent = 20  # must match the fetch_titles call below
+
+        def _progress(completed, total, concurrency):
             nonlocal _reassured, _last_pos
             increment = completed - _last_pos
             if increment > 0:
                 bar.update(increment)
                 _last_pos = completed
-            # Show throttle message once after 10% is done and ETA > 60s
-            if not _reassured and completed >= max(total // 10, 20):
-                elapsed = _time.time() - _fetch_start
-                rate = completed / elapsed
-                remaining = (total - completed) / rate
-                if remaining > 60:
-                    _reassured = True
-                    click.echo(err=err)
-                    print_hint("Throttling to be gentle to the server — this may take a few minutes")
+            # Show throttle message once when concurrency has actually been reduced
+            if not _reassured and concurrency < _max_concurrent:
+                _reassured = True
+                click.echo(err=err)
+                print_hint(f"Slowing down to avoid overloading the server (concurrency: {concurrency}/{_max_concurrent})")
 
         bar.__enter__()
         try:
