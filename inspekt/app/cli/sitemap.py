@@ -1094,8 +1094,22 @@ def sitemap(url, flat, filter_path, lang, open_target, interactive, where, neigh
             click.echo(f"  {', '.join(parts)} (of {total} total)", err=err)
         click.echo(f"  Fetching titles for {needs_title} pages\u2026", err=err)
 
+        import time as _time
+        _fetch_start = _time.time()
+        _reassured = False
+
         def _progress(completed, total):
+            nonlocal _reassured
             pct = completed * 100 // total
+            elapsed = _time.time() - _fetch_start
+            # Estimate time remaining
+            if completed > 0:
+                rate = completed / elapsed
+                remaining = (total - completed) / rate
+                if remaining > 30 and not _reassured:
+                    _reassured = True
+                    click.echo(f"\r  Fetching titles\u2026 {completed}/{total} ({pct}%) — throttling to be gentle to the server" + " " * 5, err=err)
+                    return
             click.echo(f"\r  Fetching titles\u2026 {completed}/{total} ({pct}%)", nl=False, err=err)
 
         fetched = fetch_titles(

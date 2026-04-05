@@ -847,8 +847,12 @@ def fetch_titles(
                 active_count -= 1
                 gate_ready.notify()
 
-    def _maybe_backoff(success: bool):
-        """Reduce concurrency if the server is struggling (>30% failure rate)."""
+    def _maybe_adjust(success: bool):
+        """Adjust concurrency based on rolling failure rate.
+
+        Backs off (halve concurrency) when failure rate exceeds 30%.
+        Recovers (increase by 2) when failure rate drops below 10%.
+        """
         nonlocal concurrency_limit
         with backoff_lock:
             recent_results.append(success)
@@ -862,7 +866,10 @@ def fetch_titles(
                 new_limit = max(concurrency_limit // 2, min_concurrency)
                 if new_limit < concurrency_limit:
                     concurrency_limit = new_limit
-                    logger.debug(f"Backing off: concurrency → {concurrency_limit} (failure rate: {failure_rate:.0%})")
+                    logger.debug(f"Throttling: concurrency → {concurrency_limit} (failure rate: {failure_rate:.0%})")
+            elif failure_rate < 0.1 and concurrency_limit < max_concurrent:
+                concurrency_limit = min(concurrency_limit + 2, max_concurrent)
+                logger.debug(f"Recovering: concurrency → {concurrency_limit} (failure rate: {failure_rate:.0%})")
 
     with ThreadPoolExecutor(max_workers=max_concurrent) as executor:
         futures = {}
@@ -876,7 +883,7 @@ def fetch_titles(
             try:
                 result = future.result()
                 success = bool(result["title"] or result["http_status"])
-                _maybe_backoff(success)
+                _maybe_adjust(success)
 
                 if result["title"]:
                     entries[idx].title = result["title"]
@@ -894,7 +901,7 @@ def fetch_titles(
                 entries[idx].etag = result["etag"]
                 entries[idx].lang = result["lang"]
             except Exception:
-                _maybe_backoff(False)
+                _maybe_adjust(False)
                 # Mark as attempted so we don't retry on the next run
                 entries[idx].http_status = -1
 
