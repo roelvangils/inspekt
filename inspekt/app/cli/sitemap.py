@@ -1105,11 +1105,9 @@ def sitemap(url, flat, filter_path, lang, open_target, interactive, where, neigh
             empty_char=click.style("\u2591", fg="bright_black"),
             file=sys.stderr if err else None,
         )
-        _fetch_start = _time.time()
         _reassured = False
         _last_pos = 0
-
-        _max_concurrent = 20  # must match the fetch_titles call below
+        _max_concurrent = 20
 
         def _progress(completed, total, concurrency):
             nonlocal _reassured, _last_pos
@@ -1126,7 +1124,7 @@ def sitemap(url, flat, filter_path, lang, open_target, interactive, where, neigh
         bar.__enter__()
         try:
             fetched = fetch_titles(
-                result.entries, max_concurrent=20, timeout=10.0, progress_callback=_progress
+                result.entries, max_concurrent=_max_concurrent, timeout=10.0, progress_callback=_progress
             )
         finally:
             # Ensure bar completes to 100%
