@@ -1066,7 +1066,7 @@ def sitemap(url, flat, filter_path, lang, open_target, interactive, where, neigh
         no_titles = True
 
     # Count how many titles still need fetching (used by menu threshold)
-    needs_title = sum(1 for e in result.entries if not e.title and e.http_status == 0)
+    needs_title = sum(1 for e in result.entries if not e.title and e.http_status in {0, 429, 500, 502, 503, 504, -1, -2})
 
     # For large sitemaps, offer an interactive menu instead of blindly fetching
     fetch_subset = None  # if set, only fetch titles for this subset of entries
@@ -1099,14 +1099,14 @@ def sitemap(url, flat, filter_path, lang, open_target, interactive, where, neigh
 
     # Fetch page titles
     entries_to_fetch = fetch_subset if fetch_subset is not None else result.entries
-    needs_title = sum(1 for e in entries_to_fetch if not e.title and e.http_status == 0)
+    needs_title = sum(1 for e in entries_to_fetch if not e.title and e.http_status in {0, 429, 500, 502, 503, 504, -1, -2})
 
     if not no_titles and needs_title > 0:
         # Send progress to stderr so it doesn't corrupt --json output
         err = output_json
 
         already_titled_in_subset = sum(1 for e in entries_to_fetch if e.title)
-        already_checked_in_subset = sum(1 for e in entries_to_fetch if not e.title and e.http_status != 0)
+        already_checked_in_subset = sum(1 for e in entries_to_fetch if not e.title and e.http_status not in {0, 429, 500, 502, 503, 504, -1, -2})
 
         if already_titled_in_subset > 0 or already_checked_in_subset > 0:
             parts = []

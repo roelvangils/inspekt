@@ -813,10 +813,10 @@ def fetch_titles(
     from concurrent.futures import ThreadPoolExecutor, as_completed
 
     # Filter to entries that need titles.
-    # Skip entries that already have a title, and entries that were previously
-    # attempted (http_status != 0): positive = HTTP response (e.g., 404),
-    # negative = network failure (e.g., -1). Use --refresh to retry.
-    to_fetch = [(i, e) for i, e in enumerate(entries) if not e.title and e.http_status == 0]
+    # Skip entries that already have a title or had a permanent failure (404, 403, etc.).
+    # Retry entries with temporary failures (429 rate-limit, 5xx server errors, 0 = untried).
+    _RETRYABLE = {0, 429, 500, 502, 503, 504, -1, -2}
+    to_fetch = [(i, e) for i, e in enumerate(entries) if not e.title and e.http_status in _RETRYABLE]
     if not to_fetch:
         return 0
 
