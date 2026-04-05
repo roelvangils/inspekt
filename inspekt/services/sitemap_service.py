@@ -711,6 +711,11 @@ def fetch_titles(
     """
     Fetch page titles for sitemap entries concurrently.
 
+    Uses adaptive concurrency: starts at max_concurrent and backs off
+    if the server starts dropping connections (>30% failure rate in a
+    rolling window). This prevents overwhelming servers that have
+    connection limits.
+
     Modifies entries in-place, setting the `title` field. Skips entries
     that already have a title.
 
@@ -723,6 +728,7 @@ def fetch_titles(
     Returns:
         Number of titles successfully fetched
     """
+    import threading
     from concurrent.futures import ThreadPoolExecutor, as_completed
 
     # Filter to entries that need titles
@@ -734,10 +740,52 @@ def fetch_titles(
     fetched = 0
     completed = 0
 
+    # Adaptive concurrency — starts at max_concurrent, backs off on failures.
+    # Uses a simple gate: _throttled_fetch checks active count before proceeding.
+    min_concurrency = 5
+    concurrency_limit = max_concurrent
+    active_count = 0
+    gate_lock = threading.Lock()
+    gate_ready = threading.Condition(gate_lock)
+
+    # Rolling failure window: track last 50 results (True=success, False=failure)
+    recent_results: list[bool] = []
+    backoff_lock = threading.Lock()
+
+    def _throttled_fetch(url: str) -> dict:
+        nonlocal active_count
+        with gate_ready:
+            while active_count >= concurrency_limit:
+                gate_ready.wait()
+            active_count += 1
+        try:
+            return _fetch_single_title(url, timeout)
+        finally:
+            with gate_ready:
+                active_count -= 1
+                gate_ready.notify()
+
+    def _maybe_backoff(success: bool):
+        """Reduce concurrency if the server is struggling (>30% failure rate)."""
+        nonlocal concurrency_limit
+        with backoff_lock:
+            recent_results.append(success)
+            if len(recent_results) > 50:
+                recent_results.pop(0)
+            if len(recent_results) < 20:
+                return
+
+            failure_rate = 1 - sum(recent_results) / len(recent_results)
+            if failure_rate > 0.3 and concurrency_limit > min_concurrency:
+                new_limit = max(concurrency_limit // 2, min_concurrency)
+                if new_limit < concurrency_limit:
+                    concurrency_limit = new_limit
+                    logger.debug(f"Backing off: concurrency → {concurrency_limit} (failure rate: {failure_rate:.0%})")
+
     with ThreadPoolExecutor(max_workers=max_concurrent) as executor:
         futures = {}
         for idx, entry in to_fetch:
-            future = executor.submit(_fetch_single_title, entry.loc, timeout)
+            future = executor.submit(_throttled_fetch, entry.loc)
             futures[future] = idx
 
         for future in as_completed(futures):
@@ -745,6 +793,9 @@ def fetch_titles(
             completed += 1
             try:
                 result = future.result()
+                success = bool(result["title"] or result["http_status"])
+                _maybe_backoff(success)
+
                 if result["title"]:
                     entries[idx].title = result["title"]
                     fetched += 1
@@ -761,7 +812,7 @@ def fetch_titles(
                 entries[idx].etag = result["etag"]
                 entries[idx].lang = result["lang"]
             except Exception:
-                pass
+                _maybe_backoff(False)
 
             if progress_callback:
                 progress_callback(completed, total)

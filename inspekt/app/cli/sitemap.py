@@ -896,34 +896,40 @@ def sitemap(url, flat, filter_path, lang, open_index, interactive, stats, no_fla
     if lang and not filter_path:
         filter_path = f"/{lang.strip('/')}/"
 
-    # Fetch page titles on fresh fetches (not from cache — failed titles won't retry)
-    if not no_titles and not from_cache and result.entries:
-        needs_fetch = any(not e.title for e in result.entries)
-        if needs_fetch:
-            total = sum(1 for e in result.entries if not e.title)
+    # Fetch page titles (skip entries that already have titles from cache)
+    if not no_titles and result.entries:
+        already_titled = sum(1 for e in result.entries if e.title)
+        needs_title = sum(1 for e in result.entries if not e.title)
 
+        if needs_title > 0:
             # Send progress to stderr so it doesn't corrupt --json output
             err = output_json
+
+            if already_titled > 0:
+                click.echo(f"  {already_titled} of {len(result.entries)} titles already cached", err=err)
+            click.echo(f"  Fetching titles for {needs_title} pages\u2026", err=err)
 
             def _progress(completed, total):
                 pct = completed * 100 // total
                 click.echo(f"\r  Fetching titles\u2026 {completed}/{total} ({pct}%)", nl=False, err=err)
 
-            click.echo(f"  Fetching titles for {total} pages\u2026", err=err)
             fetched = fetch_titles(
                 result.entries, max_concurrent=20, timeout=10.0, progress_callback=_progress
             )
-            click.echo(f"\r  Fetching titles\u2026 {fetched}/{total} found" + " " * 10, err=err)
+            click.echo(f"\r  Fetching titles\u2026 {fetched}/{needs_title} found" + " " * 10, err=err)
 
-            # Strip the common site name from all titles
-            site_name = detect_site_name(result.entries)
-            if site_name:
-                for entry in result.entries:
-                    if entry.title:
-                        entry.title = strip_site_name(entry.title, site_name)
-
-            # Re-cache with cleaned titles
+            # Cache with raw titles (site name stripping happens below for display)
             save_to_cache(result)
+
+    # Strip the common site name from titles for display. This runs on both
+    # fresh and cached results so titles collected by the API (which stores
+    # raw titles) are also cleaned. strip_site_name is idempotent.
+    if not no_titles and result.entries:
+        site_name = detect_site_name(result.entries)
+        if site_name:
+            for entry in result.entries:
+                if entry.title:
+                    entry.title = strip_site_name(entry.title, site_name)
 
     # Handle sitemap index (not flattened)
     if result.is_index and not result.entries:

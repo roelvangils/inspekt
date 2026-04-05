@@ -1028,6 +1028,25 @@
             display: none;
         }
 
+        /* Keep Alive: pulsing heartbeat indicator */
+        @keyframes keepalive-pulse {
+            0%, 100% { opacity: 0.4; transform: scale(0.9); }
+            50% { opacity: 1; transform: scale(1.1); }
+        }
+        .tab.tab-keepalive::after {
+            content: '💚';
+            position: absolute;
+            left: 3px;
+            bottom: 1px;
+            font-size: 7px;
+            line-height: 1;
+            pointer-events: none;
+            animation: keepalive-pulse 2s ease-in-out infinite;
+        }
+        .tab.tab-keepalive .tab-close {
+            display: none;
+        }
+
         .tab.tab-local {
             border-bottom: 2px solid var(--accent-blue, #4a9eff);
         }
@@ -1107,14 +1126,6 @@
          * Context Menu — Section A: Common (all platforms)
          * Structural styles that read from --menu-* variables
          * ============================================= */
-        @keyframes contextMenuIn {
-            from { opacity: 0; transform: scale(0.96); }
-            to   { opacity: 1; transform: scale(1); }
-        }
-        @keyframes contextMenuOut {
-            from { opacity: 1; transform: scale(1); }
-            to   { opacity: 0; transform: scale(0.96); }
-        }
         @keyframes menuItemFlicker {
             0%   { background: var(--menu-accent); color: var(--menu-text-selected); }
             25%  { background: transparent; color: var(--menu-text); }
@@ -1141,10 +1152,8 @@
             font-family: var(--menu-font-family, inherit);
             font-size: var(--menu-font-size);
             font-weight: var(--menu-font-weight);
-            animation: contextMenuIn 120ms ease-out;
-        }
-        .context-menu.closing {
-            animation: contextMenuOut 100ms ease-in forwards;
+            user-select: none;
+            -webkit-user-select: none;
         }
 
         /* Shared base styles for all interactive menu items */
@@ -1203,6 +1212,40 @@
             height: 1px;
             background: var(--menu-separator-color);
             margin: var(--menu-separator-margin);
+        }
+
+        /* Section header — non-interactive dimmed label for grouping items */
+        .context-menu-header {
+            padding: var(--menu-item-padding);
+            margin: var(--menu-item-margin, 0);
+            color: var(--menu-text-disabled);
+            font-size: calc(var(--menu-font-size) - 1px);
+            font-weight: 600;
+            cursor: default;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        /* Scroll container — holds all menu items, becomes scrollable when overflowing */
+        .context-menu-scroll {
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Scroll arrows — hidden by default, shown when menu content overflows */
+        .context-menu-scroll-arrow {
+            display: none;
+            text-align: center;
+            padding: 2px 0;
+            font-size: 8px;
+            color: var(--menu-text-disabled);
+            cursor: default;
+            user-select: none;
+            -webkit-user-select: none;
+            flex-shrink: 0;
+        }
+        .context-menu-scroll-arrow.visible {
+            display: block;
         }
 
         /* Navigation icon row (Reload / Back / Forward) */
@@ -1276,6 +1319,26 @@
         .context-menu [role="menuitem"].flickering,
         .context-menu-nav button.flickering {
             animation: menuItemFlicker 150ms steps(1) forwards;
+        }
+
+        /* Parent keeps full accent highlight while its submenu is open but not yet entered */
+        .context-menu [role="menuitem"].submenu-parent-open {
+            background: var(--menu-accent);
+            color: var(--menu-text-selected);
+            outline: none;
+        }
+        .context-menu [role="menuitem"].submenu-parent-open .submenu-chevron {
+            color: var(--menu-text-selected);
+        }
+
+        /* Parent dims when focus moves into the submenu */
+        .context-menu [role="menuitem"].submenu-parent-active {
+            background: color-mix(in srgb, var(--menu-accent) 50%, transparent);
+            color: rgba(0, 0, 0, 0.85);
+            outline: none;
+        }
+        .context-menu [role="menuitem"].submenu-parent-active .submenu-chevron {
+            color: rgba(0, 0, 0, 0.85);
         }
 
         /* =============================================
@@ -3822,6 +3885,13 @@
     <link rel="stylesheet" href="/toolbar.css">
     <link rel="stylesheet" href="/vision-sim.css">
     <script src="/vendor/sortable.min.js"></script>
+    <!-- Extracted modules -->
+    <script src="/context-menu.js" defer></script>
+    <script src="/vnc-overlay.js" defer></script>
+    <script src="/audio.js" defer></script>
+    <script src="/zoom.js" defer></script>
+    <script src="/scrollbar.js" defer></script>
+    <!-- Existing extracted modules -->
     <script src="/toolbar.js" defer></script>
     <script src="/vision-sim.js" defer></script>
     <link rel="stylesheet" href="/motor-sim.css">
@@ -4495,6 +4565,17 @@
 
         // Log port configuration for debugging
         console.log('[Inspekt] Port config:', { pagePort, VNC_PORT, CONTROL_PORT, TERMINAL_PORT });
+
+        // =============================================
+        // Shared Nav Icons (reused across context menus)
+        // =============================================
+        const NAV_ICONS = {
+            back:    '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>',
+            forward: '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 4l-1.41 1.41L16.17 11H4v2h12.17l-5.58 5.59L12 20l8-8z"/></svg>',
+            up:      '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M4 12l1.41 1.41L11 7.83V20h2V7.83l5.58 5.59L20 12l-8-8-8 8z"/></svg>',
+            reload:  '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>',
+            down:    '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M20 12l-1.41-1.41L13 16.17V4h-2v12.17l-5.58-5.59L4 12l8 8 8-8z"/></svg>',
+        };
 
         // =============================================
         // VM Configuration (from inspekt-config.yaml)
@@ -5947,6 +6028,11 @@
                         if (pluginDropdownOpen) renderPluginList();
                         // Trigger autorun plugins on navigation
                         triggerAutorunPlugins(currentUrl);
+                        // Sitemap: auto-fetch on new domain, refresh tree for current page.
+                        // maybeFetchSitemap resets _sitemapNav synchronously before its
+                        // first await, so stale data is cleared immediately.
+                        maybeFetchSitemap(currentUrl);
+                        refreshSitemapNav(currentUrl);
                     }
                     // Auto-detect internal URL: if Chrome navigated to http://inspekt/,
                     // switch to native iframe view automatically
@@ -6722,6 +6808,11 @@
         let lastAutorunTime = 0;
         const AUTORUN_DEBOUNCE_MS = 3000;
 
+        // Sitemap navigation state
+        let _sitemapReady = false;               // Has the sitemap been fetched for current origin?
+        let _sitemapFetchedOrigins = new Set();   // Origins we've already fetched this session
+        let _sitemapNav = null;                   // Cached tree response for current page
+
         /**
          * Simple glob-style pattern matcher (mirrors Python's fnmatch).
          * Supports '*' (any chars) and '?' (single char).
@@ -6789,6 +6880,148 @@
             } catch (e) {
                 // API not available — silently skip
             }
+        }
+
+        // --- Sitemap auto-fetch and tree pre-loading ---
+
+        async function maybeFetchSitemap(url) {
+            try {
+                const origin = new URL(url).origin;
+                if (_sitemapFetchedOrigins.has(origin)) return;
+
+                // New domain — reset state so context menu shows "Loading…" until ready
+                _sitemapReady = false;
+                _sitemapNav = null;
+
+                // Check if already cached on the server (fast, no fetch)
+                const statusResp = await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/api/sitemaps/status?origin=${encodeURIComponent(origin)}`);
+                const status = await statusResp.json();
+                if (status.ok && status.cached) {
+                    _sitemapFetchedOrigins.add(origin);
+                    _sitemapReady = true;
+                    refreshSitemapNav(url);
+                    return;
+                }
+
+                // Fetch sitemap structure in background (XML only, no titles)
+                const resp = await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/api/sitemaps/fetch`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ origin })
+                });
+                const data = await resp.json();
+                _sitemapFetchedOrigins.add(origin);
+                if (data.ok && data.total_urls > 0) {
+                    _sitemapReady = true;
+                    showToast(`Sitemap indexed (${data.total_urls} pages)`, 'dark');
+                    refreshSitemapNav(url);
+                } else {
+                    // No sitemap found — mark as ready so context menu shows
+                    // "not in sitemap" instead of "Loading…" forever
+                    _sitemapReady = true;
+                    _sitemapNav = null;
+                }
+            } catch (e) {
+                // Network error — mark as ready (no data) so the context menu
+                // isn't stuck on "Loading…". Origin is NOT added to the set,
+                // so navigating within this domain will retry the fetch.
+                _sitemapReady = true;
+                _sitemapNav = null;
+                console.debug('[Sitemap] Auto-fetch failed:', e);
+            }
+        }
+
+        let _sitemapNavAbort = null;  // AbortController for in-flight /tree requests
+
+        async function refreshSitemapNav(url) {
+            // Cancel any in-flight request so stale responses don't overwrite
+            if (_sitemapNavAbort) _sitemapNavAbort.abort();
+            _sitemapNavAbort = new AbortController();
+            const signal = _sitemapNavAbort.signal;
+
+            try {
+                const u = new URL(url);
+                // If sitemap wasn't auto-fetched yet, check if it was cached
+                // by another source (e.g., the CLI `sitemap` command)
+                if (!_sitemapReady) {
+                    const statusResp = await fetch(
+                        `http://${VNC_HOST}:${CONTROL_PORT}/api/sitemaps/status?origin=${encodeURIComponent(u.origin)}`,
+                        { signal }
+                    );
+                    const status = await statusResp.json();
+                    if (status.ok && status.cached) {
+                        _sitemapReady = true;
+                        _sitemapFetchedOrigins.add(u.origin);
+                    } else {
+                        _sitemapNav = null;
+                        return;
+                    }
+                }
+                const resp = await fetch(
+                    `http://${VNC_HOST}:${CONTROL_PORT}/api/sitemaps/tree?origin=${encodeURIComponent(u.origin)}&path=${encodeURIComponent(u.pathname)}`,
+                    { signal }
+                );
+                const data = await resp.json();
+                _sitemapNav = data.ok ? data : null;
+            } catch (e) {
+                if (e.name === 'AbortError') return;  // superseded by newer request
+                _sitemapNav = null;
+            }
+        }
+
+        function _sitemapGoUp() {
+            if (_sitemapNav && _sitemapNav.parent && _sitemapNav.parent.url) {
+                navigateTo(_sitemapNav.parent.url);
+            }
+        }
+
+        /**
+         * Recursively build context menu items from sitemap children.
+         * Leaf nodes navigate on click; branch nodes open a submenu.
+         * Branch nodes that are also real pages get an "Open [title]" item
+         * at the top of their submenu so the page itself remains navigable.
+         */
+        function _buildSitemapSubmenuItems(children, childrenTotal) {
+            const titled = [];
+            const untitled = [];
+
+            for (const child of children) {
+                const pageExists = child.exists !== false;
+                const hasTitle = !!child.title;
+                const slug = '/' + (child.path.split('/').filter(Boolean).pop() || '');
+                const label = hasTitle ? child.title : slug;
+
+                if (child.children && child.children.length > 0) {
+                    // Branch node — has sub-children, open as submenu
+                    const subItems = _buildSitemapSubmenuItems(child.children, child.children_total);
+                    if (pageExists) {
+                        subItems.unshift({
+                            label: `Open \u201c${label}\u201d`,
+                            action: () => navigateTo(child.url),
+                        });
+                    }
+                    (hasTitle ? titled : untitled).push({ label, children: subItems });
+                } else if (pageExists) {
+                    // Leaf node — navigate on click
+                    (hasTitle ? titled : untitled).push({ label, action: () => navigateTo(child.url) });
+                }
+            }
+
+            // Titled items first, then untitled items with a header
+            const items = [...titled];
+            if (untitled.length > 0) {
+                if (titled.length > 0) items.push({ separator: true });
+                items.push({ header: 'Not in sitemap' });
+                items.push(...untitled);
+            }
+            if (childrenTotal > 25) {
+                items.push({ separator: true });
+                items.push({
+                    label: `(${childrenTotal - 25} more pages)`,
+                    disabled: true,
+                });
+            }
+            return items;
         }
 
         // Tab switching
@@ -9132,6 +9365,93 @@
         // Terminal Management
         // =============================================
 
+        // Directory history for context menu back/forward navigation.
+        // Only tracks menu-initiated cd commands (not manual typing).
+        const _termCwdHistory = [];
+        let _termCwdPos = -1;  // Index into history; -1 = no menu navigation yet
+
+        /** Send a command to the terminal, styled dim+italic to show it was menu-initiated.
+         *  Ctrl-U clears any current input before sending. */
+        function _sendTerminalCommand(cmd) {
+            if (!terminalSocket || terminalSocket.readyState !== WebSocket.OPEN) return;
+            // Capture the absolute row where the command will be echoed (current prompt line)
+            const buf = terminal?.buffer?.active;
+            const cmdAbsRow = buf ? buf.baseY + buf.cursorY : -1;
+
+            terminalSocket.send(`\x15${cmd}\r`);
+
+            // Restyle after the shell echoes the command.
+            // Uses the saved absolute row so multi-line output doesn't throw off positioning.
+            setTimeout(() => {
+                if (!terminal || cmdAbsRow < 0) return;
+                const currentBuf = terminal.buffer.active;
+                const line = currentBuf.getLine(cmdAbsRow);
+                if (!line) return;
+                const text = line.translateToString(true).trimEnd();
+                const splitPos = text.indexOf('$ ');
+                if (splitPos === -1) return;
+                const prompt = text.slice(0, splitPos + 2);
+                const cmdText = text.slice(splitPos + 2);
+                // Convert absolute row to viewport-relative (CUP is 1-based)
+                const viewportRow = cmdAbsRow - currentBuf.baseY + 1;
+                if (viewportRow < 1 || viewportRow > terminal.rows) return; // scrolled off
+                terminal.write(
+                    '\x1b7' +
+                    `\x1b[${viewportRow};1H` +
+                    '\x1b[2K' +
+                    `${prompt}\x1b[2;3m${cmdText}\x1b[0m` +
+                    '\x1b8'
+                );
+            }, 100);
+        }
+
+        /** Quote a string for safe use in shell commands */
+        function _shellQuote(s) {
+            return `'${s.replace(/'/g, "'\\''")}'`;
+        }
+
+        /** Send a cd command (quoted) via _sendTerminalCommand */
+        function _sendCd(dir) {
+            _sendTerminalCommand(`cd ${_shellQuote(dir)}`);
+        }
+
+        /** Send a cd command and track it in navigation history */
+        function sendTerminalCd(targetDir) {
+            if (!targetDir) return;
+            // Seed history with current dir on first menu navigation
+            if (_termCwdHistory.length === 0 || _termCwdPos === -1) {
+                const history = _parseTerminalHistory();
+                _termCwdHistory.length = 0;
+                _termCwdHistory.push(history?.cwd || '/home/inspekt');
+                _termCwdPos = 0;
+            }
+            // Truncate forward history, push new destination
+            _termCwdHistory.length = _termCwdPos + 1;
+            _termCwdHistory.push(targetDir);
+            _termCwdPos = _termCwdHistory.length - 1;
+            _sendCd(targetDir);
+        }
+
+        function canTerminalGoBack() {
+            return _termCwdPos > 0;
+        }
+
+        function canTerminalGoForward() {
+            return _termCwdPos >= 0 && _termCwdPos < _termCwdHistory.length - 1;
+        }
+
+        function terminalGoBack() {
+            if (!canTerminalGoBack()) return;
+            _termCwdPos--;
+            _sendCd(_termCwdHistory[_termCwdPos]);
+        }
+
+        function terminalGoForward() {
+            if (!canTerminalGoForward()) return;
+            _termCwdPos++;
+            _sendCd(_termCwdHistory[_termCwdPos]);
+        }
+
         function toggleTerminal() {
             const overlay = document.getElementById('terminalOverlay');
             const termBtn = document.querySelector('button[onclick="toggleTerminal()"]');
@@ -9877,217 +10197,7 @@
             toggleTerminal();
         }
 
-        // =============================================
-        // Audio Streaming
-        // =============================================
-
-        const AUDIO_PORT = 6081;
-        let isAudioEnabled = false;
-        let audioSocket = null;
-        let audioElement = null;
-        let mediaSource = null;
-        let sourceBuffer = null;
-        let audioDataQueue = [];
-        let directFeed = true;
-
-        function initAudioElement() {
-            if (!audioElement) {
-                audioElement = document.createElement('audio');
-                audioElement.id = 'vmAudio';
-                document.body.appendChild(audioElement);
-            }
-        }
-
-        function updateAudioButton() {
-            const iconOff = document.getElementById('audioIconOff');
-            const iconOn = document.getElementById('audioIconOn');
-            const btn = document.getElementById('audioBtn');
-
-            if (isAudioEnabled) {
-                iconOff.style.display = 'none';
-                iconOn.style.display = 'block';
-                btn.classList.add('active');
-            } else {
-                iconOff.style.display = 'block';
-                iconOn.style.display = 'none';
-                btn.classList.remove('active');
-            }
-        }
-
-        async function toggleAudio() {
-            if (isAudioEnabled) {
-                await stopAudio();
-                showToast('Audio disabled', 'info');
-            } else {
-                await startAudio();
-            }
-            updateAudioButton();
-        }
-
-        async function startAudio() {
-            if (isAudioEnabled) return;
-
-            initAudioElement();
-
-            const mime = 'audio/webm; codecs="opus"';
-            if (!MediaSource.isTypeSupported(mime)) {
-                showToast('Audio codec not supported by browser', 'error');
-                return;
-            }
-
-            try {
-                mediaSource = new MediaSource();
-                audioElement.src = URL.createObjectURL(mediaSource);
-
-                await new Promise((resolve, reject) => {
-                    mediaSource.addEventListener('sourceopen', () => {
-                        try {
-                            sourceBuffer = mediaSource.addSourceBuffer(mime);
-                            sourceBuffer.mode = 'sequence';
-
-                            sourceBuffer.addEventListener('updateend', () => {
-                                if (sourceBuffer.updating) return;
-
-                                if (audioDataQueue.length === 0) {
-                                    directFeed = true;
-                                    return;
-                                }
-
-                                const data = audioDataQueue.shift();
-                                try {
-                                    sourceBuffer.appendBuffer(data);
-                                } catch (e) {
-                                    if (e.name === 'QuotaExceededError') {
-                                        emptyAudioBuffer();
-                                    }
-                                }
-                            });
-
-                            resolve();
-                        } catch (e) {
-                            reject(e);
-                        }
-                    }, { once: true });
-
-                    mediaSource.addEventListener('error', reject, { once: true });
-                });
-
-                // Connect to audio WebSocket.
-                // Specify 'binary' subprotocol — websockify requires it for
-                // raw binary data (without it, data may be base64-encoded).
-                const wsUrl = `ws://${VNC_HOST}:${AUDIO_PORT}`;
-                audioSocket = new WebSocket(wsUrl);
-                audioSocket.binaryType = 'arraybuffer';
-
-                audioSocket.addEventListener('open', async () => {
-                    console.log('[Audio] WebSocket connected');
-                    isAudioEnabled = true;
-                    updateAudioButton();
-
-                    // Try to play immediately — the user's click on the audio
-                    // button counts as a user gesture for autoplay policy.
-                    audioElement.playbackRate = 1.003; // Slight speedup to reduce drift
-                    try {
-                        await audioElement.play();
-                        console.log('[Audio] Playback started');
-                        showToast('Audio enabled', 'success');
-                    } catch (e) {
-                        if (e.name === 'NotAllowedError') {
-                            // Autoplay blocked — wait for a user click
-                            console.log('[Audio] Autoplay blocked, waiting for click');
-                            showToast('Audio enabled — click anywhere to start playback', 'success');
-                            document.body.addEventListener('click', async () => {
-                                try {
-                                    await audioElement.play();
-                                    console.log('[Audio] Playback started (after click)');
-                                } catch (err) {
-                                    console.error('[Audio] Playback error:', err);
-                                }
-                            }, { capture: true, once: true });
-                        } else if (e.name !== 'AbortError') {
-                            console.error('[Audio] Playback error:', e);
-                        }
-                    }
-                });
-
-                audioSocket.addEventListener('message', (event) => {
-                    feedAudioData(event.data);
-                });
-
-                audioSocket.addEventListener('error', async () => {
-                    console.error('[Audio] WebSocket error');
-                    showToast('Audio connection failed', 'error');
-                    await stopAudio();
-                });
-
-                audioSocket.addEventListener('close', async () => {
-                    console.log('[Audio] WebSocket closed');
-                    if (isAudioEnabled) {
-                        showToast('Audio connection closed', 'info');
-                        await stopAudio();
-                    }
-                });
-
-            } catch (e) {
-                console.error('[Audio] Setup error:', e);
-                showToast(`Audio setup failed: ${e.message}`, 'error');
-                await stopAudio();
-            }
-        }
-
-        function feedAudioData(data) {
-            if (!sourceBuffer || mediaSource.readyState !== 'open') return;
-
-            if (directFeed && !sourceBuffer.updating) {
-                try {
-                    sourceBuffer.appendBuffer(data);
-                    directFeed = false;
-                } catch (e) {
-                    if (e.name === 'QuotaExceededError') {
-                        emptyAudioBuffer();
-                        audioDataQueue.push(data);
-                    }
-                }
-            } else {
-                audioDataQueue.push(data);
-            }
-        }
-
-        function emptyAudioBuffer() {
-            if (!sourceBuffer || sourceBuffer.buffered.length === 0) return;
-            const bufferEnd = sourceBuffer.buffered.end(0);
-            const removeEnd = bufferEnd - 30; // Keep 30 seconds
-            if (removeEnd > 0) {
-                sourceBuffer.remove(0, removeEnd);
-            }
-        }
-
-        async function stopAudio() {
-            isAudioEnabled = false;
-            directFeed = true;
-            audioDataQueue = [];
-
-            if (audioSocket) {
-                audioSocket.close();
-                audioSocket = null;
-            }
-
-            if (audioElement) {
-                audioElement.pause();
-                audioElement.removeAttribute('src');
-                audioElement.currentTime = 0;
-            }
-
-            if (mediaSource && mediaSource.readyState === 'open') {
-                try {
-                    mediaSource.endOfStream();
-                } catch (e) {}
-            }
-            mediaSource = null;
-            sourceBuffer = null;
-
-            updateAudioButton();
-        }
+        // See audio.js
 
         // =============================================
         // DevTools Management
@@ -12144,6 +12254,7 @@
                         const serverTab = serverTabs.find(t => t.id === localTab.id);
                         if (serverTab) {
                             serverTab.pinned = localTab.pinned || false;
+                            serverTab.keepAlive = localTab.keepAlive || false;
                             return serverTab;
                         }
                         return localTab;
@@ -12151,10 +12262,12 @@
 
                     // Add new tabs from server (tabs we don't have locally)
                     const pinnedUrls = getPinnedUrls();
+                    const keepAliveUrls = getKeepAliveUrls();
                     serverTabs.forEach(serverTab => {
                         if (!localTabIds.has(serverTab.id)) {
-                            // Restore pinned state from localStorage for newly discovered tabs
+                            // Restore pinned/keepAlive state from localStorage
                             serverTab.pinned = pinnedUrls.includes(serverTab.url);
+                            serverTab.keepAlive = keepAliveUrls.includes(serverTab.url);
                             tabs.push(serverTab);
                         }
                     });
@@ -12309,7 +12422,7 @@
                 if (tabEl) {
                     // Update existing tab element (no DOM recreation = no flicker)
                     const wasLoading = tabEl.classList.contains('loading');
-                    tabEl.className = 'tab' + (tab.id === activeTabId ? ' active' : '') + (wasLoading ? ' loading' : '') + (tab.pinned ? ' tab-pinned' : '') + (localTabs[tab.id] ? ' tab-local' : '');
+                    tabEl.className = 'tab' + (tab.id === activeTabId ? ' active' : '') + (wasLoading ? ' loading' : '') + (tab.pinned ? ' tab-pinned' : '') + (tab.keepAlive ? ' tab-keepalive' : '') + (localTabs[tab.id] ? ' tab-local' : '');
                     tabEl.dataset.index = index;
 
                     // Update title
@@ -12395,7 +12508,7 @@
         // Create a new tab element
         function createTabElement(tab, index) {
             const tabEl = document.createElement('div');
-            tabEl.className = 'tab' + (tab.id === activeTabId ? ' active' : '') + (tab.pinned ? ' tab-pinned' : '') + (localTabs[tab.id] ? ' tab-local' : '');
+            tabEl.className = 'tab' + (tab.id === activeTabId ? ' active' : '') + (tab.pinned ? ' tab-pinned' : '') + (tab.keepAlive ? ' tab-keepalive' : '') + (localTabs[tab.id] ? ' tab-local' : '');
             tabEl.draggable = true;
             tabEl.dataset.tabId = tab.id;
             tabEl.dataset.index = index;
@@ -12503,7 +12616,7 @@
                 { label: 'New Cloud Tab', action: () => createNewTab() },
                 { label: 'New Local Tab', action: () => createLocalTab() },
                 { separator: true },
-                { label: 'Open URLs from Clipboard', action: () => openUrlsFromClipboard() },
+                { label: 'Paste and Open URLs', action: () => openUrlsFromClipboard() },
             ]);
         }
 
@@ -12677,6 +12790,12 @@
         async function closeTab(tabId, skipPinProtection) {
             const tab = tabs.find(t => t.id === tabId);
 
+            // Keep Alive protection: tab cannot be closed until released
+            if (tab && tab.keepAlive) {
+                showToast('This tab is kept alive — release it first', 'warning');
+                return;
+            }
+
             // Pinned tab protection: show undo toast instead of closing immediately
             if (tab && tab.pinned && !skipPinProtection) {
                 const pinnedUrl = tab.url;
@@ -12784,616 +12903,131 @@
             }
         }
 
-        // =============================================
-        // VNC Overlay Manager (host-side highlights)
-        // =============================================
+        // See vnc-overlay.js
 
-        const vncOverlay = {
-            _container: null,
-            _overlays: {},
+        // See context-menu.js
 
-            _ensureContainer() {
-                if (this._container) return this._container;
-                const c = document.createElement('div');
-                c.id = 'vncOverlayContainer';
-                document.getElementById('vncContainer').appendChild(c);
-                this._container = c;
-                return c;
-            },
-
-            show(id, rect, options = {}) {
-                this._ensureContainer();
-                // Always dismiss existing overlay with same ID first to prevent
-                // race conditions with animated dismissals
-                this.dismiss(id, false);
-                const el = document.createElement('div');
-                el.dataset.overlayId = id;
-                el.style.position = 'absolute';
-                el.style.pointerEvents = 'none';
-                this._container.appendChild(el);
-                const entry = { element: el };
-                this._overlays[id] = entry;
-                if (rect) {
-                    el.style.left = rect.left + 'px';
-                    el.style.top = rect.top + 'px';
-                    if (rect.width != null) el.style.width = rect.width + 'px';
-                    if (rect.height != null) el.style.height = rect.height + 'px';
-                }
-                if (options.text !== undefined) el.textContent = options.text;
-                else if (options.html !== undefined) el.innerHTML = options.html;
-                if (options.className) el.className = options.className;
-                if (options.style) Object.assign(el.style, options.style);
-                el.style.display = 'block';
-                return el;
-            },
-
-            update(id, rect) {
-                const entry = this._overlays[id];
-                if (!entry) return;
-                const el = entry.element;
-                if (rect.left != null) el.style.left = rect.left + 'px';
-                if (rect.top != null) el.style.top = rect.top + 'px';
-                if (rect.width != null) el.style.width = rect.width + 'px';
-                if (rect.height != null) el.style.height = rect.height + 'px';
-            },
-
-            dismiss(id, animate = true) {
-                const entry = this._overlays[id];
-                if (!entry) return;
-                const el = entry.element;
-                // Always remove from tracking immediately to prevent races
-                delete this._overlays[id];
-                if (animate) {
-                    el.style.transition = 'opacity 0.15s ease';
-                    el.style.opacity = '0';
-                    setTimeout(() => el.remove(), 150);
-                } else {
-                    el.remove();
-                }
-            },
-
-            dismissAll(animate = false) {
-                for (const id of Object.keys(this._overlays)) {
-                    this.dismiss(id, animate);
-                }
-                // Nuclear cleanup: remove any DOM orphans not tracked in _overlays
-                if (this._container) {
-                    const orphans = this._container.querySelectorAll('[data-overlay-id]');
-                    orphans.forEach(el => el.remove());
-                }
-            },
-
-            isVisible(id) { return !!this._overlays[id]; }
-        };
-
-        // --- Inspect overlay tracking state ---
-        let _inspectTrackingInterval = null;
-        let _inspectTrackingActive = false;
-        let _lastInspectMeta = {};  // { siblingIndex, siblingCount }
-        const _tabInspectState = {};  // { tabId: { wasTracking: bool } }
-
-        function _positionInspectOverlay(rect, selector, meta) {
-            // Update sibling metadata if provided
-            if (meta && meta.siblingIndex) {
-                _lastInspectMeta = { siblingIndex: meta.siblingIndex, siblingCount: meta.siblingCount };
-            }
-            const isNew = !vncOverlay.isVisible('inspect-highlight');
-
-            if (isNew) {
-                // First show: create with entering class, then remove to trigger fade-in
-                vncOverlay.show('inspect-highlight', rect, { className: 'vnc-overlay-highlight entering' });
-                requestAnimationFrame(() => {
-                    const entry = vncOverlay._overlays['inspect-highlight'];
-                    if (entry) entry.element.classList.remove('entering');
-                });
-            } else {
-                // Subsequent updates: just move — CSS transition handles the animation
-                vncOverlay.update('inspect-highlight', rect);
-            }
-
-            // Tooltip: position + content (with optional sibling index)
-            let tooltipText = selector;
-            if (_lastInspectMeta.siblingIndex && _lastInspectMeta.siblingCount > 1) {
-                tooltipText += ` (${_lastInspectMeta.siblingIndex}/${_lastInspectMeta.siblingCount})`;
-            }
-            tooltipText += ' \u2022 ' + Math.round(rect.width) + '\u00d7' + Math.round(rect.height);
-            const tooltipTop = rect.top >= 28 ? rect.top - 28 : rect.top + rect.height + 4;
-            const tooltipLeft = Math.max(0, rect.left);
-            const tooltipRect = { left: tooltipLeft, top: tooltipTop };
-
-            if (isNew) {
-                vncOverlay.show('inspect-tooltip', null, {
-                    className: 'vnc-overlay-tooltip entering',
-                    text: tooltipText,
-                    style: { left: tooltipLeft + 'px', top: tooltipTop + 'px', width: 'auto', height: 'auto' }
-                });
-                requestAnimationFrame(() => {
-                    const entry = vncOverlay._overlays['inspect-tooltip'];
-                    if (entry) entry.element.classList.remove('entering');
-                });
-            } else {
-                // Move tooltip and update text — CSS transition handles position
-                const entry = vncOverlay._overlays['inspect-tooltip'];
-                if (entry) {
-                    entry.element.style.left = tooltipLeft + 'px';
-                    entry.element.style.top = tooltipTop + 'px';
-                    entry.element.textContent = tooltipText;
-                }
-            }
+        /** Move a tab one position to the left or right */
+        function moveTab(tabId, direction) {
+            const idx = tabs.findIndex(t => t.id === tabId);
+            if (idx < 0) return;
+            const targetIdx = idx + direction;
+            if (targetIdx < 0 || targetIdx >= tabs.length) return;
+            const [moved] = tabs.splice(idx, 1);
+            tabs.splice(targetIdx, 0, moved);
+            savePinnedUrls();
+            renderTabs();
         }
 
-        function _stopInspectTracking() {
-            if (_inspectTrackingInterval) {
-                clearTimeout(_inspectTrackingInterval);
-                _inspectTrackingInterval = null;
-            }
-            _inspectTrackingActive = false;
-            // Also dismiss the info panel when tracking stops
-            _dismissInspectInfoPanel();
-            updateInspectButton();
+        /** Keep Alive state: URLs that cannot be closed */
+        function getKeepAliveUrls() {
+            try { return JSON.parse(localStorage.getItem('inspekt_keepalive_tabs')) || []; }
+            catch { return []; }
         }
 
-        async function _pollInspectRect() {
-            if (!_inspectTrackingActive) return;
-            try {
-                const resp = await fetch(
-                    `http://${VNC_HOST}:${CONTROL_PORT}/inspect/get-rect`,
-                    { signal: AbortSignal.timeout(500) }
-                );
-                const data = await resp.json();
-                if (data.ok && data.rect && _inspectTrackingActive) {
-                    _positionInspectOverlay(data.rect, data.selector, data);
-                } else if (!data.ok && _inspectTrackingActive) {
-                    // Element disconnected from DOM (navigated away, etc.)
-                    _stopInspectTracking();
-                    vncOverlay.dismiss('inspect-highlight', true);
-                    vncOverlay.dismiss('inspect-tooltip', true);
-                    return;
-                }
-            } catch {
-                // Network error — skip this tick
-            }
-            // Schedule next poll only AFTER this one completes (no overlap)
-            if (_inspectTrackingActive) {
-                _inspectTrackingInterval = setTimeout(_pollInspectRect, 200);
-            }
+        function saveKeepAliveUrls() {
+            const urls = tabs.filter(t => t.keepAlive).map(t => t.url);
+            localStorage.setItem('inspekt_keepalive_tabs', JSON.stringify(urls));
         }
 
-        function showInspectOverlay(rect, selector) {
-            _stopInspectTracking();
-            vncOverlay.dismiss('inspect-highlight', false);
-            vncOverlay.dismiss('inspect-tooltip', false);
-            _lastInspectMeta = {};  // Reset sibling info for fresh inspection
-            if (!rect || !rect.width || !rect.height) return;
+        async function toggleKeepAlive(tabId) {
+            const tab = tabs.find(t => t.id === tabId);
+            if (!tab) return;
+            tab.keepAlive = !tab.keepAlive;
+            saveKeepAliveUrls();
+            renderTabs();
 
-            // Show initial position immediately
-            _positionInspectOverlay(rect, selector);
-
-            // Start polling to track scroll, resize, and font size changes.
-            // Uses chained setTimeout (not setInterval) to prevent request pile-up.
-            _inspectTrackingActive = true;
-            _inspectTrackingInterval = setTimeout(_pollInspectRect, 200);
-        }
-
-        // --- DOM navigation via arrow keys ---
-        let _inspectNavPending = false;
-
-        async function _navigateInspect(direction) {
-            if (_inspectNavPending || !_inspectTrackingActive) return;
-            _inspectNavPending = true;
-            try {
-                const resp = await fetch(
-                    `http://${VNC_HOST}:${CONTROL_PORT}/inspect/navigate?direction=${direction}`,
-                    { signal: AbortSignal.timeout(1000) }
-                );
-                const data = await resp.json();
-                if (data.ok && data.rect) {
-                    _positionInspectOverlay(data.rect, data.selector, data);
-                    // Flash tooltip orange on auto-climb (moved to parent because no sibling)
-                    if (data.autoClimbed) {
-                        const entry = vncOverlay._overlays['inspect-tooltip'];
-                        if (entry) {
-                            entry.element.style.background = 'linear-gradient(135deg, #e67e22, #d35400)';
-                            setTimeout(() => {
-                                if (vncOverlay._overlays['inspect-tooltip'])
-                                    vncOverlay._overlays['inspect-tooltip'].element.style.background = '';
-                            }, 600);
-                        }
-                    }
-                }
-                // If !ok, element doesn't exist in that direction — just stay put
-            } catch {
-                // Network error — ignore
-            } finally {
-                _inspectNavPending = false;
-            }
-        }
-
-        // Arrow key + shortcut handler for DOM navigation (only active when inspect overlay is showing)
-        document.addEventListener('keydown', (e) => {
-            if (!_inspectTrackingActive || activeContextMenu) return;
-
-            // Don't intercept keys when terminal or editor is active
-            const termOverlay = document.getElementById('terminalOverlay');
-            if (termOverlay && termOverlay.classList.contains('open')) return;
-            if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) return;
-
-            // Copy selector with 'c' key
-            if (e.key === 'c' && !e.metaKey && !e.ctrlKey) {
-                e.preventDefault();
-                const entry = vncOverlay._overlays['inspect-tooltip'];
-                if (entry) {
-                    const selector = entry.element.textContent.split(' \u2022 ')[0].split(' (')[0];
-                    navigator.clipboard.writeText(selector);
-                    showToast(`Copied: ${selector}`, 'success');
-                }
-                return;
+            // For cloud tabs: instruct Chromium to prevent freezing/discarding via CDP
+            if (!localTabs[tabId]) {
+                try {
+                    await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/tabs/${tabId}/keep-alive?enabled=${tab.keepAlive}`);
+                } catch {}
             }
 
-            const directionMap = {
-                'ArrowUp': 'up',
-                'ArrowDown': 'down',
-                'ArrowLeft': 'left',
-                'ArrowRight': 'right'
-            };
-            const direction = directionMap[e.key];
-            if (!direction) return;
-
-            e.preventDefault();
-            _navigateInspect(direction);
-        });
-
-        // =============================================
-        // Context Menu (generic, reusable)
-        // =============================================
-
-        let activeContextMenu = null;
-        let _lastMenuItemIdx = -1; // Track last focused item for keyboard resume after mouse leave
-
-        // Scroll lock: prevent page scrolling while a context menu is open
-        let _menuScrollLock = null;
-        function _lockScroll() {
-            _menuScrollLock = (e) => { e.preventDefault(); };
-            document.addEventListener('wheel', _menuScrollLock, { passive: false });
-            document.addEventListener('touchmove', _menuScrollLock, { passive: false });
-        }
-        function _unlockScroll() {
-            if (_menuScrollLock) {
-                document.removeEventListener('wheel', _menuScrollLock);
-                document.removeEventListener('touchmove', _menuScrollLock);
-                _menuScrollLock = null;
-            }
+            showToast(tab.keepAlive ? 'Tab kept alive — won\'t freeze or close' : 'Tab released', 'success');
         }
 
-        // macOS: flicker the item highlight before dismissing, matching native behavior.
-        // Captures the active menu reference so a stale timeout can't dismiss a newer menu.
-        function _flickerAndDismiss(btn, action) {
-            if (_platform === 'macos') {
-                const menuRef = activeContextMenu;
-                btn.classList.add('flickering');
-                setTimeout(() => {
-                    if (activeContextMenu === menuRef) dismissContextMenu();
-                    action();
-                }, 160);
-            } else {
-                dismissContextMenu();
-                action();
-            }
-        }
-
-        function showContextMenu(e, items) {
-            dismissContextMenu(true);  // skip animation when replacing
-
-            const menu = document.createElement('div');
-            menu.className = 'context-menu';
-            menu.setAttribute('role', 'menu');
-            menu.setAttribute('aria-label', 'Context menu');
-
-            // Suppress real browser context menu inside our menu
-            menu.addEventListener('contextmenu', ev => ev.preventDefault());
-
-            // When mouse leaves the menu entirely, return focus to the container
-            // so no item appears highlighted but keyboard still works.
-            menu.addEventListener('mouseleave', () => {
-                menu.focus({ preventScroll: true });
-            });
-
-            items.forEach((item, i) => {
-                if (item.hidden) return;
-                if (item.separator) {
-                    const sep = document.createElement('div');
-                    sep.setAttribute('role', 'separator');
-                    menu.appendChild(sep);
-                    return;
-                }
-                // Navigation icon row (Back / Forward / Reload as icons)
-                if (item.navRow) {
-                    const row = document.createElement('div');
-                    row.className = 'context-menu-nav';
-                    row.setAttribute('role', 'group');
-                    item.navRow.forEach(nav => {
-                        const btn = document.createElement('button');
-                        btn.setAttribute('role', 'menuitem');
-                        const tpl = document.createElement('template');
-                        tpl.innerHTML = nav.icon;
-                        btn.appendChild(tpl.content.firstChild);
-                        btn.setAttribute('aria-label', nav.label);
-                        btn.title = nav.label;
-                        btn.tabIndex = -1;
-                        if (nav.disabled) btn.setAttribute('aria-disabled', 'true');
-                        btn.onclick = () => {
-                            if (nav.disabled) return;
-                            _flickerAndDismiss(btn, nav.action);
-                        };
-                        row.appendChild(btn);
-                    });
-                    menu.appendChild(row);
-                    return;
-                }
-                // Checkbox menu item (toggle, does NOT dismiss menu)
-                if (item.checkbox) {
-                    const btn = document.createElement('button');
-                    btn.setAttribute('role', 'menuitemcheckbox');
-                    btn.setAttribute('aria-checked', item.checked ? 'true' : 'false');
-                    btn.tabIndex = -1;
-
-                    const checkIcon = document.createElement('span');
-                    checkIcon.className = 'check-icon';
-                    const checkSvg = '<svg width="10" height="10" viewBox="0 0 10 10"><path d="M2 5l2.5 2.5L8 3" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-                    checkIcon.innerHTML = item.checked ? checkSvg : '';
-                    btn.appendChild(checkIcon);
-
-                    const label = document.createElement('span');
-                    label.textContent = item.label;
-                    btn.appendChild(label);
-
-                    btn.onclick = (ev) => {
-                        ev.stopPropagation();
-                        const newState = btn.getAttribute('aria-checked') !== 'true';
-                        btn.setAttribute('aria-checked', newState ? 'true' : 'false');
-                        checkIcon.innerHTML = newState ? checkSvg : '';
-                        if (item.onToggle) item.onToggle(newState);
-                    };
-                    menu.appendChild(btn);
-                    return;
-                }
-
-                const btn = document.createElement('button');
-                btn.setAttribute('role', 'menuitem');
-                btn.tabIndex = -1;
-                if (item.submenu) {
-                    // Submenu indicator: label on left, SF Symbol chevron on right
-                    const labelSpan = document.createElement('span');
-                    labelSpan.textContent = item.label;
-                    labelSpan.style.flex = '1';
-                    btn.appendChild(labelSpan);
-                    const chevron = document.createElement('span');
-                    chevron.className = 'submenu-chevron';
-                    // U+100BFB = SF Symbols "chevron.forward"
-                    // Requires SF Pro font (installed on macOS by default)
-                    chevron.textContent = String.fromCodePoint(0x100BFB);
-                    btn.appendChild(chevron);
-                } else {
-                    btn.textContent = item.label;
-                }
-                if (item.title) btn.title = item.title;
-                if (item.disabled) {
-                    btn.setAttribute('aria-disabled', 'true');
-                } else {
-                    btn.onclick = () => _flickerAndDismiss(btn, item.action);
-                }
-                menu.appendChild(btn);
-            });
-
-            document.body.appendChild(menu);
-            activeContextMenu = menu;
-
-            // Focus items on mouse enter — this is the single source of truth for
-            // which item is "selected". Both mouse and keyboard use focus, so there's
-            // never a dual-highlight and screen readers always announce the active item.
-            _getMenuItems().forEach((item, i) => {
-                item.addEventListener('mouseenter', () => {
-                    item.focus({ preventScroll: true });
-                    _lastMenuItemIdx = i;
-                });
-            });
-
-            // Position: keep within viewport
-            const rect = menu.getBoundingClientRect();
-            let x = e.clientX;
-            let y = e.clientY;
-            if (x + rect.width > window.innerWidth) x = window.innerWidth - rect.width - 4;
-            if (y + rect.height > window.innerHeight) y = window.innerHeight - rect.height - 4;
-            menu.style.left = x + 'px';
-            menu.style.top = y + 'px';
-
-            // Lock scrolling while menu is open
-            _lockScroll();
-
-            // Focus the menu container itself (not an item) so keydown events
-            // reach handleMenuKeydown. The first ArrowDown will focus the first item.
-            menu.tabIndex = -1;
-            menu.focus({ preventScroll: true });
-
-            // Dismiss on outside click, Escape, or window blur
-            // Next tick to avoid the originating right-click from immediately dismissing
-            requestAnimationFrame(() => {
-                document.addEventListener('mousedown', onMenuOutsideClick);
-                document.addEventListener('keydown', handleMenuKeydown);
-                window.addEventListener('blur', onMenuBlur);
-            });
-        }
-
-        function _getMenuItems() {
-            if (!activeContextMenu) return [];
-            return Array.from(activeContextMenu.querySelectorAll(
-                '[role="menuitem"]:not([aria-disabled="true"]), [role="menuitemcheckbox"]:not([aria-disabled="true"])'
-            ));
-        }
-
-        function _focusMenuItem(items, i) {
-            items[i].focus({ preventScroll: true });
-            _lastMenuItemIdx = i;
-        }
-
-        function handleMenuKeydown(e) {
-            if (!activeContextMenu) return;
-
-            // Always prevent default for menu keys to stop events reaching the page
-            if (['Escape', 'ArrowDown', 'ArrowUp', 'Home', 'End', 'PageUp', 'PageDown', 'Enter', ' ', 'Tab'].includes(e.key)) {
-                e.preventDefault();
-                e.stopPropagation();
-            }
-
-            if (e.key === 'Escape' || e.key === 'Tab') {
-                dismissContextMenu();
-                return;
-            }
-
-            const items = _getMenuItems();
-            if (items.length === 0) return;
-            const idx = items.indexOf(document.activeElement);
-
-            // Enter/Space: activate focused item.
-            // This calls .click() which triggers the onclick handler set in showContextMenu,
-            // which calls _flickerAndDismiss() — so the macOS flicker animation plays on
-            // keyboard activation too, not just mouse clicks.
-            if (e.key === 'Enter' || e.key === ' ') {
-                if (idx >= 0) document.activeElement.click();
-                return;
-            }
-
-            // If no item is focused (e.g. after mouse left the menu), use the
-            // last known index so arrow keys resume from where the user left off.
-            let ei = idx; // effective index
-            if (ei < 0 && _lastMenuItemIdx >= 0 && _lastMenuItemIdx < items.length) {
-                ei = _lastMenuItemIdx;
-            }
-
-            if (e.key === 'ArrowDown') {
-                _focusMenuItem(items, ei < 0 ? 0 : Math.min(ei + 1, items.length - 1));
-            } else if (e.key === 'ArrowUp') {
-                _focusMenuItem(items, ei < 0 ? items.length - 1 : Math.max(ei - 1, 0));
-            } else if (e.key === 'Home' || e.key === 'PageUp') {
-                _focusMenuItem(items, 0);
-            } else if (e.key === 'End' || e.key === 'PageDown') {
-                _focusMenuItem(items, items.length - 1);
-            } else if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
-                // Type-ahead: jump to first item starting with the typed character
-                const char = e.key.toLowerCase();
-                const i = items.findIndex(item => item.textContent.trim().toLowerCase().startsWith(char));
-                if (i >= 0) _focusMenuItem(items, i);
-            }
-        }
-
-        function onMenuOutsideClick(e) {
-            if (activeContextMenu && !activeContextMenu.contains(e.target)) {
-                dismissContextMenu();
-            }
-        }
-
-        function onMenuBlur() {
-            dismissContextMenu();
-        }
-
-        function dismissContextMenu(immediate) {
-            if (!activeContextMenu) return;
-            _unlockScroll();
-            _lastMenuItemIdx = -1;
-            document.removeEventListener('mousedown', onMenuOutsideClick);
-            document.removeEventListener('keydown', handleMenuKeydown);
-            window.removeEventListener('blur', onMenuBlur);
-            if (immediate === true) {
-                activeContextMenu.remove();
-                activeContextMenu = null;
-                return;
-            }
-            const menu = activeContextMenu;
-            activeContextMenu = null;
-            menu.classList.add('closing');
-            menu.addEventListener('animationend', () => menu.remove(), { once: true });
-        }
-
-        // Tab context menu (thin wrapper)
         function showTabContextMenu(e, tabId) {
             e.preventDefault();
             const tab = tabs.find(t => t.id === tabId);
             if (!tab) return;
 
-            const otherCount = tabs.length - 1;
-            const closeOthersLabel = otherCount === 1 ? 'Close Other Tab' : `Close ${otherCount} Other Tabs`;
             const tabIndex = tabs.findIndex(t => t.id === tabId);
+            const isLocal = !!localTabs[tabId];
+            const otherCount = tabs.length - 1;
             const tabsToLeft = tabs.slice(0, tabIndex).filter(t => !t.pinned).length;
             const tabsToRight = tabs.slice(tabIndex + 1).filter(t => !t.pinned).length;
 
-            // Context menu for local tabs
-            if (localTabs[tabId]) {
-                const localUrl = localTabs[tabId].url;
-                const localItems = [
-                    { label: tab.pinned ? 'Unpin Tab' : 'Pin Tab', action: () => togglePinTab(tabId) },
-                    { label: 'Duplicate this Local Tab', action: () => duplicateTab(tabId) },
-                    { label: 'Duplicate as Cloud Tab', action: () => duplicateAsCloudTab(tabId) },
-                    { separator: true },
-                    { label: 'Reload Page', action: () => {
-                        const iframe = document.querySelector('#nativeContainer iframe');
-                        if (iframe) { iframe.src = 'about:blank'; setTimeout(() => iframe.src = localUrl, 50); }
-                    }},
-                    { separator: true },
-                    { label: 'Copy URL', action: () => copyTabUrl(tabId) },
-                    { label: 'Copy as Markdown Link', action: () => copyTabAsMarkdownLink(tabId) },
-                    { label: 'Open in Host Browser', action: () => window.open(localUrl, '_blank') },
-                    { separator: true },
-                ];
-                if (tabs.length > 1) {
-                    localItems.push({ label: 'Close this Tab', action: () => closeTab(tabId) });
-                }
-                if (otherCount > 1) {
-                    localItems.push({ label: closeOthersLabel, action: () => closeOtherTabs(tabId) });
-                }
-                if (tabsToLeft > 0) {
-                    localItems.push({ label: `Close ${tabsToLeft === 1 ? 'Tab' : tabsToLeft + ' Tabs'} to the Left`, action: () => closeTabsToLeft(tabId) });
-                }
-                if (tabsToRight > 0) {
-                    localItems.push({ label: `Close ${tabsToRight === 1 ? 'Tab' : tabsToRight + ' Tabs'} to the Right`, action: () => closeTabsToRight(tabId) });
-                }
-                showContextMenu(e, localItems);
-                return;
-            }
-
-            // Context menu for cloud tabs
-            const opts = getReloadOptions(tab.url);
-            const anyClearing = opts.clearCache || opts.clearCookies || opts.clearStorage;
-
+            // ── Tab State ──
             const items = [
                 { label: tab.pinned ? 'Unpin Tab' : 'Pin Tab', action: () => togglePinTab(tabId) },
-                { label: 'Duplicate this Cloud Tab', action: () => duplicateTab(tabId) },
-                { label: 'Duplicate as Local Tab', action: () => duplicateAsLocalTab(tabId) },
-                { separator: true },
-                { label: anyClearing ? 'Reload Page ✦' : 'Reload Page', action: () => reloadWithOptions(tabId) },
-                { checkbox: true, label: 'Clear cache', checked: opts.clearCache,
-                  onToggle: (v) => setReloadOption(tab.url, 'clearCache', v) },
-                { checkbox: true, label: 'Clear cookies', checked: opts.clearCookies,
-                  onToggle: (v) => setReloadOption(tab.url, 'clearCookies', v) },
-                { checkbox: true, label: 'Clear all storage', checked: opts.clearStorage,
-                  onToggle: (v) => setReloadOption(tab.url, 'clearStorage', v) },
-                { separator: true },
-                { label: 'Copy URL', action: () => copyTabUrl(tabId) },
-                { label: 'Copy as Markdown Link', action: () => copyTabAsMarkdownLink(tabId) },
-                { label: 'Open in Host Browser', action: () => openInHostBrowser(tabId) },
-                { label: 'Open Fullscreen', action: () => toggleFullscreen() },
+                { label: tab.keepAlive ? 'Release Tab' : 'Keep Alive', action: () => toggleKeepAlive(tabId) },
                 { separator: true },
             ];
-            if (tabs.length > 1) {
-                items.push({ label: 'Close this Tab', action: () => closeTab(tabId) });
+
+            // ── Organization ──
+            if (isLocal) {
+                items.push({ label: 'Duplicate Tab', children: [
+                    { label: 'As Local Tab', action: () => duplicateTab(tabId) },
+                    { label: 'As Cloud Tab', action: () => duplicateAsCloudTab(tabId) },
+                ]});
+            } else {
+                items.push({ label: 'Duplicate Tab', children: [
+                    { label: 'As Cloud Tab', action: () => duplicateTab(tabId) },
+                    { label: 'As Local Tab', action: () => duplicateAsLocalTab(tabId) },
+                ]});
             }
-            if (otherCount > 1) {
-                items.push({ label: closeOthersLabel, action: () => closeOtherTabs(tabId) });
+            items.push(
+                { label: 'Move Tab Left', action: () => moveTab(tabId, -1), disabled: tabIndex === 0 },
+                { label: 'Move Tab Right', action: () => moveTab(tabId, 1), disabled: tabIndex === tabs.length - 1 },
+                { separator: true },
+            );
+
+            // ── Reload ──
+            if (isLocal) {
+                const localUrl = localTabs[tabId].url;
+                items.push({ label: 'Reload Page', action: () => {
+                    const iframe = document.querySelector('#nativeContainer iframe');
+                    if (iframe) { iframe.src = 'about:blank'; setTimeout(() => iframe.src = localUrl, 50); }
+                }});
+            } else {
+                const opts = getReloadOptions(tab.url);
+                const anyClearing = opts.clearCache || opts.clearCookies || opts.clearStorage;
+                items.push(
+                    { label: anyClearing ? 'Reload Page ✦' : 'Reload Page', action: () => reloadWithOptions(tabId) },
+                    { checkbox: true, label: 'Clear Cache', checked: opts.clearCache,
+                      onToggle: (v) => setReloadOption(tab.url, 'clearCache', v) },
+                    { checkbox: true, label: 'Clear Cookies', checked: opts.clearCookies,
+                      onToggle: (v) => setReloadOption(tab.url, 'clearCookies', v) },
+                    { checkbox: true, label: 'Clear All Storage', checked: opts.clearStorage,
+                      onToggle: (v) => setReloadOption(tab.url, 'clearStorage', v) },
+                );
+            }
+            items.push({ separator: true });
+
+            // ── Links ──
+            items.push(
+                { label: 'Copy URL', action: () => copyTabUrl(tabId) },
+                { label: 'Copy as Markdown Link', action: () => copyTabAsMarkdownLink(tabId) },
+                { label: 'Open in Host Browser', action: () => isLocal ? window.open(localTabs[tabId].url, '_blank') : openInHostBrowser(tabId) },
+            );
+            if (!isLocal) {
+                items.push({ label: 'Open Fullscreen', action: () => toggleFullscreen() });
+            }
+            items.push({ separator: true });
+
+            // ── Close (destructive, always last) ──
+            if (tabs.length > 1) {
+                items.push({ label: 'Close Tab', action: () => closeTab(tabId), disabled: tab.keepAlive });
+            }
+            if (otherCount >= 1) {
+                items.push({ label: otherCount === 1 ? 'Close Other Tab' : `Close ${otherCount} Other Tabs`, action: () => closeOtherTabs(tabId) });
             }
             if (tabsToLeft > 0) {
-                items.push({ label: `Close ${tabsToLeft === 1 ? 'Tab' : tabsToLeft + ' Tabs'} to the Left`, action: () => closeTabsToLeft(tabId) });
+                items.push({ label: tabsToLeft === 1 ? 'Close Tab to the Left' : `Close ${tabsToLeft} Tabs to the Left`, action: () => closeTabsToLeft(tabId) });
             }
             if (tabsToRight > 0) {
-                items.push({ label: `Close ${tabsToRight === 1 ? 'Tab' : tabsToRight + ' Tabs'} to the Right`, action: () => closeTabsToRight(tabId) });
+                items.push({ label: tabsToRight === 1 ? 'Close Tab to the Right' : `Close ${tabsToRight} Tabs to the Right`, action: () => closeTabsToRight(tabId) });
             }
 
             showContextMenu(e, items);
@@ -13423,13 +13057,15 @@
         }
 
         async function showVNCContextMenu(pageX, pageY, vmX, vmY) {
+            // Debug: show dummy test menu with submenus for development
+            if (_DEBUG_DUMMY_MENU) return _showDummyTestMenu(pageX, pageY);
+
+            // --- Real VNC context menu ---
             // Clear any previous host-side overlays when opening a new context menu
             if (activeTabId) _tabInspectState[activeTabId] = { wasTracking: false };
             _stopInspectTracking();
             vncOverlay.dismissAll();
 
-            // Fetch element info from VM browser (with timeout).
-            // This also eagerly sets __INSPEKT_INSPECTED_ELEMENT__ for inspected * commands.
             let info = { selectedText: '', isImage: false, imageSrc: '', isLink: false, linkHref: '', elementTag: '', elementSelector: '' };
             try {
                 const controller = new AbortController();
@@ -13441,28 +13077,46 @@
                 clearTimeout(timeout);
                 const data = await resp.json();
                 if (data.ok) info = data;
-            } catch (e) {
-                // Graceful degradation — show menu with defaults
-            }
-
+            } catch (e) {}
             const hasSelection = !!info.selectedText;
             const hasLink = !!info.linkHref;
             const hasImage = info.isImage;
             const hasElement = !!info.elementTag;
             const selectorLabel = info.elementSelector || info.elementTag || 'element';
-
-            // Build contextual menu — only show sections relevant to what was right-clicked
             const items = [];
-
-            // --- Navigation row (always shown) ---
             items.push({ navRow: [
-                { label: 'Reload', icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>', action: () => reloadPage() },
-                { label: 'Back', icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>', action: () => goBack(), disabled: !canGoBack() },
-                { label: 'Forward', icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 4l-1.41 1.41L16.17 11H4v2h12.17l-5.58 5.59L12 20l8-8z"/></svg>', action: () => goForward(), disabled: !canGoForward() },
+                { label: 'Reload', icon: NAV_ICONS.reload, action: () => reloadPage() },
+                { label: 'Back', icon: NAV_ICONS.back, action: () => goBack(), disabled: !canGoBack() },
+                { label: 'Forward', icon: NAV_ICONS.forward, action: () => goForward(), disabled: !canGoForward() },
             ] });
-            items.push({ separator: true });
 
-            // --- Selection section (only when text is selected) ---
+            // Sitemap structural navigation (Up = parent, Down = children)
+            // Only shown when we have sitemap data for this page
+            if (_sitemapReady && _sitemapNav && _sitemapNav.in_sitemap) {
+                items.push({ separator: true });
+
+                // Up: navigate to parent page
+                const parentInfo = _sitemapNav.parent;
+                items.push({
+                    label: parentInfo
+                        ? `\u2191 ${parentInfo.title || parentInfo.path.split('/').filter(Boolean).pop() || '/'}`
+                        : '\u2191 Parent page',
+                    action: parentInfo ? () => _sitemapGoUp() : null,
+                    disabled: !parentInfo,
+                    title: parentInfo ? parentInfo.url : 'Already at the top',
+                });
+
+                // Down: recursive submenu with child pages (up to 4 levels deep)
+                if (_sitemapNav.children_total > 0) {
+                    items.push({
+                        label: `\u2193 Child pages (${_sitemapNav.children_total})`,
+                        children: _buildSitemapSubmenuItems(_sitemapNav.children, _sitemapNav.children_total),
+                    });
+                } else {
+                    items.push({ label: '\u2193 Child pages', disabled: true, title: 'No child pages' });
+                }
+            }
+            items.push({ separator: true });
             if (hasSelection) {
                 items.push({ label: 'Copy as Text', action: () => runInspektForClipboard('selection text --raw', 'Text') });
                 items.push({ label: 'Copy as Markdown', action: () => runInspektForClipboard('selection markdown --raw', 'Markdown') });
@@ -13473,16 +13127,12 @@
                 items.push({ label: 'Ask About Selection\u2026', action: () => showAskDialog('selection') });
                 items.push({ separator: true });
             }
-
-            // --- Link section (only when right-clicking a link) ---
             if (hasLink) {
                 items.push({ label: 'Open Link in New Tab', action: () => openLinkInNewTab(info.linkHref) });
                 items.push({ label: 'Open Link in Host Browser', action: () => window.open(info.linkHref, '_blank') });
                 items.push({ label: 'Copy Link Address', action: () => copyToClipboard(info.linkHref) });
                 items.push({ separator: true });
             }
-
-            // --- Image section (only when right-clicking an image) ---
             if (hasImage) {
                 items.push({ label: 'Copy Image', action: () => copyImageToClipboard(info.imageSrc) });
                 items.push({ label: 'Copy Image URL', action: () => copyToClipboard(info.imageSrc) });
@@ -13492,19 +13142,14 @@
                 items.push({ label: 'Describe Image (AI)', action: () => runInspektAI('inspected describe', 'Analyzing image', 'Image description') });
                 items.push({ separator: true });
             }
-
-            // --- Element section (always available — right-click always has a target) ---
             if (hasElement) {
                 items.push({ label: `Inspect \u2039${selectorLabel}\u203A`, action: async () => {
-                    // Call set-at-point to set inspected element and get its rect
                     try {
                         const resp = await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/inspect/set-at-point?x=${vmX}&y=${vmY}`);
                         const data = await resp.json();
                         if (data.ok) {
-                            // Show host-side overlay (crisp, no DOM pollution)
                             showInspectOverlay(data.rect, data.selector || selectorLabel);
                             showToast(`Inspecting: ${data.selector || selectorLabel}`, 'success');
-                            // Show detailed info panel
                             _showInspectInfoPanel();
                         } else {
                             showToast(data.error || 'Could not inspect element', 'error');
@@ -13519,8 +13164,6 @@
                 items.push({ label: 'Ask About Element\u2026', action: () => showAskDialog('inspected') });
                 items.push({ separator: true });
             }
-
-            // --- Screenshot section (always available) ---
             items.push({ label: 'Screenshot Viewport', action: () => {
                 const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
                 screenshotToDownload('/screenshot/viewport', `viewport-${timestamp}.png`);
@@ -13530,14 +13173,122 @@
                 screenshotToDownload('/screenshot/page', `fullpage-${timestamp}.png`);
             }});
             items.push({ separator: true });
-
-            // --- Utilities (always shown) ---
             items.push({ label: 'Copy Page URL', action: () => copyToClipboard(currentUrl || '') });
             items.push({ label: 'Inspect (DevTools)', action: () => toggleDevToolsInVM() });
             items.push({ label: isTerminalOpen ? 'Hide Terminal' : 'Show Terminal', action: () => toggleTerminal() });
-
             showContextMenu({ clientX: pageX, clientY: pageY }, items);
         }
+
+        // Dummy test menu with submenus, headers, disabled items, and enough items to test scrolling.
+        // Activated by setting _DEBUG_DUMMY_MENU = true above.
+        function _showDummyTestMenu(pageX, pageY) {
+            const t = (msg) => () => showToast(msg, 'success');
+            showContextMenu({ clientX: pageX, clientY: pageY }, [
+                { header: 'File' },
+                { label: 'New File', action: t('New File') },
+                { label: 'New from Template', children: [
+                    { header: 'Documents' },
+                    { label: 'Blank Document', action: t('Blank Document') },
+                    { label: 'Letter', action: t('Letter') },
+                    { label: 'Resume', action: t('Resume') },
+                    { label: 'Report', action: t('Report') },
+                    { separator: true },
+                    { header: 'Spreadsheets' },
+                    { label: 'Budget', action: t('Budget') },
+                    { label: 'Invoice', action: t('Invoice') },
+                    { label: 'Timesheet', action: t('Timesheet') },
+                    { separator: true },
+                    { header: 'Presentations' },
+                    { label: 'Pitch Deck', action: t('Pitch Deck') },
+                    { label: 'Keynote', action: t('Keynote') },
+                    { label: 'Workshop', action: t('Workshop') },
+                ]},
+                { label: 'Open Recent', children: [
+                    { label: 'quarterly-report.pdf', action: t('quarterly-report.pdf') },
+                    { label: 'team-photo.png', action: t('team-photo.png') },
+                    { label: 'meeting-notes.md', action: t('meeting-notes.md') },
+                    { label: 'budget-2026.xlsx', action: t('budget-2026.xlsx') },
+                    { label: 'presentation-v3.key', action: t('presentation-v3.key') },
+                    { separator: true },
+                    { label: 'Older Files', children: [
+                        { label: 'archive-jan.zip', action: t('archive-jan.zip') },
+                        { label: 'backup-feb.sql', action: t('backup-feb.sql') },
+                        { label: 'draft-proposal.docx', action: t('draft-proposal.docx') },
+                        { label: 'client-feedback.pdf', action: t('client-feedback.pdf') },
+                        { label: 'wireframes-v1.fig', action: t('wireframes-v1.fig') },
+                        { label: 'design-system.sketch', action: t('design-system.sketch') },
+                        { label: 'api-docs.yaml', action: t('api-docs.yaml') },
+                        { label: 'test-results.xml', action: t('test-results.xml') },
+                        { label: 'deployment-log.txt', action: t('deployment-log.txt') },
+                        { label: 'sprint-retro.md', action: t('sprint-retro.md') },
+                        { separator: true },
+                        { label: 'Even Older', children: [
+                            { label: 'This submenu should not open (max depth reached)', action: t('nope') },
+                        ]},
+                    ]},
+                    { separator: true },
+                    { label: 'Clear Recent', action: t('Cleared') },
+                ]},
+                { separator: true },
+                { label: 'Save', action: t('Saved') },
+                { label: 'Save As…', action: t('Save As') },
+                { label: 'Export As', children: [
+                    { header: 'Images' },
+                    { label: 'PNG (Lossless)', action: t('PNG') },
+                    { label: 'JPEG (High Quality)', action: t('JPEG HQ') },
+                    { label: 'JPEG (Low Quality)', action: t('JPEG LQ') },
+                    { label: 'WebP (Compressed)', action: t('WebP') },
+                    { label: 'AVIF (Modern)', action: t('AVIF') },
+                    { label: 'TIFF (Uncompressed)', action: t('TIFF') },
+                    { label: 'BMP (Legacy)', action: t('BMP') },
+                    { separator: true },
+                    { header: 'Vector' },
+                    { label: 'SVG', action: t('SVG') },
+                    { label: 'PDF', action: t('PDF') },
+                    { label: 'EPS (Legacy)', action: t('EPS') },
+                    { separator: true },
+                    { header: 'Data' },
+                    { label: 'JSON', action: t('JSON') },
+                    { label: 'CSV', action: t('CSV') },
+                    { label: 'XML', action: t('XML') },
+                    { label: 'YAML', action: t('YAML') },
+                ]},
+                { label: 'Import From', children: [{ label: 'No sources available' }], disabled: true },
+                { separator: true },
+                { header: 'Edit' },
+                { label: 'Undo', action: t('Undo') },
+                { label: 'Redo', action: t('Redo') },
+                { separator: true },
+                { label: 'Cut', action: t('Cut') },
+                { label: 'Copy', action: t('Copy') },
+                { label: 'Paste', action: t('Paste') },
+                { label: 'Paste Special', children: [
+                    { label: 'Paste as Plain Text', action: t('Plain Text') },
+                    { label: 'Paste as HTML', action: t('HTML') },
+                    { label: 'Paste as Markdown', action: t('Markdown') },
+                    { label: 'Paste and Match Style', action: t('Match Style') },
+                    { separator: true },
+                    { label: 'Paste from Clipboard History', children: [
+                        { label: 'Clipboard item 1: "Hello world"', action: t('Clip 1') },
+                        { label: 'Clipboard item 2: "const x = 42;"', action: t('Clip 2') },
+                        { label: 'Clipboard item 3: "https://example.com"', action: t('Clip 3') },
+                    ]},
+                ]},
+                { label: 'Select All', action: t('Select All') },
+                { label: 'Find and Replace…', action: t('Find and Replace') },
+                { separator: true },
+                { header: 'View' },
+                { label: 'Zoom In', action: t('Zoom In') },
+                { label: 'Zoom Out', action: t('Zoom Out') },
+                { label: 'Reset Zoom', action: t('Reset Zoom') },
+                { label: 'Toggle Fullscreen', action: t('Fullscreen') },
+                { separator: true },
+                { label: 'Preferences', action: t('Preferences') },
+                { label: 'About', action: t('About') },
+                { label: 'Close', action: t('Close') },
+            ]);
+        }
+
 
         function togglePinTab(tabId) {
             const tab = tabs.find(t => t.id === tabId);
@@ -13666,8 +13417,8 @@
         }
 
         async function closeOtherTabs(tabId) {
-            const othersToClose = tabs.filter(t => t.id !== tabId && !t.pinned);
-            const skippedPinned = tabs.filter(t => t.id !== tabId && t.pinned).length;
+            const othersToClose = tabs.filter(t => t.id !== tabId && !t.pinned && !t.keepAlive);
+            const skippedPinned = tabs.filter(t => t.id !== tabId && (t.pinned || t.keepAlive)).length;
             for (const t of othersToClose) {
                 await _doCloseTab(t.id);
             }
@@ -13679,8 +13430,8 @@
         async function closeTabsToRight(tabId) {
             const tabIndex = tabs.findIndex(t => t.id === tabId);
             if (tabIndex < 0) return;
-            const toClose = tabs.slice(tabIndex + 1).filter(t => !t.pinned);
-            const skippedPinned = tabs.slice(tabIndex + 1).filter(t => t.pinned).length;
+            const toClose = tabs.slice(tabIndex + 1).filter(t => !t.pinned && !t.keepAlive);
+            const skippedPinned = tabs.slice(tabIndex + 1).filter(t => t.pinned || t.keepAlive).length;
             for (const t of toClose) {
                 await _doCloseTab(t.id);
             }
@@ -13692,8 +13443,8 @@
         async function closeTabsToLeft(tabId) {
             const tabIndex = tabs.findIndex(t => t.id === tabId);
             if (tabIndex <= 0) return;
-            const toClose = tabs.slice(0, tabIndex).filter(t => !t.pinned);
-            const skippedPinned = tabs.slice(0, tabIndex).filter(t => t.pinned).length;
+            const toClose = tabs.slice(0, tabIndex).filter(t => !t.pinned && !t.keepAlive);
+            const skippedPinned = tabs.slice(0, tabIndex).filter(t => t.pinned || t.keepAlive).length;
             for (const t of toClose) {
                 await _doCloseTab(t.id);
             }
@@ -13787,8 +13538,8 @@
         }
 
         async function closeAllTabs() {
-            const toClose = tabs.filter(t => !t.pinned);
-            const pinnedCount = tabs.filter(t => t.pinned).length;
+            const toClose = tabs.filter(t => !t.pinned && !t.keepAlive);
+            const pinnedCount = tabs.filter(t => t.pinned || t.keepAlive).length;
             for (const t of toClose) {
                 await _doCloseTab(t.id);
             }
@@ -13822,7 +13573,7 @@
             const items = [
                 { label: 'New Cloud Tab', action: () => createNewTab() },
                 { label: 'New Local Tab', action: () => createLocalTab() },
-                { label: 'Open URLs from Clipboard', action: () => openUrlsFromClipboard() },
+                { label: 'Paste and Open URLs', action: () => openUrlsFromClipboard() },
             ];
 
             if (closedTabs.length > 0) {
@@ -13922,6 +13673,13 @@
 
         // Poll for tab updates every 2 seconds
         setInterval(fetchTabs, 2000);
+
+        // Re-apply CDP keep-alive for persisted keep-alive tabs after initial load
+        setTimeout(() => {
+            tabs.filter(t => t.keepAlive && !localTabs[t.id]).forEach(t => {
+                fetch(`http://${VNC_HOST}:${CONTROL_PORT}/tabs/${t.id}/keep-alive?enabled=true`).catch(() => {});
+            });
+        }, 3000);
 
         // Fetch initial plugin icon state (autorun indicator)
         (async () => {
@@ -14027,7 +13785,7 @@
                 }
                 // Normal left click: dismiss overlays
                 if (e.button === 0) {
-                    if (activeContextMenu) dismissContextMenu();
+                    if (_isMenuOpen()) dismissContextMenu();
                     if (_inspectTrackingActive && activeTabId) {
                         _tabInspectState[activeTabId] = { wasTracking: false };
                     }
@@ -14060,7 +13818,7 @@
                     return;
                 }
                 if (e.button === 0) {
-                    if (activeContextMenu) dismissContextMenu();
+                    if (_isMenuOpen()) dismissContextMenu();
                     if (_inspectTrackingActive && activeTabId) {
                         _tabInspectState[activeTabId] = { wasTracking: false };
                     }
@@ -14228,25 +13986,25 @@
                 if (data.ok) folderInfo = data;
             } catch {}
 
-            // Build smart download items
-            const downloadItems = [];
-            if (folderInfo) {
-                const recent = folderInfo.most_recent;
-                if (recent) {
-                    const sizeStr = recent.size > 1024 ? `${(recent.size / 1024).toFixed(1)} KB` : `${recent.size} B`;
-                    downloadItems.push({
-                        label: `Download ${recent.name} (${sizeStr})`,
-                        action: () => triggerFileDownload(recent.path)
-                    });
-                }
-                if (folderInfo.file_count > 0) {
-                    const totalStr = folderInfo.total_size > 1024 * 1024
-                        ? `${(folderInfo.total_size / 1024 / 1024).toFixed(1)} MB`
-                        : `${(folderInfo.total_size / 1024).toFixed(1)} KB`;
-                    const zipLabel = `Download all files as .zip (${folderInfo.file_count} files, ${totalStr})`;
+            // Build download submenu: individual files + zip-all at the bottom
+            let downloadSubmenu = null;
 
+            if (folderInfo && folderInfo.recent_files?.length > 0) {
+                const children = folderInfo.recent_files.map(f => ({
+                    label: `${f.name}  (${f.size === 0 ? 'Empty' : formatBytes(f.size)})`,
+                    action: () => triggerFileDownload(f.path),
+                    disabled: !f.downloadable,
+                    title: !f.downloadable ? 'File exceeds 5 MB limit' : undefined
+                }));
+
+                // Append zip-all option after a separator
+                if (folderInfo.file_count > 1) {
+                    const n = folderInfo.file_count;
+                    const zipLabel = `Download all ${n} files as .zip (${formatBytes(folderInfo.total_size)})`;
+
+                    children.push({ separator: true });
                     if (folderInfo.can_zip) {
-                        downloadItems.push({
+                        children.push({
                             label: zipLabel,
                             action: async () => {
                                 showToast('Creating zip…', 'info');
@@ -14270,7 +14028,7 @@
                             }
                         });
                     } else {
-                        downloadItems.push({
+                        children.push({
                             label: zipLabel,
                             disabled: true,
                             title: folderInfo.exceeded_limits
@@ -14279,9 +14037,39 @@
                         });
                     }
                 }
+
+                downloadSubmenu = {
+                    label: 'Download',
+                    children
+                };
             }
 
+            // Build folder navigation submenu
+            let folderSubmenu = null;
+            const subdirs = folderInfo?.subdirs || [];
+            if (subdirs.length > 0) {
+                folderSubmenu = {
+                    label: 'Go to Folder',
+                    children: subdirs.map(name => ({
+                        label: name,
+                        action: () => sendTerminalCd(`${cwd}/${name}`)
+                    }))
+                };
+            }
+
+            const parentDir = folderInfo?.parent;
+            const cwdDisplay = history?.cwdDisplay || '~';
+
             const items = [
+                // ── Navigation ──
+                { navRow: [
+                    { label: 'Back', icon: NAV_ICONS.back, action: () => terminalGoBack(), disabled: !canTerminalGoBack() },
+                    { label: 'Forward', icon: NAV_ICONS.forward, action: () => terminalGoForward(), disabled: !canTerminalGoForward() },
+                    { label: 'Parent Directory', icon: NAV_ICONS.up, action: () => sendTerminalCd(parentDir), disabled: !parentDir },
+                ] },
+                ...(folderSubmenu ? [folderSubmenu] : []),
+                { separator: true },
+                // ── Clipboard ──
                 { label: 'Copy', action: () => {
                     if (hasSelection) {
                         navigator.clipboard.writeText(terminal.getSelection());
@@ -14296,39 +14084,71 @@
                         }
                     } catch {}
                 }},
+                { label: 'Select All', action: () => terminal?.selectAll?.() },
                 { separator: true },
-                { label: 'Copy Last Command', action: () => {
-                    navigator.clipboard.writeText(history.command);
-                    showToast('Command copied', 'success');
-                }, disabled: !hasCommand },
-                { label: 'Copy Last Output', action: () => {
-                    navigator.clipboard.writeText(history.output);
-                    showToast('Output copied', 'success');
-                }, disabled: !hasOutput },
-                { label: 'Copy Last Command & Output', action: () => {
-                    navigator.clipboard.writeText(`$ ${history.command}\n${history.output}`);
-                    showToast('Command & output copied', 'success');
-                }, disabled: !hasCommand || !hasOutput },
+                { label: 'Copy to Clipboard', children: [
+                    { label: 'Last Command', action: () => {
+                        navigator.clipboard.writeText(history.command);
+                        showToast('Command copied', 'success');
+                    }, disabled: !hasCommand },
+                    { label: 'Last Output', action: () => {
+                        navigator.clipboard.writeText(history.output);
+                        showToast('Output copied', 'success');
+                    }, disabled: !hasOutput },
+                    { label: 'Last Command and Output', action: () => {
+                        navigator.clipboard.writeText(`$ ${history.command}\n${history.output}`);
+                        showToast('Command and output copied', 'success');
+                    }, disabled: !hasCommand || !hasOutput },
+                    { separator: true },
+                    { label: `Working Directory (${cwdDisplay})`, action: () => {
+                        navigator.clipboard.writeText(cwd);
+                        showToast(`Copied: ${cwdDisplay}`, 'success');
+                    }},
+                ]},
                 { separator: true },
-                { label: `Copy Working Directory`, action: () => {
-                    navigator.clipboard.writeText(cwd);
-                    showToast(`Copied: ${history?.cwdDisplay || '~'}`, 'success');
+                // ── File Operations ──
+                { label: 'New File…', action: () => {
+                    const name = prompt('File name:');
+                    if (name) _sendTerminalCommand(`touch ${_shellQuote(name)}`);
+                }},
+                { label: 'New Folder…', action: () => {
+                    const name = prompt('Folder name:');
+                    if (name) _sendTerminalCommand(`mkdir ${_shellQuote(name)}`);
+                }},
+                { label: 'List Files', children: [
+                    { label: 'Simple', action: () => _sendTerminalCommand('ls') },
+                    { label: 'Detailed', action: () => _sendTerminalCommand('ls -la') },
+                    { label: 'By Size', action: () => _sendTerminalCommand('ls -lS') },
+                    { label: 'By Date', action: () => _sendTerminalCommand('ls -lt') },
+                ]},
+                { label: 'Find File…', action: () => {
+                    const term = prompt('Search for file name containing:');
+                    if (term) _sendTerminalCommand(`find . -maxdepth 3 -iname ${_shellQuote('*' + term + '*')} -not -path '*/.*'`);
                 }},
                 { separator: true },
-                ...(downloadItems.length > 0 ? [...downloadItems, { separator: true }] : []),
-                { label: 'Select All', action: () => terminal?.selectAll?.() },
-                { label: 'Clear Terminal', action: () => {
+                // ── Transfer ──
+                { label: 'Upload…', action: () => triggerUploadFromToolbar() },
+                ...(downloadSubmenu ? [downloadSubmenu] : []),
+                { separator: true },
+                // ── Inspekt CLI ──
+                { label: 'Inspekt', children: [
+                    { label: 'Page Info', action: () => _sendTerminalCommand('inspekt info') },
+                    { label: 'Accessibility Audit', action: () => _sendTerminalCommand('inspekt axe') },
+                    { label: 'Page Outline', action: () => _sendTerminalCommand('inspekt outline') },
+                    { label: 'Extract Links', action: () => _sendTerminalCommand('inspekt links') },
+                    { label: 'Take Screenshot', action: () => _sendTerminalCommand('inspekt screenshot') },
+                ]},
+                { separator: true },
+                // ── Terminal Settings ──
+                { label: 'Clear', action: () => {
                     terminal?.clear();
                     if (terminalSocket?.readyState === WebSocket.OPEN) {
                         terminalSocket.send('\x0c');
                     }
                 }},
-                { label: 'Upload File(s)…', action: () => triggerUploadFromToolbar() },
-                { separator: true },
-                { label: 'Increase Font Size', action: () => adjustTerminalFontSize(1) },
-                { label: 'Decrease Font Size', action: () => adjustTerminalFontSize(-1) },
-                { separator: true },
-                { label: terminalMode === 'split' ? 'Switch to Floating Terminal' : 'Switch to Split View',
+                { label: 'Larger Text', action: () => adjustTerminalFontSize(1) },
+                { label: 'Smaller Text', action: () => adjustTerminalFontSize(-1) },
+                { label: terminalMode === 'split' ? 'Floating Terminal' : 'Split View',
                   action: () => {
                     if (terminalMode === 'split') {
                         exitSplitMode();
@@ -14336,7 +14156,7 @@
                         enterSplitMode();
                     }
                 }},
-                { label: 'Edit Trigger Words', action: () => {
+                { label: 'Trigger Words…', action: () => {
                     openFileInEditor('/home/inspekt/.config/inspekt.yaml');
                 }},
             ];
@@ -14377,7 +14197,7 @@
         // canvas gives it focus, and noVNC intercepts Escape before it bubbles
         // to our context menu dismiss handler.
         document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape' && activeContextMenu) {
+            if (e.key === 'Escape' && _isMenuOpen()) {
                 e.preventDefault();
                 e.stopImmediatePropagation();
                 dismissContextMenu();
@@ -14473,7 +14293,7 @@
                     return;
                 }
                 // Dismiss context menu first (highest priority)
-                if (activeContextMenu) {
+                if (_isMenuOpen()) {
                     e.preventDefault();
                     dismissContextMenu();
                     return;
@@ -14608,264 +14428,6 @@
 
         // Check DevTools status on page load
         checkDevToolsStatus();
-
-        // =============================================
-        // Zoom Controller (programmatic zoom via extension API)
-        // =============================================
-        const ZOOM_STEPS = [0.25, 0.33, 0.5, 0.67, 0.75, 0.8, 0.9, 1.0, 1.1, 1.25, 1.5, 1.75, 2.0, 2.5, 3.0, 4.0, 5.0];
-        const ZOOM_MESSAGES = {
-            0.25: 'Minimum zoom level',
-            0.5:  'Good for seeing the full layout at a glance',
-            1.0:  'Default zoom level',
-            1.5:  'Common accessibility zoom level',
-            2.0:  'WCAG requires content to be usable at this level',
-            3.0:  'Tests extreme zoom for low-vision users',
-            4.0:  'WCAG 1.4.10 requires content reflow at this level',
-            5.0:  'Maximum zoom level',
-        };
-        let currentZoom = 1.0;
-
-        async function handleZoom(action) {
-            let targetZoom;
-            if (action === 'reset') {
-                targetZoom = 1.0;
-            } else if (action === 'in') {
-                const next = ZOOM_STEPS.find(s => s > currentZoom + 0.001);
-                targetZoom = next || ZOOM_STEPS[ZOOM_STEPS.length - 1];
-            } else {
-                const prev = [...ZOOM_STEPS].reverse().find(s => s < currentZoom - 0.001);
-                targetZoom = prev || ZOOM_STEPS[0];
-            }
-
-            try {
-                const resp = await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/zoom`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ level: targetZoom })
-                });
-                const data = await resp.json();
-                if (data.ok) {
-                    currentZoom = targetZoom;
-                    showZoomHUD(targetZoom);
-                }
-            } catch (e) {
-                console.warn('[Zoom] Failed:', e);
-            }
-        }
-
-        function showZoomHUD(level) {
-            const pct = Math.round(level * 100);
-            const msg = ZOOM_MESSAGES[level];
-            const text = msg ? `Zoom: ${pct}% — ${msg}` : `Zoom: ${pct}%`;
-            showToast(text, { type: 'dark', duration: 2000 });
-        }
-
-        // Fetch initial zoom level on load
-        fetch(`http://${VNC_HOST}:${CONTROL_PORT}/zoom`)
-            .then(r => r.json())
-            .then(data => { if (data.ok) currentZoom = data.zoom; })
-            .catch(() => {});
-
-        // =============================================
-        // Virtual Scrollbar Controller
-        // =============================================
-        (function initVirtualScrollbar() {
-            const scrollbar = document.getElementById('vScrollbar');
-            const track = document.getElementById('vScrollbarTrack');
-            const thumb = document.getElementById('vScrollbarThumb');
-            const container = document.getElementById('vncContainer');
-
-            let scrollState = { top: 0, scrollHeight: 0, clientHeight: 0, hasVerticalScroll: false };
-            let isDragging = false;
-            let dragOffsetY = 0;
-            let hideTimer = null;
-            let pollTimer = null;
-            let pollInterval = 500;       // idle rate
-            const activePollInterval = 80; // during/after scroll
-            const hideDelay = 1500;        // ms before auto-hide
-            let activePollResetTimer = null;
-            let lastScrollSendTime = 0;
-            const scrollSendThrottle = 50; // ms between scroll-to requests during drag
-
-            // Thumb color adapts automatically via CSS mix-blend-mode: difference
-            // combined with filter: grayscale(1) — no JS needed for color logic.
-
-            // --- Polling scroll state from control server ---
-            function pollScrollState() {
-                // During drag, thumb position is updated optimistically — no need to poll
-                if (isDragging) return;
-                fetch(`http://${VNC_HOST}:${CONTROL_PORT}/scroll-state`)
-                    .then(r => r.json())
-                    .then(data => {
-                        if (data.ok) {
-                            scrollState = data;
-                            updateThumb();
-                        }
-                    })
-                    .catch(() => {})
-                    .finally(() => {
-                        pollTimer = setTimeout(pollScrollState, pollInterval);
-                    });
-            }
-
-            // --- Lifecycle: allow VNC connect/disconnect to control polling ---
-            window.stopScrollbarPolling = function() {
-                clearTimeout(pollTimer);
-                pollTimer = null;
-            };
-            window.startScrollbarPolling = function() {
-                if (pollTimer) return; // already running
-                pollTimer = setTimeout(pollScrollState, 500);
-            };
-
-            // --- Thumb positioning ---
-            function updateThumb() {
-                if (!scrollState.hasVerticalScroll) {
-                    scrollbar.classList.remove('visible');
-                    return;
-                }
-                const trackHeight = track.offsetHeight;
-                const ratio = scrollState.clientHeight / scrollState.scrollHeight;
-                const thumbHeight = Math.max(30, Math.round(trackHeight * ratio));
-                const maxThumbTop = trackHeight - thumbHeight;
-                const scrollRange = scrollState.scrollHeight - scrollState.clientHeight;
-                const thumbTop = scrollRange > 0
-                    ? Math.round((scrollState.top / scrollRange) * maxThumbTop)
-                    : 0;
-
-                thumb.style.height = thumbHeight + 'px';
-                thumb.style.top = thumbTop + 'px';
-            }
-
-            // --- Show / hide ---
-            function show() {
-                if (!scrollState.hasVerticalScroll) return;
-                scrollbar.classList.add('visible');
-                scheduleHide();
-            }
-
-            function scheduleHide() {
-                clearTimeout(hideTimer);
-                hideTimer = setTimeout(() => {
-                    if (!isDragging) scrollbar.classList.remove('visible');
-                }, hideDelay);
-            }
-
-            // --- Boost poll rate temporarily ---
-            function setActivePollRate() {
-                pollInterval = activePollInterval;
-                // Return to idle rate after 2s of no further triggers
-                clearTimeout(activePollResetTimer);
-                activePollResetTimer = setTimeout(() => {
-                    pollInterval = 500;
-                }, 2000);
-            }
-
-            // --- Send scroll command to VM (throttled) ---
-            function sendScrollTo(targetTop, force) {
-                const now = Date.now();
-                if (!force && now - lastScrollSendTime < scrollSendThrottle) return;
-                lastScrollSendTime = now;
-                fetch(`http://${VNC_HOST}:${CONTROL_PORT}/scroll-to`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ top: Math.round(targetTop) })
-                }).catch(() => {});
-            }
-
-            // --- Thumb drag ---
-            function onDragStart(e) {
-                e.preventDefault();
-                isDragging = true;
-                scrollbar.classList.add('dragging');
-                thumb.classList.add('dragging');
-                const thumbRect = thumb.getBoundingClientRect();
-                dragOffsetY = e.clientY - thumbRect.top;
-                // Capture pointer so drag continues even outside the scrollbar area
-                thumb.setPointerCapture(e.pointerId);
-                thumb.addEventListener('pointermove', onDragMove);
-                thumb.addEventListener('pointerup', onDragEnd);
-            }
-
-            function onDragMove(e) {
-                if (!isDragging) return;
-                const trackRect = track.getBoundingClientRect();
-                const thumbHeight = thumb.offsetHeight;
-                const maxY = trackRect.height - thumbHeight;
-                const currentY = Math.max(0, Math.min(e.clientY - trackRect.top - dragOffsetY, maxY));
-
-                // Optimistic visual update
-                thumb.style.top = currentY + 'px';
-
-                // Calculate and send scroll position
-                const scrollRatio = maxY > 0 ? currentY / maxY : 0;
-                const targetScrollTop = scrollRatio * (scrollState.scrollHeight - scrollState.clientHeight);
-                sendScrollTo(targetScrollTop);
-            }
-
-            function onDragEnd(e) {
-                // Send final position unthrottled to ensure exact landing
-                const trackRect = track.getBoundingClientRect();
-                const thumbHeight = thumb.offsetHeight;
-                const maxY = trackRect.height - thumbHeight;
-                const currentY = Math.max(0, Math.min(e.clientY - trackRect.top - dragOffsetY, maxY));
-                const scrollRatio = maxY > 0 ? currentY / maxY : 0;
-                const targetScrollTop = scrollRatio * (scrollState.scrollHeight - scrollState.clientHeight);
-                sendScrollTo(targetScrollTop, true);
-
-                isDragging = false;
-                scrollbar.classList.remove('dragging');
-                thumb.classList.remove('dragging');
-                thumb.releasePointerCapture(e.pointerId);
-                thumb.removeEventListener('pointermove', onDragMove);
-                thumb.removeEventListener('pointerup', onDragEnd);
-                scheduleHide();
-                // Restart polling (was paused during drag) and refocus VNC
-                pollScrollState();
-                if (rfb) rfb.focus();
-            }
-
-            // --- Track click (jump to position) ---
-            function onTrackClick(e) {
-                if (e.target === thumb) return;
-                const trackRect = track.getBoundingClientRect();
-                const clickRatio = (e.clientY - trackRect.top) / trackRect.height;
-                const targetScrollTop = clickRatio * (scrollState.scrollHeight - scrollState.clientHeight);
-                sendScrollTo(targetScrollTop);
-                show();
-                setActivePollRate();
-            }
-
-            // --- Wheel detection on VNC container ---
-            container.addEventListener('wheel', () => {
-                show();
-                setActivePollRate();
-            }, { passive: true, capture: true });
-
-            // --- Hover zone along right edge ---
-            const hoverZone = document.getElementById('vScrollbarHoverZone');
-            hoverZone.addEventListener('mouseenter', () => {
-                setActivePollRate();
-                show();
-            });
-            hoverZone.addEventListener('mouseleave', () => {
-                scheduleHide();
-            });
-            // Keep scrollbar visible while hovering the scrollbar itself
-            scrollbar.addEventListener('mouseenter', () => {
-                clearTimeout(hideTimer);
-            });
-            scrollbar.addEventListener('mouseleave', () => {
-                if (!isDragging) scheduleHide();
-            });
-
-            // --- Bind events ---
-            thumb.addEventListener('pointerdown', onDragStart);
-            track.addEventListener('click', onTrackClick);
-
-            // --- Start polling ---
-            pollTimer = setTimeout(pollScrollState, 1000); // initial delay for page load
-        })();
     </script>
 </body>
 </html>
