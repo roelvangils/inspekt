@@ -82,6 +82,7 @@ class SitemapResult:
     entries: list[SitemapEntry] = field(default_factory=list)
     child_sitemaps: list[str] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
     fetch_time: float = 0.0
 
     @property
@@ -113,6 +114,7 @@ class SitemapResult:
                 for e in self.entries
             ],
             "errors": self.errors,
+            **({"warnings": self.warnings} if self.warnings else {}),
         }
 
 
@@ -306,13 +308,20 @@ def fetch_sitemap(
                 result.errors.extend(child_result.errors)
 
     elif tag == "urlset":
+        skipped = 0
         for url_elem in root.findall(f"{NS}url"):
             entry = _parse_url_element(url_elem)
             if entry:
                 result.entries.append(entry)
+            else:
+                skipped += 1
+        if skipped:
+            result.warnings.append(f"Skipped {skipped} <url> element(s) with no <loc>")
 
     else:
-        result.errors.append(f"Unknown root element: {root.tag}")
+        result.errors.append(
+            f"Invalid sitemap: expected <urlset> or <sitemapindex>, got <{tag}>"
+        )
 
     result.fetch_time = time.time() - start
     return result
@@ -961,61 +970,79 @@ def detect_languages(entries: list[SitemapEntry]) -> set[str]:
 _TITLE_SEPARATORS = [" | ", " - ", " — ", " · ", " :: ", " // ", " – "]
 
 
-def detect_site_name(entries: list[SitemapEntry], threshold: float = 0.5) -> str:
+def detect_site_name(
+    entries: list[SitemapEntry], threshold: float = 0.5
+) -> list[str]:
     """
-    Detect the site name by finding the fragment that repeats across most titles.
+    Detect site name variants from page titles.
 
-    Splits each title on common separators (|, -, —, ·) and counts which
-    fragment appears most often. If it appears in more than `threshold` of
-    titled entries, it's the site name.
+    Focuses on the SUFFIX fragment (the part after the last separator),
+    since site names almost always appear at the end of titles
+    (e.g., "Page Title | Site Name").
+
+    Handles multilingual sites where the suffix varies by language
+    (e.g., "| AXA Verzekeringen" in Dutch, "| AXA Assurances" in French).
 
     Args:
         entries: Sitemap entries (must have titles already fetched)
-        threshold: Minimum fraction of titles that must contain the fragment
+        threshold: Minimum fraction of titles for a single suffix
 
     Returns:
-        The detected site name, or empty string if none found
+        List of detected site name variants, or empty list if none found
     """
     titles = [e.title for e in entries if e.title]
     if len(titles) < 3:
-        return ""
+        return []
 
-    # Split all titles on separators and count fragment frequency
-    fragment_counts: dict[str, int] = {}
+    # Count suffix fragments (last part after separator), case-insensitive.
+    # Track the most common casing for each suffix.
+    suffix_counts: dict[str, int] = {}
+    suffix_canonical: dict[str, str] = {}
     for title in titles:
-        # Try each separator, use the first one that splits the title
-        parts = [title]
         for sep in _TITLE_SEPARATORS:
             if sep in title:
-                parts = [p.strip() for p in title.split(sep) if p.strip()]
+                suffix = title.rsplit(sep, 1)[-1].strip()
+                key = suffix.lower()
+                suffix_counts[key] = suffix_counts.get(key, 0) + 1
+                # Keep the casing that appears most often
+                prev = suffix_canonical.get(key, "")
+                if not prev or suffix_counts[key] > suffix_counts.get(prev.lower(), 0):
+                    suffix_canonical[key] = suffix
                 break
 
-        for part in parts:
-            fragment_counts[part] = fragment_counts.get(part, 0) + 1
+    if not suffix_counts:
+        return []
 
-    if not fragment_counts:
-        return ""
+    # Phase 1: single dominant suffix (monolingual sites, e.g., "Stad Gent")
+    top_key, top_count = max(suffix_counts.items(), key=lambda x: x[1])
+    if top_count >= len(titles) * threshold:
+        return [suffix_canonical[top_key]]
 
-    # The site name is the most frequent fragment that appears in enough titles
-    most_common = max(fragment_counts.items(), key=lambda x: x[1])
-    name, count = most_common
+    # Phase 2: multiple suffix variants (multilingual sites)
+    # Collect suffixes appearing in ≥10% of titles; if combined ≥60%, return all
+    min_count = max(3, int(len(titles) * 0.10))
+    candidates = sorted(
+        [(k, c) for k, c in suffix_counts.items() if c >= min_count],
+        key=lambda x: -x[1],
+    )
+    combined = sum(c for _, c in candidates)
+    if len(candidates) >= 2 and combined >= len(titles) * 0.6:
+        return [suffix_canonical[k] for k, _ in candidates]
 
-    if count >= len(titles) * threshold:
-        return name
-
-    return ""
+    return []
 
 
-def strip_site_name(title: str, site_name: str) -> str:
+def strip_site_name(title: str, site_name: str | list[str]) -> str:
     """
     Remove the site name from a page title.
 
     Handles both "Site Name | Page Title" and "Page Title | Site Name" patterns,
-    with any common separator.
+    with any common separator. Accepts a single name or a list of variants
+    (for multilingual sites).
 
     Args:
         title: The full page title
-        site_name: The detected site name to remove
+        site_name: The detected site name(s) to remove
 
     Returns:
         The cleaned title, or original if site name not found
@@ -1023,21 +1050,23 @@ def strip_site_name(title: str, site_name: str) -> str:
     if not site_name or not title:
         return title
 
-    # Try removing with each separator
-    for sep in _TITLE_SEPARATORS:
-        # Site name at the start: "Site Name | Page Title"
-        prefix = f"{site_name}{sep}"
-        if title.startswith(prefix):
-            cleaned = title[len(prefix):].strip()
-            if cleaned:
-                return cleaned
+    names = [site_name] if isinstance(site_name, str) else site_name
 
-        # Site name at the end: "Page Title | Site Name"
-        suffix = f"{sep}{site_name}"
-        if title.endswith(suffix):
-            cleaned = title[:-len(suffix)].strip()
-            if cleaned:
-                return cleaned
+    for name in names:
+        for sep in _TITLE_SEPARATORS:
+            # Site name at the start: "Site Name | Page Title"
+            prefix = f"{name}{sep}"
+            if title.startswith(prefix):
+                cleaned = title[len(prefix):].strip()
+                if cleaned:
+                    return cleaned
+
+            # Site name at the end: "Page Title | Site Name"
+            suffix = f"{sep}{name}"
+            if title.endswith(suffix):
+                cleaned = title[:-len(suffix)].strip()
+                if cleaned:
+                    return cleaned
 
     return title
 
@@ -1120,6 +1149,7 @@ def load_from_cache(origin: str) -> Optional[SitemapResult]:
             is_index=r.get("is_index", False),
             child_sitemaps=r.get("child_sitemaps", []),
             errors=r.get("errors", []),
+            warnings=r.get("warnings", []),
         )
 
         for entry_data in r.get("entries", []):

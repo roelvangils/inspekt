@@ -94,7 +94,7 @@ def _find_node_by_path(
 
 
 def _node_to_info(
-    node: sitemap_service.TreeNode, origin: str, site_name: str = ""
+    node: sitemap_service.TreeNode, origin: str, site_name: str | list[str] = ""
 ) -> SitemapNodeInfo:
     """Convert a TreeNode to a SitemapNodeInfo response object."""
     entry = node.entry
@@ -157,7 +157,7 @@ def _enrich_nodes(
         logger.debug("Title enrichment failed: %s", e)
 
 
-def _sort_key(node: sitemap_service.TreeNode, site_name: str = "") -> str:
+def _sort_key(node: sitemap_service.TreeNode, site_name: str | list[str] = "") -> str:
     """Sort key for tree nodes: stripped title (lowercase), falling back to name."""
     title = node.entry.title if node.entry and node.entry.title else ""
     if title and site_name:
@@ -168,7 +168,7 @@ def _sort_key(node: sitemap_service.TreeNode, site_name: str = "") -> str:
 def _build_recursive_children(
     node: sitemap_service.TreeNode,
     origin: str,
-    site_name: str = "",
+    site_name: str | list[str] = "",
     max_depth: int = 4,
     per_level: int = 25,
     _depth: int = 0,
