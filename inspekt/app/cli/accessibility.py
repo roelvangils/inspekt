@@ -26,6 +26,128 @@ from inspekt.client import BridgeClient
 
 
 # ============================================================================
+# Engine Tracking - Prevent Re-injection and Exclude Inspekt UI
+# ============================================================================
+
+# Selectors for Inspekt UI elements that should be excluded from a11y scans
+INSPEKT_UI_SELECTORS = [
+    '[data-inspekt-badge]',
+    '[data-inspekt-axe-popover]',
+    '[data-inspekt-ibm-popover]',
+    '.inspekt-axe-popover',
+    '.inspekt-ibm-popover',
+    '#inspekt-badge-styles',
+    '#inspekt-axe-popover-styles',
+    '#inspekt-axe-popover-additional-styles',
+    '#inspekt-ibm-popover-styles',
+    '#inspekt-ibm-badge-styles',
+]
+
+
+def _load_engine_tracker(client) -> bool:
+    """
+    Load the engine tracker script if not already loaded.
+
+    This provides window.__inspektIsEngineLoaded__ and related functions
+    to prevent re-injecting engine libraries on repeated audits.
+
+    Returns:
+        True if tracker is ready, False on error
+    """
+    tracker_path = Path(__file__).parent.parent.parent / "scripts" / "engine-tracker.js"
+
+    try:
+        with builtin_open(tracker_path) as f:
+            tracker_script = f.read()
+
+        # Always load the full tracker script to ensure all functions are available
+        # (in case page was refreshed or partial load occurred)
+        check_and_load = f"""
+(function() {{
+    {tracker_script}
+    return window.__inspektTrackerInitialized__ === true;
+}})()
+"""
+        result = client.execute(check_and_load, timeout=5.0)
+        return result.get("ok") and result.get("result") is True
+    except Exception:
+        return False
+
+
+def _is_engine_loaded(client, engine: str) -> bool:
+    """
+    Check if an engine library is already loaded in the browser.
+
+    Args:
+        client: Bridge client for browser communication
+        engine: Engine identifier (axe, ace, htmlcs, sia)
+
+    Returns:
+        True if engine is already loaded, False otherwise
+    """
+    check_code = f"window.__inspektIsEngineLoaded__ ? window.__inspektIsEngineLoaded__('{engine}') : false"
+    try:
+        result = client.execute(check_code, timeout=2.0)
+        return result.get("ok") and result.get("result") == True
+    except Exception:
+        return False
+
+
+def _mark_engine_loaded(client, engine: str) -> bool:
+    """
+    Mark an engine as loaded to prevent re-injection.
+
+    Args:
+        client: Bridge client for browser communication
+        engine: Engine identifier (axe, ace, htmlcs, sia)
+
+    Returns:
+        True if successfully marked, False otherwise
+    """
+    mark_code = f"window.__inspektMarkEngineLoaded__ && window.__inspektMarkEngineLoaded__('{engine}')"
+    try:
+        result = client.execute(mark_code, timeout=2.0)
+        return result.get("ok")
+    except Exception:
+        return False
+
+
+def _filter_inspekt_ui_violations(violations: list, selector_key: str = 'selector') -> list:
+    """
+    Remove violations that occur within Inspekt's own UI elements.
+
+    This is used as a post-filter for engines that don't support exclude options.
+
+    Args:
+        violations: List of violation dicts
+        selector_key: Key name for the selector field in violation dict
+
+    Returns:
+        Filtered list with Inspekt UI violations removed
+    """
+    filtered = []
+    for v in violations:
+        selector = v.get(selector_key, '')
+        # Handle both string and list selectors
+        if isinstance(selector, list):
+            selector = ' '.join(str(s) for s in selector)
+        else:
+            selector = str(selector)
+
+        # Check if this violation is within Inspekt UI
+        is_inspekt_ui = any(
+            ui_sel.replace('[', '').replace(']', '').replace('.', '').replace('#', '')
+            in selector
+            for ui_sel in INSPEKT_UI_SELECTORS
+        )
+
+        if not is_inspekt_ui:
+            filtered.append(v)
+
+    return filtered
+
+
+# ============================================================================
 # Engine Registry for Multi-Engine Accessibility Testing
 # ============================================================================
 
@@ -63,12 +185,13 @@ AVAILABLE_ENGINES = {
 DEFAULT_ENGINE_ORDER = ["axe", "eac", "hcs", "sia"]
 
 
-def _validate_and_normalize_engines(engines: tuple[str, ...]) -> list[str]:
+def _validate_and_normalize_engines(engines: str | tuple[str, ...] | None) -> list[str]:
     """
     Validate engine names and return normalized list.
 
     Args:
-        engines: Tuple of engine names from CLI (may be empty)
+        engines: Comma-separated engine string (e.g. "axe,eac"),
+                 tuple of engine names, or None for defaults
 
     Returns:
         List of validated engine names in execution order
@@ -79,10 +202,19 @@ def _validate_and_normalize_engines(engines: tuple[str, ...]) -> list[str]:
     if not engines:
         return DEFAULT_ENGINE_ORDER.copy()
 
+    # Support comma-separated string (from --engines option)
+    if isinstance(engines, str):
+        engine_names = [e.strip() for e in engines.split(",") if e.strip()]
+    else:
+        engine_names = list(engines)
+
+    if not engine_names:
+        return DEFAULT_ENGINE_ORDER.copy()
+
     normalized = []
     seen = set()
 
-    for engine in engines:
+    for engine in engine_names:
         engine_lower = engine.lower()
 
         if engine_lower not in AVAILABLE_ENGINES:
@@ -1300,7 +1432,12 @@ def axe(level, rule, list_rules, tags, include_passes, include_incomplete, outpu
             for item in incomplete_checks:
                 impact = item.get("impact", "unknown")
                 color = _get_impact_color(impact)
-                click.echo(f"  {click.style('•', fg=color)} {item.get('id')}: {item.get('description')} ({item.get('nodeCount', 0)} elements)")
+                from inspekt.app.cli.sitemap import wrap_styled_line
+                for line in wrap_styled_line(
+                    prefix=f"  {click.style('•', fg=color)} {item.get('id')}: ",
+                    text=f"{item.get('description')} ({item.get('nodeCount', 0)} elements)",
+                ):
+                    click.echo(line)
             click.echo()
 
         # Persistent monitoring mode
@@ -2429,6 +2566,195 @@ def _sc_matches_level(sc: str, level: str) -> bool:
     return True
 
 
+def _build_enriched_report_data(
+    url: str,
+    level: str,
+    engine_list: list[str],
+    engine_results: dict,
+    consolidated: dict,
+    versions: dict,
+    include_recommendations: bool = False,
+) -> dict:
+    """Build the canonical enriched report data dict.
+
+    This is a pure-data function (no click.echo calls) that computes
+    all analysis data and returns a structured dict suitable for
+    JSON serialization or HTML report rendering.
+
+    Args:
+        url: The audited URL
+        level: WCAG conformance level (e.g. "21aa")
+        engine_list: List of engine names in execution order
+        engine_results: Dict mapping engine name to its raw results
+        consolidated: Level-filtered consolidated results by WCAG SC
+        versions: Dict mapping engine name to version string
+        include_recommendations: Whether to include recommendations
+
+    Returns:
+        Enriched report data dict
+    """
+    from datetime import datetime, timezone
+
+    # Helper to count violations from filtered consolidated results
+    def count_filtered_violations(engine: str) -> int:
+        count = 0
+        for _sc, data in consolidated.items():
+            status = data.get(f"{engine}_status", "pass")
+            sc_count = data.get(f"{engine}_count", 0)
+            if status in ("violation", "potentialviolation"):
+                count += sc_count
+        return count
+
+    # Sort SCs
+    def sc_sort_key(sc):
+        parts = sc.split(".")
+        return tuple(int(p) for p in parts)
+
+    sorted_scs = sorted(consolidated.keys(), key=sc_sort_key)
+
+    # Compute disagreements and disparities
+    issues_count = 0
+    disagreements = []
+    disparities = []
+
+    for sc in sorted_scs:
+        data = consolidated[sc]
+        engine_fails = {
+            eng: data.get(f"{eng}_status") not in ("pass",)
+            for eng in engine_list
+        }
+        engine_counts = {
+            eng: data.get(f"{eng}_count", 0)
+            for eng in engine_list
+        }
+        failing_engines = [eng for eng, fails in engine_fails.items() if fails]
+        passing_engines = [eng for eng, fails in engine_fails.items() if not fails]
+
+        if failing_engines:
+            issues_count += 1
+
+        # Disagreements
+        if failing_engines and passing_engines:
+            disagreements.append({
+                "sc": sc,
+                "description": WCAG_SC_DESCRIPTIONS.get(sc, ""),
+                "conformance_level": WCAG_SC_LEVELS.get(sc, {}).get("level", ""),
+                "failing_engines": [
+                    {"engine": eng, "abbr": AVAILABLE_ENGINES[eng]["abbr"], "count": engine_counts[eng]}
+                    for eng in failing_engines
+                ],
+                "passing_engines": [
+                    {"engine": eng, "abbr": AVAILABLE_ENGINES[eng]["abbr"]}
+                    for eng in passing_engines
+                ],
+            })
+
+        # Disparities
+        if len(failing_engines) >= 2:
+            counts = [engine_counts[eng] for eng in failing_engines if engine_counts[eng] > 0]
+            if len(counts) >= 2:
+                min_c, max_c = min(counts), max(counts)
+                if min_c > 0 and max_c / min_c >= 2:
+                    disparities.append({
+                        "sc": sc,
+                        "description": WCAG_SC_DESCRIPTIONS.get(sc, ""),
+                        "conformance_level": WCAG_SC_LEVELS.get(sc, {}).get("level", ""),
+                        "counts": {eng: engine_counts[eng] for eng in engine_list},
+                        "ratio": round(max_c / min_c, 1),
+                    })
+
+    # Engine correlation
+    correlation = _calculate_engine_correlation(consolidated, engine_list)
+
+    # Build enriched engines dict
+    engines_data = {}
+    for engine in engine_list:
+        eng_result = engine_results.get(engine, {})
+        eng_detail: dict = {
+            "name": AVAILABLE_ENGINES[engine]["name"],
+            "abbr": AVAILABLE_ENGINES[engine]["abbr"],
+            "version": versions.get(engine, "unknown"),
+            "violations": count_filtered_violations(engine),
+            "error": eng_result.get("error"),
+        }
+
+        # Enriched fields: passes and incomplete counts
+        if engine == "axe":
+            eng_detail["passes"] = len(eng_result.get("passes", []))
+            eng_detail["incomplete"] = len(eng_result.get("incomplete", []))
+            # Impact summary from violations
+            impact_counts = {"critical": 0, "serious": 0, "moderate": 0, "minor": 0}
+            for v in eng_result.get("violations", []):
+                impact = v.get("impact", "minor")
+                count = v.get("nodeCount", len(v.get("nodes", [])))
+                impact_counts[impact] = impact_counts.get(impact, 0) + count
+            eng_detail["impact_summary"] = impact_counts
+        elif engine == "eac":
+            issues = eng_result.get("issues", [])
+            eng_detail["passes"] = len([i for i in issues if i.get("level") == "pass"])
+            eng_detail["incomplete"] = 0
+        elif engine == "hcs":
+            messages = eng_result.get("messages", [])
+            eng_detail["passes"] = 0  # HCS doesn't report passes
+            eng_detail["incomplete"] = len([m for m in messages if m.get("type") == 2])
+        elif engine == "sia":
+            outcomes = eng_result.get("outcomes", [])
+            eng_detail["passes"] = len([o for o in outcomes if o.get("outcome") == "passed"])
+            eng_detail["incomplete"] = len(eng_result.get("cantTell", []))
+
+        engines_data[engine] = eng_detail
+
+    # Enrich consolidated with descriptions and levels
+    enriched_consolidated = {}
+    for sc in sorted_scs:
+        entry = dict(consolidated[sc])  # Copy
+        entry["description"] = WCAG_SC_DESCRIPTIONS.get(sc, "")
+        sc_info = WCAG_SC_LEVELS.get(sc, {})
+        entry["conformance_level"] = sc_info.get("level", "")
+        entry["wcag_version"] = sc_info.get("version", "")
+        enriched_consolidated[sc] = entry
+
+    # Build output
+    output: dict = {
+        "url": url,
+        "timestamp": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+        "level": level,
+        "engines": engines_data,
+        "execution_order": engine_list,
+        "consolidated": enriched_consolidated,
+        "analysis": {
+            "total_criteria_with_issues": issues_count,
+            "agreement_percentage": correlation["agreement_percentage"],
+            "total_criteria_evaluated": correlation["total_scs"],
+            "full_agreement_count": correlation["full_agreement"],
+            "disagreements": disagreements,
+            "disparities": disparities,
+        },
+        "engine_details": _extract_engine_rule_details(engine_results, engine_list),
+    }
+
+    # Recommendations
+    if include_recommendations:
+        recommendations = _collect_recommendations(engine_results, engine_list)
+        recommendations_by_sc: dict[str, list] = {}
+        for rec in recommendations:
+            sc = rec["sc"] or "unknown"
+            if sc not in recommendations_by_sc:
+                recommendations_by_sc[sc] = []
+            recommendations_by_sc[sc].append({
+                "engine": rec["engine"],
+                "rule_id": rec["rule_id"],
+                "level": rec["level"],
+                "message": rec["message"],
+            })
+        output["recommendations"] = {
+            "total": len(recommendations),
+            "by_sc": recommendations_by_sc,
+        }
+
+    return output
+
+
 def _get_contextual_tips(
     engine_list: list[str],
     issue_count: int,
@@ -2528,8 +2854,8 @@ def _get_contextual_tips(
             None
         ))
 
-    # Return max 2 tips
-    return tips[:2]
+    # Return max 3 tips
+    return tips[:3]
 
 
 def _extract_wcag_from_axe_tags(tags: list[str]) -> list[str]:
@@ -2663,11 +2989,11 @@ def _get_release_date_cache_path() -> Path:
 
 def _fetch_npm_release_date(package: str, version: str, timeout: float = 5.0) -> str | None:
     """Fetch release date for a specific package version from npm."""
-    import requests
+    from inspekt.services import http_client
 
     try:
         url = f"https://registry.npmjs.org/{package}"
-        response = requests.get(url, timeout=timeout)
+        response = http_client.get(url, timeout=timeout)
         response.raise_for_status()
         data = response.json()
 
@@ -2770,6 +3096,9 @@ def _run_axe_audit(client, level: str, timeout: float, include_recommendations: 
         return {"error": "axe-core not found", "violations": [], "passes": []}
 
     try:
+        # Load engine tracker first (prevents re-injection)
+        _load_engine_tracker(client)
+
         with builtin_open(axe_lib_path) as f:
             axe_lib = f.read()
         with builtin_open(script_path) as f:
@@ -2779,14 +3108,21 @@ def _run_axe_audit(client, level: str, timeout: float, include_recommendations: 
         config = _build_axe_config(level, None, True, include_recommendations)
         config["__showBadges"] = False  # No badges for combined
 
+        # Exclude Inspekt UI elements from the scan (axe native exclude option)
+        config["exclude"] = INSPEKT_UI_SELECTORS
+
         # Replace placeholder
         audit_script = audit_script.replace("__AXE_CONFIG__", json.dumps(config))
 
-        # Inject library
-        axe_lib_wrapped = f"(function() {{ {axe_lib} return typeof axe !== 'undefined'; }})()"
-        result = client.execute(axe_lib_wrapped, timeout=15.0)
-        if not result.get("ok") or not result.get("result"):
-            return {"error": "Failed to load axe-core", "violations": [], "passes": []}
+        # Check if axe is already loaded (skip injection if so)
+        if not _is_engine_loaded(client, 'axe'):
+            # Inject library
+            axe_lib_wrapped = f"(function() {{ {axe_lib} return typeof axe !== 'undefined'; }})()"
+            result = client.execute(axe_lib_wrapped, timeout=15.0)
+            if not result.get("ok") or not result.get("result"):
+                return {"error": "Failed to load axe-core", "violations": [], "passes": []}
+            # Mark engine as loaded
+            _mark_engine_loaded(client, 'axe')
 
         # Run audit
         result = client.execute(audit_script, timeout=timeout)
@@ -2816,6 +3152,9 @@ def _run_ibm_audit(client, level: str, timeout: float, include_recommendations: 
         return {"error": "IBM Equal Access not found", "issues": [], "summary": {}}
 
     try:
+        # Load engine tracker first (prevents re-injection)
+        _load_engine_tracker(client)
+
         with builtin_open(ace_lib_path) as f:
             ace_lib = f.read()
         with builtin_open(script_path) as f:
@@ -2828,11 +3167,15 @@ def _run_ibm_audit(client, level: str, timeout: float, include_recommendations: 
         # Replace placeholder
         audit_script = audit_script.replace("__IBM_CONFIG__", json.dumps(config))
 
-        # Inject library
-        ace_lib_wrapped = f"(function() {{ {ace_lib}; window.ace = ace; return typeof window.ace !== 'undefined'; }})()"
-        result = client.execute(ace_lib_wrapped, timeout=15.0)
-        if not result.get("ok") or not result.get("result"):
-            return {"error": "Failed to load IBM Equal Access", "issues": [], "summary": {}}
+        # Check if ace is already loaded (skip injection if so)
+        if not _is_engine_loaded(client, 'ace'):
+            # Inject library
+            ace_lib_wrapped = f"(function() {{ {ace_lib}; window.ace = ace; return typeof window.ace !== 'undefined'; }})()"
+            result = client.execute(ace_lib_wrapped, timeout=15.0)
+            if not result.get("ok") or not result.get("result"):
+                return {"error": "Failed to load IBM Equal Access", "issues": [], "summary": {}}
+            # Mark engine as loaded
+            _mark_engine_loaded(client, 'ace')
 
         # Run audit
         result = client.execute(audit_script, timeout=timeout)
@@ -2844,8 +3187,13 @@ def _run_ibm_audit(client, level: str, timeout: float, include_recommendations: 
             return {"error": data.get("error"), "issues": [], "summary": {}}
 
         audit_result = data.get("result", {})
+
+        # Filter out violations from Inspekt's own UI elements
+        issues = audit_result.get("issues", [])
+        issues = _filter_inspekt_ui_violations(issues, selector_key='path')
+
         return {
-            "issues": audit_result.get("issues", []),
+            "issues": issues,
             "summary": audit_result.get("summary", {}),
             "url": audit_result.get("url", ""),
         }
@@ -2862,6 +3210,9 @@ def _run_htmlcs_audit(client, level: str, timeout: float, include_recommendation
         return {"error": "HTML_CodeSniffer not found", "messages": [], "summary": {}}
 
     try:
+        # Load engine tracker first (prevents re-injection)
+        _load_engine_tracker(client)
+
         with builtin_open(htmlcs_lib_path) as f:
             htmlcs_lib = f.read()
         with builtin_open(script_path) as f:
@@ -2887,11 +3238,15 @@ def _run_htmlcs_audit(client, level: str, timeout: float, include_recommendation
         # Replace placeholder
         audit_script = audit_script.replace("__HTMLCS_CONFIG__", json.dumps(config))
 
-        # Inject library
-        htmlcs_lib_wrapped = f"(function() {{ {htmlcs_lib}; return typeof HTMLCS !== 'undefined'; }})()"
-        result = client.execute(htmlcs_lib_wrapped, timeout=15.0)
-        if not result.get("ok") or not result.get("result"):
-            return {"error": "Failed to load HTML_CodeSniffer", "messages": [], "summary": {}}
+        # Check if htmlcs is already loaded (skip injection if so)
+        if not _is_engine_loaded(client, 'htmlcs'):
+            # Inject library
+            htmlcs_lib_wrapped = f"(function() {{ {htmlcs_lib}; return typeof HTMLCS !== 'undefined'; }})()"
+            result = client.execute(htmlcs_lib_wrapped, timeout=15.0)
+            if not result.get("ok") or not result.get("result"):
+                return {"error": "Failed to load HTML_CodeSniffer", "messages": [], "summary": {}}
+            # Mark engine as loaded
+            _mark_engine_loaded(client, 'htmlcs')
 
         # Run audit
         result = client.execute(audit_script, timeout=timeout)
@@ -2902,8 +3257,12 @@ def _run_htmlcs_audit(client, level: str, timeout: float, include_recommendation
         if not data.get("ok"):
             return {"error": data.get("error"), "messages": [], "summary": {}}
 
+        # Filter out violations from Inspekt's own UI elements
+        messages = data.get("messages", [])
+        messages = _filter_inspekt_ui_violations(messages, selector_key='selector')
+
         return {
-            "messages": data.get("messages", []),
+            "messages": messages,
             "summary": data.get("summary", {}),
             "url": data.get("url", ""),
         }
@@ -2921,6 +3280,9 @@ def _run_sia_audit(client, level: str, timeout: float, include_recommendations: 
         return {"error": "Alfa not found", "outcomes": [], "summary": {}}
 
     try:
+        # Load engine tracker first (prevents re-injection)
+        _load_engine_tracker(client)
+
         with builtin_open(sia_lib_path, encoding="utf-8") as f:
             sia_lib = f.read()
         with builtin_open(script_path, encoding="utf-8") as f:
@@ -2957,11 +3319,15 @@ def _run_sia_audit(client, level: str, timeout: float, include_recommendations: 
         # Replace placeholder
         audit_script = audit_script.replace("__SIA_CONFIG__", json.dumps(config))
 
-        # Inject library - Alfa uses 'var Alfa=' so we need to explicitly export to window
-        sia_lib_wrapped = f"(function() {{ {sia_lib}; window.Alfa = Alfa; return typeof window.Alfa !== 'undefined'; }})()"
-        result = client.execute(sia_lib_wrapped, timeout=30.0)
-        if not result.get("ok") or not result.get("result"):
-            return {"error": "Failed to load Alfa", "outcomes": [], "summary": {}}
+        # Check if sia is already loaded (skip injection if so)
+        if not _is_engine_loaded(client, 'sia'):
+            # Inject library - Alfa uses 'var Alfa=' so we need to explicitly export to window
+            sia_lib_wrapped = f"(function() {{ {sia_lib}; window.Alfa = Alfa; return typeof window.Alfa !== 'undefined'; }})()"
+            result = client.execute(sia_lib_wrapped, timeout=30.0)
+            if not result.get("ok") or not result.get("result"):
+                return {"error": "Failed to load Alfa", "outcomes": [], "summary": {}}
+            # Mark engine as loaded
+            _mark_engine_loaded(client, 'sia')
 
         # Run audit
         result = client.execute(audit_script, timeout=timeout)
@@ -2975,8 +3341,12 @@ def _run_sia_audit(client, level: str, timeout: float, include_recommendations: 
             stack = data.get("stack", "")
             return {"error": error_msg, "stack": stack, "outcomes": [], "summary": {}}
 
+        # Filter out violations from Inspekt's own UI elements
+        outcomes = data.get("outcomes", [])
+        outcomes = _filter_inspekt_ui_violations(outcomes, selector_key='target')
+
         return {
-            "outcomes": data.get("outcomes", []),
+            "outcomes": outcomes,
             "summary": data.get("summary", {}),
             "url": data.get("url", ""),
             "version": data.get("version", version),
@@ -3062,6 +3432,7 @@ def _inject_badges_into_page(client, engine_list: list, level: str, timeout: flo
         # Add engine-specific configs
         if "axe" in engine_list:
             config["axeRunOnly"] = _get_axe_run_only(level)
+            config["axeExclude"] = INSPEKT_UI_SELECTORS  # Exclude Inspekt UI from scan
         if "eac" in engine_list:
             config["ibmGuidelines"] = _get_ibm_guidelines(level)
             if include_recommendations:
@@ -3217,6 +3588,7 @@ def _run_unified_a11y_with_badges(client, engine_list: list, level: str, timeout
         # Add engine-specific configs
         if "axe" in engine_list:
             config["axeRunOnly"] = _get_axe_run_only(level)
+            config["axeExclude"] = INSPEKT_UI_SELECTORS  # Exclude Inspekt UI from scan
         if "eac" in engine_list:
             config["ibmGuidelines"] = _get_ibm_guidelines(level)
         if "hcs" in engine_list:
@@ -3561,7 +3933,15 @@ def _run_engines_in_order(
                         click.echo(click.style(f"{indent}{msg}", fg="green"), err=True)
                     else:
                         # Found violations - use alert icon
-                        msg = alert(f"Found {v_count}{potential_qualifier} {pluralize(v_count, 'violation')}")
+                        # Include recommendations count when --include-recommendations is used
+                        if include_recommendations:
+                            rec_count = _count_recommendations(engine_result, engine)
+                            if rec_count > 0:
+                                msg = alert(f"Found {v_count}{potential_qualifier} {pluralize(v_count, 'violation')} (and {rec_count} {pluralize(rec_count, 'recommendation')})")
+                            else:
+                                msg = alert(f"Found {v_count}{potential_qualifier} {pluralize(v_count, 'violation')}")
+                        else:
+                            msg = alert(f"Found {v_count}{potential_qualifier} {pluralize(v_count, 'violation')}")
                         click.echo(click.style(f"{indent}{msg}", fg="yellow"), err=True)
                 # Time elapsed with stopwatch icon
                 time_msg = stopwatch(f"Took {elapsed:.1f} seconds")
@@ -3604,6 +3984,29 @@ def _count_alfa_elements(result: dict) -> int:
     # Handle both camelCase (JS) and snake_case (Python) key formats
     summary = result.get("summary", {})
     return summary.get("failedCount") or summary.get("failed_count") or 0
+
+
+def _count_recommendations(result: dict, engine: str) -> int:
+    """Count recommendations/incomplete checks from engine result.
+
+    Different engines use different terminology:
+    - axe: 'incomplete' (checks that need manual review)
+    - eac: 'recommendation' and 'potentialrecommendation' in summary
+    - hcs: type 3 messages (notices)
+    - sia: 'cantTell' (items requiring manual verification)
+    """
+    if engine == "axe":
+        return len(result.get("incomplete", []))
+    elif engine == "eac":
+        summary = result.get("summary", {})
+        return summary.get("recommendation", 0) + summary.get("potentialrecommendation", 0)
+    elif engine == "hcs":
+        # Type 3 = notice (recommendations)
+        messages = result.get("messages", [])
+        return sum(1 for m in messages if m.get("type") == 3)
+    elif engine == "sia":
+        return len(result.get("cantTell", []))
+    return 0
 
 
 def _calculate_engine_correlation(consolidated: dict, engine_list: list[str]) -> dict:
@@ -3996,9 +4399,17 @@ def _print_recommendations_section(engine_results: dict, engine_list: list[str])
     if not grouped:
         return
 
+    # Only show Engine column when multiple engines are used
+    show_engine_column = len(engine_list) > 1
+
     # Build table
-    headers = ["WCAG SC", "Level", "Engine", "Count", "Description"]
-    alignments = ["left", "left", "left", "right", "left"]
+    if show_engine_column:
+        headers = ["WCAG SC", "Level", "Engine", "Count", "Description"]
+        alignments = ["left", "left", "left", "right", "left"]
+    else:
+        headers = ["WCAG SC", "Level", "Count", "Description"]
+        alignments = ["left", "left", "right", "left"]
+
     rows = []
     row_colors = []
 
@@ -4013,8 +4424,12 @@ def _print_recommendations_section(engine_results: dict, engine_list: list[str])
         # Truncate message
         msg = data["message"][:50] + "…" if len(data["message"]) > 50 else data["message"]
 
-        rows.append([sc or "—", sc_level, engine_abbr, str(data["count"]), msg])
-        row_colors.append([None, None, engine_color, "cyan", None])
+        if show_engine_column:
+            rows.append([sc or "—", sc_level, engine_abbr, str(data["count"]), msg])
+            row_colors.append([None, None, engine_color, "cyan", None])
+        else:
+            rows.append([sc or "—", sc_level, str(data["count"]), msg])
+            row_colors.append([None, None, "cyan", None])
 
     total = sum(d["count"] for d in grouped.values())
     title = f"Recommendations ({total} items)"
@@ -4030,6 +4445,214 @@ def _print_recommendations_section(engine_results: dict, engine_list: list[str])
     for row_data, colors in zip(rows, row_colors):
         table.print_row(row_data, colors)
     table.print_footer()
+
+
+def _extract_engine_rule_details(engine_results: dict, engine_list: list[str]) -> dict:
+    """Extract structured rule-level details from each engine's raw results.
+
+    This is the data-only counterpart of _print_engine_rule_tables().
+    Returns structured dicts instead of printing to the terminal.
+
+    Args:
+        engine_results: Dict mapping engine name to its raw results
+        engine_list: List of engine names in execution order
+
+    Returns:
+        Dict mapping engine name to structured violation/pass/incomplete data
+    """
+    details = {}
+
+    for engine in engine_list:
+        result = engine_results.get(engine, {})
+        if result.get("error"):
+            details[engine] = {"error": result["error"]}
+            continue
+
+        engine_detail: dict = {"violations": [], "passes": [], "incomplete": [], "impact_summary": {}}
+
+        if engine == "axe":
+            violations = result.get("violations", [])
+            impact_order = {"critical": 0, "serious": 1, "moderate": 2, "minor": 3}
+            violations = sorted(violations, key=lambda v: impact_order.get(v.get("impact", "minor"), 4))
+
+            impact_counts = {"critical": 0, "serious": 0, "moderate": 0, "minor": 0}
+            for v in violations:
+                rule_id = v.get("id", "unknown")
+                impact = v.get("impact", "minor")
+                nodes = v.get("nodes", [])
+                count = v.get("nodeCount", len(nodes))
+                impact_counts[impact] = impact_counts.get(impact, 0) + count
+
+                node_details = []
+                for node in nodes[:10]:  # Cap at 10 nodes per rule
+                    node_details.append({
+                        "selector": ", ".join(node.get("target", [])) if isinstance(node.get("target"), list) else str(node.get("target", "")),
+                        "html": node.get("html", ""),
+                        "failure_summary": node.get("failureSummary", ""),
+                    })
+
+                engine_detail["violations"].append({
+                    "rule_id": rule_id,
+                    "impact": impact,
+                    "count": count,
+                    "description": v.get("description", ""),
+                    "help_url": v.get("helpUrl", ""),
+                    "nodes": node_details,
+                })
+
+            engine_detail["impact_summary"] = impact_counts
+
+            # Passes
+            for p in result.get("passes", []):
+                engine_detail["passes"].append({
+                    "rule_id": p.get("id", "unknown"),
+                    "count": p.get("nodeCount", len(p.get("nodes", []))),
+                    "description": p.get("description", ""),
+                })
+
+            # Incomplete
+            for inc in result.get("incomplete", []):
+                engine_detail["incomplete"].append({
+                    "rule_id": inc.get("id", "unknown"),
+                    "count": inc.get("nodeCount", len(inc.get("nodes", []))),
+                    "description": inc.get("description", ""),
+                })
+
+        elif engine == "eac":
+            issues = result.get("issues", [])
+            violations = [i for i in issues if i.get("level") == "violation"]
+
+            # Group by rule
+            rule_groups: dict[str, dict] = {}
+            for issue in violations:
+                rule_id = issue.get("ruleId", "unknown")
+                if rule_id not in rule_groups:
+                    rule_groups[rule_id] = {"count": 0, "message": issue.get("message", ""), "nodes": []}
+                rule_groups[rule_id]["count"] += 1
+                if len(rule_groups[rule_id]["nodes"]) < 10:
+                    # path can be a dict {"dom": "..."} or a plain string
+                    path = issue.get("path", "")
+                    if isinstance(path, dict):
+                        dom_path = path.get("dom", "")
+                    else:
+                        dom_path = str(path) if path else ""
+                    selector = ", ".join(dom_path.split(" > ")[-3:]) if dom_path else ""
+                    rule_groups[rule_id]["nodes"].append({
+                        "selector": selector,
+                        "html": issue.get("snippet", ""),
+                        "failure_summary": issue.get("message", ""),
+                    })
+
+            for rule_id, data in sorted(rule_groups.items()):
+                engine_detail["violations"].append({
+                    "rule_id": rule_id,
+                    "impact": "violation",
+                    "count": data["count"],
+                    "description": data["message"],
+                    "help_url": "",
+                    "nodes": data["nodes"],
+                })
+
+            # Passes and recommendations as passes
+            passes = [i for i in issues if i.get("level") == "pass"]
+            pass_groups: dict[str, int] = {}
+            for p in passes:
+                rid = p.get("ruleId", "unknown")
+                pass_groups[rid] = pass_groups.get(rid, 0) + 1
+            for rid, cnt in sorted(pass_groups.items()):
+                engine_detail["passes"].append({"rule_id": rid, "count": cnt, "description": ""})
+
+        elif engine == "hcs":
+            messages = result.get("messages", [])
+            errors = [m for m in messages if m.get("type") == 1]
+
+            # Group by code
+            code_groups: dict[str, dict] = {}
+            for msg in errors:
+                code = msg.get("code", "unknown")
+                if code not in code_groups:
+                    code_groups[code] = {"count": 0, "message": msg.get("message", ""), "nodes": []}
+                code_groups[code]["count"] += 1
+                if len(code_groups[code]["nodes"]) < 10:
+                    code_groups[code]["nodes"].append({
+                        "selector": msg.get("selector", ""),
+                        "html": msg.get("context", ""),
+                        "failure_summary": msg.get("message", ""),
+                    })
+
+            for code, data in sorted(code_groups.items()):
+                engine_detail["violations"].append({
+                    "rule_id": code,
+                    "impact": "error",
+                    "count": data["count"],
+                    "description": data["message"],
+                    "help_url": "",
+                    "nodes": data["nodes"],
+                })
+
+            # Warnings as incomplete
+            warnings = [m for m in messages if m.get("type") == 2]
+            warn_groups: dict[str, int] = {}
+            for w in warnings:
+                wcode = w.get("code", "unknown")
+                warn_groups[wcode] = warn_groups.get(wcode, 0) + 1
+            for wcode, cnt in sorted(warn_groups.items()):
+                engine_detail["incomplete"].append({"rule_id": wcode, "count": cnt, "description": ""})
+
+        elif engine == "sia":
+            outcomes = result.get("outcomes", [])
+            failed = [o for o in outcomes if o.get("outcome") == "failed"]
+
+            # Group by rule
+            rule_groups_sia: dict[str, dict] = {}
+            for outcome in failed:
+                rule_url = outcome.get("rule", "unknown")
+                rule_id = rule_url.split("/")[-1] if "/" in rule_url else rule_url
+                title_text = outcome.get("title", rule_id)
+                if rule_id not in rule_groups_sia:
+                    rule_groups_sia[rule_id] = {"count": 0, "title": title_text, "nodes": []}
+                rule_groups_sia[rule_id]["count"] += 1
+                if len(rule_groups_sia[rule_id]["nodes"]) < 10:
+                    target = outcome.get("target", "")
+                    rule_groups_sia[rule_id]["nodes"].append({
+                        "selector": target if isinstance(target, str) else str(target),
+                        "html": "",
+                        "failure_summary": outcome.get("message", ""),
+                    })
+
+            for rule_id, data in sorted(rule_groups_sia.items()):
+                engine_detail["violations"].append({
+                    "rule_id": rule_id,
+                    "impact": "serious",
+                    "count": data["count"],
+                    "description": data["title"],
+                    "help_url": f"https://alfa.siteimprove.com/rules/{rule_id}" if rule_id.startswith("sia-") else "",
+                    "nodes": data["nodes"],
+                })
+
+            # Passed outcomes
+            passed = [o for o in outcomes if o.get("outcome") == "passed"]
+            pass_groups_sia: dict[str, int] = {}
+            for o in passed:
+                rule_url = o.get("rule", "unknown")
+                rid = rule_url.split("/")[-1] if "/" in rule_url else rule_url
+                pass_groups_sia[rid] = pass_groups_sia.get(rid, 0) + 1
+            for rid, cnt in sorted(pass_groups_sia.items()):
+                engine_detail["passes"].append({"rule_id": rid, "count": cnt, "description": o.get("title", "")})
+
+            # cantTell as incomplete
+            cant_tell = result.get("cantTell", [])
+            ct_groups: dict[str, int] = {}
+            for ct in cant_tell:
+                rule_url = ct.get("rule", "unknown")
+                rid = rule_url.split("/")[-1] if "/" in rule_url else rule_url
+                ct_groups[rid] = ct_groups.get(rid, 0) + 1
+            for rid, cnt in sorted(ct_groups.items()):
+                engine_detail["incomplete"].append({"rule_id": rid, "count": cnt, "description": ""})
+
+        details[engine] = engine_detail
+
+    return details
 
 
 def _print_engine_rule_tables(engine_results: dict, engine_list: list[str]) -> None:
@@ -4451,7 +5074,19 @@ def _print_engine_rules_table(engine_id: str) -> None:
 
 
 @click.command()
-@click.argument("engines", nargs=-1)
+@click.option(
+    "--engines",
+    "-e",
+    "engines",
+    type=str,
+    default=None,
+    help="Engines to run, comma-separated (default: axe,eac,hcs). Available: axe, eac, hcs, sia"
+)
+@click.option(
+    "--list-engines",
+    is_flag=True,
+    help="List available accessibility engines and exit"
+)
 @click.option(
     "--level",
     type=click.Choice(["2a", "2aa", "2aaa", "21a", "21aa", "22aa"], case_sensitive=False),
@@ -4459,10 +5094,11 @@ def _print_engine_rules_table(engine_id: str) -> None:
     help="WCAG conformance level to test (default: 21aa)"
 )
 @click.option(
-    "--json",
-    "output_json",
-    is_flag=True,
-    help="Output full results as JSON"
+    "--format",
+    "output_format",
+    type=click.Choice(["json", "html"], case_sensitive=False),
+    default=None,
+    help="Output format: json (machine-readable) or html (interactive report)"
 )
 @click.option(
     "--timeout",
@@ -4562,9 +5198,32 @@ def _print_engine_rules_table(engine_id: str) -> None:
     "-o",
     "output_file",
     type=click.Path(),
-    help="Save JSON output to file (requires --json)"
+    help="Save output to file (requires --format)"
 )
-def a11y(engines, level, output_json, timeout, show_passes, include_recommendations, show_badges, interactive, dev_css, all_disagreements, info, verbose, scoped, exclude, rule, disable_rule, enable_rule, persistent, no_compliance_warning, summary_only, output_file):
+@click.option(
+    "--no-open",
+    is_flag=True,
+    help="Don't auto-open the HTML report in the browser"
+)
+@click.option(
+    "--headless",
+    is_flag=True,
+    default=False,
+    help="Run audit in headless Chrome (no browser extension required)"
+)
+@click.option(
+    "--mirror-session",
+    is_flag=True,
+    default=False,
+    help="Mirror cookies/storage from live browser for authenticated pages (implies --headless)"
+)
+@click.option(
+    "--url",
+    "headless_url",
+    default=None,
+    help="URL to audit in headless mode (required with --headless unless --mirror-session)"
+)
+def a11y(engines, list_engines, level, output_format, timeout, show_passes, include_recommendations, show_badges, interactive, dev_css, all_disagreements, info, verbose, scoped, exclude, rule, disable_rule, enable_rule, persistent, no_compliance_warning, summary_only, output_file, no_open, headless, mirror_session, headless_url):
     """
     Run combined accessibility audit with selected engines.
 
@@ -4574,8 +5233,8 @@ def a11y(engines, level, output_json, timeout, show_passes, include_recommendati
 
     ENGINE SELECTION:
 
-    By default (no arguments), runs all available engines: axe, eac, hcs.
-    Specify engines by name to run a subset or control execution order.
+    By default, runs all available engines: axe, eac, hcs.
+    Use --engines/-e with comma-separated names to select specific engines.
 
     Order matters: engines execute in the order specified, which may
     affect results when scripts have side effects (e.g., DOM mutations).
@@ -4589,18 +5248,17 @@ def a11y(engines, level, output_json, timeout, show_passes, include_recommendati
 
     \b
     Examples:
-        inspekt a11y                     # All engines (axe, eac, hcs)
-        inspekt a11y axe                 # Axe-core only
-        inspekt a11y eac                 # Equal Access Checker only
-        inspekt a11y hcs                 # HTML CodeSniffer only
-        inspekt a11y axe eac             # axe and eac only
-        inspekt a11y eac axe             # eac first, then axe
-        inspekt a11y --level 21aa        # WCAG 2.1 AA
-        inspekt a11y --show-passes       # Include passing criteria
-        inspekt a11y --json              # JSON output
-        inspekt a11y --show-badges       # Show badges on page
-        inspekt a11y list                # List available engines
-        inspekt a11y axe --info          # Show engine metadata
+        inspekt a11y                       # All engines (axe, eac, hcs)
+        inspekt a11y -e axe                # Axe-core only
+        inspekt a11y -e eac                # Equal Access Checker only
+        inspekt a11y -e axe,eac            # axe and eac only
+        inspekt a11y -e eac,axe            # eac first, then axe
+        inspekt a11y --level 21aa          # WCAG 2.1 AA
+        inspekt a11y --format json         # JSON output
+        inspekt a11y --format html         # HTML report (opens in browser)
+        inspekt a11y --show-badges         # Show badges on page
+        inspekt a11y --list-engines        # List available engines
+        inspekt a11y -e axe --info         # Show engine metadata
 
     \b
     Available Engines:
@@ -4612,17 +5270,18 @@ def a11y(engines, level, output_json, timeout, show_passes, include_recommendati
     from inspekt.data import load_engine_metadata, get_engine_metadata
     from inspekt.services.engines import get_engine
 
-    # Handle "list" subcommand - show available engines and exit
-    if engines and engines[0].lower() == "list":
+    # Handle --list-engines flag
+    if list_engines:
         _show_engine_list()
         return
 
     # Handle --info flag - show engine metadata and exit
     if info:
-        if not engines or len(engines) != 1:
-            raise click.UsageError("--info requires exactly one engine argument (e.g., 'inspekt a11y axe --info')")
+        engine_list_parsed = _validate_and_normalize_engines(engines) if engines else []
+        if len(engine_list_parsed) != 1:
+            raise click.UsageError("--info requires exactly one engine (e.g., 'inspekt a11y -e axe --info')")
 
-        engine_id = engines[0].lower()
+        engine_id = engine_list_parsed[0]
         _show_engine_info(engine_id)
         return
 
@@ -4651,15 +5310,169 @@ def a11y(engines, level, output_json, timeout, show_passes, include_recommendati
     if enable_rule and rule:
         raise click.UsageError("--enable-rule and --rule are mutually exclusive")
 
-    if output_file and not output_json:
-        raise click.UsageError("--output requires --json")
+    if output_file and not output_format:
+        raise click.UsageError("--output requires --format")
 
     # Persistent mode not yet implemented for multi-engine
     if persistent:
         click.echo(click.style("Note: --persistent is not yet fully implemented for multi-engine mode", fg="yellow"), err=True)
 
+    # ========== HEADLESS MODE ==========
+    if headless or mirror_session:
+        import asyncio
+        from inspekt.services.headless import HeadlessContext
+        from inspekt.services.script_loader import ScriptLoader
+
+        # mirror_session implies headless
+        if mirror_session:
+            headless = True
+
+        # Validate: headless requires --url or --mirror-session
+        if not headless_url and not mirror_session:
+            raise click.UsageError("--headless requires --url or --mirror-session")
+
+        # Some features not available in headless mode
+        if show_badges:
+            click.echo(click.style("Note: --show-badges not available in headless mode (no visual display)", fg="yellow"), err=True)
+        if interactive:
+            click.echo(click.style("Note: --interactive not available in headless mode", fg="yellow"), err=True)
+
+        # Currently only axe is supported in headless mode
+        if engine_list != ["axe"]:
+            raise click.UsageError("Headless mode currently only supports axe engine. Use: inspekt a11y axe --headless")
+
+        async def run_headless_audit():
+            """Run axe-core audit in headless Chrome."""
+            loader = ScriptLoader()
+
+            if not output_format:
+                if mirror_session:
+                    click.echo(click.style("  Headless mode with session mirroring", fg="blue"), err=True)
+                else:
+                    click.echo(click.style("  Headless mode", fg="blue"), err=True)
+
+            try:
+                async with HeadlessContext(
+                    url=headless_url,
+                    mirror_session=mirror_session,
+                    timeout=timeout,
+                ) as ctx:
+                    url = ctx.url
+                    if not output_format:
+                        click.echo(f"URL: {url}", err=True)
+                        click.echo(err=True)
+
+                    # Inject axe-core
+                    axe_script = loader.load_script_sync("run_axe.js")
+
+                    # Build options for axe
+                    axe_options = {
+                        "level": level,
+                        "showBadges": False,  # No badges in headless
+                        "interactive": False,
+                        "includePass": show_passes,
+                        "includeRecommendations": include_recommendations,
+                    }
+
+                    if scoped:
+                        axe_options["scoped"] = scoped
+                    if exclude:
+                        axe_options["exclude"] = list(exclude)
+                    if rule:
+                        axe_options["rule"] = rule
+                    if disable_rule:
+                        axe_options["disableRules"] = list(disable_rule)
+                    if enable_rule:
+                        axe_options["enableRules"] = list(enable_rule)
+
+                    # Replace placeholder and execute
+                    import json as json_module
+                    code = axe_script.replace("OPTIONS_PLACEHOLDER", json_module.dumps(axe_options))
+
+                    if not output_format:
+                        click.echo("Running axe-core audit...", err=True)
+
+                    result = await ctx.execute_script(code)
+
+                    return {"ok": True, "result": result, "url": url}
+
+            except Exception as e:
+                return {"ok": False, "error": str(e)}
+
+        # Run async audit
+        audit_result = asyncio.run(run_headless_audit())
+
+        if not audit_result.get("ok"):
+            if output_format == "json":
+                click.echo(json.dumps({"ok": False, "error": audit_result.get("error")}))
+            else:
+                click.echo(f"Error: {audit_result.get('error')}", err=True)
+            sys.exit(1)
+
+        result = audit_result.get("result", {})
+        url = audit_result.get("url", "unknown")
+
+        # Process axe results
+        if not result.get("ok"):
+            if output_format == "json":
+                click.echo(json.dumps({"ok": False, "error": result.get("error", "Unknown error")}))
+            else:
+                click.echo(f"Error: {result.get('error', 'Unknown error')}", err=True)
+            sys.exit(1)
+
+        violations = result.get("violations", [])
+        passes = result.get("passes", [])
+        incomplete = result.get("incomplete", [])
+
+        # Output results
+        if output_format == "json":
+            output_data = {
+                "ok": True,
+                "url": url,
+                "engine": "axe",
+                "level": level,
+                "violations": violations,
+                "passes": passes if show_passes else [],
+                "incomplete": incomplete,
+                "summary": {
+                    "violations": len(violations),
+                    "passes": len(passes),
+                    "incomplete": len(incomplete),
+                }
+            }
+            json_str = json.dumps(output_data, indent=2)
+            if output_file:
+                Path(output_file).write_text(json_str)
+                click.echo(f"Results saved to {output_file}", err=True)
+            else:
+                click.echo(json_str)
+        else:
+            # Print summary
+            click.echo(err=True)
+            click.echo(click.style("Summary", bold=True), err=True)
+            click.echo(f"  Violations: {len(violations)}", err=True)
+            click.echo(f"  Passes: {len(passes)}", err=True)
+            click.echo(f"  Incomplete: {len(incomplete)}", err=True)
+            click.echo(err=True)
+
+            if violations:
+                click.echo(click.style("Violations:", bold=True, fg="red"), err=True)
+                for v in violations:
+                    impact = v.get("impact", "unknown")
+                    impact_color = {"critical": "red", "serious": "yellow", "moderate": "cyan", "minor": "white"}.get(impact, "white")
+                    from inspekt.app.cli.sitemap import wrap_styled_line
+                    for line in wrap_styled_line(
+                        prefix=f"  [{click.style(impact, fg=impact_color)}] {v.get('id')}: ",
+                        text=v.get('description', ''),
+                    ):
+                        click.echo(line, err=True)
+                    click.echo(f"    Affected: {len(v.get('nodes', []))} element(s)", err=True)
+                click.echo(err=True)
+
+        return  # Exit early - headless mode complete
+
     client = BridgeClient()
-    client.quiet = output_json  # Suppress warnings in JSON mode
+    client.quiet = bool(output_format)  # Suppress warnings in format mode
 
     # Get URL first
     url_result = client.execute("window.location.href", timeout=5.0)
@@ -4671,9 +5484,9 @@ def a11y(engines, level, output_json, timeout, show_passes, include_recommendati
     # Note: Badge injection happens at the end of the normal audit flow
     # This ensures consistent CLI output whether or not badges are requested
 
-    # Show progress header (unless JSON output)
+    # Show progress header (unless format output)
     is_single_engine = len(engine_list) == 1
-    if not output_json:
+    if not output_format:
         click.echo(click.style("Running Accessibility Audit", bold=True), err=True)
         click.echo(f"URL: {url}", err=True)
         click.echo(err=True)
@@ -4691,10 +5504,10 @@ def a11y(engines, level, output_json, timeout, show_passes, include_recommendati
 
     # Run engines in order
     total_start = time.time()
-    engine_results = _run_engines_in_order(client, engine_list, level, timeout, versions, quiet=output_json, include_recommendations=include_recommendations)
+    engine_results = _run_engines_in_order(client, engine_list, level, timeout, versions, quiet=bool(output_format), include_recommendations=include_recommendations)
     total_elapsed = time.time() - total_start
 
-    if not output_json:
+    if not output_format:
         click.echo(err=True)
         # Only show total time for multiple engines
         if not is_single_engine:
@@ -4712,8 +5525,8 @@ def a11y(engines, level, output_json, timeout, show_passes, include_recommendati
             print_wrapped(warning_text, err=True)
             click.echo(err=True)
 
-    # Show per-engine rule tables in verbose mode (skip in JSON mode)
-    if verbose and not output_json:
+    # Show per-engine rule tables in verbose mode (skip in format mode)
+    if verbose and not output_format:
         _print_engine_rule_tables(engine_results, engine_list)
         click.echo()
 
@@ -4741,59 +5554,51 @@ def a11y(engines, level, output_json, timeout, show_passes, include_recommendati
                 count += sc_count
         return count
 
-    if output_json:
-        from datetime import datetime
+    if output_format in ("json", "html"):
         from pathlib import Path
-        output = {
-            "url": url,
-            "timestamp": datetime.utcnow().isoformat() + "Z",
-            "level": level,
-            "engines": {
-                engine: {
-                    "name": AVAILABLE_ENGINES[engine]["name"],
-                    "version": versions.get(engine, "unknown"),
-                    "violations": count_filtered_violations(engine),
-                    "error": engine_results.get(engine, {}).get("error"),
-                }
-                for engine in engine_list
-            },
-            "execution_order": engine_list,
-            "consolidated": consolidated,
-        }
+        enriched = _build_enriched_report_data(
+            url=url,
+            level=level,
+            engine_list=engine_list,
+            engine_results=engine_results,
+            consolidated=consolidated,
+            versions=versions,
+            include_recommendations=include_recommendations,
+        )
 
-        # Add recommendations to JSON output when requested
-        if include_recommendations:
-            recommendations = _collect_recommendations(engine_results, engine_list)
-            # Group by SC for structured output
-            recommendations_by_sc: dict[str, list] = {}
-            for rec in recommendations:
-                sc = rec["sc"] or "unknown"
-                if sc not in recommendations_by_sc:
-                    recommendations_by_sc[sc] = []
-                recommendations_by_sc[sc].append({
-                    "engine": rec["engine"],
-                    "rule_id": rec["rule_id"],
-                    "level": rec["level"],
-                    "message": rec["message"],
-                })
-            output["recommendations"] = {
-                "total": len(recommendations),
-                "by_sc": recommendations_by_sc,
-            }
+        if output_format == "json":
+            json_str = json.dumps(enriched, indent=2)
+            if output_file:
+                output_path = Path(output_file)
+                output_path.parent.mkdir(parents=True, exist_ok=True)
+                with open(output_path, 'w', encoding='utf-8') as f:
+                    f.write(json_str)
+                click.echo(success(f"Report saved to: {output_path}"), err=True)
+            else:
+                click.echo(json_str)
+            return
 
-        json_str = json.dumps(output, indent=2)
+        if output_format == "html":
+            from inspekt.services.a11y_report import generate_a11y_report_html
+            html_content = generate_a11y_report_html(enriched)
 
-        if output_file:
-            # Write to file
-            output_path = Path(output_file)
-            output_path.parent.mkdir(parents=True, exist_ok=True)
-            with open(output_path, 'w', encoding='utf-8') as f:
-                f.write(json_str)
-            click.echo(success(f"Report saved to: {output_path}"), err=True)
-        else:
-            # Output to stdout
-            click.echo(json_str)
-        return
+            if output_file:
+                path = Path(output_file)
+            else:
+                from urllib.parse import urlparse
+                from datetime import datetime
+                domain = urlparse(url).netloc.replace(".", "_")
+                timestamp_str = datetime.now().strftime("%Y%m%d_%H%M%S")
+                path = Path.cwd() / f"inspekt_a11y_{domain}_{timestamp_str}.html"
+
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(html_content, encoding="utf-8")
+            click.echo(success(f"Report saved to: {path}"), err=True)
+
+            if not no_open:
+                import webbrowser
+                webbrowser.open(f"file://{path.resolve()}")
+            return
 
     # Filter results - show SCs where any engine found issues
     if not show_passes:
@@ -4807,7 +5612,7 @@ def a11y(engines, level, output_json, timeout, show_passes, include_recommendati
         click.echo(click.style(success(f"No accessibility issues found by {engine_word}!"), fg="green", bold=True))
         click.echo(f"Tested: {url}")
         # Show contextual tips even when no issues found
-        if not output_json:
+        if not output_format:
             click.echo()
             tips = _get_contextual_tips(
                 engine_list=engine_list,
@@ -5022,7 +5827,7 @@ def a11y(engines, level, output_json, timeout, show_passes, include_recommendati
         _print_recommendations_section(engine_results, engine_list)
 
     # Show contextual tips section
-    if not output_json:
+    if not output_format:
         click.echo()
         tips = _get_contextual_tips(
             engine_list=engine_list,
@@ -5039,3 +5844,54 @@ def a11y(engines, level, output_json, timeout, show_passes, include_recommendati
     # Inject badges after showing all CLI output (if requested)
     if show_badges and issues_count > 0:
         _inject_badges_into_page(client, engine_list, level, timeout, interactive, dev_css, include_recommendations)
+
+
+@click.command(name="a11y-reset")
+def a11y_reset():
+    """
+    Reset accessibility audit state and remove all badges/popovers.
+
+    This removes all Inspekt accessibility UI elements from the page
+    (badges, popovers, styles) and clears engine tracking state so
+    a fresh audit can be run.
+
+    Useful when:
+    - You want to re-run audits with a clean slate
+    - Badges are cluttering the page
+    - You want to clear persistent mode state
+
+    \b
+    Example:
+        inspekt a11y-reset
+    """
+    from inspekt.config import get_bridge_port
+    from inspekt.services.bridge_executor import BridgeExecutor
+
+    executor = BridgeExecutor(port=get_bridge_port())
+
+    if not executor.is_server_running():
+        click.secho("Error: Bridge server is not running.", fg="red", err=True)
+        click.echo("Start it with: inspekt start", err=True)
+        sys.exit(1)
+
+    if not executor.has_active_browser_connection():
+        click.secho("Error: No browser connected.", fg="red", err=True)
+        sys.exit(1)
+
+    # Execute the reset function from engine-tracker.js
+    result = executor.execute(
+        "window.__inspektResetAll__ ? window.__inspektResetAll__() : { ok: false, error: 'Tracker not loaded' }",
+        timeout=5.0,
+        skip_domain_check=True
+    )
+
+    if not result.get("ok"):
+        click.secho(f"Error: {result.get('error', 'Unknown error')}", fg="red", err=True)
+        sys.exit(1)
+
+    data = result.get("result", {})
+    if data.get("ok"):
+        click.secho(success("All accessibility badges and state cleared"), fg="green")
+    else:
+        error_msg = data.get("error", "Tracker not initialized - no state to clear")
+        click.secho(f"Note: {error_msg}", fg="yellow")

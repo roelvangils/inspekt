@@ -86,23 +86,11 @@ class SitemapStatusResponse(BaseModel):
 def _find_node_by_path(
     root: sitemap_service.TreeNode, path: str
 ) -> tuple[sitemap_service.TreeNode | None, sitemap_service.TreeNode | None]:
-    """Find a node and its parent by URL path. Returns (node, parent)."""
-    # Normalize: strip trailing slash, treat empty as root
-    path = path.rstrip("/") or "/"
+    """Find a node and its parent by URL path. Returns (node, parent).
 
-    if path == "/":
-        return root, None
-
-    segments = [s for s in path.strip("/").split("/") if s]
-    parent = None
-    current = root
-    for seg in segments:
-        if seg in current.children:
-            parent = current
-            current = current.children[seg]
-        else:
-            return None, None
-    return current, parent
+    Delegates to sitemap_service.find_node_by_path.
+    """
+    return sitemap_service.find_node_by_path(root, path)
 
 
 def _node_to_info(

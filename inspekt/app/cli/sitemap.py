@@ -153,52 +153,117 @@ def _build_entry_meta(entry) -> str:
     return f" {' '.join(meta_parts)}" if meta_parts else ""
 
 
+def wrap_styled_line(
+    prefix: str,
+    text: str,
+    suffix: str = "",
+    *,
+    cont_prefix: str = "",
+    text_style: dict | None = None,
+    max_width: int = 0,
+) -> list[str]:
+    """
+    Wrap a styled line so continuation lines align with the text start.
+
+    Use this whenever you display indented text (tree labels, breadcrumbs,
+    list items) that might exceed the terminal width. The prefix and suffix
+    are never split; only the text body is wrapped at word boundaries.
+
+    Args:
+        prefix:      Styled line start (connector, marker, indent). Never wrapped.
+        text:        Styled text body. May be wrapped at word boundaries.
+        suffix:      Styled tag appended after text (e.g., "← you are here",
+                     "(3d ago)"). Kept as an atomic unit — bumped to its own
+                     line if it doesn't fit.
+        cont_prefix: Styled prefix for continuation lines. Should preserve
+                     the visual structure (pipes, indentation) so the wrapped
+                     text appears to "hang" under the first line. Defaults to
+                     spaces matching the prefix width.
+        text_style:  Style kwargs applied to wrapped text fragments on
+                     continuation lines (e.g., {"fg": "white"}). If None,
+                     continuation text is unstyled.
+        max_width:   Maximum visible columns. 0 = auto-detect from terminal.
+
+    Returns:
+        List of fully formatted lines ready for click.echo().
+
+    Example::
+
+        # Tree node:  "  ├── [5] Very Long Page Title That Wraps  (3d ago)"
+        #             "  │       continuation of the title"
+        wrap_styled_line(
+            prefix=f"{indent}{connector}{idx_str} ",
+            text=click.style(title, fg="white"),
+            suffix=meta_str,
+            cont_prefix=f"{child_prefix}{' ' * (idx_width + 1)}",
+            text_style={"fg": "white"},
+        )
+
+        # Breadcrumb:  "       ╰── Articles  ← you are here"
+        wrap_styled_line(
+            prefix=f"{indent}{connector}",
+            text=click.style(name, fg="white", bold=True),
+            suffix=click.style("  ← you are here", fg="green"),
+            cont_prefix=f"{indent}    ",
+            text_style={"fg": "white", "bold": True},
+        )
+    """
+    if max_width <= 0:
+        max_width = shutil.get_terminal_size().columns - 2
+
+    if not cont_prefix:
+        cont_prefix = " " * len(click.unstyle(prefix))
+
+    prefix_w = len(click.unstyle(prefix))
+    text_plain = click.unstyle(text)
+    suffix_w = len(click.unstyle(suffix)) if suffix else 0
+    cont_w = len(click.unstyle(cont_prefix))
+
+    # Everything fits on one line
+    if prefix_w + len(text_plain) + suffix_w <= max_width:
+        return [f"{prefix}{text}{suffix}"]
+
+    # Text alone fits — put suffix on next line
+    if suffix and prefix_w + len(text_plain) <= max_width:
+        return [
+            f"{prefix}{text}",
+            f"{cont_prefix}{suffix.lstrip()}",
+        ]
+
+    # Text needs wrapping — break at word boundaries
+    avail = max_width - prefix_w
+    text_lines = _wrap_text(text_plain, avail, max_width - cont_w)
+
+    def _style_fragment(t: str) -> str:
+        return click.style(t, **text_style) if text_style else t
+
+    result = [f"{prefix}{_style_fragment(text_lines[0])}"]
+    for extra in text_lines[1:]:
+        result.append(f"{cont_prefix}{_style_fragment(extra)}")
+
+    # Append suffix to the last line if it fits, otherwise on its own line
+    if suffix:
+        last_plain_len = len(click.unstyle(result[-1]))
+        if last_plain_len + suffix_w <= max_width:
+            result[-1] += suffix
+        else:
+            result.append(f"{cont_prefix}{suffix.lstrip()}")
+
+    return result
+
+
 def _wrap_tree_label(
     head: str, title: str, meta: str, max_width: int, cont_prefix: str
 ) -> list[str]:
-    """
-    Wrap a tree label, keeping the meta (date/priority) as an atomic unit.
-
-    Args:
-        head: Styled prefix+connector+index+space (never wrapped)
-        title: Styled title text (may be wrapped at word boundaries)
-        meta: Styled metadata like "(3d ago)" (never split — moves to next line if needed)
-        max_width: Maximum visible line width
-        cont_prefix: Pipe-preserving prefix for continuation lines (e.g., "│       ")
-
-    Returns:
-        List of formatted lines
-    """
-    head_w = len(click.unstyle(head))
-    title_plain = click.unstyle(title)
-    meta_w = len(click.unstyle(meta)) if meta else 0
-
-    # Everything fits on one line
-    if head_w + len(title_plain) + meta_w <= max_width:
-        return [f"{head}{title}{meta}"]
-
-    # Title alone fits — put meta on next line
-    if head_w + len(title_plain) <= max_width:
-        return [
-            f"{head}{title}",
-            f"{cont_prefix}{meta.lstrip()}",
-        ]
-
-    # Title needs wrapping — break at word boundaries
-    avail = max_width - head_w
-    title_lines = _wrap_text(title_plain, avail, max_width - len(cont_prefix))
-    result = [f"{head}{click.style(title_lines[0], fg='white')}"]
-    for extra in title_lines[1:]:
-        result.append(f"{cont_prefix}{click.style(extra, fg='white')}")
-
-    # Append meta to the last line if it fits, otherwise on its own line
-    last_plain_len = len(click.unstyle(result[-1]))
-    if meta and last_plain_len + meta_w <= max_width:
-        result[-1] += meta
-    elif meta:
-        result.append(f"{cont_prefix}{meta.lstrip()}")
-
-    return result
+    """Wrap a tree label. Delegates to wrap_styled_line."""
+    return wrap_styled_line(
+        prefix=head,
+        text=title,
+        suffix=meta,
+        cont_prefix=cont_prefix,
+        text_style={"fg": "white"},
+        max_width=max_width,
+    )
 
 
 def _wrap_text(text: str, first_width: int, next_width: int) -> list[str]:
@@ -752,6 +817,9 @@ def _navigate_to(url: str):
 # Named targets for --open
 _NAMED_TARGETS = {"parent", "up", "next", "prev", "first-child"}
 
+# Valid modes for --where
+_WHERE_MODES = ("compact", "nearby", "full")
+
 
 def _get_current_path() -> str:
     """Get the path portion of the current browser URL."""
@@ -855,7 +923,7 @@ def _get_origin(override_url: str | None) -> str:
 @click.option("--lang", type=str, help="Filter by language path prefix (e.g., nl, en, fr)")
 @click.option("--open", "open_target", type=str, help="Navigate by index (5) or target (parent, up, next, prev, first-child)")
 @click.option("--interactive", "-i", is_flag=True, help="Interactive fuzzy search picker")
-@click.option("--where", is_flag=True, help="Show breadcrumb from root to current page")
+@click.option("--where", is_flag=False, flag_value="compact", default=None, help="Breadcrumb: compact (default), nearby (windowed), or full (all siblings)")
 @click.option("--neighbors", is_flag=True, help="Show parent, siblings, and children of current page")
 @click.option("--from-here", "from_here", is_flag=True, help="Show subtree from current browser page")
 @click.option("--stats", is_flag=True, help="Show sitemap statistics")
@@ -883,6 +951,8 @@ def sitemap(url, flat, filter_path, lang, open_target, interactive, where, neigh
         inspekt sitemap --open prev              # Navigate to previous sibling
         inspekt sitemap --open first-child       # Navigate to first child page
         inspekt sitemap --where                  # Breadcrumb to current page
+        inspekt sitemap --where=nearby           # With surrounding pages at each level
+        inspekt sitemap --where=full             # All siblings at every level
         inspekt sitemap --neighbors              # Parent, siblings, and children
         inspekt sitemap --from-here              # Subtree from current page
         inspekt sitemap --from-here -i           # Fuzzy search within subtree
@@ -990,7 +1060,7 @@ def sitemap(url, flat, filter_path, lang, open_target, interactive, where, neigh
     # Fetch page titles (skip entries that already have titles or were already checked)
     if not no_titles and result.entries:
         already_titled = sum(1 for e in result.entries if e.title)
-        already_checked = sum(1 for e in result.entries if not e.title and e.http_status > 0)
+        already_checked = sum(1 for e in result.entries if not e.title and e.http_status != 0)
         needs_title = sum(1 for e in result.entries if not e.title and e.http_status == 0)
 
         if needs_title > 0:
@@ -1039,7 +1109,11 @@ def sitemap(url, flat, filter_path, lang, open_target, interactive, where, neigh
         if icon:
             icon += " "
         via = f"cache ({result.discovered_via})" if from_cache else result.discovered_via
-        click.echo(f"  {icon}{click.style('Sitemap Index', fg='cyan', bold=True)}  {click.style(result.source_url, fg='bright_black')}")
+        for line in wrap_styled_line(
+            prefix=f"  {icon}{click.style('Sitemap Index', fg='cyan', bold=True)}  ",
+            text=click.style(result.source_url, fg='bright_black'),
+        ):
+            click.echo(line)
         click.echo(f"  {click.style(f'Discovered via {via}', fg='bright_black')}")
         click.echo()
 
@@ -1078,7 +1152,10 @@ def sitemap(url, flat, filter_path, lang, open_target, interactive, where, neigh
 
     # --where: breadcrumb from root to current page
     if where:
-        _display_where(result, origin)
+        if where not in _WHERE_MODES:
+            print_error(f"Unknown --where mode `{where}`. Use one of: {', '.join(_WHERE_MODES)}")
+            sys.exit(1)
+        _display_where(result, origin, mode=where)
         return
 
     # --neighbors: parent, siblings, children of current page
@@ -1159,17 +1236,36 @@ def _node_display_name(node) -> str:
     return node.name
 
 
-def _display_where(result, origin: str):
-    """Show a vertical breadcrumb from root to current page (--where)."""
+def _display_where(result, origin: str, mode: str = "compact"):
+    """Show breadcrumb from root to current page, with optional sibling context.
+
+    Modes:
+        compact: Single breadcrumb path + children of current node (default)
+        nearby:  Windowed siblings (~2 before/after) at each level along the path
+        full:    All siblings at every level (guarded for large sitemaps)
+    """
     from inspekt.services.sitemap_service import find_ancestors
 
-    # _resolve_current_node handles the not-found error for us
     tree, node, parent, current_path = _resolve_current_node(result, origin)
     ancestors = find_ancestors(tree, current_path)
+    max_width = shutil.get_terminal_size().columns - 2
 
+    if mode == "compact":
+        _display_where_compact(ancestors, max_width)
+    elif mode == "full":
+        if len(result.entries) > 500:
+            print_error(f"Sitemap has {len(result.entries)} entries — `--where=full` would be too large")
+            print_hint("Use `--where=nearby` for a windowed view of siblings at each level")
+            return
+        _render_where_levels(ancestors, max_width, windowed=False)
+    else:  # nearby
+        _render_where_levels(ancestors, max_width, windowed=True)
+
+
+def _display_where_compact(ancestors, max_width: int):
+    """Compact breadcrumb: single path from root to current node + children."""
     click.echo()
 
-    # The last ancestor is the current node
     current_node = ancestors[-1]
     max_children_shown = 8
 
@@ -1178,79 +1274,310 @@ def _display_where(result, origin: str):
         is_current = ancestor is current_node
 
         if depth == 0:
-            # Root node — show hostname
-            name = click.style(ancestor.name, fg="cyan", bold=True)
-        elif is_current:
-            name = click.style(_node_display_name(ancestor), fg="white", bold=True)
-        else:
-            name = click.style(_node_display_name(ancestor, dim_slug=True), fg="blue")
-
-        # Draw connector
-        if depth == 0:
-            click.echo(f"{indent}{name}")
+            click.echo(f"{indent}{click.style(ancestor.name, fg='cyan', bold=True)}")
         else:
             connector = click.style(f"{ELBOW}{DASH}{DASH} ", fg="bright_black")
-            marker = click.style("  \u2190 you are here", fg="green") if is_current else ""
-            click.echo(f"{indent}{connector}{name}{marker}")
+            cont = indent + "    "
+            if is_current:
+                style = {"fg": "white", "bold": True}
+                suffix = click.style("  \u2190 you are here", fg="green")
+            else:
+                style = {"fg": "blue", "bold": True}
+                suffix = ""
+            for line in wrap_styled_line(
+                prefix=f"{indent}{connector}",
+                text=click.style(_node_display_name(ancestor), **style),
+                suffix=suffix,
+                cont_prefix=cont,
+                text_style=style,
+                max_width=max_width,
+            ):
+                click.echo(line)
 
-    # Show children of the current node
-    if current_node.children:
-        child_indent = "  " + "     " * len(ancestors)
-        connector_style = lambda c: click.style(c, fg="bright_black")
-        child_nodes = sorted(current_node.children.values(), key=lambda n: n.name.lower())
-        shown = child_nodes[:max_children_shown]
-        remaining = len(child_nodes) - len(shown)
-
-        for i, child in enumerate(shown):
-            is_last = (i == len(shown) - 1) and remaining == 0
-            conn = connector_style(f"{ELBOW}{DASH}{DASH} " if is_last else f"{TEE}{DASH}{DASH} ")
-            name = click.style(_node_display_name(child, dim_slug=True), fg="bright_black")
-            click.echo(f"{child_indent}{conn}{name}")
-
-        if remaining > 0:
-            conn = connector_style(f"{ELBOW}{DASH}{DASH} ")
-            more = click.style(f"({remaining} more)", fg="bright_black")
-            click.echo(f"{child_indent}{conn}{more}")
+    # Children of current node
+    _render_where_children(current_node, len(ancestors), max_width, max_children_shown)
 
     click.echo()
+    print_hint("Use `--where=nearby` to see surrounding pages at each level")
     print_hint("Use `--open parent` to navigate up, or `--open first-child` to go deeper")
+
+
+def _compute_window(total: int, followed_idx: int, radius: int = 2):
+    """Compute an anchored sibling window around the followed node.
+
+    Always includes the first and last sibling for context, plus a window
+    of `radius` items before/after the followed node. Gaps between anchors
+    and the window are collapsed into "(N more)" markers — but never
+    "(1 more)" (just show the item instead).
+
+    Returns a list of render instructions:
+        ("node", index)  — render the sibling at this index
+        ("more", count)  — render a "(N more)" marker
+    """
+    if total == 0:
+        return []
+
+    # Core window around the followed node
+    win_start = max(0, followed_idx - radius)
+    win_end = min(total, followed_idx + radius + 1)
+
+    # Build the set of indices to show: anchors + window
+    show = set(range(win_start, win_end))
+    show.add(0)          # first anchor
+    show.add(total - 1)  # last anchor
+
+    # Walk through all indices and build render instructions
+    items = []
+    i = 0
+    while i < total:
+        if i in show:
+            items.append(("node", i))
+            i += 1
+        else:
+            # Count consecutive hidden items
+            gap_start = i
+            while i < total and i not in show:
+                i += 1
+            gap = i - gap_start
+            # "Never show (1 more)" — just show the item
+            if gap == 1:
+                items.append(("node", gap_start))
+            else:
+                items.append(("more", gap))
+
+    return items
+
+
+def _render_where_levels(ancestors, max_width: int, windowed: bool):
+    """Render a proper nested tree showing windowed siblings at each level.
+
+    At each branching point, the followed ancestor's children are rendered
+    inline (nested under it with pipe characters), not after all siblings.
+    This produces a real tree structure like _render_tree does.
+    """
+    click.echo()
+
+    # Root
+    root = ancestors[0]
+    if len(ancestors) == 1:
+        # Current page is root — show with marker and children
+        suffix = click.style("  \u2190 you are here", fg="green")
+        click.echo(f"{click.style(root.name, fg='cyan', bold=True)}{suffix}")
+        _render_where_children_inline(root, "", max_width)
+    else:
+        click.echo(f"{click.style(root.name, fg='cyan', bold=True)}")
+        _render_where_branch(ancestors, depth=1, prefix="", max_width=max_width, windowed=windowed)
+
+    click.echo()
+    if windowed:
+        print_hint("Use `--where=full` to show all siblings at every level")
+    else:
+        print_hint("Use `--where=nearby` for a more compact view")
+    print_hint("Use `--open parent` to navigate up, or `--open first-child` to go deeper")
+
+
+def _render_where_branch(ancestors, depth: int, prefix: str, max_width: int, windowed: bool):
+    """Recursively render one level of the --where tree.
+
+    Shows a windowed set of siblings at this level. For the followed sibling,
+    recurses to render the next level nested underneath with pipe continuation.
+    """
+    ancestor = ancestors[depth]
+    is_final = depth == len(ancestors) - 1
+    parent_node = ancestors[depth - 1]
+
+    siblings = sorted(parent_node.children.values(), key=lambda n: n.name.lower())
+    followed_idx = next((i for i, s in enumerate(siblings) if s is ancestor), 0)
+
+    if windowed:
+        items = _compute_window(len(siblings), followed_idx)
+    else:
+        items = [("node", i) for i in range(len(siblings))]
+
+    styled_pipe = click.style(PIPE, fg="bright_black")
+
+    for item_idx, (kind, value) in enumerate(items):
+        is_last_line = item_idx == len(items) - 1
+        conn = click.style(f"{ELBOW}{DASH}{DASH} " if is_last_line else f"{TEE}{DASH}{DASH} ", fg="bright_black")
+        child_prefix = prefix + ("    " if is_last_line else f"{styled_pipe}   ")
+        cont = child_prefix
+
+        if kind == "more":
+            more = click.style(f"({value} more)", fg="bright_black", italic=True)
+            click.echo(f"{prefix}{conn}{more}")
+        else:
+            sibling = siblings[value]
+            is_followed = sibling is ancestor
+            name = _node_display_name(sibling)
+
+            if is_followed:
+                if is_final:
+                    style = {"fg": "white", "bold": True}
+                    suffix = click.style("  \u2190 you are here", fg="green")
+                else:
+                    style = {"fg": "blue", "bold": True}
+                    suffix = ""
+                for line in wrap_styled_line(
+                    prefix=f"{prefix}{conn}",
+                    text=click.style(name, **style),
+                    suffix=suffix,
+                    cont_prefix=cont,
+                    text_style=style,
+                    max_width=max_width,
+                ):
+                    click.echo(line)
+
+                # Recurse: render children of the followed node inline
+                if not is_final:
+                    _render_where_branch(ancestors, depth + 1, child_prefix, max_width, windowed)
+                else:
+                    _render_where_children_inline(ancestor, child_prefix, max_width)
+            else:
+                # Surrounding siblings: mid-gray (242 in 256-color grayscale)
+                for line in wrap_styled_line(
+                    prefix=f"{prefix}{conn}",
+                    text=click.style(name, fg=242),
+                    cont_prefix=cont,
+                    text_style={"fg": 242},
+                    max_width=max_width,
+                ):
+                    click.echo(line)
+
+                # Show "(N subpages)" hint if this sibling has children
+                if sibling.children:
+                    _render_subpage_hint(sibling, child_prefix)
+
+
+def _render_subpage_hint(node, prefix: str):
+    """Show a '(N subpages)' hint under a node. Caller must check node.children first."""
+    count = len(node.children)
+    label = "subpage" if count == 1 else "subpages"
+    conn = click.style(f"{ELBOW}{DASH}{DASH} ", fg="bright_black")
+    hint = click.style(f"({count} {label})", fg="bright_black", italic=True)
+    click.echo(f"{prefix}{conn}{hint}")
+
+
+def _render_where_children_inline(node, prefix: str, max_width: int):
+    """Render children of the current node with first/last anchoring.
+
+    Shows the first item, a "(N more)" gap, and the last item.
+    For 3 or fewer children, all are shown. Rendered in mid-gray (242).
+    """
+    if not node.children:
+        return
+
+    child_nodes = sorted(node.children.values(), key=lambda n: n.name.lower())
+    total = len(child_nodes)
+
+    # Show first item, "(N more)" gap, and last item.
+    # For small lists (≤3), show all items directly.
+    if total <= 3:
+        items = [("node", i) for i in range(total)]
+    else:
+        items = [("node", 0), ("more", total - 2), ("node", total - 1)]
+
+    styled_pipe = click.style(PIPE, fg="bright_black")
+
+    for item_idx, (kind, value) in enumerate(items):
+        is_last_line = item_idx == len(items) - 1
+        conn = click.style(f"{ELBOW}{DASH}{DASH} " if is_last_line else f"{TEE}{DASH}{DASH} ", fg="bright_black")
+        child_prefix = prefix + ("    " if is_last_line else f"{styled_pipe}   ")
+
+        if kind == "more":
+            more = click.style(f"({value} more)", fg="bright_black", italic=True)
+            click.echo(f"{prefix}{conn}{more}")
+        else:
+            child = child_nodes[value]
+            for line in wrap_styled_line(
+                prefix=f"{prefix}{conn}",
+                text=click.style(_node_display_name(child), fg=242),
+                cont_prefix=child_prefix,
+                text_style={"fg": 242},
+                max_width=max_width,
+            ):
+                click.echo(line)
+
+            if child.children:
+                _render_subpage_hint(child, child_prefix)
+
+
+def _render_where_children(node, depth: int, max_width: int, max_shown: int = 8):
+    """Render children of a node at the given depth (shared by all --where modes)."""
+    if not node.children:
+        return
+
+    child_indent = "  " + "     " * depth
+    cont = child_indent + "    "
+    child_nodes = sorted(node.children.values(), key=lambda n: n.name.lower())
+    shown = child_nodes[:max_shown]
+    remaining = len(child_nodes) - len(shown)
+
+    for i, child in enumerate(shown):
+        is_last = (i == len(shown) - 1) and remaining == 0
+        conn = click.style(f"{ELBOW}{DASH}{DASH} " if is_last else f"{TEE}{DASH}{DASH} ", fg="bright_black")
+        for line in wrap_styled_line(
+            prefix=f"{child_indent}{conn}",
+            text=click.style(_node_display_name(child), fg="bright_black"),
+            cont_prefix=cont,
+            text_style={"fg": "bright_black"},
+            max_width=max_width,
+        ):
+            click.echo(line)
+
+    if remaining > 0:
+        conn = click.style(f"{ELBOW}{DASH}{DASH} ", fg="bright_black")
+        more = click.style(f"({remaining} more)", fg="bright_black")
+        click.echo(f"{child_indent}{conn}{more}")
 
 
 def _display_neighbors(result, origin: str):
     """Show parent, siblings, and children of the current page (--neighbors)."""
     tree, node, parent, current_path = _resolve_current_node(result, origin)
+    max_width = shutil.get_terminal_size().columns - 2
 
     click.echo()
 
     # Parent section
     if parent:
         arrow = click.style("\u2191", fg="blue")
-        parent_name = _node_display_name(parent, dim_slug=True)
         if parent.full_path == "/":
-            parent_name = click.style(parent.name, fg="cyan")
-        click.echo(f"  {arrow} Parent: {parent_name}")
+            pstyle = {"fg": "cyan"}
+        else:
+            pstyle = {"fg": "white"}
+        for line in wrap_styled_line(
+            prefix=f"  {arrow} Parent: ",
+            text=click.style(_node_display_name(parent), **pstyle),
+            cont_prefix="             ",
+            text_style=pstyle,
+            max_width=max_width,
+        ):
+            click.echo(line)
         click.echo()
 
     # Siblings section (includes current node, highlighted)
     if parent:
         siblings = sorted(parent.children.values(), key=lambda n: n.name.lower())
-    else:
-        # At root — no siblings
-        siblings = [node]
-
-    if len(siblings) > 1 or parent is None:
-        if parent:
-            click.echo(click.style("  Siblings:", fg="bright_black"))
+        click.echo(click.style("  Siblings:", fg="bright_black"))
         for sibling in siblings:
-            is_current = sibling is node
-            name = _node_display_name(sibling, dim_slug=True)
-            if is_current:
-                marker = click.style("\u25b8 ", fg="green")
-                name = click.style(_node_display_name(sibling), fg="white", bold=True)
-                tag = click.style("  \u2190 you are here", fg="green")
-                click.echo(f"  {marker}{name}{tag}")
+            if sibling is node:
+                for line in wrap_styled_line(
+                    prefix=f"  {click.style("► ", fg='green')}",
+                    text=click.style(_node_display_name(sibling), fg="white", bold=True),
+                    suffix=click.style("  \u2190 you are here", fg="green"),
+                    cont_prefix="    ",
+                    text_style={"fg": "white", "bold": True},
+                    max_width=max_width,
+                ):
+                    click.echo(line)
             else:
-                click.echo(f"    {name}")
+                for line in wrap_styled_line(
+                    prefix="    ",
+                    text=click.style(_node_display_name(sibling), fg="bright_black"),
+                    cont_prefix="    ",
+                    text_style={"fg": "bright_black"},
+                    max_width=max_width,
+                ):
+                    click.echo(line)
         click.echo()
 
     # Children section
@@ -1261,8 +1588,14 @@ def _display_neighbors(result, origin: str):
         label = "Child" if count == 1 else "Children"
         click.echo(f"  {arrow} {label} ({count}):")
         for child in child_nodes:
-            name = _node_display_name(child, dim_slug=True)
-            click.echo(f"    {name}")
+            for line in wrap_styled_line(
+                prefix="    ",
+                text=click.style(_node_display_name(child), fg="bright_black"),
+                cont_prefix="    ",
+                text_style={"fg": "bright_black"},
+                max_width=max_width,
+            ):
+                click.echo(line)
     else:
         click.echo(click.style("  No child pages", fg="bright_black"))
 
@@ -1310,15 +1643,30 @@ def _display_from_here(result, origin: str, flat: bool, interactive: bool):
     count = len(subtree_entries)
     pages_word = "page" if count == 1 else "pages"
     current_name = _node_display_name(node)
-    click.echo(f"  {click.style('Subtree from', fg='bright_black')} {click.style(current_name, fg='cyan', bold=True)}  {click.style(f'({count} {pages_word})', fg='bright_black')}")
+    for line in wrap_styled_line(
+        prefix=f"  {click.style('Subtree from', fg='bright_black')} ",
+        text=click.style(current_name, fg='cyan', bold=True),
+        suffix=f"  {click.style(f'({count} {pages_word})', fg='bright_black')}",
+    ):
+        click.echo(line)
     click.echo()
 
     if flat:
+        max_width = shutil.get_terminal_size().columns - 2
         for entry in subtree_entries:
             path = urlparse(entry.loc).path or "/"
             title = entry.title
             if title:
-                click.echo(f"  {click.style(title, fg='white')}  {click.style(path, fg='bright_black')}")
+                path_suffix = click.style(f"  {path}", fg="bright_black")
+                for line in wrap_styled_line(
+                    prefix="  ",
+                    text=click.style(title, fg="white"),
+                    suffix=path_suffix,
+                    cont_prefix="  ",
+                    text_style={"fg": "white"},
+                    max_width=max_width,
+                ):
+                    click.echo(line)
             else:
                 click.echo(f"  {path}")
     else:
@@ -1339,7 +1687,11 @@ def _display_sitemap(result, flat: bool, filter_path: str, from_cache: bool = Fa
     if icon:
         icon += " "
     via = f"cache ({result.discovered_via})" if from_cache else result.discovered_via
-    click.echo(f"  {icon}{click.style('Sitemap', fg='cyan', bold=True)}  {click.style(result.source_url, fg='bright_black')}")
+    for line in wrap_styled_line(
+        prefix=f"  {icon}{click.style('Sitemap', fg='cyan', bold=True)}  ",
+        text=click.style(result.source_url, fg='bright_black'),
+    ):
+        click.echo(line)
     click.echo(f"  {click.style(f'Discovered via {via}', fg='bright_black')}  {click.style(f'{result.total_urls} URLs', fg='bright_black')}")
 
     if result.fetch_time > 0 and not from_cache:
@@ -1436,7 +1788,11 @@ def _display_stats(result, stats: dict):
     icon = get_icon("Sitemaps") or ""
     if icon:
         icon += " "
-    click.echo(f"  {icon}{click.style('Sitemap Statistics', fg='cyan', bold=True)}  {click.style(result.source_url, fg='bright_black')}")
+    for line in wrap_styled_line(
+        prefix=f"  {icon}{click.style('Sitemap Statistics', fg='cyan', bold=True)}  ",
+        text=click.style(result.source_url, fg='bright_black'),
+    ):
+        click.echo(line)
     click.echo()
 
     # Summary table
