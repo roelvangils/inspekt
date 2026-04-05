@@ -1070,15 +1070,32 @@ def sitemap(url, flat, filter_path, lang, open_target, interactive, where, neigh
     already_checked = sum(1 for e in result.entries if not e.title and e.http_status != 0)
     needs_title = sum(1 for e in result.entries if not e.title and e.http_status == 0)
 
-    # Warn before expensive title fetching
-    if not no_titles and needs_title > 0 and not output_json:
-        if needs_title > 1000 and total > 10_000:
-            print_warning(f"This sitemap has {total:,} pages — fetching titles for {needs_title:,} pages may take several minutes")
-            if not click.confirm("  Continue?", default=True):
-                print_hint("Use `--no-titles` to skip title fetching, or `--filter /section` to limit scope")
-                return
-        elif needs_title > 500:
-            print_warning(f"Fetching titles for {needs_title:,} pages — this may take a while")
+    # For large sitemaps, offer the user a choice of how to proceed
+    if not no_titles and needs_title > 1000 and total > 10_000 and not output_json:
+        choice = _large_sitemap_menu(result, needs_title)
+        if choice == "stats":
+            _display_stats(result, get_stats(result))
+            return
+        elif choice == "skip":
+            no_titles = True
+        elif choice == "all":
+            pass  # continue with full fetch
+        elif choice.startswith("lang:"):
+            # Filter to a specific language prefix
+            lang_code = choice[5:]
+            filter_path = f"/{lang_code}/"
+        elif choice.startswith("depth:"):
+            # Filter to entries at or above a certain depth
+            max_depth = int(choice[6:])
+            result.entries = [
+                e for e in result.entries
+                if (urlparse(e.loc).path.rstrip("/") or "/").count("/") <= max_depth
+            ]
+            # Recount after filtering
+            needs_title = sum(1 for e in result.entries if not e.title and e.http_status == 0)
+            total = len(result.entries)
+    elif not no_titles and needs_title > 500 and not output_json:
+        print_warning(f"Fetching titles for {needs_title:,} pages — this may take a while")
 
     # Fetch page titles
     if not no_titles and needs_title > 0:
@@ -1854,6 +1871,112 @@ def _display_flat(result, filter_path: str):
             colors = ["bright_black", None, "bright_black", "yellow" if row[3] else None]
         table.print_row(row, colors=colors)
     table.print_footer()
+
+
+def _estimate_time(pages: int, concurrent: int = 20, avg_response: float = 0.5) -> str:
+    """Estimate fetch time as a human-readable string."""
+    seconds = pages / concurrent * avg_response
+    if seconds < 10:
+        return "~a few sec"
+    elif seconds < 60:
+        return f"~{int(seconds)} sec"
+    else:
+        minutes = round(seconds / 60)
+        return f"~{minutes} min"
+
+
+def _large_sitemap_menu(result, needs_title: int) -> str:
+    """Show an interactive menu for large sitemaps and return the user's choice.
+
+    Returns one of: "all", "skip", "stats", "lang:<code>", "depth:<n>"
+    """
+    from inspekt.services.sitemap_service import detect_languages
+
+    total = len(result.entries)
+    click.echo()
+    print_warning(f"This sitemap has {total:,} pages")
+    click.echo()
+    click.echo("  How would you like to proceed?")
+    click.echo()
+
+    # Build options dynamically
+    options = {}
+    option_lines = []
+    idx = 1
+
+    def _add_option(key: str, label: str, time_str: str, suffix: str = ""):
+        nonlocal idx
+        options[str(idx)] = key
+        option_lines.append((str(idx), label, time_str, suffix))
+        idx += 1
+
+    # Option: fetch all
+    _add_option("all", f"Fetch all {needs_title:,} titles", _estimate_time(needs_title))
+
+    # Option: top N levels — find a good depth cutoff (aim for ≤500 pages)
+    depths: dict[int, int] = {}
+    for entry in result.entries:
+        parsed = urlparse(entry.loc)
+        path = parsed.path.rstrip("/") or "/"
+        depth = 0 if path == "/" else path.count("/")
+        depths[depth] = depths.get(depth, 0) + 1
+
+    cumulative = 0
+    chosen_depth = 1
+    for d in sorted(depths.keys()):
+        cumulative += depths.get(d, 0)
+        if cumulative > 500:
+            break
+        chosen_depth = d
+
+    depth_count = sum(depths.get(d, 0) for d in sorted(depths.keys()) if d <= chosen_depth)
+    if 0 < depth_count < total:
+        levels = f"level{'s' if chosen_depth > 1 else ''}"
+        _add_option(f"depth:{chosen_depth}", f"Top {chosen_depth} {levels} only ({depth_count:,} pages)", _estimate_time(depth_count))
+
+    # Option: language filter (prefer English, otherwise largest language)
+    languages = detect_languages(result.entries)
+    if len(languages) >= 2:
+        lang_counts = {}
+        for entry in result.entries:
+            parsed = urlparse(entry.loc)
+            parts = [p for p in parsed.path.split("/") if p]
+            if parts and parts[0].lower() in languages:
+                lang = parts[0].lower()
+                lang_counts[lang] = lang_counts.get(lang, 0) + 1
+
+        if lang_counts:
+            preferred = "en" if "en" in lang_counts else max(lang_counts, key=lang_counts.get)
+            lang_total = lang_counts[preferred]
+            _add_option(f"lang:{preferred}", f"{preferred.upper()} pages only ({lang_total:,} pages)", _estimate_time(lang_total), " *")
+
+    # Option: skip titles
+    _add_option("skip", "Skip title fetching (show paths only)", "instant")
+
+    # Option: stats
+    _add_option("stats", "Show statistics", "instant")
+
+    # Render options with right-aligned time estimates
+    max_label_len = max(len(line[1]) for line in option_lines)
+    for num, label, time_str, suffix in option_lines:
+        padding = max_label_len - len(label) + 4
+        click.echo(f"  [{num}] {label}{' ' * padding}{click.style(time_str, fg='bright_black')}{suffix}")
+
+    # Footnotes
+    click.echo()
+    if any(v.startswith("lang:") for v in options.values()):
+        click.echo(click.style("  (*) Use --lang to see all languages, or --lang=LANG to pick one", fg="bright_black"))
+    print_hint("Titles are cached \u2014 run again later to fill in the rest")
+    click.echo()
+
+    # Default to the depth option if available, otherwise "all"
+    depth_option = next((k for k, v in options.items() if v.startswith("depth:")), "1")
+
+    while True:
+        choice = click.prompt("  Choice", default=depth_option, show_default=True).strip()
+        if choice in options:
+            return options[choice]
+        click.echo(f"  Please enter a number between 1 and {len(options)}")
 
 
 def _display_stats(result, stats: dict):
