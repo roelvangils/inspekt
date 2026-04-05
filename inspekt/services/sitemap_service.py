@@ -995,20 +995,25 @@ def detect_site_name(
         return []
 
     # Count suffix fragments (last part after separator), case-insensitive.
-    # Track the most common casing for each suffix.
-    suffix_counts: dict[str, int] = {}
-    suffix_canonical: dict[str, str] = {}
+    # Track the most common exact casing for each suffix.
+    suffix_counts: dict[str, int] = {}  # lowercase key → total count
+    casing_counts: dict[str, int] = {}  # exact casing → count
     for title in titles:
         for sep in _TITLE_SEPARATORS:
             if sep in title:
                 suffix = title.rsplit(sep, 1)[-1].strip()
                 key = suffix.lower()
                 suffix_counts[key] = suffix_counts.get(key, 0) + 1
-                # Keep the casing that appears most often
-                prev = suffix_canonical.get(key, "")
-                if not prev or suffix_counts[key] > suffix_counts.get(prev.lower(), 0):
-                    suffix_canonical[key] = suffix
+                casing_counts[suffix] = casing_counts.get(suffix, 0) + 1
                 break
+
+    # Build canonical form mapping: pick the casing with the highest count
+    suffix_canonical: dict[str, str] = {}
+    for exact, count in casing_counts.items():
+        key = exact.lower()
+        prev = suffix_canonical.get(key)
+        if prev is None or count > casing_counts.get(prev, 0):
+            suffix_canonical[key] = exact
 
     if not suffix_counts:
         return []
