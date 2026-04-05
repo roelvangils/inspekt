@@ -1101,12 +1101,12 @@ def sitemap(url, flat, filter_path, lang, open_target, interactive, where, neigh
         def _progress(completed, total):
             nonlocal _reassured
             pct = completed * 100 // total
-            elapsed = _time.time() - _fetch_start
-            # Estimate time remaining
-            if completed > 0:
+            # Only estimate remaining time after 10% is done (enough data for a reliable rate)
+            if not _reassured and completed >= max(total // 10, 20):
+                elapsed = _time.time() - _fetch_start
                 rate = completed / elapsed
                 remaining = (total - completed) / rate
-                if remaining > 30 and not _reassured:
+                if remaining > 60:
                     _reassured = True
                     click.echo(f"\r  Fetching titles\u2026 {completed}/{total} ({pct}%) — throttling to be gentle to the server" + " " * 5, err=err)
                     return
