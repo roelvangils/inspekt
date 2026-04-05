@@ -44,6 +44,8 @@ terminal_hidden = False
 # Clipboard relay: CLI posts text here, control panel fetches it
 clipboard_data = {'text': '', 'timestamp': 0}
 upload_state = {'status': 'idle', 'files': [], 'errors': [], 'timestamp': 0}
+# Files to exclude from download listings and zip archives (shell config, history, etc.)
+_DOWNLOAD_EXCLUDE = frozenset({'zsh_history', 'zsh_sessions', 'zcompdump'})
 # Copyable block relay: CLI posts raw code block text, control panel shows copy button
 copyable_data = {'text': '', 'timestamp': 0}
 # Canvas size: last known VNC container dimensions (set by control panel auto-resize)
@@ -1618,7 +1620,7 @@ class ControlHandler(BaseHTTPRequestHandler):
             # Create a new tab using CDP directly
             # CDP on port 9222 only affects the VM's Chromium, not the host browser
             query = parse_qs(urlparse(self.path).query)
-            url = query.get('url', ['http://inspekt/status'])[0]
+            url = query.get('url', ['about:blank'])[0]
 
             try:
                 # URL-encode to handle special characters (?, &, etc.)
@@ -1686,6 +1688,64 @@ class ControlHandler(BaseHTTPRequestHandler):
                     self.send_json({'ok': True, 'message': 'Tab closed', 'id': tab_id})
                 else:
                     self.send_json({'ok': False, 'error': 'Failed to close tab'}, 500)
+            except Exception as e:
+                self.send_json({'ok': False, 'error': str(e)}, 500)
+
+        elif path.startswith('/tabs/') and path.endswith('/keep-alive'):
+            # Prevent Chromium from freezing or discarding this tab.
+            # Uses Page.setWebLifecycleState to force the active state,
+            # and Emulation.setIdleOverride to prevent idle detection.
+            tab_id = path.split('/tabs/')[1].split('/keep-alive')[0]
+            query = parse_qs(urlparse(self.path).query)
+            enabled = query.get('enabled', ['true'])[0] == 'true'
+
+            try:
+                page_tabs = get_page_tabs()
+                tab = next((t for t in page_tabs if t['id'] == tab_id), None)
+                if not tab:
+                    self.send_json({'ok': False, 'error': 'Tab not found'}, 404)
+                    return
+
+                ws_url = tab.get('webSocketDebuggerUrl')
+                if not ws_url:
+                    self.send_json({'ok': False, 'error': 'No debugger URL'}, 500)
+                    return
+
+                if enabled:
+                    # Force tab to stay active (prevents freeze/discard)
+                    send_cdp_command(ws_url, 'Page.setWebLifecycleState', {'state': 'active'})
+                    send_cdp_command(ws_url, 'Emulation.setIdleOverride', {
+                        'isUserActive': True, 'isScreenUnlocked': True
+                    })
+                else:
+                    # Release: let Chromium manage the tab normally
+                    try:
+                        send_cdp_command(ws_url, 'Emulation.clearIdleOverride', {})
+                    except Exception:
+                        pass  # May fail if tab was already discarded
+
+                # Also toggle keep-alive on the Inspekt bridge to prevent
+                # the WebSocket connection from being cleaned up as stale/idle.
+                bridge_url = os.environ.get('INSPEKT_BRIDGE_URL', 'http://localhost:8767')
+                try:
+                    # Find bridge instance by matching the tab's URL
+                    inst_resp = urllib.request.urlopen(f'{bridge_url}/instances', timeout=2)
+                    inst_data = json.loads(inst_resp.read())
+                    tab_url = tab.get('url', '')
+                    for inst in inst_data.get('instances', []):
+                        if inst.get('url') == tab_url:
+                            body = json.dumps({'instance_id': inst['id'], 'enabled': enabled}).encode()
+                            req = urllib.request.Request(
+                                f'{bridge_url}/instances/keep-alive',
+                                data=body,
+                                headers={'Content-Type': 'application/json'},
+                                method='POST'
+                            )
+                            urllib.request.urlopen(req, timeout=2)
+                except Exception:
+                    pass  # Bridge may not be running; CDP protection still applies
+
+                self.send_json({'ok': True, 'enabled': enabled})
             except Exception as e:
                 self.send_json({'ok': False, 'error': str(e)}, 500)
 
@@ -2328,6 +2388,75 @@ class ControlHandler(BaseHTTPRequestHandler):
             except Exception as e:
                 self.send_json({'ok': False, 'error': str(e)}, 500)
 
+        elif path == '/file/download-zip':
+            # Download all files in a directory as a zip archive.
+            # Enforces limits: max 50 files, max 50 MB total, max 5 MB per file.
+            import zipfile, io
+
+            query = parse_qs(urlparse(self.path).query)
+            dir_path = query.get('path', [None])[0]
+
+            if not dir_path:
+                self.send_json({'ok': False, 'error': 'Missing path parameter'}, 400)
+                return
+
+            dir_path = os.path.realpath(dir_path)
+            if not (dir_path == '/home/inspekt' or dir_path.startswith('/home/inspekt/') or dir_path.startswith('/tmp/')):
+                self.send_json({'ok': False, 'error': 'Path not allowed'}, 403)
+                return
+
+            if not os.path.isdir(dir_path):
+                self.send_json({'ok': False, 'error': 'Not a directory'}, 404)
+                return
+
+            try:
+                max_files = 50
+                max_total = 50 * 1024 * 1024
+                max_single = 5 * 1024 * 1024
+
+                zip_buffer = io.BytesIO()
+                file_count = 0
+                total_size = 0
+
+                with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zf:
+                    for entry in os.scandir(dir_path):
+                        if entry.name.startswith('.') or entry.name in _DOWNLOAD_EXCLUDE:
+                            continue
+                        if not entry.is_file(follow_symlinks=True):
+                            continue
+                        try:
+                            st = entry.stat(follow_symlinks=True)
+                        except OSError:
+                            continue
+                        if st.st_size > max_single:
+                            continue  # Skip oversized files silently
+
+                        file_count += 1
+                        total_size += st.st_size
+
+                        if file_count > max_files or total_size > max_total:
+                            self.send_json({'ok': False, 'error': 'Folder exceeds download limits'}, 413)
+                            return
+
+                        zf.write(entry.path, entry.name)
+
+                if file_count == 0:
+                    self.send_json({'ok': False, 'error': 'No downloadable files in this folder'}, 404)
+                    return
+
+                zip_content = zip_buffer.getvalue()
+                folder_name = os.path.basename(dir_path) or 'files'
+
+                self.send_response(200)
+                self.send_header('Content-Type', 'application/zip')
+                self.send_header('Content-Disposition', f'attachment; filename="{folder_name}.zip"')
+                self.send_header('Content-Length', str(len(zip_content)))
+                self.send_header('Access-Control-Allow-Origin', '*')
+                self.end_headers()
+                self.wfile.write(zip_content)
+            except Exception as e:
+                self.send_json({'ok': False, 'error': str(e)}, 500)
+
         # =============================================
         # File Editor Endpoints
         # =============================================
@@ -2367,8 +2496,8 @@ class ControlHandler(BaseHTTPRequestHandler):
                     self.send_json({'ok': False, 'error': 'Cannot edit binary files'}, 400)
                     return
 
-                writable_prefixes = ['/home/inspekt/', '/tmp/']
-                is_writable = any(file_path.startswith(p) for p in writable_prefixes)
+                # All readable paths are writable (both prefixes are user-owned)
+                is_writable = True
 
                 with open(file_path, 'r', encoding='utf-8', errors='replace') as f:
                     content = f.read()
@@ -2391,9 +2520,8 @@ class ControlHandler(BaseHTTPRequestHandler):
             # Resolve symlinks BEFORE validation
             dir_path = os.path.realpath(dir_path)
 
-            # Allow /home/inspekt itself and subdirs, plus /tmp/
-            allowed_prefixes = ['/home/inspekt/', '/home/inspekt', '/tmp/']
-            if dir_path != '/home/inspekt' and not any(dir_path.startswith(p) for p in allowed_prefixes):
+            # Allow /home/inspekt (exact) and its subdirs, plus /tmp/
+            if not (dir_path == '/home/inspekt' or dir_path.startswith('/home/inspekt/') or dir_path.startswith('/tmp/')):
                 self.send_json({'ok': False, 'error': 'Path not allowed'}, 403)
                 return
 
@@ -2418,6 +2546,83 @@ class ControlHandler(BaseHTTPRequestHandler):
                             entry['size'] = 0
                     entries.append(entry)
                 self.send_json({'ok': True, 'path': dir_path, 'entries': entries})
+            except Exception as e:
+                self.send_json({'ok': False, 'error': str(e)}, 500)
+
+        elif path == '/file/folder-info':
+            # Folder metadata for context menu download options.
+            # Returns recent files (sorted by mtime) + totals for zip eligibility.
+            query = parse_qs(urlparse(self.path).query)
+            dir_path = query.get('path', ['/home/inspekt'])[0]
+            dir_path = os.path.realpath(dir_path)
+
+            if not (dir_path == '/home/inspekt' or dir_path.startswith('/home/inspekt/') or dir_path.startswith('/tmp/')):
+                self.send_json({'ok': False, 'error': 'Path not allowed'}, 403)
+                return
+
+            if not os.path.isdir(dir_path):
+                self.send_json({'ok': False, 'error': 'Not a directory'}, 404)
+                return
+
+            try:
+                max_files_zip = 50
+                max_total_zip = 50 * 1024 * 1024  # 50 MB
+                max_single = 5 * 1024 * 1024       # 5 MB per file
+                max_recent = 25                     # Files shown in download submenu
+
+                all_files = []   # Collect all files for sorting
+                subdirs = []     # Subdirectories for navigation
+                file_count = 0
+                total_size = 0
+
+                for entry in os.scandir(dir_path):
+                    if entry.name.startswith('.') or entry.name in _DOWNLOAD_EXCLUDE:
+                        continue
+                    try:
+                        st = entry.stat(follow_symlinks=True)
+                    except OSError:
+                        continue
+
+                    if entry.is_dir(follow_symlinks=True):
+                        subdirs.append(entry.name)
+                        continue
+
+                    if not entry.is_file(follow_symlinks=True):
+                        continue
+
+                    file_count += 1
+                    total_size += st.st_size
+                    all_files.append({
+                        'name': entry.name,
+                        'path': os.path.join(dir_path, entry.name),
+                        'size': st.st_size,
+                        'mtime': st.st_mtime,
+                        'downloadable': st.st_size <= max_single
+                    })
+
+                exceeded_limits = file_count > max_files_zip or total_size > max_total_zip
+                can_zip = file_count > 0 and not exceeded_limits
+
+                # Sort by mtime descending, limit to 25 most recent
+                all_files.sort(key=lambda f: f['mtime'], reverse=True)
+                recent_files = all_files[:max_recent]
+
+                # Parent dir (None if already at allowed root)
+                parent = os.path.dirname(dir_path)
+                if not (parent == '/home/inspekt' or parent.startswith('/home/inspekt/') or parent.startswith('/tmp/')):
+                    parent = None
+
+                self.send_json({
+                    'ok': True,
+                    'path': dir_path,
+                    'parent': parent,
+                    'subdirs': sorted(subdirs),
+                    'recent_files': recent_files,
+                    'file_count': file_count,
+                    'total_size': total_size,
+                    'can_zip': can_zip,
+                    'exceeded_limits': exceeded_limits
+                })
             except Exception as e:
                 self.send_json({'ok': False, 'error': str(e)}, 500)
 
@@ -2906,7 +3111,6 @@ class ControlHandler(BaseHTTPRequestHandler):
         elif path == '/file/upload':
             # POST /file/upload — receive files as JSON with base64 data
             # Body: { "files": [{ "name": "file.txt", "data": "<base64>", "size": 123 }] }
-            import base64
 
             try:
                 content_length = int(self.headers.get('Content-Length', 0))
