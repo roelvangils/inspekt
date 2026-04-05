@@ -1912,7 +1912,7 @@ def _large_sitemap_menu(result, needs_title: int) -> str:
     # Option: fetch all
     _add_option("all", f"Fetch all {needs_title:,} titles", _estimate_time(needs_title))
 
-    # Option: top N levels — find a good depth cutoff (aim for ≤500 pages)
+    # Options: multiple depth tiers so the user can choose their trade-off
     depths: dict[int, int] = {}
     for entry in result.entries:
         parsed = urlparse(entry.loc)
@@ -1920,18 +1920,19 @@ def _large_sitemap_menu(result, needs_title: int) -> str:
         depth = 0 if path == "/" else path.count("/")
         depths[depth] = depths.get(depth, 0) + 1
 
+    # Build cumulative counts per depth, offer tiers that are meaningfully different
     cumulative = 0
-    chosen_depth = 1
+    last_offered = 0
     for d in sorted(depths.keys()):
         cumulative += depths.get(d, 0)
-        if cumulative > 500:
-            break
-        chosen_depth = d
-
-    depth_count = sum(depths.get(d, 0) for d in sorted(depths.keys()) if d <= chosen_depth)
-    if 0 < depth_count < total:
-        levels = f"level{'s' if chosen_depth > 1 else ''}"
-        _add_option(f"depth:{chosen_depth}", f"Top {chosen_depth} {levels} only ({depth_count:,} pages)", _estimate_time(depth_count))
+        if cumulative >= total:
+            break  # don't offer a tier that includes everything
+        # Offer this tier if it's meaningfully larger than the last one offered
+        # and doesn't exceed half the total (above that, "fetch all" is close enough)
+        if cumulative > last_offered * 2 and cumulative < total * 0.5:
+            levels = f"level{'s' if d > 1 else ''}"
+            _add_option(f"depth:{d}", f"Top {d} {levels} ({cumulative:,} pages)", _estimate_time(cumulative))
+            last_offered = cumulative
 
     # Option: language filter (prefer English, otherwise largest language)
     languages = detect_languages(result.entries)
