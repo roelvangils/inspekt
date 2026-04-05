@@ -1071,6 +1071,7 @@ def sitemap(url, flat, filter_path, lang, open_target, interactive, where, neigh
     needs_title = sum(1 for e in result.entries if not e.title and e.http_status == 0)
 
     # For large sitemaps, offer an interactive menu instead of blindly fetching
+    fetch_subset = None  # if set, only fetch titles for this subset of entries
     if not no_titles and needs_title > 1000 and total > 10_000 and not output_json:
         choice = _large_sitemap_menu(result, needs_title)
         if choice == "stats":
@@ -1081,34 +1082,41 @@ def sitemap(url, flat, filter_path, lang, open_target, interactive, where, neigh
         elif choice == "all":
             pass  # continue with full fetch
         elif choice.startswith("lang:"):
-            # Filter to a specific language prefix
             lang_code = choice[5:]
             filter_path = f"/{lang_code}/"
+            # Only fetch titles for this language (but keep full result for caching)
+            fetch_subset = [
+                e for e in result.entries
+                if f"/{lang_code}/" in urlparse(e.loc).path.lower()
+            ]
         elif choice.startswith("depth:"):
-            # Filter to entries at or above a certain depth
+            # Only fetch titles for entries at or above the chosen depth
             max_depth = int(choice[6:])
-            result.entries = [
+            fetch_subset = [
                 e for e in result.entries
                 if (urlparse(e.loc).path.rstrip("/") or "/").count("/") <= max_depth
             ]
-            # Recount after filtering
-            needs_title = sum(1 for e in result.entries if not e.title and e.http_status == 0)
-            total = len(result.entries)
     elif not no_titles and needs_title > 500 and not output_json:
         print_warning(f"Fetching titles for {needs_title:,} pages — this may take a while")
 
     # Fetch page titles
+    entries_to_fetch = fetch_subset if fetch_subset is not None else result.entries
+    needs_title = sum(1 for e in entries_to_fetch if not e.title and e.http_status == 0)
+
     if not no_titles and needs_title > 0:
         # Send progress to stderr so it doesn't corrupt --json output
         err = output_json
 
-        if already_titled > 0 or already_checked > 0:
+        already_titled_in_subset = sum(1 for e in entries_to_fetch if e.title)
+        already_checked_in_subset = sum(1 for e in entries_to_fetch if not e.title and e.http_status != 0)
+
+        if already_titled_in_subset > 0 or already_checked_in_subset > 0:
             parts = []
-            if already_titled > 0:
-                parts.append(f"{already_titled} titles cached")
-            if already_checked > 0:
-                parts.append(f"{already_checked} unreachable")
-            click.echo(f"  {', '.join(parts)} (of {total} total)", err=err)
+            if already_titled_in_subset > 0:
+                parts.append(f"{already_titled_in_subset} titles cached")
+            if already_checked_in_subset > 0:
+                parts.append(f"{already_checked_in_subset} unreachable")
+            click.echo(f"  {', '.join(parts)} (of {len(entries_to_fetch)} total)", err=err)
 
         import time as _time
 
@@ -1143,7 +1151,7 @@ def sitemap(url, flat, filter_path, lang, open_target, interactive, where, neigh
         bar.__enter__()
         try:
             fetched = fetch_titles(
-                result.entries, max_concurrent=_max_concurrent, timeout=10.0, progress_callback=_progress
+                entries_to_fetch, max_concurrent=_max_concurrent, timeout=10.0, progress_callback=_progress
             )
         finally:
             # Ensure bar completes to 100%
