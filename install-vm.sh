@@ -20,7 +20,7 @@ TARBALL_URL="https://github.com/roelvangils/inspekt/archive/refs/heads/feature/v
 INSTALL_DIR="${INSPEKT_DIR:-$HOME/inspekt}"
 SCRIPT_URL="https://raw.githubusercontent.com/roelvangils/inspekt/feature/vm-install-script/install-vm.sh"
 
-INSTALLER_VERSION="0.11"
+INSTALLER_VERSION="0.12"
 
 IMAGE_NAME="inspekt-browser-vm"
 CONTAINER_NAME="inspekt-browser-vm"
@@ -100,10 +100,12 @@ check_docker() {
      || system_profiler SPHardwareDataType 2>/dev/null | grep -qi "virtual"; then
     echo ""
     warn "It looks like you're running inside a virtual machine."
-    echo "  OrbStack/Docker need nested virtualization enabled."
+    echo "  Docker needs nested virtualization, which not all VM hosts support."
     echo "  For Parallels, shut down this VM and run on the ${BOLD}host${RESET}:"
     echo ""
     echo "    ${DIM}prlctl set \"<vm-name>\" --nested-virt on${RESET}"
+    echo ""
+    echo "  ${DIM}Your mileage may vary — Inspekt VM works best on real hardware.${RESET}"
     echo ""
   fi
 
