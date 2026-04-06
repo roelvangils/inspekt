@@ -10626,6 +10626,7 @@
             function cleanup() {
                 overlay.remove();
                 document.removeEventListener('keydown', onKey);
+                document.removeEventListener('mouseup', onMouseUp);
                 if (typeof rfb !== 'undefined' && rfb && rfb._keyboard) rfb._keyboard.grab();
             }
 
@@ -10663,7 +10664,8 @@
                 sizeLabel.style.top = (y + h - 2) + 'px';
             });
 
-            overlay.addEventListener('mouseup', async (e) => {
+            // Listen on document so mouseup outside the overlay still completes the selection
+            async function onMouseUp(e) {
                 if (!dragging) return;
                 dragging = false;
 
@@ -10689,7 +10691,8 @@
                     `/screenshot/region?x=${region.x}&y=${region.y}&w=${region.w}&h=${region.h}`,
                     `region-${Math.round(region.w)}x${Math.round(region.h)}-${ts}.png`
                 );
-            });
+            }
+            document.addEventListener('mouseup', onMouseUp);
 
             document.addEventListener('keydown', onKey);
 

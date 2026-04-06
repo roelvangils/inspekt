@@ -168,6 +168,20 @@ def _load_sr_script():
     return script
 
 
+_redact_script_cache = None
+
+def _get_redact_script():
+    """Load the screenshot redaction script (cached after first call)."""
+    global _redact_script_cache
+    if _redact_script_cache is not None:
+        return _redact_script_cache
+    base = _get_sr_base_path()
+    script_path = os.path.join(base, 'scripts', 'screenshot_redact.js')
+    with open(script_path) as f:
+        _redact_script_cache = f.read()
+    return _redact_script_cache
+
+
 def _sr_execute(ws_url, config):
     """Execute a screen reader simulator command via CDP."""
     script = _load_sr_script()
@@ -2307,6 +2321,190 @@ class ControlHandler(BaseHTTPRequestHandler):
                     send_cdp_command(ws_url, 'Emulation.clearDeviceMetricsOverride', {})
                 except Exception:
                     pass
+                self.send_json({'ok': False, 'error': str(e)}, 500)
+
+        elif path == '/screenshot/element':
+            # Capture screenshot of the element at given coordinates (or the inspected element)
+            try:
+                tab = get_active_tab()
+                if not tab or not tab.get('webSocketDebuggerUrl'):
+                    self.send_json({'ok': False, 'error': 'No active tab found'}, 500)
+                    return
+                ws_url = tab['webSocketDebuggerUrl']
+
+                # Get the bounding rect of the inspected element (set by /context-menu-info)
+                rect_result = send_cdp_command(ws_url, 'Runtime.evaluate', {
+                    'expression': '''(() => {
+                        const el = window.__INSPEKT_INSPECTED_ELEMENT__;
+                        if (!el || !el.isConnected) return null;
+                        const r = el.getBoundingClientRect();
+                        return JSON.stringify({
+                            x: r.left + window.scrollX,
+                            y: r.top + window.scrollY,
+                            width: r.width,
+                            height: r.height
+                        });
+                    })()''',
+                    'returnByValue': True
+                })
+                rect_str = rect_result.get('result', {}).get('result', {}).get('value')
+                if not rect_str:
+                    self.send_json({'ok': False, 'error': 'No element selected or element disconnected'}, 400)
+                    return
+                rect = json.loads(rect_str)
+                if rect['width'] < 1 or rect['height'] < 1:
+                    self.send_json({'ok': False, 'error': 'Element has no visible dimensions'}, 400)
+                    return
+
+                result = send_cdp_command(ws_url, 'Page.captureScreenshot', {
+                    'format': 'png',
+                    'captureBeyondViewport': True,
+                    'clip': {
+                        'x': rect['x'],
+                        'y': rect['y'],
+                        'width': rect['width'],
+                        'height': rect['height'],
+                        'scale': 1
+                    }
+                })
+                if result and 'result' in result and 'data' in result['result']:
+                    self.send_json({'ok': True, 'data': result['result']['data'], 'format': 'png'})
+                else:
+                    self.send_json({'ok': False, 'error': 'Element screenshot failed'}, 500)
+            except Exception as e:
+                self.send_json({'ok': False, 'error': str(e)}, 500)
+
+        elif path == '/screenshot/region':
+            # Capture a specific region by clip coordinates.
+            # Coordinates are in CSS viewport pixels; scroll offset is added automatically
+            # so that captureBeyondViewport clips at the correct page-absolute position.
+            query = parse_qs(urlparse(self.path).query)
+            try:
+                clip_x = float(query.get('x', ['0'])[0])
+                clip_y = float(query.get('y', ['0'])[0])
+                clip_w = float(query.get('w', ['0'])[0])
+                clip_h = float(query.get('h', ['0'])[0])
+                if clip_w < 1 or clip_h < 1:
+                    self.send_json({'ok': False, 'error': 'Region too small'}, 400)
+                    return
+
+                tab = get_active_tab()
+                if not tab or not tab.get('webSocketDebuggerUrl'):
+                    self.send_json({'ok': False, 'error': 'No active tab found'}, 500)
+                    return
+                ws_url = tab['webSocketDebuggerUrl']
+
+                # Add scroll offset to convert viewport coords to page-absolute coords
+                scroll_result = send_cdp_command(ws_url, 'Runtime.evaluate', {
+                    'expression': 'JSON.stringify({x: window.scrollX, y: window.scrollY})',
+                    'returnByValue': True
+                })
+                scroll_val = scroll_result.get('result', {}).get('result', {}).get('value', '{}')
+                scroll = json.loads(scroll_val) if isinstance(scroll_val, str) else {}
+                abs_x = clip_x + scroll.get('x', 0)
+                abs_y = clip_y + scroll.get('y', 0)
+
+                result = send_cdp_command(ws_url, 'Page.captureScreenshot', {
+                    'format': 'png',
+                    'captureBeyondViewport': True,
+                    'clip': {
+                        'x': abs_x,
+                        'y': abs_y,
+                        'width': clip_w,
+                        'height': clip_h,
+                        'scale': 1
+                    }
+                })
+                if result and 'result' in result and 'data' in result['result']:
+                    self.send_json({'ok': True, 'data': result['result']['data'], 'format': 'png'})
+                else:
+                    self.send_json({'ok': False, 'error': 'Region screenshot failed'}, 500)
+            except (ValueError, TypeError) as e:
+                self.send_json({'ok': False, 'error': f'Invalid region parameters: {e}'}, 400)
+            except Exception as e:
+                self.send_json({'ok': False, 'error': str(e)}, 500)
+
+        elif path == '/screenshot/redacted':
+            # Capture viewport or full-page screenshot with sensitive data redacted
+            query = parse_qs(urlparse(self.path).query)
+            mode = query.get('mode', ['viewport'])[0]    # 'viewport' or 'page'
+            style = query.get('style', ['bar'])[0]       # 'blur' or 'bar'
+            if mode not in ('viewport', 'page'):
+                self.send_json({'ok': False, 'error': 'mode must be viewport or page'}, 400)
+                return
+            if style not in ('blur', 'bar'):
+                self.send_json({'ok': False, 'error': 'style must be blur or bar'}, 400)
+                return
+
+            tab = get_active_tab()
+            if not tab or not tab.get('webSocketDebuggerUrl'):
+                self.send_json({'ok': False, 'error': 'No active tab found'}, 500)
+                return
+            ws_url = tab['webSocketDebuggerUrl']
+
+            try:
+                # Load and inject redaction script
+                redact_script = _get_redact_script()
+                apply_options = json.dumps({'action': 'apply', 'style': style})
+                apply_code = redact_script.replace('OPTIONS_PLACEHOLDER', apply_options)
+                send_cdp_command(ws_url, 'Runtime.evaluate', {
+                    'expression': apply_code,
+                    'returnByValue': True,
+                    'awaitPromise': False
+                })
+
+                try:
+                    if mode == 'viewport':
+                        result = send_cdp_command(ws_url, 'Page.captureScreenshot', {
+                            'format': 'png',
+                            'captureBeyondViewport': False
+                        })
+                    else:
+                        # Full page: expand viewport, capture, then always restore viewport size
+                        dims_result = send_cdp_command(ws_url, 'Runtime.evaluate', {
+                            'expression': 'JSON.stringify({scrollWidth: document.documentElement.scrollWidth, scrollHeight: document.documentElement.scrollHeight, viewportWidth: window.innerWidth, viewportHeight: window.innerHeight})',
+                            'returnByValue': True
+                        })
+                        dims = json.loads(dims_result.get('result', {}).get('result', {}).get('value', '{}'))
+                        scroll_w = dims.get('scrollWidth', 1280)
+                        scroll_h = dims.get('scrollHeight', 800)
+                        orig_w = dims.get('viewportWidth', 1280)
+                        orig_h = dims.get('viewportHeight', 800)
+
+                        send_cdp_command(ws_url, 'Emulation.setDeviceMetricsOverride', {
+                            'width': scroll_w, 'height': scroll_h,
+                            'deviceScaleFactor': 1, 'mobile': False
+                        })
+                        try:
+                            result = send_cdp_command(ws_url, 'Page.captureScreenshot', {
+                                'format': 'png',
+                                'captureBeyondViewport': False
+                            })
+                        finally:
+                            # Always restore viewport size, even if capture fails
+                            send_cdp_command(ws_url, 'Emulation.setDeviceMetricsOverride', {
+                                'width': orig_w, 'height': orig_h,
+                                'deviceScaleFactor': 1, 'mobile': False
+                            })
+                            send_cdp_command(ws_url, 'Emulation.clearDeviceMetricsOverride', {})
+                finally:
+                    # Always restore: remove redaction overlays
+                    restore_code = redact_script.replace('OPTIONS_PLACEHOLDER',
+                        json.dumps({'action': 'restore'}))
+                    try:
+                        send_cdp_command(ws_url, 'Runtime.evaluate', {
+                            'expression': restore_code,
+                            'returnByValue': True,
+                            'awaitPromise': False
+                        })
+                    except Exception:
+                        pass
+
+                if result and 'result' in result and 'data' in result['result']:
+                    self.send_json({'ok': True, 'data': result['result']['data'], 'format': 'png'})
+                else:
+                    self.send_json({'ok': False, 'error': 'Redacted screenshot failed'}, 500)
+            except Exception as e:
                 self.send_json({'ok': False, 'error': str(e)}, 500)
 
         # =============================================
