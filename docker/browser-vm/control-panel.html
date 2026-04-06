@@ -4571,10 +4571,13 @@
         // (inspect tracking, context menus, VNC overlay)
         // =============================================
         let _inspectTrackingActive = false;
+        let _isMenuOpen = false;
+        let _DEBUG_DUMMY_MENU = false;
         const _tabInspectState = {};
         function _stopInspectTracking() {}
         function _pollInspectRect() {}
         function showContextMenu(e, items) { console.warn('[ContextMenu] Not yet initialized'); }
+        function handleZoom(direction) { console.warn('[Zoom] Not yet initialized'); }
 
         // =============================================
         // Shared Nav Icons (reused across context menus)
