@@ -59,10 +59,13 @@ class TerminalSession:
             pw = pwd.getpwnam('inspekt')
             os.setgid(pw.pw_gid)
             os.setuid(pw.pw_uid)
+            os.chdir(pw.pw_dir)
             env['HOME'] = pw.pw_dir
             env['USER'] = 'inspekt'
             env['SHELL'] = '/bin/zsh'
             env['ZDOTDIR'] = '/etc/inspekt-shell'
+            # Pass bridge URL so inspekt commands can reach the bridge
+            env['INSPEKT_BRIDGE_URL'] = 'http://localhost:8767'
             os.execve('/bin/zsh', ['/bin/zsh', '-l'], env)
         else:
             # Parent process
