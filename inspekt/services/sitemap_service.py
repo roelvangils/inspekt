@@ -1065,6 +1065,30 @@ def detect_site_name(
     return []
 
 
+# Separator chars for dangling-separator cleanup (excludes alphanumeric like "l")
+_DANGLING_SEP_CHARS = {sep.strip() for sep in _TITLE_SEPARATORS if not sep.strip().isalnum()}
+
+
+def _strip_dangling_separators(text: str) -> str:
+    """Strip whitespace and any dangling separator characters from both ends.
+
+    After removing a site name fragment, the remaining title may have a
+    trailing or leading separator (e.g., "VRT NWS: news |" → "VRT NWS: news").
+    """
+    text = text.strip()
+    changed = True
+    while changed:
+        changed = False
+        for s in _DANGLING_SEP_CHARS:
+            if text.endswith(s):
+                text = text[:-len(s)].strip()
+                changed = True
+            if text.startswith(s):
+                text = text[len(s):].strip()
+                changed = True
+    return text
+
+
 def strip_site_name(title: str, site_name: str | list[str]) -> str:
     """
     Remove the site name from a page title.
@@ -1090,14 +1114,14 @@ def strip_site_name(title: str, site_name: str | list[str]) -> str:
             # Site name at the start: "Site Name | Page Title"
             prefix = f"{name}{sep}"
             if title.startswith(prefix):
-                cleaned = title[len(prefix):].strip()
+                cleaned = _strip_dangling_separators(title[len(prefix):])
                 if cleaned:
                     return cleaned
 
             # Site name at the end: "Page Title | Site Name"
             suffix = f"{sep}{name}"
             if title.endswith(suffix):
-                cleaned = title[:-len(suffix)].strip()
+                cleaned = _strip_dangling_separators(title[:-len(suffix)])
                 if cleaned:
                     return cleaned
 
