@@ -6,6 +6,10 @@ echo "Resolution: ${VNC_RESOLUTION}"
 echo "noVNC Port: ${NOVNC_PORT}"
 echo "Home URL: ${HOME_URL}"
 
+# Create inspekt.json so get_data_dir() uses ~/.config/inspekt/ (where the Docker volume is)
+echo '{}' > /root/.config/inspekt.json
+echo '{}' > /home/inspekt/.config/inspekt.json 2>/dev/null || true
+
 # Add 'inspekt' hostname to /etc/hosts
 echo "127.0.0.1 inspekt" >> /etc/hosts
 echo "Added 'inspekt' to /etc/hosts"

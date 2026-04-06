@@ -400,6 +400,11 @@ COPY docker/browser-vm/fonts /usr/share/novnc/fonts
 COPY docker/browser-vm/vendor/codemirror.min.js /usr/share/novnc/vendor/codemirror.min.js
 COPY docker/browser-vm/vendor/ninja-keys.min.js /usr/share/novnc/vendor/ninja-keys.min.js
 COPY docker/browser-vm/vendor/sortable.min.js /usr/share/novnc/vendor/sortable.min.js
+COPY docker/browser-vm/context-menu.js /usr/share/novnc/context-menu.js
+COPY docker/browser-vm/vnc-overlay.js /usr/share/novnc/vnc-overlay.js
+COPY docker/browser-vm/audio.js /usr/share/novnc/audio.js
+COPY docker/browser-vm/zoom.js /usr/share/novnc/zoom.js
+COPY docker/browser-vm/scrollbar.js /usr/share/novnc/scrollbar.js
 COPY docker/browser-vm/inspekt-chromium.sh /opt/inspekt-chromium.sh
 COPY docker/browser-vm/devtools-manager.sh /opt/devtools-manager.sh
 COPY docker/browser-vm/xorg.conf /etc/X11/xorg.conf
