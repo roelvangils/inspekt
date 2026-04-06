@@ -126,7 +126,12 @@ class PluginService:
                     created_at INTEGER NOT NULL,
                     updated_at INTEGER NOT NULL,
                     run_count INTEGER DEFAULT 0,
-                    last_run_at INTEGER
+                    last_run_at INTEGER,
+                    autorun INTEGER DEFAULT 0,
+                    autorun_domains TEXT,
+                    engine TEXT DEFAULT 'js',
+                    proxy_config TEXT DEFAULT '{}',
+                    builtin INTEGER DEFAULT 0
                 )
             """)
             cursor.execute("""
@@ -148,6 +153,16 @@ class PluginService:
                 cursor.execute("ALTER TABLE plugins ADD COLUMN unload_code TEXT")
             if "credits" not in columns:
                 cursor.execute("ALTER TABLE plugins ADD COLUMN credits TEXT")
+            if "autorun" not in columns:
+                cursor.execute("ALTER TABLE plugins ADD COLUMN autorun INTEGER DEFAULT 0")
+            if "autorun_domains" not in columns:
+                cursor.execute("ALTER TABLE plugins ADD COLUMN autorun_domains TEXT")
+            if "engine" not in columns:
+                cursor.execute("ALTER TABLE plugins ADD COLUMN engine TEXT DEFAULT 'js'")
+            if "proxy_config" not in columns:
+                cursor.execute("ALTER TABLE plugins ADD COLUMN proxy_config TEXT DEFAULT '{}'")
+            if "builtin" not in columns:
+                cursor.execute("ALTER TABLE plugins ADD COLUMN builtin INTEGER DEFAULT 0")
 
             conn.commit()
         finally:
@@ -391,6 +406,11 @@ class PluginService:
                 "mcp_exposed",
                 "unload_mode",
                 "unload_code",
+                "autorun",
+                "autorun_domains",
+                "engine",
+                "proxy_config",
+                "builtin",
             }
 
             set_clauses = []
@@ -402,7 +422,9 @@ class PluginService:
 
                 if field == "tags":
                     value = json.dumps(value if isinstance(value, list) else [])
-                elif field in ("returns_data", "mcp_exposed"):
+                elif field == "proxy_config":
+                    value = json.dumps(value) if isinstance(value, dict) else value
+                elif field in ("returns_data", "mcp_exposed", "autorun", "builtin"):
                     value = 1 if value else 0
                 elif field == "unload_mode" and value not in ("toggle", "custom", "none"):
                     value = "none"
@@ -572,6 +594,35 @@ class PluginService:
         finally:
             conn.close()
 
+    def set_autorun(self, plugin_id: str, enabled: bool, domains: str | None = None) -> dict[str, Any]:
+        """Toggle autorun for a plugin."""
+        plugin = self.get_plugin(plugin_id)
+        if not plugin:
+            return {"ok": False, "error": f"Plugin '{plugin_id}' not found"}
+
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        try:
+            cursor.execute(
+                "UPDATE plugins SET autorun = ?, autorun_domains = ?, updated_at = ? WHERE id = ?",
+                (1 if enabled else 0, domains if enabled else plugin.get("autorun_domains"), int(time.time()), plugin_id),
+            )
+            conn.commit()
+            return {"ok": True, "autorun": enabled}
+        finally:
+            conn.close()
+
+    def get_autorun_plugins(self) -> list[dict[str, Any]]:
+        """Get all plugins with autorun enabled."""
+        conn = sqlite3.connect(self.db_path)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        try:
+            cursor.execute("SELECT * FROM plugins WHERE autorun = 1 ORDER BY name ASC")
+            return [self._row_to_dict(row) for row in cursor.fetchall()]
+        finally:
+            conn.close()
+
     def increment_run_count(self, plugin_id: str) -> None:
         """Increment run count and update last_run_at for a plugin."""
         conn = sqlite3.connect(self.db_path)
@@ -734,6 +785,11 @@ class PluginService:
             "updated_at": row["updated_at"],
             "run_count": row["run_count"],
             "last_run_at": row["last_run_at"],
+            "autorun": bool(row["autorun"]),
+            "autorun_domains": row["autorun_domains"],
+            "engine": row["engine"] or "js",
+            "proxy_config": json.loads(row["proxy_config"]) if row["proxy_config"] else {},
+            "builtin": bool(row["builtin"]),
         }
 
 
