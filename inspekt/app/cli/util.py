@@ -701,6 +701,13 @@ def download(output, list_only, output_json, timeout, open_after, reveal_after):
         # Create output directory if needed
         downloads_dir.mkdir(parents=True, exist_ok=True)
 
+        # In VM, route downloads through mitmproxy (inspekt user has no direct outbound access)
+        from inspekt.config import is_isolated_mode
+        _download_kwargs = dict(
+            proxies={"http": "http://localhost:8080", "https": "http://localhost:8080"},
+            verify=False,
+        ) if is_isolated_mode() else {}
+
         # Download files
         success_count = 0
         for file_info in files_to_download:
@@ -710,14 +717,7 @@ def download(output, list_only, output_json, timeout, open_after, reveal_after):
 
             try:
                 click.echo(f"  Downloading {filename}...")
-                # In VM, route through mitmproxy (inspekt user has no direct outbound access)
-                from inspekt.config import is_isolated_mode
-                if is_isolated_mode():
-                    response = requests.get(url, timeout=30,
-                        proxies={"http": "http://localhost:8080", "https": "http://localhost:8080"},
-                        verify=False)
-                else:
-                    response = requests.get(url, timeout=30)
+                response = requests.get(url, timeout=30, **_download_kwargs)
                 response.raise_for_status()
 
                 with builtin_open(output_path, "wb") as f:

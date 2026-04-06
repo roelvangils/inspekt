@@ -12,7 +12,6 @@ from inspekt.services.script_loader import ScriptLoader
 
 def html_output_options(fn):
     """Shared Click options for HTML/CSS output formatting."""
-    import functools
     fn = click.option("--indent", type=int, default=2, help="Indentation width")(fn)
     fn = click.option("--theme", type=click.Choice(["monokai", "github", "dracula", "none"]), default="none", help="Syntax highlighting theme")(fn)
     fn = click.option("--colors/--no-colors", default=True, help="Enable ANSI colors in output")(fn)
