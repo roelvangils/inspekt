@@ -376,13 +376,12 @@ async def get_sitemap(params: "SitemapParams") -> "SitemapResponse":
 
     from inspekt.core.schemas.navigation import SitemapEntryItem, SitemapResponse
     from inspekt.services.sitemap_service import (
-        detect_site_name,
         discover_sitemap,
         fetch_sitemap,
         fetch_titles,
         load_from_cache,
         save_to_cache,
-        strip_site_name,
+        strip_site_names_from_entries,
     )
 
     # Determine origin
@@ -427,11 +426,7 @@ async def get_sitemap(params: "SitemapParams") -> "SitemapResponse":
                 fetch_titles, sitemap_result.entries, 30, 10.0
             )
 
-            site_name = detect_site_name(sitemap_result.entries)
-            if site_name:
-                for entry in sitemap_result.entries:
-                    if entry.title:
-                        entry.title = strip_site_name(entry.title, site_name)
+            strip_site_names_from_entries(sitemap_result.entries)
 
         save_to_cache(sitemap_result)
 

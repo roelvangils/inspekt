@@ -1183,12 +1183,11 @@ def sitemap(url, flat, filter_path, lang, open_target, interactive, where, neigh
         else:
             click.echo(f"  {fetched} of {needs_title} titles found", err=err)
 
-        # Cache with raw titles (site name stripping happens below for display)
-        save_to_cache(result)
+        # Strip site names before caching so all consumers get clean titles
+        if result.entries:
+            strip_site_names_from_entries(result.entries)
 
-    # Strip common site name fragments from titles for display
-    if result.entries:
-        strip_site_names_from_entries(result.entries)
+        save_to_cache(result)
 
     # Handle sitemap index (not flattened)
     if result.is_index and not result.entries:
@@ -1363,8 +1362,8 @@ def _enrich_visible_nodes(ancestors, result, mode: str = "compact"):
 
     This avoids fetching thousands of titles when only a handful are shown.
     Collects entries from ancestors, their siblings, and children of the
-    current node, then batch-fetches titles, saves to cache, and strips
-    site names for display.
+    current node, then batch-fetches titles, strips site names, and saves
+    cleaned titles to cache.
     """
     from inspekt.services.sitemap_service import fetch_titles, save_to_cache, strip_site_names_from_entries
 
@@ -1392,13 +1391,11 @@ def _enrich_visible_nodes(ancestors, result, mode: str = "compact"):
     to_fetch = [e for e in all_entries if not e.title]
     if to_fetch:
         fetch_titles(to_fetch, max_concurrent=10, timeout=5.0)
-        # Save enriched titles to cache so consecutive calls are instant
+        # Strip site names and save cleaned titles to cache
+        titled = [e for e in all_entries if e.title]
+        if titled:
+            strip_site_names_from_entries(titled)
         save_to_cache(result)
-
-    # Strip site names from all titled entries
-    titled = [e for e in all_entries if e.title]
-    if titled:
-        strip_site_names_from_entries(titled)
 
 
 def _display_where(result, origin: str, mode: str = "compact"):

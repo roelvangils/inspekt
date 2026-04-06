@@ -118,15 +118,13 @@ def _find_nearest_ancestor(
 
 
 def _node_to_info(
-    node: sitemap_service.TreeNode, origin: str, site_name: str | list[str] = ""
+    node: sitemap_service.TreeNode, origin: str,
 ) -> SitemapNodeInfo:
     """Convert a TreeNode to a SitemapNodeInfo response object."""
     entry = node.entry
     path = node.full_path or "/"
     url = f"{origin}{path}"
     title = entry.title if entry else ""
-    if title and site_name:
-        title = sitemap_service.strip_site_name(title, site_name)
     # A node "exists" if it hasn't been checked yet (http_status=0) or got a 2xx/3xx
     exists = not entry or entry.http_status == 0 or entry.http_status < 400
     return SitemapNodeInfo(
@@ -176,23 +174,24 @@ def _enrich_nodes(
         for entry in virtual_entries:
             if entry.title and entry.loc not in cached_urls:
                 result.entries.append(entry)
+        # Strip site names before caching so all consumers get clean titles
+        titled = [e for e in result.entries if e.title]
+        if len(titled) >= 3:
+            sitemap_service.strip_site_names_from_entries(titled)
         sitemap_service.save_to_cache(result)
     except Exception as e:
         logger.debug("Title enrichment failed: %s", e)
 
 
-def _sort_key(node: sitemap_service.TreeNode, site_name: str | list[str] = "") -> str:
-    """Sort key for tree nodes: stripped title (lowercase), falling back to name."""
+def _sort_key(node: sitemap_service.TreeNode) -> str:
+    """Sort key for tree nodes: title (lowercase), falling back to path segment name."""
     title = node.entry.title if node.entry and node.entry.title else ""
-    if title and site_name:
-        title = sitemap_service.strip_site_name(title, site_name)
     return title.lower() if title else node.name.lower()
 
 
 def _build_recursive_children(
     node: sitemap_service.TreeNode,
     origin: str,
-    site_name: str | list[str] = "",
     max_depth: int = 4,
     per_level: int = 25,
     _depth: int = 0,
@@ -201,6 +200,7 @@ def _build_recursive_children(
 
     Each child that itself has children is recursed up to max_depth levels.
     Children are sorted by title and capped at per_level items.
+    Titles are expected to be already stripped in the cache.
     """
     if _depth >= max_depth:
         return []
@@ -212,23 +212,23 @@ def _build_recursive_children(
         import heapq
         child_nodes = heapq.nsmallest(
             per_level, node.children.values(),
-            key=lambda n: _sort_key(n, site_name),
+            key=_sort_key,
         )
     else:
         child_nodes = sorted(
-            node.children.values(), key=lambda n: _sort_key(n, site_name)
+            node.children.values(), key=_sort_key
         )[:per_level]
 
     result = []
     for child in child_nodes:
-        info = _node_to_info(child, origin, site_name)
+        info = _node_to_info(child, origin)
         grandchild_count = len(child.children)
         if grandchild_count > 0:
             info.children_total = grandchild_count
             # Don't recurse into children that themselves have huge child lists
             if grandchild_count <= 1000:
                 info.children = _build_recursive_children(
-                    child, origin, site_name, max_depth, per_level, _depth + 1
+                    child, origin, max_depth, per_level, _depth + 1
                 )
         result.append(info)
 
@@ -301,7 +301,11 @@ def fetch_sitemap(request: SitemapFetchRequest):
     # Preserve titles from expired cache before saving
     sitemap_service.merge_titles_from_stale_cache(result)
 
-    # Cache the result
+    # Strip site names before caching so all consumers get clean titles
+    titled = [e for e in result.entries if e.title]
+    if len(titled) >= 3:
+        sitemap_service.strip_site_names_from_entries(titled)
+
     sitemap_service.save_to_cache(result)
 
     return SitemapFetchResponse(
@@ -342,12 +346,6 @@ def get_sitemap_tree(
             # Enrich the ancestor's title if needed
             if enrich:
                 _enrich_nodes([nearest], origin, result)
-            # Strip site name using all cached entries for detection,
-            # but only modifying the ancestor's title
-            if nearest.entry and nearest.entry.title:
-                titled = [e for e in result.entries if e.title]
-                if len(titled) >= 3:
-                    sitemap_service.strip_site_names_from_entries(titled)
             return SitemapTreeResponse(
                 ok=True,
                 in_sitemap=False,
@@ -388,17 +386,9 @@ def get_sitemap_tree(
         nodes_to_enrich.extend(sibling_nodes[:10])
         _enrich_nodes(nodes_to_enrich, origin, result)
 
-    # Strip common site name fragments from enriched titles (in-place).
-    # Uses multi-pass stripping to handle "Page | Brand | Tagline" patterns.
-    enriched_entries = [
-        n.entry for n in nodes_to_enrich
-        if n.entry and n.entry.title
-    ]
-    sitemap_service.strip_site_names_from_entries(enriched_entries)
-
     # Build recursive children (up to 4 levels, 25 per level)
-    # Titles are already stripped, so no site_name needed
-    recursive_children = _build_recursive_children(node, origin, site_name="")
+    # Titles are already stripped in cache
+    recursive_children = _build_recursive_children(node, origin)
 
     return SitemapTreeResponse(
         ok=True,
