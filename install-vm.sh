@@ -29,13 +29,13 @@ VM_PORTS=(6080 6081 8767 8768 8888 8889 9222)
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
 
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[0;33m'
-BLUE='\033[0;34m'
-BOLD='\033[1m'
-DIM='\033[2m'
-RESET='\033[0m'
+RED=$'\033[0;31m'
+GREEN=$'\033[0;32m'
+YELLOW=$'\033[0;33m'
+BLUE=$'\033[0;34m'
+BOLD=$'\033[1m'
+DIM=$'\033[2m'
+RESET=$'\033[0m'
 
 info()    { printf "${BLUE}▸${RESET} %s\n" "$*"; }
 success() { printf "${GREEN}✔${RESET} %s\n" "$*"; }
@@ -97,10 +97,10 @@ check_docker() {
 
   warn "Docker is not installed"
   echo ""
-  echo "  Inspekt VM needs Docker to run. Pick one:"
+  echo "  Inspekt VM needs Docker to run. Pick one (both are free):"
   echo ""
-  echo "    1) OrbStack  — lightweight, fast, recommended   (brew install orbstack)"
-  echo "    2) Docker Desktop — official Docker app          (brew install docker)"
+  echo "    1) OrbStack       — lightweight and fast (recommended)"
+  echo "    2) Docker Desktop — the official Docker app"
   echo "    3) I'll install Docker myself"
   echo ""
   local choice
