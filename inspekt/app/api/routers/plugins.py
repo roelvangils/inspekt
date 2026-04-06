@@ -22,6 +22,10 @@ router = APIRouter()
 BRIDGE_HTTP_HOST = "127.0.0.1"
 BRIDGE_HTTP_PORT = 8765
 
+# Control server (handles proxy endpoints)
+CONTROL_SERVER_HOST = "127.0.0.1"
+CONTROL_SERVER_PORT = 8888
+
 
 # ============================================================================
 # Request/Response Models
@@ -90,6 +94,7 @@ class PluginUpdateRequest(BaseModel):
     mcp_exposed: bool | None = Field(None, description="MCP exposure flag")
     unload_mode: str | None = Field(None, description="Unload behavior: 'toggle', 'custom', or 'none'")
     unload_code: str | None = Field(None, description="Custom unload JavaScript code")
+    proxy_config: dict | None = Field(None, description="Proxy script configuration")
 
 
 class PluginTestRequest(BaseModel):
@@ -255,6 +260,17 @@ def export_plugins(ids: str | None = None):
         plugin_ids = ids.split(",") if ids else None
         result = plugin_service.export_plugins(plugin_ids)
         return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/autorun")
+def get_autorun_plugins():
+    """Get all plugins with autorun enabled."""
+    try:
+        plugin_service = get_plugin_service()
+        plugins = plugin_service.get_autorun_plugins()
+        return {"ok": True, "plugins": plugins}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -450,22 +466,17 @@ def delete_plugin(plugin_id: str):
 
 
 @router.post("/{plugin_id}/run", response_model=PluginRunResponse)
-def run_plugin(plugin_id: str, capture_console: bool = True):
+def run_plugin(plugin_id: str, capture_console: bool = True, domain: str | None = None):
     """
-    Execute a plugin in the browser.
+    Execute a plugin in the browser (JS) or enable a proxy script (proxy).
 
     Args:
         plugin_id: Plugin slug ID
-        capture_console: Whether to capture console output
+        capture_console: Whether to capture console output (JS only)
+        domain: Domain scope for proxy plugins
 
     Returns:
         Execution result with optional console output
-
-    Examples:
-        ```bash
-        curl -X POST http://localhost:8000/api/plugins/text-spacing/run
-        curl -X POST "http://localhost:8000/api/plugins/text-spacing/run?capture_console=true"
-        ```
     """
     try:
         plugin_service = get_plugin_service()
@@ -474,12 +485,15 @@ def run_plugin(plugin_id: str, capture_console: bool = True):
         if not plugin:
             raise HTTPException(status_code=404, detail=f"Plugin '{plugin_id}' not found")
 
-        result = _execute_plugin_code(
-            code=plugin["code"],
-            timeout=plugin["timeout"],
-            capture_console=capture_console,
-            returns_data=plugin["returns_data"],
-        )
+        if plugin["engine"] == "proxy":
+            result = _toggle_proxy_script(plugin["code"], enabled=True, config=plugin.get("proxy_config"))
+        else:
+            result = _execute_plugin_code(
+                code=plugin["code"],
+                timeout=plugin["timeout"],
+                capture_console=capture_console,
+                returns_data=plugin["returns_data"],
+            )
 
         # Update run count
         plugin_service.increment_run_count(plugin_id)
@@ -494,24 +508,17 @@ def run_plugin(plugin_id: str, capture_console: bool = True):
 @router.post("/{plugin_id}/unload", response_model=PluginRunResponse)
 def unload_plugin(plugin_id: str, capture_console: bool = True):
     """
-    Unload/reverse a plugin's effects.
+    Unload/reverse a plugin's effects or disable a proxy script.
 
-    Behavior depends on the plugin's unload_mode:
-    - 'toggle': Re-runs the plugin code (for toggle-style plugins)
-    - 'custom': Runs the custom unload_code
-    - 'none': Returns error (plugin doesn't support unloading)
+    For JS plugins, behavior depends on unload_mode ('toggle', 'custom', 'none').
+    For proxy plugins, disables the mitmproxy script.
 
     Args:
         plugin_id: Plugin slug ID
-        capture_console: Whether to capture console output
+        capture_console: Whether to capture console output (JS only)
 
     Returns:
         Execution result with optional console output
-
-    Examples:
-        ```bash
-        curl -X POST http://localhost:8000/api/plugins/text-spacing/unload
-        ```
     """
     try:
         plugin_service = get_plugin_service()
@@ -519,6 +526,9 @@ def unload_plugin(plugin_id: str, capture_console: bool = True):
 
         if not plugin:
             raise HTTPException(status_code=404, detail=f"Plugin '{plugin_id}' not found")
+
+        if plugin["engine"] == "proxy":
+            return _toggle_proxy_script(plugin["code"], enabled=False)
 
         unload_mode = plugin.get("unload_mode", "none")
 
@@ -551,6 +561,28 @@ def unload_plugin(plugin_id: str, capture_console: bool = True):
             returns_data=plugin["returns_data"],
         )
 
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class AutorunToggleRequest(BaseModel):
+    """Request model for toggling autorun."""
+
+    enabled: bool = Field(..., description="Enable or disable autorun")
+    domains: str | None = Field(None, description="Domain/path patterns for autorun")
+
+
+@router.post("/{plugin_id}/autorun")
+def toggle_autorun(plugin_id: str, request: AutorunToggleRequest):
+    """Toggle autorun for a plugin."""
+    try:
+        plugin_service = get_plugin_service()
+        result = plugin_service.set_autorun(plugin_id, request.enabled, request.domains)
+        if not result.get("ok"):
+            raise HTTPException(status_code=404, detail=result.get("error"))
         return result
     except HTTPException:
         raise
@@ -624,6 +656,57 @@ def import_plugins(request: PluginImportRequest):
 # ============================================================================
 # Helper Functions
 # ============================================================================
+
+
+def _toggle_proxy_script(script_name: str, enabled: bool, config: dict | None = None) -> dict[str, Any]:
+    """
+    Enable or disable a mitmproxy script via the control server.
+
+    Args:
+        script_name: mitmproxy script name (e.g. 'strip_csp')
+        enabled: True to enable, False to disable
+        config: Optional script config (e.g. find/replace rules)
+
+    Returns:
+        Result dict with ok/error
+    """
+    base = f"http://{CONTROL_SERVER_HOST}:{CONTROL_SERVER_PORT}"
+    try:
+        # Auto-enable proxy globally when enabling a script
+        if enabled:
+            requests.post(f"{base}/proxy/toggle", json={"enabled": True}, timeout=5.0)
+
+        # Push script config if provided
+        if config and enabled:
+            requests.post(
+                f"{base}/proxy/scripts/{script_name}/config",
+                json=config,
+                timeout=5.0,
+            )
+
+        # Toggle the script
+        response = requests.post(
+            f"{base}/proxy/scripts/{script_name}/toggle",
+            json={"enabled": enabled},
+            timeout=10.0,
+        )
+
+        if response.status_code != 200:
+            return {"ok": False, "error": f"Control server returned HTTP {response.status_code}"}
+
+        data = response.json()
+        if not data.get("ok"):
+            return {"ok": False, "error": data.get("error", "Failed to toggle proxy script")}
+
+        return {
+            "ok": True,
+            "result": {"script": script_name, "enabled": data.get("enabled", enabled)},
+        }
+
+    except requests.exceptions.ConnectionError:
+        return {"ok": False, "error": "Could not connect to control server at port 8888"}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
 
 
 def _execute_plugin_code(
