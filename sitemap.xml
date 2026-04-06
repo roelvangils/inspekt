@@ -17,6 +17,14 @@
          <lastmod>2026-04-06</lastmod>
     </url>
     <url>
+         <loc>https://roelvangils.github.io/inspekt/blog-draft-context-menus/</loc>
+         <lastmod>2026-04-06</lastmod>
+    </url>
+    <url>
+         <loc>https://roelvangils.github.io/inspekt/blog-draft-css-lang-trick/</loc>
+         <lastmod>2026-04-06</lastmod>
+    </url>
+    <url>
          <loc>https://roelvangils.github.io/inspekt/caching/</loc>
          <lastmod>2026-04-06</lastmod>
     </url>
@@ -26,6 +34,10 @@
     </url>
     <url>
          <loc>https://roelvangils.github.io/inspekt/keyboard-focus-replay/</loc>
+         <lastmod>2026-04-06</lastmod>
+    </url>
+    <url>
+         <loc>https://roelvangils.github.io/inspekt/pdf-accessibility-roadmap/</loc>
          <lastmod>2026-04-06</lastmod>
     </url>
     <url>
@@ -42,6 +54,10 @@
     </url>
     <url>
          <loc>https://roelvangils.github.io/inspekt/url-scheme/</loc>
+         <lastmod>2026-04-06</lastmod>
+    </url>
+    <url>
+         <loc>https://roelvangils.github.io/inspekt/webctl-comparison/</loc>
          <lastmod>2026-04-06</lastmod>
     </url>
     <url>
@@ -89,6 +105,26 @@
          <lastmod>2026-04-06</lastmod>
     </url>
     <url>
+         <loc>https://roelvangils.github.io/inspekt/commands/extract/</loc>
+         <lastmod>2026-04-06</lastmod>
+    </url>
+    <url>
+         <loc>https://roelvangils.github.io/inspekt/commands/focused/</loc>
+         <lastmod>2026-04-06</lastmod>
+    </url>
+    <url>
+         <loc>https://roelvangils.github.io/inspekt/commands/inspected-css/</loc>
+         <lastmod>2026-04-06</lastmod>
+    </url>
+    <url>
+         <loc>https://roelvangils.github.io/inspekt/commands/pdf/</loc>
+         <lastmod>2026-04-06</lastmod>
+    </url>
+    <url>
+         <loc>https://roelvangils.github.io/inspekt/commands/press/</loc>
+         <lastmod>2026-04-06</lastmod>
+    </url>
+    <url>
          <loc>https://roelvangils.github.io/inspekt/commands/record/</loc>
          <lastmod>2026-04-06</lastmod>
     </url>
@@ -105,6 +141,10 @@
          <lastmod>2026-04-06</lastmod>
     </url>
     <url>
+         <loc>https://roelvangils.github.io/inspekt/commands/selection/</loc>
+         <lastmod>2026-04-06</lastmod>
+    </url>
+    <url>
          <loc>https://roelvangils.github.io/inspekt/commands/tunnel/</loc>
          <lastmod>2026-04-06</lastmod>
     </url>
@@ -117,7 +157,15 @@
          <lastmod>2026-04-06</lastmod>
     </url>
     <url>
+         <loc>https://roelvangils.github.io/inspekt/development/adding-commands/</loc>
+         <lastmod>2026-04-06</lastmod>
+    </url>
+    <url>
          <loc>https://roelvangils.github.io/inspekt/development/architecture/</loc>
+         <lastmod>2026-04-06</lastmod>
+    </url>
+    <url>
+         <loc>https://roelvangils.github.io/inspekt/development/bridge/</loc>
          <lastmod>2026-04-06</lastmod>
     </url>
     <url>
@@ -146,6 +194,10 @@
     </url>
     <url>
          <loc>https://roelvangils.github.io/inspekt/development/ui-development/</loc>
+         <lastmod>2026-04-06</lastmod>
+    </url>
+    <url>
+         <loc>https://roelvangils.github.io/inspekt/development/vm/</loc>
          <lastmod>2026-04-06</lastmod>
     </url>
     <url>
@@ -201,6 +253,10 @@
          <lastmod>2026-04-06</lastmod>
     </url>
     <url>
+         <loc>https://roelvangils.github.io/inspekt/getting-started/shell-completion/</loc>
+         <lastmod>2026-04-06</lastmod>
+    </url>
+    <url>
          <loc>https://roelvangils.github.io/inspekt/getting-started/updating/</loc>
          <lastmod>2026-04-06</lastmod>
     </url>
@@ -250,6 +306,10 @@
     </url>
     <url>
          <loc>https://roelvangils.github.io/inspekt/guide/overview/</loc>
+         <lastmod>2026-04-06</lastmod>
+    </url>
+    <url>
+         <loc>https://roelvangils.github.io/inspekt/guide/pdf-accessibility/</loc>
          <lastmod>2026-04-06</lastmod>
     </url>
     <url>
