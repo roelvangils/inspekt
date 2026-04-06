@@ -20,7 +20,7 @@ TARBALL_URL="https://github.com/roelvangils/inspekt/archive/refs/heads/main.tar.
 INSTALL_DIR="${INSPEKT_DIR:-$HOME/inspekt}"
 SCRIPT_URL="https://raw.githubusercontent.com/roelvangils/inspekt/main/install-vm.sh"
 
-INSTALLER_VERSION="0.4"
+INSTALLER_VERSION="0.5"
 
 IMAGE_NAME="inspekt-browser-vm"
 CONTAINER_NAME="inspekt-browser-vm"
@@ -84,12 +84,13 @@ check_docker() {
   fi
 
   if command -v docker &>/dev/null; then
-    error "Docker is installed but not running"
+    warn "Docker is installed but not running"
     echo ""
-    echo "  Please start Docker and re-run this script:"
-    rerun_hint
-    echo ""
-    exit 1
+    echo "  Trying to start it..."
+    # Try starting whichever Docker app is installed
+    open -a OrbStack 2>/dev/null || open -a Docker 2>/dev/null || true
+    wait_for_docker
+    return 0
   fi
 
   warn "Docker is not installed"
@@ -107,29 +108,13 @@ check_docker() {
   case "$choice" in
     1)
       install_via_brew "OrbStack" "--cask orbstack"
-      echo ""
-      info "Starting OrbStack..."
       open -a OrbStack
-      echo ""
-      echo "  OrbStack needs a moment to initialize. Once the menubar icon appears,"
-      echo "  re-run this script:"
-      echo ""
-      rerun_hint
-      echo ""
-      exit 0
+      wait_for_docker
       ;;
     2)
       install_via_brew "Docker Desktop" "--cask docker"
-      echo ""
-      info "Starting Docker Desktop..."
       open -a Docker
-      echo ""
-      echo "  Docker Desktop needs a moment to initialize. Once the whale icon"
-      echo "  appears in the menubar, re-run this script:"
-      echo ""
-      rerun_hint
-      echo ""
-      exit 0
+      wait_for_docker
       ;;
     3)
       echo ""
@@ -142,6 +127,34 @@ check_docker() {
       fatal "Invalid choice. Please enter 1, 2, or 3."
       ;;
   esac
+}
+
+wait_for_docker() {
+  info "Waiting for Docker to be ready..."
+
+  local max_wait=120
+  local waited=0
+
+  while ! docker info &>/dev/null 2>&1; do
+    sleep 3
+    waited=$((waited + 3))
+
+    if (( waited % 15 == 0 )); then
+      printf "  ${DIM}still waiting... (%ds)${RESET}\n" "$waited"
+    fi
+
+    if [[ $waited -ge $max_wait ]]; then
+      echo ""
+      error "Timed out after ${max_wait}s waiting for Docker"
+      echo ""
+      echo "  Please start Docker manually, then re-run this script:"
+      rerun_hint
+      echo ""
+      exit 1
+    fi
+  done
+
+  success "Docker is ready"
 }
 
 install_via_brew() {
