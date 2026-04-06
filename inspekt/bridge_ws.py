@@ -1380,37 +1380,13 @@ async def handle_http_run(request):
                     status=404
                 )
 
-        # Create ack event BEFORE sending, to avoid race condition where
-        # the ack arrives before we're ready to receive it
         request_id = str(uuid.uuid4())
-        ack_event = asyncio.Event()
-        ack_events[request_id] = ack_event
 
-        # Now send the code (using our pre-generated request_id)
+        # Send code to browser
         await send_code_to_browser_with_id(code, request_id, browser_index=browser_index, target_ws=target_ws)
 
-        try:
-            await asyncio.wait_for(ack_event.wait(), timeout=ACK_TIMEOUT)
-            # Ack received - browser is alive and processing
-            return web.json_response({"ok": True, "request_id": request_id})
-
-        except asyncio.TimeoutError:
-            # No ack within timeout - browser is likely frozen/unresponsive
-            # Clean up the pending request since it won't be processed
-            pending_requests.pop(request_id, None)
-
-            return web.json_response(
-                {
-                    "ok": False,
-                    "error": "browser_not_responding",
-                    "message": "Browser tab not responding. Try clicking on the tab or refreshing the page."
-                },
-                status=504
-            )
-
-        finally:
-            # Clean up ack event
-            ack_events.pop(request_id, None)
+        # Return immediately — the client polls /result for the outcome
+        return web.json_response({"ok": True, "request_id": request_id})
 
     except Exception as e:
         return web.json_response({"ok": False, "error": str(e)}, status=500)

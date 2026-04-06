@@ -800,9 +800,11 @@
                     }
 
                     if (message.type === 'execute') {
-                        console.log('[Inspekt Content] Forwarding to background script:', message.code);
                         const requestId = message.request_id;
                         const code = message.code;
+
+                        // Send ACK immediately so bridge knows we received the request
+                        ws.send(JSON.stringify({ type: 'execute_ack', request_id: requestId }));
 
                         try {
                             // Send to background script for CSP bypass execution
