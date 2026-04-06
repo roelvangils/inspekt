@@ -20,7 +20,7 @@ TARBALL_URL="https://github.com/roelvangils/inspekt/archive/refs/heads/feature/v
 INSTALL_DIR="${INSPEKT_DIR:-$HOME/inspekt}"
 SCRIPT_URL="https://raw.githubusercontent.com/roelvangils/inspekt/feature/vm-install-script/install-vm.sh"
 
-INSTALLER_VERSION="0.8"
+INSTALLER_VERSION="0.9"
 
 IMAGE_NAME="inspekt-browser-vm"
 CONTAINER_NAME="inspekt-browser-vm"
@@ -111,6 +111,7 @@ check_docker() {
       open -a OrbStack
       echo ""
       info "OrbStack is opening — please complete its setup wizard if prompted."
+      info "This may take a few minutes while it downloads its runtime. Sit tight!"
       wait_for_docker
       ;;
     2)
@@ -118,6 +119,7 @@ check_docker() {
       open -a Docker
       echo ""
       info "Docker Desktop is opening — please complete its setup wizard if prompted."
+      info "This may take a few minutes while it downloads its runtime. Sit tight!"
       wait_for_docker
       ;;
     3)
