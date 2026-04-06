@@ -95,5 +95,33 @@ mcp-test/
 # Marketing materials (separate repo?)
 marketing/
 
+# Inspekt scan output (YAML dumps from inspekt runs)
+inspekt_*.yaml
+inspekt/inspekt_*.yaml
+
+# Broken pip artifacts
+=*
+
+# Cache directories
+.cache/
+
+# Claude Code project config (machine-specific)
+.claude/projects/
+
+# TTS cache
+tts_cache.db
+
+# Test/scratch files
+test*.yaml
+kaka.yaml
+
+# Media files
+*.webm
+*.zip
+
+# Handoff prompts (temporary)
+*_HANDOFF.md
+
 # Misc
 *.pdf
+logos/
