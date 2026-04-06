@@ -686,49 +686,67 @@ class ControlHandler(BaseHTTPRequestHandler):
         if query_string:
             upstream_url += f'?{query_string}'
 
-        try:
-            # Read request body for POST/PUT/DELETE
-            body = None
-            if method in ('POST', 'PUT', 'DELETE'):
-                content_length = int(self.headers.get('Content-Length', 0))
-                if content_length > 0:
-                    body = self.rfile.read(content_length)
+        # Read request body for POST/PUT/DELETE
+        body = None
+        if method in ('POST', 'PUT', 'DELETE'):
+            content_length = int(self.headers.get('Content-Length', 0))
+            if content_length > 0:
+                body = self.rfile.read(content_length)
 
-            req = urllib.request.Request(upstream_url, data=body, method=method)
-            # Forward Content-Type header
-            content_type = self.headers.get('Content-Type')
-            if content_type:
-                req.add_header('Content-Type', content_type)
+        # Retry on connection refused — the API may still be starting up
+        max_retries = 5
+        retry_delay = 1.0  # seconds
+        last_error = None
 
-            with urllib.request.urlopen(req, timeout=30) as resp:
-                resp_body = resp.read()
-                self.send_response(resp.status)
+        for attempt in range(max_retries):
+            try:
+                req = urllib.request.Request(upstream_url, data=body, method=method)
+                content_type = self.headers.get('Content-Type')
+                if content_type:
+                    req.add_header('Content-Type', content_type)
+
+                with urllib.request.urlopen(req, timeout=30) as resp:
+                    resp_body = resp.read()
+                    self.send_response(resp.status)
+                    self.send_header('Access-Control-Allow-Origin', '*')
+                    for header in ('Content-Type', 'Content-Disposition', 'Cache-Control', 'ETag'):
+                        val = resp.headers.get(header)
+                        if val:
+                            self.send_header(header, val)
+                    self.end_headers()
+                    self.wfile.write(resp_body)
+                return True  # success
+            except urllib.error.HTTPError as e:
+                resp_body = e.read() if hasattr(e, 'read') else b''
+                self.send_response(e.code)
+                self.send_header('Content-Type', e.headers.get('Content-Type', 'text/html'))
                 self.send_header('Access-Control-Allow-Origin', '*')
-                # Forward relevant response headers
-                for header in ('Content-Type', 'Content-Disposition', 'Cache-Control', 'ETag'):
-                    val = resp.headers.get(header)
-                    if val:
-                        self.send_header(header, val)
                 self.end_headers()
                 self.wfile.write(resp_body)
-        except urllib.error.HTTPError as e:
-            resp_body = e.read() if hasattr(e, 'read') else b''
-            self.send_response(e.code)
-            self.send_header('Content-Type', e.headers.get('Content-Type', 'text/html'))
-            self.send_header('Access-Control-Allow-Origin', '*')
-            self.end_headers()
-            self.wfile.write(resp_body)
-        except Exception as e:
-            error_msg = html_module.escape(str(e))
-            html = f"""<!DOCTYPE html>
+                return True  # HTTP error from upstream, not a connection issue
+            except urllib.error.URLError as e:
+                # URLError wraps ConnectionRefusedError in e.reason
+                if isinstance(e.reason, ConnectionRefusedError) and attempt < max_retries - 1:
+                    last_error = e
+                    time.sleep(retry_delay)
+                    continue
+                last_error = e
+                break
+            except Exception as e:
+                last_error = e
+                break
+
+        # All retries exhausted or non-retryable error
+        error_msg = html_module.escape(str(last_error))
+        html = f"""<!DOCTYPE html>
 <html><head><meta charset="utf-8"><title>Proxy Error</title>
 <style>body {{ font-family: system-ui; padding: 2rem; }} h1 {{ color: #e74c3c; }}</style>
 </head><body><h1>Failed to reach Inspekt API</h1><p>{error_msg}</p></body></html>"""
-            self.send_response(502)
-            self.send_header('Content-Type', 'text/html; charset=utf-8')
-            self.send_header('Access-Control-Allow-Origin', '*')
-            self.end_headers()
-            self.wfile.write(html.encode())
+        self.send_response(502)
+        self.send_header('Content-Type', 'text/html; charset=utf-8')
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.end_headers()
+        self.wfile.write(html.encode())
         return True
 
     def do_OPTIONS(self):

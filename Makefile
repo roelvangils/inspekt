@@ -1,4 +1,6 @@
-.PHONY: help dev install clean test test-unit test-integration test-e2e lint format typecheck pre-commit all
+.PHONY: help dev install clean test test-unit test-integration test-e2e lint format typecheck pre-commit all \
+       vm-start vm-stop vm-restart vm-rebuild vm-status vm-logs vm-shell vm-services vm-health \
+       vm-restart-control vm-restart-terminal vm-restart-chromium vm-restart-proxy
 
 # Default target
 help:
@@ -86,3 +88,57 @@ pre-commit:
 all: format lint typecheck test
 	@echo ""
 	@echo "✓ All checks passed!"
+
+# ── Browser VM ──────────────────────────────────────────────
+
+# Auto-detect container name (CLI creates "inspekt-browser-vm", Compose creates "inspekt-browser")
+VM_CONTAINER := $(shell docker ps --format '{{.Names}}' --filter 'name=inspekt-browser' 2>/dev/null | head -1)
+
+vm-start:
+	inspekt vm start
+
+vm-stop:
+	inspekt vm stop
+
+vm-restart:
+	inspekt vm restart
+
+vm-rebuild:
+	inspekt vm restart --rebuild
+
+vm-status:
+	inspekt vm status
+
+vm-logs:
+	inspekt vm logs
+
+vm-shell:
+	inspekt vm shell
+
+# Restart individual services inside the container
+vm-restart-control:
+	@if [ -z "$(VM_CONTAINER)" ]; then echo "Error: No VM container running"; exit 1; fi
+	docker exec $(VM_CONTAINER) supervisorctl restart control-server
+
+vm-restart-terminal:
+	@if [ -z "$(VM_CONTAINER)" ]; then echo "Error: No VM container running"; exit 1; fi
+	docker exec $(VM_CONTAINER) supervisorctl restart terminal-server
+
+vm-restart-chromium:
+	@if [ -z "$(VM_CONTAINER)" ]; then echo "Error: No VM container running"; exit 1; fi
+	docker exec $(VM_CONTAINER) supervisorctl restart chromium
+
+vm-restart-proxy:
+	@if [ -z "$(VM_CONTAINER)" ]; then echo "Error: No VM container running"; exit 1; fi
+	docker exec $(VM_CONTAINER) supervisorctl restart mitmproxy
+
+# List all supervised services and their status
+vm-services:
+	@if [ -z "$(VM_CONTAINER)" ]; then echo "Error: No VM container running"; exit 1; fi
+	docker exec $(VM_CONTAINER) supervisorctl status
+
+# Health check all endpoints (hits host ports, no container exec needed)
+vm-health:
+	@printf "Control server (8888): " && curl -sf http://localhost:8888/health > /dev/null && echo "✓" || echo "✗"
+	@printf "noVNC (6080):          " && curl -sf http://localhost:6080/ > /dev/null && echo "✓" || echo "✗"
+	@printf "CDP (9222):            " && curl -sf http://localhost:9222/json/version > /dev/null && echo "✓" || echo "✗"

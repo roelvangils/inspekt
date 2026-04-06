@@ -1,6 +1,6 @@
 # Inspekt Browser VM - Chromium + noVNC + Inspekt
 # A complete virtual browser environment with Inspekt pre-installed
-# Based on Alpine Linux for minimal image size (~1GB)
+# Based on Alpine Linux for minimal image size
 #
 # Build from project root:
 #   docker build -t inspekt-browser-vm -f docker/browser-vm/Dockerfile .
@@ -469,6 +469,37 @@ RUN chmod +x /entrypoint.sh /root/.config/openbox/autostart /opt/inspekt-chromiu
     # Note: pointer/keyboard event interception previously injected into vnc.html
     # is no longer needed — control-panel.html embeds RFB directly (no iframe),
     # so all event handling happens via capture-phase listeners on the VNC container.
+
+# ── Final cleanup: remove build-time-only tools and dead weight ──
+# All removals in a single layer to avoid inflating the image.
+# Saves ~80 MB by stripping things only needed during docker build.
+RUN \
+    # pip is only needed at build time (both system and venv copies)
+    rm -rf /opt/inspekt/.venv/lib/python3.12/site-packages/pip /opt/inspekt/.venv/lib/python3.12/site-packages/pip-*.dist-info && \
+    rm -rf /usr/lib/python3.12/site-packages/pip /usr/lib/python3.12/site-packages/pip-*.dist-info && \
+    # NOTE: do NOT remove setuptools/pkg_resources from system Python — supervisord depends on it
+    # setuptools in venv is safe to remove (inspekt doesn't use it at runtime)
+    rm -rf /opt/inspekt/.venv/lib/python3.12/site-packages/setuptools /opt/inspekt/.venv/lib/python3.12/site-packages/setuptools-*.dist-info && \
+    # mkcert — certs are already generated, binary no longer needed
+    rm -f /usr/local/bin/mkcert && \
+    # noVNC test suite, docs, and snap packaging — never served
+    rm -rf /usr/share/novnc/tests /usr/share/novnc/docs /usr/share/novnc/snap && \
+    # Python stdlib modules unused at runtime
+    rm -rf /usr/lib/python3.12/ensurepip && \
+    rm -rf /usr/lib/python3.12/lib2to3 && \
+    rm -rf /usr/lib/python3.12/pydoc_data && \
+    rm -rf /usr/lib/python3.12/turtledemo && \
+    rm -f /usr/lib/python3.12/turtle.py && \
+    # Test suites shipped inside pip packages
+    rm -rf /opt/inspekt/.venv/lib/python3.12/site-packages/tornado/test && \
+    rm -rf /opt/inspekt/.venv/lib/python3.12/site-packages/jsonschema/tests && \
+    rm -rf /opt/inspekt/.venv/lib/python3.12/site-packages/referencing/tests && \
+    rm -rf /opt/inspekt/.venv/lib/python3.12/site-packages/jsonschema_specifications/tests && \
+    rm -rf /opt/inspekt/.venv/lib/python3.12/site-packages/mitmproxy/test && \
+    # Compiled Python bytecode — regenerated on first import, negligible startup cost
+    find /opt/inspekt/.venv -name '*.pyc' -delete && \
+    find /opt/inspekt/.venv -type d -name '__pycache__' -empty -delete && \
+    true
 
 # Expose ports
 EXPOSE 443 6080 6081 7835 8767 8768 8889 9222

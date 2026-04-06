@@ -431,6 +431,7 @@ def start(rebuild, no_open, dev, no_dev):
             webbrowser.open(f"http://localhost:{NOVNC_PORT}/control.html")
         return
 
+    start_time = time.time()
     click.echo("Starting Inspekt Browser VM...\n")
 
     # SAFEGUARD 1: Check for orphaned containers from old image versions
@@ -499,12 +500,15 @@ def start(rebuild, no_open, dev, no_dev):
 
     click.echo("  ✓ VM started and verified")
 
+    elapsed = time.time() - start_time
+    elapsed_str = f" in {elapsed:.1f}s" if elapsed >= 1 else ""
+
     if dev:
-        click.echo(f"\n✓ Inspekt Browser VM is running (development mode)\n")
+        click.echo(f"\n✓ Inspekt Browser VM is running{elapsed_str} (development mode)\n")
         click.echo("  ⚠ Note: Container restart required for file changes")
         click.echo("         (noVNC caches files at startup)\n")
     else:
-        click.echo(f"\n✓ Inspekt Browser VM is running\n")
+        click.echo(f"\n✓ Inspekt Browser VM is running{elapsed_str}\n")
     click.echo(f"  Control panel: http://localhost:{NOVNC_PORT}/control.html")
     click.echo(f"  VNC viewer:    http://localhost:{NOVNC_PORT}/vnc.html")
 
@@ -570,6 +574,7 @@ def restart(rebuild, dev, no_dev):
         click.echo("Error: Docker is not running", err=True)
         sys.exit(1)
 
+    start_time = time.time()
     click.echo("Restarting Inspekt Browser VM...\n")
 
     # Stop and remove all VM containers (running, stopped, or orphaned)
@@ -610,11 +615,14 @@ def restart(rebuild, dev, no_dev):
 
     click.echo("  ✓ VM started")
 
+    elapsed = time.time() - start_time
+    elapsed_str = f" in {elapsed:.1f}s" if elapsed >= 1 else ""
+
     if dev:
-        click.echo(f"\n✓ Inspekt Browser VM restarted (development mode)\n")
+        click.echo(f"\n✓ Inspekt Browser VM restarted{elapsed_str} (development mode)\n")
         click.echo("  ⚠ Note: Container restart required for file changes\n")
     else:
-        click.echo(f"\n✓ Inspekt Browser VM restarted\n")
+        click.echo(f"\n✓ Inspekt Browser VM restarted{elapsed_str}\n")
     click.echo(f"  Control panel: http://localhost:{NOVNC_PORT}/control.html")
 
 
