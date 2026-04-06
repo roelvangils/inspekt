@@ -11,7 +11,16 @@ from inspekt.services.script_loader import ScriptLoader
 
 
 def html_output_options(fn):
-    """Decorator placeholder for HTML output options (--raw, --copy, etc.)."""
+    """Shared Click options for HTML/CSS output formatting."""
+    import functools
+    fn = click.option("--indent", type=int, default=2, help="Indentation width")(fn)
+    fn = click.option("--theme", type=click.Choice(["monokai", "github", "dracula", "none"]), default="none", help="Syntax highlighting theme")(fn)
+    fn = click.option("--colors/--no-colors", default=True, help="Enable ANSI colors in output")(fn)
+    fn = click.option("--compact", is_flag=True, help="Compact single-line output")(fn)
+    fn = click.option("--pretty", is_flag=True, help="Pretty-print output")(fn)
+    fn = click.option("--json", "output_json", is_flag=True, help="Output as JSON")(fn)
+    fn = click.option("--copy", is_flag=True, help="Copy output to clipboard")(fn)
+    fn = click.option("--raw", is_flag=True, help="Raw output without decorations")(fn)
     return fn
 
 
