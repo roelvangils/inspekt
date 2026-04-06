@@ -50,11 +50,6 @@ ask() {
   [[ -z "$answer" || "$answer" =~ ^[Yy] ]]
 }
 
-prompt_choice() {
-  printf "${BOLD}%s${RESET} " "$1" >/dev/tty
-  read -r choice </dev/tty
-  echo "$choice"
-}
 
 rerun_hint() {
   # Show the right command depending on how the script was invoked
@@ -104,7 +99,8 @@ check_docker() {
   echo "    3) I'll install Docker myself"
   echo ""
   local choice
-  choice=$(prompt_choice "Choice [1/2/3]:")
+  printf "${BOLD}Choice [1/2/3]:${RESET} " >/dev/tty
+  read -r choice </dev/tty
 
   case "$choice" in
     1)
