@@ -269,12 +269,22 @@ def fetch_sitemap(request: SitemapFetchRequest):
     if not urls:
         return SitemapFetchResponse(ok=False, error="No sitemap found")
 
-    # Fetch and parse the first discovered sitemap (flatten index sitemaps)
+    # Fetch all discovered sitemaps and merge entries (multilingual sites
+    # often have separate sitemaps per language in robots.txt)
     try:
         result = sitemap_service.fetch_sitemap(urls[0], flatten=True)
+        seen_urls = {e.loc for e in result.entries}
+        for extra_url in urls[1:]:
+            extra = sitemap_service.fetch_sitemap(extra_url, flatten=True)
+            for entry in extra.entries:
+                if entry.loc not in seen_urls:
+                    result.entries.append(entry)
+                    seen_urls.add(entry.loc)
+            result.errors.extend(extra.errors)
+            result.child_sitemaps.extend(extra.child_sitemaps)
         result.origin = origin
         result.discovered_via = method
-        result.source_url = urls[0]
+        result.source_url = urls[0] if len(urls) == 1 else f"{urls[0]} (+{len(urls) - 1} more)"
     except Exception as e:
         return SitemapFetchResponse(ok=False, error=f"Fetch failed: {e}")
 
