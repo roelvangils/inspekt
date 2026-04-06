@@ -26,6 +26,9 @@ class Category(str, Enum):
     NETWORK = "Network"
     DEBUGGING = "Debugging"
     PLUGINS = "Plugins"
+    CONTROL = "Control"
+    RECORDING = "Recording"
+    UTILITIES = "Utilities"
 
 
 # Order for displaying categories in UI
@@ -41,6 +44,9 @@ CATEGORY_ORDER = [
     Category.NETWORK,
     Category.DEBUGGING,
     Category.PLUGINS,
+    Category.CONTROL,
+    Category.RECORDING,
+    Category.UTILITIES,
 ]
 
 
@@ -48,6 +54,22 @@ class EmptyParams(BaseModel):
     """Empty parameter model for commands with no inputs."""
 
     pass
+
+
+class EmptyResponse(BaseModel):
+    """Empty response model for commands with no output."""
+
+    pass
+
+
+@dataclass
+class SubcommandDefinition:
+    """Definition for a subcommand within a command group."""
+
+    name: str
+    description: str
+    params_schema: type[BaseModel] = EmptyParams
+    examples: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -100,6 +122,18 @@ class CommandDefinition:
     # === MCP Configuration ===
     mcp_name: str | None = None  # Override MCP tool name (default: id)
     mcp_enabled_default: bool = True  # Default MCP enabled state
+
+    # === URL Scheme (inspekt:// deep links) ===
+    url_scheme: str | None = None  # Scheme name, e.g., "open" → inspekt://open
+    url_scheme_params: dict[str, str] = field(default_factory=dict)  # Param name → description
+    url_scheme_examples: list[str] = field(default_factory=list)  # Example URLs
+    url_scheme_output_mode: str | None = None  # Default output mode for scheme
+    url_scheme_allowed_output_modes: list[str] = field(default_factory=list)  # Allowed modes
+    url_scheme_timeout: int | None = None  # Timeout in seconds for scheme execution
+
+    # === Command Groups ===
+    is_group: bool = False  # True if this is a group with subcommands
+    subcommands: list[SubcommandDefinition] = field(default_factory=list)  # Subcommand definitions
 
     # === Metadata ===
     examples: list[str] = field(default_factory=list)  # Usage examples
