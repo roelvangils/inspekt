@@ -20,7 +20,7 @@ TARBALL_URL="https://github.com/roelvangils/inspekt/archive/refs/heads/main.tar.
 INSTALL_DIR="${INSPEKT_DIR:-$HOME/inspekt}"
 SCRIPT_URL="https://raw.githubusercontent.com/roelvangils/inspekt/main/install-vm.sh"
 
-INSTALLER_VERSION="0.3"
+INSTALLER_VERSION="0.4"
 
 IMAGE_NAME="inspekt-browser-vm"
 CONTAINER_NAME="inspekt-browser-vm"
@@ -151,8 +151,8 @@ install_via_brew() {
   if ! command -v brew &>/dev/null; then
     info "Installing Homebrew first..."
     echo ""
-    # Homebrew's installer reads from /dev/tty internally, so this works with curl | bash
-    /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+    # Redirect stdin from /dev/tty so Homebrew runs interactively even under curl | bash
+    /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" </dev/tty
 
     # Add Homebrew to PATH for Apple Silicon
     if [[ -f /opt/homebrew/bin/brew ]]; then
