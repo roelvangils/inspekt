@@ -4570,14 +4570,284 @@
         // Stubs for features defined in external modules
         // (inspect tracking, context menus, VNC overlay)
         // =============================================
+        // =============================================
+        // Stubs for inspect tracking (full impl TBD)
+        // =============================================
         let _inspectTrackingActive = false;
-        let _isMenuOpen = false;
         let _DEBUG_DUMMY_MENU = false;
         const _tabInspectState = {};
         function _stopInspectTracking() {}
         function _pollInspectRect() {}
-        function showContextMenu(e, items) { console.warn('[ContextMenu] Not yet initialized'); }
-        function handleZoom(direction) { console.warn('[Zoom] Not yet initialized'); }
+
+        // =============================================
+        // Context Menu System
+        // =============================================
+        let activeContextMenu = null;
+        let _lastMenuItemIdx = -1;
+
+        function _isMenuOpen() { return activeContextMenu !== null; }
+
+        let _menuScrollLock = null;
+        function _lockScroll() {
+            _menuScrollLock = (e) => { e.preventDefault(); };
+            document.addEventListener('wheel', _menuScrollLock, { passive: false });
+            document.addEventListener('touchmove', _menuScrollLock, { passive: false });
+        }
+        function _unlockScroll() {
+            if (_menuScrollLock) {
+                document.removeEventListener('wheel', _menuScrollLock);
+                document.removeEventListener('touchmove', _menuScrollLock);
+                _menuScrollLock = null;
+            }
+        }
+
+        function _flickerAndDismiss(btn, action) {
+            if (_platform === 'macos') {
+                const menuRef = activeContextMenu;
+                btn.classList.add('flickering');
+                setTimeout(() => {
+                    if (activeContextMenu === menuRef) dismissContextMenu();
+                    action();
+                }, 160);
+            } else {
+                dismissContextMenu();
+                action();
+            }
+        }
+
+        function showContextMenu(e, items) {
+            dismissContextMenu(true);
+
+            const menu = document.createElement('div');
+            menu.className = 'context-menu';
+            menu.setAttribute('role', 'menu');
+            menu.setAttribute('aria-label', 'Context menu');
+
+            menu.addEventListener('contextmenu', ev => ev.preventDefault());
+            menu.addEventListener('mouseleave', () => {
+                menu.focus({ preventScroll: true });
+            });
+
+            items.forEach((item, i) => {
+                if (item.hidden) return;
+                if (item.separator) {
+                    const sep = document.createElement('div');
+                    sep.setAttribute('role', 'separator');
+                    menu.appendChild(sep);
+                    return;
+                }
+                if (item.navRow) {
+                    const row = document.createElement('div');
+                    row.className = 'context-menu-nav';
+                    row.setAttribute('role', 'group');
+                    item.navRow.forEach(nav => {
+                        const btn = document.createElement('button');
+                        btn.setAttribute('role', 'menuitem');
+                        const tpl = document.createElement('template');
+                        tpl.innerHTML = nav.icon;
+                        btn.appendChild(tpl.content.firstChild);
+                        btn.setAttribute('aria-label', nav.label);
+                        btn.title = nav.label;
+                        btn.tabIndex = -1;
+                        if (nav.disabled) btn.setAttribute('aria-disabled', 'true');
+                        btn.onclick = () => {
+                            if (nav.disabled) return;
+                            _flickerAndDismiss(btn, nav.action);
+                        };
+                        row.appendChild(btn);
+                    });
+                    menu.appendChild(row);
+                    return;
+                }
+                if (item.checkbox) {
+                    const btn = document.createElement('button');
+                    btn.setAttribute('role', 'menuitemcheckbox');
+                    btn.setAttribute('aria-checked', item.checked ? 'true' : 'false');
+                    btn.tabIndex = -1;
+
+                    const checkIcon = document.createElement('span');
+                    checkIcon.className = 'check-icon';
+                    const checkSvg = '<svg width="10" height="10" viewBox="0 0 10 10"><path d="M2 5l2.5 2.5L8 3" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+                    checkIcon.innerHTML = item.checked ? checkSvg : '';
+                    btn.appendChild(checkIcon);
+
+                    const label = document.createElement('span');
+                    label.textContent = item.label;
+                    btn.appendChild(label);
+
+                    btn.onclick = (ev) => {
+                        ev.stopPropagation();
+                        const newState = btn.getAttribute('aria-checked') !== 'true';
+                        btn.setAttribute('aria-checked', newState ? 'true' : 'false');
+                        checkIcon.innerHTML = newState ? checkSvg : '';
+                        if (item.onToggle) item.onToggle(newState);
+                    };
+                    menu.appendChild(btn);
+                    return;
+                }
+
+                const btn = document.createElement('button');
+                btn.setAttribute('role', 'menuitem');
+                btn.tabIndex = -1;
+                if (item.submenu) {
+                    const labelSpan = document.createElement('span');
+                    labelSpan.textContent = item.label;
+                    labelSpan.style.flex = '1';
+                    btn.appendChild(labelSpan);
+                    const chevron = document.createElement('span');
+                    chevron.className = 'submenu-chevron';
+                    chevron.textContent = String.fromCodePoint(0x100BFB);
+                    btn.appendChild(chevron);
+                } else {
+                    btn.textContent = item.label;
+                }
+                if (item.title) btn.title = item.title;
+                if (item.disabled) {
+                    btn.setAttribute('aria-disabled', 'true');
+                } else {
+                    btn.onclick = () => _flickerAndDismiss(btn, item.action);
+                }
+                menu.appendChild(btn);
+            });
+
+            document.body.appendChild(menu);
+            activeContextMenu = menu;
+
+            _getMenuItems().forEach((item, i) => {
+                item.addEventListener('mouseenter', () => {
+                    item.focus({ preventScroll: true });
+                    _lastMenuItemIdx = i;
+                });
+            });
+
+            const rect = menu.getBoundingClientRect();
+            let x = e.clientX;
+            let y = e.clientY;
+            if (x + rect.width > window.innerWidth) x = window.innerWidth - rect.width - 4;
+            if (y + rect.height > window.innerHeight) y = window.innerHeight - rect.height - 4;
+            menu.style.left = x + 'px';
+            menu.style.top = y + 'px';
+
+            _lockScroll();
+            menu.tabIndex = -1;
+            menu.focus({ preventScroll: true });
+
+            requestAnimationFrame(() => {
+                document.addEventListener('mousedown', onMenuOutsideClick);
+                document.addEventListener('keydown', handleMenuKeydown);
+                window.addEventListener('blur', onMenuBlur);
+            });
+        }
+
+        function _getMenuItems() {
+            if (!activeContextMenu) return [];
+            return Array.from(activeContextMenu.querySelectorAll(
+                '[role="menuitem"]:not([aria-disabled="true"]), [role="menuitemcheckbox"]:not([aria-disabled="true"])'
+            ));
+        }
+
+        function _focusMenuItem(items, i) {
+            items[i].focus({ preventScroll: true });
+            _lastMenuItemIdx = i;
+        }
+
+        function handleMenuKeydown(e) {
+            if (!activeContextMenu) return;
+            if (['Escape', 'ArrowDown', 'ArrowUp', 'Home', 'End', 'PageUp', 'PageDown', 'Enter', ' ', 'Tab'].includes(e.key)) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+            if (e.key === 'Escape' || e.key === 'Tab') { dismissContextMenu(); return; }
+            const items = _getMenuItems();
+            if (items.length === 0) return;
+            const idx = items.indexOf(document.activeElement);
+            if (e.key === 'Enter' || e.key === ' ') { if (idx >= 0) document.activeElement.click(); return; }
+            let ei = idx;
+            if (ei < 0 && _lastMenuItemIdx >= 0 && _lastMenuItemIdx < items.length) ei = _lastMenuItemIdx;
+            if (e.key === 'ArrowDown') { _focusMenuItem(items, ei < 0 ? 0 : Math.min(ei + 1, items.length - 1)); }
+            else if (e.key === 'ArrowUp') { _focusMenuItem(items, ei < 0 ? items.length - 1 : Math.max(ei - 1, 0)); }
+            else if (e.key === 'Home' || e.key === 'PageUp') { _focusMenuItem(items, 0); }
+            else if (e.key === 'End' || e.key === 'PageDown') { _focusMenuItem(items, items.length - 1); }
+            else if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+                const char = e.key.toLowerCase();
+                const i = items.findIndex(item => item.textContent.trim().toLowerCase().startsWith(char));
+                if (i >= 0) _focusMenuItem(items, i);
+            }
+        }
+
+        function onMenuOutsideClick(e) {
+            if (activeContextMenu && !activeContextMenu.contains(e.target)) dismissContextMenu();
+        }
+        function onMenuBlur() { dismissContextMenu(); }
+
+        function dismissContextMenu(immediate) {
+            if (!activeContextMenu) return;
+            _unlockScroll();
+            _lastMenuItemIdx = -1;
+            document.removeEventListener('mousedown', onMenuOutsideClick);
+            document.removeEventListener('keydown', handleMenuKeydown);
+            window.removeEventListener('blur', onMenuBlur);
+            if (immediate === true) { activeContextMenu.remove(); activeContextMenu = null; return; }
+            const menu = activeContextMenu;
+            activeContextMenu = null;
+            menu.classList.add('closing');
+            menu.addEventListener('animationend', () => menu.remove(), { once: true });
+        }
+
+        // =============================================
+        // Zoom Control
+        // =============================================
+        const ZOOM_STEPS = [0.25, 0.33, 0.5, 0.67, 0.75, 0.8, 0.9, 1.0, 1.1, 1.25, 1.5, 1.75, 2.0, 2.5, 3.0, 4.0, 5.0];
+        const ZOOM_MESSAGES = {
+            0.25: 'Minimum zoom level',
+            0.5:  'Good for seeing the full layout at a glance',
+            1.0:  'Default zoom level',
+            1.5:  'Common accessibility zoom level',
+            2.0:  'WCAG requires content to be usable at this level',
+            3.0:  'Tests extreme zoom for low-vision users',
+            4.0:  'WCAG 1.4.10 requires content reflow at this level',
+            5.0:  'Maximum zoom level',
+        };
+        let currentZoom = 1.0;
+
+        async function handleZoom(action) {
+            let targetZoom;
+            if (action === 'reset') {
+                targetZoom = 1.0;
+            } else if (action === 'in') {
+                const next = ZOOM_STEPS.find(s => s > currentZoom + 0.001);
+                targetZoom = next || ZOOM_STEPS[ZOOM_STEPS.length - 1];
+            } else {
+                const prev = [...ZOOM_STEPS].reverse().find(s => s < currentZoom - 0.001);
+                targetZoom = prev || ZOOM_STEPS[0];
+            }
+            try {
+                const resp = await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/zoom`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ level: targetZoom })
+                });
+                const data = await resp.json();
+                if (data.ok) {
+                    currentZoom = targetZoom;
+                    showZoomHUD(targetZoom);
+                }
+            } catch (e) {
+                console.warn('[Zoom] Failed:', e);
+            }
+        }
+
+        function showZoomHUD(level) {
+            const pct = Math.round(level * 100);
+            const msg = ZOOM_MESSAGES[level];
+            const text = msg ? `Zoom: ${pct}% — ${msg}` : `Zoom: ${pct}%`;
+            showToast(text, { type: 'dark', duration: 2000 });
+        }
+
+        fetch(`http://${VNC_HOST}:${CONTROL_PORT}/zoom`)
+            .then(r => r.json())
+            .then(data => { if (data.ok) currentZoom = data.zoom; })
+            .catch(() => {});
 
         // =============================================
         // Shared Nav Icons (reused across context menus)
