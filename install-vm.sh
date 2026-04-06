@@ -20,7 +20,7 @@ TARBALL_URL="https://github.com/roelvangils/inspekt/archive/refs/heads/main.tar.
 INSTALL_DIR="${INSPEKT_DIR:-$HOME/inspekt}"
 SCRIPT_URL="https://raw.githubusercontent.com/roelvangils/inspekt/main/install-vm.sh"
 
-INSTALLER_VERSION="0.5"
+INSTALLER_VERSION="0.6"
 
 IMAGE_NAME="inspekt-browser-vm"
 CONTAINER_NAME="inspekt-browser-vm"
@@ -171,6 +171,8 @@ install_via_brew() {
     if [[ -f /opt/homebrew/bin/brew ]]; then
       eval "$(/opt/homebrew/bin/brew shellenv)"
     fi
+    echo ""
+    success "Homebrew installed (ignore the 'Next steps' above — the script handles it)"
     echo ""
   fi
 
