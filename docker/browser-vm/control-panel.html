@@ -4567,6 +4567,16 @@
         console.log('[Inspekt] Port config:', { pagePort, VNC_PORT, CONTROL_PORT, TERMINAL_PORT });
 
         // =============================================
+        // Stubs for features defined in external modules
+        // (inspect tracking, context menus, VNC overlay)
+        // =============================================
+        let _inspectTrackingActive = false;
+        const _tabInspectState = {};
+        function _stopInspectTracking() {}
+        function _pollInspectRect() {}
+        function showContextMenu(e, items) { console.warn('[ContextMenu] Not yet initialized'); }
+
+        // =============================================
         // Shared Nav Icons (reused across context menus)
         // =============================================
         const NAV_ICONS = {

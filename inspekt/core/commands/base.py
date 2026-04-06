@@ -159,6 +159,10 @@ class CommandDefinition:
             return self.mcp_name
         return self.id  # MCP uses snake_case
 
+    def has_url_scheme(self) -> bool:
+        """Check if this command has a URL scheme registered."""
+        return self.url_scheme is not None
+
     def get_input_schema(self) -> dict[str, Any]:
         """Get JSON Schema for input parameters (for MCP)."""
         schema = self.params_schema.model_json_schema()
