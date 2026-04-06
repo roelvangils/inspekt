@@ -20,7 +20,7 @@ TARBALL_URL="https://github.com/roelvangils/inspekt/archive/refs/heads/main.tar.
 INSTALL_DIR="${INSPEKT_DIR:-$HOME/inspekt}"
 SCRIPT_URL="https://raw.githubusercontent.com/roelvangils/inspekt/main/install-vm.sh"
 
-INSTALLER_VERSION="0.6"
+INSTALLER_VERSION="0.7"
 
 IMAGE_NAME="inspekt-browser-vm"
 CONTAINER_NAME="inspekt-browser-vm"
@@ -109,11 +109,15 @@ check_docker() {
     1)
       install_via_brew "OrbStack" "--cask orbstack"
       open -a OrbStack
+      echo ""
+      info "OrbStack is opening — please complete its setup wizard if prompted."
       wait_for_docker
       ;;
     2)
       install_via_brew "Docker Desktop" "--cask docker"
       open -a Docker
+      echo ""
+      info "Docker Desktop is opening — please complete its setup wizard if prompted."
       wait_for_docker
       ;;
     3)
@@ -132,14 +136,14 @@ check_docker() {
 wait_for_docker() {
   info "Waiting for Docker to be ready..."
 
-  local max_wait=120
+  local max_wait=300
   local waited=0
 
   while ! docker info &>/dev/null 2>&1; do
     sleep 3
     waited=$((waited + 3))
 
-    if (( waited % 15 == 0 )); then
+    if (( waited % 30 == 0 )); then
       printf "  ${DIM}still waiting... (%ds)${RESET}\n" "$waited"
     fi
 
