@@ -786,6 +786,20 @@ def print_error(message: str, bold: bool = True, err: bool = True) -> None:
     click.echo(styled, err=err)
 
 
+def print_step(label: str, status: str = "running", **kwargs) -> None:
+    """Print a step indicator with status."""
+    icons = {"running": "•", "done": "✓", "error": "✗", "skip": "○"}
+    colors = {"running": "blue", "done": "green", "error": "red", "skip": "bright_black"}
+    icon = click.style(icons.get(status, "•"), fg=colors.get(status, "blue"))
+    click.echo(f"  {icon} {label}")
+
+
+def print_checkbox_step(label: str, checked: bool = False, **kwargs) -> None:
+    """Print a checkbox-style step indicator."""
+    icon = click.style("✓", fg="green") if checked else click.style("○", fg="bright_black")
+    click.echo(f"  {icon} {label}")
+
+
 def print_success(message: str, bold: bool = False) -> None:
     """
     Print a green success message with ✓ icon and text wrapping.

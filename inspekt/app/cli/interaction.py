@@ -23,6 +23,11 @@ from inspekt.services.bridge_executor import BridgeExecutor
 from inspekt.services.script_loader import ScriptLoader
 
 
+def _focus_browser_if_requested(ctx):
+    """Placeholder for browser focus-on-command feature."""
+    pass
+
+
 def _send_text(text, selector, delay_ms, clear=True):
     """Helper function to send text to browser."""
     executor = BridgeExecutor()
@@ -396,6 +401,46 @@ def wait(selector, timeout, visible, hidden, text):
             click.echo(f"  Element: {response['element']}")
         click.echo(f"  Waited: {waited_sec:.2f}s")
 
+    except (ConnectionError, TimeoutError, RuntimeError) as e:
+        click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
+
+
+@click.command()
+@click.argument("keys")
+def press(keys):
+    """
+    Press keyboard keys or shortcuts.
+
+    Supports single keys, modifiers, and combinations.
+
+    Examples:
+        inspekt press Tab
+        inspekt press Enter
+        inspekt press "Ctrl+A"
+        inspekt press Escape
+        inspekt press "Shift+Tab"
+    """
+    from inspekt.services.key_parser import parse_key_combo
+
+    executor = BridgeExecutor()
+    script_loader = ScriptLoader()
+
+    try:
+        script = script_loader.load_script_sync("press_keys.js")
+    except FileNotFoundError as e:
+        click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
+
+    parsed = parse_key_combo(keys)
+    code = script.replace("'KEYS_PLACEHOLDER'", json.dumps(parsed))
+
+    try:
+        result = executor.execute(code)
+        if not result.get("ok"):
+            click.echo(f"Error: {result.get('error')}", err=True)
+            sys.exit(1)
+        click.echo(f"✓ Pressed: {keys}")
     except (ConnectionError, TimeoutError, RuntimeError) as e:
         click.echo(f"Error: {e}", err=True)
         sys.exit(1)

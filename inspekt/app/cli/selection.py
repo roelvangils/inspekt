@@ -10,6 +10,11 @@ from inspekt.services.bridge_executor import BridgeExecutor
 from inspekt.services.script_loader import ScriptLoader
 
 
+def html_output_options(fn):
+    """Decorator placeholder for HTML output options (--raw, --copy, etc.)."""
+    return fn
+
+
 def get_selection_data():
     """Helper function to get selection data from browser."""
     executor = BridgeExecutor()
