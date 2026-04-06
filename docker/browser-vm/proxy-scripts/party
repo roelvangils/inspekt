@@ -1,0 +1,12 @@
+#!/bin/zsh
+# Celebration! For when all violations are fixed.
+echo ""
+gum style --foreground 212 --bold --align center "
+  🎉 🎊 🥳 🎉 🎊 🥳 🎉
+
+    All violations fixed!
+        Ship it! 🚀
+
+  🎉 🎊 🥳 🎉 🎊 🥳 🎉
+"
+echo ""

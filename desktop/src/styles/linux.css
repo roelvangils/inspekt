@@ -1,0 +1,41 @@
+/**
+ * Linux-Specific CSS Overrides for Inspekt PDF Viewer
+ *
+ * This stylesheet provides styling that harmonizes with GNOME/GTK and KDE/Qt.
+ * These styles are applied when running on Linux.
+ *
+ * TODO: Implement Linux-specific styling:
+ * - Cantarell or system-ui fonts
+ * - Adwaita color palette (GNOME)
+ * - Breeze color palette (KDE)
+ * - GTK-style focus rings
+ * - Native scrollbar appearance
+ */
+
+:root {
+  /* GNOME/Cantarell font stack */
+  --font-system: "Cantarell", system-ui, "Ubuntu", "DejaVu Sans", sans-serif;
+  --font-mono: "JetBrains Mono", "Source Code Pro", "Ubuntu Mono", monospace;
+
+  /* Adwaita color palette */
+  --adwaita-blue: #3584e4;
+  --adwaita-green: #33d17a;
+  --adwaita-yellow: #f6d32d;
+  --adwaita-orange: #ff7800;
+  --adwaita-red: #e01b24;
+  --adwaita-purple: #9141ac;
+}
+
+/* GTK-style selection */
+::selection {
+  background-color: var(--adwaita-blue);
+  color: white;
+}
+
+/* GTK-style focus ring */
+*:focus-visible {
+  outline: 2px solid var(--adwaita-blue);
+  outline-offset: 2px;
+}
+
+/* Placeholder for future Linux-specific styles */

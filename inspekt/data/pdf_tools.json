@@ -1,0 +1,398 @@
+{
+  "adobe_indesign": {
+    "display_name": "Adobe InDesign",
+    "vendor": "Adobe",
+    "accessibility_docs_url": "https://helpx.adobe.com/indesign/using/creating-accessible-pdfs.html",
+    "patterns": {
+      "creator": ["InDesign", "Adobe InDesign"],
+      "producer": ["InDesign", "Adobe PDF Library"]
+    }
+  },
+  "adobe_illustrator": {
+    "display_name": "Adobe Illustrator",
+    "vendor": "Adobe",
+    "accessibility_docs_url": "https://helpx.adobe.com/illustrator/using/creating-accessible-pdfs.html",
+    "patterns": {
+      "creator": ["Illustrator", "Adobe Illustrator"],
+      "producer": ["Illustrator", "Adobe PDF Library"]
+    }
+  },
+  "adobe_acrobat": {
+    "display_name": "Adobe Acrobat",
+    "vendor": "Adobe",
+    "accessibility_docs_url": "https://helpx.adobe.com/acrobat/using/create-verify-pdf-accessibility.html",
+    "patterns": {
+      "creator": ["Acrobat", "Adobe Acrobat", "Adobe PDF"],
+      "producer": ["Acrobat", "Adobe Acrobat", "Acrobat Distiller", "Adobe PDF Library"]
+    }
+  },
+  "adobe_photoshop": {
+    "display_name": "Adobe Photoshop",
+    "vendor": "Adobe",
+    "accessibility_docs_url": "https://helpx.adobe.com/photoshop/using/accessibility.html",
+    "patterns": {
+      "creator": ["Photoshop", "Adobe Photoshop"],
+      "producer": ["Photoshop", "Adobe PDF Library"]
+    }
+  },
+  "microsoft_word": {
+    "display_name": "Microsoft Word",
+    "vendor": "Microsoft",
+    "accessibility_docs_url": "https://support.microsoft.com/en-us/office/create-accessible-pdfs-064625e0-56ea-4e16-ad71-3aa33bb4b7ed",
+    "patterns": {
+      "creator": ["Microsoft Word", "Microsoft Office Word", "Word"],
+      "producer": ["Microsoft Word", "macOS Version", "Windows"]
+    }
+  },
+  "microsoft_powerpoint": {
+    "display_name": "Microsoft PowerPoint",
+    "vendor": "Microsoft",
+    "accessibility_docs_url": "https://support.microsoft.com/en-us/office/create-accessible-pdfs-from-powerpoint-a93aceb0-e10c-4b3c-ac78-3a3e8f7fd3ba",
+    "patterns": {
+      "creator": ["Microsoft PowerPoint", "Microsoft Office PowerPoint", "PowerPoint"],
+      "producer": ["Microsoft PowerPoint"]
+    }
+  },
+  "microsoft_excel": {
+    "display_name": "Microsoft Excel",
+    "vendor": "Microsoft",
+    "accessibility_docs_url": "https://support.microsoft.com/en-us/office/make-your-excel-documents-accessible-6cc05fc5-1314-48b5-8eb3-683e49b3e593",
+    "patterns": {
+      "creator": ["Microsoft Excel", "Microsoft Office Excel", "Excel"],
+      "producer": ["Microsoft Excel"]
+    }
+  },
+  "apple_pages": {
+    "display_name": "Apple Pages",
+    "vendor": "Apple",
+    "accessibility_docs_url": "https://support.apple.com/guide/pages/create-accessible-documents-tan7e893fb9/mac",
+    "patterns": {
+      "creator": ["Pages", "Apple Pages"],
+      "producer": ["Mac OS X", "macOS", "Quartz PDFContext"]
+    }
+  },
+  "apple_keynote": {
+    "display_name": "Apple Keynote",
+    "vendor": "Apple",
+    "accessibility_docs_url": "https://support.apple.com/guide/keynote/create-accessible-presentations-tane30b71f20/mac",
+    "patterns": {
+      "creator": ["Keynote", "Apple Keynote"],
+      "producer": ["Mac OS X", "macOS", "Quartz PDFContext"]
+    }
+  },
+  "apple_preview": {
+    "display_name": "Apple Preview",
+    "vendor": "Apple",
+    "accessibility_docs_url": "https://support.apple.com/guide/preview/welcome/mac",
+    "patterns": {
+      "creator": ["Preview"],
+      "producer": ["Mac OS X", "macOS", "Quartz PDFContext"]
+    }
+  },
+  "libreoffice": {
+    "display_name": "LibreOffice",
+    "vendor": "The Document Foundation",
+    "accessibility_docs_url": "https://wiki.documentfoundation.org/Accessibility",
+    "patterns": {
+      "creator": ["LibreOffice", "Writer", "Calc", "Impress", "Draw"],
+      "producer": ["LibreOffice"]
+    }
+  },
+  "openoffice": {
+    "display_name": "Apache OpenOffice",
+    "vendor": "Apache",
+    "accessibility_docs_url": "https://www.openoffice.org/accessibility/",
+    "patterns": {
+      "creator": ["OpenOffice", "OpenOffice.org"],
+      "producer": ["OpenOffice"]
+    }
+  },
+  "scribus": {
+    "display_name": "Scribus",
+    "vendor": "Scribus Team",
+    "accessibility_docs_url": "https://wiki.scribus.net/canvas/Help:Manual_Exportpdf",
+    "patterns": {
+      "creator": ["Scribus"],
+      "producer": ["Scribus PDF Library"]
+    }
+  },
+  "latex": {
+    "display_name": "LaTeX",
+    "vendor": "LaTeX Project",
+    "accessibility_docs_url": "https://www.latex-project.org/publications/2020-FMi-TUB-tb128mitt-tagpdf.pdf",
+    "patterns": {
+      "creator": ["LaTeX", "TeX", "pdfTeX", "XeTeX", "LuaTeX", "pdfLaTeX", "XeLaTeX", "LuaLaTeX"],
+      "producer": ["pdfTeX", "XeTeX", "LuaTeX", "dvipdfm", "dvips", "ps2pdf"]
+    }
+  },
+  "google_docs": {
+    "display_name": "Google Docs",
+    "vendor": "Google",
+    "accessibility_docs_url": "https://support.google.com/docs/answer/6199477",
+    "patterns": {
+      "creator": ["Google Docs", "Google"],
+      "producer": ["Google"]
+    }
+  },
+  "google_slides": {
+    "display_name": "Google Slides",
+    "vendor": "Google",
+    "accessibility_docs_url": "https://support.google.com/docs/answer/6199477",
+    "patterns": {
+      "creator": ["Google Slides"],
+      "producer": ["Google"]
+    }
+  },
+  "canva": {
+    "display_name": "Canva",
+    "vendor": "Canva",
+    "accessibility_docs_url": "https://www.canva.com/designschool/courses/designing-for-accessibility/",
+    "patterns": {
+      "creator": ["Canva"],
+      "producer": ["Canva"]
+    }
+  },
+  "figma": {
+    "display_name": "Figma",
+    "vendor": "Figma",
+    "accessibility_docs_url": "https://help.figma.com/hc/en-us/articles/360039956874-Apply-accessibility-best-practices-to-designs",
+    "patterns": {
+      "creator": ["Figma"],
+      "producer": ["Figma"]
+    }
+  },
+  "prince": {
+    "display_name": "Prince",
+    "vendor": "YesLogic",
+    "accessibility_docs_url": "https://www.princexml.com/doc/pdf-accessibility/",
+    "patterns": {
+      "creator": ["Prince"],
+      "producer": ["Prince"]
+    }
+  },
+  "wkhtmltopdf": {
+    "display_name": "wkhtmltopdf",
+    "vendor": "wkhtmltopdf",
+    "accessibility_docs_url": "https://wkhtmltopdf.org/usage/wkhtmltopdf.txt",
+    "patterns": {
+      "creator": ["wkhtmltopdf"],
+      "producer": ["wkhtmltopdf", "Qt"]
+    }
+  },
+  "puppeteer": {
+    "display_name": "Puppeteer/Chrome",
+    "vendor": "Google",
+    "accessibility_docs_url": "https://pptr.dev/api/puppeteer.pdfoptions",
+    "patterns": {
+      "creator": ["Puppeteer", "Chromium", "HeadlessChrome"],
+      "producer": ["Chromium", "Chrome", "Skia/PDF"]
+    }
+  },
+  "playwright": {
+    "display_name": "Playwright",
+    "vendor": "Microsoft",
+    "accessibility_docs_url": "https://playwright.dev/docs/api/class-page#page-pdf",
+    "patterns": {
+      "creator": ["Playwright"],
+      "producer": ["Chromium", "Chrome", "Skia/PDF"]
+    }
+  },
+  "weasyprint": {
+    "display_name": "WeasyPrint",
+    "vendor": "WeasyPrint",
+    "accessibility_docs_url": "https://doc.courtbouillon.org/weasyprint/stable/api_reference.html",
+    "patterns": {
+      "creator": ["WeasyPrint"],
+      "producer": ["WeasyPrint", "cairo"]
+    }
+  },
+  "pdfkit": {
+    "display_name": "PDFKit",
+    "vendor": "PDFKit",
+    "accessibility_docs_url": "https://pdfkit.org/docs/accessibility.html",
+    "patterns": {
+      "creator": ["PDFKit"],
+      "producer": ["PDFKit"]
+    }
+  },
+  "reportlab": {
+    "display_name": "ReportLab",
+    "vendor": "ReportLab",
+    "accessibility_docs_url": "https://docs.reportlab.com/reportlab/userguide/ch9_pdfa/",
+    "patterns": {
+      "creator": ["ReportLab"],
+      "producer": ["ReportLab"]
+    }
+  },
+  "itext": {
+    "display_name": "iText",
+    "vendor": "iText Group",
+    "accessibility_docs_url": "https://kb.itextpdf.com/itext/pdfua-conformance-itext-7-pdfua",
+    "patterns": {
+      "creator": ["iText"],
+      "producer": ["iText", "iTextSharp"]
+    }
+  },
+  "tcpdf": {
+    "display_name": "TCPDF",
+    "vendor": "Tecnick.com",
+    "accessibility_docs_url": "https://tcpdf.org/docs/srcdoc/TCPDF/",
+    "patterns": {
+      "creator": ["TCPDF"],
+      "producer": ["TCPDF"]
+    }
+  },
+  "fpdf": {
+    "display_name": "FPDF",
+    "vendor": "FPDF",
+    "accessibility_docs_url": "http://www.fpdf.org/",
+    "patterns": {
+      "creator": ["FPDF"],
+      "producer": ["FPDF"]
+    }
+  },
+  "apache_fop": {
+    "display_name": "Apache FOP",
+    "vendor": "Apache",
+    "accessibility_docs_url": "https://xmlgraphics.apache.org/fop/2.9/accessibility.html",
+    "patterns": {
+      "creator": ["Apache FOP", "FOP"],
+      "producer": ["Apache FOP", "FOP"]
+    }
+  },
+  "pandoc": {
+    "display_name": "Pandoc",
+    "vendor": "John MacFarlane",
+    "accessibility_docs_url": "https://pandoc.org/MANUAL.html#creating-a-pdf",
+    "patterns": {
+      "creator": ["Pandoc"],
+      "producer": ["Pandoc", "pdfTeX", "XeTeX", "LuaTeX", "ConTeXt"]
+    }
+  },
+  "quarkxpress": {
+    "display_name": "QuarkXPress",
+    "vendor": "Quark",
+    "accessibility_docs_url": "https://www.quark.com/documentation/quarkxpress/2024/english/A%20Guide%20to%20QuarkXPress%202024/index.html#t=A_Guide_to_QuarkXPress_2024%2FPDF_Export%2FExporting_for_PDF_Accessibility.htm",
+    "patterns": {
+      "creator": ["QuarkXPress", "Quark"],
+      "producer": ["QuarkXPress", "Quark"]
+    }
+  },
+  "affinity_publisher": {
+    "display_name": "Affinity Publisher",
+    "vendor": "Serif",
+    "accessibility_docs_url": "https://affinity.help/publisher2/en-US.lproj/index.html",
+    "patterns": {
+      "creator": ["Affinity Publisher", "Affinity"],
+      "producer": ["Affinity Publisher", "Affinity"]
+    }
+  },
+  "affinity_designer": {
+    "display_name": "Affinity Designer",
+    "vendor": "Serif",
+    "accessibility_docs_url": "https://affinity.help/designer2/en-US.lproj/index.html",
+    "patterns": {
+      "creator": ["Affinity Designer"],
+      "producer": ["Affinity Designer", "Affinity"]
+    }
+  },
+  "coreldraw": {
+    "display_name": "CorelDRAW",
+    "vendor": "Corel",
+    "accessibility_docs_url": "https://learn.corel.com/tutorials/creating-accessible-documents/",
+    "patterns": {
+      "creator": ["CorelDRAW", "Corel"],
+      "producer": ["CorelDRAW", "Corel PDF Engine"]
+    }
+  },
+  "nitro_pro": {
+    "display_name": "Nitro Pro",
+    "vendor": "Nitro",
+    "accessibility_docs_url": "https://www.gonitro.com/support/product-help/nitro-pro/accessibility",
+    "patterns": {
+      "creator": ["Nitro Pro", "Nitro PDF"],
+      "producer": ["Nitro Pro", "Nitro PDF"]
+    }
+  },
+  "foxit": {
+    "display_name": "Foxit PDF Editor",
+    "vendor": "Foxit",
+    "accessibility_docs_url": "https://www.foxit.com/pdf-editor/how-to/accessibility-pdf.html",
+    "patterns": {
+      "creator": ["Foxit", "Foxit PDF", "Foxit PhantomPDF"],
+      "producer": ["Foxit", "Foxit PDF"]
+    }
+  },
+  "pdfpen": {
+    "display_name": "PDFpen",
+    "vendor": "SmileOnMyMac",
+    "accessibility_docs_url": "https://pdfpen.com/pdfpen/support/",
+    "patterns": {
+      "creator": ["PDFpen", "PDFpenPro"],
+      "producer": ["PDFpen"]
+    }
+  },
+  "pdf_xchange": {
+    "display_name": "PDF-XChange Editor",
+    "vendor": "Tracker Software",
+    "accessibility_docs_url": "https://help.pdf-xchange.com/pxe/Default.htm#Accessibility_Options.html",
+    "patterns": {
+      "creator": ["PDF-XChange", "PDF-XChange Editor"],
+      "producer": ["PDF-XChange"]
+    }
+  },
+  "cutepdf": {
+    "display_name": "CutePDF",
+    "vendor": "Acro Software",
+    "accessibility_docs_url": "https://www.cutepdf.com/",
+    "patterns": {
+      "creator": ["CutePDF"],
+      "producer": ["CutePDF", "GPL Ghostscript"]
+    }
+  },
+  "ghostscript": {
+    "display_name": "Ghostscript",
+    "vendor": "Artifex",
+    "accessibility_docs_url": "https://ghostscript.com/docs/9.54.0/VectorDevices.htm#PDF",
+    "patterns": {
+      "creator": ["Ghostscript", "GPL Ghostscript"],
+      "producer": ["Ghostscript", "GPL Ghostscript"]
+    }
+  },
+  "cairo": {
+    "display_name": "Cairo",
+    "vendor": "Cairo Project",
+    "accessibility_docs_url": "https://cairographics.org/manual/",
+    "patterns": {
+      "creator": ["cairo"],
+      "producer": ["cairo"]
+    }
+  },
+  "docraptor": {
+    "display_name": "DocRaptor",
+    "vendor": "DocRaptor",
+    "accessibility_docs_url": "https://docraptor.com/documentation/article/1067959-pdf-accessibility",
+    "patterns": {
+      "creator": ["DocRaptor"],
+      "producer": ["DocRaptor", "Prince"]
+    }
+  },
+  "paged_js": {
+    "display_name": "Paged.js",
+    "vendor": "Paged Media",
+    "accessibility_docs_url": "https://pagedjs.org/documentation/",
+    "patterns": {
+      "creator": ["Paged.js", "pagedjs"],
+      "producer": ["Chromium", "Skia/PDF"]
+    }
+  },
+  "antenna_house": {
+    "display_name": "Antenna House",
+    "vendor": "Antenna House",
+    "accessibility_docs_url": "https://www.antennahouse.com/product/ahf70/ahf-accessibility",
+    "patterns": {
+      "creator": ["Antenna House", "AH Formatter", "XSL Formatter"],
+      "producer": ["Antenna House", "AH Formatter"]
+    }
+  }
+}

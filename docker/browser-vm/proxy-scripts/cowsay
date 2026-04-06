@@ -1,0 +1,14 @@
+#!/bin/zsh
+# cowsay — because every terminal needs a talking cow
+msg="${*:-Moo!}"
+len=${#msg}
+border=$(printf '%0.s-' {1..$((len + 2))})
+
+echo " $border"
+echo "< $msg >"
+echo " $border"
+echo '        \   ^__^'
+echo '         \  (oo)\_______'
+echo '            (__)\       )\/\'
+echo '                ||----w |'
+echo '                ||     ||'

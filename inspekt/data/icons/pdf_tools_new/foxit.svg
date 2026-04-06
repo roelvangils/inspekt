@@ -1,0 +1,6 @@
+<svg viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
+  <rect width="128" height="128" rx="16" fill="#E4322B"/>
+  <path d="M32 96V32h48l16 16v48H32z" fill="white"/>
+  <path d="M80 32v16h16" fill="none" stroke="white" stroke-width="2"/>
+  <text x="64" y="76" font-family="Arial Black, sans-serif" font-size="24" font-weight="bold" fill="#E4322B" text-anchor="middle">FOX</text>
+</svg>

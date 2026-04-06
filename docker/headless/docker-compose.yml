@@ -1,0 +1,66 @@
+# Docker Compose for Inspekt Headless
+#
+# Provides easy-to-use services for headless Inspekt operations.
+#
+# Usage:
+#   # Screenshot
+#   docker-compose run --rm screenshot --url "https://example.com" --selector "h1" -o /output/shot.png
+#
+#   # Accessibility audit
+#   docker-compose run --rm a11y --url "https://example.com" --json
+#
+#   # Start API server
+#   docker-compose up -d api
+#   curl http://localhost:8080/screenshot?url=https://example.com&selector=h1
+
+version: "3.8"
+
+services:
+  # Base headless service (used by other services)
+  headless:
+    build:
+      context: ../..
+      dockerfile: docker/headless/Dockerfile
+    image: inspekt-headless:latest
+    volumes:
+      - ./output:/output
+    # Shared memory size for Chrome
+    shm_size: 2g
+    # Security options for Chrome sandbox
+    security_opt:
+      - seccomp:unconfined
+    cap_add:
+      - SYS_ADMIN
+
+  # Screenshot service
+  screenshot:
+    extends: headless
+    entrypoint: ["inspekt", "screenshot", "node", "--headless"]
+
+  # Accessibility audit service
+  a11y:
+    extends: headless
+    entrypoint: ["inspekt", "a11y", "axe", "--headless"]
+
+  # Page indexing service
+  index:
+    extends: headless
+    entrypoint: ["inspekt", "index", "--headless"]
+
+  # Remote API server
+  api:
+    extends: headless
+    entrypoint: ["python", "-m", "inspekt.services.headless.api"]
+    ports:
+      - "8080:8080"
+    environment:
+      - INSPEKT_API_HOST=0.0.0.0
+      - INSPEKT_API_PORT=8080
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  output:

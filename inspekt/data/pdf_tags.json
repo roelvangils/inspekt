@@ -1,0 +1,438 @@
+{
+  "version": "1.0",
+  "source": "ISO 32000-2:2020 (PDF 2.0), PDF/UA-1 (ISO 14289-1)",
+  "tags": [
+    {
+      "pdfTag": "Document",
+      "htmlEquivalent": "<html>, <body>",
+      "semanticType": "Structural",
+      "description": "The root element of the document's tag structure. Contains all other tagged content.",
+      "callout": "The `Document` tag is the root element of a PDF's tag tree. Every accessible PDF must have exactly one Document tag at the top level, containing all other structure elements.\n\nIn HTML, this is similar to combining `<html>` and `<body>` — it establishes the document as a single logical unit that screen readers and other assistive technologies can navigate.",
+      "documentationUrl": "https://pdfa.org/resource/iso-32000-2/"
+    },
+    {
+      "pdfTag": "Part",
+      "htmlEquivalent": null,
+      "semanticType": "Structural",
+      "description": "A large-scale division of a document, such as a chapter or major section.",
+      "callout": "The `Part` tag represents a high-level division of a document, like a chapter, volume, or major section. It's used for organizing large documents into logical parts.\n\nHTML doesn't have a direct equivalent. The closest concept would be using `<div>` with ARIA roles, or the rarely-used `<section>` at the top level of a document.",
+      "documentationUrl": "https://pdfa.org/resource/iso-32000-2/"
+    },
+    {
+      "pdfTag": "Sect",
+      "htmlEquivalent": "<section>",
+      "semanticType": "Structural",
+      "description": "A subdivision of content, typically representing a chapter section or subsection.",
+      "callout": "The `Sect` (Section) tag groups related content together, similar to a chapter section or article segment. It creates a logical grouping that helps users understand the document's structure.\n\nIn HTML, this maps to the `<section>` element. Both serve the same purpose: grouping thematically related content with its own heading.",
+      "documentationUrl": "https://pdfa.org/resource/iso-32000-2/"
+    },
+    {
+      "pdfTag": "Art",
+      "htmlEquivalent": "<article>",
+      "semanticType": "Structural",
+      "description": "A self-contained body of text considered to be a single article.",
+      "callout": "The `Art` (Article) tag marks a self-contained, independently meaningful piece of content — like a news article, blog post, or forum entry.\n\nThis maps directly to HTML's `<article>` element. Screen readers can use this to help users skip between articles in documents containing multiple independent pieces.",
+      "documentationUrl": "https://pdfa.org/resource/iso-32000-2/"
+    },
+    {
+      "pdfTag": "Div",
+      "htmlEquivalent": "<div>",
+      "semanticType": "Presentational",
+      "description": "A generic container with no semantic meaning. Used for grouping content.",
+      "callout": "The `Div` tag is a generic container element with no inherent semantic meaning. It's used purely for grouping content, often for layout or styling purposes.\n\nLike HTML's `<div>`, overusing `Div` tags can make documents harder to navigate with assistive technology. Prefer semantic tags (`Sect`, `Art`, `P`) whenever the content has meaning.",
+      "documentationUrl": "https://pdfa.org/resource/iso-32000-2/"
+    },
+    {
+      "pdfTag": "H",
+      "htmlEquivalent": "<h1>–<h6> (auto-level)",
+      "semanticType": "Partial",
+      "description": "A generic heading. The level is determined by its nesting within the document structure.",
+      "callout": "The `H` tag is a generic heading whose level is determined automatically by its position in the document hierarchy. PDF viewers calculate the appropriate level (1-6) based on nesting depth.\n\nWhile this can work, explicit heading levels (`H1`–`H6`) are preferred for accessibility. The generic `H` tag can lead to inconsistent heading hierarchy if the document structure changes.",
+      "documentationUrl": "https://pdfa.org/resource/iso-32000-2/"
+    },
+    {
+      "pdfTag": "H1",
+      "htmlEquivalent": "<h1>",
+      "semanticType": "Semantic",
+      "description": "Level 1 heading, the highest level. Typically the document or page title.",
+      "callout": "The `H1` tag marks the most important heading — typically the document title or main topic. A well-structured document usually has just one `H1`.\n\nThis maps directly to HTML's `<h1>`. Screen reader users often navigate by headings, so proper heading hierarchy is crucial for accessibility.",
+      "documentationUrl": "https://pdfa.org/resource/iso-32000-2/"
+    },
+    {
+      "pdfTag": "H2",
+      "htmlEquivalent": "<h2>",
+      "semanticType": "Semantic",
+      "description": "Level 2 heading, used for major sections under the main title.",
+      "callout": "The `H2` tag marks major section headings directly under the document title. These are your chapter titles or main topic divisions.\n\nMaps to HTML's `<h2>`. Don't skip heading levels — going from `H1` to `H3` without an `H2` creates a broken hierarchy that confuses screen reader users.",
+      "documentationUrl": "https://pdfa.org/resource/iso-32000-2/"
+    },
+    {
+      "pdfTag": "H3",
+      "htmlEquivalent": "<h3>",
+      "semanticType": "Semantic",
+      "description": "Level 3 heading, used for subsections within H2 sections.",
+      "callout": "The `H3` tag marks subsections within major sections. It creates the third level of your document's outline.\n\nMaps to HTML's `<h3>`. This level is often used for sub-topics, method names in technical docs, or article subsections.",
+      "documentationUrl": "https://pdfa.org/resource/iso-32000-2/"
+    },
+    {
+      "pdfTag": "H4",
+      "htmlEquivalent": "<h4>",
+      "semanticType": "Semantic",
+      "description": "Level 4 heading, for further subdivisions within H3 sections.",
+      "callout": "The `H4` tag marks the fourth level of headings. At this depth, you're usually dealing with detailed sub-subsections or specific topics.\n\nMaps to HTML's `<h4>`. If you find yourself needing many `H4` tags, consider whether your document structure could be simplified.",
+      "documentationUrl": "https://pdfa.org/resource/iso-32000-2/"
+    },
+    {
+      "pdfTag": "H5",
+      "htmlEquivalent": "<h5>",
+      "semanticType": "Semantic",
+      "description": "Level 5 heading, for deep subdivisions.",
+      "callout": "The `H5` tag marks fifth-level headings. This depth is uncommon and typically appears only in very detailed technical documents.\n\nMaps to HTML's `<h5>`. Deep nesting can indicate overly complex document structure — consider whether flattening would improve readability.",
+      "documentationUrl": "https://pdfa.org/resource/iso-32000-2/"
+    },
+    {
+      "pdfTag": "H6",
+      "htmlEquivalent": "<h6>",
+      "semanticType": "Semantic",
+      "description": "Level 6 heading, the lowest heading level.",
+      "callout": "The `H6` tag marks the deepest heading level. It's rarely needed and often indicates an overly complex document structure.\n\nMaps to HTML's `<h6>`. If you need more than 6 levels, consider restructuring your content or using different organizational approaches.",
+      "documentationUrl": "https://pdfa.org/resource/iso-32000-2/"
+    },
+    {
+      "pdfTag": "P",
+      "htmlEquivalent": "<p>",
+      "semanticType": "Semantic",
+      "description": "A paragraph of text. The most common content element.",
+      "callout": "The `P` tag marks a paragraph — a block of text that forms a complete thought or idea. It's the most common content element in most documents.\n\nMaps directly to HTML's `<p>`. Screen readers announce paragraphs as distinct units, helping users understand where one thought ends and another begins.",
+      "documentationUrl": "https://pdfa.org/resource/iso-32000-2/"
+    },
+    {
+      "pdfTag": "L",
+      "htmlEquivalent": "<ul>, <ol>",
+      "semanticType": "Semantic",
+      "description": "A list container. Contains list items (LI).",
+      "callout": "The `L` (List) tag is a container for list items. PDF doesn't distinguish between ordered and unordered lists at the structural level — that information comes from the list markers.\n\nMaps to HTML's `<ul>` or `<ol>`. Screen readers announce lists with their item count, helping users understand the scope of the content.",
+      "documentationUrl": "https://pdfa.org/resource/iso-32000-2/"
+    },
+    {
+      "pdfTag": "LI",
+      "htmlEquivalent": "<li>",
+      "semanticType": "Semantic",
+      "description": "A list item. Must be contained within a list (L).",
+      "callout": "The `LI` (List Item) tag marks an individual item within a list. Each `LI` typically contains a `Lbl` (label/marker) and `LBody` (content).\n\nMaps to HTML's `<li>`. In PDF, list items have a richer structure than HTML — they separate the bullet/number from the content.",
+      "documentationUrl": "https://pdfa.org/resource/iso-32000-2/"
+    },
+    {
+      "pdfTag": "Lbl",
+      "htmlEquivalent": "::marker",
+      "semanticType": "Presentational",
+      "description": "The label or marker for a list item (bullet, number, letter, etc.).",
+      "callout": "The `Lbl` (Label) tag contains the list marker — the bullet point, number, or letter that identifies the list item.\n\nIn HTML/CSS, this is similar to the `::marker` pseudo-element. Screen readers may read the label separately, so ensure markers are meaningful (\"1.\" vs just \"•\").",
+      "documentationUrl": "https://pdfa.org/resource/iso-32000-2/"
+    },
+    {
+      "pdfTag": "LBody",
+      "htmlEquivalent": null,
+      "semanticType": "Structural",
+      "description": "The content body of a list item, excluding the marker/label.",
+      "callout": "The `LBody` (List Body) tag contains the actual content of a list item, separate from its marker.\n\nHTML doesn't have a direct equivalent — in HTML, the `<li>` contains everything including the marker. PDF's separation allows more precise control over reading order and styling.",
+      "documentationUrl": "https://pdfa.org/resource/iso-32000-2/"
+    },
+    {
+      "pdfTag": "Table",
+      "htmlEquivalent": "<table>",
+      "semanticType": "Semantic",
+      "description": "A data table with rows and cells.",
+      "callout": "The `Table` tag marks tabular data — information organized in rows and columns. Screen readers provide special navigation commands for tables.\n\nMaps to HTML's `<table>`. For accessibility, tables should have proper header cells (`TH`) and avoid being used purely for layout.",
+      "documentationUrl": "https://pdfa.org/resource/iso-32000-2/"
+    },
+    {
+      "pdfTag": "TR",
+      "htmlEquivalent": "<tr>",
+      "semanticType": "Semantic",
+      "description": "A table row containing cells.",
+      "callout": "The `TR` (Table Row) tag groups cells into a horizontal row. Each row should contain the same number of cells (accounting for colspan).\n\nMaps to HTML's `<tr>`. Screen readers announce row numbers as users navigate, helping them track their position in the table.",
+      "documentationUrl": "https://pdfa.org/resource/iso-32000-2/"
+    },
+    {
+      "pdfTag": "TH",
+      "htmlEquivalent": "<th>",
+      "semanticType": "Semantic",
+      "description": "A table header cell that labels a row or column.",
+      "callout": "The `TH` (Table Header) tag marks a cell that labels other cells — either a column header at the top or a row header on the left.\n\nMaps to HTML's `<th>`. Header cells are essential for accessibility — screen readers announce them when navigating data cells, providing context.",
+      "documentationUrl": "https://pdfa.org/resource/iso-32000-2/"
+    },
+    {
+      "pdfTag": "TD",
+      "htmlEquivalent": "<td>",
+      "semanticType": "Semantic",
+      "description": "A table data cell containing content.",
+      "callout": "The `TD` (Table Data) tag marks a regular cell containing data. Each `TD` is associated with its header cells (`TH`).\n\nMaps to HTML's `<td>`. Screen readers read the associated headers when users navigate to a cell, providing context like \"Column: Price, Row: Product A\".",
+      "documentationUrl": "https://pdfa.org/resource/iso-32000-2/"
+    },
+    {
+      "pdfTag": "THead",
+      "htmlEquivalent": "<thead>",
+      "semanticType": "Semantic",
+      "description": "The header section of a table, containing header rows.",
+      "callout": "The `THead` (Table Head) tag groups header rows at the top of a table. This helps assistive technology understand which rows contain labels vs. data.\n\nMaps to HTML's `<thead>`. When tables span multiple pages, `THead` content may be repeated at the top of each page for context.",
+      "documentationUrl": "https://pdfa.org/resource/iso-32000-2/"
+    },
+    {
+      "pdfTag": "TBody",
+      "htmlEquivalent": "<tbody>",
+      "semanticType": "Semantic",
+      "description": "The body section of a table, containing data rows.",
+      "callout": "The `TBody` (Table Body) tag groups the main data rows of a table, separating them from headers and footers.\n\nMaps to HTML's `<tbody>`. While optional, using `TBody` improves document structure and can help with styling and assistive technology.",
+      "documentationUrl": "https://pdfa.org/resource/iso-32000-2/"
+    },
+    {
+      "pdfTag": "TFoot",
+      "htmlEquivalent": "<tfoot>",
+      "semanticType": "Semantic",
+      "description": "The footer section of a table, containing summary rows.",
+      "callout": "The `TFoot` (Table Foot) tag groups footer rows at the bottom of a table, typically containing totals or summaries.\n\nMaps to HTML's `<tfoot>`. In paginated documents, `TFoot` content may be repeated at the bottom of each page.",
+      "documentationUrl": "https://pdfa.org/resource/iso-32000-2/"
+    },
+    {
+      "pdfTag": "Figure",
+      "htmlEquivalent": "<figure>",
+      "semanticType": "Semantic",
+      "description": "An image, chart, diagram, or other graphical content.",
+      "callout": "The `Figure` tag marks graphical content: images, charts, diagrams, photos, or illustrations. Screen readers announce this as an image and read any alt text.\n\nMaps to HTML's `<figure>`. For PDF/UA compliance, **every** Figure must have descriptive alt text set via the /Alt entry. Missing alt text is a common accessibility failure.",
+      "documentationUrl": "https://pdfa.org/resource/iso-32000-2/"
+    },
+    {
+      "pdfTag": "Caption",
+      "htmlEquivalent": "<figcaption>",
+      "semanticType": "Semantic",
+      "description": "A caption describing a figure or table.",
+      "callout": "The `Caption` tag provides a visible text description for a `Figure` or `Table`. Unlike alt text, captions are displayed to all users.\n\nMaps to HTML's `<figcaption>`. Good practice is to have both: a visible caption for everyone and alt text for screen reader users that may include additional details.",
+      "documentationUrl": "https://pdfa.org/resource/iso-32000-2/"
+    },
+    {
+      "pdfTag": "Link",
+      "htmlEquivalent": "<a>",
+      "semanticType": "Semantic",
+      "description": "A hyperlink to another location in the document or an external URL.",
+      "callout": "The `Link` tag marks clickable hyperlinks. These can navigate to other pages in the document, external URLs, or specific destinations.\n\nMaps to HTML's `<a>` element. Screen readers announce links and may provide a list of all links on the page for quick navigation.",
+      "documentationUrl": "https://pdfa.org/resource/iso-32000-2/"
+    },
+    {
+      "pdfTag": "Span",
+      "htmlEquivalent": "<span>",
+      "semanticType": "Presentational",
+      "description": "An inline container with no semantic meaning. Used for styling portions of text.",
+      "callout": "The `Span` tag is an inline container with no inherent meaning. It's typically used to apply styling (like color or font) to a portion of text.\n\nMaps to HTML's `<span>`. Like `Div`, overusing `Span` adds structural noise. Prefer semantic inline elements (`Link`, `Quote`, `Code`) when they apply.",
+      "documentationUrl": "https://pdfa.org/resource/iso-32000-2/"
+    },
+    {
+      "pdfTag": "BlockQuote",
+      "htmlEquivalent": "<blockquote>",
+      "semanticType": "Semantic",
+      "description": "A block of text quoted from another source.",
+      "callout": "The `BlockQuote` tag marks an extended quotation from another source, typically displayed as an indented block.\n\nMaps to HTML's `<blockquote>`. Screen readers can announce this as a quotation, helping users understand the text is from an external source.",
+      "documentationUrl": "https://pdfa.org/resource/iso-32000-2/"
+    },
+    {
+      "pdfTag": "Quote",
+      "htmlEquivalent": "<q>",
+      "semanticType": "Semantic",
+      "description": "An inline quotation from another source.",
+      "callout": "The `Quote` tag marks a short, inline quotation — typically a phrase or sentence embedded within a paragraph.\n\nMaps to HTML's `<q>` element. Unlike `BlockQuote`, `Quote` doesn't create a separate block and is used for shorter quoted text.",
+      "documentationUrl": "https://pdfa.org/resource/iso-32000-2/"
+    },
+    {
+      "pdfTag": "Code",
+      "htmlEquivalent": "<code>",
+      "semanticType": "Semantic",
+      "description": "Computer code or programming text.",
+      "callout": "The `Code` tag marks computer code, commands, or programming text. It's typically rendered in a monospace font.\n\nMaps to HTML's `<code>`. Screen readers may announce this differently, helping users understand they're hearing code rather than prose.",
+      "documentationUrl": "https://pdfa.org/resource/iso-32000-2/"
+    },
+    {
+      "pdfTag": "TOC",
+      "htmlEquivalent": "<nav> (table of contents)",
+      "semanticType": "Structural",
+      "description": "A table of contents listing sections of the document.",
+      "callout": "The `TOC` (Table of Contents) tag marks a navigation section listing the document's structure with links to each section.\n\nIn HTML, this is similar to a `<nav>` element containing a list of internal links. Screen readers may provide shortcuts to navigate to the TOC.",
+      "documentationUrl": "https://pdfa.org/resource/iso-32000-2/"
+    },
+    {
+      "pdfTag": "TOCI",
+      "htmlEquivalent": null,
+      "semanticType": "Structural",
+      "description": "An individual entry in a table of contents.",
+      "callout": "The `TOCI` (Table of Contents Item) tag marks a single entry in the table of contents, typically containing a section title and page number.\n\nHTML doesn't have a direct equivalent — TOC entries are usually just list items (`<li>`) containing links. PDF's dedicated tag helps identify TOC structure.",
+      "documentationUrl": "https://pdfa.org/resource/iso-32000-2/"
+    },
+    {
+      "pdfTag": "Index",
+      "htmlEquivalent": null,
+      "semanticType": "Structural",
+      "description": "An index section at the end of a document.",
+      "callout": "The `Index` tag marks an alphabetical index, typically found at the end of books and technical documents.\n\nHTML doesn't have a dedicated index element. This tag helps assistive technology identify and navigate to the document's index.",
+      "documentationUrl": "https://pdfa.org/resource/iso-32000-2/"
+    },
+    {
+      "pdfTag": "Note",
+      "htmlEquivalent": "<aside>, <small>",
+      "semanticType": "Semantic",
+      "description": "A footnote, endnote, or annotation providing additional information.",
+      "callout": "The `Note` tag marks supplementary information like footnotes or endnotes. These are typically referenced from the main text.\n\nIn HTML, this is similar to `<aside>` for side content or footnotes. Screen readers may announce notes differently or allow users to skip them.",
+      "documentationUrl": "https://pdfa.org/resource/iso-32000-2/"
+    },
+    {
+      "pdfTag": "Reference",
+      "htmlEquivalent": "<a> (internal link)",
+      "semanticType": "Semantic",
+      "description": "A cross-reference to another part of the document.",
+      "callout": "The `Reference` tag marks text that refers to another location in the document, like \"see Section 3.2\" or \"as shown in Figure 1\".\n\nIn HTML, this would be an internal link (`<a href=\"#...\">`). The Reference tag identifies the semantic purpose as a cross-reference.",
+      "documentationUrl": "https://pdfa.org/resource/iso-32000-2/"
+    },
+    {
+      "pdfTag": "BibEntry",
+      "htmlEquivalent": null,
+      "semanticType": "Semantic",
+      "description": "A bibliography or reference list entry.",
+      "callout": "The `BibEntry` (Bibliography Entry) tag marks a single citation in a bibliography or reference list.\n\nHTML doesn't have a dedicated bibliography element, though citations are sometimes marked with `<cite>`. This tag helps identify formal reference entries.",
+      "documentationUrl": "https://pdfa.org/resource/iso-32000-2/"
+    },
+    {
+      "pdfTag": "Formula",
+      "htmlEquivalent": "<math>",
+      "semanticType": "Semantic",
+      "description": "A mathematical formula or equation.",
+      "callout": "The `Formula` tag marks mathematical expressions and equations. These require special handling for accessibility.\n\nMaps to HTML's `<math>` (MathML) element. For accessibility, formulas should have alt text describing the equation in words.",
+      "documentationUrl": "https://pdfa.org/resource/iso-32000-2/"
+    },
+    {
+      "pdfTag": "Form",
+      "htmlEquivalent": "<form>, <input>",
+      "semanticType": "Semantic",
+      "description": "A fillable form field or form widget.",
+      "callout": "The `Form` tag marks interactive form elements — text fields, checkboxes, buttons, and other input controls.\n\nMaps to HTML's `<form>` and `<input>` elements. Accessible forms need proper labels associated with each field.",
+      "documentationUrl": "https://pdfa.org/resource/iso-32000-2/"
+    },
+    {
+      "pdfTag": "Annot",
+      "htmlEquivalent": null,
+      "semanticType": "Semantic",
+      "description": "An annotation, such as a comment or highlight.",
+      "callout": "The `Annot` (Annotation) tag marks PDF annotations — comments, highlights, sticky notes, or other markup added to the document.\n\nHTML doesn't have a direct equivalent. Annotations are interactive elements that may contain user-added content or reviews.",
+      "documentationUrl": "https://pdfa.org/resource/iso-32000-2/"
+    },
+    {
+      "pdfTag": "Ruby",
+      "htmlEquivalent": "<ruby>",
+      "semanticType": "Semantic",
+      "description": "Ruby annotation (small text above/beside base text, common in CJK languages).",
+      "callout": "The `Ruby` tag marks ruby annotations — small text placed above or beside base characters to show pronunciation, commonly used in Chinese, Japanese, and Korean text.\n\nMaps directly to HTML's `<ruby>` element. Ruby text helps readers pronounce unfamiliar characters.",
+      "documentationUrl": "https://pdfa.org/resource/iso-32000-2/"
+    },
+    {
+      "pdfTag": "RB",
+      "htmlEquivalent": "<rb>",
+      "semanticType": "Semantic",
+      "description": "Ruby base text (the text being annotated).",
+      "callout": "The `RB` (Ruby Base) tag contains the base text that ruby annotations describe — typically a character or word that needs pronunciation guidance.\n\nMaps to HTML's `<rb>` element (part of the ruby annotation system).",
+      "documentationUrl": "https://pdfa.org/resource/iso-32000-2/"
+    },
+    {
+      "pdfTag": "RT",
+      "htmlEquivalent": "<rt>",
+      "semanticType": "Semantic",
+      "description": "Ruby text (the annotation text showing pronunciation).",
+      "callout": "The `RT` (Ruby Text) tag contains the annotation text — typically phonetic characters showing how to pronounce the base text.\n\nMaps to HTML's `<rt>` element. Screen readers can use this to provide correct pronunciation.",
+      "documentationUrl": "https://pdfa.org/resource/iso-32000-2/"
+    },
+    {
+      "pdfTag": "RP",
+      "htmlEquivalent": "<rp>",
+      "semanticType": "Presentational",
+      "description": "Ruby parentheses (fallback punctuation for browsers that don't support ruby).",
+      "callout": "The `RP` (Ruby Parentheses) tag provides fallback parentheses shown in software that doesn't support ruby layout.\n\nMaps to HTML's `<rp>` element. The content (usually parentheses) is hidden when ruby is properly rendered.",
+      "documentationUrl": "https://pdfa.org/resource/iso-32000-2/"
+    },
+    {
+      "pdfTag": "Warichu",
+      "htmlEquivalent": null,
+      "semanticType": "Semantic",
+      "description": "Japanese warichu (inline annotation in smaller text).",
+      "callout": "The `Warichu` tag marks a Japanese typographic feature — a small inline note or annotation rendered in a smaller font size within the text flow.\n\nHTML doesn't have a direct equivalent. This is specific to Japanese typography conventions.",
+      "documentationUrl": "https://pdfa.org/resource/iso-32000-2/"
+    },
+    {
+      "pdfTag": "NonStruct",
+      "htmlEquivalent": null,
+      "semanticType": "Presentational",
+      "description": "A non-structural grouping element with no semantic meaning.",
+      "callout": "The `NonStruct` tag explicitly marks content that has no structural significance. It's used when content needs to be grouped but has no semantic meaning.\n\nHTML doesn't have an equivalent — this is similar to a `<div>` or `<span>` but explicitly signals to assistive technology that the grouping is not meaningful.",
+      "documentationUrl": "https://pdfa.org/resource/iso-32000-2/"
+    },
+    {
+      "pdfTag": "Private",
+      "htmlEquivalent": null,
+      "semanticType": "Presentational",
+      "description": "Application-specific content that may not be accessible.",
+      "callout": "The `Private` tag marks content that is specific to a particular application and may not be accessible to standard PDF readers.\n\nHTML doesn't have an equivalent. Private content should generally be avoided in accessible documents, or alternative accessible content should be provided.",
+      "documentationUrl": "https://pdfa.org/resource/iso-32000-2/"
+    },
+    {
+      "pdfTag": "DocumentFragment",
+      "htmlEquivalent": null,
+      "semanticType": "Structural",
+      "description": "A fragment of a document, used in document assembly.",
+      "callout": "The `DocumentFragment` tag is used when assembling documents from multiple sources. It marks a portion that came from a separate source document.\n\nThis is primarily used during PDF creation and assembly processes. The content within should still have proper structure.",
+      "documentationUrl": "https://pdfa.org/resource/iso-32000-2/"
+    },
+    {
+      "pdfTag": "Aside",
+      "htmlEquivalent": "<aside>",
+      "semanticType": "Semantic",
+      "description": "Content tangentially related to the main content (PDF 2.0).",
+      "callout": "The `Aside` tag (introduced in PDF 2.0) marks content that's tangentially related to the surrounding content — like a sidebar, pull quote, or supplementary information.\n\nMaps directly to HTML's `<aside>` element. Screen readers may announce this as secondary content.",
+      "documentationUrl": "https://pdfa.org/resource/iso-32000-2/"
+    },
+    {
+      "pdfTag": "Sub",
+      "htmlEquivalent": "<section>",
+      "semanticType": "Structural",
+      "description": "A subsection within a section (PDF 2.0).",
+      "callout": "The `Sub` tag (PDF 2.0) marks a subsection within a larger section, providing an additional level of document hierarchy.\n\nIn HTML, this is similar to nested `<section>` elements. It helps create deeper, more granular document structure.",
+      "documentationUrl": "https://pdfa.org/resource/iso-32000-2/"
+    },
+    {
+      "pdfTag": "Title",
+      "htmlEquivalent": "<title>, <h1>",
+      "semanticType": "Semantic",
+      "description": "The title of the document or a major section (PDF 2.0).",
+      "callout": "The `Title` tag (PDF 2.0) explicitly marks the document's title or a section's title, distinguishing it from regular headings.\n\nMaps to HTML's `<title>` (for document title) or a prominent `<h1>`. This provides clearer semantics than using just `H1`.",
+      "documentationUrl": "https://pdfa.org/resource/iso-32000-2/"
+    },
+    {
+      "pdfTag": "FENote",
+      "htmlEquivalent": null,
+      "semanticType": "Semantic",
+      "description": "A footnote or endnote (PDF 2.0).",
+      "callout": "The `FENote` tag (PDF 2.0) specifically marks footnotes and endnotes, providing more precise semantics than the generic `Note` tag.\n\nThis helps assistive technology clearly identify and handle footnotes, potentially offering options to skip or read them on demand.",
+      "documentationUrl": "https://pdfa.org/resource/iso-32000-2/"
+    },
+    {
+      "pdfTag": "Em",
+      "htmlEquivalent": "<em>",
+      "semanticType": "Semantic",
+      "description": "Emphasized text (PDF 2.0).",
+      "callout": "The `Em` tag (PDF 2.0) marks text with emphatic stress — content that should be emphasized when read aloud.\n\nMaps directly to HTML's `<em>` element. Screen readers may change voice inflection for emphasized text.",
+      "documentationUrl": "https://pdfa.org/resource/iso-32000-2/"
+    },
+    {
+      "pdfTag": "Strong",
+      "htmlEquivalent": "<strong>",
+      "semanticType": "Semantic",
+      "description": "Strongly emphasized text (PDF 2.0).",
+      "callout": "The `Strong` tag (PDF 2.0) marks text with strong importance — content that is more critical than surrounding text.\n\nMaps directly to HTML's `<strong>` element. Screen readers may increase emphasis for strongly marked content.",
+      "documentationUrl": "https://pdfa.org/resource/iso-32000-2/"
+    }
+  ]
+}

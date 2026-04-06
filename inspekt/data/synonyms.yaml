@@ -1,0 +1,833 @@
+# Inspekt Action Synonyms
+# =========================
+#
+# This file defines synonym mappings for the `inspekt do` command.
+# When you type a command like `inspekt do "go home"`, the matcher
+# will expand "home" to include all its synonyms before searching.
+#
+# Format:
+#   word:
+#     - synonym1
+#     - synonym2
+#
+# The key is the canonical term, values are alternatives that mean the same thing.
+# Matching is case-insensitive.
+#
+# You can customize this file or create your own at a custom location
+# and set it in your config.json:
+#
+#   {
+#     "do": {
+#       "synonyms-file": "~/my-synonyms.yaml"
+#     }
+#   }
+#
+# Multilingual support:
+# The synonyms below include common Dutch, French, German, and Spanish terms.
+# Feel free to add more languages or domain-specific terms.
+
+# Navigation
+home:
+  - homepage
+  - main
+  - index
+  - start
+  - startpagina      # Dutch
+  - hoofdpagina      # Dutch
+  - accueil          # French
+  - startseite       # German
+  - inicio           # Spanish
+
+# Authentication
+login:
+  - signin
+  - sign in
+  - log in
+  - authenticate
+  - inloggen         # Dutch
+  - aanmelden        # Dutch
+  - connexion        # French
+  - anmelden         # German
+  - entrar           # Spanish
+
+logout:
+  - signout
+  - sign out
+  - log out
+  - uitloggen        # Dutch
+  - afmelden         # Dutch
+  - deconnexion      # French
+  - abmelden         # German
+  - salir            # Spanish
+
+register:
+  - signup
+  - sign up
+  - join
+  - create account
+  - registreren      # Dutch
+  - inscription      # French
+  - registrieren     # German
+  - registrarse      # Spanish
+
+# Search
+search:
+  - find
+  - lookup
+  - query
+  - zoeken           # Dutch
+  - rechercher       # French
+  - suchen           # German
+  - buscar           # Spanish
+
+# Information
+contact:
+  - reach us
+  - get in touch
+  - support
+  - contacteer       # Dutch
+  - contacter        # French
+  - kontakt          # German
+  - contacto         # Spanish
+
+about:
+  - about us
+  - who we are
+  - our story
+  - over ons         # Dutch
+  - a propos         # French
+  - uber uns         # German
+  - acerca de        # Spanish
+
+help:
+  - assistance
+  - faq
+  - hulp             # Dutch
+  - aide             # French
+  - hilfe            # German
+  - ayuda            # Spanish
+
+# E-commerce
+products:
+  - catalog
+  - shop
+  - store
+  - items
+  - producten        # Dutch
+  - produits         # French
+  - produkte         # German
+  - productos        # Spanish
+
+pricing:
+  - price
+  - cost
+  - plans
+  - tarieven         # Dutch
+  - tarifs           # French
+  - preise           # German
+  - precios          # Spanish
+
+cart:
+  - basket
+  - bag
+  - shopping cart
+  - winkelwagen      # Dutch
+  - panier           # French
+  - warenkorb        # German
+  - carrito          # Spanish
+
+checkout:
+  - pay
+  - purchase
+  - order
+  - afrekenen        # Dutch
+  - payer            # French
+  - bezahlen         # German
+  - pagar            # Spanish
+
+# User
+settings:
+  - preferences
+  - config
+  - configuration
+  - options
+  - instellingen     # Dutch
+  - parametres       # French
+  - einstellungen    # German
+  - configuracion    # Spanish
+
+profile:
+  - account
+  - user
+  - me
+  - my account
+  - profiel          # Dutch
+  - profil           # French/German
+  - perfil           # Spanish
+
+# Actions
+submit:
+  - send
+  - confirm
+  - versturen        # Dutch
+  - verzenden        # Dutch
+  - bevestigen       # Dutch
+  - envoyer          # French
+  - confirmer        # French
+  - senden           # German
+  - bestätigen       # German
+  - enviar           # Spanish
+  - confirmar        # Spanish
+
+save:
+  - store
+  - keep
+  - opslaan          # Dutch
+  - bewaren          # Dutch
+  - enregistrer      # French
+  - sauvegarder      # French
+  - speichern        # German
+  - guardar          # Spanish
+
+cancel:
+  - abort
+  - dismiss
+  - annuleren        # Dutch
+  - afbreken         # Dutch
+  - annuler          # French
+  - abbrechen        # German
+  - cancelar         # Spanish
+
+close:
+  - exit
+  - quit
+  - sluiten          # Dutch
+  - afsluiten        # Dutch
+  - fermer           # French
+  - schliessen       # German
+  - cerrar           # Spanish
+
+open:
+  - launch
+  - start
+  - openen           # Dutch
+  - ouvrir           # French
+  - öffnen           # German
+  - abrir            # Spanish
+
+next:
+  - continue
+  - forward
+  - proceed
+  - volgende         # Dutch
+  - verder           # Dutch
+  - suivant          # French
+  - continuer        # French
+  - weiter           # German
+  - siguiente        # Spanish
+  - continuar        # Spanish
+
+previous:
+  - back
+  - prior
+  - vorige           # Dutch
+  - terug            # Dutch
+  - précédent        # French
+  - retour           # French
+  - zurück           # German
+  - anterior         # Spanish
+  - atrás            # Spanish
+
+delete:
+  - remove
+  - trash
+  - erase
+  - verwijderen      # Dutch
+  - verwijder        # Dutch
+  - wissen           # Dutch
+  - wis              # Dutch
+  - supprimer        # French
+  - effacer          # French
+  - löschen          # German
+  - entfernen        # German
+  - eliminar         # Spanish
+  - borrar           # Spanish
+
+add:
+  - create
+  - new
+  - plus
+  - insert
+  - toevoegen        # Dutch
+  - voeg toe         # Dutch
+  - nieuw            # Dutch
+  - ajouter          # French
+  - créer            # French
+  - nouveau          # French
+  - hinzufügen       # German
+  - neu              # German
+  - añadir           # Spanish
+  - crear            # Spanish
+  - nuevo            # Spanish
+
+edit:
+  - modify
+  - change
+  - update
+  - bewerken         # Dutch
+  - wijzigen         # Dutch
+  - aanpassen        # Dutch
+  - modifier         # French
+  - changer          # French
+  - bearbeiten       # German
+  - ändern           # German
+  - editar           # Spanish
+  - modificar        # Spanish
+
+copy:
+  - duplicate
+  - clone
+  - kopiëren         # Dutch
+  - kopieer          # Dutch
+  - copier           # French
+  - dupliquer        # French
+  - kopieren         # German
+  - copiar           # Spanish
+  - duplicar         # Spanish
+
+share:
+  - send to
+  - delen            # Dutch
+  - partager         # French
+  - teilen           # German
+  - compartir        # Spanish
+
+refresh:
+  - reload
+  - update
+  - vernieuwen       # Dutch
+  - herladen         # Dutch
+  - actualiser       # French
+  - recharger        # French
+  - aktualisieren    # German
+  - neu laden        # German
+  - actualizar       # Spanish
+  - recargar         # Spanish
+
+print:
+  - afdrukken        # Dutch
+  - imprimer         # French
+  - drucken          # German
+  - imprimir         # Spanish
+
+accept:
+  - agree
+  - ok
+  - yes
+  - akkoord          # Dutch
+  - ja               # Dutch/German
+  - accepteren       # Dutch
+  - accepter         # French
+  - oui              # French
+  - d'accord         # French
+  - akzeptieren      # German
+  - einverstanden    # German
+  - aceptar          # Spanish
+  - sí               # Spanish
+
+decline:
+  - reject
+  - refuse
+  - no
+  - deny
+  - weigeren         # Dutch
+  - afwijzen         # Dutch
+  - nee              # Dutch
+  - refuser          # French
+  - non              # French
+  - ablehnen         # German
+  - nein             # German
+  - rechazar         # Spanish
+  - denegar          # Spanish
+
+show:
+  - display
+  - view
+  - reveal
+  - tonen            # Dutch
+  - toon             # Dutch
+  - weergeven        # Dutch
+  - bekijken         # Dutch
+  - afficher         # French
+  - voir             # French
+  - montrer          # French
+  - zeigen           # German
+  - anzeigen         # German
+  - mostrar          # Spanish
+  - ver              # Spanish
+
+hide:
+  - conceal
+  - verbergen        # Dutch
+  - verberg          # Dutch
+  - cacher           # French
+  - masquer          # French
+  - verstecken       # German
+  - ausblenden       # German
+  - ocultar          # Spanish
+  - esconder         # Spanish
+
+select:
+  - choose
+  - pick
+  - selecteren       # Dutch
+  - kiezen           # Dutch
+  - kies             # Dutch
+  - sélectionner     # French
+  - choisir          # French
+  - auswählen        # German
+  - wählen           # German
+  - seleccionar      # Spanish
+  - elegir           # Spanish
+
+all:
+  - everything
+  - alles            # Dutch/German
+  - alle             # Dutch/German
+  - tout             # French
+  - tous             # French
+  - todo             # Spanish
+  - todos            # Spanish
+
+clear:
+  - reset
+  - empty
+  - wissen           # Dutch
+  - leegmaken        # Dutch
+  - effacer          # French
+  - vider            # French
+  - leeren           # German
+  - löschen          # German
+  - borrar           # Spanish
+  - vaciar           # Spanish
+
+apply:
+  - use
+  - activate
+  - toepassen        # Dutch
+  - activeren        # Dutch
+  - appliquer        # French
+  - activer          # French
+  - anwenden         # German
+  - aktivieren       # German
+  - aplicar          # Spanish
+  - activar          # Spanish
+
+filter:
+  - narrow
+  - filteren         # Dutch
+  - filtrer          # French
+  - filtern          # German
+  - filtrar          # Spanish
+
+sort:
+  - order
+  - arrange
+  - sorteren         # Dutch
+  - rangschikken     # Dutch
+  - trier            # French
+  - ordonner         # French
+  - sortieren        # German
+  - ordnen           # German
+  - ordenar          # Spanish
+  - clasificar       # Spanish
+
+expand:
+  - open
+  - show more
+  - uitklappen       # Dutch
+  - uitvouwen        # Dutch
+  - développer       # French
+  - erweitern        # German
+  - aufklappen       # German
+  - expandir         # Spanish
+  - desplegar        # Spanish
+
+collapse:
+  - close
+  - show less
+  - inklappen        # Dutch
+  - invouwen         # Dutch
+  - réduire          # French
+  - einklappen       # German
+  - zuklappen        # German
+  - colapsar         # Spanish
+  - contraer         # Spanish
+
+more:
+  - show more
+  - load more
+  - meer             # Dutch
+  - plus             # French
+  - mehr             # German
+  - más              # Spanish
+
+less:
+  - show less
+  - minder           # Dutch
+  - moins            # French
+  - weniger          # German
+  - menos            # Spanish
+
+# Media
+download:
+  - save
+  - get
+  - export
+  - downloaden       # Dutch
+  - télécharger      # French
+  - herunterladen    # German
+  - descargar        # Spanish
+
+upload:
+  - attach
+  - add file
+  - import
+  - uploaden         # Dutch
+  - bijvoegen        # Dutch
+  - téléverser       # French
+  - joindre          # French
+  - hochladen        # German
+  - anhängen         # German
+  - subir            # Spanish
+  - adjuntar         # Spanish
+
+# Playback controls
+play:
+  - start
+  - afspelen         # Dutch
+  - spelen           # Dutch
+  - jouer            # French
+  - lire             # French
+  - abspielen        # German
+  - reproducir       # Spanish
+
+pause:
+  - pauzeren         # Dutch
+  - pause            # French/German
+  - pausieren        # German
+  - pausar           # Spanish
+
+stop:
+  - halt
+  - stoppen          # Dutch
+  - arrêter          # French
+  - anhalten         # German
+  - parar            # Spanish
+  - detener          # Spanish
+
+mute:
+  - silence
+  - dempen           # Dutch
+  - geluid uit       # Dutch
+  - muet             # French
+  - couper le son    # French
+  - stumm            # German
+  - ton aus          # German
+  - silenciar        # Spanish
+
+fullscreen:
+  - full screen
+  - maximize
+  - volledig scherm  # Dutch
+  - plein écran      # French
+  - vollbild         # German
+  - pantalla completa # Spanish
+
+# Social & Communication
+like:
+  - love
+  - heart
+  - favorite
+  - vind ik leuk     # Dutch
+  - leuk             # Dutch
+  - aimer            # French
+  - j'aime           # French
+  - gefällt mir      # German
+  - me gusta         # Spanish
+
+follow:
+  - subscribe
+  - volgen           # Dutch
+  - suivre           # French
+  - s'abonner        # French
+  - folgen           # German
+  - abonnieren       # German
+  - seguir           # Spanish
+  - suscribirse      # Spanish
+
+unfollow:
+  - unsubscribe
+  - ontvolgen        # Dutch
+  - niet meer volgen # Dutch
+  - ne plus suivre   # French
+  - se désabonner    # French
+  - entfolgen        # German
+  - dejar de seguir  # Spanish
+
+reply:
+  - respond
+  - answer
+  - antwoorden       # Dutch
+  - reageren         # Dutch
+  - répondre         # French
+  - antworten        # German
+  - responder        # Spanish
+  - contestar        # Spanish
+
+comment:
+  - reactie          # Dutch
+  - opmerking        # Dutch
+  - commentaire      # French
+  - kommentar        # German
+  - comentario       # Spanish
+
+message:
+  - chat
+  - dm
+  - bericht          # Dutch
+  - message          # French
+  - nachricht        # German
+  - mensaje          # Spanish
+
+notifications:
+  - alerts
+  - meldingen        # Dutch
+  - notificaties     # Dutch
+  - notifications    # French
+  - benachrichtigungen # German
+  - notificaciones   # Spanish
+  - alertas          # Spanish
+
+# Common UI elements
+menu:
+  - navigation
+  - hamburger
+  - nav
+  - navigatie        # Dutch
+  - navigation       # French
+  - menü             # German
+  - menú             # Spanish
+
+sidebar:
+  - side panel
+  - zijbalk          # Dutch
+  - barre latérale   # French
+  - seitenleiste     # German
+  - barra lateral    # Spanish
+
+footer:
+  - bottom
+  - voettekst        # Dutch
+  - pied de page     # French
+  - fußzeile         # German
+  - pie de página    # Spanish
+
+header:
+  - top
+  - koptekst         # Dutch
+  - en-tête          # French
+  - kopfzeile        # German
+  - encabezado       # Spanish
+
+modal:
+  - dialog
+  - popup
+  - overlay
+  - dialoogvenster   # Dutch
+  - pop-up           # Dutch
+  - dialogue         # French
+  - fenêtre modale   # French
+  - dialogfenster    # German
+  - diálogo          # Spanish
+  - ventana emergente # Spanish
+
+tab:
+  - tabblad          # Dutch
+  - onglet           # French
+  - reiter           # German
+  - pestaña          # Spanish
+
+dropdown:
+  - select
+  - combobox
+  - uitklapmenu      # Dutch
+  - keuzelijst       # Dutch
+  - liste déroulante # French
+  - dropdown-menü    # German
+  - menú desplegable # Spanish
+
+checkbox:
+  - check
+  - tick
+  - selectievakje    # Dutch
+  - aanvinken        # Dutch
+  - case à cocher    # French
+  - kontrollkästchen # German
+  - casilla          # Spanish
+
+toggle:
+  - switch
+  - schakelaar       # Dutch
+  - interrupteur     # French
+  - schalter         # German
+  - interruptor      # Spanish
+
+slider:
+  - range
+  - schuifregelaar   # Dutch
+  - curseur          # French
+  - schieberegler    # German
+  - control deslizante # Spanish
+
+# Forms
+form:
+  - formulier        # Dutch
+  - formulaire       # French
+  - formular         # German
+  - formulario       # Spanish
+
+input:
+  - field
+  - text field
+  - invoerveld       # Dutch
+  - tekstveld        # Dutch
+  - champ            # French
+  - eingabefeld      # German
+  - campo            # Spanish
+
+password:
+  - wachtwoord       # Dutch
+  - mot de passe     # French
+  - passwort         # German
+  - kennwort         # German
+  - contraseña       # Spanish
+
+email:
+  - e-mail
+  - mail
+  - e-mailadres      # Dutch
+  - adresse e-mail   # French
+  - e-mail-adresse   # German
+  - correo electrónico # Spanish
+
+username:
+  - user
+  - gebruikersnaam   # Dutch
+  - nom d'utilisateur # French
+  - benutzername     # German
+  - nombre de usuario # Spanish
+
+required:
+  - mandatory
+  - verplicht        # Dutch
+  - obligatoire      # French
+  - erforderlich     # German
+  - pflichtfeld      # German
+  - obligatorio      # Spanish
+
+optional:
+  - optioneel        # Dutch
+  - facultatif       # French
+  - optional         # German
+  - opcional         # Spanish
+
+# Status & Feedback
+loading:
+  - wait
+  - please wait
+  - laden            # Dutch
+  - even geduld      # Dutch
+  - chargement       # French
+  - veuillez patienter # French
+  - wird geladen     # German
+  - bitte warten     # German
+  - cargando         # Spanish
+  - por favor espere # Spanish
+
+error:
+  - fout             # Dutch
+  - erreur           # French
+  - fehler           # German
+  - error            # Spanish
+
+warning:
+  - caution
+  - waarschuwing     # Dutch
+  - avertissement    # French
+  - warnung          # German
+  - advertencia      # Spanish
+
+success:
+  - done
+  - complete
+  - finished
+  - gelukt           # Dutch
+  - voltooid         # Dutch
+  - succès           # French
+  - terminé          # French
+  - erfolg           # German
+  - fertig           # German
+  - éxito            # Spanish
+  - completado       # Spanish
+
+info:
+  - information
+  - details
+  - informatie       # Dutch
+  - information      # French
+  - informationen    # German
+  - información      # Spanish
+
+# Language & Locale
+language:
+  - lang
+  - taal             # Dutch
+  - langue           # French
+  - sprache          # German
+  - idioma           # Spanish
+
+english:
+  - en
+  - engels           # Dutch
+  - anglais          # French
+  - englisch         # German
+  - inglés           # Spanish
+
+dutch:
+  - nl
+  - nederlands       # Dutch
+  - néerlandais      # French
+  - niederländisch   # German
+  - holandés         # Spanish
+
+french:
+  - fr
+  - français         # French
+  - frans            # Dutch
+  - französisch      # German
+  - francés          # Spanish
+
+german:
+  - de
+  - deutsch          # German
+  - duits            # Dutch
+  - allemand         # French
+  - alemán           # Spanish
+
+spanish:
+  - es
+  - español          # Spanish
+  - spaans           # Dutch
+  - espagnol         # French
+  - spanisch         # German

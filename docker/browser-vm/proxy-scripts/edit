@@ -1,0 +1,93 @@
+#!/bin/zsh
+# edit — open a file in the control panel editor or a terminal editor
+#
+# Usage:
+#   edit file.json              Open in the graphical editor (default)
+#   edit --nano file.json       Open in nano
+#   edit --micro file.json      Open in micro
+#   edit                        Open file browser (home directory)
+
+editor=""
+filepath=""
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --nano)   editor="nano"; shift ;;
+        --micro)  editor="micro"; shift ;;
+        --gui)    editor="gui"; shift ;;
+        -h|--help)
+            echo "Usage: edit [--nano|--micro|--gui] <file>"
+            echo ""
+            echo "Opens a file for editing."
+            echo ""
+            echo "Options:"
+            echo "  --nano     Open in nano (terminal)"
+            echo "  --micro    Open in micro (terminal)"
+            echo "  --gui      Open in the graphical editor (default)"
+            echo ""
+            echo "You can also set a default with: export EDITOR=nano"
+            exit 0
+            ;;
+        -*)
+            echo "edit: unknown option '$1'" >&2
+            echo "Usage: edit [--nano|--micro|--gui] <file>" >&2
+            exit 1
+            ;;
+        *)  filepath="$1"; shift ;;
+    esac
+done
+
+# No editor flag? Check EDITOR env var
+if [[ -z "$editor" ]]; then
+    case "${EDITOR:-}" in
+        nano)  editor="nano" ;;
+        micro) editor="micro" ;;
+        *)     editor="gui" ;;
+    esac
+fi
+
+# No file argument — open file browser (gui only)
+if [[ -z "$filepath" ]]; then
+    if [[ "$editor" != "gui" ]]; then
+        echo "Usage: edit [--nano|--micro] <file>" >&2
+        exit 1
+    fi
+    printf '\033]1337;edit=%s\007' "$HOME"
+    echo "Opening file browser"
+    exit 0
+fi
+
+# Resolve to absolute path
+if [[ "$filepath" != /* ]]; then
+    filepath="$(pwd)/$filepath"
+fi
+filepath=$(realpath "$filepath" 2>/dev/null || echo "$filepath")
+
+if [[ ! -e "$filepath" ]]; then
+    echo "edit: not found: $filepath" >&2
+    exit 1
+fi
+
+# Images always open in the GUI preview (not terminal editors)
+ext="${filepath:e:l}"  # zsh: get lowercase extension
+case "$ext" in
+    png|jpg|jpeg|gif|webp|svg|bmp|ico|avif)
+        printf '\033]1337;edit=%s\007' "$filepath"
+        echo "Opening preview: $(basename "$filepath")"
+        exit 0
+        ;;
+esac
+
+# Route to the chosen editor
+case "$editor" in
+    nano)
+        exec nano "$filepath"
+        ;;
+    micro)
+        exec micro "$filepath"
+        ;;
+    gui)
+        printf '\033]1337;edit=%s\007' "$filepath"
+        echo "Opening: $(basename "$filepath")"
+        ;;
+esac

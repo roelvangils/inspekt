@@ -1,0 +1,53 @@
+# Inspekt Browser VM - Zsh Configuration
+
+# Initialize completion system
+autoload -Uz compinit && compinit
+
+# Menu selection with highlighting
+zstyle ':completion:*' menu select
+zstyle ':completion:*' matcher-list 'm:{a-zA-Z}={A-Za-z}'  # Case insensitive
+zstyle ':completion:*' list-colors ${(s.:.)LS_COLORS}      # Colored completions
+zstyle ':completion:*:descriptions' format '%F{green}-- %d --%f'
+zstyle ':completion:*:warnings' format '%F{red}No matches%f'
+
+# Use arrow keys in menu
+bindkey '^[[Z' reverse-menu-complete  # Shift+Tab
+
+# Inspekt CLI tab completion
+eval "$(_INSPEKT_COMPLETE=zsh_source inspekt)"
+
+# Dynamic prompt: shows the domain of the active browser tab
+# Domain is refreshed in the background after each command, so the prompt is always instant
+_INSPEKT_DOMAIN_FILE="/tmp/.inspekt_domain"
+echo "inspekt" > "$_INSPEKT_DOMAIN_FILE"
+
+# Background worker: fetch domain and write to file
+_refresh_inspekt_domain() {
+    {
+        local d
+        d=$(curl -sf --max-time 1 http://localhost:8888/url 2>/dev/null \
+            | jq -r '.url // empty' 2>/dev/null \
+            | sed -n 's|^https\?://\([^/:]*\).*|\1|p')
+        [[ -n "$d" ]] && echo "$d" > "$_INSPEKT_DOMAIN_FILE"
+    } &!
+}
+
+# Kick off initial fetch
+_refresh_inspekt_domain
+
+precmd() {
+    local domain
+    domain=$(<"$_INSPEKT_DOMAIN_FILE")
+    PROMPT="%F{green}${domain:-inspekt}%f:%F{blue}%~%f$ "
+    # Refresh for next prompt (runs in background)
+    _refresh_inspekt_domain
+}
+
+# Enable color support
+alias ls='ls --color=auto'
+alias grep='grep --color=auto'
+
+# History settings
+HISTSIZE=1000
+SAVEHIST=1000
+HISTFILE=~/.zsh_history

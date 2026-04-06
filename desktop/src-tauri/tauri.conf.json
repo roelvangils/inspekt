@@ -1,0 +1,88 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Inspekt PDF Viewer",
+  "version": "0.1.0",
+  "identifier": "be.fronteers.inspekt-pdf-viewer",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "macOSPrivateApi": true,
+    "windows": [
+      {
+        "title": "Inspekt PDF Viewer",
+        "width": 1200,
+        "height": 800,
+        "minWidth": 800,
+        "minHeight": 600,
+        "center": true,
+        "resizable": true,
+        "fullscreen": false,
+        "decorations": true,
+        "transparent": false,
+        "titleBarStyle": "Overlay",
+        "hiddenTitle": true,
+        "acceptFirstMouse": true,
+        "tabbingIdentifier": "inspekt-pdf-viewer"
+      }
+    ],
+    "security": {
+      "csp": null,
+      "assetProtocol": {
+        "enable": true,
+        "scope": ["**"]
+      }
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png"
+    ],
+    "macOS": {
+      "minimumSystemVersion": "10.15",
+      "exceptionDomain": "",
+      "signingIdentity": null,
+      "entitlements": null,
+      "infoPlist": "Info.plist"
+    },
+    "resources": [
+      "icons/pdfi-document.icns"
+    ],
+    "fileAssociations": [
+      {
+        "ext": ["pdfi"],
+        "name": "Inspekt Package",
+        "description": "Inspekt PDF Accessibility Package",
+        "role": "Viewer",
+        "mimeType": "application/vnd.inspekt.pdfi"
+      },
+      {
+        "ext": ["json"],
+        "name": "Inspekt Report",
+        "description": "Inspekt PDF Accessibility Report",
+        "role": "Viewer"
+      },
+      {
+        "ext": ["pdf"],
+        "name": "PDF Document",
+        "description": "PDF Document for Accessibility Check",
+        "role": "Viewer"
+      }
+    ]
+  },
+  "plugins": {
+    "deep-link": {
+      "desktop": {
+        "schemes": ["inspekt"]
+      }
+    }
+  }
+}

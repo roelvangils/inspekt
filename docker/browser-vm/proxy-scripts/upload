@@ -1,0 +1,96 @@
+#!/bin/zsh
+# upload — upload files from host browser to the VM
+# Shows a drag-drop overlay in the control panel, then offers rename.
+#
+# Usage:
+#   upload          Open the upload overlay
+#   upload --help   Show help
+
+UPLOAD_DIR="$HOME/Uploads"
+CONTROL_SERVER="http://localhost:8888"
+
+if [[ "$1" == "-h" || "$1" == "--help" ]]; then
+    echo "Usage: upload"
+    echo ""
+    echo "Opens a drag-and-drop overlay to upload files from your computer."
+    echo "Files are saved to: $UPLOAD_DIR"
+    echo ""
+    echo "Restrictions:"
+    echo "  • Text files only (no binaries)"
+    echo "  • Maximum 1 MB per file"
+    exit 0
+fi
+
+# Ensure upload directory exists
+mkdir -p "$UPLOAD_DIR"
+
+# Reset upload state on the control server
+curl -sf -X POST "$CONTROL_SERVER/file/upload-reset" > /dev/null 2>&1
+
+# Signal the control panel to show the upload overlay
+printf '\033]1337;upload\007'
+
+# Poll for upload completion (timeout after 120 seconds)
+echo "Waiting for files… (drop files onto the terminal or click Browse)"
+poll_timeout=120
+elapsed=0
+upload_status="waiting"
+
+while [[ "$upload_status" == "waiting" && $elapsed -lt $poll_timeout ]]; do
+    sleep 1
+    elapsed=$((elapsed + 1))
+    result=$(curl -sf "$CONTROL_SERVER/file/upload-status" 2>/dev/null)
+    upload_status=$(echo "$result" | jq -r '.status // "waiting"' 2>/dev/null)
+done
+
+if [[ "$upload_status" != "done" ]]; then
+    echo "Upload cancelled or timed out."
+    exit 0
+fi
+
+# Parse results
+files_json=$(echo "$result" | jq '.files // []')
+errors_json=$(echo "$result" | jq '.errors // []')
+count=$(echo "$files_json" | jq 'length')
+total_size=$(echo "$files_json" | jq '[.[].size] | add // 0')
+
+if [[ "$count" -eq 0 ]]; then
+    echo "No files were uploaded."
+    error_count=$(echo "$errors_json" | jq 'length')
+    if [[ "$error_count" -gt 0 ]]; then
+        echo ""
+        echo "$errors_json" | jq -r '.[]' | while read -r err; do
+            echo "  ⚠ $err"
+        done
+    fi
+    exit 0
+fi
+
+# Format total size for display
+if [[ "$total_size" -gt 1048576 ]]; then
+    size_str="$(echo "scale=1; $total_size / 1048576" | bc) MB"
+elif [[ "$total_size" -gt 1024 ]]; then
+    size_str="$(echo "scale=1; $total_size / 1024" | bc) KB"
+else
+    size_str="$total_size bytes"
+fi
+
+echo ""
+gum style --foreground 10 --bold "✓ Successfully uploaded $count file(s) to Inspekt VM. $size_str in total."
+echo ""
+
+# Show errors if any
+error_count=$(echo "$errors_json" | jq 'length')
+if [[ "$error_count" -gt 0 ]]; then
+    echo "$errors_json" | jq -r '.[]' | while read -r err; do
+        gum style --foreground 11 "  ⚠ $err"
+    done
+    echo ""
+fi
+
+# List uploaded files
+echo "Files saved to $UPLOAD_DIR:"
+echo "$files_json" | jq -r '.[].saved' | while read -r name; do
+    echo "  • $name"
+done
+echo ""

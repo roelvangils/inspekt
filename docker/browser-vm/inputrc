@@ -1,0 +1,22 @@
+# Readline configuration for Inspekt VM terminal
+
+# Tab cycles through completions instead of listing them
+TAB: menu-complete
+
+# Shift+Tab cycles backward
+"\e[Z": menu-complete-backward
+
+# Show all completions on first Tab if ambiguous
+set show-all-if-ambiguous on
+
+# Case-insensitive completion
+set completion-ignore-case on
+
+# Show common prefix while cycling
+set menu-complete-display-prefix on
+
+# Color completions by file type
+set colored-stats on
+
+# Show completion type with color
+set visible-stats on

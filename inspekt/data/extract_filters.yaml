@@ -1,0 +1,81 @@
+# Post-processing filters for article extraction
+#
+# These patterns are removed from the extracted Markdown content.
+# Patterns support wildcards:
+#   *  - matches any characters (including none)
+#   ?  - matches exactly one character
+#
+# Patterns are matched against individual lines.
+# A line is removed if it matches any pattern (case-insensitive).
+
+filters:
+# Audio/listen buttons (common on news sites)
+- "Artikel luisteren"
+- "Listen to article"
+- "Listen to this article"
+- "LUISTER"
+
+# Publication metadata lines
+- "Gepubliceerd*"
+- "Published*"
+- "image: *"
+- "* comments*"
+- "* reacties"
+- "*follow topics and authors*"
+- "*[Belga*"
+- "*.Bron *"
+- "Dossier"
+- "Lees hier alle artikelen over*"
+- "[Naar het dossier*"
+- "Bron *"
+- "Bron: *"
+- "Quote van*"
+- "> *"
+- "©*"
+- "Op basis van bovenstaand artikel*"
+
+# Regional news headers
+- "Regionaal nieuws uit*"
+
+# Broadcast/radio labels
+- "Radio 2"
+
+# Feedback/survey prompts
+- "Help ons door uw ervaring*"
+- “scan the qt code to*”
+
+# Related content sections
+- "## Lees ook*"
+- "Lees ook:*"
+- "Geselecteerd door de redactie*"
+
+# Reading time indicators
+- "*min"
+- "* min"
+- "* min."
+- "* min read"
+- "*min read"
+- "* minute read"
+- "*minute read"
+- "* minutes"
+- "*minutes"
+- "* minutes read"
+- "* minuten"
+- "*minuten"
+- "* minuten lezen"
+
+# Share buttons that sometimes leak through
+- "Share this article"
+- "Deel dit artikel"
+- "Share on *"
+- "Delen op *"
+
+# Newsletter prompts
+- "Subscribe to *"
+- "Sign up for *"
+- "Schrijf je in *"
+
+# Skip links that leak through
+- "Skip to *"
+- "Direct naar *"
+- "Ga naar *"

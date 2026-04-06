@@ -1,0 +1,28 @@
+#!/bin/zsh
+# Brief matrix-style falling characters animation (3 seconds)
+chars="ﾊﾐﾋｰｳｼﾅﾓﾆｻﾜﾂｵﾘｱﾎﾃﾏｹﾒｴｶｷﾑﾕﾗｾﾈｽﾀﾇﾍ012345789Z:.*="
+cols=$(tput cols 2>/dev/null || echo 80)
+end=$((SECONDS + 3))
+
+# Hide cursor during animation
+printf '\033[?25l'
+
+while [[ $SECONDS -lt $end ]]; do
+    line=""
+    for ((i=0; i<cols; i++)); do
+        if (( RANDOM % 3 == 0 )); then
+            # Bright green (new drop)
+            line+="\033[1;32m${chars:RANDOM%${#chars}:1}\033[0m"
+        elif (( RANDOM % 2 == 0 )); then
+            # Dim green (trail)
+            line+="\033[2;32m${chars:RANDOM%${#chars}:1}\033[0m"
+        else
+            line+=" "
+        fi
+    done
+    printf "%b\n" "$line"
+    sleep 0.04
+done
+
+# Show cursor again
+printf '\033[?25h'

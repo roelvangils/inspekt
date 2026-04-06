@@ -1,0 +1,45 @@
+[package]
+name = "inspekt-pdf-viewer"
+version = "0.1.0"
+description = "PDF Accessibility Viewer for Inspekt"
+authors = ["Inspekt Team"]
+edition = "2021"
+rust-version = "1.77"
+
+[lib]
+name = "inspekt_pdf_viewer_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["protocol-asset", "macos-private-api"] }
+tauri-plugin-shell = "2"
+tauri-plugin-dialog = "2"
+tauri-plugin-fs = "2"
+tauri-plugin-store = "2"
+tauri-plugin-window-state = "2"
+tauri-plugin-notification = "2"
+tauri-plugin-deep-link = "2"
+tauri-plugin-os = "2"
+window-vibrancy = "0.5"
+
+# macOS native APIs for reading system accent color and accessibility settings
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2-app-kit = { version = "0.3", features = ["NSColor", "NSColorSpace", "NSWorkspace"] }
+
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["process", "time"] }
+open = "5"
+zip = "2"
+tempfile = "3"
+chrono = { version = "0.4", features = ["serde"] }
+
+[profile.release]
+panic = "abort"
+codegen-units = 1
+lto = true
+opt-level = "s"
+strip = true

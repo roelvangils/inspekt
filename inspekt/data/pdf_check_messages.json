@@ -1,0 +1,32 @@
+{
+  "version": "1.0",
+  "messages": {
+    "en": {
+      "no_structure_warning": {
+        "heading": "Important: This PDF isn't tagged (no structure).",
+        "explanation": "Some users rely on PDF tags to navigate documents. Tags help identify headings, lists, tables, and images (with alt text). They also ensure that the content is presented (or read aloud) in the correct order. Without tags, assistive tools must guess the layout, often leading to an incoherent reading order, especially in documents with columns and tables.",
+        "consequence": "While an untagged PDF isn't unusable, it always <strong>fails accessibility standards</strong> and creates <strong>major difficulties</strong> for users who depend on assistive technology, particularly those who are blind or visually impaired.",
+        "tip_with_tool": "This file originated from <strong>{tool_name}</strong>. Refer to the <a href=\"{docs_url}\" target=\"_blank\">accessibility guide for {tool_name}</a> to add tags and export a proper PDF. If you don't have the original file, fixing it becomes more challenging. <strong>Eleven Ways</strong> can assist.",
+        "tip_without_tool": "If you have access to the original source file, use your authoring application's accessibility features to add tags before exporting to PDF. If you don't have the original file, fixing it becomes more challenging. <strong>Eleven Ways</strong> can assist."
+      }
+    },
+    "fr": {
+      "no_structure_warning": {
+        "heading": "Important : Ce PDF n'est pas balisé (pas de structure).",
+        "explanation": "...",
+        "consequence": "...",
+        "tip_with_tool": "...",
+        "tip_without_tool": "..."
+      }
+    },
+    "nl": {
+      "no_structure_warning": {
+        "heading": "Belangrijk: Deze PDF heeft geen tags (geen structuur).",
+        "explanation": "...",
+        "consequence": "...",
+        "tip_with_tool": "...",
+        "tip_without_tool": "..."
+      }
+    }
+  }
+}

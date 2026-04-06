@@ -1,0 +1,504 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    font-size: 14px;
+    line-height: 1.6;
+    color: #333;
+    background: #f5f5f5;
+    width: 400px;
+    max-height: 600px;
+    overflow-y: auto;
+}
+
+.container {
+    background: white;
+}
+
+header {
+    background: linear-gradient(135deg, #0066ff 0%, #004db3 100%);
+    color: white;
+    padding: 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.logo-icon {
+    font-size: 24px;
+}
+
+h1 {
+    font-size: 18px;
+    font-weight: 600;
+}
+
+.version {
+    background: rgba(255, 255, 255, 0.2);
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.status {
+    padding: 16px 20px;
+    background: #f9f9f9;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.status-indicator {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.status-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #ffa500;
+    animation: pulse 2s infinite;
+}
+
+.status-dot.connected {
+    background: #00aa00;
+    animation: none;
+}
+
+.status-dot.disconnected {
+    background: #ff4444;
+    animation: none;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+.status-text {
+    font-size: 13px;
+    color: #666;
+}
+
+.status-text.connected {
+    color: #00aa00;
+    font-weight: 500;
+}
+
+.status-text.disconnected {
+    color: #ff4444;
+}
+
+section {
+    padding: 16px 20px;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+section:last-of-type {
+    border-bottom: none;
+}
+
+h2 {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 12px;
+    color: #0066ff;
+}
+
+.quick-start {
+    list-style-position: inside;
+    padding-left: 0;
+}
+
+.quick-start li {
+    margin-bottom: 8px;
+    color: #555;
+}
+
+code {
+    background: #f0f0f0;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
+    font-size: 12px;
+    color: #0066ff;
+}
+
+.feature-list {
+    list-style: none;
+}
+
+.feature-list li {
+    margin-bottom: 12px;
+    padding-left: 0;
+    color: #555;
+}
+
+.feature-list strong {
+    color: #333;
+}
+
+.command-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.command-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px;
+    background: #f9f9f9;
+    border-radius: 6px;
+}
+
+.command-item span {
+    font-size: 12px;
+    color: #666;
+}
+
+footer {
+    padding: 16px 20px;
+    background: #f9f9f9;
+}
+
+.links {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 12px;
+}
+
+.link-button {
+    flex: 1;
+    text-align: center;
+    padding: 10px;
+    background: white;
+    border: 1px solid #e0e0e0;
+    border-radius: 6px;
+    text-decoration: none;
+    color: #0066ff;
+    font-size: 13px;
+    font-weight: 500;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+}
+
+.link-button:hover {
+    background: #0066ff;
+    color: white;
+    border-color: #0066ff;
+}
+
+.copyright {
+    text-align: center;
+    font-size: 11px;
+    color: #999;
+}
+
+/* Permissions Section */
+.permissions {
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.domain-status {
+    padding: 12px;
+    background: #f9f9f9;
+    border-radius: 6px;
+    margin-bottom: 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.domain-status .domain-name {
+    font-weight: 600;
+    color: #333;
+    font-size: 13px;
+}
+
+.domain-status .domain-badge {
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+}
+
+.domain-status .domain-badge.allowed {
+    background: #d4edda;
+    color: #155724;
+}
+
+.domain-status .domain-badge.denied {
+    background: #f8d7da;
+    color: #721c24;
+}
+
+.domain-status button {
+    padding: 6px 12px;
+    border: 1px solid #e0e0e0;
+    background: white;
+    color: #0066ff;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.domain-status button:hover {
+    background: #0066ff;
+    color: white;
+    border-color: #0066ff;
+}
+
+.domain-status button.remove {
+    color: #dc3545;
+}
+
+.domain-status button.remove:hover {
+    background: #dc3545;
+    color: white;
+    border-color: #dc3545;
+}
+
+/* Temp Bypass Section */
+.temp-bypass-section {
+    padding: 12px;
+    background: #fff8e1;
+    border-radius: 6px;
+    margin-bottom: 12px;
+}
+
+.temp-bypass-section label {
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    color: #333;
+    margin-bottom: 8px;
+}
+
+.temp-bypass-section select {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid #e0e0e0;
+    border-radius: 4px;
+    font-size: 13px;
+    background: white;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.temp-bypass-section select:hover {
+    border-color: #0066ff;
+}
+
+.temp-bypass-section select:focus {
+    outline: none;
+    border-color: #0066ff;
+    box-shadow: 0 0 0 3px rgba(0, 102, 255, 0.1);
+}
+
+.bypass-status {
+    margin-top: 8px;
+    padding: 8px 12px;
+    background: #ffc107;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #333;
+    text-align: center;
+}
+
+.bypass-status.hidden {
+    display: none;
+}
+
+.bypass-status span {
+    font-weight: 700;
+}
+
+.domains-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.domain-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    background: #f9f9f9;
+    border-radius: 6px;
+}
+
+.domain-item .domain-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.domain-item .domain-name {
+    font-size: 13px;
+    color: #333;
+    font-weight: 500;
+}
+
+.domain-item .domain-date {
+    font-size: 11px;
+    color: #666;
+}
+
+.domain-item button {
+    padding: 4px 8px;
+    border: 1px solid #e0e0e0;
+    background: white;
+    color: #dc3545;
+    border-radius: 4px;
+    font-size: 11px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.domain-item button:hover {
+    background: #dc3545;
+    color: white;
+    border-color: #dc3545;
+}
+
+.permissions-note {
+    margin-top: 12px;
+    padding: 8px;
+    background: #fff3cd;
+    border-radius: 6px;
+    font-size: 12px;
+    color: #856404;
+    line-height: 1.4;
+}
+
+.no-domains {
+    padding: 16px;
+    text-align: center;
+    color: #999;
+    font-size: 13px;
+}
+
+/* CSP Bypass Section */
+.csp-bypass {
+    background: #fff3e0;
+}
+
+.csp-status {
+    margin-bottom: 12px;
+}
+
+.csp-info {
+    font-size: 12px;
+    color: #666;
+    line-height: 1.4;
+}
+
+.csp-toggle {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+#csp-bypass-label {
+    font-size: 13px;
+    color: #333;
+}
+
+#csp-current-domain {
+    font-weight: 600;
+    color: #0066ff;
+}
+
+/* Toggle Switch Styles */
+.switch {
+    position: relative;
+    display: inline-block;
+    width: 48px;
+    height: 26px;
+}
+
+.switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #ccc;
+    transition: 0.3s;
+    border-radius: 26px;
+}
+
+.slider:before {
+    position: absolute;
+    content: "";
+    height: 20px;
+    width: 20px;
+    left: 3px;
+    bottom: 3px;
+    background-color: white;
+    transition: 0.3s;
+    border-radius: 50%;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+input:checked + .slider {
+    background-color: #ff9800;
+}
+
+input:focus + .slider {
+    box-shadow: 0 0 1px #ff9800;
+}
+
+input:checked + .slider:before {
+    transform: translateX(22px);
+}
+
+.csp-message {
+    margin-top: 12px;
+    padding: 8px 12px;
+    border-radius: 4px;
+    font-size: 12px;
+    line-height: 1.4;
+}
+
+.csp-message.hidden {
+    display: none;
+}
+
+.csp-message.success {
+    background: #d4edda;
+    color: #155724;
+}
+
+.csp-message.error {
+    background: #f8d7da;
+    color: #721c24;
+}

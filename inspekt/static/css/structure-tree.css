@@ -1,0 +1,499 @@
+/**
+ * Structure Tree Panel Styles
+ * Interactive structure tree visualization for PDF accessibility reports
+ */
+
+/* Container */
+.structure-tree-container {
+    position: relative;
+    min-height: 200px;
+    max-height: 500px;
+    overflow-y: auto;
+    background: var(--bg-light, #f8fafc);
+    border-radius: 0.5rem;
+    padding: 1rem;
+    padding-bottom: 1.5rem;
+}
+
+/* Toolbar */
+.structure-tree-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.5rem 0;
+    margin-bottom: 0.75rem;
+    border-bottom: 1px solid var(--border-color, #e2e8f0);
+}
+
+.toggle-all-btn {
+    padding: 0.375rem 0.75rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+    border: 1px solid var(--border-color, #e2e8f0);
+    border-radius: 4px;
+    background: white;
+    cursor: pointer;
+    transition: background-color 0.15s, border-color 0.15s;
+}
+
+.toggle-all-btn:hover {
+    background: var(--bg-light, #f1f5f9);
+    border-color: #cbd5e1;
+}
+
+.toggle-all-btn:focus {
+    outline: 2px solid #3b82f6;
+    outline-offset: 2px;
+}
+
+/* Toolbar separator */
+.toolbar-separator {
+    width: 1px;
+    height: 1.25rem;
+    background: var(--border-color, #e2e8f0);
+}
+
+/* Toolbar checkboxes */
+.toolbar-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    font-size: 0.75rem;
+    color: var(--text-secondary, #64748b);
+    cursor: pointer;
+}
+
+.toolbar-checkbox input[type="checkbox"] {
+    width: 0.875rem;
+    height: 0.875rem;
+    margin: 0;
+    cursor: pointer;
+    accent-color: #3b82f6;
+}
+
+.toolbar-checkbox:hover {
+    color: var(--text-primary, #1e293b);
+}
+
+/* Tooltip styling for checkbox labels */
+.toolbar-checkbox[title] {
+    position: relative;
+    cursor: help;
+    text-decoration: underline;
+    text-decoration-style: dotted;
+    text-underline-offset: 2px;
+}
+
+/* Tree list styles */
+.structure-tree-container ul {
+    list-style: none;
+    padding-left: 1.25rem;
+    margin: 0;
+}
+
+.structure-tree-container > ul {
+    padding-left: 0;
+}
+
+.structure-tree-container li {
+    margin: 0.125rem 0;
+}
+
+.structure-tree-container details {
+    margin: 0;
+}
+
+.structure-tree-container summary {
+    cursor: pointer;
+    padding: 0.125rem 0;
+    list-style: none;
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+}
+
+.structure-tree-container summary::-webkit-details-marker {
+    display: none;
+}
+
+.structure-tree-container summary::before {
+    content: "▶";
+    display: inline-block;
+    width: 0.875rem;
+    font-size: 0.625rem;
+    color: var(--text-secondary, #64748b);
+    transition: transform 0.15s;
+}
+
+.structure-tree-container details[open] > summary::before {
+    transform: rotate(90deg);
+}
+
+/* Tag pills - reduced size */
+.tag {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.0625rem 0.3125rem;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    border-radius: 3px;
+    white-space: nowrap;
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+}
+
+/* WCAG-compliant tag colors with appropriate text contrast */
+/* Dark backgrounds use white text, light backgrounds use black text */
+
+/* Headings - warm colors, dark backgrounds, white text */
+.tag-H1 { background: #dc2626; color: #fff; }  /* Red-600 */
+.tag-H2 { background: #ea580c; color: #fff; }  /* Orange-600 */
+.tag-H3 { background: #ca8a04; color: #000; }  /* Yellow-600 - black text */
+.tag-H4 { background: #65a30d; color: #000; }  /* Lime-600 - black text */
+.tag-H5 { background: #16a34a; color: #fff; }  /* Green-600 */
+.tag-H6 { background: #0d9488; color: #fff; }  /* Teal-600 */
+.tag-H { background: #b45309; color: #fff; }   /* Amber-700 (generic heading) */
+
+/* Content - cool colors */
+.tag-P { background: #0284c7; color: #fff; }      /* Sky-600 */
+.tag-Span { background: #7c3aed; color: #fff; }   /* Violet-600 */
+
+/* Structure elements - grays */
+.tag-Document { background: #1f2937; color: #fff; }  /* Gray-800 */
+.tag-Part { background: #374151; color: #fff; }      /* Gray-700 */
+.tag-Sect { background: #6b7280; color: #fff; }      /* Gray-500 */
+.tag-Div { background: #9ca3af; color: #000; }       /* Gray-400 - black text */
+.tag-Art { background: #0891b2; color: #fff; }       /* Cyan-600 */
+
+/* Media elements */
+.tag-Figure { background: #a855f7; color: #000; }  /* Purple-500 - black text */
+.tag-Formula { background: #ec4899; color: #000; } /* Pink-500 - black text */
+.tag-Caption { background: #f472b6; color: #000; } /* Pink-400 - black text */
+
+/* Table elements - cyan shades */
+.tag-Table { background: #06b6d4; color: #000; }   /* Cyan-500 - black text */
+.tag-TR { background: #67e8f9; color: #000; }      /* Cyan-300 - black text */
+.tag-TH { background: #0e7490; color: #fff; }      /* Cyan-700 */
+.tag-TD { background: #22d3ee; color: #000; }      /* Cyan-400 - black text */
+.tag-THead { background: #155e75; color: #fff; }   /* Cyan-800 */
+.tag-TBody { background: #67e8f9; color: #000; }   /* Cyan-300 - black text */
+.tag-TFoot { background: #a5f3fc; color: #000; }   /* Cyan-200 - black text */
+
+/* List elements - orange shades */
+.tag-L { background: #f97316; color: #000; }     /* Orange-500 - black text */
+.tag-LI { background: #fb923c; color: #000; }    /* Orange-400 - black text */
+.tag-Lbl { background: #fdba74; color: #000; }   /* Orange-300 - black text */
+.tag-LBody { background: #fed7aa; color: #000; } /* Orange-200 - black text */
+
+/* Links and navigation - yellow shades */
+.tag-Link { background: #eab308; color: #000; }      /* Yellow-500 - black text */
+.tag-Reference { background: #facc15; color: #000; } /* Yellow-400 - black text */
+.tag-Annot { background: #fde047; color: #000; }     /* Yellow-300 - black text */
+.tag-TOC { background: #84cc16; color: #000; }       /* Lime-500 - black text */
+.tag-TOCI { background: #a3e635; color: #000; }      /* Lime-400 - black text */
+
+/* Forms */
+.tag-Form { background: #ec4899; color: #000; }      /* Pink-500 - black text */
+
+/* Block elements - violet/indigo shades */
+.tag-BlockQuote { background: #8b5cf6; color: #000; } /* Violet-500 - black text */
+.tag-Quote { background: #a78bfa; color: #000; }      /* Violet-400 - black text */
+.tag-Note { background: #c4b5fd; color: #000; }       /* Violet-300 - black text */
+.tag-Code { background: #6366f1; color: #fff; }       /* Indigo-500 */
+.tag-Index { background: #818cf8; color: #000; }      /* Indigo-400 - black text */
+
+/* Non-structural elements */
+.tag-NonStruct { background: #9ca3af; color: #000; }  /* Gray-400 - black text */
+.tag-Private { background: #d1d5db; color: #000; }    /* Gray-300 - black text */
+
+/* Default/unknown tag */
+.tag-unknown { background: #9ca3af; color: #000; }    /* Gray-400 - black text */
+
+/* Has issues indicator */
+.tag.has-issues {
+    outline: 2px solid #dc2626;
+    outline-offset: 1px;
+}
+
+/* Heading preview inline */
+.heading-preview {
+    font-weight: 700;
+    margin-left: 0.375rem;
+    color: var(--text-primary, #1e293b);
+    font-size: 0.8125rem;
+    max-width: 300px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Tag preview for non-headings */
+.tag-preview {
+    color: var(--text-secondary, #64748b);
+    font-size: 0.75rem;
+    margin-left: 0.375rem;
+    font-style: italic;
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Alt text indicator */
+.tag-alt {
+    color: #16a34a;
+    font-size: 0.6875rem;
+    margin-left: 0.375rem;
+}
+
+/* Warning indicator */
+.tag-warning {
+    color: #dc2626;
+    margin-left: 0.25rem;
+}
+
+/* More items indicator */
+.more-items {
+    color: var(--text-secondary, #64748b);
+    font-style: italic;
+    font-size: 0.75rem;
+    padding: 0.25rem 0;
+}
+
+/* Sibling group for collapsed identical siblings */
+.sibling-group {
+    display: contents;
+}
+
+.sibling-toggle-item {
+    list-style: none;
+    margin: 0.125rem 0;
+}
+
+.sibling-toggle {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.25rem 0.5rem;
+    font-size: 0.6875rem;
+    font-weight: 500;
+    color: #3b82f6;
+    background: #eff6ff;
+    border: 1px solid #bfdbfe;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.15s, border-color 0.15s;
+}
+
+.sibling-toggle:hover {
+    background: #dbeafe;
+    border-color: #93c5fd;
+}
+
+.sibling-toggle:focus {
+    outline: 2px solid #3b82f6;
+    outline-offset: 2px;
+}
+
+.sibling-toggle::before {
+    content: "";
+    display: inline-block;
+    width: 0.75em;
+    height: 0.75em;
+    margin-right: 0.375rem;
+    background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='%233b82f6' viewBox='0 0 24 24'%3E%3Cpath d='M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z'/%3E%3C/svg%3E") center/contain no-repeat;
+}
+
+.sibling-toggle[aria-expanded="true"]::before {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='%233b82f6' viewBox='0 0 24 24'%3E%3Cpath d='M19 13H5v-2h14v2z'/%3E%3C/svg%3E");
+}
+
+.sibling-toggle:disabled {
+    opacity: 0.6;
+    cursor: wait;
+}
+
+/* Sibling fade effect */
+.hidden-sibling {
+    transition: opacity 0.1s ease-out;
+}
+
+.hidden-sibling.fading-out {
+    opacity: 0;
+}
+
+.hidden-sibling.fading-in {
+    opacity: 0;
+}
+
+.hidden-sibling.fading-in.visible {
+    opacity: 1;
+}
+
+/* Figure icon (inline SVG) */
+.tag-Figure::before {
+    content: "";
+    display: inline-block;
+    width: 0.75em;
+    height: 0.75em;
+    margin-right: 0.25rem;
+    background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='black' viewBox='0 0 24 24'%3E%3Cpath d='M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z'/%3E%3C/svg%3E") center/contain no-repeat;
+}
+
+/* Resize handle */
+.resize-handle {
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 60px;
+    height: 6px;
+    background: var(--border-color, #cbd5e1);
+    border-radius: 3px;
+    cursor: ns-resize;
+    opacity: 0.6;
+    transition: opacity 0.15s;
+}
+
+.resize-handle:hover {
+    opacity: 1;
+}
+
+.resize-handle:focus {
+    outline: 2px solid #3b82f6;
+    outline-offset: 2px;
+    opacity: 1;
+}
+
+/* Figure tooltip */
+.structure-figure-tooltip {
+    position: fixed;
+    max-width: 240px;
+    padding: 0.5rem;
+    background: white;
+    border: 1px solid var(--border-color, #e2e8f0);
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    z-index: 1000;
+    pointer-events: none;
+}
+
+.structure-figure-tooltip img {
+    max-width: 100%;
+    border-radius: 4px;
+}
+
+/* Info panel */
+.structure-tree-info {
+    margin-top: 1rem;
+    padding: 0.75rem;
+    background: var(--bg-light, #f1f5f9);
+    border-radius: 0.5rem;
+    font-size: 0.75rem;
+}
+
+.structure-tree-info summary {
+    cursor: pointer;
+    font-weight: 600;
+    color: var(--text-primary, #1e293b);
+}
+
+.structure-tree-info p {
+    margin: 0.5rem 0 0;
+    color: var(--text-secondary, #64748b);
+}
+
+.color-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 1rem;
+    margin: 0.5rem 0;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.6875rem;
+    color: var(--text-secondary, #64748b);
+}
+
+.legend-swatch {
+    width: 12px;
+    height: 12px;
+    border-radius: 2px;
+    flex-shrink: 0;
+}
+
+kbd {
+    padding: 0.125rem 0.375rem;
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 0.6875rem;
+    background: #e2e8f0;
+    border-radius: 3px;
+    border: 1px solid #cbd5e1;
+}
+
+/* Dark mode */
+@media (prefers-color-scheme: dark) {
+    .structure-tree-container {
+        background: #1e293b;
+    }
+
+    .structure-tree-toolbar {
+        border-bottom-color: #475569;
+    }
+
+    .toggle-all-btn {
+        background: #334155;
+        color: #f1f5f9;
+        border-color: #475569;
+    }
+
+    .toggle-all-btn:hover {
+        background: #475569;
+        border-color: #64748b;
+    }
+
+    .structure-tree-container summary::before {
+        color: #94a3b8;
+    }
+
+    .heading-preview {
+        color: #f1f5f9;
+    }
+
+    .tag-preview {
+        color: #94a3b8;
+    }
+
+    .structure-figure-tooltip {
+        background: #334155;
+        border-color: #475569;
+    }
+
+    .structure-tree-info {
+        background: #334155;
+    }
+
+    .structure-tree-info summary {
+        color: #f1f5f9;
+    }
+
+    .structure-tree-info p {
+        color: #94a3b8;
+    }
+
+    .legend-item {
+        color: #94a3b8;
+    }
+
+    kbd {
+        background: #475569;
+        border-color: #64748b;
+        color: #f1f5f9;
+    }
+
+    .resize-handle {
+        background: #475569;
+    }
+}

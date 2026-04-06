@@ -1,0 +1,8 @@
+{
+  "name": "@mozilla/readability",
+  "version": "0.6.0",
+  "source": "https://github.com/mozilla/readability",
+  "downloaded": "2026-01-04",
+  "file": "Readability.js",
+  "license": "Apache-2.0"
+}

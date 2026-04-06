@@ -1,0 +1,31 @@
+Analyze this PDF image for accessibility purposes.
+
+Respond in JSON format with the following fields:
+{
+  "category": "one of: photograph, illustration, infographic, chart_or_graph, table_as_image, text_as_image, logo_or_icon, decorative",
+  "confidence": 0.0-1.0,
+  "suggested_alt_text": "concise description for screen reader users",
+  "is_meaningful": true/false (does this image convey information?),
+  "contains_text": true/false,
+  "accessibility_concerns": ["list of potential issues"],
+  "remediation_suggestions": ["list of recommendations"]
+}
+
+CATEGORY DEFINITIONS:
+- photograph: Real-world photo of people, places, objects, or events
+- illustration: Drawing, clipart, artistic rendering, or stylized graphic
+- infographic: Complex visualization combining data, text, and graphics
+- chart_or_graph: Bar chart, line graph, pie chart, scatter plot, or similar data visualization
+- table_as_image: Tabular data captured as an image (NOT a proper PDF table)
+- text_as_image: Screenshot, scanned document, or text rendered as an image
+- logo_or_icon: Brand logo, symbol, icon, or badge
+- decorative: Background pattern, border, spacer, or purely aesthetic element
+
+ACCESSIBILITY CONCERNS TO CHECK:
+- Text as image (should use real text)
+- Tables as images (should use proper table structure)
+- Low contrast elements
+- Complex infographics without text alternatives
+- Missing context for meaningful images
+
+Respond with valid JSON only, no markdown formatting.

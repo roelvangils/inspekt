@@ -1,0 +1,4 @@
+#!/bin/zsh
+face='( ͡° ͜ʖ ͡°)'
+echo "$face"
+echo -n "$face" | pbcopy 2>/dev/null && echo "(copied to clipboard)"

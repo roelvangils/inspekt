@@ -1,0 +1,54 @@
+{
+  "axe": {
+    "official_name": "Axe-core",
+    "short_name": "axe",
+    "provider": "Deque Systems",
+    "description": "Industry-leading automated accessibility testing engine, marketed as having 'zero false positives'.",
+    "official_url": "https://www.deque.com/axe/",
+    "license": "MPL-2.0",
+    "wcag_support": ["2.0", "2.1", "2.2"],
+    "npm_package": "axe-core",
+    "color": "cyan",
+    "latest_update": "2025-10-09",
+    "reports_potential_violations": false
+  },
+  "eac": {
+    "official_name": "Equal Access Checker",
+    "short_name": "eac",
+    "provider": "IBM",
+    "description": "Comprehensive WCAG checker with ACT-Rules harmonization",
+    "official_url": "https://www.ibm.com/able/toolkit/",
+    "license": "Apache-2.0",
+    "wcag_support": ["2.0", "2.1", "2.2"],
+    "npm_package": "accessibility-checker-engine",
+    "color": "magenta",
+    "latest_update": "2025-12-12",
+    "reports_potential_violations": true
+  },
+  "hcs": {
+    "official_name": "HTML CodeSniffer",
+    "short_name": "hcs",
+    "provider": "Squiz Labs",
+    "description": "Client-side accessibility checker used by Pa11y",
+    "official_url": "https://squizlabs.github.io/HTML_CodeSniffer/",
+    "license": "BSD-3-Clause",
+    "wcag_support": ["2.0", "2.1"],
+    "npm_package": "html_codesniffer",
+    "color": "yellow",
+    "latest_update": "2020-04-13",
+    "reports_potential_violations": true
+  },
+  "sia": {
+    "official_name": "Alfa",
+    "short_name": "sia",
+    "provider": "Siteimprove",
+    "description": "ACT-Rules based accessibility conformance testing engine",
+    "official_url": "https://alfa.siteimprove.com/",
+    "license": "MIT",
+    "wcag_support": ["2.0", "2.1", "2.2"],
+    "npm_package": "@siteimprove/alfa-rules",
+    "color": "blue",
+    "latest_update": "2025-12-10",
+    "reports_potential_violations": true
+  }
+}

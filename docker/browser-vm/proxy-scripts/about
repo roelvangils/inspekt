@@ -1,0 +1,86 @@
+#!/bin/zsh
+# about — neofetch-style system info for Inspekt Browser VM
+
+CONTROL_SERVER="http://localhost:8888"
+
+# ── Gather system info ──
+inspekt_version=$(/opt/inspekt/.venv/bin/inspekt --version 2>/dev/null | sed 's/inspekt, version //')
+# Chromium version (written at build time, see Dockerfile)
+chromium_version=$(cat /etc/inspekt-versions/chromium 2>/dev/null || echo "unknown")
+alpine_version=$(cat /etc/alpine-release 2>/dev/null || echo "unknown")
+kernel_version=$(uname -r | cut -d- -f1)
+zsh_version=$(/bin/zsh --version 2>/dev/null | sed 's/zsh \([0-9.]*\).*/\1/')
+python_version=$(/opt/inspekt/.venv/bin/python3 --version 2>/dev/null | sed 's/Python //')
+node_version=$(node --version 2>/dev/null | sed 's/v//')
+
+# Uptime from /proc/uptime (seconds → human readable)
+if [[ -f /proc/uptime ]]; then
+    raw_uptime=$(cut -d. -f1 /proc/uptime)
+    days=$((raw_uptime / 86400))
+    hours=$(( (raw_uptime % 86400) / 3600 ))
+    mins=$(( (raw_uptime % 3600) / 60 ))
+    if [[ $days -gt 0 ]]; then uptime_str="${days}d ${hours}h ${mins}m"
+    elif [[ $hours -gt 0 ]]; then uptime_str="${hours}h ${mins}m"
+    else uptime_str="${mins}m"
+    fi
+else
+    uptime_str="unknown"
+fi
+
+# Current page from control server
+page_url=$(curl -sf --max-time 1 "$CONTROL_SERVER/url" 2>/dev/null | jq -r '.url // "—"' 2>/dev/null)
+# Truncate long URLs
+if [[ ${#page_url} -gt 35 ]]; then
+    page_url="${page_url:0:32}…"
+fi
+
+# Count available commands
+inspekt_cmds=$(ls /opt/inspekt/commands/ 2>/dev/null | grep -v '^\.' | wc -l | tr -d ' ')
+util_cmds=$(ls /opt/inspekt/allowed-bin/ 2>/dev/null | wc -l | tr -d ' ')
+
+# ── Colors ──
+C="\033[36m"    # cyan (labels)
+W="\033[37m"    # white (values)
+B="\033[1;36m"  # bold cyan (logo)
+D="\033[2m"     # dim
+R="\033[0m"     # reset
+
+# ── ASCII art logo + info side by side ──
+# Logo is 6 lines, info is 9 lines — printed in parallel
+logo=(
+    "${B}  ___                      _    _   ${R}"
+    "${B} |_ _|_ __  ___ _ __   ___| | _| |_ ${R}"
+    "${B}  | || '_ \\/ __| '_ \\ / _ \\ |/ / __|${R}"
+    "${B}  | || | | \\__ \\ |_) |  __/   <| |_ ${R}"
+    "${B} |___|_| |_|___/ .__/ \\___|_|\\_\\\\__|${R}"
+    "${B}               |_|                   ${R}"
+)
+
+info=(
+    "${C}Version${R}     ${W}${inspekt_version:-unknown}${R}"
+    "${C}Browser${R}     ${W}Chromium ${chromium_version}${R}"
+    "${C}OS${R}          ${W}Alpine Linux ${alpine_version}${R}"
+    "${C}Kernel${R}      ${W}${kernel_version}${R}"
+    "${C}Shell${R}       ${W}zsh ${zsh_version}${R}"
+    "${C}Python${R}      ${W}${python_version}${R}"
+    "${C}Uptime${R}      ${W}${uptime_str}${R}"
+    "${C}Page${R}        ${W}${page_url}${R}"
+    "${C}Commands${R}    ${W}${inspekt_cmds} inspekt + ${util_cmds} utils${R}"
+)
+
+echo ""
+
+# Print logo + info side by side
+# Logo is 6 lines, info is 9 lines — pad logo with blanks
+logo_width=40
+total_lines=${#info[@]}
+
+for ((i=1; i<=total_lines; i++)); do
+    if [[ $i -le ${#logo[@]} ]]; then
+        printf "%b  %b\n" "${logo[$i]}" "${info[$i]}"
+    else
+        printf "%-${logo_width}s  %b\n" "" "${info[$i]}"
+    fi
+done
+
+echo ""

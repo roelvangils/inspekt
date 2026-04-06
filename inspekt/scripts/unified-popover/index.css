@@ -1,0 +1,19 @@
+/**
+ * Inspekt Unified Popover Styles
+ *
+ * Extends the Axe popover styles with source tabs for multi-tool support.
+ * Imports existing axe-popover CSS files and adds unified badge/popover classes.
+ */
+
+/* Import existing Axe popover styles */
+@import url("../axe-popover/tokens.css");
+@import url("../axe-popover/base.css");
+@import url("../axe-popover/nav.css");
+@import url("../axe-popover/content.css");
+@import url("../axe-popover/badges.css");
+@import url("../axe-popover/animations.css");
+@import url("../axe-popover/themes.css");
+
+/* Import unified-specific styles */
+@import url("source-tabs.css");
+@import url("ibm-content.css");

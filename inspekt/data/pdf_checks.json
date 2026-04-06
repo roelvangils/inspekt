@@ -1,0 +1,173 @@
+{
+  "version": "1.0.0",
+  "generated": "2025-01-16",
+  "source": "Based on Luxembourg simplA11yPDFCrawler and PDF/UA standards",
+  "checks": [
+    {
+      "id": "tagged",
+      "name": "Tagged PDF",
+      "description": "PDF must be tagged for assistive technology access",
+      "long_description": "Tagged PDFs contain a logical structure tree that maps the visual presentation to a reading order. This is essential for screen readers and other assistive technologies to properly interpret the document content.",
+      "severity": "critical",
+      "wcag_sc": "1.3.1",
+      "wcag_level": "A",
+      "wcag_name": "Info and Relationships",
+      "pdf_ua_clause": "7.1",
+      "matterhorn_id": "01",
+      "remediation": "Use an accessible PDF authoring tool (e.g., Microsoft Word with accessibility features, Adobe InDesign) to create properly tagged PDFs, or remediate using Adobe Acrobat Pro's accessibility tools."
+    },
+    {
+      "id": "title",
+      "name": "Document Title",
+      "description": "Document must have a title with DisplayDocTitle enabled",
+      "long_description": "The document must have a meaningful Title metadata property, and the PDF viewer settings must be configured to display this title (DisplayDocTitle = true) rather than the filename.",
+      "severity": "serious",
+      "wcag_sc": "2.4.2",
+      "wcag_level": "A",
+      "wcag_name": "Page Titled",
+      "pdf_ua_clause": "7.1",
+      "matterhorn_id": "07",
+      "remediation": "In Adobe Acrobat: File > Properties > Description tab to set Title. Then: File > Properties > Initial View tab > Show: Document Title."
+    },
+    {
+      "id": "language",
+      "name": "Document Language",
+      "description": "Document language must be defined",
+      "long_description": "The document must specify its primary language using the Lang entry in the document catalog. This enables screen readers to use the correct pronunciation rules.",
+      "severity": "serious",
+      "wcag_sc": "3.1.1",
+      "wcag_level": "A",
+      "wcag_name": "Language of Page",
+      "pdf_ua_clause": "7.2",
+      "matterhorn_id": "11",
+      "remediation": "In Adobe Acrobat: File > Properties > Advanced tab > Reading Options > Language dropdown. Common codes: en (English), fr (French), de (German), nl (Dutch)."
+    },
+    {
+      "id": "protected",
+      "name": "Not Protected Against AT",
+      "description": "Document must not block assistive technology access",
+      "long_description": "Some PDFs use security settings that prevent text extraction. While this may be intended for copy protection, it also blocks screen readers from accessing the content. Assistive technology access should never be restricted.",
+      "severity": "critical",
+      "wcag_sc": "1.1.1",
+      "wcag_level": "A",
+      "wcag_name": "Non-text Content",
+      "pdf_ua_clause": "7.1",
+      "matterhorn_id": "26",
+      "remediation": "In Adobe Acrobat: File > Properties > Security tab > Security Method: No Security. Or adjust permissions to allow content copying for accessibility."
+    },
+    {
+      "id": "bookmarks",
+      "name": "Navigation Bookmarks",
+      "description": "Documents with 20+ pages should have bookmarks for navigation",
+      "long_description": "For longer documents, bookmarks (also called outlines) provide an alternative navigation mechanism that allows users to jump directly to different sections without scrolling through all pages sequentially.",
+      "severity": "moderate",
+      "wcag_sc": "2.4.5",
+      "wcag_level": "AA",
+      "wcag_name": "Multiple Ways",
+      "pdf_ua_clause": "7.3",
+      "matterhorn_id": null,
+      "remediation": "In Adobe Acrobat: View > Navigation Panels > Bookmarks. Create bookmarks from the heading structure or manually add them for major sections.",
+      "threshold_pages": 20
+    },
+    {
+      "id": "scanned",
+      "name": "Not Scanned/Image-Only",
+      "description": "PDF must not be a scanned image-only document",
+      "long_description": "Image-only PDFs (typically from scanning paper documents) contain no actual text - just pictures of text. Screen readers cannot read these. The document must either contain real text or have been OCR-processed.",
+      "severity": "critical",
+      "wcag_sc": "1.4.5",
+      "wcag_level": "AA",
+      "wcag_name": "Images of Text",
+      "pdf_ua_clause": "7.1",
+      "matterhorn_id": "06",
+      "remediation": "Run OCR (Optical Character Recognition) on the document. In Adobe Acrobat: Tools > Scan & OCR > Recognize Text. Consider re-creating the document from the original source if available."
+    },
+    {
+      "id": "figure_alt_text",
+      "name": "Figure Alt Text",
+      "description": "All Figure tags must have alternative text",
+      "long_description": "Figure tags in PDF represent images, charts, diagrams, and other visual content. Each Figure must have an Alt attribute providing a text alternative that describes the image content for screen reader users who cannot see the visual.",
+      "severity": "serious",
+      "wcag_sc": "1.1.1",
+      "wcag_level": "A",
+      "wcag_name": "Non-text Content",
+      "pdf_ua_clause": "7.3",
+      "matterhorn_id": "13-004",
+      "remediation": "In Adobe Acrobat: View > Show/Hide > Navigation Panes > Tags. Right-click each Figure tag > Properties > Tag tab. Add descriptive alt text in the 'Alternate Text' field. For decorative images, mark them as Artifact instead."
+    },
+    {
+      "id": "forms",
+      "name": "Form Fields",
+      "description": "PDF contains AcroForm fields that require accessibility labeling",
+      "long_description": "Interactive PDF forms with AcroForm fields need proper accessibility labels, tab order, and descriptions. Unlabeled form fields are inaccessible to screen reader users who cannot determine what information to enter.",
+      "severity": "moderate",
+      "wcag_sc": "1.3.1",
+      "wcag_level": "A",
+      "wcag_name": "Info and Relationships",
+      "pdf_ua_clause": "7.6",
+      "matterhorn_id": "25",
+      "remediation": "In Adobe Acrobat: Tools > Prepare Form to add accessible labels. Ensure each field has a tooltip that describes its purpose. Set proper tab order: Tools > Accessibility > Reading Order."
+    },
+    {
+      "id": "xfa",
+      "name": "XFA Forms",
+      "description": "PDF contains XFA dynamic forms which are often inaccessible",
+      "long_description": "XFA (XML Forms Architecture) forms are dynamic forms that many PDF readers cannot render properly. They are not supported in most browsers and have significant accessibility limitations compared to AcroForms.",
+      "severity": "serious",
+      "wcag_sc": "1.3.1",
+      "wcag_level": "A",
+      "wcag_name": "Info and Relationships",
+      "pdf_ua_clause": "7.6",
+      "matterhorn_id": null,
+      "remediation": "Convert XFA forms to tagged PDF with AcroForms. In Adobe Acrobat: you may need to recreate the form from scratch using Prepare Form tool, or flatten the XFA form and re-add form fields."
+    },
+    {
+      "id": "xmp_metadata",
+      "name": "XMP Metadata",
+      "description": "PDF contains XMP metadata for enhanced discoverability",
+      "long_description": "XMP (Extensible Metadata Platform) metadata provides standardized, machine-readable information about the document including title, author, description, keywords, and more. This enhances document discoverability and cataloging.",
+      "severity": "minor",
+      "wcag_sc": null,
+      "wcag_level": null,
+      "wcag_name": null,
+      "pdf_ua_clause": null,
+      "matterhorn_id": null,
+      "remediation": "Add XMP metadata using PDF authoring tools. In Adobe Acrobat: File > Properties > Description. Enable 'Include bookmarks in PDF' when exporting from Word or InDesign."
+    },
+    {
+      "id": "list_structure",
+      "name": "List Structure",
+      "description": "Lists must have proper L/LI/Lbl/LBody structure",
+      "long_description": "Tagged PDFs must use proper list semantics with L (List) containing LI (List Item) children. Each LI should contain Lbl (label/bullet) and/or LBody (list item content). Nested lists must be placed inside LBody, not directly under L or LI.",
+      "severity": "serious",
+      "wcag_sc": "1.3.1",
+      "wcag_level": "A",
+      "wcag_name": "Info and Relationships",
+      "pdf_ua_clause": "7.6",
+      "matterhorn_id": "13",
+      "remediation": "In Adobe Acrobat Pro: View > Show/Hide > Navigation Panes > Tags. Ensure L contains only LI children, and each LI has Lbl and/or LBody. Fix nested lists by moving them inside LBody elements."
+    }
+  ],
+  "severity_levels": {
+    "critical": {
+      "label": "Critical",
+      "description": "Blocks assistive technology access entirely",
+      "color": "red"
+    },
+    "serious": {
+      "label": "Serious",
+      "description": "Significantly impacts accessibility",
+      "color": "yellow"
+    },
+    "moderate": {
+      "label": "Moderate",
+      "description": "May impact navigation or usability",
+      "color": "cyan"
+    },
+    "minor": {
+      "label": "Minor",
+      "description": "Small usability improvement recommended",
+      "color": "blue"
+    }
+  }
+}

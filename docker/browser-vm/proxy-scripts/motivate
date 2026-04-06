@@ -1,0 +1,19 @@
+#!/bin/zsh
+# Random accessibility motivational quote
+quotes=(
+    "The power of the Web is in its universality. Access by everyone regardless of disability is an essential aspect. — Tim Berners-Lee"
+    "Accessibility is not a feature. It's a social trend. — Antonio Santos"
+    "The one argument for accessibility that doesn't get made nearly often enough is how extraordinarily good it makes you feel. — Steve Krug"
+    "Disability is not a brave struggle or 'courage in the face of adversity.' Disability is an art. It's an ingenious way to live. — Neil Marcus"
+    "When we design for disability first, we often stumble upon solutions that are better for everyone. — Elise Roy"
+    "The web, as I envisaged it, we have not seen it yet. The future is still so much bigger than the past. — Tim Berners-Lee"
+    "Accessibility allows us to tap into everyone's potential. — Debra Ruh"
+    "Design for the margins and you design for all. — Liz Jackson"
+    "We need to make every single thing accessible to every single person with a disability. — Stevie Wonder"
+    "Solving one problem should not create another. — Sheri Byrne-Haber"
+    "Inclusion is not a matter of political correctness. It is the key to growth. — Jesse Jackson"
+    "Your needs are not special. They are human. — Anonymous"
+)
+echo ""
+gum style --foreground 6 --italic "  ${quotes[RANDOM % ${#quotes[@]} + 1]}"
+echo ""

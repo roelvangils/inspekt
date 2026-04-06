@@ -1,0 +1,37 @@
+/**
+ * Windows-Specific CSS Overrides for Inspekt PDF Viewer
+ *
+ * This stylesheet provides native Windows appearance using Fluent Design principles.
+ * These styles are applied when running on Windows.
+ *
+ * TODO: Implement Windows-specific styling:
+ * - Segoe UI Variable font
+ * - Fluent Design System colors
+ * - Mica/Acrylic material effects
+ * - Windows 11 rounded corners
+ * - Native scrollbar appearance
+ */
+
+:root {
+  /* Segoe UI font family */
+  --font-system: "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "Cascadia Code", "Cascadia Mono", Consolas, monospace;
+
+  /* Windows 11 accent colors (will be overridden by system) */
+  --windows-accent: #0078d4;
+  --windows-accent-light: #60cdff;
+  --windows-accent-dark: #003d6d;
+}
+
+/* Windows-style selection */
+::selection {
+  background-color: var(--windows-accent);
+  color: white;
+}
+
+/* Windows 11 rounded corners */
+.windows-card {
+  border-radius: 8px;
+}
+
+/* Placeholder for future Windows-specific styles */

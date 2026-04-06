@@ -1,0 +1,466 @@
+/**
+ * macOS-Specific CSS Overrides for Inspekt PDF Viewer
+ *
+ * This stylesheet uses WebKit-specific CSS features to achieve native macOS appearance.
+ * These styles are only applied in Safari/WebKit browsers (Tauri on macOS uses WebKit).
+ *
+ * References:
+ * - https://webkit.org/blog/3709/using-the-system-font-in-web-content/
+ * - https://webkit.org/blog/8840/dark-mode-support-in-webkit/
+ * - https://github.com/WebKit/WebKit/blob/main/Source/WebCore/css/CSSValueKeywords.in
+ */
+
+/* ============================================================================
+   SYSTEM FONTS
+
+   macOS provides dynamic type styles that adapt to user's accessibility settings.
+   Using -apple-system fonts ensures proper rendering and text behavior.
+   ============================================================================ */
+
+:root {
+  /* San Francisco font family with proper fallbacks */
+  --font-system: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display",
+                 system-ui, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+
+  /* Monospace with SF Mono */
+  --font-mono: "SF Mono", ui-monospace, SFMono-Regular, Menlo, Monaco,
+               Consolas, "Liberation Mono", monospace;
+
+  /* Rounded variant (macOS Big Sur+) */
+  --font-rounded: -apple-system-ui-serif, ui-rounded, "SF Pro Rounded",
+                  -apple-system, system-ui, sans-serif;
+}
+
+/* Dynamic type styles - these adapt to macOS text size settings */
+.text-body {
+  font: -apple-system-body;
+}
+
+.text-headline {
+  font: -apple-system-headline;
+}
+
+.text-subheadline {
+  font: -apple-system-subheadline;
+}
+
+.text-caption {
+  font: -apple-system-caption1;
+}
+
+.text-caption2 {
+  font: -apple-system-caption2;
+}
+
+.text-footnote {
+  font: -apple-system-footnote;
+}
+
+/* Short variants for compact UIs */
+.text-short-body {
+  font: -apple-system-short-body;
+}
+
+.text-short-headline {
+  font: -apple-system-short-headline;
+}
+
+.text-short-subheadline {
+  font: -apple-system-short-subheadline;
+}
+
+
+/* ============================================================================
+   SYSTEM COLORS
+
+   These are WebKit-internal colors that match macOS system appearance.
+   They automatically adapt to light/dark mode and accent color preferences.
+   ============================================================================ */
+
+:root {
+  /* Label colors - semantic text colors */
+  --macos-label: -apple-system-label;
+  --macos-secondary-label: -apple-system-secondary-label;
+  --macos-tertiary-label: -apple-system-tertiary-label;
+  --macos-quaternary-label: -apple-system-quaternary-label;
+
+  /* Background colors */
+  --macos-background: -apple-system-background;
+  --macos-secondary-background: -apple-system-secondary-background;
+  --macos-tertiary-background: -apple-system-tertiary-background;
+  --macos-control-background: -apple-system-control-background;
+  --macos-text-background: -apple-system-text-background;
+
+  /* Grouped background (for table views, settings) */
+  --macos-grouped-background: -apple-system-grouped-background;
+  --macos-secondary-grouped-background: -apple-system-secondary-grouped-background;
+  --macos-tertiary-grouped-background: -apple-system-tertiary-grouped-background;
+
+  /* Selection colors */
+  --macos-selected-content-background: -apple-system-selected-content-background;
+  --macos-selected-text-background: -apple-system-selected-text-background;
+  --macos-unemphasized-selected-content-background: -apple-system-unemphasized-selected-content-background;
+  --macos-unemphasized-selected-text-background: -apple-system-unemphasized-selected-text-background;
+
+  /* UI element colors */
+  --macos-separator: -apple-system-separator;
+  --macos-opaque-separator: -apple-system-opaque-separator;
+  --macos-grid: -apple-system-grid;
+  --macos-header-text: -apple-system-header-text;
+  --macos-placeholder-text: -apple-system-placeholder-text;
+  --macos-container-border: -apple-system-container-border;
+
+  /* Fill colors */
+  --macos-fill: -apple-system-fill;
+  --macos-secondary-fill: -apple-system-secondary-fill;
+  --macos-tertiary-fill: -apple-system-tertiary-fill;
+  --macos-quaternary-fill: -apple-system-quaternary-fill;
+
+  /* Accent colors - these follow the user's macOS accent color preference */
+  --macos-blue: -apple-system-blue;
+  --macos-brown: -apple-system-brown;
+  --macos-gray: -apple-system-gray;
+  --macos-green: -apple-system-green;
+  --macos-indigo: -apple-system-indigo;
+  --macos-orange: -apple-system-orange;
+  --macos-pink: -apple-system-pink;
+  --macos-purple: -apple-system-purple;
+  --macos-red: -apple-system-red;
+  --macos-teal: -apple-system-teal;
+  --macos-yellow: -apple-system-yellow;
+}
+
+
+/* ============================================================================
+   TEXT SELECTION
+
+   Use the system highlight color for text selection to match native apps.
+   ============================================================================ */
+
+::selection {
+  background-color: -apple-system-selected-text-background;
+  color: -apple-system-label;
+}
+
+::-moz-selection {
+  background-color: Highlight;
+  color: HighlightText;
+}
+
+/* For non-focused windows, use unemphasized selection */
+*:not(:focus-within) ::selection {
+  background-color: -apple-system-unemphasized-selected-text-background;
+}
+
+
+/* ============================================================================
+   NATIVE FORM CONTROLS
+
+   Use -webkit-appearance to get native macOS control styling.
+   ============================================================================ */
+
+/* Native buttons */
+button.native,
+.btn-native {
+  -webkit-appearance: push-button;
+  font: -apple-system-body;
+}
+
+/* Native text inputs */
+input[type="text"].native,
+input[type="search"].native,
+input[type="email"].native,
+input[type="password"].native,
+textarea.native {
+  -webkit-appearance: textfield;
+  background-color: -apple-system-control-background;
+  color: -apple-system-label;
+  border: 1px solid -apple-system-container-border;
+}
+
+input[type="text"].native::placeholder,
+input[type="search"].native::placeholder,
+textarea.native::placeholder {
+  color: -apple-system-placeholder-text;
+}
+
+/* Native checkboxes and radio buttons */
+input[type="checkbox"].native {
+  -webkit-appearance: checkbox;
+}
+
+input[type="radio"].native {
+  -webkit-appearance: radio;
+}
+
+/* Native select/dropdown */
+select.native {
+  -webkit-appearance: menulist;
+  background-color: -apple-system-control-background;
+  color: -apple-system-label;
+}
+
+/* Native progress bar */
+progress.native {
+  -webkit-appearance: progress-bar;
+}
+
+/* Native slider */
+input[type="range"].native {
+  -webkit-appearance: slider-horizontal;
+}
+
+
+/* ============================================================================
+   FOCUS STYLES
+
+   macOS-style focus rings using the system accent color.
+   ============================================================================ */
+
+*:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px -apple-system-blue;
+  /* Alternative with reduced opacity */
+  /* box-shadow: 0 0 0 4px color-mix(in srgb, -apple-system-blue 40%, transparent); */
+}
+
+/* Remove default focus ring for elements with custom styling */
+button:focus-visible,
+[role="button"]:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in srgb, -apple-system-blue 50%, transparent);
+}
+
+
+/* ============================================================================
+   SCROLLBARS
+
+   macOS-style overlay scrollbars.
+   ============================================================================ */
+
+/* Modern overlay scrollbars (macOS style) */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 0, 0, 0.3) transparent;
+}
+
+@media (prefers-color-scheme: dark) {
+  * {
+    scrollbar-color: rgba(255, 255, 255, 0.3) transparent;
+  }
+}
+
+/* WebKit scrollbar styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: rgba(0, 0, 0, 0.3);
+  border-radius: 4px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(0, 0, 0, 0.5);
+}
+
+@media (prefers-color-scheme: dark) {
+  ::-webkit-scrollbar-thumb {
+    background-color: rgba(255, 255, 255, 0.3);
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(255, 255, 255, 0.5);
+  }
+}
+
+/* Hide scrollbar when not scrolling (macOS behavior) */
+::-webkit-scrollbar-thumb:window-inactive {
+  background-color: transparent;
+}
+
+
+/* ============================================================================
+   VIBRANCY & MATERIALS
+
+   Frosted glass effects using backdrop-filter.
+   ============================================================================ */
+
+.vibrancy-sidebar {
+  background: rgba(246, 246, 246, 0.7);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  backdrop-filter: blur(20px) saturate(180%);
+}
+
+.vibrancy-toolbar {
+  background: rgba(246, 246, 246, 0.8);
+  -webkit-backdrop-filter: blur(10px) saturate(150%);
+  backdrop-filter: blur(10px) saturate(150%);
+}
+
+.vibrancy-popover {
+  background: rgba(255, 255, 255, 0.85);
+  -webkit-backdrop-filter: blur(30px) saturate(200%);
+  backdrop-filter: blur(30px) saturate(200%);
+}
+
+@media (prefers-color-scheme: dark) {
+  .vibrancy-sidebar {
+    background: rgba(40, 40, 45, 0.7);
+  }
+
+  .vibrancy-toolbar {
+    background: rgba(40, 40, 45, 0.8);
+  }
+
+  .vibrancy-popover {
+    background: rgba(50, 50, 55, 0.85);
+  }
+}
+
+
+/* ============================================================================
+   SF SYMBOLS (via Unicode)
+
+   Many SF Symbols are available as Unicode characters when using the system font.
+   These map to native glyphs on macOS.
+   ============================================================================ */
+
+.sf-symbol {
+  font-family: -apple-system, system-ui;
+  -webkit-font-smoothing: antialiased;
+  font-style: normal;
+  font-weight: 400;
+}
+
+/* Common SF Symbol Unicode mappings (subset that works in web) */
+.sf-icon-chevron-right::before { content: "›"; }
+.sf-icon-chevron-left::before { content: "‹"; }
+.sf-icon-chevron-down::before { content: "⌄"; }
+.sf-icon-chevron-up::before { content: "⌃"; }
+.sf-icon-checkmark::before { content: "✓"; }
+.sf-icon-xmark::before { content: "✕"; }
+.sf-icon-plus::before { content: "+"; }
+.sf-icon-minus::before { content: "−"; }
+.sf-icon-magnifyingglass::before { content: "⌕"; }
+.sf-icon-gear::before { content: "⚙"; }
+.sf-icon-info-circle::before { content: "ⓘ"; }
+.sf-icon-exclamationmark-triangle::before { content: "⚠"; }
+
+
+/* ============================================================================
+   TYPOGRAPHY ENHANCEMENTS
+
+   macOS-specific text rendering optimizations.
+   ============================================================================ */
+
+body {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  font-feature-settings: "kern" 1, "liga" 1;
+}
+
+/* Proper font weight for Retina displays */
+@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+  body {
+    -webkit-font-smoothing: subpixel-antialiased;
+  }
+}
+
+
+/* ============================================================================
+   WINDOW CHROME INTEGRATION
+
+   Styles for content that integrates with the macOS window chrome.
+   ============================================================================ */
+
+/* Title bar area - make draggable */
+.titlebar-area {
+  -webkit-app-region: drag;
+  height: env(titlebar-area-height, 38px);
+  padding-left: env(titlebar-area-x, 78px);
+}
+
+/* Exclude interactive elements from draggable region */
+.titlebar-area button,
+.titlebar-area input,
+.titlebar-area select,
+.titlebar-area a {
+  -webkit-app-region: no-drag;
+}
+
+/* Traffic light buttons spacing */
+.sidebar-header {
+  padding-left: 78px; /* Space for traffic light buttons */
+}
+
+/* Safe area for notch on newer MacBooks */
+@supports (padding-top: env(safe-area-inset-top)) {
+  .app-container {
+    padding-top: env(safe-area-inset-top);
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
+
+
+/* ============================================================================
+   ANIMATIONS & TRANSITIONS
+
+   macOS uses specific easing curves and durations.
+   ============================================================================ */
+
+:root {
+  /* macOS standard animation curves */
+  --ease-macos-standard: cubic-bezier(0.4, 0.0, 0.2, 1);
+  --ease-macos-decelerate: cubic-bezier(0.0, 0.0, 0.2, 1);
+  --ease-macos-accelerate: cubic-bezier(0.4, 0.0, 1, 1);
+  --ease-macos-spring: cubic-bezier(0.175, 0.885, 0.32, 1.275);
+
+  /* Standard durations */
+  --duration-instant: 0.1s;
+  --duration-fast: 0.2s;
+  --duration-normal: 0.3s;
+  --duration-slow: 0.5s;
+}
+
+/* Reduce motion for users who prefer it */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+
+/* ============================================================================
+   COLOR SCHEME
+
+   Proper color-scheme support for automatic dark mode.
+   ============================================================================ */
+
+:root {
+  color-scheme: light dark;
+}
+
+/* Force light mode */
+[data-theme="light"] {
+  color-scheme: light;
+}
+
+/* Force dark mode */
+[data-theme="dark"] {
+  color-scheme: dark;
+}

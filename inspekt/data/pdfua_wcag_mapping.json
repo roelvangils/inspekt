@@ -1,0 +1,630 @@
+{
+  "version": "1.0.0",
+  "description": "Maps ISO 14289-1 (PDF/UA-1) clauses to WCAG 2.1 success criteria",
+  "source": "PDF/UA Technical Implementation Guide and WCAG 2.1",
+  "mappings": {
+    "7.1": {
+      "title": "General",
+      "wcag_criteria": ["1.3.1", "4.1.2"],
+      "wcag_level": "A",
+      "wcag_titles": ["Info and Relationships", "Name, Role, Value"],
+      "category": "structure",
+      "remediation_hint": "Ensure the PDF is tagged with a valid structure tree. Use Adobe Acrobat Pro or accessible authoring tools."
+    },
+    "7.2": {
+      "title": "Text",
+      "wcag_criteria": ["3.1.1", "3.1.2"],
+      "wcag_level": "A",
+      "wcag_titles": ["Language of Page", "Language of Parts"],
+      "category": "metadata",
+      "remediation_hint": "Set document language in File > Properties > Advanced. Mark language changes with /Lang attribute on structure elements."
+    },
+    "7.3": {
+      "title": "Graphics",
+      "wcag_criteria": ["1.1.1"],
+      "wcag_level": "A",
+      "wcag_titles": ["Non-text Content"],
+      "category": "alt_text",
+      "remediation_hint": "Add alternative text to all meaningful images. Mark decorative images as artifacts."
+    },
+    "7.4": {
+      "title": "Headings",
+      "wcag_criteria": ["1.3.1", "2.4.6"],
+      "wcag_level": "A/AA",
+      "wcag_titles": ["Info and Relationships", "Headings and Labels"],
+      "category": "structure",
+      "remediation_hint": "Use proper heading tags (H1-H6) in logical order. Do not skip heading levels."
+    },
+    "7.5": {
+      "title": "Tables",
+      "wcag_criteria": ["1.3.1", "1.3.2"],
+      "wcag_level": "A",
+      "wcag_titles": ["Info and Relationships", "Meaningful Sequence"],
+      "category": "structure",
+      "remediation_hint": "Mark table headers with TH tags. Use scope attributes for complex tables. Avoid nested tables."
+    },
+    "7.6": {
+      "title": "Lists",
+      "wcag_criteria": ["1.3.1"],
+      "wcag_level": "A",
+      "wcag_titles": ["Info and Relationships"],
+      "category": "structure",
+      "remediation_hint": "Use L, LI, Lbl, and LBody tags for lists. Ensure list structure matches visual presentation."
+    },
+    "7.7": {
+      "title": "Mathematical expressions",
+      "wcag_criteria": ["1.1.1", "1.3.1"],
+      "wcag_level": "A",
+      "wcag_titles": ["Non-text Content", "Info and Relationships"],
+      "category": "alt_text",
+      "remediation_hint": "Use MathML or provide text alternatives for mathematical expressions."
+    },
+    "7.9": {
+      "title": "Notes and references",
+      "wcag_criteria": ["1.3.1"],
+      "wcag_level": "A",
+      "wcag_titles": ["Info and Relationships"],
+      "category": "structure",
+      "remediation_hint": "Mark footnotes with Note tags. Link footnote references to their content."
+    },
+    "7.10": {
+      "title": "Optional content",
+      "wcag_criteria": ["1.3.2"],
+      "wcag_level": "A",
+      "wcag_titles": ["Meaningful Sequence"],
+      "category": "reading_order",
+      "remediation_hint": "Ensure optional content layers have a logical reading order when toggled."
+    },
+    "7.11": {
+      "title": "Embedded files",
+      "wcag_criteria": ["1.1.1"],
+      "wcag_level": "A",
+      "wcag_titles": ["Non-text Content"],
+      "category": "alt_text",
+      "remediation_hint": "Provide descriptions for embedded files. Ensure embedded content is accessible."
+    },
+    "7.12": {
+      "title": "Article threads",
+      "wcag_criteria": ["1.3.2"],
+      "wcag_level": "A",
+      "wcag_titles": ["Meaningful Sequence"],
+      "category": "reading_order",
+      "remediation_hint": "Ensure article threads follow a logical reading sequence across pages."
+    },
+    "7.13": {
+      "title": "Digital signatures",
+      "wcag_criteria": ["4.1.2"],
+      "wcag_level": "A",
+      "wcag_titles": ["Name, Role, Value"],
+      "category": "forms",
+      "remediation_hint": "Ensure signature fields are properly labeled and accessible."
+    },
+    "7.14": {
+      "title": "Non-interactive forms",
+      "wcag_criteria": ["1.3.1"],
+      "wcag_level": "A",
+      "wcag_titles": ["Info and Relationships"],
+      "category": "forms",
+      "remediation_hint": "Structure non-interactive forms semantically. Associate labels with values."
+    },
+    "7.15": {
+      "title": "XFA",
+      "wcag_criteria": ["4.1.2"],
+      "wcag_level": "A",
+      "wcag_titles": ["Name, Role, Value"],
+      "category": "forms",
+      "remediation_hint": "Avoid XFA forms. Convert to tagged PDF with AcroForms for better accessibility."
+    },
+    "7.16": {
+      "title": "Security",
+      "wcag_criteria": ["1.1.1"],
+      "wcag_level": "A",
+      "wcag_titles": ["Non-text Content"],
+      "category": "structure",
+      "remediation_hint": "Do not use encryption settings that block assistive technology access."
+    },
+    "7.17": {
+      "title": "Navigation",
+      "wcag_criteria": ["2.4.1", "2.4.5"],
+      "wcag_level": "A/AA",
+      "wcag_titles": ["Bypass Blocks", "Multiple Ways"],
+      "category": "links_nav",
+      "remediation_hint": "Add bookmarks for navigation. Ensure logical tab order. Include table of contents for long documents."
+    },
+    "7.18": {
+      "title": "Annotations",
+      "wcag_criteria": ["1.1.1", "4.1.2"],
+      "wcag_level": "A",
+      "wcag_titles": ["Non-text Content", "Name, Role, Value"],
+      "category": "links_nav",
+      "remediation_hint": "Provide alternative text for link annotations. Ensure annotations have meaningful labels."
+    },
+    "7.19": {
+      "title": "Actions",
+      "wcag_criteria": ["3.2.5"],
+      "wcag_level": "AAA",
+      "wcag_titles": ["Change on Request"],
+      "category": "links_nav",
+      "remediation_hint": "Avoid automatic actions. Provide user control over JavaScript and form submissions."
+    },
+    "7.20": {
+      "title": "XObjects",
+      "wcag_criteria": ["1.1.1"],
+      "wcag_level": "A",
+      "wcag_titles": ["Non-text Content"],
+      "category": "alt_text",
+      "remediation_hint": "Ensure XObject references have proper structure and alternative text."
+    },
+    "7.21": {
+      "title": "Fonts",
+      "wcag_criteria": ["1.4.4", "1.4.5"],
+      "wcag_level": "AA",
+      "wcag_titles": ["Resize Text", "Images of Text"],
+      "category": "structure",
+      "remediation_hint": "Embed fonts. Ensure character mapping (ToUnicode) is correct for copy/paste and AT."
+    }
+  },
+  "iso_32000_mappings": {
+    "ISO-32000-1-7.18.1": {
+      "pdf_ua_clause": "7.18",
+      "title": "Link annotation alternate description",
+      "wcag_criteria": ["1.1.1", "2.4.4"],
+      "wcag_level": "A",
+      "wcag_titles": ["Non-text Content", "Link Purpose (In Context)"],
+      "category": "links_nav",
+      "remediation_hint": "Add Contents or Alt entry to link annotations with meaningful link text."
+    },
+    "ISO-32000-1-7.18.3": {
+      "pdf_ua_clause": "7.18",
+      "title": "Widget annotation alternate description",
+      "wcag_criteria": ["1.3.1", "4.1.2"],
+      "wcag_level": "A",
+      "wcag_titles": ["Info and Relationships", "Name, Role, Value"],
+      "category": "forms",
+      "remediation_hint": "Add TU (tooltip) entry to form widgets with descriptive labels."
+    },
+    "ISO-32000-1-14.6": {
+      "pdf_ua_clause": "7.1",
+      "title": "Marked content",
+      "wcag_criteria": ["1.3.1"],
+      "wcag_level": "A",
+      "wcag_titles": ["Info and Relationships"],
+      "category": "structure",
+      "remediation_hint": "Ensure all content is marked within the structure tree or as artifacts."
+    },
+    "ISO-32000-1-14.7": {
+      "pdf_ua_clause": "7.1",
+      "title": "Logical structure",
+      "wcag_criteria": ["1.3.1", "1.3.2"],
+      "wcag_level": "A",
+      "wcag_titles": ["Info and Relationships", "Meaningful Sequence"],
+      "category": "structure",
+      "remediation_hint": "Create a complete structure tree with proper parent-child relationships."
+    },
+    "ISO-32000-1-14.7.2": {
+      "pdf_ua_clause": "7.1",
+      "title": "Structure hierarchy",
+      "wcag_criteria": ["1.3.1"],
+      "wcag_level": "A",
+      "wcag_titles": ["Info and Relationships"],
+      "category": "structure",
+      "remediation_hint": "Ensure structure elements form a valid hierarchy with Document as root."
+    },
+    "ISO-32000-1-14.8.2.2": {
+      "pdf_ua_clause": "7.4",
+      "title": "Heading structure",
+      "wcag_criteria": ["1.3.1", "2.4.6"],
+      "wcag_level": "A/AA",
+      "wcag_titles": ["Info and Relationships", "Headings and Labels"],
+      "category": "structure",
+      "remediation_hint": "Use H, H1-H6 tags in proper sequence. H tags must form an outline."
+    },
+    "ISO-32000-1-14.8.4.2": {
+      "pdf_ua_clause": "7.6",
+      "title": "List structure",
+      "wcag_criteria": ["1.3.1"],
+      "wcag_level": "A",
+      "wcag_titles": ["Info and Relationships"],
+      "category": "structure",
+      "remediation_hint": "Structure lists with L, LI, Lbl, LBody tags. Nest properly for multi-level lists."
+    },
+    "ISO-32000-1-14.8.4.3": {
+      "pdf_ua_clause": "7.5",
+      "title": "Table structure general",
+      "wcag_criteria": ["1.3.1"],
+      "wcag_level": "A",
+      "wcag_titles": ["Info and Relationships"],
+      "category": "structure",
+      "remediation_hint": "Use Table, TR, TH, TD tags. Ensure TH cells have scope or Headers attributes."
+    },
+    "ISO-32000-1-14.8.4.3.5": {
+      "pdf_ua_clause": "7.5",
+      "title": "Table headers",
+      "wcag_criteria": ["1.3.1"],
+      "wcag_level": "A",
+      "wcag_titles": ["Info and Relationships"],
+      "category": "structure",
+      "remediation_hint": "Mark header cells with TH. Use Scope attribute (Row/Column/Both)."
+    }
+  },
+  "matterhorn_mappings": {
+    "01-001": {
+      "title": "Artifacts",
+      "wcag_criteria": ["1.3.1"],
+      "wcag_level": "A",
+      "wcag_titles": ["Info and Relationships"],
+      "category": "structure",
+      "remediation_hint": "Mark purely decorative content as artifacts, not structure elements."
+    },
+    "01-002": {
+      "title": "Content not tagged",
+      "wcag_criteria": ["1.3.1"],
+      "wcag_level": "A",
+      "wcag_titles": ["Info and Relationships"],
+      "category": "structure",
+      "remediation_hint": "All real content must be tagged. Check for content outside structure tree."
+    },
+    "01-003": {
+      "title": "Tag not mapped to role",
+      "wcag_criteria": ["4.1.2"],
+      "wcag_level": "A",
+      "wcag_titles": ["Name, Role, Value"],
+      "category": "structure",
+      "remediation_hint": "Use standard PDF tags or map custom tags to standard roles via RoleMap."
+    },
+    "01-004": {
+      "title": "Circular role mapping",
+      "wcag_criteria": ["4.1.1"],
+      "wcag_level": "A",
+      "wcag_titles": ["Parsing"],
+      "category": "structure",
+      "remediation_hint": "Remove circular mappings in RoleMap dictionary."
+    },
+    "01-005": {
+      "title": "Conflicting semantics",
+      "wcag_criteria": ["1.3.1"],
+      "wcag_level": "A",
+      "wcag_titles": ["Info and Relationships"],
+      "category": "structure",
+      "remediation_hint": "Do not use tags in ways that conflict with their semantic meaning."
+    },
+    "01-007": {
+      "title": "Document not tagged",
+      "wcag_criteria": ["1.3.1"],
+      "wcag_level": "A",
+      "wcag_titles": ["Info and Relationships"],
+      "category": "structure",
+      "remediation_hint": "Set MarkInfo dictionary Marked entry to true. Create StructTreeRoot."
+    },
+    "02-001": {
+      "title": "Natural language not specified",
+      "wcag_criteria": ["3.1.1"],
+      "wcag_level": "A",
+      "wcag_titles": ["Language of Page"],
+      "category": "metadata",
+      "remediation_hint": "Set /Lang in document catalog with valid BCP 47 language tag."
+    },
+    "02-002": {
+      "title": "Language change not marked",
+      "wcag_criteria": ["3.1.2"],
+      "wcag_level": "AA",
+      "wcag_titles": ["Language of Parts"],
+      "category": "metadata",
+      "remediation_hint": "Add Lang attribute to structure elements containing different language text."
+    },
+    "02-003": {
+      "title": "Invalid language tag",
+      "wcag_criteria": ["3.1.1"],
+      "wcag_level": "A",
+      "wcag_titles": ["Language of Page"],
+      "category": "metadata",
+      "remediation_hint": "Use valid BCP 47 / RFC 5646 language tags (e.g., 'en', 'en-US', 'fr-CA')."
+    },
+    "06-001": {
+      "title": "Figure without alternative text",
+      "wcag_criteria": ["1.1.1"],
+      "wcag_level": "A",
+      "wcag_titles": ["Non-text Content"],
+      "category": "alt_text",
+      "remediation_hint": "Add Alt entry to Figure tags. For decorative images, use empty Alt or mark as Artifact."
+    },
+    "06-002": {
+      "title": "Figure alternative text not semantically appropriate",
+      "wcag_criteria": ["1.1.1"],
+      "wcag_level": "A",
+      "wcag_titles": ["Non-text Content"],
+      "category": "alt_text",
+      "remediation_hint": "Write descriptive alt text that conveys the image meaning, not just appearance."
+    },
+    "06-003": {
+      "title": "Caption relationship not established",
+      "wcag_criteria": ["1.3.1"],
+      "wcag_level": "A",
+      "wcag_titles": ["Info and Relationships"],
+      "category": "alt_text",
+      "remediation_hint": "Group Figures with their Captions using a Figure parent element."
+    },
+    "07-001": {
+      "title": "Document title not displayed",
+      "wcag_criteria": ["2.4.2"],
+      "wcag_level": "A",
+      "wcag_titles": ["Page Titled"],
+      "category": "metadata",
+      "remediation_hint": "Set ViewerPreferences/DisplayDocTitle to true. Ensure Title in document Info."
+    },
+    "07-002": {
+      "title": "Document title missing",
+      "wcag_criteria": ["2.4.2"],
+      "wcag_level": "A",
+      "wcag_titles": ["Page Titled"],
+      "category": "metadata",
+      "remediation_hint": "Add meaningful Title to document Info dictionary."
+    },
+    "09-001": {
+      "title": "Heading levels skip",
+      "wcag_criteria": ["1.3.1"],
+      "wcag_level": "A",
+      "wcag_titles": ["Info and Relationships"],
+      "category": "structure",
+      "remediation_hint": "Use heading levels in order (H1, H2, H3...). Do not skip levels."
+    },
+    "09-002": {
+      "title": "Document uses numbered headings only",
+      "wcag_criteria": ["1.3.1"],
+      "wcag_level": "A",
+      "wcag_titles": ["Info and Relationships"],
+      "category": "structure",
+      "remediation_hint": "Avoid mixing H tags with H1-H6 tags. Use H1-H6 for explicit hierarchy."
+    },
+    "09-003": {
+      "title": "First heading not H1",
+      "wcag_criteria": ["1.3.1"],
+      "wcag_level": "A",
+      "wcag_titles": ["Info and Relationships"],
+      "category": "structure",
+      "remediation_hint": "Start document structure with H1 as the first heading."
+    },
+    "09-004": {
+      "title": "More than one H1",
+      "wcag_criteria": ["1.3.1"],
+      "wcag_level": "A",
+      "wcag_titles": ["Info and Relationships"],
+      "category": "structure",
+      "remediation_hint": "Use only one H1 per document. Use H2 for major sections."
+    },
+    "11-001": {
+      "title": "Link annotation Contents key missing",
+      "wcag_criteria": ["2.4.4"],
+      "wcag_level": "A",
+      "wcag_titles": ["Link Purpose (In Context)"],
+      "category": "links_nav",
+      "remediation_hint": "Add Contents entry to Link annotations with descriptive text."
+    },
+    "11-002": {
+      "title": "Link annotation without link tag",
+      "wcag_criteria": ["1.3.1", "4.1.2"],
+      "wcag_level": "A",
+      "wcag_titles": ["Info and Relationships", "Name, Role, Value"],
+      "category": "links_nav",
+      "remediation_hint": "Wrap link annotations in Link structure element."
+    },
+    "11-003": {
+      "title": "Link text empty or missing",
+      "wcag_criteria": ["2.4.4"],
+      "wcag_level": "A",
+      "wcag_titles": ["Link Purpose (In Context)"],
+      "category": "links_nav",
+      "remediation_hint": "Ensure Link elements contain descriptive text content."
+    },
+    "11-004": {
+      "title": "Link not linked to OBJR",
+      "wcag_criteria": ["4.1.2"],
+      "wcag_level": "A",
+      "wcag_titles": ["Name, Role, Value"],
+      "category": "links_nav",
+      "remediation_hint": "Associate Link structure elements with their annotation objects."
+    },
+    "11-005": {
+      "title": "Reference to annotation not allowed",
+      "wcag_criteria": ["4.1.2"],
+      "wcag_level": "A",
+      "wcag_titles": ["Name, Role, Value"],
+      "category": "links_nav",
+      "remediation_hint": "Only Link elements may reference link annotations."
+    },
+    "11-006": {
+      "title": "Link annotation alternate description",
+      "wcag_criteria": ["1.1.1"],
+      "wcag_level": "A",
+      "wcag_titles": ["Non-text Content"],
+      "category": "links_nav",
+      "remediation_hint": "Provide Alt entry for non-text link content (images, etc.)."
+    },
+    "12-001": {
+      "title": "Table missing headers",
+      "wcag_criteria": ["1.3.1"],
+      "wcag_level": "A",
+      "wcag_titles": ["Info and Relationships"],
+      "category": "structure",
+      "remediation_hint": "Mark header cells with TH tag. Add Scope attribute."
+    },
+    "12-002": {
+      "title": "Table headers attribute missing",
+      "wcag_criteria": ["1.3.1"],
+      "wcag_level": "A",
+      "wcag_titles": ["Info and Relationships"],
+      "category": "structure",
+      "remediation_hint": "Add Headers attribute to TD cells referencing TH IDs in complex tables."
+    },
+    "13-001": {
+      "title": "List structure invalid",
+      "wcag_criteria": ["1.3.1"],
+      "wcag_level": "A",
+      "wcag_titles": ["Info and Relationships"],
+      "category": "structure",
+      "remediation_hint": "Lists must contain only LI children. LI must contain Lbl and/or LBody."
+    },
+    "13-002": {
+      "title": "LI does not contain Lbl or LBody",
+      "wcag_criteria": ["1.3.1"],
+      "wcag_level": "A",
+      "wcag_titles": ["Info and Relationships"],
+      "category": "structure",
+      "remediation_hint": "Each LI must have at least Lbl (label) or LBody (content)."
+    },
+    "14-001": {
+      "title": "Form field missing name",
+      "wcag_criteria": ["1.3.1", "4.1.2"],
+      "wcag_level": "A",
+      "wcag_titles": ["Info and Relationships", "Name, Role, Value"],
+      "category": "forms",
+      "remediation_hint": "Add TU (tooltip) entry to form field with descriptive name."
+    },
+    "14-002": {
+      "title": "Form field type not supported",
+      "wcag_criteria": ["4.1.2"],
+      "wcag_level": "A",
+      "wcag_titles": ["Name, Role, Value"],
+      "category": "forms",
+      "remediation_hint": "Use standard AcroForm field types. Avoid custom field types."
+    },
+    "14-003": {
+      "title": "Form field value not text",
+      "wcag_criteria": ["4.1.2"],
+      "wcag_level": "A",
+      "wcag_titles": ["Name, Role, Value"],
+      "category": "forms",
+      "remediation_hint": "Ensure form field values are accessible as text."
+    },
+    "14-006": {
+      "title": "Radio button without parent group",
+      "wcag_criteria": ["1.3.1"],
+      "wcag_level": "A",
+      "wcag_titles": ["Info and Relationships"],
+      "category": "forms",
+      "remediation_hint": "Group related radio buttons under a common parent field."
+    },
+    "14-007": {
+      "title": "Checkbox without grouping",
+      "wcag_criteria": ["1.3.1"],
+      "wcag_level": "A",
+      "wcag_titles": ["Info and Relationships"],
+      "category": "forms",
+      "remediation_hint": "Group related checkboxes semantically when they form a set."
+    },
+    "17-001": {
+      "title": "Bookmarks missing for long document",
+      "wcag_criteria": ["2.4.5"],
+      "wcag_level": "AA",
+      "wcag_titles": ["Multiple Ways"],
+      "category": "links_nav",
+      "remediation_hint": "Add bookmarks that match heading structure for navigation."
+    },
+    "17-002": {
+      "title": "Bookmark destination invalid",
+      "wcag_criteria": ["2.4.5"],
+      "wcag_level": "AA",
+      "wcag_titles": ["Multiple Ways"],
+      "category": "links_nav",
+      "remediation_hint": "Ensure all bookmarks point to valid destinations within the document."
+    },
+    "17-003": {
+      "title": "PageLabel not defined",
+      "wcag_criteria": ["2.4.5"],
+      "wcag_level": "AA",
+      "wcag_titles": ["Multiple Ways"],
+      "category": "links_nav",
+      "remediation_hint": "Define page labels for consistent page numbering across viewers."
+    },
+    "19-001": {
+      "title": "Content outside structure",
+      "wcag_criteria": ["1.3.1", "1.3.2"],
+      "wcag_level": "A",
+      "wcag_titles": ["Info and Relationships", "Meaningful Sequence"],
+      "category": "reading_order",
+      "remediation_hint": "All visible content must be within the structure tree or marked as artifact."
+    },
+    "19-002": {
+      "title": "Content order illogical",
+      "wcag_criteria": ["1.3.2"],
+      "wcag_level": "A",
+      "wcag_titles": ["Meaningful Sequence"],
+      "category": "reading_order",
+      "remediation_hint": "Reorder structure elements to match logical reading sequence."
+    },
+    "19-003": {
+      "title": "Tab order not defined",
+      "wcag_criteria": ["2.4.3"],
+      "wcag_level": "A",
+      "wcag_titles": ["Focus Order"],
+      "category": "reading_order",
+      "remediation_hint": "Set Tabs entry in page dictionary to S (structure) for logical tab order."
+    },
+    "26-001": {
+      "title": "Content extraction prevented",
+      "wcag_criteria": ["1.1.1"],
+      "wcag_level": "A",
+      "wcag_titles": ["Non-text Content"],
+      "category": "structure",
+      "remediation_hint": "Remove security settings that block content extraction for AT."
+    },
+    "26-002": {
+      "title": "Printing disabled blocks accessibility",
+      "wcag_criteria": ["1.1.1"],
+      "wcag_level": "A",
+      "wcag_titles": ["Non-text Content"],
+      "category": "structure",
+      "remediation_hint": "Enable printing or ensure accessibility extraction is allowed separately."
+    },
+    "28-001": {
+      "title": "Font not embedded",
+      "wcag_criteria": ["1.4.5"],
+      "wcag_level": "AA",
+      "wcag_titles": ["Images of Text"],
+      "category": "structure",
+      "remediation_hint": "Embed all fonts to ensure consistent rendering and text extraction."
+    },
+    "28-002": {
+      "title": "ToUnicode CMap missing",
+      "wcag_criteria": ["1.4.5"],
+      "wcag_level": "AA",
+      "wcag_titles": ["Images of Text"],
+      "category": "structure",
+      "remediation_hint": "Add ToUnicode CMap to fonts for correct Unicode text extraction."
+    },
+    "28-003": {
+      "title": "ActualText missing for non-Unicode glyphs",
+      "wcag_criteria": ["1.1.1"],
+      "wcag_level": "A",
+      "wcag_titles": ["Non-text Content"],
+      "category": "alt_text",
+      "remediation_hint": "Add ActualText attribute for glyphs that cannot map to Unicode."
+    },
+    "28-004": {
+      "title": "Character cannot be mapped to Unicode",
+      "wcag_criteria": ["1.1.1"],
+      "wcag_level": "A",
+      "wcag_titles": ["Non-text Content"],
+      "category": "structure",
+      "remediation_hint": "Use fonts with proper Unicode mapping or add ActualText."
+    }
+  },
+  "wcag_reference": {
+    "1.1.1": {"title": "Non-text Content", "level": "A", "principle": "Perceivable"},
+    "1.3.1": {"title": "Info and Relationships", "level": "A", "principle": "Perceivable"},
+    "1.3.2": {"title": "Meaningful Sequence", "level": "A", "principle": "Perceivable"},
+    "1.4.4": {"title": "Resize Text", "level": "AA", "principle": "Perceivable"},
+    "1.4.5": {"title": "Images of Text", "level": "AA", "principle": "Perceivable"},
+    "2.4.1": {"title": "Bypass Blocks", "level": "A", "principle": "Operable"},
+    "2.4.2": {"title": "Page Titled", "level": "A", "principle": "Operable"},
+    "2.4.3": {"title": "Focus Order", "level": "A", "principle": "Operable"},
+    "2.4.4": {"title": "Link Purpose (In Context)", "level": "A", "principle": "Operable"},
+    "2.4.5": {"title": "Multiple Ways", "level": "AA", "principle": "Operable"},
+    "2.4.6": {"title": "Headings and Labels", "level": "AA", "principle": "Operable"},
+    "3.1.1": {"title": "Language of Page", "level": "A", "principle": "Understandable"},
+    "3.1.2": {"title": "Language of Parts", "level": "AA", "principle": "Understandable"},
+    "3.2.5": {"title": "Change on Request", "level": "AAA", "principle": "Understandable"},
+    "4.1.1": {"title": "Parsing", "level": "A", "principle": "Robust"},
+    "4.1.2": {"title": "Name, Role, Value", "level": "A", "principle": "Robust"}
+  }
+}

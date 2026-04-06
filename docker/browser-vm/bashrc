@@ -1,0 +1,39 @@
+# Inspekt Browser VM - Bash Configuration
+# This file is sourced by bash in the VM terminal
+
+# Load readline config for interactive tab completion
+export INPUTRC=/root/.inputrc
+
+# Inspekt CLI tab completion
+eval "$(_INSPEKT_COMPLETE=bash_source inspekt)"
+
+# Dynamic prompt: shows the domain of the active browser tab
+# Domain is refreshed in the background after each command, so the prompt is always instant
+_INSPEKT_DOMAIN_FILE="/tmp/.inspekt_domain"
+echo "inspekt" > "$_INSPEKT_DOMAIN_FILE"
+
+_refresh_inspekt_domain() {
+    {
+        local d
+        d=$(curl -sf --max-time 1 http://localhost:8888/url 2>/dev/null \
+            | jq -r '.url // empty' 2>/dev/null \
+            | sed -n 's|^https\?://\([^/:]*\).*|\1|p')
+        [[ -n "$d" ]] && echo "$d" > "$_INSPEKT_DOMAIN_FILE"
+    } &
+    disown
+}
+
+# Kick off initial fetch
+_refresh_inspekt_domain
+
+_update_inspekt_prompt() {
+    local domain
+    domain=$(< "$_INSPEKT_DOMAIN_FILE")
+    PS1="\[\e[0;32m\]${domain:-inspekt}\[\e[0m\]:\[\e[0;34m\]\w\[\e[0m\]\$ "
+    _refresh_inspekt_domain
+}
+PROMPT_COMMAND=_update_inspekt_prompt
+
+# Enable color support
+alias ls='ls --color=auto'
+alias grep='grep --color=auto'

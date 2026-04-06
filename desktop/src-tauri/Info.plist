@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- Declare the custom UTI for .pdfi files -->
+    <key>UTExportedTypeDeclarations</key>
+    <array>
+        <dict>
+            <key>UTTypeIdentifier</key>
+            <string>be.fronteers.inspekt.pdfi</string>
+            <key>UTTypeDescription</key>
+            <string>Inspekt PDF Accessibility Package</string>
+            <key>UTTypeConformsTo</key>
+            <array>
+                <string>public.data</string>
+                <string>public.archive</string>
+                <string>public.composite-content</string>
+            </array>
+            <key>UTTypeTagSpecification</key>
+            <dict>
+                <key>public.filename-extension</key>
+                <array>
+                    <string>pdfi</string>
+                </array>
+                <key>public.mime-type</key>
+                <string>application/vnd.inspekt.pdfi</string>
+            </dict>
+            <key>UTTypeIconFile</key>
+            <string>pdfi-document.icns</string>
+        </dict>
+    </array>
+
+    <!-- Document types this app can open -->
+    <key>CFBundleDocumentTypes</key>
+    <array>
+        <!-- PDFI Package (primary) -->
+        <dict>
+            <key>CFBundleTypeName</key>
+            <string>Inspekt Package</string>
+            <key>CFBundleTypeRole</key>
+            <string>Viewer</string>
+            <key>LSHandlerRank</key>
+            <string>Owner</string>
+            <key>LSItemContentTypes</key>
+            <array>
+                <string>be.fronteers.inspekt.pdfi</string>
+            </array>
+            <key>CFBundleTypeIconFile</key>
+            <string>pdfi-document.icns</string>
+            <key>CFBundleTypeExtensions</key>
+            <array>
+                <string>pdfi</string>
+            </array>
+        </dict>
+        <!-- JSON Report -->
+        <dict>
+            <key>CFBundleTypeName</key>
+            <string>Inspekt Report</string>
+            <key>CFBundleTypeRole</key>
+            <string>Viewer</string>
+            <key>LSHandlerRank</key>
+            <string>Alternate</string>
+            <key>CFBundleTypeExtensions</key>
+            <array>
+                <string>json</string>
+            </array>
+        </dict>
+        <!-- PDF Document -->
+        <dict>
+            <key>CFBundleTypeName</key>
+            <string>PDF Document</string>
+            <key>CFBundleTypeRole</key>
+            <string>Viewer</string>
+            <key>LSHandlerRank</key>
+            <string>Alternate</string>
+            <key>LSItemContentTypes</key>
+            <array>
+                <string>com.adobe.pdf</string>
+            </array>
+        </dict>
+    </array>
+</dict>
+</plist>

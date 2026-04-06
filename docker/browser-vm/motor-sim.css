@@ -1,0 +1,23 @@
+/* =============================================
+   Motor Impairment Simulator
+   ============================================= */
+
+/* Hide the real cursor when a motor simulation is active */
+.vnc-container.motor-cursor-active,
+.vnc-container.motor-cursor-active canvas {
+    cursor: none !important;
+}
+
+/* Fake cursor — positioned via JS, follows real mouse + tremor */
+.motor-cursor {
+    position: fixed;
+    z-index: 10002; /* above toasts (10001) — cursor must always be on top */
+    pointer-events: none;
+    width: 20px;
+    height: 20px;
+    /* Offset so the SVG arrow tip aligns with the actual position */
+    margin-left: -1px;
+    margin-top: -1px;
+    will-change: left, top;
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.3));
+}
