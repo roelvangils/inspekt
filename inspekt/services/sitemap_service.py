@@ -1108,19 +1108,20 @@ def strip_site_name(title: str, site_name: str | list[str]) -> str:
         return title
 
     names = [site_name] if isinstance(site_name, str) else site_name
+    title_lower = title.lower()
 
     for name in names:
         for sep in _TITLE_SEPARATORS:
             # Site name at the start: "Site Name | Page Title"
             prefix = f"{name}{sep}"
-            if title.startswith(prefix):
+            if title_lower.startswith(prefix.lower()):
                 cleaned = _strip_dangling_separators(title[len(prefix):])
                 if cleaned:
                     return cleaned
 
             # Site name at the end: "Page Title | Site Name"
             suffix = f"{sep}{name}"
-            if title.endswith(suffix):
+            if title_lower.endswith(suffix.lower()):
                 cleaned = _strip_dangling_separators(title[:-len(suffix)])
                 if cleaned:
                     return cleaned
@@ -1128,12 +1129,61 @@ def strip_site_name(title: str, site_name: str | list[str]) -> str:
     return title
 
 
+def _strip_repeated_tails(entries: list[SitemapEntry], min_count: int = 3) -> None:
+    """Strip sub-site name tails that appear across multiple titles.
+
+    After the main site name stripping, external links may still carry their
+    own site names (e.g., " | Duurzaam Wonen" on 33 pages). This function
+    finds any "separator + suffix" tail appearing in min_count+ titles and
+    strips them all.
+    """
+    titles = [e.title for e in entries if e.title]
+    if len(titles) < min_count:
+        return
+
+    # Count exact tail strings (separator + suffix at the end of each title)
+    tail_counts: dict[str, int] = {}
+    for title in titles:
+        best_pos = -1
+        best_sep = None
+        for sep in _TITLE_SEPARATORS:
+            pos = title.rfind(sep)
+            if pos > best_pos:
+                best_pos = pos
+                best_sep = sep
+        if best_sep and best_pos > 0:
+            tail = title[best_pos:]
+            tail_counts[tail] = tail_counts.get(tail, 0) + 1
+
+    # Collect tails that appear frequently enough
+    frequent_tails = {tail for tail, count in tail_counts.items() if count >= min_count}
+    if not frequent_tails:
+        return
+
+    # Strip each frequent tail from matching entries
+    for entry in entries:
+        if not entry.title:
+            continue
+        for tail in frequent_tails:
+            if entry.title.endswith(tail):
+                cleaned = _strip_dangling_separators(entry.title[:-len(tail)])
+                if cleaned:
+                    entry.title = cleaned
+                break
+
+
 def strip_site_names_from_entries(entries: list[SitemapEntry]) -> None:
     """Strip all common site name fragments from entry titles (in-place).
 
-    Runs detect+strip in a loop to handle multi-part titles like
+    Phase 1: detect+strip in a loop to handle multi-part titles like
     "Page Title | Site Name | Tagline". Each pass strips one fragment.
+
+    Phase 2: post-processing for sub-site names. After the main passes,
+    any "sep + tail" pattern appearing in 3+ titles is stripped too.
+    This catches external links with their own site names (e.g.,
+    "Duurzaam Wonen" appearing on 33 pages of a municipality sitemap).
     """
+    # Phase 1: dominant site name (high-frequency suffix)
     for _ in range(3):  # at most 3 passes (page | brand | tagline)
         site_name = detect_site_name(entries)
         if not site_name:
@@ -1141,6 +1191,9 @@ def strip_site_names_from_entries(entries: list[SitemapEntry]) -> None:
         for entry in entries:
             if entry.title:
                 entry.title = strip_site_name(entry.title, site_name)
+
+    # Phase 2: strip remaining sub-site tails appearing 3+ times
+    _strip_repeated_tails(entries, min_count=3)
 
 
 # ============================================================================
