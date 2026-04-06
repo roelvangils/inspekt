@@ -1066,10 +1066,10 @@ def sitemap(url, flat, filter_path, lang, open_target, interactive, where, neigh
     # --- Size guardrails and title fetching ---
     total = len(result.entries)
 
-    # --where and --neighbors only display a handful of nodes — skip bulk
-    # title fetch entirely and enrich just the visible nodes on demand
-    needs_targeted_only = where or neighbors
-    if needs_targeted_only:
+    # These commands don't need bulk title fetching — they either enrich
+    # just the visible nodes on demand (--where, --neighbors) or don't
+    # need titles at all (--open, --stats)
+    if where or neighbors or open_target is not None or stats:
         no_titles = True
 
     # Skip bulk title fetch for targeted operations on huge sitemaps
