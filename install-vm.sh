@@ -20,6 +20,8 @@ TARBALL_URL="https://github.com/roelvangils/inspekt/archive/refs/heads/main.tar.
 INSTALL_DIR="${INSPEKT_DIR:-$HOME/inspekt}"
 SCRIPT_URL="https://raw.githubusercontent.com/roelvangils/inspekt/main/install-vm.sh"
 
+INSTALLER_VERSION="0.3"
+
 IMAGE_NAME="inspekt-browser-vm"
 CONTAINER_NAME="inspekt-browser-vm"
 
@@ -386,8 +388,8 @@ open_panel() {
 
 main() {
   echo ""
-  echo "  ${BOLD}Inspekt VM Installer${RESET}"
-  echo "  ───────────────────"
+  echo "  ${BOLD}Inspekt VM Installer${RESET} ${DIM}(v${INSTALLER_VERSION})${RESET}"
+  echo "  ────────────────────────"
   echo ""
 
   preflight
