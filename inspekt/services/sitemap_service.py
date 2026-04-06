@@ -812,7 +812,9 @@ def fetch_titles(
     # Filter to entries that need titles.
     # Skip entries that already have a title or had a permanent failure (404, 403, etc.).
     # Retry entries with temporary failures (429 rate-limit, 5xx server errors, 0 = untried).
-    _RETRYABLE = {0, 429, 500, 502, 503, 504, -1, -2}
+    # Only retry entries that haven't been attempted (0) or had temporary server errors.
+    # Network failures (-1) and depth-filter skips (-2) are not retried — use --refresh.
+    _RETRYABLE = {0, 429, 500, 502, 503, 504}
     to_fetch = [(i, e) for i, e in enumerate(entries) if not e.title and e.http_status in _RETRYABLE]
     if not to_fetch:
         return 0
