@@ -1358,14 +1358,15 @@ def _node_display_name(node) -> str:
     return node.name
 
 
-def _enrich_visible_nodes(ancestors, mode: str = "compact"):
+def _enrich_visible_nodes(ancestors, result, mode: str = "compact"):
     """Fetch titles only for nodes that will be displayed in --where/--neighbors.
 
     This avoids fetching thousands of titles when only a handful are shown.
     Collects entries from ancestors, their siblings, and children of the
-    current node, then batch-fetches titles and strips site names.
+    current node, then batch-fetches titles, saves to cache, and strips
+    site names for display.
     """
-    from inspekt.services.sitemap_service import fetch_titles, strip_site_names_from_entries
+    from inspekt.services.sitemap_service import fetch_titles, save_to_cache, strip_site_names_from_entries
 
     # Collect all visible entries in one pass
     seen = set()
@@ -1391,6 +1392,8 @@ def _enrich_visible_nodes(ancestors, mode: str = "compact"):
     to_fetch = [e for e in all_entries if not e.title]
     if to_fetch:
         fetch_titles(to_fetch, max_concurrent=10, timeout=5.0)
+        # Save enriched titles to cache so consecutive calls are instant
+        save_to_cache(result)
 
     # Strip site names from all titled entries
     titled = [e for e in all_entries if e.title]
@@ -1413,7 +1416,7 @@ def _display_where(result, origin: str, mode: str = "compact"):
     max_width = shutil.get_terminal_size().columns - 2
 
     # Fetch titles only for the nodes we'll display (not the entire sitemap)
-    _enrich_visible_nodes(ancestors, mode)
+    _enrich_visible_nodes(ancestors, result, mode)
 
     if mode == "compact":
         _display_where_compact(ancestors, max_width)
@@ -1658,7 +1661,7 @@ def _display_neighbors(result, origin: str):
     max_width = shutil.get_terminal_size().columns - 2
 
     # Enrich visible nodes — use "nearby" mode to include siblings
-    _enrich_visible_nodes(ancestors, mode="nearby")
+    _enrich_visible_nodes(ancestors, result, mode="nearby")
 
     click.echo()
 
