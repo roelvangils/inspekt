@@ -710,7 +710,14 @@ def download(output, list_only, output_json, timeout, open_after, reveal_after):
 
             try:
                 click.echo(f"  Downloading {filename}...")
-                response = requests.get(url, timeout=30)
+                # In VM, route through mitmproxy (inspekt user has no direct outbound access)
+                from inspekt.config import is_isolated_mode
+                if is_isolated_mode():
+                    response = requests.get(url, timeout=30,
+                        proxies={"http": "http://localhost:8080", "https": "http://localhost:8080"},
+                        verify=False)
+                else:
+                    response = requests.get(url, timeout=30)
                 response.raise_for_status()
 
                 with builtin_open(output_path, "wb") as f:

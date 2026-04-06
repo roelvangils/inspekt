@@ -73,6 +73,7 @@ INSPEKT_UID=$(id -u inspekt)
 
 # Allow specific local services
 iptables -A OUTPUT -m owner --uid-owner $INSPEKT_UID -o lo -p tcp --dport 80 -j ACCEPT     # inspekt API
+iptables -A OUTPUT -m owner --uid-owner $INSPEKT_UID -o lo -p tcp --dport 8080 -j ACCEPT  # mitmproxy (for downloads)
 iptables -A OUTPUT -m owner --uid-owner $INSPEKT_UID -o lo -p tcp --dport 8767 -j ACCEPT  # bridge WebSocket
 iptables -A OUTPUT -m owner --uid-owner $INSPEKT_UID -o lo -p tcp --dport 8768 -j ACCEPT  # bridge HTTP
 iptables -A OUTPUT -m owner --uid-owner $INSPEKT_UID -o lo -p tcp --dport 8888 -j ACCEPT  # control server
