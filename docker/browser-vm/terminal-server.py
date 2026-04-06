@@ -54,9 +54,16 @@ class TerminalSession:
             # Mark this as the control panel terminal (supports OSC 1337 downloads)
             env['INSPEKT_TERMINAL'] = 'control-panel'
 
-            # Activate inspekt venv and start shell
-            os.execve('/bin/bash', ['/bin/bash', '-c',
-                'source /opt/inspekt/.venv/bin/activate && exec /bin/bash'], env)
+            # Run as restricted 'inspekt' user with locked-down zsh
+            import pwd
+            pw = pwd.getpwnam('inspekt')
+            os.setgid(pw.pw_gid)
+            os.setuid(pw.pw_uid)
+            env['HOME'] = pw.pw_dir
+            env['USER'] = 'inspekt'
+            env['SHELL'] = '/bin/zsh'
+            env['ZDOTDIR'] = '/etc/inspekt-shell'
+            os.execve('/bin/zsh', ['/bin/zsh', '-l'], env)
         else:
             # Parent process
             os.close(self.slave_fd)
