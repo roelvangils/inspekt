@@ -16,11 +16,11 @@ set -euo pipefail
 # ── Configuration ────────────────────────────────────────────────────────────
 
 REPO_URL="https://github.com/roelvangils/inspekt"
-TARBALL_URL="https://github.com/roelvangils/inspekt/archive/refs/heads/main.tar.gz"
+TARBALL_URL="https://github.com/roelvangils/inspekt/archive/refs/heads/feature/vm-install-script.tar.gz"
 INSTALL_DIR="${INSPEKT_DIR:-$HOME/inspekt}"
-SCRIPT_URL="https://raw.githubusercontent.com/roelvangils/inspekt/main/install-vm.sh"
+SCRIPT_URL="https://raw.githubusercontent.com/roelvangils/inspekt/feature/vm-install-script/install-vm.sh"
 
-INSTALLER_VERSION="0.7"
+INSTALLER_VERSION="0.8"
 
 IMAGE_NAME="inspekt-browser-vm"
 CONTAINER_NAME="inspekt-browser-vm"
