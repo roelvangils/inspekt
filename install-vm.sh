@@ -20,7 +20,7 @@ TARBALL_URL="https://github.com/roelvangils/inspekt/archive/refs/heads/feature/v
 INSTALL_DIR="${INSPEKT_DIR:-$HOME/inspekt}"
 SCRIPT_URL="https://raw.githubusercontent.com/roelvangils/inspekt/feature/vm-install-script/install-vm.sh"
 
-INSTALLER_VERSION="0.9"
+INSTALLER_VERSION="0.10"
 
 IMAGE_NAME="inspekt-browser-vm"
 CONTAINER_NAME="inspekt-browser-vm"
@@ -94,6 +94,17 @@ check_docker() {
   fi
 
   warn "Docker is not installed"
+
+  # Detect if running inside a VM — nested virtualization may need enabling
+  if sysctl -n machdep.cpu.features 2>/dev/null | grep -qi "VMM" \
+     || system_profiler SPHardwareDataType 2>/dev/null | grep -qi "virtual"; then
+    echo ""
+    warn "It looks like you're running inside a virtual machine."
+    echo "  Make sure ${BOLD}nested virtualization${RESET} is enabled in your VM settings,"
+    echo "  or OrbStack/Docker may fail to start."
+    echo ""
+  fi
+
   echo ""
   echo "  Inspekt VM needs Docker to run. Pick one (both are free):"
   echo ""
