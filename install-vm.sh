@@ -51,7 +51,7 @@ ask() {
 }
 
 prompt_choice() {
-  printf "${BOLD}%s${RESET} " "$1"
+  printf "${BOLD}%s${RESET} " "$1" >/dev/tty
   read -r choice </dev/tty
   echo "$choice"
 }
