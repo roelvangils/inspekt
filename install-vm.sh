@@ -20,7 +20,7 @@ TARBALL_URL="https://github.com/roelvangils/inspekt/archive/refs/heads/feature/v
 INSTALL_DIR="${INSPEKT_DIR:-$HOME/inspekt}"
 SCRIPT_URL="https://raw.githubusercontent.com/roelvangils/inspekt/feature/vm-install-script/install-vm.sh"
 
-INSTALLER_VERSION="0.12"
+INSTALLER_VERSION="0.13"
 
 IMAGE_NAME="inspekt-browser-vm"
 CONTAINER_NAME="inspekt-browser-vm"
@@ -100,12 +100,23 @@ check_docker() {
      || system_profiler SPHardwareDataType 2>/dev/null | grep -qi "virtual"; then
     echo ""
     warn "It looks like you're running inside a virtual machine."
-    echo "  Docker needs nested virtualization, which not all VM hosts support."
-    echo "  For Parallels, shut down this VM and run on the ${BOLD}host${RESET}:"
+    echo ""
+    echo "  Docker requires hardware virtualization, which typically does not work"
+    echo "  inside a virtual machine. Neither OrbStack nor Docker Desktop are likely"
+    echo "  to start successfully."
+    echo ""
+    echo "  If you're using Parallels, you can ${BOLD}try${RESET} enabling nested virtualization"
+    echo "  on the ${BOLD}host${RESET} (shut down this VM first):"
     echo ""
     echo "    ${DIM}prlctl set \"<vm-name>\" --nested-virt on${RESET}"
     echo ""
-    echo "  ${DIM}Your mileage may vary — Inspekt VM works best on real hardware.${RESET}"
+    echo "  ${BOLD}Recommended:${RESET} run this installer on real hardware instead."
+    echo ""
+    if ! ask "  Continue anyway (probably won't work)?"; then
+      echo ""
+      echo "  Run this script on a real Mac for the best experience."
+      exit 0
+    fi
     echo ""
   fi
 
