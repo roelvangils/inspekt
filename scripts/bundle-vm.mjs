@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+#!/usr/bin/env bun
 
 /**
  * Bundle control panel CSS + JS for production.
@@ -11,7 +11,7 @@
  *   docker/browser-vm/dist/app.min.css   (all app CSS, minified)
  *   docker/browser-vm/dist/app.min.js    (all app JS, minified)
  *
- * Usage: node scripts/bundle-vm.mjs
+ * Usage: bun scripts/bundle-vm.mjs
  */
 
 import { readFileSync, writeFileSync, mkdirSync } from "fs";

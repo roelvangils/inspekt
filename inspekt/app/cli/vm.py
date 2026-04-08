@@ -4,6 +4,7 @@ This module provides commands to manage the Inspekt Browser VM,
 a Docker-based virtual machine with Chromium and the Inspekt extension pre-installed.
 """
 
+import shutil
 import subprocess
 import sys
 import time
@@ -229,6 +230,9 @@ def _build_image(vm_dir: Path) -> bool:
     # Bundle control panel assets (CSS + JS → minified bundles)
     bundle_script = project_root / "scripts" / "bundle-vm.mjs"
     click.echo("  • Bundling control panel assets...")
+    if not shutil.which("bun"):
+        click.echo("  ✗ 'bun' is not installed. Install it: https://bun.sh", err=True)
+        return False
     bundle_result = subprocess.run(
         ["bun", str(bundle_script)],
         cwd=project_root,
