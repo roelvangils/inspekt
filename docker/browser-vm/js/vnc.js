@@ -1,7 +1,7 @@
 // =============================================
 // RFB (noVNC) — direct embedding (no iframe)
 // =============================================
-let rfb = null;
+// rfb declared in config.js (shared state)
 let _rfbReconnectAttempts = 0;
 let _vncInitialized = false;
 let _isCleaningUp = false;
@@ -105,36 +105,21 @@ const TERMINAL_THEMES = {
     }
 };
 
-let isConnected = false;
-let terminal = null;
-let terminalSocket = null;
-let fitAddon = null;
-let isTerminalOpen = false;
-let hasTerminalSession = false; // Track if we have an active terminal session
-let _terminalPromptDomain = 'inspekt'; // Tracks domain shown in terminal prompt
+// Shared state (rfb, terminal, terminalSocket, fitAddon, isTerminalOpen,
+// hasTerminalSession, isConnected, editorView, editorCurrentPath, editorIsReadOnly,
+// editorIsDirty, activePanel, terminalPosition, terminalMode, splitRatio,
+// splitFlipped, isDraggingSplitHandle, _lastMouseX, _lastMouseY, _terminalPromptDomain)
+// are declared in config.js so they're available to all modules regardless of load order.
 
 // Global mouse position tracking (needed for keyboard-triggered context menus).
 // Uses both document-level and pointermove on VNC container because noVNC may
 // use setPointerCapture which redirects events away from document listeners.
-let _lastMouseX = window.innerWidth / 2, _lastMouseY = window.innerHeight / 2;
 function _trackMouse(e) { _lastMouseX = e.clientX; _lastMouseY = e.clientY; }
 document.addEventListener('mousemove', _trackMouse, { passive: true });
 document.addEventListener('pointermove', _trackMouse, { passive: true });
 
-// ── Editor state ──
-let editorView = null;          // CodeMirror EditorView instance
-let editorCurrentPath = null;   // Absolute path of open file
-let editorIsReadOnly = false;   // true for files outside /home/inspekt/
-let editorIsDirty = false;      // Unsaved changes exist
-let activePanel = 'terminal';   // 'terminal' | 'editor'
+// ── Editor state (CodeMirror compartment — must be after vendor script loads) ──
 const editorThemeCompartment = typeof CM !== 'undefined' ? new CM.Compartment() : null;
-
-// Split mode & position state
-let terminalPosition = localStorage.getItem('terminalPosition') || 'right';
-let terminalMode = localStorage.getItem('terminalMode') || 'floating';  // 'floating' | 'split'
-let splitRatio = parseFloat(localStorage.getItem('splitRatio')) || 0.5;
-let splitFlipped = localStorage.getItem('splitFlipped') === 'true';
-let isDraggingSplitHandle = false;
 
 /**
  * Cosmetically rewrite the terminal prompt when the active URL changes.

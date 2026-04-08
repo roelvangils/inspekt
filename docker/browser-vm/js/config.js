@@ -144,3 +144,40 @@ function checkTriggerWords(text) {
     playNotificationBeep();
     showToast(trimmedLine, { type: 'error', duration: 5000, dismissible: true });
 }
+
+// =============================================
+// Shared State (cross-module variables)
+// =============================================
+// These are declared here (loaded first) so all modules
+// can read/write them regardless of bundle concatenation order.
+
+// VNC / RFB
+var rfb = null;
+
+// Terminal
+var terminal = null;
+var terminalSocket = null;
+var fitAddon = null;
+var isTerminalOpen = false;
+var hasTerminalSession = false;
+var _terminalPromptDomain = 'inspekt';
+
+// Editor
+var editorView = null;
+var editorCurrentPath = null;
+var editorIsReadOnly = false;
+var editorIsDirty = false;
+var activePanel = 'terminal';
+
+// Split mode & position
+var terminalPosition = localStorage.getItem('terminalPosition') || 'right';
+var terminalMode = localStorage.getItem('terminalMode') || 'floating';
+var splitRatio = parseFloat(localStorage.getItem('splitRatio')) || 0.5;
+var splitFlipped = localStorage.getItem('splitFlipped') === 'true';
+var isDraggingSplitHandle = false;
+
+// VNC connection state
+var isConnected = false;
+
+// Global mouse position tracking
+var _lastMouseX = window.innerWidth / 2, _lastMouseY = window.innerHeight / 2;

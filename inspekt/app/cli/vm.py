@@ -206,14 +206,10 @@ def _verify_vm_serving_correctly(timeout: int = 10) -> tuple[bool, str | None]:
             with urllib.request.urlopen(url, timeout=5) as response:
                 content = response.read().decode("utf-8", errors="replace")
 
-                # Check for expected content markers
-                if "terminalInitialized" not in content:
+                # Check for expected content markers — works for both
+                # dev mode (source HTML) and production (bundled HTML)
+                if "Inspekt Browser VM" not in content:
                     return False, "Stale content detected (missing expected code)"
-
-                # Get content length to verify it's the full file
-                content_length = len(content)
-                if content_length < 190000:  # control.html should be ~193KB
-                    return False, f"Content too small ({content_length} bytes)"
 
                 return True, None
         except urllib.error.URLError:
@@ -234,7 +230,7 @@ def _build_image(vm_dir: Path) -> bool:
     bundle_script = project_root / "scripts" / "bundle-vm.mjs"
     click.echo("  • Bundling control panel assets...")
     bundle_result = subprocess.run(
-        ["node", str(bundle_script)],
+        ["bun", str(bundle_script)],
         cwd=project_root,
         capture_output=True,
         text=True,
