@@ -1,0 +1,19 @@
+{
+  "$schema": "https://schemas.tauri.app/config/2/capability",
+  "identifier": "default",
+  "description": "Default capability for local windows",
+  "windows": ["main", "preferences"],
+  "permissions": [
+    "core:default",
+    "core:window:default",
+    "core:window:allow-create",
+    "core:window:allow-show",
+    "core:window:allow-hide",
+    "core:window:allow-set-focus",
+    "core:window:allow-close",
+    "core:event:default",
+    "shell:default",
+    "notification:default",
+    "os:default"
+  ]
+}
