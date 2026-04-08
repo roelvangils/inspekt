@@ -408,7 +408,6 @@ COPY docker/browser-vm/scripts/devtools-manager.sh /opt/devtools-manager.sh
 COPY docker/browser-vm/config/xorg.conf /etc/X11/xorg.conf
 COPY docker/browser-vm/scripts/resize-display.sh /opt/resize-display.sh
 COPY docker/browser-vm/scripts/download.sh /usr/local/bin/download
-COPY docker/browser-vm/audio-proxy.sh /opt/audio-proxy.sh
 COPY docker/browser-vm/servers/audio-server.py /opt/audio-server.py
 COPY docker/browser-vm/config/pulse-config.pa /etc/pulse/default.pa
 COPY docker/browser-vm/proxy-scripts /opt/proxy-scripts
@@ -463,7 +462,7 @@ RUN mkdir -p /etc/inspekt-versions && \
 # Customize noVNC HTML and set permissions
 RUN chmod +x /entrypoint.sh /root/.config/openbox/autostart /opt/inspekt-chromium.sh \
               /opt/devtools-manager.sh /opt/terminal-server.py /usr/local/bin/download \
-              /opt/audio-proxy.sh /opt/resize-display.sh && \
+              /opt/resize-display.sh && \
     # Remove noVNC logo from HTML
     sed -i 's|<h1 class="noVNC_logo" translate="no"><span>no</span><br>VNC</h1>||g' /usr/share/novnc/vnc.html && \
     sed -i 's|<div class="noVNC_logo" translate="no"><span>no</span>VNC</div>||g' /usr/share/novnc/vnc.html && \
