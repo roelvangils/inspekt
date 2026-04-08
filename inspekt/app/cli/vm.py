@@ -300,6 +300,7 @@ def _start_container(dev_mode: bool = False, vm_dir: Path = None) -> bool:
             "-v", f"{vm_dir}/audio.js:/usr/share/novnc/audio.js:ro",
             "-v", f"{vm_dir}/zoom.js:/usr/share/novnc/zoom.js:ro",
             "-v", f"{vm_dir}/scrollbar.js:/usr/share/novnc/scrollbar.js:ro",
+            "-v", f"{vm_dir}/js:/usr/share/novnc/js:ro",
             "-v", f"{vm_dir}/vendor/sortable.min.js:/usr/share/novnc/vendor/sortable.min.js:ro",
             "-v", f"{vm_dir}/fonts:/usr/share/novnc/fonts:ro",
             "-v", f"{vm_dir}/icons:/usr/share/novnc/icons:ro",

@@ -405,6 +405,7 @@ COPY docker/browser-vm/vnc-overlay.js /usr/share/novnc/vnc-overlay.js
 COPY docker/browser-vm/audio.js /usr/share/novnc/audio.js
 COPY docker/browser-vm/zoom.js /usr/share/novnc/zoom.js
 COPY docker/browser-vm/scrollbar.js /usr/share/novnc/scrollbar.js
+COPY docker/browser-vm/js /usr/share/novnc/js
 COPY docker/browser-vm/inspekt-chromium.sh /opt/inspekt-chromium.sh
 COPY docker/browser-vm/devtools-manager.sh /opt/devtools-manager.sh
 COPY docker/browser-vm/xorg.conf /etc/X11/xorg.conf
