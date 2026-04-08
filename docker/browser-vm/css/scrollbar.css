@@ -1,0 +1,79 @@
+/* =============================================
+ * Virtual Scrollbar Overlay
+ * ============================================= */
+
+.virtual-scrollbar {
+    position: absolute;
+    z-index: var(--z-scrollbar);
+    pointer-events: auto;
+    opacity: 0;
+    transition: opacity var(--duration-slow) ease;
+    /* Blend the entire scrollbar group against the canvas behind it.
+       Must be here (not on .scrollbar-thumb) because z-index creates
+       a stacking context — children can only blend within their group.
+       Using a gray thumb base (not white) minimizes color artifacts:
+       gray difference any-color → muted result vs white → full inversion. */
+    mix-blend-mode: difference;
+
+    &.visible { opacity: 1; }
+    &.always-visible { opacity: 1 !important; }
+
+    &.vertical {
+        right: 5px;
+        top: 5px;
+        bottom: 5px;
+        width: 8px;
+        transition: opacity var(--duration-slow) ease, width var(--duration-fast) ease, right var(--duration-fast) ease;
+
+        &:hover,
+        &.dragging {
+            width: 12px;
+        }
+
+        &:hover .scrollbar-thumb,
+        &.dragging .scrollbar-thumb {
+            border-radius: var(--radius-md);
+        }
+    }
+}
+
+.scrollbar-track {
+    position: relative;
+    width: 100%;
+    height: 100%;
+}
+
+.scrollbar-thumb {
+    position: absolute;
+    width: 100%;
+    min-height: 30px;
+    background: rgba(160, 160, 160, 0.7);
+    border-radius: var(--radius-sm);
+    cursor: default;
+    transition: top var(--duration-fast) ease, border-radius var(--duration-fast) ease;
+
+    /* Disable smooth top transition during drag for instant feedback */
+    &.dragging {
+        transition: border-radius var(--duration-fast) ease;
+    }
+
+    &:hover {
+        background: rgba(160, 160, 160, 0.85);
+    }
+
+    &:active,
+    &.dragging {
+        background: rgba(160, 160, 160, 0.95);
+    }
+}
+
+/* Invisible hover zone along right edge to trigger scrollbar */
+.virtual-scrollbar-hover-zone {
+    position: absolute;
+    z-index: var(--z-scrollbar);
+    right: 0;
+    top: 0;
+    bottom: 0;
+    width: 30px;
+    pointer-events: auto;
+}

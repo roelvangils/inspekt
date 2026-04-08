@@ -1,0 +1,117 @@
+/* =============================================
+ * Control Bar (top navigation bar)
+ * ============================================= */
+
+.control-bar {
+    background: var(--bg-bar);
+    padding: 10px var(--space-4);
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    flex-shrink: 0;
+}
+
+.logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-right: var(--space-2);
+}
+
+.logo-icon {
+    width: var(--space-8);
+    height: var(--space-8);
+    background: linear-gradient(135deg, var(--accent) 0%, var(--accent-secondary) 100%);
+    border-radius: var(--radius-lg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: var(--text-lg);
+    color: white;
+}
+
+.logo-text {
+    font-weight: 600;
+    font-size: var(--text-lg);
+    color: var(--text-bright);
+}
+
+.logo-badge {
+    font-size: var(--text-xs);
+    background: var(--bg-btn);
+    color: var(--text-dim);
+    padding: 2px var(--space-2);
+    border-radius: var(--radius-sm);
+    margin-left: -4px;
+}
+
+.divider {
+    width: 1px;
+    height: var(--space-6);
+    background: var(--divider);
+}
+
+.btn-group {
+    display: flex;
+    gap: var(--space-2);
+}
+
+button {
+    background: var(--bg-btn);
+    color: var(--text);
+    border: none;
+    padding: var(--space-2) 14px;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    font-size: var(--text-base);
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    transition: all var(--duration-fast) ease;
+    font-family: inherit;
+
+    &:hover {
+        background: var(--bg-btn-hover);
+        color: var(--text-bright);
+    }
+
+    &:active {
+        transform: scale(0.98);
+    }
+
+    &.primary {
+        background: linear-gradient(135deg, var(--accent) 0%, var(--accent-secondary) 100%);
+        border: none;
+        color: var(--text-bright);
+
+        &:hover {
+            opacity: 0.9;
+        }
+    }
+
+    &.danger {
+        background: var(--danger);
+        color: white;
+
+        &:hover {
+            background: #c82333;
+        }
+    }
+
+    & svg {
+        width: 16px;
+        height: 16px;
+        fill: currentColor;
+    }
+
+    /* Navigation buttons (icon only) */
+    &.nav-btn {
+        padding: var(--space-2) 10px;
+
+        &:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+    }
+}

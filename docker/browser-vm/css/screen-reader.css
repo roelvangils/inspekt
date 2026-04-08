@@ -1,0 +1,369 @@
+/* =============================================
+ * Screen Reader Simulator UI
+ * ============================================= */
+
+/* Focus indicator (positioned over VNC canvas) */
+.sr-focus-indicator {
+    position: absolute;
+    border: 3px solid #2196f3;
+    border-radius: 2px;
+    background: rgba(33, 150, 243, 0.06);
+    pointer-events: none;
+    z-index: var(--z-sr-focus);
+    transition: left var(--duration-normal) cubic-bezier(0.4, 0, 0.2, 1),
+                top var(--duration-normal) cubic-bezier(0.4, 0, 0.2, 1),
+                width var(--duration-normal) cubic-bezier(0.4, 0, 0.2, 1),
+                height var(--duration-normal) cubic-bezier(0.4, 0, 0.2, 1),
+                border-radius var(--duration-normal) ease,
+                opacity var(--duration-fast) ease-out;
+    box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.25);
+
+    &.sr-jaws    { border-color: #2196f3; box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.25); }
+    &.sr-nvda    { border-color: #9c27b0; box-shadow: 0 0 0 2px rgba(156, 39, 176, 0.25); }
+    &.sr-voiceover { border-color: #333; box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.25); }
+}
+
+.sr-focus-label {
+    position: absolute;
+    top: -22px;
+    left: -3px;
+    background: #2196f3;
+    color: #fff;
+    font: 500 11px/1 system-ui, sans-serif;
+    padding: 3px var(--space-2);
+    border-radius: 3px 3px 0 0;
+    white-space: nowrap;
+}
+
+.sr-focus-indicator.sr-nvda .sr-focus-label { background: #9c27b0; }
+.sr-focus-indicator.sr-voiceover .sr-focus-label { background: #333; }
+
+/* ── Caption bar (between VNC and terminal) ── */
+
+.sr-captions {
+    background: rgba(15, 15, 25, 0.95);
+    border-top: 1px solid var(--overlay-white-medium);
+    padding: var(--space-2) var(--space-4);
+    font-family: system-ui, sans-serif;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    min-height: 44px;
+    animation: srCaptionSlideIn var(--duration-normal) ease-out;
+}
+
+@keyframes srCaptionSlideIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.sr-captions-current { display: flex; align-items: center; flex: 1; min-width: 0; }
+.sr-captions-indicator { color: var(--accent); margin-right: var(--space-2); font-size: var(--text-md); }
+.sr-captions-text { color: #fff; font-size: var(--text-lg); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sr-captions-history { color: rgba(255, 255, 255, 0.35); font-size: var(--text-base); margin-right: var(--space-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 250px; }
+.sr-captions-meta { display: flex; align-items: center; gap: var(--space-1); flex-shrink: 0; }
+.sr-captions-position { color: rgba(255, 255, 255, 0.5); font: var(--text-base)/1 system-ui; font-variant-numeric: tabular-nums; margin-right: var(--space-2); }
+
+.sr-captions-btn {
+    background: none;
+    border: none;
+    color: rgba(255, 255, 255, 0.5);
+    cursor: pointer;
+    font-size: 15px;
+    padding: var(--space-1) 6px;
+    border-radius: var(--radius-sm);
+    transition: color var(--duration-fast), background var(--duration-fast);
+
+    &:hover { color: #fff; background: var(--overlay-white-medium); }
+    &.active { color: var(--accent); }
+}
+
+/* ── VoiceOver-style floating caption panel ── */
+
+.sr-floating-caption {
+    position: absolute;
+    z-index: var(--z-sr-floating);
+    background: rgba(30, 30, 30, 0.65);
+    -webkit-backdrop-filter: blur(40px) saturate(1.8);
+    backdrop-filter: blur(40px) saturate(1.8);
+    color: #fff;
+    outline: 1px solid rgba(0, 0, 0, 0.35);
+    border: 4px solid #fff;
+    border-radius: 14px;
+    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.5);
+    padding: 10px 14px;
+    font: 500 16px/1.3 system-ui, -apple-system, sans-serif;
+    min-width: 280px;
+    resize: horizontal;
+    overflow: hidden;
+    user-select: none;
+    cursor: default;
+    animation: srFloatIn var(--duration-normal) ease-out;
+
+    & .sr-floating-header {
+        display: flex;
+        align-items: center;
+        gap: var(--space-2);
+    }
+
+    & .sr-floating-text {
+        flex: 1;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    & .sr-floating-close {
+        background: none;
+        border: none;
+        color: #fff;
+        font-size: 18px;
+        line-height: 1;
+        cursor: pointer;
+        padding: 0 2px;
+        opacity: 0.7;
+        transition: opacity var(--duration-fast);
+        flex-shrink: 0;
+        order: -1;
+
+        &:hover { opacity: 1; }
+    }
+
+    & .sr-floating-meta {
+        font: 13px/1 system-ui;
+        color: rgba(255, 255, 255, 0.5);
+        margin-top: var(--space-1);
+        font-variant-numeric: tabular-nums;
+    }
+}
+
+@keyframes srFloatIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Speech log (generic, works for all SRs) ── */
+
+.sr-speech-log {
+    background: rgba(15, 15, 25, 0.95);
+    border-top: 1px solid var(--overlay-white-medium);
+    max-height: 200px;
+    display: flex;
+    flex-direction: column;
+}
+
+.sr-speech-log-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px var(--space-3);
+    font: 500 11px/1 system-ui;
+    color: rgba(255, 255, 255, 0.4);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    flex-shrink: 0;
+}
+
+.sr-speech-log-header-actions { display: flex; gap: 6px; }
+
+.sr-speech-log-btn {
+    background: none;
+    border: none;
+    color: rgba(255, 255, 255, 0.4);
+    cursor: pointer;
+    font: 11px system-ui;
+    padding: 2px 6px;
+    border-radius: 3px;
+    transition: color var(--duration-fast), background var(--duration-fast);
+
+    &:hover { color: #fff; background: var(--overlay-white-medium); }
+}
+
+.sr-speech-log-entries {
+    overflow-y: auto;
+    flex: 1;
+    font: 13px/1.5 'SF Mono', Menlo, Consolas, monospace;
+    color: rgba(255, 255, 255, 0.8);
+}
+
+.sr-speech-log-entry {
+    padding: 3px var(--space-3);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+
+    & .sr-log-role {
+        color: var(--accent);
+        margin-right: var(--space-2);
+        font-weight: 600;
+        font-size: 11px;
+        text-transform: uppercase;
+    }
+}
+
+/* ── SR launcher popout ── */
+
+.sr-popout {
+    display: none !important;
+    flex-direction: column !important;
+    right: 0;
+    left: auto;
+    padding: 14px !important;
+    width: 220px !important;
+    min-width: 220px !important;
+    max-width: 220px !important;
+    box-sizing: border-box !important;
+
+    &.show { display: flex !important; }
+}
+
+.sr-popout-header {
+    font: 500 10px/1.2 system-ui, sans-serif;
+    color: rgba(255, 255, 255, 0.4);
+    margin-bottom: var(--space-2);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+
+.sr-selector {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+    margin-bottom: 10px;
+}
+
+.sr-option {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--overlay-white-subtle);
+    border: 1px solid var(--overlay-white-light);
+    border-radius: var(--radius-lg);
+    padding: 6px 10px;
+    cursor: pointer;
+    color: #fff;
+    font-family: system-ui, sans-serif;
+    transition: background var(--duration-fast), border-color var(--duration-fast);
+    text-align: left;
+    min-width: 0;
+
+    &:hover {
+        background: var(--overlay-white-light);
+        border-color: rgba(255, 255, 255, 0.18);
+    }
+
+    &.active {
+        border-color: var(--accent);
+        background: color-mix(in srgb, var(--accent) 12%, transparent);
+    }
+}
+
+img.sr-badge {
+    width: 26px;
+    height: 26px;
+    border-radius: var(--radius-md);
+    flex-shrink: 0;
+    object-fit: cover;
+}
+
+.sr-option-name { font-weight: 600; font-size: var(--text-base); line-height: 1.2; }
+.sr-option-platform { font-size: 11px; color: rgba(255, 255, 255, 0.4); }
+
+.sr-popout-options {
+    font: var(--text-sm)/1.4 system-ui, sans-serif;
+    color: rgba(255, 255, 255, 0.5);
+
+    & select {
+        background: var(--overlay-white-light);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        color: #fff;
+        border-radius: var(--radius-sm);
+        padding: 2px 6px;
+        font-size: 11px;
+        margin-left: var(--space-1);
+    }
+
+    & label {
+        display: flex;
+        align-items: center;
+        gap: var(--space-1);
+        cursor: pointer;
+        white-space: nowrap;
+        font-size: var(--text-sm);
+    }
+}
+
+/* SR button active state */
+button.sr-active {
+    color: var(--accent) !important;
+    position: relative;
+
+    &::after {
+        content: '';
+        position: absolute;
+        bottom: 2px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 16px;
+        height: 2px;
+        background: var(--accent);
+        border-radius: 1px;
+    }
+}
+
+/* ── Cheat sheet overlay ── */
+
+.sr-cheat-sheet {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.88);
+    z-index: var(--z-sr-cheat);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    font-family: system-ui, sans-serif;
+    color: #fff;
+    animation: srCheatFadeIn var(--duration-fast) ease-out;
+}
+
+@keyframes srCheatFadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.sr-cheat-title { font-size: 18px; font-weight: 600; margin-bottom: var(--space-5); color: rgba(255, 255, 255, 0.9); }
+
+.sr-cheat-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px var(--space-10);
+    max-width: 480px;
+}
+
+.sr-cheat-section-title {
+    grid-column: span 2;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: rgba(255, 255, 255, 0.4);
+    margin-top: var(--space-3);
+    margin-bottom: 2px;
+
+    &:first-child { margin-top: 0; }
+}
+
+.sr-cheat-row { display: flex; gap: 10px; align-items: baseline; }
+
+.sr-cheat-key {
+    background: rgba(255, 255, 255, 0.12);
+    padding: 2px var(--space-2);
+    border-radius: var(--radius-sm);
+    font: var(--text-sm)/1.6 'SF Mono', Menlo, monospace;
+    min-width: var(--space-9);
+    text-align: center;
+    color: rgba(255, 255, 255, 0.85);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.sr-cheat-desc { color: rgba(255, 255, 255, 0.6); font-size: var(--text-base); }
+.sr-cheat-footer { margin-top: var(--space-6); color: rgba(255, 255, 255, 0.3); font-size: var(--text-sm); }

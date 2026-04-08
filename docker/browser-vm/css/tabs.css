@@ -1,0 +1,249 @@
+/* =============================================
+ * Tab Bar
+ * ============================================= */
+
+.tab-bar {
+    display: flex;
+    align-items: center;
+    background: var(--bg-bar);
+    padding: 0 var(--space-2);
+    height: var(--space-9);
+    border-bottom: 1px solid var(--divider);
+}
+
+.tabs-container {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    min-width: 0;
+    flex: 1;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+
+    &::-webkit-scrollbar {
+        display: none;
+    }
+}
+
+.tab {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: 6px var(--space-3);
+    background: var(--bg-btn);
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    cursor: pointer;
+    min-width: 120px;
+    max-width: 200px;
+    height: var(--space-8);
+    transition: all var(--duration-fast) ease;
+    user-select: none;
+    position: relative;
+
+    &:hover {
+        background: var(--bg-btn-hover);
+    }
+
+    &.has-theme-color {
+        background: color-mix(in srgb, var(--tab-theme-color) 15%, var(--bg-btn));
+
+        &:hover {
+            background: color-mix(in srgb, var(--tab-theme-color) 25%, var(--bg-btn-hover));
+        }
+    }
+
+    &.active {
+        background: var(--bg-page);
+        color: var(--text-bright);
+
+        &.has-theme-color {
+            background: color-mix(in srgb, var(--tab-theme-color) 12%, var(--bg-page));
+        }
+
+        & .tab-title {
+            color: var(--text-bright);
+        }
+
+        & .tab-close {
+            opacity: 1;
+        }
+    }
+
+    &.dragging {
+        opacity: 0.5;
+        transform: scale(0.95);
+    }
+
+    &.drag-over {
+        border-left: 2px solid var(--accent);
+    }
+
+    &:hover .tab-close {
+        opacity: 1;
+    }
+
+    /* Pinned tabs: icon-only, fixed small width */
+    &.tab-pinned {
+        min-width: var(--space-9);
+        max-width: var(--space-9);
+        padding: 6px;
+        justify-content: center;
+
+        & .tab-title { display: none; }
+        & .tab-close { display: none; }
+    }
+
+    /* Keep Alive: pulsing heartbeat indicator */
+    &.tab-keepalive {
+        &::after {
+            content: '\1F49A'; /* 💚 */
+            position: absolute;
+            left: 3px;
+            bottom: 1px;
+            font-size: 7px;
+            line-height: 1;
+            pointer-events: none;
+            animation: keepalive-pulse 2s ease-in-out infinite;
+        }
+
+        & .tab-close { display: none; }
+    }
+
+    &.tab-local {
+        border-bottom: 2px solid var(--accent-blue, #4a9eff);
+
+        & .tab-favicon-placeholder {
+            font-size: 11px;
+        }
+    }
+}
+
+@keyframes keepalive-pulse {
+    0%, 100% { opacity: 0.4; transform: scale(0.9); }
+    50% { opacity: 1; transform: scale(1.1); }
+}
+
+.tab-favicon {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+    border-radius: 2px;
+}
+
+.tab-favicon-placeholder {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+    background: var(--divider);
+    border-radius: 2px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: var(--text-xs);
+    color: var(--text-dim);
+}
+
+.tab-title {
+    flex: 1;
+    font-size: var(--text-sm);
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.tab-close {
+    width: 18px;
+    height: 18px;
+    padding: 0;
+    margin: 0;
+    box-sizing: content-box;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    background: transparent;
+    border: none;
+    color: var(--text-dim);
+    cursor: pointer;
+    opacity: 0;
+    transition: all var(--duration-fast) ease;
+    flex-shrink: 0;
+    font-size: var(--text-sm);
+    line-height: 1;
+    aspect-ratio: 1;
+
+    &:hover {
+        background: var(--danger);
+        color: white;
+    }
+}
+
+/* Feature gating: disable VNC-dependent toolbar buttons for local tabs */
+body.local-tab-active :is(
+    .toolbar-btn-wrapper[data-button-key="inspect"],
+    .toolbar-btn-wrapper[data-button-key="devtools"],
+    .toolbar-btn-wrapper[data-button-key="sr"],
+    .toolbar-btn-wrapper[data-button-key="audio"],
+    .toolbar-btn-wrapper[data-button-key="auto-scan"],
+    .toolbar-btn-wrapper[data-button-key="vision"],
+    .toolbar-btn-wrapper[data-button-key="recordings"],
+    .toolbar-btn-wrapper[data-button-key="screenshot"],
+    .toolbar-btn-wrapper[data-button-key="inspekt"]
+) button {
+    opacity: 0.35;
+    pointer-events: none;
+}
+
+/* Separator between pinned and unpinned tabs */
+.tab-pin-separator {
+    width: 1px;
+    height: 20px;
+    background: var(--divider);
+    margin: 0 6px;
+    flex-shrink: 0;
+    align-self: center;
+}
+
+.new-tab-btn {
+    width: var(--space-7);
+    height: var(--space-7);
+    border-radius: var(--radius-md);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg-bar);
+    border: none;
+    color: var(--text-dim);
+    cursor: pointer;
+    transition: all var(--duration-fast) ease;
+    font-size: 18px;
+    margin-left: var(--space-1);
+    flex-shrink: 0;
+    position: sticky;
+    right: 0;
+}
+
+.new-tab-btn:hover,
+.new-tab-dropdown-btn:hover {
+    background: var(--bg-btn);
+    color: var(--text-bright);
+}
+
+.new-tab-dropdown-btn {
+    width: 18px;
+    height: var(--space-7);
+    border-radius: var(--radius-md);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg-bar);
+    border: none;
+    color: var(--text-dim);
+    cursor: pointer;
+    transition: all var(--duration-fast) ease;
+    margin-left: 1px;
+    flex-shrink: 0;
+    position: sticky;
+    right: 0;
+}

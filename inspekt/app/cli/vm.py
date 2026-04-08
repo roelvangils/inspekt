@@ -289,6 +289,7 @@ def _start_container(dev_mode: bool = False, vm_dir: Path = None) -> bool:
         # Mount control panel, fonts, and servers for UI/server development
         cmd.extend([
             "-v", f"{vm_dir}/control-panel.html:/usr/share/novnc/control.html:ro",
+            "-v", f"{vm_dir}/css:/usr/share/novnc/css:ro",
             "-v", f"{vm_dir}/toolbar.css:/usr/share/novnc/toolbar.css:ro",
             "-v", f"{vm_dir}/toolbar.js:/usr/share/novnc/toolbar.js:ro",
             "-v", f"{vm_dir}/vision-sim.js:/usr/share/novnc/vision-sim.js:ro",

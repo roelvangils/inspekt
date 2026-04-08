@@ -1,0 +1,281 @@
+/* =============================================
+ * Overlays: Focus, Dropdown, Toasts, Command Palette, Output Panel
+ * ============================================= */
+
+/* ── Focus Overlay (click-to-interact prompt) ── */
+
+.focus-overlay {
+    position: fixed;
+    top: 48px; /* Below toolbar */
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: var(--overlay-dark-light);
+    display: none;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+    z-index: var(--z-focus-overlay);
+    backdrop-filter: blur(2px);
+    animation: fadeIn var(--duration-normal) ease-out;
+
+    &.visible {
+        display: flex;
+    }
+}
+
+.focus-overlay-hint {
+    background: var(--bg-bar);
+    color: var(--text-bright);
+    padding: var(--space-4) var(--space-8);
+    border-radius: var(--radius-lg);
+    font-size: var(--text-lg);
+    font-weight: 500;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    pointer-events: none;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+/* ── Dropdown Menu ── */
+
+.dropdown {
+    position: relative;
+}
+
+.dropdown-menu {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    margin-top: var(--space-1);
+    background: var(--bg-bar);
+    border-radius: var(--radius-lg);
+    padding: var(--space-1);
+    min-width: 200px;
+    display: none;
+    z-index: var(--z-focus-overlay);
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+
+    &.show { display: block; }
+}
+
+.dropdown-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px var(--space-3);
+    color: var(--text);
+    text-decoration: none;
+    border-radius: var(--radius-md);
+    font-size: var(--text-base);
+    cursor: pointer;
+    border: none;
+    background: none;
+    width: 100%;
+    text-align: left;
+    transition: all var(--duration-fast) ease;
+
+    &:hover {
+        background: var(--bg-btn);
+        color: var(--text-bright);
+    }
+
+    & svg {
+        width: 16px;
+        height: 16px;
+        fill: currentColor;
+        opacity: 0.7;
+    }
+}
+
+.dropdown-divider {
+    height: 1px;
+    background: var(--divider);
+    margin: var(--space-1) 0;
+}
+
+/* ── Toast Notifications ── */
+
+.toast {
+    position: fixed;
+    bottom: var(--space-5);
+    left: 50%;
+    transform: translateX(-50%) translateY(100px);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px var(--space-4);
+    border-radius: 10px;
+    font-size: var(--text-base);
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+    transition: transform var(--duration-slow) cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: var(--z-toast);
+    pointer-events: none;
+    background: var(--bg-bar);
+    color: var(--text-bright);
+
+    &.show {
+        transform: translateX(-50%) translateY(0);
+        pointer-events: auto;
+    }
+
+    /* Type variants */
+    &.success { background: var(--success); color: white; }
+    &.error   { background: var(--danger); color: white; }
+    &.dark    { background: #1a1a2e; color: rgba(255, 255, 255, 0.9); border: 1px solid var(--overlay-white-medium); }
+
+    &.success .toast-action,
+    &.error .toast-action { border-color: rgba(255, 255, 255, 0.3); }
+}
+
+.toast-message { flex: 1; min-width: 0; }
+
+.toast-action {
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
+    padding: var(--space-1) 10px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--overlay-white-strong);
+    background: var(--overlay-white-medium);
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background var(--duration-fast) ease;
+
+    &:hover { background: var(--overlay-white-strong); }
+}
+
+.toast-dismiss {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    border: none;
+    background: var(--overlay-white-medium);
+    color: rgba(255, 255, 255, 0.6);
+    font-size: var(--text-md);
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: background var(--duration-fast) ease;
+
+    &:hover { background: var(--overlay-white-strong); color: white; }
+}
+
+/* ── Command Palette (ninja-keys) ── */
+
+ninja-keys {
+    --ninja-accent-color: var(--accent);
+    --ninja-font-family: var(--font-sans);
+    --ninja-font-size: var(--text-lg);
+    --ninja-z-index: var(--z-ninja-keys);
+    --ninja-modal-background: var(--glass-bg);
+    --ninja-backdrop-filter: var(--glass-blur);
+    --ninja-modal-shadow: var(--glass-shadow);
+    --ninja-overflow-background: transparent;
+    --ninja-text-color: var(--text-bright);
+    --ninja-placeholder-color: var(--text-dim);
+    --ninja-secondary-text-color: var(--text-dim);
+    --ninja-icon-color: var(--text-dim);
+    --ninja-selected-background: color-mix(in srgb, var(--accent) 20%, transparent);
+    --ninja-footer-background: color-mix(in srgb, var(--bg-bar) 90%, transparent);
+    --ninja-secondary-background-color: color-mix(in srgb, var(--bg-btn) 80%, transparent);
+    --ninja-key-border-radius: var(--radius-md);
+    --ninja-actions-height: 400px;
+}
+
+ninja-keys::part(actions-list) {
+    border: var(--glass-border);
+    border-radius: 0 0 var(--radius-xl) var(--radius-xl);
+}
+
+/* ── Output Panel (structured command results) ── */
+
+.output-panel {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    max-height: 50vh;
+    background: rgba(15, 15, 25, 0.95);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-top: 1px solid var(--divider); /* BUG FIX: was var(--border) */
+    transform: translateY(100%);
+    transition: transform var(--duration-slow) ease;
+    z-index: var(--z-output-panel);
+    display: flex;
+    flex-direction: column;
+
+    &.open {
+        transform: translateY(0);
+    }
+}
+
+.output-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--space-3) var(--space-5);
+    border-bottom: 1px solid var(--divider); /* BUG FIX: was var(--border) */
+    background: rgba(30, 30, 40, 0.8);
+}
+
+.output-panel-title {
+    font-weight: 600;
+    color: var(--text-bright);
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+}
+
+.output-panel-close {
+    background: none;
+    border: none;
+    color: var(--text-dim);
+    cursor: pointer;
+    padding: var(--space-1) var(--space-2);
+    border-radius: var(--radius-sm);
+    font-size: 18px;
+
+    &:hover {
+        background: var(--bg-btn);
+        color: var(--text-bright);
+    }
+}
+
+.output-panel-content {
+    flex: 1;
+    overflow: auto;
+    padding: var(--space-4) var(--space-5);
+    font-family: var(--font-mono);
+    font-size: var(--text-base);
+    line-height: 1.6;
+    color: var(--text);
+    white-space: pre-wrap;
+
+    & table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    & th,
+    & td {
+        padding: var(--space-2) var(--space-3);
+        text-align: left;
+        border-bottom: 1px solid var(--divider); /* BUG FIX: was var(--border) */
+    }
+
+    & th {
+        color: var(--text-dim);
+        font-weight: 500;
+        font-size: var(--text-sm);
+        text-transform: uppercase;
+    }
+}

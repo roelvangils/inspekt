@@ -1,0 +1,335 @@
+/* =============================================
+ * Context Menu
+ * Section A: Common styles (all platforms)
+ * Section B: macOS Sequoia
+ * Section C: Windows / Other
+ * ============================================= */
+
+@keyframes menuItemFlicker {
+    0%   { background: var(--menu-accent); color: var(--menu-text-selected); }
+    25%  { background: transparent; color: var(--menu-text); }
+    50%  { background: var(--menu-accent); color: var(--menu-text-selected); }
+    75%  { background: transparent; color: var(--menu-text); }
+    100% { background: var(--menu-accent); color: var(--menu-text-selected); }
+}
+
+/* ── Section A: Common (all platforms) ── */
+
+.context-menu {
+    position: fixed;
+    z-index: var(--z-context-menu);
+    display: flex;
+    flex-direction: column;
+    background: var(--menu-bg);
+    backdrop-filter: var(--menu-blur);
+    -webkit-backdrop-filter: var(--menu-blur);
+    border: var(--menu-border);
+    outline: var(--menu-outline, none);
+    border-radius: var(--menu-radius);
+    corner-shape: var(--menu-corner-shape, round);
+    padding: var(--menu-padding) 0;
+    min-width: var(--menu-min-width);
+    box-shadow: var(--menu-shadow);
+    font-family: var(--menu-font-family, inherit);
+    font-size: var(--menu-font-size);
+    font-weight: var(--menu-font-weight);
+    user-select: none;
+    -webkit-user-select: none;
+
+    /* Suppress browser focus ring on menu container */
+    &:focus,
+    &:focus-visible {
+        outline: var(--menu-outline, none);
+    }
+
+    /* Shared base styles for all interactive menu items */
+    & :is([role="menuitem"], [role="menuitemcheckbox"]) {
+        all: unset;
+        display: flex;
+        align-items: center;
+        gap: var(--space-2);
+        height: var(--menu-item-height, auto);
+        padding: var(--menu-item-padding);
+        color: var(--menu-text);
+        cursor: pointer;
+        font-family: inherit;
+        font-size: var(--menu-font-size);
+        font-weight: var(--menu-font-weight);
+        box-sizing: border-box;
+
+        &:focus,
+        &:focus-visible {
+            background: var(--menu-accent);
+            color: var(--menu-text-selected);
+            outline: none;
+        }
+
+        &:active {
+            background: var(--menu-accent);
+        }
+
+        &[aria-disabled="true"] {
+            color: var(--menu-text-disabled);
+            cursor: default;
+            pointer-events: none;
+        }
+    }
+
+    & [role="separator"] {
+        height: 1px;
+        background: var(--menu-separator-color);
+        margin: var(--menu-separator-margin);
+    }
+
+    /* Submenu chevron */
+    & .submenu-chevron {
+        margin-left: auto;
+        width: 25px;
+        text-align: right;
+        font-size: var(--text-sm);
+        font-weight: 500;
+        color: var(--menu-text);
+    }
+
+    & [role="menuitem"]:focus .submenu-chevron {
+        color: var(--menu-text-selected);
+    }
+
+    & .check-icon {
+        width: var(--menu-check-width);
+        height: var(--menu-check-width);
+        flex-shrink: 0;
+        border: 1.5px solid var(--menu-text-disabled);
+        border-radius: 3px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.12s ease;
+    }
+
+    & [role="menuitemcheckbox"][aria-checked="true"] .check-icon {
+        background: var(--menu-accent);
+        border-color: var(--menu-accent);
+        color: white;
+    }
+
+    /* Flicker animation class (macOS selection feedback) */
+    & :is([role="menuitem"].flickering, .context-menu-nav button.flickering) {
+        animation: menuItemFlicker 150ms steps(1) forwards;
+    }
+
+    /* Parent keeps full accent highlight while its submenu is open */
+    & [role="menuitem"].submenu-parent-open {
+        background: var(--menu-accent);
+        color: var(--menu-text-selected);
+        outline: none;
+
+        & .submenu-chevron {
+            color: var(--menu-text-selected);
+        }
+    }
+
+    /* Parent dims when focus moves into the submenu */
+    & [role="menuitem"].submenu-parent-active {
+        background: color-mix(in srgb, var(--menu-accent) 50%, transparent);
+        color: rgba(0, 0, 0, 0.85);
+        outline: none;
+
+        & .submenu-chevron {
+            color: rgba(0, 0, 0, 0.85);
+        }
+    }
+}
+
+/* Section header */
+.context-menu-header {
+    padding: var(--menu-item-padding);
+    margin: var(--menu-item-margin, 0);
+    color: var(--menu-text-disabled);
+    font-size: calc(var(--menu-font-size) - 1px);
+    font-weight: 600;
+    cursor: default;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+/* Scroll container */
+.context-menu-scroll {
+    display: flex;
+    flex-direction: column;
+}
+
+/* Scroll arrows */
+.context-menu-scroll-arrow {
+    display: none;
+    text-align: center;
+    padding: 2px 0;
+    font-size: 8px;
+    color: var(--menu-text-disabled);
+    cursor: default;
+    user-select: none;
+    -webkit-user-select: none;
+    flex-shrink: 0;
+
+    &.visible {
+        display: block;
+    }
+}
+
+/* Navigation icon row (Reload / Back / Forward) */
+.context-menu-nav {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    padding: var(--space-1) var(--space-2);
+
+    & button {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: var(--space-8);
+        height: var(--space-7);
+        border: none;
+        background: none;
+        color: var(--menu-text);
+        cursor: pointer;
+        border-radius: var(--menu-item-radius);
+
+        &:focus:not([aria-disabled="true"]),
+        &:focus-visible:not([aria-disabled="true"]) {
+            background: var(--menu-accent);
+            color: var(--menu-text-selected);
+            outline: none;
+        }
+
+        &:active {
+            background: var(--menu-accent);
+        }
+
+        &[aria-disabled="true"] {
+            color: var(--menu-text-disabled);
+            cursor: default;
+            pointer-events: none;
+        }
+
+        & svg {
+            width: 16px;
+            height: 16px;
+            min-width: 16px;
+            min-height: 16px;
+            fill: currentColor;
+        }
+    }
+}
+
+/* ── Section B: macOS Sequoia ── */
+
+.os-macos .context-menu {
+    --menu-bg: rgba(30, 30, 30, 0.78);
+    --menu-blur: blur(50px) saturate(190%);
+    --menu-border: 1px solid rgba(255, 255, 255, 0.5);
+    --menu-outline: 0.5px solid rgba(0, 0, 0, 0.7);
+    --menu-radius: 6px;
+    --menu-corner-shape: round;
+    --menu-shadow:
+        0 10px 38px rgba(0, 0, 0, 0.5),
+        0 2px 8px rgba(0, 0, 0, 0.3);
+    --menu-padding: 4px;
+    --menu-item-padding: 0 11px;
+    --menu-item-margin: 0 4px;
+    --menu-item-height: 24px;
+    --menu-item-radius: 7px;
+    --menu-accent: AccentColor;
+    --menu-text: rgba(255, 255, 255, 0.85);
+    --menu-text-selected: #fff;
+    --menu-text-disabled: rgba(255, 255, 255, 0.3);
+    --menu-separator-color: rgba(255, 255, 255, 0.1);
+    --menu-separator-margin: 5px 15px;
+    --menu-font-family: "SF Pro Text", "SF Pro", -apple-system, system-ui, sans-serif;
+    --menu-font-size: 13.75px;
+    --menu-font-weight: 400;
+    --menu-min-width: 326px;
+    --menu-check-width: 16px;
+}
+
+/* macOS Light Mode */
+@media (prefers-color-scheme: light) {
+    .os-macos .context-menu {
+        --menu-bg: rgba(246, 246, 246, 0.78);
+        --menu-border: 1px solid rgba(255, 255, 255, 0.5);
+        --menu-outline: 0.5px solid rgba(0, 0, 0, 0.5);
+        --menu-shadow:
+            0 10px 38px rgba(0, 0, 0, 0.12),
+            0 2px 10px rgba(0, 0, 0, 0.06);
+        --menu-text: rgba(0, 0, 0, 0.85);
+        --menu-text-disabled: rgba(0, 0, 0, 0.3);
+        --menu-separator-color: rgba(0, 0, 0, 0.1);
+    }
+}
+
+/* AccentColor fallback */
+@supports not (color: AccentColor) {
+    .os-macos .context-menu {
+        --menu-accent: #0A82FF;
+    }
+}
+
+/* Squircle upgrade for Chrome 139+ */
+@supports (corner-shape: squircle) {
+    .os-macos .context-menu {
+        --menu-radius: 21px;
+        --menu-corner-shape: squircle;
+    }
+}
+
+/* macOS: pill-shaped item highlight */
+.os-macos .context-menu :is([role="menuitem"], [role="menuitemcheckbox"]) {
+    margin: var(--menu-item-margin);
+    border-radius: var(--menu-item-radius);
+}
+
+/* macOS: checkmarks are simple marks, not boxed checkboxes */
+.os-macos .context-menu .check-icon {
+    border: none;
+    background: none;
+    width: var(--menu-check-width);
+}
+
+.os-macos .context-menu [role="menuitemcheckbox"][aria-checked="true"] .check-icon {
+    background: none;
+    border: none;
+    color: var(--menu-text);
+}
+
+.os-macos .context-menu [role="menuitemcheckbox"][aria-checked="true"]:focus .check-icon {
+    color: var(--menu-text-selected);
+}
+
+/* macOS: nav row buttons get pill shape too */
+.os-macos .context-menu-nav button {
+    border-radius: var(--menu-item-radius);
+}
+
+/* ── Section C: Windows / Other ── */
+
+:is(.os-windows, .os-other) .context-menu {
+    --menu-bg: var(--bg-page);
+    --menu-blur: none;
+    --menu-border: 1px solid var(--divider);
+    --menu-radius: var(--radius-lg);
+    --menu-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    --menu-padding: 4px;
+    --menu-item-padding: 6px 12px;
+    --menu-item-margin: 0;
+    --menu-item-radius: 0;
+    --menu-accent: var(--bg-btn-hover);
+    --menu-text: var(--text);
+    --menu-text-selected: var(--text-bright);
+    --menu-text-disabled: var(--text-dim);
+    --menu-separator-color: var(--divider);
+    --menu-separator-margin: 4px 0;
+    --menu-font-size: 13px;
+    --menu-font-weight: 400;
+    --menu-min-width: 180px;
+    --menu-check-width: 14px;
+}
