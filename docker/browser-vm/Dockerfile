@@ -387,8 +387,8 @@ COPY docker/browser-vm/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 COPY docker/browser-vm/openbox-autostart /root/.config/openbox/autostart
 COPY docker/browser-vm/openbox-rc.xml /root/.config/openbox/rc.xml
 COPY docker/browser-vm/entrypoint.sh /entrypoint.sh
-COPY docker/browser-vm/control-server.py /opt/control-server.py
-COPY docker/browser-vm/terminal-server.py /opt/terminal-server.py
+COPY docker/browser-vm/servers/control-server.py /opt/control-server.py
+COPY docker/browser-vm/servers/terminal-server.py /opt/terminal-server.py
 # Production: use bundled control panel (built by scripts/bundle-vm.mjs)
 COPY docker/browser-vm/dist/control.html /usr/share/novnc/control.html
 COPY docker/browser-vm/dist/app.min.css /usr/share/novnc/dist/app.min.css
@@ -409,7 +409,7 @@ COPY docker/browser-vm/xorg.conf /etc/X11/xorg.conf
 COPY docker/browser-vm/resize-display.sh /opt/resize-display.sh
 COPY docker/browser-vm/download.sh /usr/local/bin/download
 COPY docker/browser-vm/audio-proxy.sh /opt/audio-proxy.sh
-COPY docker/browser-vm/audio-server.py /opt/audio-server.py
+COPY docker/browser-vm/servers/audio-server.py /opt/audio-server.py
 COPY docker/browser-vm/pulse-config.pa /etc/pulse/default.pa
 COPY docker/browser-vm/proxy-scripts /opt/proxy-scripts
 COPY docker/browser-vm/pages /opt/pages

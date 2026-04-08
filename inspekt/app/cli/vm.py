@@ -307,8 +307,9 @@ def _start_container(dev_mode: bool = False, vm_dir: Path = None) -> bool:
             "-v", f"{vm_dir}/vendor/sortable.min.js:/usr/share/novnc/vendor/sortable.min.js:ro",
             "-v", f"{vm_dir}/fonts:/usr/share/novnc/fonts:ro",
             "-v", f"{vm_dir}/icons:/usr/share/novnc/icons:ro",
-            "-v", f"{vm_dir}/control-server.py:/opt/control-server.py:ro",
-            "-v", f"{vm_dir}/terminal-server.py:/opt/terminal-server.py:ro",
+            "-v", f"{vm_dir}/servers/control-server.py:/opt/control-server.py:ro",
+            "-v", f"{vm_dir}/servers/terminal-server.py:/opt/terminal-server.py:ro",
+            "-v", f"{vm_dir}/servers/audio-server.py:/opt/audio-server.py:ro",
             "-v", f"{vm_dir}/inspekt-config.yaml:/root/.config/inspekt.yaml:ro",
         ])
 
