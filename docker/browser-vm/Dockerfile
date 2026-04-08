@@ -403,11 +403,11 @@ COPY docker/browser-vm/vendor/xterm.min.js /usr/share/novnc/vendor/xterm.min.js
 COPY docker/browser-vm/vendor/xterm-addon-fit.min.js /usr/share/novnc/vendor/xterm-addon-fit.min.js
 COPY docker/browser-vm/vendor/xterm-addon-web-links.min.js /usr/share/novnc/vendor/xterm-addon-web-links.min.js
 COPY docker/browser-vm/js /usr/share/novnc/js
-COPY docker/browser-vm/inspekt-chromium.sh /opt/inspekt-chromium.sh
-COPY docker/browser-vm/devtools-manager.sh /opt/devtools-manager.sh
+COPY docker/browser-vm/scripts/inspekt-chromium.sh /opt/inspekt-chromium.sh
+COPY docker/browser-vm/scripts/devtools-manager.sh /opt/devtools-manager.sh
 COPY docker/browser-vm/xorg.conf /etc/X11/xorg.conf
-COPY docker/browser-vm/resize-display.sh /opt/resize-display.sh
-COPY docker/browser-vm/download.sh /usr/local/bin/download
+COPY docker/browser-vm/scripts/resize-display.sh /opt/resize-display.sh
+COPY docker/browser-vm/scripts/download.sh /usr/local/bin/download
 COPY docker/browser-vm/audio-proxy.sh /opt/audio-proxy.sh
 COPY docker/browser-vm/servers/audio-server.py /opt/audio-server.py
 COPY docker/browser-vm/pulse-config.pa /etc/pulse/default.pa
