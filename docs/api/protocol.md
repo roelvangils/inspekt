@@ -1,636 +1,574 @@
-# WebSocket Protocol Specification
+# Inspekt Protocol Specification
 
-Complete specification for the Inspekt WebSocket protocol.
+**Protocol Version**: 3.4 (current userscript version)
+**Server Implementation**: aiohttp WebSocket
+**Client Implementation**: Browser-side JavaScript (Tampermonkey)
+**Last Updated**: 2025-10-27
+
+---
+
+## Table of Contents
+
+- [Overview](#overview)
+- [Connection Lifecycle](#connection-lifecycle)
+- [Message Format](#message-format)
+- [Message Types](#message-types)
+- [Error Handling](#error-handling)
+- [Versioning](#versioning)
+- [Security Considerations](#security-considerations)
+- [Future Enhancements](#future-enhancements)
 
 ---
 
 ## Overview
 
-Inspekt uses a bidirectional WebSocket protocol for real-time communication between the Python server and browser userscript. The protocol supports:
+Inspekt uses a WebSocket-based protocol for bidirectional communication between the CLI (via HTTP), server, and browser. The protocol is JSON-based with typed messages.
 
-- **Code Execution**: Execute JavaScript in browser from server
-- **Keepalive**: Ping/pong for connection health
-- **Control Mode**: Interactive keyboard navigation
-- **Notifications**: Asynchronous events from browser
+### Communication Architecture
 
-**Protocol Version:** 1.0  
-**WebSocket Path:** `ws://127.0.0.1:8766`  
-**HTTP API:** `http://127.0.0.1:8765`
+```
+┌─────────────┐                      ┌──────────────┐
+│  CLI Client │                      │   Browser    │
+│  (requests) │                      │ (Tampermonkey)│
+└──────┬──────┘                      └──────┬───────┘
+       │                                    │
+       │ HTTP POST /run                    │ WebSocket
+       │ HTTP GET /result                  │ ws://127.0.0.1:8766/ws
+       │ HTTP GET /health                  │
+       │ HTTP GET /notifications           │
+       │ HTTP POST /reinit-control         │
+       │                                    │
+       ▼                                    ▼
+┌────────────────────────────────────────────────────┐
+│            Bridge Server (aiohttp)                 │
+│  HTTP :8765 (CLI ← → Server)                       │
+│  WebSocket :8766/ws (Server ← → Browser)           │
+└────────────────────────────────────────────────────┘
+```
+
+### Protocol Flow
+
+1. **Browser** connects via WebSocket on page load
+2. **CLI** sends HTTP POST to server with JavaScript code
+3. **Server** generates UUID request_id, stores pending request
+4. **Server** broadcasts execute message via WebSocket
+5. **Browser** receives message, evaluates JavaScript
+6. **Browser** sends result message via WebSocket
+7. **Server** moves request from pending to completed
+8. **CLI** polls GET /result until complete
+9. **CLI** displays result to user
 
 ---
 
 ## Connection Lifecycle
 
-### 1. Connection Establishment
+### Browser WebSocket Connection
 
-```mermaid
-sequenceDiagram
-    participant Browser
-    participant Server
-    
-    Browser->>Server: WebSocket Connect (ws://127.0.0.1:8766)
-    Server-->>Browser: Connection Accepted
-    Browser->>Server: ping
-    Server-->>Browser: pong
+```
+Page Load
+   ↓
+Connect to ws://127.0.0.1:8766/ws
+   ↓
+[Connected] ──→ Listen for messages
+   │               ↓
+   │            Execute code
+   │               ↓
+   │            Send result
+   │               ↓
+   │            (Repeat)
+   │
+   ↓ (Page navigation)
+Disconnect
+   ↓
+Wait 3 seconds
+   ↓
+Reconnect (Auto-retry)
 ```
 
-**Steps:**
+### Auto-Reconnect Behavior
 
-1. Browser userscript connects to `ws://127.0.0.1:8766`
-2. Server accepts WebSocket connection
-3. Browser sends periodic ping messages
-4. Server responds with pong messages
+- **Reconnect delay**: 3 seconds
+- **Max retries**: Infinite (continues until page closes)
+- **Exponential backoff**: No (fixed 3s delay)
+- **Pending requests**: Resent to new connection on reconnect
 
-### 2. Active Communication
+### Connection States
 
-Once connected, both sides can send messages at any time:
+| State | Description | Actions |
+|-------|-------------|---------|
+| `CONNECTING` | WebSocket opening | Wait |
+| `OPEN` | Connected and ready | Send/receive messages |
+| `CLOSING` | Closing gracefully | Finish pending operations |
+| `CLOSED` | Disconnected | Trigger reconnect after 3s |
 
-- Server sends `execute` requests
-- Browser sends `result` responses
-- Browser sends `reinit_control` requests
-- Browser sends `refocus_notification` events
-- Browser sends `ping` keepalives
-- Server sends `pong` responses
+---
 
-### 3. Connection Termination
+## Message Format
 
-Connection closes when:
+All messages are JSON objects with a `type` field.
 
-- Browser tab/window closes
-- Server shuts down
-- Connection error occurs
-- Keepalive timeout (no ping for 30+ seconds)
+### General Structure
+
+```json
+{
+    "type": "message_type",
+    "field1": "value1",
+    "field2": "value2"
+}
+```
+
+**Rules**:
+- All messages MUST be valid JSON
+- All messages MUST have a `type` field (string)
+- Unknown `type` values SHOULD be ignored (forward compatibility)
+- Field names are kebab-case for consistency (e.g., `request_id`)
 
 ---
 
 ## Message Types
 
-### Direction: Server → Browser
+### 1. Execute Request (Server → Browser)
 
-#### execute
+**Purpose**: Request browser to execute JavaScript code
 
-Execute JavaScript code in the browser.
+**Direction**: Server → Browser (via WebSocket)
 
-**Format:**
+**Format**:
 ```json
 {
-  "type": "execute",
-  "request_id": "550e8400-e29b-41d4-a716-446655440000",
-  "code": "document.title"
+    "type": "execute",
+    "request_id": "550e8400-e29b-41d4-a716-446655440000",
+    "code": "document.title"
 }
 ```
 
-**Fields:**
+**Fields**:
+- `type` (string): Always "execute"
+- `request_id` (string): UUID v4 identifying this request
+- `code` (string): JavaScript code to evaluate
 
-- `type`: Always "execute"
-- `request_id`: UUID v4 for request tracking
-- `code`: JavaScript code to evaluate
-
-**Response:** Browser sends `result` message
-
----
-
-#### pong
-
-Keepalive response to ping.
-
-**Format:**
+**Example**:
 ```json
 {
-  "type": "pong"
-}
-```
-
-**Fields:**
-
-- `type`: Always "pong"
-
-**Trigger:** Sent in response to `ping` from browser
-
----
-
-### Direction: Browser → Server
-
-#### result
-
-Result of JavaScript code execution.
-
-**Format (Success):**
-```json
-{
-  "type": "result",
-  "request_id": "550e8400-e29b-41d4-a716-446655440000",
-  "ok": true,
-  "result": "Example Domain",
-  "url": "https://example.com",
-  "title": "Example Domain"
-}
-```
-
-**Format (Error):**
-```json
-{
-  "type": "result",
-  "request_id": "550e8400-e29b-41d4-a716-446655440000",
-  "ok": false,
-  "error": "ReferenceError: foo is not defined"
-}
-```
-
-**Fields:**
-
-- `type`: Always "result"
-- `request_id`: UUID matching the execute request
-- `ok`: true if execution succeeded, false otherwise
-- `result`: Return value (present if ok=true)
-- `error`: Error message (present if ok=false)
-- `url`: Current page URL (optional)
-- `title`: Current page title (optional)
-
-**Additional Fields:** Browser may include extra fields
-
----
-
-#### reinit_control
-
-Request to reinitialize control mode after page reload.
-
-**Format:**
-```json
-{
-  "type": "reinit_control",
-  "config": {
-    "auto-refocus": "only-spa",
-    "speak-name": false,
-    "verbose": true
-  }
-}
-```
-
-**Fields:**
-
-- `type`: Always "reinit_control"
-- `config`: Control mode configuration object
-
-**Purpose:** Sent when browser detects page reload and needs control mode reinitialized
-
----
-
-#### refocus_notification
-
-Notification of refocus operation result.
-
-**Format:**
-```json
-{
-  "type": "refocus_notification",
-  "success": true,
-  "message": "Refocused to first interactive element"
-}
-```
-
-**Fields:**
-
-- `type`: Always "refocus_notification"
-- `success`: Whether refocus succeeded
-- `message`: Human-readable status message
-
-**Purpose:** Asynchronous notification of refocus events (not tied to a specific request)
-
----
-
-#### ping
-
-Keepalive message.
-
-**Format:**
-```json
-{
-  "type": "ping"
-}
-```
-
-**Fields:**
-
-- `type`: Always "ping"
-
-**Response:** Server sends `pong` message
-
-**Frequency:** Sent every 10 seconds by browser
-
----
-
-## Request/Response Patterns
-
-### Execute Pattern
-
-Standard synchronous request/response:
-
-```mermaid
-sequenceDiagram
-    participant CLI
-    participant Server
-    participant Browser
-    
-    CLI->>Server: HTTP POST /run {code}
-    Server->>Server: Generate request_id
-    Server->>Browser: execute {request_id, code}
-    Browser->>Browser: Evaluate JavaScript
-    Browser->>Server: result {request_id, ok, result/error}
-    Server->>CLI: HTTP Response {ok, result}
-```
-
-**Timeline:**
-
-1. CLI makes HTTP request to server
-2. Server generates unique request_id
-3. Server sends execute message to browser via WebSocket
-4. Browser evaluates JavaScript code
-5. Browser sends result message back to server
-6. Server returns result to CLI via HTTP response
-
-**Timeout:** Configurable (default: 10 seconds)
-
----
-
-### Notification Flow
-
-Asynchronous notifications from browser:
-
-```mermaid
-sequenceDiagram
-    participant Browser
-    participant Server
-    participant CLI
-    
-    Browser->>Browser: Page navigates
-    Browser->>Server: reinit_control {config}
-    Server->>Browser: execute {control initialization}
-    Browser->>Browser: Reinitialize control mode
-    Browser->>Server: refocus_notification {success, message}
-    Server->>CLI: Store notification
-    CLI->>Server: HTTP GET /notifications
-    Server->>CLI: Response {notifications}
-```
-
-**Flow:**
-
-1. Browser detects event (navigation, refocus, etc.)
-2. Browser sends notification to server
-3. Server stores notification
-4. CLI polls /notifications endpoint
-5. Server returns stored notifications
-6. Notifications cleared after retrieval
-
----
-
-### Keepalive Pattern
-
-Connection health monitoring:
-
-```mermaid
-sequenceDiagram
-    participant Browser
-    participant Server
-    
-    loop Every 10 seconds
-        Browser->>Server: ping
-        Server->>Browser: pong
-    end
-    
-    Note over Browser,Server: If no ping for 30s, connection considered dead
-```
-
-**Parameters:**
-
-- Ping interval: 10 seconds
-- Timeout threshold: 30 seconds
-- Action on timeout: Close connection
-
----
-
-## Error Handling
-
-### Connection Errors
-
-**Error:** WebSocket connection fails
-
-**Behavior:**
-
-- Browser userscript logs error to console
-- Server marks connection as closed
-- CLI commands fail with "Server not running" error
-
-**Recovery:**
-
-- Browser: Retry connection (exponential backoff)
-- CLI: User must start server with `inspekt server start`
-
----
-
-### Execution Errors
-
-**Error:** JavaScript execution throws exception
-
-**Behavior:**
-
-- Browser catches exception
-- Browser sends result with `ok: false` and `error` message
-- Server returns error to CLI
-- CLI exits with code 1
-
-**Example:**
-
-```json
-{
-  "type": "result",
-  "request_id": "550e8400-e29b-41d4-a716-446655440000",
-  "ok": false,
-  "error": "TypeError: Cannot read property 'foo' of undefined"
+    "type": "execute",
+    "request_id": "a3f2b1c0-1234-5678-90ab-cdef12345678",
+    "code": "Array.from(document.querySelectorAll('a')).map(a => a.href)"
 }
 ```
 
 ---
 
-### Timeout Errors
+### 2. Result Response (Browser → Server)
 
-**Error:** No response received within timeout
+**Purpose**: Browser sends execution result back to server
 
-**Behavior:**
+**Direction**: Browser → Server (via WebSocket)
 
-- Server waits for configured timeout (default: 10s)
-- If no response, server returns timeout error
-- CLI can optionally retry with exponential backoff
-
-**Mitigation:**
-
-- Increase timeout for slow operations
-- Enable retry with `retry_on_timeout=True`
-
----
-
-### Version Mismatch
-
-**Error:** Userscript version doesn't match server version
-
-**Behavior:**
-
-- Server checks version on first execute
-- If mismatch, prints warning to CLI
-- Execution continues (non-fatal)
-
-**Resolution:**
-
-- Update userscript to match server version
-- Or update server to match userscript version
-
----
-
-## Version Negotiation
-
-**Current Version:** 1.0 (implicit)
-
-**Future:** Version field may be added to messages:
-
+**Format** (Success):
 ```json
 {
-  "type": "execute",
-  "version": "2.0",
-  "request_id": "...",
-  "code": "..."
+    "type": "result",
+    "request_id": "550e8400-e29b-41d4-a716-446655440000",
+    "ok": true,
+    "result": "Example Domain",
+    "url": "https://example.com",
+    "title": "Example Domain"
 }
 ```
 
-**Compatibility:**
-
-- Current protocol has no explicit versioning
-- Version mismatch detected via userscript metadata
-- Non-breaking changes allowed in minor versions
-- Breaking changes require major version bump
-
----
-
-## Code Examples
-
-### Python Server (Sending Execute Request)
-
-```python
-import uuid
-import json
-from zen.domain.models import create_execute_request
-
-# Create request
-request_id = str(uuid.uuid4())
-request = create_execute_request(
-    request_id=request_id,
-    code="document.title"
-)
-
-# Serialize to JSON
-message = request.model_dump_json()
-
-# Send via WebSocket
-await websocket.send(message)
-
-# Wait for response
-response_data = await websocket.recv()
-response_dict = json.loads(response_data)
-
-# Parse response
-from zen.domain.models import parse_incoming_message
-result = parse_incoming_message(response_dict)
-
-if result.type == "result":
-    if result.ok:
-        print(f"Success: {result.result}")
-    else:
-        print(f"Error: {result.error}")
+**Format** (Error):
+```json
+{
+    "type": "result",
+    "request_id": "550e8400-e29b-41d4-a716-446655440000",
+    "ok": false,
+    "result": null,
+    "error": "ReferenceError: foo is not defined",
+    "url": "https://example.com",
+    "title": "Example Domain"
+}
 ```
 
+**Fields**:
+- `type` (string): Always "result"
+- `request_id` (string): UUID matching the execute request
+- `ok` (boolean): True if execution succeeded, false if error
+- `result` (any): Return value from JavaScript (JSON-serializable)
+- `error` (string | null): Error message if ok=false
+- `url` (string): Current page URL
+- `title` (string): Current page title
+
+**Serialization Rules**:
+- `result` is JSON.stringify'd automatically
+- `undefined` → `null`
+- Functions → `null`
+- Circular references → Error (cannot serialize)
+
 ---
 
-### JavaScript Browser (Receiving Execute Request)
+### 3. Reinit Control Request (Browser → Server)
 
-```javascript
-// WebSocket connection
-const ws = new WebSocket('ws://127.0.0.1:8766');
+**Purpose**: Browser requests automatic reinitialization of control mode after page reload
 
-ws.onmessage = async (event) => {
-  const message = JSON.parse(event.data);
-  
-  if (message.type === 'execute') {
-    try {
-      // Evaluate JavaScript code
-      const result = await eval(message.code);
-      
-      // Send success response
-      ws.send(JSON.stringify({
-        type: 'result',
-        request_id: message.request_id,
-        ok: true,
-        result: result,
-        url: location.href,
-        title: document.title
-      }));
-      
-    } catch (error) {
-      // Send error response
-      ws.send(JSON.stringify({
-        type: 'result',
-        request_id: message.request_id,
-        ok: false,
-        error: error.toString()
-      }));
+**Direction**: Browser → Server (via WebSocket)
+
+**Format**:
+```json
+{
+    "type": "reinit_control",
+    "config": {
+        "auto-refocus": "only-spa",
+        "focus-outline": "custom",
+        "navigation-wrap": true,
+        "verbose": true
     }
-  }
-  
-  else if (message.type === 'pong') {
-    // Keepalive acknowledged
-    console.log('Pong received');
-  }
-};
-
-// Send ping every 10 seconds
-setInterval(() => {
-  ws.send(JSON.stringify({ type: 'ping' }));
-}, 10000);
-```
-
----
-
-### JavaScript Browser (Sending Notification)
-
-```javascript
-// Detect page navigation
-window.addEventListener('load', () => {
-  // Request control mode reinitialization
-  ws.send(JSON.stringify({
-    type: 'reinit_control',
-    config: {
-      'auto-refocus': 'only-spa',
-      'speak-name': false,
-      'verbose': true
-    }
-  }));
-});
-
-// Send refocus notification
-function notifyRefocus(success, message) {
-  ws.send(JSON.stringify({
-    type: 'refocus_notification',
-    success: success,
-    message: message
-  }));
 }
 ```
 
+**Fields**:
+- `type` (string): Always "reinit_control"
+- `config` (object): Control mode configuration settings
+
+**Response**: Server sends execute message with control.js script
+
 ---
 
-## HTTP API Integration
+### 4. Refocus Notification (Browser → Server)
 
-While WebSocket handles real-time communication, HTTP API provides REST interface:
+**Purpose**: Browser notifies server of refocus operation result (for verbose output)
+
+**Direction**: Browser → Server (via WebSocket)
+
+**Format**:
+```json
+{
+    "type": "refocus_notification",
+    "success": true,
+    "message": "Refocused to element: <button>Submit</button>"
+}
+```
+
+**Fields**:
+- `type` (string): Always "refocus_notification"
+- `success` (boolean): Whether refocus succeeded
+- `message` (string): Human-readable status message
+
+**Handling**: Server stores notification in `pending_notifications` list for CLI to poll
+
+---
+
+### 5. Ping (Browser → Server)
+
+**Purpose**: Keepalive to detect connection health
+
+**Direction**: Browser → Server (via WebSocket)
+
+**Format**:
+```json
+{
+    "type": "ping"
+}
+```
+
+**Response**: Server immediately sends pong
+
+---
+
+### 6. Pong (Server → Browser)
+
+**Purpose**: Acknowledge ping keepalive
+
+**Direction**: Server → Browser (via WebSocket)
+
+**Format**:
+```json
+{
+    "type": "pong"
+}
+```
+
+**Fields**: None (just type)
+
+---
+
+## HTTP API Endpoints
 
 ### POST /run
 
-Submit code for execution.
+**Purpose**: Submit JavaScript code for execution
 
-**Request:**
+**Request**:
 ```json
 {
-  "code": "document.title"
+    "code": "document.title"
 }
 ```
 
-**Response:**
+**Response** (Success):
 ```json
 {
-  "ok": true,
-  "request_id": "550e8400-e29b-41d4-a716-446655440000"
+    "ok": true,
+    "request_id": "a3f2b1c0-1234-5678-90ab-cdef12345678"
 }
 ```
+
+**Response** (Error):
+```json
+{
+    "ok": false,
+    "error": "missing code"
+}
+```
+
+**Status Codes**:
+- `200 OK`: Request submitted successfully
+- `400 Bad Request`: Invalid request (missing code)
+- `500 Internal Server Error`: Server error
 
 ---
 
-### GET /result?request_id=<id>
+### GET /result
 
-Retrieve execution result.
+**Purpose**: Get result of previously submitted request
 
-**Response (Pending):**
+**Query Parameters**:
+- `request_id` (string, required): UUID of request
+
+**Response** (Completed):
 ```json
 {
-  "ok": false,
-  "status": "pending"
+    "ok": true,
+    "result": "Example Domain",
+    "url": "https://example.com",
+    "title": "Example Domain"
 }
 ```
 
-**Response (Complete):**
+**Response** (Pending):
 ```json
 {
-  "ok": true,
-  "result": "Example Domain",
-  "url": "https://example.com",
-  "title": "Example Domain"
+    "ok": false,
+    "status": "pending"
 }
 ```
+
+**Response** (Timeout):
+```json
+{
+    "ok": false,
+    "error": "Request timeout: No browser connected"
+}
+```
+
+**Response** (Not Found):
+```json
+{
+    "ok": false,
+    "error": "unknown request_id"
+}
+```
+
+**Status Codes**:
+- `200 OK`: Result available (check `ok` field)
+- `400 Bad Request`: Missing request_id
+- `404 Not Found`: Unknown request_id
+
+**Polling Strategy**:
+- Initial poll: 100ms
+- Exponential backoff: Multiply by 1.5 each retry
+- Max interval: 1 second
+- Timeout: Configurable (default 10s)
 
 ---
 
 ### GET /health
 
-Check server health.
+**Purpose**: Check server health and status
 
-**Response:**
+**Response**:
 ```json
 {
-  "ok": true,
-  "timestamp": 1698765432.123,
-  "connected_browsers": 1,
-  "pending": 0,
-  "completed": 142
+    "ok": true,
+    "timestamp": 1698765432.123,
+    "connected_browsers": 1,
+    "pending": 0,
+    "completed": 5
 }
 ```
+
+**Fields**:
+- `ok` (boolean): Always true if server is running
+- `timestamp` (float): Unix timestamp (seconds since epoch)
+- `connected_browsers` (int): Number of active WebSocket connections
+- `pending` (int): Number of pending requests
+- `completed` (int): Number of completed requests in cache
+
+**Use Case**: CLI checks if server is running before submitting requests
 
 ---
 
 ### GET /notifications
 
-Retrieve pending notifications.
+**Purpose**: Get pending notifications (e.g., refocus status)
 
-**Response:**
+**Response**:
 ```json
 {
-  "ok": true,
-  "notifications": [
-    {
-      "type": "refocus",
-      "success": true,
-      "message": "Refocused to first interactive element",
-      "timestamp": 1698765432.123
-    }
-  ]
+    "ok": true,
+    "notifications": [
+        {
+            "type": "refocus",
+            "success": true,
+            "message": "Refocused to element: <button>Submit</button>",
+            "timestamp": 1698765432.123
+        }
+    ]
 }
 ```
+
+**Behavior**:
+- Returns all pending notifications
+- Clears notification list on each request
+- Empty array if no notifications
 
 ---
 
 ### POST /reinit-control
 
-Request control mode reinitialization.
+**Purpose**: Request auto-reinitialization of control mode
 
-**Request:**
+**Request**:
 ```json
 {
-  "config": {
-    "auto-refocus": "always",
-    "speak-name": true
-  }
+    "config": {
+        "auto-refocus": "only-spa",
+        "verbose": true
+    }
 }
 ```
 
-**Response:**
+**Response**:
 ```json
 {
-  "ok": true
+    "ok": true,
+    "request_id": "b4e3c2d1-5678-90ab-cdef-1234567890ab"
+}
+```
+
+**Status Codes**:
+- `200 OK`: Request submitted
+- `500 Internal Server Error`: control.js not found or error
+
+---
+
+## Error Handling
+
+### Browser-Side Errors
+
+When JavaScript execution fails in browser:
+
+```json
+{
+    "type": "result",
+    "request_id": "...",
+    "ok": false,
+    "result": null,
+    "error": "ReferenceError: foo is not defined",
+    "url": "...",
+    "title": "..."
+}
+```
+
+**Common Error Types**:
+- `SyntaxError`: Invalid JavaScript syntax
+- `ReferenceError`: Undefined variable
+- `TypeError`: Invalid type operation
+- `SecurityError`: Violates same-origin policy
+
+### Server-Side Errors
+
+**No Browser Connected**:
+```json
+{
+    "ok": false,
+    "error": "Request timeout: No browser connected"
+}
+```
+
+Triggered when:
+- Request pending for >60 seconds
+- No WebSocket connections active
+
+**Invalid Request**:
+```json
+{
+    "ok": false,
+    "error": "missing code"
+}
+```
+
+Triggered when:
+- POST /run without `code` field
+- GET /result without `request_id`
+
+### Network Errors
+
+**WebSocket Connection Failed**:
+- Browser console: `[Inspekt] Connection failed`
+- Auto-reconnect after 3 seconds
+
+**HTTP Request Failed**:
+- CLI: `ConnectionError: Failed to submit code`
+- Check if server is running: `inspekt server status`
+
+---
+
+## Versioning
+
+### Current Version
+
+**Userscript Version**: 3.4 (defined in `window.__ZEN_BRIDGE_VERSION__`)
+**Server Version**: 1.0.0 (defined in `zen/__init__.py`)
+
+### Version Checking
+
+**Mechanism**: CLI reads userscript version on first request
+
+```python
+# In client.py
+installed_version = client.execute("window.__ZEN_BRIDGE_VERSION__ || 'unknown'")
+expected_version = get_expected_userscript_version()  # From userscript_ws.js
+
+if installed_version != expected_version:
+    print(f"⚠️  WARNING: Userscript version mismatch!", file=sys.stderr)
+```
+
+**Warning** (shown once per CLI session):
+```
+⚠️  WARNING: Userscript version mismatch!
+   Installed: 3.3
+   Expected:  3.4
+   Please update your userscript from: userscript_ws.js
+```
+
+### Protocol Evolution (Future)
+
+**Current State**: No formal protocol versioning
+- Breaking changes require manual userscript update
+- Version mismatch warning only
+
+**Planned (Phase 1+)**:
+- Protocol version in handshake message
+- Server rejects incompatible clients
+- Graceful degradation for minor version differences
+
+**Versioning Strategy** (To Be Implemented):
+```json
+{
+    "type": "handshake",
+    "protocol_version": "2.0",
+    "client_version": "3.4",
+    "capabilities": ["execute", "ping", "reinit_control"]
 }
 ```
 
@@ -638,92 +576,219 @@ Request control mode reinitialization.
 
 ## Security Considerations
 
-### Origin Validation
+### Threat Model
 
-**Current:** No origin validation (localhost only)
+**Assumptions**:
+- Server runs on localhost only (`127.0.0.1`)
+- User trusts their local system
+- User trusts websites they visit with Inspekt active
 
-**Future:** Add CORS headers, origin whitelist
+**Security Properties**:
+- ✅ Server binds to localhost (not `0.0.0.0`)
+- ✅ WebSocket only accepts connections from same machine
+- ✅ No authentication required (localhost assumption)
+- ⚠️  No origin validation (any localhost page can connect)
+- ⚠️  No rate limiting (not needed for local use)
 
-### Authentication
+### Attack Vectors (Mitigated)
 
-**Current:** No authentication (local use only)
+**Remote Code Execution**:
+- ❌ Not possible: Server only accepts localhost connections
+- Browser same-origin policy prevents remote exploitation
 
-**Future:** Token-based auth for remote access
+**Cross-Site WebSocket Hijacking**:
+- ⚠️  Possible in theory (no origin check)
+- ✅ Mitigated: Localhost-only binding, user must visit malicious page
 
-### Code Injection
+**Denial of Service**:
+- ⚠️  Local DoS possible (flood server with requests)
+- ✅ Mitigated: Single-user tool, attacker already has local access
 
-**Risk:** Arbitrary JavaScript execution
+### Best Practices
 
-**Mitigation:**
+**For Users**:
+1. Only run Inspekt on trusted websites
+2. Review JavaScript code before executing
+3. Don't expose server to network (keep localhost binding)
+4. Keep userscript updated
 
-- Protocol designed for trusted local use
-- User controls what code is executed
-- Userscript runs in browser sandbox
-
-### Rate Limiting
-
-**Current:** No rate limiting
-
-**Future:** Request throttling, queue limits
-
----
-
-## Performance Characteristics
-
-### Latency
-
-- **Local WebSocket:** <5ms round-trip
-- **Execute request:** 5-50ms depending on code complexity
-- **HTTP polling:** 10-100ms
-
-### Throughput
-
-- **Max concurrent requests:** Unlimited (queued)
-- **Max message size:** 1MB (configurable)
-- **Keepalive overhead:** 12 bytes every 10 seconds
-
-### Scalability
-
-- **Connections per server:** 1 (single browser)
-- **Requests per second:** Hundreds (limited by JavaScript execution)
-- **Queue depth:** Unlimited (memory-bound)
+**For Developers**:
+1. Never bind server to `0.0.0.0` by default
+2. Sanitize any dynamically generated JavaScript
+3. Avoid storing secrets in code or config
+4. Document security assumptions in README
 
 ---
 
-## Debugging
+## Request Lifecycle Examples
 
-### Enable Verbose Logging
+### Example 1: Simple Evaluation
 
-Server side:
-```python
-import logging
-logging.basicConfig(level=logging.DEBUG)
+```
+1. User runs: inspekt eval "document.title"
+
+2. CLI sends POST /run:
+   {
+     "code": "document.title"
+   }
+
+3. Server creates request_id: a3f2b1c0-...
+   Stores in pending_requests:
+   {
+     "a3f2b1c0-...": {
+       "code": "document.title",
+       "timestamp": 1698765432.123
+     }
+   }
+
+4. Server broadcasts via WebSocket:
+   {
+     "type": "execute",
+     "request_id": "a3f2b1c0-...",
+     "code": "document.title"
+   }
+
+5. Browser receives, evaluates:
+   result = eval("document.title")  // "Example Domain"
+
+6. Browser sends:
+   {
+     "type": "result",
+     "request_id": "a3f2b1c0-...",
+     "ok": true,
+     "result": "Example Domain",
+     "url": "https://example.com",
+     "title": "Example Domain"
+   }
+
+7. Server moves to completed_requests:
+   {
+     "a3f2b1c0-...": {
+       "ok": true,
+       "result": "Example Domain",
+       "url": "https://example.com",
+       "title": "Example Domain",
+       "timestamp": 1698765432.456
+     }
+   }
+
+8. CLI polls GET /result?request_id=a3f2b1c0-...
+   Receives completed result
+
+9. CLI displays: "Example Domain"
 ```
 
-Browser side:
-```javascript
-// Set verbose-logging: true in config.json
+### Example 2: Control Mode Refocus
+
+```
+1. User runs: inspekt control next
+
+2. CLI sends control.js script with action="next"
+
+3. Browser executes, focuses next element
+
+4. Browser sends refocus_notification:
+   {
+     "type": "refocus_notification",
+     "success": true,
+     "message": "Focused: <button>Submit</button>"
+   }
+
+5. Server stores in pending_notifications
+
+6. CLI polls GET /notifications
+
+7. CLI displays: "Focused: <button>Submit</button>"
 ```
 
-### Monitor WebSocket Traffic
+### Example 3: Page Reload with Auto-Reinit
 
-Browser DevTools → Network → WS → Messages tab
+```
+1. User has control mode active
 
-### Inspect Protocol Messages
+2. User navigates to new page (or refresh)
 
-```python
-# In server code
-import json
-print(f"Sending: {json.dumps(message, indent=2)}")
-print(f"Received: {json.dumps(response, indent=2)}")
+3. WebSocket disconnects
+
+4. New page loads, userscript connects
+
+5. Userscript checks localStorage for saved control state
+
+6. If control was active, sends reinit_control:
+   {
+     "type": "reinit_control",
+     "config": {...}
+   }
+
+7. Server sends execute with control.js "start" action
+
+8. Control mode reinitialized in new page
 ```
 
 ---
 
-## See Also
+## Future Enhancements (Post-Refactor)
 
-- [Commands Reference](commands.md)
-- [Services Reference](services.md)
-- [Models Reference](models.md)
-- [Architecture Guide](../development/architecture.md)
-- [WebSocket RFC](https://datatracker.ietf.org/doc/html/rfc6455)
+### Phase 1: Validation
+
+- [ ] Pydantic models for all message types
+- [ ] JSON schema validation on incoming messages
+- [ ] Protocol version in handshake
+- [ ] Reject incompatible protocol versions
+
+### Phase 2: Reliability
+
+- [ ] Message acknowledgment system
+- [ ] Request timeout configuration per-request
+- [ ] Request cancellation mechanism
+- [ ] Connection health monitoring (ping/pong interval)
+
+### Phase 3: Features
+
+- [ ] Batch execution (multiple code snippets in one request)
+- [ ] Streaming results (for long-running operations)
+- [ ] Binary data support (screenshots, files)
+- [ ] Compression for large payloads (gzip)
+
+### Security Enhancements (Optional)
+
+- [ ] Token-based authentication (for remote binding)
+- [ ] Origin validation (whitelist)
+- [ ] Rate limiting (per-client)
+- [ ] Request signing (HMAC)
+
+---
+
+## References
+
+- ARCHITECTURE.md - High-level system design
+- CONTRIBUTING.md - Development guide
+- REFACTOR_PLAN.md - Protocol validation plan (Phase 1)
+- userscript_ws.js - Browser-side implementation
+- zen/bridge_ws.py - Server-side implementation
+- zen/client.py - HTTP client implementation
+
+---
+
+## Changelog
+
+### 3.4 (Current)
+- Current userscript version
+- Auto-reconnect on page navigation
+- Auto-reinit for control mode
+- Refocus notifications
+
+### 3.3
+- Previous version (details unknown)
+
+### Future (2.0)
+- Pydantic validation
+- Protocol versioning
+- Structured error responses
+
+---
+
+**Document Status**: ✅ Complete (current protocol documented)
+**Next Update**: After Phase 1 (add Pydantic schemas)
+**Maintainer**: Roel van Gils
+**Last Updated**: 2025-10-27

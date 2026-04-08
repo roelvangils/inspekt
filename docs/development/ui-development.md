@@ -1,604 +1,824 @@
-# UI Component Development
+# Inspekt UI Components Development Guide
 
-This guide covers how to edit and develop the HTML/CSS-based UI components in Inspekt with hot-reloading workflows.
+A comprehensive guide for editing and developing the HTML/CSS-based UI components in Inspekt with hot-reloading workflows.
 
-## Overview
-
-Inspekt has three main UI components, all using **vanilla HTML/CSS/JavaScript**:
-
-| Component | Purpose | Complexity |
-|-----------|---------|------------|
-| **Axe Popover** | Accessibility testing badges and popovers | Easiest |
-| **Extension Popup** | Toolbar popup for connection status and permissions | Easy |
-| **DevTools Panel** | Full-featured panel for element inspection | Complex |
+**Last Updated**: 2025-11-24
 
 ---
 
-## 1. Axe Popover Development
+## Table of Contents
 
-The floating accessibility popover appears when running `inspekt axe --interactive`. This is the **easiest** component to develop because changes can be tested with a simple CLI command.
-
-### File Locations
-
-**CSS (modular):**
-
-| File | Description |
-|------|-------------|
-| `inspekt/scripts/axe-popover/index.css` | Entry point (imports all modules) |
-| `inspekt/scripts/axe-popover/tokens.css` | Design tokens (colors, spacing, typography) |
-| `inspekt/scripts/axe-popover/base.css` | Popover container, anchor positioning |
-| `inspekt/scripts/axe-popover/nav.css` | Navigation bar |
-| `inspekt/scripts/axe-popover/content.css` | Header, tabs, body, sections |
-| `inspekt/scripts/axe-popover/badges.css` | Interactive page badges |
-| `inspekt/scripts/axe-popover/animations.css` | Keyframe animations |
-| `inspekt/scripts/axe-popover/themes.css` | Dark mode, high contrast |
-
-**JavaScript:**
-
-| File | Description |
-|------|-------------|
-| `inspekt/scripts/run_axe.js` | Logic, HTML structure, embedded production CSS |
-
-### How CSS Loading Works
-
-The Axe popover CSS can be loaded in two ways:
-
-| Mode | How CSS is loaded | Use case |
-|------|-------------------|----------|
-| **Production** | CSS is minified and embedded inline in `run_axe.js` | Normal usage |
-| **Development** | CSS is fetched from `localhost:8000` with hot-reload | Editing CSS |
-
-In **production mode** (`inspekt axe --interactive`), the CSS is baked into the JavaScript file. This means users don't need a dev server, but you need to rebuild after making changes.
-
-In **development mode** (`inspekt axe --interactive --dev-css`), the CSS is loaded from a local server and automatically reloads when you save changes.
-
-### Development Workflow (Recommended)
-
-This workflow provides **automatic CSS hot-reloading** - edit your CSS, save, and see changes instantly in the browser without refreshing.
-
-> **Note:** The axe command works even when your terminal has focus (unlike most Inspekt commands). See [Tab Visibility and Focus](#tab-visibility-and-focus) for details.
+1. [Quick Start](#quick-start)
+2. [Component Overview](#component-overview)
+3. [Development Workflows](#development-workflows)
+4. [Hot-Reloading Setup](#hot-reloading-setup)
+5. [File Locations Reference](#file-locations-reference)
+6. [Common Issues & Solutions](#common-issues--solutions)
+7. [CSS Architecture](#css-architecture)
+8. [Testing Checklist](#testing-checklist)
 
 ---
 
-#### Step 1: Open three windows
+## Quick Start
 
-You'll need:
-
-| Window | Purpose |
-|--------|---------|
-| **Terminal 1** | CSS dev server |
-| **Terminal 2** | Run inspekt commands |
-| **VS Code** | Edit the CSS files |
-| **Browser** | View the results |
-
----
-
-#### Step 2: Start the CSS dev server (Terminal 1)
+### Install Development Dependencies
 
 ```bash
-npm run dev:axe-css
-```
-
-You'll see:
-
-```
-🚀 CORS-enabled server running at http://localhost:8000
-📁 Serving files from: /path/to/inspekt/scripts
-🔗 CSS URL: http://localhost:8000/axe-popover/index.css
-🔄 Hot-reload: Detects changes in ANY .css file in axe-popover/
-
-💡 Press Ctrl+C to stop and build CSS for production
-```
-
-The server:
-- Serves CSS files with CORS headers (so the browser can fetch them)
-- Tracks the newest modification time across ALL CSS files in `axe-popover/`
-- Automatically builds production CSS when you press Ctrl+C
-
----
-
-#### Step 3: Open a test page in your browser
-
-Either navigate to any website, or create a simple test page with accessibility issues:
-
-```bash
-cat > /tmp/test-a11y.html << 'EOF'
-<!DOCTYPE html>
-<html>
-<head><title>A11y Test</title></head>
-<body>
-  <img src="hero.jpg">
-  <button></button>
-  <a href="#"></a>
-  <input type="text">
-</body>
-</html>
-EOF
-
-open /tmp/test-a11y.html
-```
-
----
-
-#### Step 4: Run axe with dev CSS mode (Terminal 2)
-
-```bash
-inspekt axe --interactive --dev-css
-```
-
-This:
-- Runs the accessibility audit
-- Injects badges on the page
-- Loads CSS from `http://localhost:8000/axe-popover/index.css` (instead of embedding inline)
-- **Starts CSS hot-reload polling** (checks for changes every 1.5 seconds)
-
-You'll see in the browser console:
-
-```
-[Inspekt Dev Mode] CSS loaded from http://localhost:8000/axe-popover/index.css
-[Inspekt Dev Mode] Start server: npm run dev:axe-css
-[Inspekt Dev Mode] Hot-reload enabled - save CSS to see changes automatically
-[Inspekt Dev Mode] CSS hot-reload started (checking every 1.5s)
-```
-
----
-
-#### Step 5: Edit CSS in VS Code
-
-Open the CSS directory:
-
-```bash
-code inspekt/scripts/axe-popover/
-```
-
-Edit any file - the hot-reload detects changes in **all** CSS files in the directory, not just `index.css`.
-
----
-
-#### Step 6: Make changes and save
-
-1. Edit any CSS property (e.g., change a color, spacing, or border radius)
-2. Save the file (`Cmd+S` / `Ctrl+S`)
-3. **Watch the browser** - changes appear automatically within ~1.5 seconds!
-
-When CSS reloads, you'll see in the console:
-
-```
-[Inspekt Dev Mode] CSS reloaded at 3:45:12 PM
-```
-
----
-
-#### Step 7: Stop the server and build
-
-When you're done editing, press **Ctrl+C** in Terminal 1. The server will:
-
-1. Stop serving files
-2. **Automatically build the production CSS**
-3. Embed the minified CSS into `run_axe.js`
-
-```
-👋 Stopping server...
-
-📦 Building CSS for production...
-   Building Axe Popover CSS...
-   Original: 12.3 KB (7 files)
-   Minified: 9.2 KB
-   Reduction: 25%
-   Updated: inspekt/scripts/run_axe.js
-✅ CSS built successfully!
-```
-
-Your changes are now ready for production use and can be committed.
-
----
-
-#### Summary: The Complete Loop
-
-```
-┌─────────────────────────────────────────────────────────┐
-│  1. npm run dev:axe-css        (start server)           │
-│  2. inspekt axe --interactive --dev-css                 │
-│  3. Edit CSS in VS Code                                 │
-│  4. Save (Cmd+S) → see changes in ~1.5s                 │
-│  5. Repeat steps 3-4 as needed                          │
-│  6. Ctrl+C in server terminal → auto-builds CSS         │
-│  7. Commit your changes                                 │
-└─────────────────────────────────────────────────────────┘
-```
-
-**No manual build step required** - Ctrl+C handles it automatically.
-
-### Alternative: Browser DevTools (Quick Prototyping)
-
-For quick CSS experiments without setting up the dev server:
-
-1. Run `inspekt axe --interactive`
-2. Click a badge to open the popover
-3. Right-click the popover → "Inspect"
-4. Edit CSS in the Styles panel (changes appear instantly!)
-5. Copy working CSS back to the appropriate file in `axe-popover/`
-
-### Building CSS Manually
-
-If you need to build CSS without the dev server (e.g., after pulling changes):
-
-```bash
-npm run build:axe-css
-```
-
-This:
-- Concatenates all CSS files in correct order (following `@import` statements)
-- Minifies the result (~25% smaller)
-- Updates the embedded CSS in `run_axe.js`
-
-**Output:**
-```
-Building Axe Popover CSS...
-  Original: 12.3 KB (7 files)
-  Minified: 9.2 KB
-  Reduction: 25%
-  Updated: inspekt/scripts/run_axe.js
-Done!
-```
-
-> **Important:** Always build CSS before committing changes, otherwise users without `--dev-css` won't see your updates. The dev server does this automatically on Ctrl+C.
-
-### Command Reference
-
-| Command | Description |
-|---------|-------------|
-| `npm run dev:axe-css` | Start CSS dev server (auto-builds on Ctrl+C) |
-| `npm run build:axe-css` | Manually build and embed minified CSS |
-| `inspekt axe --interactive` | Production mode (CSS embedded inline) |
-| `inspekt axe --interactive --dev-css` | Dev mode (CSS from localhost:8000) |
-
----
-
-## 2. Extension Popup Development
-
-The browser extension popup appears when clicking the Inspekt icon in the toolbar.
-
-### File Locations
-
-**Chrome:**
-
-| File | Description |
-|------|-------------|
-| `extensions/chrome/popup/popup.html` | HTML structure |
-| `extensions/chrome/popup/popup.css` | Styling (~10KB) |
-| `extensions/chrome/popup/popup.js` | Logic (~9KB) |
-
-**Firefox (shared):**
-
-| File | Description |
-|------|-------------|
-| `extensions/shared/popup/popup-base.html` | HTML structure |
-| `extensions/shared/popup/popup-base.css` | Styling (~6.5KB) |
-| `extensions/shared/popup/popup-base.js` | Logic (~12KB) |
-
-### Development Workflow
-
-#### Option A: Auto-Reload with web-ext (Recommended)
-
-```bash
-# Install dependencies (if not already done)
 npm install
+```
 
-# Start Chrome with auto-reloading extension
+This installs:
+- `web-ext` - Auto-reload browser extensions on file changes
+- `chokidar-cli` - File watching for manual reload workflow
+
+### Start Development Environment
+
+**Option 1: Auto-Reload (Recommended for Popup)**
+```bash
+npm run dev:chrome   # Opens Chrome with auto-reloading extension
+npm run dev:firefox  # Opens Firefox with auto-reloading extension
+```
+
+**Option 2: Manual Reload with File Watcher**
+```bash
+npm run watch:extensions  # Shows notifications when files change
+```
+
+**Option 3: Axe Popover Development**
+```bash
+npm run watch:axe        # Watch for Axe popover file changes
+inspekt axe --interactive  # Test changes immediately
+```
+
+---
+
+## Component Overview
+
+Inspekt has three main UI components, all using **vanilla HTML/CSS/JavaScript** with no build process:
+
+### 1. Floating Accessibility (Axe) Popover
+
+**Purpose**: Interactive accessibility testing badges and popovers injected into web pages
+
+**Files**:
+- `inspekt/scripts/run_axe.js` (1,417 lines) - Main logic, popover creation, navigation
+- `inspekt/scripts/axe_popover.css` (1,202 lines) - Complete styling
+- `inspekt/scripts/vendor/` - Dependencies (axe-core, CSS anchor positioning polyfill)
+
+**Loading Mechanism**:
+- Injected via CLI command into browser's MAIN world execution context
+- CSS embedded inline as `<style>` tag by JavaScript
+
+**Features**:
+- Numbered badges at violation locations
+- Interactive popovers with prev/next navigation
+- "Skip similar" to filter by rule type
+- Detach mode with drag-and-drop
+- Tabbed interface (Default view / Markdown export)
+- Dark mode support
+
+### 2. Browser Extension Popup
+
+**Purpose**: Toolbar extension popup for managing connection status and permissions
+
+**Chrome Files**:
+- `extensions/chrome/popup/popup.html`
+- `extensions/chrome/popup/popup.css` (10,057 bytes)
+- `extensions/chrome/popup/popup.js` (8,931 bytes)
+
+**Firefox Files** (shared):
+- `extensions/shared/popup/popup-base.html`
+- `extensions/shared/popup/popup-base.css` (6,526 bytes)
+- `extensions/shared/popup/popup-base.js` (11,904 bytes)
+
+**Loading Mechanism**:
+- Defined in `manifest.json` as `action.default_popup` (Chrome) or `browser_action.default_popup` (Firefox)
+- Loads when user clicks extension icon in toolbar
+
+**Features**:
+- Connection status indicator (WebSocket bridge)
+- Domain permissions management
+- Quick access toggle (temporary bypass)
+- Links to documentation
+
+### 3. DevTools Advanced Panel
+
+**Purpose**: Full-featured panel inside Chrome DevTools for element inspection and quick actions
+
+**Core Files**:
+- `extensions/chrome/devtools.html` - Panel registration entry point
+- `extensions/chrome/devtools.js` (81 lines) - Creates panel via Chrome API
+- `extensions/chrome/panel.html` (189 lines) - Panel UI structure
+- `extensions/chrome/panel.css` (24,963 bytes) - Complete styling
+- `extensions/chrome/panel.js` - ES6 module entry point
+
+**Modular Architecture** (ES6 Modules):
+```
+extensions/chrome/
+├── modules/
+│   ├── connection-manager.js     (4,162 bytes)
+│   ├── element-display.js        (10,919 bytes)
+│   ├── element-monitor.js        (4,381 bytes)
+│   ├── history-manager.js        (6,793 bytes)
+│   ├── quick-actions-manager.js  (12,620 bytes)
+│   ├── settings-manager.js       (2,241 bytes)
+│   └── theme-manager.js          (2,521 bytes)
+├── components/
+│   ├── element-highlighter.js
+│   ├── element-picker.js
+│   └── quick-actions/
+│       ├── action-tile.js
+│       ├── drag-handler.js
+│       ├── keyboard-handler.js
+│       └── manage-panel.js
+└── handlers/ (various element navigation handlers)
+```
+
+**Loading Mechanism**:
+1. `devtools.html` specified in manifest.json as `devtools_page`
+2. Chrome loads `devtools.js` when DevTools opens
+3. `devtools.js` calls `chrome.devtools.panels.create()` to register panel
+4. Panel displays `panel.html` which loads `panel.js` as ES6 module
+5. `panel.js` imports and initializes all managers/components
+
+**Features**:
+- Currently inspected element display (syncs with Elements panel)
+- Quick actions grid (configurable, draggable tiles)
+- Element history tracking
+- Connection status to Python bridge server
+- Theme switcher (Auto/Light/Dark)
+- Element picker with highlighting
+- Settings persistence via chrome.storage
+
+---
+
+## Development Workflows
+
+### Workflow 1: Axe Popover (Simplest)
+
+The Axe popover has the **simplest development workflow** because it's injected fresh each time you run the CLI command.
+
+**Steps:**
+```bash
+# Terminal 1: Watch for file changes (optional)
+npm run watch:axe
+
+# Terminal 2: Edit files
+vim inspekt/scripts/axe_popover.css
+vim inspekt/scripts/run_axe.js
+
+# Terminal 3: Test changes immediately
+inspekt axe --interactive
+```
+
+**Why it's simple:**
+- No extension reload required
+- Fresh injection every time
+- Changes appear instantly
+- No caching issues
+
+**Iteration time:** ~5 seconds (edit → run command → see result)
+
+### Workflow 2: Extension Popup (Auto-Reload)
+
+The popup benefits most from auto-reload because it's quick to open and test.
+
+**Steps:**
+```bash
+# Terminal 1: Start auto-reloading browser
 npm run dev:chrome
 
-# Or Firefox
+# Terminal 2: Edit files
+vim extensions/chrome/popup/popup.css
+vim extensions/chrome/popup/popup.js
+
+# Browser: Extension auto-reloads on save
+# Click extension icon in toolbar → See changes
+```
+
+**Iteration time:** ~3 seconds (edit → save → click icon)
+
+**Alternative (Manual Reload):**
+```bash
+# 1. Setup keyboard shortcut once
+# Go to chrome://extensions/shortcuts
+# Set Ctrl+Shift+R for "Reload extension"
+
+# 2. Edit files
+vim extensions/chrome/popup/popup.css
+
+# 3. Press Ctrl+Shift+R
+# 4. Click extension icon
+```
+
+### Workflow 3: DevTools Panel (Most Complex)
+
+The DevTools panel requires the most steps because Chrome doesn't reload panels automatically.
+
+**Steps:**
+```bash
+# Terminal 1: Watch for file changes
+npm run watch:extensions
+
+# Terminal 2: Edit files
+vim extensions/chrome/panel.css
+vim extensions/chrome/modules/element-display.js
+
+# Browser: Per change iteration:
+# 1. See file change notification in terminal
+# 2. Go to chrome://extensions or press Ctrl+Shift+R
+# 3. Click reload icon on Inspekt extension
+# 4. Close DevTools (Ctrl+Shift+I or F12)
+# 5. Reopen DevTools (Ctrl+Shift+I or F12)
+# 6. Click "Inspekt" panel tab
+```
+
+**Iteration time:** ~10-15 seconds (edit → reload → close/reopen DevTools)
+
+**CSS-Only Changes (Faster):**
+For pure CSS changes, you might be able to skip the extension reload:
+```bash
+# 1. Edit CSS
+vim extensions/chrome/panel.css
+
+# 2. Close DevTools
+# 3. Reopen DevTools
+# 4. Click "Inspekt" tab
+```
+
+**Iteration time:** ~5 seconds (edit → close/reopen DevTools)
+
+---
+
+## Hot-Reloading Setup
+
+### web-ext Auto-Reload (Installed)
+
+The `web-ext` tool automatically reloads extensions when files change.
+
+**Available Commands:**
+
+```bash
+# Chrome development (auto-reload)
+npm run dev:chrome
+
+# Firefox development (auto-reload)
 npm run dev:firefox
-```
 
-Edit files → Save → Extension auto-reloads → Click icon to see changes.
-
-**Note:** This opens a fresh browser profile, not your main profile.
-
-#### Option B: Manual Reload (Use Main Profile)
-
-1. Load extension as "unpacked" in `chrome://extensions`
-2. Set up keyboard shortcut in `chrome://extensions/shortcuts` (e.g., `Cmd+Shift+R`)
-3. Edit files → Press shortcut → Click extension icon
-
-### File Watcher
-
-Run the file watcher for context-aware reload instructions:
-
-```bash
+# File watcher with manual reload
 npm run watch:extensions
+
+# Axe popover file watcher
+npm run watch:axe
 ```
 
-When you save a file, it shows exactly what to do:
+**What `web-ext` Does:**
+- Opens a new browser instance with a clean profile
+- Loads your extension automatically
+- Watches for file changes
+- Reloads extension when files change
+- Opens useful URLs (chrome://extensions, about:debugging)
 
-```
-✨ File changed: extensions/chrome/popup/popup.css
-Component: popup (CSS)
+**Limitations:**
+- DevTools panels still require manual close/reopen (Chrome API limitation)
+- Creates a new browser profile (not your main profile)
+- Can't preserve logged-in state from your main browser
 
-📝 Reload Steps:
-  1. Go to chrome://extensions (or press Cmd+Shift+R if shortcut configured)
-  2. Click reload icon on Inspekt extension card
-  3. Click extension icon in toolbar to see changes
-```
+### Keyboard Shortcut Setup (Optional but Recommended)
 
----
-
-## 3. DevTools Panel Development
-
-The DevTools panel is the most complex component with a modular ES6 architecture.
-
-### File Locations
-
-**Core Files:**
-
-| File | Description |
-|------|-------------|
-| `extensions/chrome/panel.html` | Panel HTML structure |
-| `extensions/chrome/panel.css` | Panel styling (~25KB) |
-| `extensions/chrome/panel.js` | Entry point (ES6 module) |
-
-**Modules** (`extensions/chrome/modules/`):
-
-| Module | Purpose |
-|--------|---------|
-| `connection-manager.js` | WebSocket bridge connection |
-| `element-display.js` | Inspected element rendering |
-| `element-monitor.js` | Selection monitoring |
-| `history-manager.js` | Element history tracking |
-| `quick-actions-manager.js` | Action grid management |
-| `settings-manager.js` | Persistent settings |
-| `theme-manager.js` | Theme switching |
-
-### Development Workflow
-
-DevTools panels require the most steps because **Chrome doesn't auto-reload panels**.
-
-```bash
-# Start file watcher
-npm run watch:extensions
-```
-
-After editing files:
-
-1. Reload extension (`chrome://extensions` or keyboard shortcut)
-2. **Close DevTools** (`Cmd+Option+I`)
-3. **Reopen DevTools** (`Cmd+Option+I`)
-4. Click "Inspekt" panel tab
-
-**CSS-Only Changes:** Sometimes work with just close/reopen DevTools (skip step 1).
-
-### Debugging the Panel
-
-The panel runs in its own context. To debug:
-
-1. Open DevTools → Click "Inspekt" tab
-2. Right-click anywhere in the panel → "Inspect"
-3. A second DevTools opens (DevTools-in-DevTools!)
-4. Check Console for errors, Sources for breakpoints
-
----
-
-## Quick Reference
-
-### npm Scripts
-
-| Script | Purpose |
-|--------|---------|
-| `npm run dev:chrome` | Auto-reload Chrome extension |
-| `npm run dev:firefox` | Auto-reload Firefox extension |
-| `npm run dev:axe-css` | Start CSS dev server (auto-builds on Ctrl+C) |
-| `npm run build:axe-css` | Manually build and embed minified CSS |
-| `npm run watch:extensions` | File watcher with reload instructions |
-
-### Iteration Times
-
-| Component | Workflow | Time |
-|-----------|----------|------|
-| Axe Popover | Edit → Save → Auto hot-reload | ~1.5 sec |
-| Popup | Edit → Auto-reload → Click icon | ~3 sec |
-| DevTools Panel | Edit → Reload extension → Close/reopen DevTools | ~10-15 sec |
-
-### Setting Up Keyboard Shortcut
-
-To quickly reload the extension:
-
+**Chrome:**
 1. Go to `chrome://extensions/shortcuts`
 2. Find "Inspekt" extension
-3. Set a keyboard shortcut (e.g., `Cmd+Shift+R`)
+3. Set a keyboard shortcut (e.g., `Ctrl+Shift+R`)
+4. Now you can reload the extension without opening the extensions page
+
+**Firefox:**
+1. Go to `about:addons`
+2. Click gear icon → Manage Extension Shortcuts
+3. Find "Inspekt" and set shortcut
+
+### File Watcher Script
+
+The `watch-extensions.js` script provides intelligent notifications:
+
+**Features:**
+- Monitors all extension HTML/CSS/JS files
+- Detects which component changed (popup, panel, module)
+- Provides context-specific reload instructions
+- Color-coded terminal output
+- Shows file type (HTML, CSS, JS)
+
+**Usage:**
+```bash
+npm run watch:extensions
+```
+
+**Example Output:**
+```
+✨ File changed: extensions/chrome/panel.css
+Component: panel (CSS)
+
+📝 Reload Steps (DevTools Panel):
+  1. Go to chrome://extensions (or press Ctrl+Shift+R if shortcut configured)
+  2. Click reload icon on Inspekt extension card
+  3. Close DevTools completely (Ctrl+Shift+I)
+  4. Reopen DevTools (Ctrl+Shift+I)
+  5. Click "Inspekt" panel tab
+
+  Note: CSS-only changes might work with just DevTools close/reopen
+```
+
+---
+
+## File Locations Reference
+
+### Axe Popover
+| File | Location | Size | Description |
+|------|----------|------|-------------|
+| Main JS | `inspekt/scripts/run_axe.js` | 1,417 lines | Popover logic, navigation, badge injection |
+| CSS | `inspekt/scripts/axe_popover.css` | 1,202 lines | Complete styling, animations, dark mode |
+| Axe Core | `inspekt/scripts/vendor/axe-core.min.js` | Vendor | Accessibility testing engine |
+| Polyfill | `inspekt/scripts/vendor/css-anchor-positioning.js` | Vendor | CSS Anchor Positioning for Firefox |
+
+### Chrome Extension Popup
+| File | Location | Size | Description |
+|------|----------|------|-------------|
+| HTML | `extensions/chrome/popup/popup.html` | - | Popup structure |
+| CSS | `extensions/chrome/popup/popup.css` | 10,057 bytes | Popup styling |
+| JS | `extensions/chrome/popup/popup.js` | 8,931 bytes | Popup logic, connection status |
+
+### Firefox Extension Popup (Shared)
+| File | Location | Size | Description |
+|------|----------|------|-------------|
+| HTML | `extensions/shared/popup/popup-base.html` | - | Popup structure |
+| CSS | `extensions/shared/popup/popup-base.css` | 6,526 bytes | Popup styling |
+| JS | `extensions/shared/popup/popup-base.js` | 11,904 bytes | Popup logic |
+
+### DevTools Panel
+| File | Location | Size | Description |
+|------|----------|------|-------------|
+| Entry | `extensions/chrome/devtools.html` | Minimal | Loads devtools.js |
+| Registration | `extensions/chrome/devtools.js` | 81 lines | Panel registration |
+| Panel HTML | `extensions/chrome/panel.html` | 189 lines | Panel structure |
+| Panel CSS | `extensions/chrome/panel.css` | 24,963 bytes | Complete styling |
+| Panel JS | `extensions/chrome/panel.js` | ES6 module | Entry point, imports managers |
+
+### DevTools Panel Modules
+| Module | Location | Size | Purpose |
+|--------|----------|------|---------|
+| Connection Manager | `extensions/chrome/modules/connection-manager.js` | 4,162 bytes | WebSocket bridge connection |
+| Element Display | `extensions/chrome/modules/element-display.js` | 10,919 bytes | Inspected element rendering |
+| Element Monitor | `extensions/chrome/modules/element-monitor.js` | 4,381 bytes | Selection monitoring |
+| History Manager | `extensions/chrome/modules/history-manager.js` | 6,793 bytes | Element history tracking |
+| Quick Actions | `extensions/chrome/modules/quick-actions-manager.js` | 12,620 bytes | Action grid management |
+| Settings Manager | `extensions/chrome/modules/settings-manager.js` | 2,241 bytes | Persistent settings |
+| Theme Manager | `extensions/chrome/modules/theme-manager.js` | 2,521 bytes | Theme switching |
+
+---
+
+## Common Issues & Solutions
+
+### Issue: DevTools Panel Not Updating After Extension Reload
+
+**Cause**: Chrome DevTools panels are loaded once when DevTools opens. Reloading the extension doesn't reload already-open panels.
+
+**Solution**:
+1. Reload the extension in `chrome://extensions`
+2. **Close DevTools completely** (not just the tab, the entire DevTools window)
+3. Reopen DevTools
+4. Navigate to "Inspekt" panel tab
+
+**Quick tip**: For CSS-only changes, try just closing/reopening DevTools without reloading the extension.
+
+### Issue: Extension Popup Changes Not Visible
+
+**Cause**: Extension not reloaded after file changes.
+
+**Solution**:
+- If using `npm run dev:chrome`: Extension should reload automatically (wait a few seconds)
+- If editing manually: Go to `chrome://extensions` and click reload icon
+- If using keyboard shortcut: Press your configured shortcut (e.g., `Ctrl+Shift+R`)
+
+### Issue: Axe Popover Styling Broken
+
+**Cause**: CSS is embedded as inline `<style>` tag in JavaScript. Template literal escaping issues or syntax errors.
+
+**Solution**:
+1. Check `axe_popover.css` for CSS syntax errors
+2. Check `run_axe.js` around line 663-1173 where CSS is embedded
+3. Ensure proper escaping of backticks and `${}`
+4. Run `inspekt axe --interactive` to see error messages in browser console
+
+### Issue: ES6 Module Import Errors in Panel
+
+**Cause**: Incorrect relative path or missing `.js` extension.
+
+**Solution**:
+1. All imports must include `.js` extension: `import { Foo } from './foo.js';`
+2. Check paths are relative to the importing file
+3. Check file exists at the specified location
+4. Open DevTools console in the Inspekt panel itself (right-click panel → Inspect) to see errors
+
+### Issue: Anchor Positioning Not Working in Firefox
+
+**Cause**: Firefox doesn't yet support CSS Anchor Positioning API natively.
+
+**Solution**:
+The polyfill is automatically applied at `run_axe.js:1179`. Ensure:
+1. Polyfill is loaded before popover creation
+2. `CSS.supports('anchor-name', '--foo')` check works correctly
+3. Check browser console for polyfill errors
+
+### Issue: web-ext Can't Find Browser
+
+**Cause**: Firefox or Chrome not in default installation path.
+
+**Solution**:
+```bash
+# Specify custom Firefox path
+npm run dev:firefox -- --firefox=/path/to/firefox
+
+# Specify custom Chromium path
+npm run dev:chrome -- --chromium-binary=/path/to/chrome
+```
+
+### Issue: Changes Not Reflecting in Main Browser Profile
+
+**Cause**: `web-ext` uses a clean temporary profile, not your main profile.
+
+**Solution**:
+- Use manual reload workflow instead of `web-ext`
+- Load extension as "unpacked" in your main browser profile
+- Use `npm run watch:extensions` and manual reload
 
 ---
 
 ## CSS Architecture
 
-### Axe Popover CSS Structure
+### Axe Popover CSS (`axe_popover.css`)
 
-The CSS is split into modular files in `inspekt/scripts/axe-popover/`:
+**Structure** (1,202 lines):
+1. **Font imports** (line 4) - Material Icons
+2. **Popover container** (line 7-50) - Base popover styling, positioning
+3. **Position fallbacks** (line 52-63) - Manual fallback for anchor positioning
+4. **Header & impact badges** (line 65-100) - Severity indicators (critical, serious, etc.)
+5. **Tabs** (line 112-160) - Default view / Markdown export tabs
+6. **Content sections** (line 187-391) - Issue info, help text, related nodes
+7. **Interactive badges** (line 428-460) - Numbered badges on page
+8. **Animations** (line 479-736) - Direction-based entrance animations
+9. **Navigation strip** (line 738-917) - Prev/next/skip controls
+10. **Detach mode** (line 919-985) - Draggable popover
+11. **Dark mode** (line 998-1201) - Dark theme overrides
 
-| File | Contents |
-|------|----------|
-| `tokens.css` | Design tokens (colors, spacing, typography, shadows) |
-| `base.css` | Popover container, anchor positioning, scrollbar |
-| `nav.css` | Navigation bar (prev/next, counter, close, detach) |
-| `content.css` | Header, tabs, body, sections, code blocks, tags |
-| `badges.css` | Interactive violation badges on page |
-| `animations.css` | Entrance/exit keyframe animations |
-| `themes.css` | Dark mode and high contrast overrides |
-
-### CSS Nesting
-
-The CSS uses **native CSS nesting** for pseudo-classes and pseudo-elements:
-
-```css
-/* This works - pseudo-classes/elements */
-.inspekt-axe-nav__prev {
-  &:hover { background: white; }
-  &:focus-visible { outline: 2px solid blue; }
-  &::before { content: "→"; }
-}
-
-/* This does NOT work - BEM element concatenation */
-.inspekt-axe-nav {
-  &__prev { }  /* ❌ Won't produce .inspekt-axe-nav__prev */
-}
-```
-
-Native CSS nesting supports `&:pseudo`, `&.class`, `& element`, but NOT Sass-style string concatenation like `&__element` or `&--modifier`.
-
-### Design Tokens
-
-Edit `tokens.css` to customize the look and feel:
-
-```css
-:root {
-  /* Colors */
-  --blue: #2563eb;
-  --green: #10b981;
-  --red: #dc2626;
-
-  /* Spacing (3 values) */
-  --space-sm: 4px;
-  --space-md: 8px;
-  --space-lg: 16px;
-
-  /* Border Radius (3 values) */
-  --radius-sm: 4px;
-  --radius-md: 8px;
-  --radius-lg: 12px;
-
-  /* Typography */
-  --font-sans: "Inter", system-ui, sans-serif;
-  --text-sm: 13px;
-  --text-base: 14px;
-}
-```
-
-### Naming Convention
-
-We use BEM-style naming with full class names (not Sass nesting):
-
+**Naming Convention**: BEM-style
 ```css
 .inspekt-axe-popover { }                          /* Block */
 .inspekt-axe-popover__header { }                  /* Element */
 .inspekt-axe-popover__impact-badge--critical { }  /* Modifier */
 ```
 
-### CSS Variables
+**Key Features**:
+- Uses CSS Anchor Positioning API (`anchor-name`, `position-anchor`)
+- Directional animations based on badge position
+- Dark mode using `prefers-color-scheme` media query
+- Material Icons font for UI icons
 
-Components use CSS custom properties for theming:
+### Panel CSS (`panel.css`)
+
+**Structure** (24,963 bytes) - Large file, could benefit from splitting:
+
+**Suggested Module Split**:
+```css
+panel-base.css        /* Layout, typography, CSS variables, root styles */
+panel-header.css      /* Header, status indicator, theme toggle */
+panel-actions.css     /* Quick actions grid, tiles, drag-and-drop */
+panel-element.css     /* Inspected element display, properties */
+panel-history.css     /* Element history list, navigation */
+panel-reference.css   /* Quick reference section, collapsible */
+panel-themes.css      /* Light/dark theme variables */
+```
+
+**Current Structure** (all in one file):
+- CSS custom properties (colors, spacing, transitions)
+- Base layout (flexbox, grid)
+- Component-specific styles
+- Theme-specific overrides
+- Responsive adjustments
+
+**Naming Convention**: Mix of BEM and utility classes
+```css
+.inspekt-panel { }
+.quick-actions-grid { }
+.status-indicator--connected { }
+```
+
+### Popup CSS
+
+**Chrome** (`popup.css` - 10,057 bytes):
+- Material Design inspired
+- Connection status colors
+- Permission toggle switches
+- Responsive layout
+
+**Firefox** (`popup-base.css` - 6,526 bytes):
+- Simpler styling
+- Browser-specific adjustments
+- Shared color scheme
+
+---
+
+## CSS Editing Best Practices
+
+### Use Browser DevTools for Live Editing
+
+**Best Workflow**:
+1. Open component in browser (popup, panel, or page with Axe popover)
+2. Open DevTools on the component (right-click → Inspect)
+3. Edit CSS in DevTools Styles pane (live preview)
+4. Copy working CSS back to source file
+5. Reload to verify
+
+**For Axe Popover**:
+```bash
+# 1. Run Axe with interactive mode
+inspekt axe --interactive
+
+# 2. Right-click on popover → Inspect
+# 3. Edit styles in DevTools
+# 4. Copy changes to inspekt/scripts/axe_popover.css
+# 5. Run inspekt axe --interactive again to verify
+```
+
+**For Extension Popup**:
+```bash
+# 1. Click extension icon
+# 2. Right-click on popup → Inspect
+# 3. Edit styles in DevTools
+# 4. Copy changes to extensions/chrome/popup/popup.css
+# 5. Reload extension
+```
+
+**For DevTools Panel**:
+```bash
+# 1. Open DevTools → Inspekt panel
+# 2. Right-click on panel → Inspect (opens DevTools-in-DevTools!)
+# 3. Edit styles in nested DevTools
+# 4. Copy changes to extensions/chrome/panel.css
+# 5. Reload extension + close/reopen DevTools
+```
+
+### CSS Variables and Theming
+
+All components use CSS custom properties for consistency:
 
 ```css
+/* Common pattern in panel.css and popup.css */
 :root {
-  --color-primary: #2563eb;
-  --color-success: #22c55e;
-  --color-error: #dc2626;
+  --color-primary: #1976d2;
+  --color-success: #4caf50;
+  --color-error: #f44336;
+  --spacing-unit: 8px;
 }
 
+.status-indicator--connected {
+  color: var(--color-success);
+}
+```
+
+**Dark mode** (using prefers-color-scheme):
+```css
 @media (prefers-color-scheme: dark) {
   :root {
-    --color-primary: #60a5fa;
+    --color-primary: #64b5f6;
+    --background-primary: #1e1e1e;
   }
 }
+```
+
+### Avoid Over-Specificity
+
+**Good**:
+```css
+.popover__header { }
+.badge--critical { }
+```
+
+**Bad**:
+```css
+.inspekt-axe-popover .popover-container .header .title span { }
+```
+
+### Test in Both Light and Dark Modes
+
+```bash
+# macOS: System Preferences → General → Appearance
+# Toggle between Light and Dark
+
+# Or use DevTools:
+# DevTools → Rendering → Emulate prefers-color-scheme
 ```
 
 ---
 
 ## Testing Checklist
 
-### Axe Popover
+### Axe Popover Testing
+- [ ] Edit `run_axe.js` or `axe_popover.css`
+- [ ] Run `inspekt axe --interactive` on test page with accessibility issues
+- [ ] Verify badge positions (should align with violations)
+- [ ] Test popover navigation (prev/next buttons)
+- [ ] Test "Skip similar" button (should dim related violations)
+- [ ] Test detach mode (click detach button, drag popover)
+- [ ] Test in light mode
+- [ ] Test in dark mode (`prefers-color-scheme: dark`)
+- [ ] Test with 50+ violations (badge counter should show "50+")
+- [ ] Test tab switching (Default view / Markdown export)
+- [ ] Test animations (should slide from badge direction)
 
-- [ ] Badge positions align with violations
-- [ ] Popover navigation works (prev/next)
-- [ ] "Skip similar" dims related badges
-- [ ] Detach mode allows dragging
-- [ ] Tab switching works (Default/Markdown)
-- [ ] Animations play correctly
-- [ ] Light mode looks correct
-- [ ] Dark mode looks correct
+### Extension Popup Testing
+- [ ] Edit popup HTML/CSS/JS files
+- [ ] Reload extension (`chrome://extensions` or `Ctrl+Shift+R`)
+- [ ] Click extension icon in toolbar
+- [ ] Verify connection status indicator (green = connected, red = disconnected)
+- [ ] Test domain permission toggles (should persist)
+- [ ] Test "Quick Access" timer (should show countdown)
+- [ ] Test documentation links (should open in new tabs)
+- [ ] Test in light mode
+- [ ] Test in dark mode
+- [ ] Test in both Chrome and Firefox (if editing shared files)
 
-### Extension Popup
-
-- [ ] Connection status shows correctly
-- [ ] Domain permissions toggle works
-- [ ] "Quick Access" timer counts down
-- [ ] Links open in new tabs
-- [ ] Light/dark mode renders correctly
-
-### DevTools Panel
-
-- [ ] Element display updates when selecting
-- [ ] Quick actions execute correctly
-- [ ] Drag-and-drop reorders tiles
-- [ ] Theme toggle persists
-- [ ] Element history tracks selections
-- [ ] Settings persist across sessions
-
----
-
-## Troubleshooting
-
-### DevTools Panel Not Updating
-
-**Cause:** Chrome caches DevTools panels.
-
-**Solution:** Close DevTools completely, then reopen.
-
-### CSS Changes Not Visible in Axe Popover
-
-**Cause:** CSS is embedded inline in production mode.
-
-**Solution:** Use `--dev-css` flag: `inspekt axe --interactive --dev-css`
-
-### CSS Server Not Working
-
-**Cause:** Server not running or port conflict.
-
-**Solution:**
-
-1. Start the server: `npm run dev:axe-css`
-2. Verify it's running: `curl http://localhost:8000/axe-popover/index.css`
-3. If port 8000 is busy, kill the process: `lsof -ti:8000 | xargs kill`
-4. Check browser console for CORS errors
-
-### ES6 Module Import Errors
-
-**Cause:** Missing `.js` extension or wrong path.
-
-**Solution:** All imports must include `.js`: `import { Foo } from './foo.js'`
+### DevTools Panel Testing
+- [ ] Edit panel HTML/CSS/JS or module files
+- [ ] Reload extension in `chrome://extensions`
+- [ ] **Close DevTools completely**
+- [ ] Reopen DevTools (`Ctrl+Shift+I` or `F12`)
+- [ ] Click "Inspekt" panel tab
+- [ ] Select element in Elements panel (should update Inspekt panel)
+- [ ] Test element picker button (should highlight on hover)
+- [ ] Test quick actions (should execute commands)
+- [ ] Test quick actions drag-and-drop (should reorder tiles)
+- [ ] Test theme switcher (Auto/Light/Dark - should persist)
+- [ ] Test element history (should track selections)
+- [ ] Test settings persistence (should survive browser restart)
+- [ ] Test connection status indicator
+- [ ] Inspect the panel itself (right-click → Inspect) to check for console errors
+- [ ] Test with panel detached (drag tab out of DevTools)
+- [ ] Test with panel in bottom/side/separate window positions
 
 ---
 
-## Technical Notes
+## Advanced Topics
 
-### Tab Visibility and Focus
+### Building for Distribution
 
-Inspekt's Chrome extension has a **tab visibility check** that prevents most commands from executing when the browser tab is not visible or active. This is intentional—it ensures commands run on the tab the user is actually looking at.
+When you're ready to package extensions for Chrome Web Store or Firefox Add-ons:
 
-**Commands that work regardless of tab focus:**
+**Chrome**:
+```bash
+cd extensions/chrome
+./build.sh
+# Creates: build/zen-browser-bridge-chrome-{version}.zip
+```
 
-| Command Type | Why |
-|--------------|-----|
-| `inspekt axe` | Accessibility audits should work from terminal |
-| `inspekt identify` | Element identification overlays |
-| Domain management | Permission changes |
-| Ping/pong | Connection health checks |
+**Firefox**:
+```bash
+cd extensions/firefox
+./build.sh
+# Creates: build/inspekt-{version}.zip
+```
 
-**Commands that require tab focus:**
+**What build scripts do**:
+- Create clean build directory
+- Copy necessary files
+- Exclude development files (.git, node_modules, etc.)
+- Create ZIP/XPI archive
+- Do NOT transpile or bundle (vanilla files copied as-is)
 
-All other commands (e.g., `inspekt eval`, `inspekt extract-*`, `inspekt click`) require the browser tab to be visible and active.
+### ES6 Module Loading
 
-**Why this matters for development:**
+The DevTools panel uses native ES6 modules:
 
-When running `inspekt axe --interactive --dev-css` from your terminal, the terminal typically steals focus from the browser. The axe command is specifically exempted from the visibility check, so it works even when your terminal has focus.
+**panel.js** (entry point):
+```javascript
+import { ConnectionManager } from './modules/connection-manager.js';
+import { ElementPicker } from './components/element-picker.js';
 
-If you're adding new commands that should work without tab focus, you'll need to add an exception in `extensions/chrome/content.js` (search for `isAxeCommand`).
+// Initialize managers
+const connectionManager = new ConnectionManager();
+const elementPicker = new ElementPicker();
+```
 
-### After Modifying Extension Files
+**Important**:
+- Always include `.js` extension in imports
+- Use relative paths (`./`, `../`)
+- Modules load asynchronously
+- Errors appear in browser console (not terminal)
 
-When you modify extension source files (`.js`, `.html`, `.css` in `extensions/`), you must reload the extension:
+### Debugging Panel Modules
 
-1. Go to `chrome://extensions`
-2. Find the Inspekt extension card
-3. Click the reload icon (circular arrow)
+The panel runs in its own context. To debug:
 
-For DevTools panel changes, you must also close and reopen DevTools after reloading the extension.
+1. Open DevTools (`Ctrl+Shift+I`)
+2. Click "Inspekt" panel tab
+3. Right-click anywhere in panel → "Inspect"
+4. A second DevTools opens (DevTools-in-DevTools)
+5. Check Console tab for errors
+6. Check Sources tab to set breakpoints in modules
+7. Check Network tab to see if modules loaded
+
+### CSS Anchor Positioning
+
+The Axe popover uses the **CSS Anchor Positioning API**:
+
+```css
+/* Badge acts as anchor */
+.inspekt-axe-badge {
+  anchor-name: --badge-1;
+}
+
+/* Popover positions relative to badge */
+.inspekt-axe-popover {
+  position: absolute;
+  position-anchor: --badge-1;
+  bottom: anchor(top);
+  left: anchor(center);
+}
+```
+
+**Browser Support**:
+- ✅ Chrome 125+ (native support)
+- ⚠️  Firefox (needs polyfill - automatically applied)
+- ⚠️  Safari (needs polyfill - automatically applied)
+
+**Polyfill** (`css-anchor-positioning.js`):
+- Automatically loaded if browser doesn't support API
+- Provides complete anchor positioning functionality
+- No code changes needed
+
+---
+
+## Additional Resources
+
+### Documentation
+- [Chrome Extension Development](https://developer.chrome.com/docs/extensions/)
+- [Firefox Extension Development](https://extensionworkshop.com/)
+- [web-ext Documentation](https://extensionworkshop.com/documentation/develop/getting-started-with-web-ext/)
+- [CSS Anchor Positioning](https://developer.chrome.com/blog/anchor-positioning-api)
+
+### Inspekt-Specific
+- `COMMAND_DEVELOPMENT_GUIDE.md` - Guide for adding new CLI commands
+- `MCP_INTEGRATION.md` - MCP server integration details
+- `CLAUDE.md` - Instructions for Claude Code development
+
+### Tools
+- [Chrome Extensions Reloader](https://chromewebstore.google.com/detail/extensions-reloader/fimgfedafeadlieiabdeeaodndnlbhid) - Alternative to web-ext
+- [Firefox DevTools](https://firefox-source-docs.mozilla.org/devtools-user/) - Debugging extensions
+- [Chrome DevTools](https://developer.chrome.com/docs/devtools/) - Debugging extensions
+
+---
+
+## Summary
+
+### Component Complexity (Easiest → Hardest)
+
+1. **Axe Popover** (Easiest)
+   - Edit → Run CLI → See changes
+   - No extension reload needed
+   - Iteration time: ~5 seconds
+
+2. **Extension Popup** (Easy)
+   - Edit → Auto-reload → Click icon → See changes
+   - Works great with `web-ext`
+   - Iteration time: ~3 seconds
+
+3. **DevTools Panel** (Most Complex)
+   - Edit → Reload extension → Close/reopen DevTools → See changes
+   - Can't auto-reload due to Chrome API limitations
+   - Iteration time: ~10-15 seconds
+
+### Key Takeaways
+
+- **No build process** = Simple, maintainable, accessible codebase
+- **Vanilla JavaScript** = No transpilation, works in all modern browsers
+- **web-ext** helps with popup, less helpful for panel
+- **DevTools panels** require manual close/reopen (Chrome limitation)
+- **CSS-only changes** sometimes work without full reload
+- **File watcher** provides context-aware reload instructions
+
+### Recommended Setup
+
+```bash
+# Terminal 1: File watcher (for all components)
+npm run watch:extensions
+
+# Terminal 2: Editor
+vim extensions/chrome/panel.css
+
+# Browser: Manual reload workflow
+# Press Ctrl+Shift+R to reload extension
+# Close and reopen DevTools for panel changes
+```
+
+---
+
+**Happy developing!** If you encounter issues not covered here, check the browser console for errors and the `watch:extensions` output for reload instructions.

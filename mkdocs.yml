@@ -152,6 +152,7 @@ nav:
       - Keyboard Focus Replay: keyboard-focus-replay.md
       - Caching: caching.md
       - Tunneling Local Sites: guide/tunneling.md
+      - Examples: guide/examples.md
       - Advanced Usage: guide/advanced.md
   - API Reference:
       - CLI Commands: api/commands.md
@@ -200,6 +201,7 @@ nav:
       - Bridge Pattern: development/bridge.md
       - Adding Commands: development/adding-commands.md
       - UI Development: development/ui-development.md
+      - Unix Socket Transport: development/unix-socket-transport.md
       - Adding Tiles: ADDING_TILES.md
       - Contributing: development/contributing.md
       - Testing: development/testing.md

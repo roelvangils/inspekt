@@ -519,7 +519,7 @@ If you run multiple bridge servers on different ports:
 Found a bug or want to improve the MCP integration?
 
 1. Report issues: [GitHub Issues](https://github.com/roelvangils/inspekt/issues)
-2. Submit PRs: [Contributing Guide](../CONTRIBUTING.md)
+2. Submit PRs: [Contributing Guide](development/contributing.md)
 3. Discuss: [GitHub Discussions](https://github.com/roelvangils/inspekt/discussions)
 
 ---

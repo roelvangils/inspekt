@@ -387,4 +387,4 @@ cd /Users/roelvangils/zen_bridge
 
 - [HTTP API Documentation](api/http-api.md)
 - [CLI vs API Guide](guide/cli-vs-api.md)
-- [Inspekt CLI Documentation](../README.md)
+- [Inspekt CLI Documentation](index.md)
