@@ -394,10 +394,7 @@ COPY docker/browser-vm/dist/control.html /usr/share/novnc/control.html
 COPY docker/browser-vm/dist/app.min.css /usr/share/novnc/dist/app.min.css
 COPY docker/browser-vm/dist/app.min.js /usr/share/novnc/dist/app.min.js
 COPY docker/browser-vm/toolbar.css /usr/share/novnc/toolbar.css
-COPY docker/browser-vm/toolbar.js /usr/share/novnc/toolbar.js
-COPY docker/browser-vm/vision-sim.js /usr/share/novnc/vision-sim.js
 COPY docker/browser-vm/vision-sim.css /usr/share/novnc/vision-sim.css
-COPY docker/browser-vm/motor-sim.js /usr/share/novnc/motor-sim.js
 COPY docker/browser-vm/motor-sim.css /usr/share/novnc/motor-sim.css
 COPY docker/browser-vm/css /usr/share/novnc/css
 COPY docker/browser-vm/fonts /usr/share/novnc/fonts
@@ -408,11 +405,6 @@ COPY docker/browser-vm/vendor/xterm.css /usr/share/novnc/vendor/xterm.css
 COPY docker/browser-vm/vendor/xterm.min.js /usr/share/novnc/vendor/xterm.min.js
 COPY docker/browser-vm/vendor/xterm-addon-fit.min.js /usr/share/novnc/vendor/xterm-addon-fit.min.js
 COPY docker/browser-vm/vendor/xterm-addon-web-links.min.js /usr/share/novnc/vendor/xterm-addon-web-links.min.js
-COPY docker/browser-vm/context-menu.js /usr/share/novnc/context-menu.js
-COPY docker/browser-vm/vnc-overlay.js /usr/share/novnc/vnc-overlay.js
-COPY docker/browser-vm/audio.js /usr/share/novnc/audio.js
-COPY docker/browser-vm/zoom.js /usr/share/novnc/zoom.js
-COPY docker/browser-vm/scrollbar.js /usr/share/novnc/scrollbar.js
 COPY docker/browser-vm/js /usr/share/novnc/js
 COPY docker/browser-vm/inspekt-chromium.sh /opt/inspekt-chromium.sh
 COPY docker/browser-vm/devtools-manager.sh /opt/devtools-manager.sh

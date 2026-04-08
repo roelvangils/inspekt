@@ -268,7 +268,7 @@ document.addEventListener('keydown', (e) => {
         const entry = vncOverlay._overlays['inspect-tooltip'];
         if (entry) {
             const selector = entry.element.textContent.split(' \u2022 ')[0].split(' (')[0];
-            navigator.clipboard.writeText(selector);
+            writeClipboard(selector);
             showToast(`Copied: ${selector}`, 'success');
         }
         return;
