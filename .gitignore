@@ -64,7 +64,6 @@ package-lock.json
 
 # Recordings and replays (generated test files)
 recording_*.yaml
-*_replay.mp4
 sensoa.yaml
 vdab.yaml
 zelfhulp.yaml
@@ -124,4 +123,28 @@ kaka.yaml
 
 # Misc
 *.pdf
-logos/
+!logos/**/*.pdf
+
+# User-specific config files
+/config.json
+/sound_choices.json
+
+# Recording frame directories
+/recording_*/
+
+# Report asset directories
+/report_assets/
+/report-final_assets/
+
+# TTS audio cache
+/tts_audio/
+
+# Test data directories
+/test_assets/
+/test-pdfs/
+
+# Home directory artifact (from typo)
+/~/
+
+# Video files
+*.mp4
