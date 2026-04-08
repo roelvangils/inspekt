@@ -3,6 +3,7 @@ pub mod menu;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 use tauri::{Emitter, Listener, Manager, WebviewUrl, WebviewWindowBuilder};
+use tauri_plugin_clipboard_manager::ClipboardExt;
 
 #[cfg(target_os = "macos")]
 use window_vibrancy::{apply_vibrancy, NSVisualEffectMaterial};
@@ -361,6 +362,97 @@ async fn run_inspekt(args: &[&str]) -> Result<(), String> {
     Ok(())
 }
 
+/// Fetch text from the control server's inspekt endpoint and copy it
+/// to the system clipboard via the Tauri clipboard plugin.
+/// Returns the text that was copied, or an error message.
+async fn copy_inspekt_output(
+    app: tauri::AppHandle,
+    command: &str,
+) -> Result<String, String> {
+    let url = format!(
+        "{CONTROL_SERVER}/inspekt/{}",
+        urlencoding::encode(command)
+    );
+    let resp = reqwest::get(&url)
+        .await
+        .map_err(|e| format!("Request failed: {e}"))?;
+    let data: serde_json::Value = resp
+        .json()
+        .await
+        .map_err(|e| format!("JSON parse failed: {e}"))?;
+
+    if data.get("ok").and_then(|v| v.as_bool()) != Some(true) {
+        let err = data
+            .get("error")
+            .and_then(|v| v.as_str())
+            .unwrap_or("No selection found");
+        return Err(err.to_string());
+    }
+
+    let text = data
+        .get("output")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .trim()
+        .to_string();
+
+    if text.is_empty() {
+        return Err("No text to copy".to_string());
+    }
+
+    // Write to system clipboard via the Tauri clipboard plugin (Rust side)
+    app.clipboard()
+        .write_text(&text)
+        .map_err(|e| format!("Clipboard write failed: {e}"))?;
+
+    Ok(text)
+}
+
+/// Show a toast in the VM webview.
+fn show_vm_toast(app: &tauri::AppHandle, message: &str, toast_type: &str) {
+    if let Some(window) = app.get_webview_window("vm") {
+        let escaped_msg = message.replace('\'', "\\'").replace('\n', "\\n");
+        let _ = window.eval(&format!(
+            "typeof showToast === 'function' && showToast('{escaped_msg}', '{toast_type}')"
+        ));
+    }
+}
+
+/// Copy inspekt output to clipboard and show a toast in the VM webview.
+async fn copy_inspekt_with_toast(app: tauri::AppHandle, command: &str, label: &str) {
+    show_vm_toast(&app, &format!("Copying {label}..."), "");
+    match copy_inspekt_output(app.clone(), command).await {
+        Ok(_) => show_vm_toast(&app, &format!("{label} copied!"), "success"),
+        Err(e) => show_vm_toast(&app, &e, "error"),
+    }
+}
+
+/// Poll the control server's clipboard-relay endpoint and copy to system clipboard.
+/// The JS side POSTs text to /clipboard-relay, then this function reads it.
+async fn poll_clipboard_relay(app: tauri::AppHandle) {
+    let url = format!("{CONTROL_SERVER}/clipboard-relay");
+    let resp = match reqwest::get(&url).await {
+        Ok(r) => r,
+        Err(_) => return,
+    };
+    let data: serde_json::Value = match resp.json().await {
+        Ok(d) => d,
+        Err(_) => return,
+    };
+    if data.get("ok").and_then(|v| v.as_bool()) == Some(true) {
+        if let Some(text) = data.get("text").and_then(|v| v.as_str()) {
+            if !text.is_empty() {
+                let _ = app.clipboard().write_text(text);
+                let label = data
+                    .get("label")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("Text");
+                show_vm_toast(&app, &format!("{label} copied!"), "success");
+            }
+        }
+    }
+}
+
 /// Emit an event to the VM webview window.
 fn emit_to_vm(app: &tauri::AppHandle, event: &str) {
     if let Some(window) = app.get_webview_window("vm") {
@@ -601,6 +693,49 @@ pub fn run() {
                 }
 
                 // ── Edit ─────────────────────────────────────────
+                "copy_selection" => {
+                    let handle = app.clone();
+                    tauri::async_runtime::spawn(
+                        copy_inspekt_with_toast(handle, "selection text --raw", "Text"),
+                    );
+                }
+                "copy_selection_markdown" => {
+                    let handle = app.clone();
+                    tauri::async_runtime::spawn(
+                        copy_inspekt_with_toast(handle, "selection markdown --raw", "Markdown"),
+                    );
+                }
+                "copy_selection_html" => {
+                    let handle = app.clone();
+                    tauri::async_runtime::spawn(
+                        copy_inspekt_with_toast(handle, "selection html --raw", "HTML"),
+                    );
+                }
+                "copy_selection_html_clean" => {
+                    let handle = app.clone();
+                    tauri::async_runtime::spawn(
+                        copy_inspekt_with_toast(handle, "selection html --compact --raw", "Cleaned HTML"),
+                    );
+                }
+                "copy_page_url" => {
+                    let handle = app.clone();
+                    tauri::async_runtime::spawn(async move {
+                        if let Ok(resp) = reqwest::get(format!("{CONTROL_SERVER}/page-info")).await {
+                            if let Ok(info) = resp.json::<serde_json::Value>().await {
+                                if let Some(url) = info.get("url").and_then(|v| v.as_str()) {
+                                    let _ = handle.clipboard().write_text(url);
+                                    show_vm_toast(&handle, "URL copied!", "success");
+                                }
+                            }
+                        }
+                    });
+                }
+                // Clipboard relay: JS POSTs text to control server, then triggers
+                // this menu action to have Rust read and copy it.
+                "clipboard_relay" => {
+                    let handle = app.clone();
+                    tauri::async_runtime::spawn(poll_clipboard_relay(handle));
+                }
                 "find" => {
                     // Send Ctrl+F to VM
                     tauri::async_runtime::spawn(api_post(

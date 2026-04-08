@@ -58,13 +58,31 @@ pub fn create_menu(app: &AppHandle) -> Result<Menu<Wry>, tauri::Error> {
 
     // ── Edit menu ────────────────────────────────────────────────────
 
+    // Copy submenu: copy selected text from the VM browser in various formats
+    let copy_submenu = SubmenuBuilder::new(app, "Copy From VM")
+        .items(&[
+            &MenuItemBuilder::with_id("copy_selection", "Copy as Text")
+                .accelerator("CmdOrCtrl+C")
+                .build(app)?,
+            &MenuItemBuilder::with_id("copy_selection_markdown", "Copy as Markdown")
+                .build(app)?,
+            &MenuItemBuilder::with_id("copy_selection_html", "Copy as HTML")
+                .build(app)?,
+            &MenuItemBuilder::with_id("copy_selection_html_clean", "Copy as HTML (Cleaned)")
+                .build(app)?,
+            &PredefinedMenuItem::separator(app)?,
+            &MenuItemBuilder::with_id("copy_page_url", "Copy Page URL")
+                .build(app)?,
+        ])
+        .build()?;
+
     let edit_menu = SubmenuBuilder::new(app, "Edit")
         .items(&[
             &PredefinedMenuItem::undo(app, Some("Undo"))?,
             &PredefinedMenuItem::redo(app, Some("Redo"))?,
             &PredefinedMenuItem::separator(app)?,
             &PredefinedMenuItem::cut(app, Some("Cut"))?,
-            &PredefinedMenuItem::copy(app, Some("Copy"))?,
+            &copy_submenu,
             &PredefinedMenuItem::paste(app, Some("Paste"))?,
             &PredefinedMenuItem::select_all(app, Some("Select All"))?,
             &PredefinedMenuItem::separator(app)?,

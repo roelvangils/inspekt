@@ -1,13 +1,14 @@
 {
   "$schema": "https://schemas.tauri.app/config/2/capability",
   "identifier": "clipboard-remote",
-  "description": "Clipboard access for VM control panel at localhost:6080",
+  "description": "Clipboard and IPC access for VM control panel at localhost:6080",
   "windows": ["vm"],
   "remote": {
     "urls": ["http://localhost:6080/*"]
   },
   "permissions": [
     "core:default",
+    "core:event:default",
     "clipboard-manager:default",
     "clipboard-manager:allow-write-text",
     "clipboard-manager:allow-read-text",

@@ -2046,6 +2046,7 @@ dependencies = [
  "tauri-plugin-shell",
  "tokio",
  "url",
+ "urlencoding",
  "window-vibrancy 0.5.3",
 ]
 

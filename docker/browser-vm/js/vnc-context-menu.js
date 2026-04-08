@@ -13,22 +13,32 @@ function canGoForward() {
     return h.index < h.entries.length - 1;
 }
 
-// ── Clipboard abstraction (Tauri plugin → navigator.clipboard → execCommand) ──
-// In the Tauri desktop app, window.__TAURI__.clipboardManager provides native
-// OS clipboard access that bypasses WKWebView's user-activation restrictions.
+// ── Clipboard abstraction (Tauri invoke → navigator.clipboard → execCommand) ──
+// In the Tauri desktop app, WKWebView blocks navigator.clipboard.writeText()
+// after async operations (user activation expires). We bypass this entirely by
+// calling custom Tauri commands that write to the OS clipboard from Rust.
+//
+// Two Tauri commands are available:
+//   - copy_to_clipboard({ text })  — copies text directly
+//   - copy_inspekt_to_clipboard({ command })  — fetches inspekt output AND copies
+//
 // In a regular browser, we fall back to navigator.clipboard, then execCommand.
 
-const _hasTauriClipboard = !!(window.__TAURI__?.clipboardManager);
+function _hasTauriIPC() {
+    return typeof window.__TAURI_INTERNALS__?.invoke === 'function';
+}
 
 async function writeClipboard(text) {
-    if (_hasTauriClipboard) {
+    // Try Tauri IPC first (works in Tauri desktop app)
+    if (_hasTauriIPC()) {
         try {
-            await window.__TAURI__.clipboardManager.writeText(text);
+            await window.__TAURI_INTERNALS__.invoke('copy_to_clipboard', { text });
             return true;
         } catch (e) {
-            console.warn('[Clipboard] Tauri writeText failed:', e);
+            console.warn('[Clipboard] Tauri copy_to_clipboard failed:', e);
         }
     }
+    // Browser fallback
     try {
         await navigator.clipboard.writeText(text);
         return true;
@@ -38,30 +48,24 @@ async function writeClipboard(text) {
 }
 
 async function readClipboard() {
-    if (_hasTauriClipboard) {
+    if (_hasTauriIPC()) {
         try {
-            return await window.__TAURI__.clipboardManager.readText();
+            return await window.__TAURI_INTERNALS__.invoke('plugin:clipboard-manager|read_text');
         } catch (e) {
-            console.warn('[Clipboard] Tauri readText failed:', e);
+            console.warn('[Clipboard] Tauri read_text failed:', e);
         }
     }
     return navigator.clipboard.readText();
 }
 
 async function writeImageToClipboard(pngBlob) {
-    if (_hasTauriClipboard && window.__TAURI__?.image?.Image) {
-        try {
-            const bytes = new Uint8Array(await pngBlob.arrayBuffer());
-            const img = await window.__TAURI__.image.Image.fromBytes(bytes);
-            await window.__TAURI__.clipboardManager.writeImage(img);
-            return true;
-        } catch (e) {
-            console.warn('[Clipboard] Tauri writeImage failed:', e);
-        }
+    try {
+        await navigator.clipboard.write([new ClipboardItem({ 'image/png': pngBlob })]);
+        return true;
+    } catch (e) {
+        console.warn('[Clipboard] writeImage failed:', e);
+        return false;
     }
-    // Browser fallback — may throw if user activation expired (caller handles)
-    await navigator.clipboard.write([new ClipboardItem({ 'image/png': pngBlob })]);
-    return true;
 }
 
 // Last-resort fallback for browsers where navigator.clipboard also fails

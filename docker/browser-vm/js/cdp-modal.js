@@ -86,10 +86,27 @@ function openDevToolsInVM() {
     toggleDevToolsInVM();
 }
 
-// Run Inspekt command and copy output to clipboard
+// Run Inspekt command and copy output to clipboard.
+// In Tauri, uses copy_inspekt_to_clipboard which does the fetch + clipboard
+// write entirely in Rust, bypassing WKWebView clipboard restrictions.
 async function runInspektForClipboard(command, label) {
     try {
         showToast(`Copying ${label}...`);
+
+        // Tauri path: single IPC call does fetch + clipboard write in Rust
+        if (_hasTauriIPC()) {
+            try {
+                await window.__TAURI_INTERNALS__.invoke('copy_inspekt_to_clipboard', { command });
+                showToast(`${label} copied!`, 'success');
+                return;
+            } catch (e) {
+                // If the error is from the inspekt command (not IPC), show it
+                showToast(e || 'Failed to copy', 'error');
+                return;
+            }
+        }
+
+        // Browser fallback: fetch then clipboard write
         const response = await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/inspekt/${encodeURIComponent(command)}`);
         const data = await response.json();
         if (data.ok && data.output) {
