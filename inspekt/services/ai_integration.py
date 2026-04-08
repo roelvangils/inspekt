@@ -32,12 +32,12 @@ class AIIntegrationService:
         Initialize the AI integration service.
 
         Args:
-            prompts_dir: Directory containing prompt files (default: project_root/prompts/)
+            prompts_dir: Directory containing prompt files (default: inspekt/data/prompts/)
         """
         if prompts_dir is None:
-            # Default to project_root/prompts/
+            # Default to inspekt/data/prompts/
             current_file = Path(__file__)
-            self.prompts_dir = current_file.parent.parent.parent / "prompts"
+            self.prompts_dir = current_file.parent.parent / "data" / "prompts"
         else:
             self.prompts_dir = Path(prompts_dir)
 
