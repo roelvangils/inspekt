@@ -677,7 +677,7 @@ When you're ready to package extensions for Chrome Web Store or Firefox Add-ons:
 ```bash
 cd extensions/chrome
 ./build.sh
-# Creates: build/zen-browser-bridge-chrome-{version}.zip
+# Creates: build/inspekt-browser-bridge-chrome-{version}.zip
 ```
 
 **Firefox**:

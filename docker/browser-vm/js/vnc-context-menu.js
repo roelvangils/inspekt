@@ -104,124 +104,18 @@ async function showVNCContextMenu(pageX, pageY, vmX, vmY) {
         const data = await resp.json();
         if (data.ok) info = data;
     } catch (e) {}
-    const hasSelection = !!info.selectedText;
-    const hasLink = !!info.linkHref;
-    const hasImage = info.isImage;
-    const hasElement = !!info.elementTag;
-    const selectorLabel = info.elementSelector || info.elementTag || 'element';
-    const items = [];
-    items.push({ navRow: [
-        { label: 'Reload', icon: NAV_ICONS.reload, action: () => reloadPage() },
-        { label: 'Back', icon: NAV_ICONS.back, action: () => goBack(), disabled: !canGoBack() },
-        { label: 'Forward', icon: NAV_ICONS.forward, action: () => goForward(), disabled: !canGoForward() },
-    ] });
-
-    // Sitemap structural navigation (Up = parent, Down = children)
-    if (_sitemapReady && _sitemapNav) {
-        const hasSitemapContent = _sitemapNav.in_sitemap || _sitemapNav.parent;
-        if (hasSitemapContent) {
-            items.push({ separator: true });
-
-            // Up: navigate to parent (or nearest ancestor if page isn't in sitemap)
-            const parentInfo = _sitemapNav.parent;
-            if (parentInfo) {
-                items.push({
-                    label: `\u2191 ${parentInfo.title || parentInfo.path.split('/').filter(Boolean).pop() || 'Home'}`,
-                    action: () => _sitemapGoUp(),
-                    title: parentInfo.url,
-                });
-            }
-
-            // Down: recursive submenu with child pages (only when page is in sitemap)
-            if (_sitemapNav.in_sitemap && _sitemapNav.children_total > 0) {
-                items.push({
-                    label: `\u2193 Child pages (${_sitemapNav.children_total})`,
-                    children: _buildSitemapSubmenuItems(_sitemapNav.children, _sitemapNav.children_total),
-                });
-            }
-        }
-    }
-    items.push({ separator: true });
-    if (hasSelection) {
-        items.push({ label: 'Copy as Text', action: () => runInspektForClipboard('selection text --raw', 'Text') });
-        items.push({ label: 'Copy as Markdown', action: () => runInspektForClipboard('selection markdown --raw', 'Markdown') });
-        items.push({ label: 'Copy as HTML (Original)', action: () => runInspektForClipboard('selection html --raw', 'HTML') });
-        items.push({ label: 'Copy as HTML (Cleaned up)', action: () => runInspektForClipboard('selection html --compact --raw', 'Cleaned up HTML') });
-        items.push({ separator: true });
-        items.push({ label: 'Describe Selection', action: () => runInspektAI('selection describe', 'Describing selection', 'Description') });
-        items.push({ label: 'Ask About Selection\u2026', action: () => showAskDialog('selection') });
-        items.push({ separator: true });
-    }
-    if (hasLink) {
-        items.push({ label: 'Open Link in New Tab', action: () => openLinkInNewTab(info.linkHref) });
-        items.push({ label: 'Open Link in Host Browser', action: () => window.open(info.linkHref, '_blank') });
-        items.push({ label: 'Copy Link Address', action: () => copyToClipboard(info.linkHref) });
-        items.push({ separator: true });
-    }
-    if (hasImage) {
-        items.push({ label: 'Copy Image', action: () => copyImageToClipboard(info.imageSrc) });
-        items.push({ label: 'Copy Image URL', action: () => copyToClipboard(info.imageSrc) });
-        items.push({ label: 'Download Image', action: () => downloadImage(info.imageSrc) });
-        items.push({ label: 'Open Image in New Tab', action: () => openLinkInNewTab(info.imageSrc) });
-        items.push({ separator: true });
-        items.push({ label: 'Describe Image (AI)', action: () => runInspektAI('inspected describe', 'Analyzing image', 'Image description') });
-        items.push({ separator: true });
-    }
-    if (hasElement) {
-        items.push({ label: `Inspect \u2039${selectorLabel}\u203A`, action: async () => {
-            try {
-                const resp = await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/inspect/set-at-point?x=${vmX}&y=${vmY}`);
-                const data = await resp.json();
-                if (data.ok) {
-                    showInspectOverlay(data.rect, data.selector || selectorLabel);
-                    showToast(`Inspecting: ${data.selector || selectorLabel}`, 'success');
-                    _showInspectInfoPanel();
-                } else {
-                    showToast(data.error || 'Could not inspect element', 'error');
-                }
-            } catch (e) {
-                showToast('Failed to inspect element', 'error');
-            }
-        }});
-        items.push({ label: 'Copy Element HTML', action: () => runInspektForClipboard('inspected html --raw', 'Element HTML') });
-        items.push({ label: 'Copy Element Text', action: () => runInspektForClipboard('inspected text --raw', 'Element text') });
-        if (!hasImage) items.push({ label: 'Describe Element', action: () => runInspektAI('inspected describe', 'Describing element', 'Element description') });
-        items.push({ label: 'Ask About Element\u2026', action: () => showAskDialog('inspected') });
-        items.push({ separator: true });
-    }
-    // Screenshot submenu with all capture modes
-    const _ts = () => new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-    const screenshotChildren = [
-        { label: 'Viewport', action: () => screenshotToDownload('/screenshot/viewport', `viewport-${_ts()}.png`) },
-        { label: 'Full Page', action: () => screenshotToDownload('/screenshot/page', `fullpage-${_ts()}.png`) },
-    ];
-    if (hasElement) {
-        const shortSelector = (info.elementSelector || info.elementTag).slice(0, 30);
-        screenshotChildren.push({ separator: true });
-        screenshotChildren.push({ label: `Element \u2039${shortSelector}\u203a`, action: () => {
-            screenshotToDownload('/screenshot/element', `element-${(info.elementSelector || 'el').replace(/[^a-z0-9_-]/gi, '_').slice(0, 30)}-${_ts()}.png`);
-        }});
-    }
-    screenshotChildren.push({ separator: true });
-    screenshotChildren.push({ label: 'Select Region\u2026', action: () => startRegionSelection() });
-    if (_lastScreenshotRegion) {
-        const r = _lastScreenshotRegion;
-        screenshotChildren.push({ label: `Repeat Last Region (${Math.round(r.w)}\u00d7${Math.round(r.h)})`, action: () => {
-            screenshotToDownload(`/screenshot/region?x=${r.x}&y=${r.y}&w=${r.w}&h=${r.h}`, `region-${Math.round(r.w)}x${Math.round(r.h)}-${_ts()}.png`);
-        }});
-    }
-    screenshotChildren.push({ separator: true });
-    screenshotChildren.push({ label: 'Redacted', children: [
-        { label: 'Viewport (Blurred)', action: () => screenshotToDownload('/screenshot/redacted?mode=viewport&style=blur', `redacted-viewport-blur-${_ts()}.png`) },
-        { label: 'Viewport (Bars \u2588\u2588\u2588\u2588)', action: () => screenshotToDownload('/screenshot/redacted?mode=viewport&style=bar', `redacted-viewport-bar-${_ts()}.png`) },
-        { label: 'Full Page (Blurred)', action: () => screenshotToDownload('/screenshot/redacted?mode=page&style=blur', `redacted-fullpage-blur-${_ts()}.png`) },
-        { label: 'Full Page (Bars \u2588\u2588\u2588\u2588)', action: () => screenshotToDownload('/screenshot/redacted?mode=page&style=bar', `redacted-fullpage-bar-${_ts()}.png`) },
-    ]});
-    items.push({ label: 'Screenshot', children: screenshotChildren });
-    items.push({ separator: true });
-    items.push({ label: 'Copy Page URL', action: () => copyToClipboard(currentUrl || '') });
-    items.push({ label: 'Inspect (DevTools)', action: () => toggleDevToolsInVM() });
-    items.push({ label: isTerminalOpen ? 'Hide Terminal' : 'Show Terminal', action: () => toggleTerminal() });
+    const items = buildVNCContextMenuItems({
+        info,
+        canGoBack: canGoBack(),
+        canGoForward: canGoForward(),
+        sitemapReady: _sitemapReady,
+        sitemapNav: _sitemapNav,
+        lastScreenshotRegion: _lastScreenshotRegion,
+        currentUrl,
+        isTerminalOpen,
+        vmX,
+        vmY,
+    });
     showContextMenu({ clientX: pageX, clientY: pageY }, items);
 }
 
@@ -624,35 +518,7 @@ function copyAllUrlsAsMarkdown() {
 
 function showTabBarContextMenu(e) {
     e.preventDefault();
-    const items = [
-        { label: 'New Cloud Tab', action: () => createNewTab() },
-        { label: 'New Local Tab', action: () => createLocalTab() },
-        { label: 'Paste and Open URLs', action: () => openUrlsFromClipboard() },
-    ];
-
-    if (closedTabs.length > 0) {
-        const last = closedTabs[closedTabs.length - 1];
-        const label = last.title.length > 30 ? last.title.slice(0, 30) + '...' : last.title;
-        items.push({ separator: true });
-        items.push({ label: `Reopen Closed Tab (${label})`, action: () => reopenClosedTab() });
-        if (closedTabs.length > 1) {
-            items.push({ label: `Reopen All ${closedTabs.length} Closed Tabs`, action: () => reopenAllClosedTabs() });
-        }
-    }
-
-    if (tabs.length >= 2) {
-        items.push({ separator: true });
-        items.push({ label: 'Reload All Tabs', action: () => reloadAllTabs() });
-        items.push({ separator: true });
-        items.push({ label: 'Copy All URLs', action: () => copyAllUrls() });
-        items.push({ label: 'Copy All URLs as Markdown', action: () => copyAllUrlsAsMarkdown() });
-        const unpinnedCount = tabs.filter(t => !t.pinned).length;
-        if (unpinnedCount >= 2) {
-            items.push({ separator: true });
-            items.push({ label: `Close All ${unpinnedCount} Tabs`, action: () => closeAllTabs() });
-        }
-    }
-
+    const items = buildTabBarContextMenuItems({ closedTabs, tabs });
     showContextMenu(e, items);
 }
 

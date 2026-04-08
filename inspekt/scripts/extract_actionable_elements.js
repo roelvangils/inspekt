@@ -2,7 +2,7 @@
 // Returns structured data with landmarks, headings, and all actionable items
 
 (function() {
-  const ACTION_CLASS_PREFIX = 'zen-action-';
+  const ACTION_CLASS_PREFIX = 'inspekt-action-';
   let actionCounter = 0;
   const actionableElements = [];
 

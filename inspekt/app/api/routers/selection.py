@@ -90,7 +90,7 @@ def get_selection():
     """
     Get the current text selection in all formats.
 
-    Mirrors 'zen selection --json' CLI command.
+    Mirrors 'inspekt selection --json' CLI command.
 
     Returns selection in three formats:
     - text: Plain text
@@ -163,7 +163,7 @@ def get_selection_text():
     """
     Get selected text (plain text).
 
-    Mirrors 'zen selection text --json' CLI command.
+    Mirrors 'inspekt selection text --json' CLI command.
 
     Returns only the plain text content of the current selection.
 
@@ -259,7 +259,7 @@ def get_selection_markdown():
     """
     Get selected text as Markdown (converted from HTML).
 
-    Mirrors 'zen selection markdown --json' CLI command.
+    Mirrors 'inspekt selection markdown --json' CLI command.
 
     Converts the HTML markup of the selection to Markdown format.
 

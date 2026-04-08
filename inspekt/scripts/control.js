@@ -28,9 +28,9 @@
         // Add focus highlight styles based on configuration
         const focusOutlineMode = config['focus-outline'] || 'custom';
 
-        if (focusOutlineMode !== 'none' && !document.getElementById('zen-control-styles')) {
+        if (focusOutlineMode !== 'none' && !document.getElementById('inspekt-control-styles')) {
             const style = document.createElement('style');
-            style.id = 'zen-control-styles';
+            style.id = 'inspekt-control-styles';
 
             if (focusOutlineMode === 'custom') {
                 // Custom blue outline with configurable appearance
@@ -53,13 +53,13 @@
                 const boxShadow = focusGlow
                     ? `0 0 0 2px ${glowColor}, 0 0 12px ${glowColorBright}`
                     : 'none';
-                const animation = focusAnimation ? 'zen-pulse 2s infinite' : 'none';
+                const animation = focusAnimation ? 'inspekt-pulse 2s infinite' : 'none';
 
                 style.textContent = `
-                    [data-zen-control-focus] {
+                    [data-inspekt-control-focus] {
                         position: relative !important;
                     }
-                    [data-zen-control-focus]::after {
+                    [data-inspekt-control-focus]::after {
                         content: '' !important;
                         position: absolute !important;
                         top: -${focusSize + 1}px !important;
@@ -73,7 +73,7 @@
                         box-shadow: ${boxShadow} !important;
                         animation: ${animation} !important;
                     }
-                    @keyframes zen-pulse {
+                    @keyframes inspekt-pulse {
                         0%, 100% { opacity: 1; }
                         50% { opacity: 0.7; }
                     }
@@ -82,9 +82,9 @@
                 // Use the browser's original :focus styles
                 // Apply the outline/border styles that would normally appear on :focus
                 style.textContent = `
-                    [data-zen-control-focus] {
-                        outline: var(--zen-original-outline, auto 2px Highlight) !important;
-                        outline-offset: var(--zen-original-outline-offset, 0) !important;
+                    [data-inspekt-control-focus] {
+                        outline: var(--inspekt-original-outline, auto 2px Highlight) !important;
+                        outline-offset: var(--inspekt-original-outline-offset, 0) !important;
                     }
                 `;
             }
@@ -95,9 +95,9 @@
         // Update visual highlight
         function updateHighlight(element) {
             // Remove previous highlight
-            const prev = document.querySelector('[data-zen-control-focus]');
+            const prev = document.querySelector('[data-inspekt-control-focus]');
             if (prev) {
-                prev.removeAttribute('data-zen-control-focus');
+                prev.removeAttribute('data-inspekt-control-focus');
             }
 
             // Add highlight to new element (unless focus-outline is 'none')
@@ -106,7 +106,7 @@
 
                 // Only add visual highlight if not in 'none' mode
                 if (focusOutlineMode !== 'none') {
-                    element.setAttribute('data-zen-control-focus', '');
+                    element.setAttribute('data-inspekt-control-focus', '');
                 }
 
                 // Scroll into view if configured
@@ -138,7 +138,7 @@
 
             // Strategy 2: Data attributes (exclude our own control attributes)
             const dataAttrs = Array.from(el.attributes)
-                .filter(attr => attr.name.startsWith('data-') && !attr.name.startsWith('data-zen-'))
+                .filter(attr => attr.name.startsWith('data-') && !attr.name.startsWith('data-inspekt-'))
                 .map(attr => `[${attr.name}="${CSS.escape(attr.value)}"]`);
             if (dataAttrs.length > 0) {
                 selectors.push({
@@ -361,8 +361,8 @@
                         }
 
                         // Send immediate notification via WebSocket
-                        if (verbose && window.__zen_ws__ && window.__zen_ws__.readyState === WebSocket.OPEN) {
-                            window.__zen_ws__.send(JSON.stringify({
+                        if (verbose && window.__inspekt_ws__ && window.__inspekt_ws__.readyState === WebSocket.OPEN) {
+                            window.__inspekt_ws__.send(JSON.stringify({
                                 type: 'refocus_notification',
                                 success: true,
                                 message: 'Focus restored'
@@ -383,8 +383,8 @@
                         console.log('[Zen Bridge] ✗ Could not find element to refocus');
 
                         // Send immediate notification via WebSocket
-                        if (verbose && window.__zen_ws__ && window.__zen_ws__.readyState === WebSocket.OPEN) {
-                            window.__zen_ws__.send(JSON.stringify({
+                        if (verbose && window.__inspekt_ws__ && window.__inspekt_ws__.readyState === WebSocket.OPEN) {
+                            window.__inspekt_ws__.send(JSON.stringify({
                                 type: 'refocus_notification',
                                 success: false,
                                 message: 'Focus lost. Starting from top.'
@@ -460,13 +460,13 @@
         }
 
         // Remove highlight from current element
-        const highlighted = document.querySelector('[data-zen-control-focus]');
+        const highlighted = document.querySelector('[data-inspekt-control-focus]');
         if (highlighted) {
-            highlighted.removeAttribute('data-zen-control-focus');
+            highlighted.removeAttribute('data-inspekt-control-focus');
         }
 
         // Remove styles
-        const styles = document.getElementById('zen-control-styles');
+        const styles = document.getElementById('inspekt-control-styles');
         if (styles) {
             styles.remove();
         }

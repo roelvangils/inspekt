@@ -125,7 +125,7 @@ These threats are explicitly out of scope:
 Server **always** binds to `127.0.0.1`:
 
 ```python
-# zen/bridge_ws.py
+# inspekt/bridge_ws.py
 HOST = "127.0.0.1"  # Never binds to 0.0.0.0 or public IPs
 PORT = 8765
 ```
@@ -210,7 +210,7 @@ inspekt server start  # Only starts server, no code execution
 Built-in scripts loaded from package installation:
 
 ```python
-# zen/services/script_loader.py
+# inspekt/services/script_loader.py
 script_path = Path(__file__).parent.parent / "scripts" / script_name
 ```
 
@@ -307,7 +307,7 @@ This would allow **remote code execution** in your browser.
 
 ```bash
 # Check version
-inspekt eval "window.__ZEN_BRIDGE_VERSION__"
+inspekt eval "window.__INSPEKT_BRIDGE_VERSION__"
 # Current version: 3.4
 ```
 
@@ -345,7 +345,7 @@ sudo iptables -A INPUT -p tcp --dport 8765 -j DROP
 
 ```python
 # ✅ Good: Validate with Pydantic
-from zen.domain.models import RunRequest
+from inspekt.domain.models import RunRequest
 
 data = await request.json()
 validated = RunRequest(**data)  # Raises ValidationError if invalid
@@ -526,7 +526,7 @@ inspekt server start
 inspekt eval "code" --token abc123xyz
 
 # Or environment variable
-export ZEN_BRIDGE_TOKEN=abc123xyz
+export INSPEKT_BRIDGE_TOKEN=abc123xyz
 inspekt eval "code"
 ```
 

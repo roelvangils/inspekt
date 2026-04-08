@@ -62,7 +62,7 @@ zscreen() {
 
 ```bash
 # Short commands
-alias z='zen'
+alias z='inspekt'
 alias ze='inspekt eval'
 alias zx='inspekt exec'
 alias zi='inspekt info'
@@ -81,8 +81,8 @@ Create completions for your shell:
 
 **Bash:**
 ```bash
-# ~/.bash_completion.d/zen
-_zen_completion() {
+# ~/.bash_completion.d/inspekt
+_inspekt_completion() {
   local cur prev commands
   cur="${COMP_WORDS[COMP_CURS]}"
   prev="${COMP_WORDS[COMP_CURS-1]}"
@@ -94,7 +94,7 @@ _zen_completion() {
   fi
 }
 
-complete -F _zen_completion zen
+complete -F _inspekt_completion inspekt
 ```
 
 ---
@@ -328,8 +328,8 @@ done
 # Extract data from pages requiring authentication
 
 # Credentials (use environment variables in production)
-USERNAME="${ZEN_USERNAME:-user@example.com}"
-PASSWORD="${ZEN_PASSWORD:-password}"
+USERNAME="${INSPEKT_USERNAME:-user@example.com}"
+PASSWORD="${INSPEKT_PASSWORD:-password}"
 
 # Navigate to login page
 inspekt open "https://example.com/login"
@@ -605,7 +605,7 @@ inspekt eval "document.querySelectorAll('*')"
 ```bash
 #!/bin/bash
 
-cache_dir="$HOME/.zen-cache"
+cache_dir="$HOME/.inspekt-cache"
 cache_ttl=300  # 5 minutes
 
 mkdir -p "$cache_dir"
@@ -679,15 +679,15 @@ inspekt eval "document.querySelector('#search').value = '$user_input'"
 
 ```bash
 # Use environment variables
-export ZEN_USERNAME="user@example.com"
-export ZEN_PASSWORD="secure_password"
+export INSPEKT_USERNAME="user@example.com"
+export INSPEKT_PASSWORD="secure_password"
 
 # Or use a secrets manager
-# export ZEN_USERNAME=$(vault read -field=username secret/zen)
-# export ZEN_PASSWORD=$(vault read -field=password secret/zen)
+# export INSPEKT_USERNAME=$(vault read -field=username secret/inspekt)
+# export INSPEKT_PASSWORD=$(vault read -field=password secret/inspekt)
 
-inspekt send "$ZEN_USERNAME" --selector "#username"
-inspekt send "$ZEN_PASSWORD" --selector "#password"
+inspekt send "$INSPEKT_USERNAME" --selector "#username"
+inspekt send "$INSPEKT_PASSWORD" --selector "#password"
 ```
 
 ### Avoid Logging Sensitive Data
@@ -696,10 +696,10 @@ inspekt send "$ZEN_PASSWORD" --selector "#password"
 #!/bin/bash
 
 # Good - don't log passwords
-log_message "Logging in as $ZEN_USERNAME"
+log_message "Logging in as $INSPEKT_USERNAME"
 
 # Avoid
-# log_message "Login: $ZEN_USERNAME / $ZEN_PASSWORD"
+# log_message "Login: $INSPEKT_USERNAME / $INSPEKT_PASSWORD"
 ```
 
 ### Audit Logging
@@ -707,7 +707,7 @@ log_message "Logging in as $ZEN_USERNAME"
 ```bash
 #!/bin/bash
 
-log_file="$HOME/.zen-audit.log"
+log_file="$HOME/.inspekt-audit.log"
 
 log_action() {
   echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) | $USER | $*" >> "$log_file"
@@ -795,7 +795,7 @@ inspekt eval "console.log('test'); document.title"
 inspekt eval "Array.from(document.querySelectorAll('.item')).slice(0, 100)"
 
 # Clear caches periodically
-rm -rf "$HOME/.zen-cache"/*
+rm -rf "$HOME/.inspekt-cache"/*
 ```
 
 ### Rate Limiting

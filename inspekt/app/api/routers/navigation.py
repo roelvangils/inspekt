@@ -13,7 +13,7 @@ def navigate_to_url(request: NavigateRequest):
     """
     Navigate to a URL.
 
-    This endpoint mirrors the `zen open` CLI command.
+    This endpoint mirrors the `inspekt open` CLI command.
 
     Args:
         request: Navigation request with URL, wait flag, and timeout
@@ -42,7 +42,7 @@ def go_back():
     """
     Go back to the previous page in browser history.
 
-    This endpoint mirrors the `zen back` CLI command.
+    This endpoint mirrors the `inspekt back` CLI command.
 
     Returns:
         Command execution result
@@ -66,7 +66,7 @@ def go_forward():
     """
     Go forward to the next page in browser history.
 
-    This endpoint mirrors the `zen forward` CLI command.
+    This endpoint mirrors the `inspekt forward` CLI command.
 
     Returns:
         Command execution result
@@ -90,7 +90,7 @@ def reload_page(hard: bool = False):
     """
     Reload the current page.
 
-    This endpoint mirrors the `zen reload` CLI command.
+    This endpoint mirrors the `inspekt reload` CLI command.
 
     Args:
         hard: If true, bypass cache (hard reload)
@@ -121,7 +121,7 @@ def scroll_page_up():
     """
     Scroll up one page (one viewport height).
 
-    This endpoint mirrors the `zen pageup` CLI command.
+    This endpoint mirrors the `inspekt pageup` CLI command.
 
     Returns:
         Command execution result
@@ -145,7 +145,7 @@ def scroll_page_down():
     """
     Scroll down one page (one viewport height).
 
-    This endpoint mirrors the `zen pagedown` CLI command.
+    This endpoint mirrors the `inspekt pagedown` CLI command.
 
     Returns:
         Command execution result
@@ -169,7 +169,7 @@ def scroll_to_top():
     """
     Scroll to the top of the page.
 
-    This endpoint mirrors the `zen top` CLI command.
+    This endpoint mirrors the `inspekt top` CLI command.
 
     Returns:
         Command execution result
@@ -193,7 +193,7 @@ def scroll_to_bottom():
     """
     Scroll to the bottom of the page.
 
-    This endpoint mirrors the `zen bottom` CLI command.
+    This endpoint mirrors the `inspekt bottom` CLI command.
 
     Returns:
         Command execution result

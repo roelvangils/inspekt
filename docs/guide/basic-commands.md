@@ -314,19 +314,19 @@ Inspekt includes ready-to-use scripts:
 
 ```bash
 # Extract all images with metadata
-inspekt exec zen/scripts/extract_images.js --format json
+inspekt exec inspekt/scripts/extract_images.js --format json
 
 # Extract table data
-inspekt exec zen/scripts/extract_table.js --format json
+inspekt exec inspekt/scripts/extract_table.js --format json
 
 # Get SEO metadata
-inspekt exec zen/scripts/extract_metadata.js --format json
+inspekt exec inspekt/scripts/extract_metadata.js --format json
 
 # Performance metrics
-inspekt exec zen/scripts/performance_metrics.js --format json
+inspekt exec inspekt/scripts/performance_metrics.js --format json
 
 # Inject jQuery
-inspekt exec zen/scripts/inject_jquery.js
+inspekt exec inspekt/scripts/inject_jquery.js
 ```
 
 ---
@@ -407,7 +407,7 @@ https://example.com
 
 Type 'exit' or press Ctrl+D to quit.
 
-zen>
+inspekt>
 ```
 
 ### Using the REPL
@@ -415,26 +415,26 @@ zen>
 Type JavaScript code and press Enter:
 
 ```javascript
-zen> document.title
+inspekt> document.title
 "Example Domain"
 
-zen> document.querySelectorAll('p').length
+inspekt> document.querySelectorAll('p').length
 2
 
-zen> const links = Array.from(document.links)
+inspekt> const links = Array.from(document.links)
 undefined
 
-zen> links.length
+inspekt> links.length
 10
 
-zen> links.map(a => a.href)
+inspekt> links.map(a => a.href)
 [
   "https://example.com/page1",
   "https://example.com/page2",
   ...
 ]
 
-zen> exit
+inspekt> exit
 Goodbye!
 ```
 
@@ -454,25 +454,25 @@ Goodbye!
 
 **Testing selectors:**
 ```javascript
-zen> document.querySelector('.main-content')
+inspekt> document.querySelector('.main-content')
 [object HTMLDivElement]
 
-zen> $0.textContent  // if using DevTools
+inspekt> $0.textContent  // if using DevTools
 "Main content here..."
 ```
 
 **Experimenting with APIs:**
 ```javascript
-zen> await fetch('/api/data').then(r => r.json())
+inspekt> await fetch('/api/data').then(r => r.json())
 {userId: 1, name: "John Doe"}
 ```
 
 **Debugging:**
 ```javascript
-zen> window.myApp
+inspekt> window.myApp
 {state: {...}, config: {...}}
 
-zen> window.myApp.state
+inspekt> window.myApp.state
 {user: {...}, settings: {...}}
 ```
 

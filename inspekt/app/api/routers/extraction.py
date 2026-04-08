@@ -60,7 +60,7 @@ def get_page_info():
     """
     Get information about the current browser tab.
 
-    This endpoint mirrors the `zen info` CLI command and returns
+    This endpoint mirrors the `inspekt info` CLI command and returns
     basic page information like URL, title, domain, etc.
 
     Returns:
@@ -124,7 +124,7 @@ def get_page_links(include_text: bool = True):
     """
     Extract all links from the current page.
 
-    This endpoint mirrors the `zen links` CLI command.
+    This endpoint mirrors the `inspekt links` CLI command.
 
     Args:
         include_text: Include link text in the response

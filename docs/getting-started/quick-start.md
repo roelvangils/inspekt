@@ -87,19 +87,19 @@ Try these commands in the REPL:
 
 ```javascript
 // Get the page title
-zen> document.title
+inspekt> document.title
 "Example Domain"
 
 // Query the DOM
-zen> document.querySelectorAll('h1')[0].textContent
+inspekt> document.querySelectorAll('h1')[0].textContent
 "Example Domain"
 
 // Create an array of links
-zen> Array.from(document.links).map(a => ({text: a.textContent, href: a.href}))
+inspekt> Array.from(document.links).map(a => ({text: a.textContent, href: a.href}))
 [{text: "More information...", href: "https://www.iana.org/domains/example"}]
 
 // Exit the REPL
-zen> exit
+inspekt> exit
 Goodbye!
 ```
 
@@ -273,19 +273,19 @@ This is great for:
 ### Extract Table Data
 
 ```bash
-inspektexec zen/scripts/extract_table.js --format json > data.json
+inspektexec inspekt/scripts/extract_table.js --format json > data.json
 ```
 
 ### Extract All Images
 
 ```bash
-inspektexec zen/scripts/extract_images.js --format json
+inspektexec inspekt/scripts/extract_images.js --format json
 ```
 
 ### Get SEO Metadata
 
 ```bash
-inspektexec zen/scripts/extract_metadata.js --format json
+inspektexec inspekt/scripts/extract_metadata.js --format json
 ```
 
 ### Custom Extraction
@@ -800,4 +800,4 @@ Try these exercises to build your skills:
 
 ---
 
-Happy automating! If you run into any issues, check the [Troubleshooting](installation.md#troubleshooting) section or [open an issue](https://github.com/roelvangils/zen-bridge/issues) on GitHub.
+Happy automating! If you run into any issues, check the [Troubleshooting](installation.md#troubleshooting) section or [open an issue](https://github.com/roelvangils/inspekt-bridge/issues) on GitHub.

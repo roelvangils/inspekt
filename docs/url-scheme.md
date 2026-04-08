@@ -319,7 +319,7 @@ set pageText to the clipboard
 ### Automatic Installation
 
 ```bash
-cd /Users/roelvangils/zen_bridge
+cd /Users/roelvangils/inspekt_bridge
 ./url_handler/install.sh
 ```
 

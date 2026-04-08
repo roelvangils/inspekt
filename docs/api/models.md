@@ -21,7 +21,7 @@ Inspekt uses Pydantic v2 for data validation and serialization. All models provi
 - [Configuration Models](#configuration-models) - Settings and config
 - [Helper Functions](#helper-functions) - Utilities for message parsing
 
-**Location:** `zen/domain/models.py`
+**Location:** `inspekt/domain/models.py`
 
 ---
 
@@ -66,7 +66,7 @@ class ExecuteRequest(BaseModel):
 **Python Usage:**
 
 ```python
-from zen.domain.models import ExecuteRequest
+from inspekt.domain.models import ExecuteRequest
 
 request = ExecuteRequest(
     request_id="550e8400-e29b-41d4-a716-446655440000",
@@ -138,7 +138,7 @@ class ExecuteResult(BaseModel):
 **Python Usage:**
 
 ```python
-from zen.domain.models import ExecuteResult
+from inspekt.domain.models import ExecuteResult
 
 # Success
 result = ExecuteResult(
@@ -201,7 +201,7 @@ class ReinitControlRequest(BaseModel):
 **Python Usage:**
 
 ```python
-from zen.domain.models import ReinitControlRequest
+from inspekt.domain.models import ReinitControlRequest
 
 request = ReinitControlRequest(
     config={"auto-refocus": "only-spa", "speak-name": False}
@@ -249,7 +249,7 @@ class RefocusNotification(BaseModel):
 **Python Usage:**
 
 ```python
-from zen.domain.models import RefocusNotification
+from inspekt.domain.models import RefocusNotification
 
 notification = RefocusNotification(
     success=True,
@@ -287,7 +287,7 @@ class PingMessage(BaseModel):
 **Python Usage:**
 
 ```python
-from zen.domain.models import PingMessage
+from inspekt.domain.models import PingMessage
 
 ping = PingMessage()
 ```
@@ -322,7 +322,7 @@ class PongMessage(BaseModel):
 **Python Usage:**
 
 ```python
-from zen.domain.models import PongMessage
+from inspekt.domain.models import PongMessage
 
 pong = PongMessage()
 ```
@@ -376,7 +376,7 @@ class RunRequest(BaseModel):
 **Python Usage:**
 
 ```python
-from zen.domain.models import RunRequest
+from inspekt.domain.models import RunRequest
 
 request = RunRequest(code="document.title")
 ```
@@ -782,7 +782,7 @@ class ControlConfig(BaseModel):
 **Python Usage:**
 
 ```python
-from zen.domain.models import ControlConfig
+from inspekt.domain.models import ControlConfig
 
 # With defaults
 config = ControlConfig()
@@ -802,12 +802,12 @@ config = ControlConfig(**config_dict)
 
 ---
 
-### ZenConfig
+### InspektConfig
 
 Complete Inspekt configuration.
 
 ```python
-class ZenConfig(BaseModel):
+class InspektConfig(BaseModel):
     ai_language: str = Field(
         default="auto",
         alias="ai-language",
@@ -848,13 +848,13 @@ class ZenConfig(BaseModel):
 **Python Usage:**
 
 ```python
-from zen.domain.models import ZenConfig, ControlConfig
+from inspekt.domain.models import InspektConfig, ControlConfig
 
 # With defaults
-config = ZenConfig()
+config = InspektConfig()
 
 # With custom values
-config = ZenConfig(
+config = InspektConfig(
     ai_language="en",
     control=ControlConfig(auto_refocus="always")
 )
@@ -863,7 +863,7 @@ config = ZenConfig(
 import json
 with open("config.json") as f:
     config_dict = json.load(f)
-config = ZenConfig(**config_dict)
+config = InspektConfig(**config_dict)
 ```
 
 ---
@@ -894,7 +894,7 @@ def parse_incoming_message(data: dict[str, Any]) -> IncomingMessage
 **Example:**
 
 ```python
-from zen.domain.models import parse_incoming_message
+from inspekt.domain.models import parse_incoming_message
 
 raw_message = {
     "type": "result",
@@ -933,7 +933,7 @@ def create_execute_request(request_id: str, code: str) -> ExecuteRequest
 **Example:**
 
 ```python
-from zen.domain.models import create_execute_request
+from inspekt.domain.models import create_execute_request
 import uuid
 
 request = create_execute_request(
@@ -960,7 +960,7 @@ def create_pong_message() -> PongMessage
 **Example:**
 
 ```python
-from zen.domain.models import create_pong_message
+from inspekt.domain.models import create_pong_message
 
 pong = create_pong_message()
 ```
@@ -973,7 +973,7 @@ pong = create_pong_message()
 
 ```python
 import uuid
-from zen.domain.models import (
+from inspekt.domain.models import (
     create_execute_request,
     parse_incoming_message,
     ExecuteResult
@@ -1018,17 +1018,17 @@ if isinstance(result, ExecuteResult):
 ```python
 import json
 from pathlib import Path
-from zen.domain.models import ZenConfig
+from inspekt.domain.models import InspektConfig
 
 # Load from file
 config_path = Path.home() / ".config" / "inspekt" / "config.json"
 if config_path.exists():
     with open(config_path) as f:
         config_dict = json.load(f)
-    config = ZenConfig(**config_dict)
+    config = InspektConfig(**config_dict)
 else:
     # Use defaults
-    config = ZenConfig()
+    config = InspektConfig()
 
 # Access configuration
 print(f"AI Language: {config.ai_language}")
@@ -1040,7 +1040,7 @@ print(f"Speak Name: {config.control.speak_name}")
 
 ```python
 from pydantic import ValidationError
-from zen.domain.models import ControlConfig
+from inspekt.domain.models import ControlConfig
 
 try:
     config = ControlConfig(

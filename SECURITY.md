@@ -37,7 +37,7 @@ Using Inspekt requires trusting:
 The bridge server is **hardcoded** to bind only to the loopback interface:
 
 ```python
-# zen/bridge_ws.py
+# inspekt/bridge_ws.py
 HOST = "127.0.0.1"  # Never binds to 0.0.0.0 or public IPs
 PORT = 8765
 ```
@@ -195,7 +195,7 @@ There is intentionally no option to configure the bind address. This prevents ac
 
 #### Scripts Loaded from Trusted Local Filesystem
 
-Built-in scripts (`zen/scripts/`) are loaded from local filesystem:
+Built-in scripts (`inspekt/scripts/`) are loaded from local filesystem:
 
 ```python
 # Scripts are loaded from package installation directory
@@ -640,7 +640,7 @@ async def handle_http_run(request):
 ```bash
 # Enable audit logging
 inspekt config set audit.enabled true
-inspekt config set audit.log_file ~/.zen_bridge/audit.log
+inspekt config set audit.log_file ~/.inspekt/audit.log
 
 # Audit log format
 [2025-10-27 10:30:45] EVAL "document.title" -> "Example Domain"

@@ -147,11 +147,11 @@ inspekt control click
 ### 4. Make Your Changes
 
 Edit the relevant Python files:
-- `zen/cli.py` - CLI commands (current monolith)
-- `zen/bridge_ws.py` - WebSocket server
-- `zen/client.py` - HTTP client
-- `zen/config.py` - Configuration management
-- `zen/scripts/*.js` - JavaScript extraction/interaction scripts
+- `inspekt/cli.py` - CLI commands (current monolith)
+- `inspekt/bridge_ws.py` - WebSocket server
+- `inspekt/client.py` - HTTP client
+- `inspekt/config.py` - Configuration management
+- `inspekt/scripts/*.js` - JavaScript extraction/interaction scripts
 
 ### 5. Test Your Changes
 
@@ -205,14 +205,14 @@ We use **ruff** for linting and formatting.
 ```bash
 # Format code
 make format
-# or: ruff format zen/
+# or: ruff format inspekt/
 
 # Check code quality
 make lint
-# or: ruff check zen/
+# or: ruff check inspekt/
 
 # Auto-fix issues
-ruff check zen/ --fix
+ruff check inspekt/ --fix
 ```
 
 **Style Guidelines**:
@@ -239,7 +239,7 @@ def get_title(url, timeout=10.0):
 Run type checker:
 ```bash
 make typecheck
-# or: mypy zen/ --strict
+# or: mypy inspekt/ --strict
 ```
 
 ### Docstrings
@@ -275,7 +275,7 @@ def execute_script(script_path: Path, timeout: float) -> dict[str, Any]:
 
 ### JavaScript Style
 
-For scripts in `zen/scripts/`:
+For scripts in `inspekt/scripts/`:
 
 ```javascript
 // Use IIFE (Immediately Invoked Function Expression)
@@ -352,7 +352,7 @@ pytest tests/unit/test_config.py::test_load_default_config -v
 ```python
 # tests/unit/test_config.py
 import pytest
-from zen.config import load_config, validate_control_config
+from inspekt.config import load_config, validate_control_config
 
 def test_load_default_config():
     """Test loading default config when no file exists."""
@@ -372,7 +372,7 @@ def test_validate_control_config_with_invalid_values():
 ```python
 # tests/integration/test_bridge.py
 import pytest
-from zen.client import BridgeClient
+from inspekt.client import BridgeClient
 
 @pytest.fixture
 def server():
@@ -408,7 +408,7 @@ def test_extract_links_command(browser_with_userscript):
     page.goto("https://example.com")
 
     # Run CLI command (subprocess)
-    result = subprocess.run(["zen", "extract-links"], capture_output=True)
+    result = subprocess.run(["inspekt", "extract-links"], capture_output=True)
     links = json.loads(result.stdout)
 
     assert len(links) > 0
@@ -549,8 +549,8 @@ Before submitting, ensure:
 ### Current Structure (v1.0.0)
 
 ```
-zen_bridge/
-├── zen/
+inspekt/
+├── inspekt/
 │   ├── __init__.py          # Package metadata
 │   ├── cli.py               # 🔴 All CLI commands (3,946 lines)
 │   ├── bridge_ws.py         # WebSocket server
@@ -577,8 +577,8 @@ zen_bridge/
 See REFACTOR_PLAN.md for detailed migration plan.
 
 ```
-zen_bridge/
-├── zen/
+inspekt/
+├── inspekt/
 │   ├── domain/              # Layer 0: Pure domain logic
 │   │   ├── models.py        # Pydantic models
 │   │   └── validation.py    # Pure validation
@@ -619,7 +619,7 @@ zen_bridge/
 
 **Current Approach** (v1.0.0):
 
-1. Open `zen/cli.py`
+1. Open `inspekt/cli.py`
 2. Add command at end of file:
 
 ```python
@@ -651,14 +651,14 @@ def my_command(arg: str, timeout: float) -> None:
 
 **Post-Refactor Approach** (Phase 2+):
 
-1. Create `zen/app/cli/my_commands.py`
+1. Create `inspekt/app/cli/my_commands.py`
 2. Define command using services:
 
 ```python
 import click
-from zen.services.bridge_executor import BridgeExecutor
-from zen.services.script_loader import ScriptLoader
-from zen.app.cli.base import format_output
+from inspekt.services.bridge_executor import BridgeExecutor
+from inspekt.services.script_loader import ScriptLoader
+from inspekt.app.cli.base import format_output
 
 @click.command()
 @click.argument("arg")
@@ -678,10 +678,10 @@ def my_command(arg: str, timeout: float) -> None:
     click.echo(output)
 ```
 
-3. Register in `zen/app/cli/main.py`:
+3. Register in `inspekt/app/cli/main.py`:
 
 ```python
-from zen.app.cli.my_commands import my_command
+from inspekt.app.cli.my_commands import my_command
 
 cli.add_command(my_command)
 ```
@@ -697,7 +697,7 @@ def test_my_command(mock_executor):
 
 ### Adding a New JavaScript Script
 
-1. Create `zen/scripts/my_script.js`:
+1. Create `inspekt/scripts/my_script.js`:
 
 ```javascript
 /**
@@ -736,10 +736,10 @@ def test_my_command(mock_executor):
 
 ```bash
 # Terminal 1: Run server with auto-reload (Python 3.7+ only)
-python zen/bridge_ws.py
+python inspekt/bridge_ws.py
 
 # Terminal 2: Edit code
-vim zen/cli.py
+vim inspekt/cli.py
 
 # Terminal 3: Test changes
 inspekt eval "document.title"

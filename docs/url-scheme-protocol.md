@@ -10,7 +10,7 @@ The `inspekt://` URL scheme is a custom protocol handler that allows you to trig
 
 1. **Protocol Registration** - macOS LaunchServices registers `inspekt://`
 2. **App Bundle** - `/Applications/Inspekt.app` (AppleScript application)
-3. **URL Handler** - `/Users/roelvangils/zen_bridge/url_handler/inspekt_url_handler.py`
+3. **URL Handler** - `/Users/roelvangils/inspekt_bridge/url_handler/inspekt_url_handler.py`
 4. **Bridge Server** - WebSocket server that communicates with browser extension
 5. **CLI Commands** - Underlying `inspekt` command-line tools
 
@@ -194,7 +194,7 @@ inspekt://info?output=dialog                 # Show in dialog
 
 ### 1. URL Handler Script
 
-Located at: `/Users/roelvangils/zen_bridge/url_handler/inspekt_url_handler.py`
+Located at: `/Users/roelvangils/inspekt_bridge/url_handler/inspekt_url_handler.py`
 
 **Key Functions:**
 
@@ -236,8 +236,8 @@ def handle_output(result, command, output_mode):
 
 This is why we use full paths in:
 - `inspekt_url_handler.py` - All inspekt command calls
-- `zen/app/cli/extraction.py` - All mods calls
-- `zen/app/cli/selection.py` - html2markdown call
+- `inspekt/app/cli/extraction.py` - All mods calls
+- `inspekt/app/cli/selection.py` - html2markdown call
 
 ### 3. AppleScript App Bundle
 
@@ -257,7 +257,7 @@ on open location this_URL
     end try
 
     -- Execute Python handler in background
-    do shell script "/Users/roelvangils/zen_bridge/url_handler/inspekt_url_handler.py " & ¬
+    do shell script "/Users/roelvangils/inspekt_bridge/url_handler/inspekt_url_handler.py " & ¬
         quoted form of this_URL & " >> " & ¬
         quoted form of POSIX path of logFile & " 2>&1 &"
 end open location
@@ -292,7 +292,7 @@ After installation, register with:
 
 ### Step 1: Add Command to URL Handler
 
-Edit `/Users/roelvangils/zen_bridge/url_handler/inspekt_url_handler.py`:
+Edit `/Users/roelvangils/inspekt_bridge/url_handler/inspekt_url_handler.py`:
 
 ```python
 def execute_command(command, params):
@@ -350,7 +350,7 @@ tail -f ~/inspekt_url_handler.log
 
 ### Step 4: Document the Command
 
-Add to `/Users/roelvangils/zen_bridge/url_handler/test_links.html`:
+Add to `/Users/roelvangils/inspekt_bridge/url_handler/test_links.html`:
 
 ```html
 <div class="section">
@@ -617,11 +617,11 @@ Typical execution times from GUI apps:
 
 ## References
 
-- Main documentation: `/Users/roelvangils/zen_bridge/docs/url-scheme.md`
-- Quick start: `/Users/roelvangils/zen_bridge/docs/url-scheme-quick-start.md`
-- Troubleshooting: `/Users/roelvangils/zen_bridge/docs/troubleshooting.md`
-- Test page: `/Users/roelvangils/zen_bridge/url_handler/test_links.html`
-- Handler script: `/Users/roelvangils/zen_bridge/url_handler/inspekt_url_handler.py`
+- Main documentation: `/Users/roelvangils/inspekt_bridge/docs/url-scheme.md`
+- Quick start: `/Users/roelvangils/inspekt_bridge/docs/url-scheme-quick-start.md`
+- Troubleshooting: `/Users/roelvangils/inspekt_bridge/docs/troubleshooting.md`
+- Test page: `/Users/roelvangils/inspekt_bridge/url_handler/test_links.html`
+- Handler script: `/Users/roelvangils/inspekt_bridge/url_handler/inspekt_url_handler.py`
 
 ## Version History
 

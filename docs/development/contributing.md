@@ -71,7 +71,7 @@ Thank you for your interest in contributing to Inspekt! This guide will help you
 inspekt --version
 
 # Check all dependencies installed
-python -c "import zen; print(zen.__version__)"
+python -c "import inspekt; print(inspekt.__version__)"
 ```
 
 ## Development Setup
@@ -151,12 +151,12 @@ git checkout -b docs/improve-readme
 
 Edit relevant files:
 
-- `zen/app/cli/` - CLI commands
-- `zen/services/` - Business logic
-- `zen/adapters/` - I/O operations
-- `zen/domain/` - Data models
-- `zen/bridge_ws.py` - WebSocket server
-- `zen/scripts/` - JavaScript files
+- `inspekt/app/cli/` - CLI commands
+- `inspekt/services/` - Business logic
+- `inspekt/adapters/` - I/O operations
+- `inspekt/domain/` - Data models
+- `inspekt/bridge_ws.py` - WebSocket server
+- `inspekt/scripts/` - JavaScript files
 
 ### 3. Run Tests
 
@@ -165,7 +165,7 @@ Edit relevant files:
 pytest
 
 # Run with coverage
-pytest --cov=zen
+pytest --cov=inspekt
 
 # Run specific test file
 pytest tests/unit/test_models.py
@@ -178,16 +178,16 @@ pytest -v
 
 ```bash
 # Format code
-ruff format zen/
+ruff format inspekt/
 
 # Check linting
-ruff check zen/
+ruff check inspekt/
 
 # Auto-fix issues
-ruff check zen/ --fix
+ruff check inspekt/ --fix
 
 # Type checking
-mypy zen/
+mypy inspekt/
 ```
 
 ### 5. Commit Changes
@@ -246,7 +246,7 @@ from typing import Any
 import click
 from pydantic import BaseModel
 
-from zen.services.bridge_executor import get_executor
+from inspekt.services.bridge_executor import get_executor
 
 
 def my_function(arg: str, timeout: float = 10.0) -> dict[str, Any]:
@@ -286,7 +286,7 @@ def get_title(url, timeout=10.0):
 **Run type checker**:
 
 ```bash
-mypy zen/ --strict
+mypy inspekt/ --strict
 ```
 
 ### Docstrings
@@ -322,7 +322,7 @@ def execute_script(script_path: Path, timeout: float) -> dict[str, Any]:
 
 ### JavaScript Style
 
-For scripts in `zen/scripts/`:
+For scripts in `inspekt/scripts/`:
 
 ```javascript
 /**
@@ -392,7 +392,7 @@ open htmlcov/index.html
 ```python
 # tests/unit/test_my_feature.py
 import pytest
-from zen.services.my_service import MyService
+from inspekt.services.my_service import MyService
 
 
 class TestMyService:
@@ -425,7 +425,7 @@ import pytest
 @pytest.mark.asyncio
 async def test_async_operation():
     """Test async operation."""
-    from zen.adapters import filesystem
+    from inspekt.adapters import filesystem
 
     content = await filesystem.read_text_async(Path("test.txt"))
     assert content is not None
@@ -491,9 +491,9 @@ BREAKING CHANGE: Drop support for Python 3.7-3.10"
 Before submitting PR:
 
 - [ ] All tests pass (`pytest`)
-- [ ] Code is formatted (`ruff format zen/`)
-- [ ] No linting errors (`ruff check zen/`)
-- [ ] Type checking passes (`mypy zen/`)
+- [ ] Code is formatted (`ruff format inspekt/`)
+- [ ] No linting errors (`ruff check inspekt/`)
+- [ ] Type checking passes (`mypy inspekt/`)
 - [ ] Documentation updated (if applicable)
 - [ ] Commit messages follow Conventional Commits
 - [ ] No breaking changes (or documented)
@@ -532,7 +532,7 @@ Once approved, maintainer will merge using:
 
 === "Current Approach (v1.0.0)"
 
-    Edit `zen/cli.py`:
+    Edit `inspekt/cli.py`:
 
     ```python
     @cli.command()
@@ -554,12 +554,12 @@ Once approved, maintainer will merge using:
 
 === "Refactored Approach (Phase 2+)"
 
-    Create `zen/app/cli/my_commands.py`:
+    Create `inspekt/app/cli/my_commands.py`:
 
     ```python
     import click
-    from zen.services.bridge_executor import get_executor
-    from zen.services.script_loader import ScriptLoader
+    from inspekt.services.bridge_executor import get_executor
+    from inspekt.services.script_loader import ScriptLoader
 
 
     @click.command()
@@ -578,17 +578,17 @@ Once approved, maintainer will merge using:
         click.echo(result["result"])
     ```
 
-    Register in `zen/app/cli/__init__.py`:
+    Register in `inspekt/app/cli/__init__.py`:
 
     ```python
-    from zen.app.cli.my_commands import my_command
+    from inspekt.app.cli.my_commands import my_command
 
     cli.add_command(my_command)
     ```
 
 ### Adding a New JavaScript Script
 
-1. **Create script** in `zen/scripts/my_script.js`:
+1. **Create script** in `inspekt/scripts/my_script.js`:
 
 ```javascript
 /**
@@ -627,10 +627,10 @@ Once approved, maintainer will merge using:
 
 ```bash
 # Terminal 1: Server (auto-restarts on changes)
-python zen/bridge_ws.py
+python inspekt/bridge_ws.py
 
 # Terminal 2: Make changes
-vim zen/app/cli/my_commands.py
+vim inspekt/app/cli/my_commands.py
 
 # Terminal 3: Test
 inspekt my-command test-arg

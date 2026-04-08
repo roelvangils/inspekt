@@ -1,7 +1,7 @@
 """Script loader service - Loads and caches JavaScript scripts.
 
 This service:
-- Loads JavaScript files from zen/scripts/ directory
+- Loads JavaScript files from inspekt/scripts/ directory
 - Caches scripts in memory for performance
 - Handles template substitution (placeholders)
 - Provides both sync and async interfaces
@@ -21,10 +21,10 @@ class ScriptLoader:
 
         Args:
             scripts_dir: Directory containing JavaScript files.
-                        If None, uses zen/scripts/ relative to this file.
+                        If None, uses inspekt/scripts/ relative to this file.
         """
         if scripts_dir is None:
-            # Default to zen/scripts/
+            # Default to inspekt/scripts/
             self.scripts_dir = Path(__file__).parent.parent / "scripts"
         else:
             self.scripts_dir = scripts_dir

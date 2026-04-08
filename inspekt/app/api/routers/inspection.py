@@ -54,7 +54,7 @@ def inspect_element(request: InspectRequest):
     """
     Select an element and show its details.
 
-    Mirrors 'zen inspect' CLI command.
+    Mirrors 'inspekt inspect' CLI command.
 
     This endpoint marks an element for inspection and returns its details.
     The element is also highlighted briefly in the browser.
@@ -75,7 +75,7 @@ def inspect_element(request: InspectRequest):
         }}
 
         // Store reference
-        window.__ZEN_INSPECTED_ELEMENT__ = el;
+        window.__INSPEKT_INSPECTED_ELEMENT__ = el;
 
         // Highlight it briefly
         const originalOutline = el.style.outline;
@@ -181,7 +181,7 @@ def screenshot_element(request: ScreenshotRequest):
     """
     Take a screenshot of a specific element.
 
-    Mirrors 'zen screenshot' CLI command.
+    Mirrors 'inspekt screenshot' CLI command.
 
     Captures a DOM element and returns it as a base64-encoded PNG image.
     Use '$0' to screenshot the currently inspected element.

@@ -70,9 +70,9 @@ inspekteval "Array.from(document.querySelectorAll('h1, h2, h3')).map(h => h.text
 Live JavaScript experimentation with instant feedback. Perfect for exploring APIs, debugging, and prototyping.
 
 ```javascript
-zen> document.querySelectorAll('a').length
+inspekt> document.querySelectorAll('a').length
 42
-zen> Array.from(document.links).slice(0, 3).map(a => a.href)
+inspekt> Array.from(document.links).slice(0, 3).map(a => a.href)
 ["https://example.com/page1", "https://example.com/page2", "https://example.com/page3"]
 ```
 
@@ -155,7 +155,7 @@ inspektwatch input  # Monitor keyboard input in real-time
 ```bash
 # Clone the repository
 git clone https://github.com/roelvangils/inspekt.git
-cd zen-bridge
+cd inspekt-bridge
 
 # Install in development mode
 pip install -e .
@@ -259,7 +259,7 @@ Here's a practical example showing the power of Inspekt:
     inspektoutline
 
     # Extract all metadata
-    inspektexec zen/scripts/extract_metadata.js --format json
+    inspektexec inspekt/scripts/extract_metadata.js --format json
 
     # Check external links status
     inspektlinks --enrich-external --json

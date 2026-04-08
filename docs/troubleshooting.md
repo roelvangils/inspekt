@@ -38,7 +38,7 @@ The Inspekt bridge server is running, but no browser tab has connected to it via
 - Navigate to `chrome://extensions/`
 - Enable "Developer mode"
 - Click "Load unpacked"
-- Select `/Users/roelvangils/zen_bridge/extensions/chrome`
+- Select `/Users/roelvangils/inspekt_bridge/extensions/chrome`
 
 #### Extension Disabled
 - Check `chrome://extensions/` and ensure Inspekt is enabled

@@ -179,7 +179,7 @@ inspekt do "I want to learn about their long-term strategy"
 Interpretation: User wants information about long-term strategy
 Found 2 matching action(s):
 
-1. zen-action-012 (probability: 95%)
+1. inspekt-action-012 (probability: 95%)
    Type: link
    Text: ESA Strategy 2040
    Reasoning: Direct match for 'long-term strategy'
@@ -255,11 +255,11 @@ The following common actions are available in all 5 languages:
 
 ### Adding New Languages
 
-Languages are configured in JSON files at `zen/i18n/`:
+Languages are configured in JSON files at `inspekt/i18n/`:
 - `filler_words.json` - Words to remove during normalization
 - `common_actions.json` - Common action patterns with translations
 
-See the [i18n README](https://github.com/roelvangils/zen-bridge/tree/main/zen/i18n) for contribution guidelines.
+See the [i18n README](https://github.com/roelvangils/inspekt-bridge/tree/main/inspekt/i18n) for contribution guidelines.
 
 ---
 
@@ -444,14 +444,14 @@ The command shows which method was used with indicators:
 
 ### Cache Location
 
-Cache is stored in: `~/.config/zen-bridge/action_cache.db` (SQLite)
+Cache is stored in: `~/.config/inspekt-bridge/action_cache.db` (SQLite)
 
 ### Clear Cache
 
 To clear the cache, delete the database file:
 
 ```bash
-rm ~/.config/zen-bridge/action_cache.db
+rm ~/.config/inspekt-bridge/action_cache.db
 ```
 
 Or programmatically (coming soon):

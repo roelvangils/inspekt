@@ -92,7 +92,7 @@ pytest -k "test_execute"
 
 ```bash
 # Run with coverage
-pytest --cov=zen
+pytest --cov=inspekt
 
 # With HTML report
 pytest --cov=inspekt --cov-report=html
@@ -102,7 +102,7 @@ open htmlcov/index.html
 pytest --cov=inspekt --cov-report=term-missing
 
 # Coverage for specific module
-pytest tests/unit/test_models.py --cov=zen.domain.models
+pytest tests/unit/test_models.py --cov=inspekt.domain.models
 ```
 
 ### Watch Mode
@@ -126,7 +126,7 @@ ptw
 ```python
 # tests/unit/test_my_service.py
 import pytest
-from zen.services.my_service import MyService
+from inspekt.services.my_service import MyService
 
 
 class TestMyService:
@@ -158,7 +158,7 @@ class TestMyService:
 # tests/unit/test_models.py
 import pytest
 from pydantic import ValidationError
-from zen.domain.models import ExecuteRequest
+from inspekt.domain.models import ExecuteRequest
 
 
 class TestExecuteRequest:
@@ -213,7 +213,7 @@ For async functions, use `@pytest.mark.asyncio`:
 ```python
 import pytest
 from pathlib import Path
-from zen.adapters import filesystem
+from inspekt.adapters import filesystem
 
 
 @pytest.mark.asyncio
@@ -236,7 +236,7 @@ async def test_read_text_async():
 @pytest.mark.asyncio
 async def test_script_loader_async():
     """Test async script loading."""
-    from zen.services.script_loader import ScriptLoader
+    from inspekt.services.script_loader import ScriptLoader
 
     loader = ScriptLoader()
     script = await loader.load_script_async("control.js")
@@ -266,7 +266,7 @@ def project_root():
 @pytest.fixture
 def scripts_dir(project_root):
     """Return scripts directory."""
-    return project_root / "zen" / "scripts"
+    return project_root / "inspekt" / "scripts"
 
 
 @pytest.fixture
@@ -292,7 +292,7 @@ def test_scripts_directory_exists(scripts_dir):
 
 def test_load_config_with_sample(sample_config):
     """Test loading sample config."""
-    from zen.config import validate_control_config
+    from inspekt.config import validate_control_config
 
     validated = validate_control_config(sample_config)
     assert validated["auto-refocus"] == "only-spa"
@@ -302,7 +302,7 @@ def test_load_config_with_sample(sample_config):
 
 ```python
 import pytest
-from zen.bridge_ws import create_app
+from inspekt.bridge_ws import create_app
 from aiohttp.test_utils import TestServer
 
 
@@ -340,7 +340,7 @@ from unittest.mock import Mock, patch
 
 def test_execute_with_mocked_client():
     """Test execution with mocked client."""
-    from zen.services.bridge_executor import BridgeExecutor
+    from inspekt.services.bridge_executor import BridgeExecutor
 
     # Create mock client
     mock_client = Mock()
@@ -364,10 +364,10 @@ def test_execute_with_mocked_client():
 #### Patch Functions
 
 ```python
-@patch("zen.adapters.filesystem.read_text_sync")
+@patch("inspekt.adapters.filesystem.read_text_sync")
 def test_script_loader_with_mock_fs(mock_read):
     """Test script loader with mocked filesystem."""
-    from zen.services.script_loader import ScriptLoader
+    from inspekt.services.script_loader import ScriptLoader
 
     # Configure mock
     mock_read.return_value = "console.log('test');"
@@ -385,7 +385,7 @@ def test_script_loader_with_mock_fs(mock_read):
 ```python
 def test_with_monkeypatch(monkeypatch):
     """Test using monkeypatch."""
-    from zen.services import my_service
+    from inspekt.services import my_service
 
     # Patch function
     def mock_function():
@@ -409,7 +409,7 @@ def test_with_monkeypatch(monkeypatch):
 import pytest
 import aiohttp
 from aiohttp import web
-from zen.bridge_ws import create_app
+from inspekt.bridge_ws import create_app
 
 
 @pytest.mark.integration
@@ -471,15 +471,15 @@ from playwright.sync_api import sync_playwright
 
 
 @pytest.fixture
-def zen_server():
+def inspekt_server():
     """Start inspekt server in background."""
-    proc = subprocess.Popen(["zen", "server", "start"])
+    proc = subprocess.Popen(["inspekt", "server", "start"])
     yield
     proc.terminate()
 
 
 @pytest.mark.e2e
-def test_eval_command(zen_server):
+def test_eval_command(inspekt_server):
     """Test inspekt eval command with real browser."""
     with sync_playwright() as p:
         # Launch browser
@@ -497,7 +497,7 @@ def test_eval_command(zen_server):
 
         # Run CLI command
         result = subprocess.run(
-            ["zen", "eval", "document.title"],
+            ["inspekt", "eval", "document.title"],
             capture_output=True,
             text=True
         )
@@ -540,7 +540,7 @@ pytest --cov=inspekt --cov-report=html
 open htmlcov/index.html
 
 # Coverage for specific package
-pytest --cov=zen.services --cov-report=term
+pytest --cov=inspekt.services --cov-report=term
 
 # Fail if coverage below threshold
 pytest --cov=inspekt --cov-fail-under=80
@@ -552,7 +552,7 @@ Create `.coveragerc`:
 
 ```ini
 [run]
-source = zen
+source = inspekt
 omit =
     */tests/*
     */venv/*
@@ -661,7 +661,7 @@ def test_uppercase(input, expected):
 ])
 def test_eval_types(code, result_type):
     """Test eval returns correct types."""
-    from zen.services.bridge_executor import get_executor
+    from inspekt.services.bridge_executor import get_executor
 
     executor = get_executor()
     result = executor.execute(code)
@@ -695,7 +695,7 @@ Arrange, Act, Assert:
 def test_script_loader_caching():
     """Test that scripts are cached after first load."""
     # Arrange
-    from zen.services.script_loader import ScriptLoader
+    from inspekt.services.script_loader import ScriptLoader
     loader = ScriptLoader()
 
     # Act

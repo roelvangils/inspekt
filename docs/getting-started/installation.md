@@ -66,7 +66,7 @@ You can install Inspekt from source (recommended for development) or via pip (wh
     pip install -e .
     ```
 
-    This installs the `zen` command and all dependencies. The `-e` flag means "editable" - changes to the source code will be reflected immediately.
+    This installs the `inspekt` command and all dependencies. The `-e` flag means "editable" - changes to the source code will be reflected immediately.
 
 === "Install Dependencies Manually"
 
@@ -98,7 +98,7 @@ You can install Inspekt from source (recommended for development) or via pip (wh
 
 ### Verify the Installation
 
-After installation, verify the `zen` command is available:
+After installation, verify the `inspekt` command is available:
 
 ```bash
 inspekt--version
@@ -305,7 +305,7 @@ Display the userscript code using the CLI:
 inspektuserscript
 ```
 
-This will output the complete userscript code to your terminal. The userscript is located at `/Users/roelvangils/zen_bridge/userscript_ws.js` in the repository.
+This will output the complete userscript code to your terminal. The userscript is located at `/Users/roelvangils/inspekt_bridge/userscript_ws.js` in the repository.
 
 #### 2.3b Create the Userscript
 
@@ -481,9 +481,9 @@ inspektrepl
 
 ## Troubleshooting
 
-### "zen: command not found"
+### "inspekt: command not found"
 
-**Problem**: The `zen` command is not in your PATH.
+**Problem**: The `inspekt` command is not in your PATH.
 
 **Solutions**:
 
@@ -508,7 +508,7 @@ inspektrepl
 === "Use python -m"
     ```bash
     # Run as a module instead
-    python3 -m zen.cli --help
+    python3 -m inspekt.cli --help
     ```
 
 ### "Bridge server is not running"

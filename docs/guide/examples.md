@@ -65,7 +65,7 @@ inspekt eval "window.currentUser || window.user" --format json
 inspekt eval "(performance.timing.loadEventEnd - performance.timing.navigationStart) + 'ms'"
 
 # Full performance report
-inspekt exec zen/scripts/performance_metrics.js --format json
+inspekt exec inspekt/scripts/performance_metrics.js --format json
 
 # Memory usage
 inspekt eval "Math.round(performance.memory.usedJSHeapSize / 1048576) + 'MB'"
@@ -75,28 +75,28 @@ inspekt eval "Math.round(performance.memory.usedJSHeapSize / 1048576) + 'MB'"
 
 ### Extract all images
 ```bash
-inspekt exec zen/scripts/extract_images.js --format json > images.json
+inspekt exec inspekt/scripts/extract_images.js --format json > images.json
 ```
 
 ### Extract table data
 ```bash
 # Perfect for scraping tables from any page
-inspekt exec zen/scripts/extract_table.js --format json > table_data.json
+inspekt exec inspekt/scripts/extract_table.js --format json > table_data.json
 ```
 
 ### Get SEO metadata
 ```bash
-inspekt exec zen/scripts/extract_metadata.js --format json
+inspekt exec inspekt/scripts/extract_metadata.js --format json
 ```
 
 ### Performance metrics
 ```bash
-inspekt exec zen/scripts/performance_metrics.js --format json
+inspekt exec inspekt/scripts/performance_metrics.js --format json
 ```
 
 ### Inject jQuery
 ```bash
-inspekt exec zen/scripts/inject_jquery.js
+inspekt exec inspekt/scripts/inject_jquery.js
 
 # Then use jQuery
 inspekt eval "$('a').length"
@@ -105,7 +105,7 @@ inspekt eval "$('a').length"
 ### Highlight elements
 ```bash
 # Edit the script to change selector, then:
-inspekt exec zen/scripts/highlight_selector.js
+inspekt exec inspekt/scripts/highlight_selector.js
 ```
 
 ## 🚀 Advanced Workflows
@@ -255,10 +255,10 @@ inspekt repl
 
 Then in REPL:
 ```javascript
-zen> document.body.style.backgroundColor = '#1a1a1a'
-zen> document.body.style.color = '#fff'
-zen> document.querySelectorAll('a').forEach(a => a.style.color = '#4a9eff')
-zen> exit
+inspekt> document.body.style.backgroundColor = '#1a1a1a'
+inspekt> document.body.style.color = '#fff'
+inspekt> document.querySelectorAll('a').forEach(a => a.style.color = '#4a9eff')
+inspekt> exit
 ```
 
 ### Test API calls
@@ -267,8 +267,8 @@ inspekt repl
 ```
 
 ```javascript
-zen> await fetch('/api/users').then(r => r.json())
-zen> await fetch('/api/data', {method: 'POST', body: JSON.stringify({test: true})}).then(r => r.json())
+inspekt> await fetch('/api/users').then(r => r.json())
+inspekt> await fetch('/api/data', {method: 'POST', body: JSON.stringify({test: true})}).then(r => r.json())
 ```
 
 ## 📊 Analysis Scripts

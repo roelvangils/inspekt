@@ -100,7 +100,7 @@ Override with `?output=mode` parameter.
 
 Open the test page:
 ```bash
-open /Users/roelvangils/zen_bridge/url_handler/test_links.html
+open /Users/roelvangils/inspekt_bridge/url_handler/test_links.html
 ```
 
 Or try from Terminal:
@@ -152,6 +152,6 @@ end tell
 
 ## Next Steps
 
-- See full documentation: `/Users/roelvangils/zen_bridge/docs/url-scheme.md`
-- Troubleshooting guide: `/Users/roelvangils/zen_bridge/docs/troubleshooting.md`
-- HTTP API docs: `/Users/roelvangils/zen_bridge/docs/api/http-api.md`
+- See full documentation: `/Users/roelvangils/inspekt_bridge/docs/url-scheme.md`
+- Troubleshooting guide: `/Users/roelvangils/inspekt_bridge/docs/troubleshooting.md`
+- HTTP API docs: `/Users/roelvangils/inspekt_bridge/docs/api/http-api.md`

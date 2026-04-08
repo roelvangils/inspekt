@@ -1,6 +1,6 @@
 // Watch keyboard input and send events back to server
 (function() {
-    const watchId = '__ZEN_KEYBOARD_WATCH__';
+    const watchId = '__INSPEKT_KEYBOARD_WATCH__';
 
     // Check if already watching
     if (window[watchId]) {
@@ -43,10 +43,10 @@
         const output = modifiers ? `[${modifiers}${key}]` : key;
 
         // Store in events array for polling
-        if (!window.__ZEN_KEYBOARD_EVENTS__) {
-            window.__ZEN_KEYBOARD_EVENTS__ = [];
+        if (!window.__INSPEKT_KEYBOARD_EVENTS__) {
+            window.__INSPEKT_KEYBOARD_EVENTS__ = [];
         }
-        window.__ZEN_KEYBOARD_EVENTS__.push(output);
+        window.__INSPEKT_KEYBOARD_EVENTS__.push(output);
     };
 
     // Add listener
@@ -57,6 +57,6 @@
 
     return {
         ok: true,
-        message: 'Keyboard watcher started. Press keys to see output. Run zen.stopWatchingKeyboard() to stop.'
+        message: 'Keyboard watcher started. Press keys to see output. Run inspekt.stopWatchingKeyboard() to stop.'
     };
 })()

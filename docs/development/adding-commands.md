@@ -16,8 +16,8 @@ This guide provides step-by-step instructions for adding new commands or modifyi
 ## Directory Structure
 
 ```
-zen_bridge/
-├── zen/
+inspekt_bridge/
+├── inspekt/
 │   ├── __init__.py                    # Package version
 │   ├── cli.py                          # OLD monolithic CLI (deprecated, kept for reference)
 │   ├── app/
@@ -53,50 +53,50 @@ zen_bridge/
 │   ├── do.prompt
 │   └── summary.prompt
 ├── tests/
-└── pyproject.toml                      # Entry point: inspekt = "zen.app.cli:main"
+└── pyproject.toml                      # Entry point: inspekt = "inspekt.app.cli:main"
 ```
 
 **Important**: Note that:
-- CLI command files are in: `zen/app/cli/`
-- JavaScript scripts are in: `zen/scripts/`
-- AI prompts are in: `prompts/` (at project root, NOT in zen/)
+- CLI command files are in: `inspekt/app/cli/`
+- JavaScript scripts are in: `inspekt/scripts/`
+- AI prompts are in: `prompts/` (at project root, NOT in inspekt/)
 
 ---
 
 ## Path Resolution Rules
 
-When you're in a command file at `zen/app/cli/extraction.py`, here's how to reference other files:
+When you're in a command file at `inspekt/app/cli/extraction.py`, here's how to reference other files:
 
 ### JavaScript Scripts
 
-Scripts are located at: `zen/scripts/`
+Scripts are located at: `inspekt/scripts/`
 
-From `zen/app/cli/extraction.py`:
+From `inspekt/app/cli/extraction.py`:
 ```python
 script_path = Path(__file__).parent.parent.parent / "scripts" / "my_script.js"
 ```
 
 **Breakdown**:
-- `Path(__file__)` = `/path/to/zen/app/cli/extraction.py`
-- `.parent` = `/path/to/zen/app/cli/`
-- `.parent.parent` = `/path/to/zen/app/`
-- `.parent.parent.parent` = `/path/to/zen/`
-- `/ "scripts"` = `/path/to/zen/scripts/`
+- `Path(__file__)` = `/path/to/inspekt/app/cli/extraction.py`
+- `.parent` = `/path/to/inspekt/app/cli/`
+- `.parent.parent` = `/path/to/inspekt/app/`
+- `.parent.parent.parent` = `/path/to/inspekt/`
+- `/ "scripts"` = `/path/to/inspekt/scripts/`
 
 ### AI Prompts
 
 Prompts are located at: `prompts/` (project root)
 
-From `zen/app/cli/extraction.py`:
+From `inspekt/app/cli/extraction.py`:
 ```python
 prompt_path = Path(__file__).parent.parent.parent.parent / "prompts" / "my_prompt.prompt"
 ```
 
 **Breakdown**:
-- `Path(__file__)` = `/path/to/zen/app/cli/extraction.py`
-- `.parent` = `/path/to/zen/app/cli/`
-- `.parent.parent` = `/path/to/zen/app/`
-- `.parent.parent.parent` = `/path/to/zen/`
+- `Path(__file__)` = `/path/to/inspekt/app/cli/extraction.py`
+- `.parent` = `/path/to/inspekt/app/cli/`
+- `.parent.parent` = `/path/to/inspekt/app/`
+- `.parent.parent.parent` = `/path/to/inspekt/`
 - `.parent.parent.parent.parent` = `/path/to/` (project root)
 - `/ "prompts"` = `/path/to/prompts/`
 
@@ -109,7 +109,7 @@ cli/
     ↓ .parent
 app/
     ↓ .parent
-zen/                    ← scripts/ lives here
+inspekt/                    ← scripts/ lives here
     ↓ .parent
 project_root/           ← prompts/ lives here
 ```
@@ -136,7 +136,7 @@ Decide which module your command belongs to:
 
 If your command needs to execute JavaScript in the browser:
 
-1. Create script at: `zen/scripts/my_new_script.js`
+1. Create script at: `inspekt/scripts/my_new_script.js`
 2. Use IIFE pattern:
    ```javascript
    (function() {
@@ -148,7 +148,7 @@ If your command needs to execute JavaScript in the browser:
    ```
 3. Test the script manually first:
    ```bash
-   inspekt eval --file zen/scripts/my_new_script.js --format json
+   inspekt eval --file inspekt/scripts/my_new_script.js --format json
    ```
 
 ### Step 3: Create AI Prompt (if needed)
@@ -162,7 +162,7 @@ If your command uses AI:
 
 ### Step 4: Add Command Function
 
-Add to the appropriate module (e.g., `zen/app/cli/extraction.py`):
+Add to the appropriate module (e.g., `inspekt/app/cli/extraction.py`):
 
 ```python
 @click.command()
@@ -261,7 +261,7 @@ def my_command(my_arg, my_option, debug):
 
 ### Step 5: Register Command
 
-Add to `zen/app/cli/__init__.py`:
+Add to `inspekt/app/cli/__init__.py`:
 
 ```python
 # In the appropriate section (e.g., Content extraction commands)
@@ -300,15 +300,15 @@ pyenv rehash  # If using pyenv
 
 ### Step 1: Locate Command
 
-1. Check `zen/app/cli/__init__.py` to find which module contains the command
-2. Open the appropriate module (e.g., `zen/app/cli/extraction.py`)
+1. Check `inspekt/app/cli/__init__.py` to find which module contains the command
+2. Open the appropriate module (e.g., `inspekt/app/cli/extraction.py`)
 
 ### Step 2: Understand Dependencies
 
 Check if the command uses:
-- JavaScript scripts? → `zen/scripts/`
+- JavaScript scripts? → `inspekt/scripts/`
 - AI prompts? → `prompts/`
-- Services? → `zen/services/`
+- Services? → `inspekt/services/`
 
 ### Step 3: Make Changes
 
@@ -354,7 +354,7 @@ If command uses JavaScript:
 
 ```bash
 # Test the script directly first
-inspekt eval --file zen/scripts/my_script.js --format json
+inspekt eval --file inspekt/scripts/my_script.js --format json
 
 # Then test through the command
 inspekt my-command "test input" --debug
@@ -424,12 +424,12 @@ inspekt info --help
 
 ### 1. Wrong Path Levels
 
-**Problem**: `Error: Script not found: /path/to/zen/app/scripts/my_script.js`
+**Problem**: `Error: Script not found: /path/to/inspekt/app/scripts/my_script.js`
 
 **Cause**: Used `.parent.parent` instead of `.parent.parent.parent`
 
 **Solution**:
-- Scripts: 3 parents → `zen/scripts/`
+- Scripts: 3 parents → `inspekt/scripts/`
 - Prompts: 4 parents → `prompts/`
 
 ### 2. Forgot to Reinstall
@@ -450,7 +450,7 @@ pyenv rehash
 
 ### 4. Changed Entry Point but Not Paths
 
-**Problem**: After changing from `zen.cli` to `zen.app.cli`, all commands broke
+**Problem**: After changing from `inspekt.cli` to `inspekt.app.cli`, all commands broke
 
 **Solution**: When changing infrastructure, update ALL path references
 
@@ -458,9 +458,9 @@ pyenv rehash
 
 **Problem**: NameError: name 'open' is not defined (Click shadows built-in)
 
-**Solution**: Use `builtin_open()` from `zen.app.cli.base`
+**Solution**: Use `builtin_open()` from `inspekt.app.cli.base`
 ```python
-from zen.app.cli.base import builtin_open
+from inspekt.app.cli.base import builtin_open
 
 with builtin_open(script_path) as f:
     script = f.read()
@@ -504,18 +504,18 @@ click.echo(actual_output)              # Goes to stdout
 
 ### File Locations
 
-| Item | Location | From `zen/app/cli/*.py` |
+| Item | Location | From `inspekt/app/cli/*.py` |
 |------|----------|-------------------------|
-| JavaScript scripts | `zen/scripts/` | `.parent.parent.parent / "scripts"` |
+| JavaScript scripts | `inspekt/scripts/` | `.parent.parent.parent / "scripts"` |
 | AI prompts | `prompts/` | `.parent.parent.parent.parent / "prompts"` |
-| Command modules | `zen/app/cli/` | Same directory |
-| Services | `zen/services/` | `.parent.parent / "services"` |
+| Command modules | `inspekt/app/cli/` | Same directory |
+| Services | `inspekt/services/` | `.parent.parent / "services"` |
 
 ### Command Template Locations
 
-- Extraction/AI commands: `zen/app/cli/extraction.py`
-- Execution commands: `zen/app/cli/exec.py`
-- Interaction commands: `zen/app/cli/interaction.py`
+- Extraction/AI commands: `inspekt/app/cli/extraction.py`
+- Execution commands: `inspekt/app/cli/exec.py`
+- Interaction commands: `inspekt/app/cli/interaction.py`
 
 ### Testing Commands
 
@@ -523,7 +523,7 @@ click.echo(actual_output)              # Goes to stdout
 # Full test cycle
 inspekt my-command --help                   # 1. Help text
 inspekt my-command "test" --debug 2>&1      # 2. Path resolution
-inspekt eval --file zen/scripts/test.js     # 3. Script execution
+inspekt eval --file inspekt/scripts/test.js     # 3. Script execution
 inspekt my-command "real input"             # 4. Full functionality
 inspekt my-command ""                       # 5. Error handling
 ```
@@ -549,7 +549,7 @@ Let's add a hypothetical `inspekt analyze` command:
 
 ```bash
 # 1. Create JavaScript script
-cat > zen/scripts/analyze_page.js << 'EOF'
+cat > inspekt/scripts/analyze_page.js << 'EOF'
 (function() {
   return {
     title: document.title,
@@ -559,7 +559,7 @@ cat > zen/scripts/analyze_page.js << 'EOF'
 EOF
 
 # 2. Test script directly
-inspekt eval --file zen/scripts/analyze_page.js --format json
+inspekt eval --file inspekt/scripts/analyze_page.js --format json
 
 # 3. Create AI prompt
 cat > prompts/analyze.prompt << 'EOF'
@@ -567,10 +567,10 @@ Analyze this page data and provide insights.
 Return JSON with "insights" array.
 EOF
 
-# 4. Add command to zen/app/cli/extraction.py
+# 4. Add command to inspekt/app/cli/extraction.py
 # (Add the @click.command() function)
 
-# 5. Register in zen/app/cli/__init__.py
+# 5. Register in inspekt/app/cli/__init__.py
 # cli.add_command(extraction_module.analyze, name="analyze")
 
 # 6. Reinstall

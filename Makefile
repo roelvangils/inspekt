@@ -105,7 +105,7 @@ vm-restart:
 	inspekt vm restart
 
 vm-bundle:
-	@node scripts/bundle-vm.mjs
+	@bun scripts/bundle-vm.mjs
 
 vm-rebuild:
 	inspekt vm restart --rebuild

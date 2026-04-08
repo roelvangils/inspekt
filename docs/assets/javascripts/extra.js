@@ -40,7 +40,7 @@ document.addEventListener('DOMContentLoaded', function() {
   // Enhance external links
   document.querySelectorAll('a[href^="http"]').forEach(link => {
     // Skip if it's an internal link to the docs
-    if (!link.href.includes('roelvangils.github.io/zen-bridge')) {
+    if (!link.href.includes('roelvangils.github.io/inspekt-bridge')) {
       link.setAttribute('target', '_blank');
       link.setAttribute('rel', 'noopener noreferrer');
     }

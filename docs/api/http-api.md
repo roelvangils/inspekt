@@ -6,7 +6,7 @@ Inspekt includes a comprehensive REST API that exposes all CLI commands as HTTP 
 
 ```bash
 # Start the API server
-uvicorn zen.app.api.server:app --host 127.0.0.1 --port 8000
+uvicorn inspekt.app.api.server:app --host 127.0.0.1 --port 8000
 
 # Check if it's running
 curl http://localhost:8000/health
@@ -37,7 +37,7 @@ The HTTP API is built with several modern technologies working together. Here's 
 **Command breakdown**:
 
 ```bash
-uvicorn zen.app.api.server:app --host 127.0.0.1 --port 8000
+uvicorn inspekt.app.api.server:app --host 127.0.0.1 --port 8000
 #        └─module─────┘ └─app─┘   └─bind address┘   └─port┘
 ```
 
@@ -45,16 +45,16 @@ uvicorn zen.app.api.server:app --host 127.0.0.1 --port 8000
 
 ```bash
 # Auto-reload on code changes (development)
-uvicorn zen.app.api.server:app --reload
+uvicorn inspekt.app.api.server:app --reload
 
 # Run on all network interfaces (accessible from other machines)
-uvicorn zen.app.api.server:app --host 0.0.0.0 --port 8000
+uvicorn inspekt.app.api.server:app --host 0.0.0.0 --port 8000
 
 # Run in background
-uvicorn zen.app.api.server:app --host 127.0.0.1 --port 8000 &
+uvicorn inspekt.app.api.server:app --host 127.0.0.1 --port 8000 &
 
 # Multiple workers (production)
-uvicorn zen.app.api.server:app --workers 4
+uvicorn inspekt.app.api.server:app --workers 4
 ```
 
 ---
@@ -703,8 +703,8 @@ curl http://localhost:8000/api/extraction/info
 ```json
 {
   "ok": false,
-  "error": "Bridge server is not running. Start it with: zen server start",
-  "detail": "Is the bridge server running? Start it with: zen server start"
+  "error": "Bridge server is not running. Start it with: inspekt server start",
+  "detail": "Is the bridge server running? Start it with: inspekt server start"
 }
 ```
 
@@ -828,34 +828,34 @@ http POST localhost:8000/api/navigation/open \
 Use the `--reload` flag to automatically restart the server when code changes:
 
 ```bash
-uvicorn zen.app.api.server:app --host 127.0.0.1 --port 8000 --reload
+uvicorn inspekt.app.api.server:app --host 127.0.0.1 --port 8000 --reload
 ```
 
-Now every time you edit `/zen/app/api/server.py` or any router file, the server restarts automatically!
+Now every time you edit `/inspekt/app/api/server.py` or any router file, the server restarts automatically!
 
 ### Enable Debug Logging
 
 ```bash
-uvicorn zen.app.api.server:app --log-level debug
+uvicorn inspekt.app.api.server:app --log-level debug
 ```
 
 ### Custom Port
 
 ```bash
-uvicorn zen.app.api.server:app --port 8888
+uvicorn inspekt.app.api.server:app --port 8888
 ```
 
 ### Run in Background
 
 ```bash
 # Start in background
-uvicorn zen.app.api.server:app --host 127.0.0.1 --port 8000 &
+uvicorn inspekt.app.api.server:app --host 127.0.0.1 --port 8000 &
 
 # Save the process ID
-echo $! > /tmp/zen-api.pid
+echo $! > /tmp/inspekt-api.pid
 
 # Stop later
-kill $(cat /tmp/zen-api.pid)
+kill $(cat /tmp/inspekt-api.pid)
 ```
 
 ---
@@ -867,7 +867,7 @@ For production use, consider:
 ### 1. Multiple Workers
 
 ```bash
-uvicorn zen.app.api.server:app --workers 4 --host 0.0.0.0 --port 8000
+uvicorn inspekt.app.api.server:app --workers 4 --host 0.0.0.0 --port 8000
 ```
 
 ### 2. Behind a Reverse Proxy
@@ -892,16 +892,16 @@ server {
 Use systemd or supervisor to keep it running:
 
 ```ini
-# /etc/systemd/system/zen-api.service
+# /etc/systemd/system/inspekt-api.service
 [Unit]
 Description=Inspekt HTTP API
 After=network.target
 
 [Service]
 Type=simple
-User=zen
-WorkingDirectory=/opt/zen-bridge
-ExecStart=/usr/local/bin/uvicorn zen.app.api.server:app --host 127.0.0.1 --port 8000 --workers 4
+User=inspekt
+WorkingDirectory=/opt/inspekt-bridge
+ExecStart=/usr/local/bin/uvicorn inspekt.app.api.server:app --host 127.0.0.1 --port 8000 --workers 4
 Restart=always
 
 [Install]
@@ -988,7 +988,7 @@ The API server sends commands to the bridge server, which sends them to the brow
 
 **A**: Yes! The API is completely independent. You just need:
 
-1. Bridge server running (`zen server start`)
+1. Bridge server running (`inspekt server start`)
 2. Browser with extension/userscript
 3. API server running (`uvicorn ...`)
 

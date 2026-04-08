@@ -17,13 +17,13 @@ inspekt--version
 ### Update to Latest Version
 
 ```bash
-pip install --upgrade zen-bridge
+pip install --upgrade inspekt-bridge
 ```
 
 Or with pipx:
 
 ```bash
-pipx upgrade zen-bridge
+pipx upgrade inspekt-bridge
 ```
 
 ### Verify Update
@@ -65,7 +65,7 @@ If you have version 3.4 or earlier (without auto-update):
 2. **Delete the old "Inspekt" script**
 3. **Visit the raw userscript file:**
    ```
-   https://raw.githubusercontent.com/roelvangils/zen-bridge/main/userscript_ws.js
+   https://raw.githubusercontent.com/roelvangils/inspekt-bridge/main/userscript_ws.js
    ```
 4. **Tampermonkey/Violentmonkey will prompt to install** the new version
 5. **Click "Install"**
@@ -76,7 +76,7 @@ If you have version 3.4 or earlier (without auto-update):
 Open the browser console (F12) and check:
 
 ```javascript
-window.__ZEN_BRIDGE_VERSION__
+window.__INSPEKT_BRIDGE_VERSION__
 // Should show "3.5" or higher
 ```
 
@@ -100,7 +100,7 @@ Or look for the version in the console on page load:
 
 **Changes:**
 - Prevents unnecessary reconnection attempts on CSP-blocked sites
-- Exposes `__ZEN_BRIDGE_CSP_BLOCKED__` flag for CLI integration
+- Exposes `__INSPEKT_BRIDGE_CSP_BLOCKED__` flag for CLI integration
 
 **Documentation:**
 - New troubleshooting guide for CSP issues
@@ -139,14 +139,14 @@ Future major versions may include breaking changes. Check the changelog before u
 
 ```bash
 # If using pip
-which zen
-# Should show path to zen
+which inspekt
+# Should show path to inspekt
 
 # If it's missing, reinstall
-pip install --force-reinstall zen-bridge
+pip install --force-reinstall inspekt-bridge
 
 # If using pipx
-pipx reinstall zen-bridge
+pipx reinstall inspekt-bridge
 ```
 
 **Issue: Old version still showing**
@@ -156,7 +156,7 @@ pipx reinstall zen-bridge
 pip cache purge
 
 # Reinstall
-pip install --upgrade --force-reinstall --no-cache-dir zen-bridge
+pip install --upgrade --force-reinstall --no-cache-dir inspekt-bridge
 
 # Verify
 inspekt--version
@@ -187,11 +187,11 @@ You may have version 3.4 or earlier without auto-update support. Use the manual 
 
 ### CLI
 
-Check the [GitHub Releases](https://github.com/roelvangils/zen-bridge/releases) page for new versions:
+Check the [GitHub Releases](https://github.com/roelvangils/inspekt-bridge/releases) page for new versions:
 
 ```bash
 # Check PyPI for latest version
-pip index versions zen-bridge
+pip index versions inspekt-bridge
 
 # Compare with your version
 inspekt--version
@@ -205,7 +205,7 @@ The userscript version is in the file header:
 // @version      3.5
 ```
 
-Check the [latest version on GitHub](https://github.com/roelvangils/zen-bridge/blob/main/userscript_ws.js).
+Check the [latest version on GitHub](https://github.com/roelvangils/inspekt-bridge/blob/main/userscript_ws.js).
 
 ---
 
@@ -215,7 +215,7 @@ Check the [latest version on GitHub](https://github.com/roelvangils/zen-bridge/b
 
 - **Watch the repository** on GitHub for release notifications
 - **Star the repo** to follow development
-- **Check the changelog** regularly: [CHANGELOG.md](https://github.com/roelvangils/zen-bridge/blob/main/CHANGELOG.md)
+- **Check the changelog** regularly: [CHANGELOG.md](https://github.com/roelvangils/inspekt-bridge/blob/main/CHANGELOG.md)
 
 ### Automatic Checks
 
@@ -233,15 +233,15 @@ If you need to downgrade due to issues:
 
 ```bash
 # Downgrade to specific version
-pip install zen-bridge==2.0.0
+pip install inspekt-bridge==2.0.0
 
 # Or use pipx
-pipx install zen-bridge==2.0.0 --force
+pipx install inspekt-bridge==2.0.0 --force
 ```
 
 ### Userscript
 
-1. Visit the [commit history](https://github.com/roelvangils/zen-bridge/commits/main/userscript_ws.js)
+1. Visit the [commit history](https://github.com/roelvangils/inspekt-bridge/commits/main/userscript_ws.js)
 2. Find the version you want
 3. Click "View file" on that commit
 4. Click "Raw" to get the direct URL
@@ -264,7 +264,7 @@ pipx install zen-bridge==2.0.0 --force
 If you encounter issues during updates:
 
 1. Check the [Troubleshooting Guide](../troubleshooting/csp-issues.md)
-2. Visit [GitHub Issues](https://github.com/roelvangils/zen-bridge/issues)
+2. Visit [GitHub Issues](https://github.com/roelvangils/inspekt-bridge/issues)
 3. Include your version numbers when reporting problems:
    ```bash
    inspekt--version

@@ -6,7 +6,7 @@ Complete reference for all 42+ Inspekt CLI commands organized by category.
 
 ## Overview
 
-The Zen CLI provides commands to interact with the browser through the WebSocket bridge. Commands range from simple JavaScript execution to complex AI-powered content analysis and interactive browser control.
+The Inspekt CLI provides commands to interact with the browser through the WebSocket bridge. Commands range from simple JavaScript execution to complex AI-powered content analysis and interactive browser control.
 
 **Global Usage:**
 ```bash
@@ -1033,7 +1033,7 @@ Shows instructions for stopping server:
 
 ```
 Note: Use Ctrl+C to stop the server if running in foreground
-For daemon mode, use: pkill -f 'zen.bridge_ws'
+For daemon mode, use: pkill -f 'inspekt.bridge_ws'
 ```
 
 **Related:**
@@ -1480,15 +1480,15 @@ inspekt repl
 Interactive JavaScript REPL:
 
 ```
-Zen Browser REPL - Type JavaScript code, 'exit' to quit
+Inspekt Browser REPL - Type JavaScript code, 'exit' to quit
 
 Connected to: Example Domain (https://example.com)
 
-zen> document.title
+inspekt> document.title
 Example Domain
-zen> location.href
+inspekt> location.href
 https://example.com/
-zen> exit
+inspekt> exit
 Goodbye!
 ```
 

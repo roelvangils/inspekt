@@ -152,7 +152,7 @@ def list_cookies(response: Response):
     """
     List all cookies for the current page.
 
-    Mirrors 'zen cookies list --json' CLI command.
+    Mirrors 'inspekt cookies list --json' CLI command.
 
     Returns:
         Cookie data with comprehensive metadata (when extension is active)
@@ -226,7 +226,7 @@ def get_cookie(name: str, response: Response):
     """
     Get the value of a specific cookie.
 
-    Mirrors 'zen cookies get <name> --json' CLI command.
+    Mirrors 'inspekt cookies get <name> --json' CLI command.
 
     Args:
         name: Cookie name to retrieve
@@ -271,7 +271,7 @@ def set_cookie(request: SetCookieRequest, response: Response):
     """
     Set a cookie with various options.
 
-    Mirrors 'zen cookies set' CLI command.
+    Mirrors 'inspekt cookies set' CLI command.
 
     Examples:
         - Basic cookie: `{"name": "session_id", "value": "abc123"}`
@@ -322,7 +322,7 @@ def delete_cookie(name: str, response: Response):
     """
     Delete a specific cookie.
 
-    Mirrors 'zen cookies delete <name>' CLI command.
+    Mirrors 'inspekt cookies delete <name>' CLI command.
 
     Args:
         name: Cookie name to delete
@@ -354,7 +354,7 @@ def clear_cookies(response: Response):
     """
     Clear all cookies for the current page.
 
-    Mirrors 'zen cookies clear' CLI command.
+    Mirrors 'inspekt cookies clear' CLI command.
 
     Deletes all cookies associated with the current domain.
 

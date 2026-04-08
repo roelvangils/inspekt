@@ -151,7 +151,7 @@ Edit the summarization prompt:
 
 ```bash
 # Edit prompt file
-nano ~/zen_bridge/prompts/summary.prompt
+nano ~/inspekt_bridge/prompts/summary.prompt
 ```
 
 **Default prompt:**
@@ -228,7 +228,7 @@ See the extracted page structure and full prompt.
 Edit the description prompt:
 
 ```bash
-nano ~/zen_bridge/prompts/describe.prompt
+nano ~/inspekt_bridge/prompts/describe.prompt
 ```
 
 **Default prompt:**
@@ -581,8 +581,8 @@ Tailor prompts to your needs:
 
 ```bash
 # Edit prompts
-nano ~/zen_bridge/prompts/summary.prompt
-nano ~/zen_bridge/prompts/describe.prompt
+nano ~/inspekt_bridge/prompts/summary.prompt
+nano ~/inspekt_bridge/prompts/describe.prompt
 ```
 
 ### 4. Monitor Costs

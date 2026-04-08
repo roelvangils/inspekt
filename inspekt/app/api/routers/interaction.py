@@ -165,7 +165,7 @@ def click_element(request: ClickRequest):
     """
     Click on an element.
 
-    Mirrors 'zen click' CLI command.
+    Mirrors 'inspekt click' CLI command.
 
     Examples:
         - Click stored element: `{"selector": "$0"}`
@@ -189,7 +189,7 @@ def double_click_element(request: ClickRequest):
     """
     Double-click on an element.
 
-    Mirrors 'zen double-click' CLI command.
+    Mirrors 'inspekt double-click' CLI command.
 
     Examples:
         - Double-click element: `{"selector": "div.item"}`
@@ -212,7 +212,7 @@ def right_click_element(request: ClickRequest):
     """
     Right-click (context menu) on an element.
 
-    Mirrors 'zen right-click' CLI command.
+    Mirrors 'inspekt right-click' CLI command.
 
     Examples:
         - Right-click element: `{"selector": "a.download-link"}`
@@ -235,7 +235,7 @@ def type_text(request: TypeRequest):
     """
     Type text character by character into the browser.
 
-    Mirrors 'zen type' CLI command.
+    Mirrors 'inspekt type' CLI command.
 
     By default, clears any existing text and types as fast as possible.
     Use speed parameter to control typing rate and clear=false to append.
@@ -275,7 +275,7 @@ def paste_text(request: PasteRequest):
     """
     Paste text instantly into the browser.
 
-    Mirrors 'zen paste' CLI command.
+    Mirrors 'inspekt paste' CLI command.
 
     By default, clears any existing text before pasting.
     This is equivalent to type with maximum speed.
@@ -304,7 +304,7 @@ def wait_for_element(request: WaitRequest):
     """
     Wait for an element to appear, be visible, hidden, or contain text.
 
-    Mirrors 'zen wait' CLI command.
+    Mirrors 'inspekt wait' CLI command.
 
     By default, waits for element to exist in the DOM.
 

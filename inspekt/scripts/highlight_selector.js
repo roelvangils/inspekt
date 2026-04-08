@@ -8,15 +8,15 @@
     }
 
     // Remove previous highlights
-    document.querySelectorAll('[data-zen-highlight]').forEach(el => {
+    document.querySelectorAll('[data-inspekt-highlight]').forEach(el => {
         el.style.outline = '';
-        el.removeAttribute('data-zen-highlight');
+        el.removeAttribute('data-inspekt-highlight');
     });
 
     // Add new highlights
     elements.forEach((el, index) => {
         el.style.outline = '3px solid #ff6b6b';
-        el.setAttribute('data-zen-highlight', index);
+        el.setAttribute('data-inspekt-highlight', index);
     });
 
     return `Highlighted ${elements.length} element(s) matching: ${selector}`;

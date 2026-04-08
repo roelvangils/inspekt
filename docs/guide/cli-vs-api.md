@@ -39,7 +39,7 @@ Let's look at actual performance measurements:
 
 ```bash
 # Single CLI command
-time zen info
+time inspekt info
 # Real time: ~430ms
 
 # Single API request
@@ -47,7 +47,7 @@ time curl http://localhost:8767/api/extraction/info
 # Real time: ~60ms
 
 # 10 CLI commands
-time for i in {1..10}; do zen info > /dev/null; done
+time for i in {1..10}; do inspekt info > /dev/null; done
 # Real time: ~4.3 seconds (430ms each)
 
 # 10 API requests
@@ -146,16 +146,16 @@ When you're exploring a website manually:
 
 ```bash
 # Open a page
-zen open "https://example.com"
+inspekt open "https://example.com"
 
 # Look at the page structure
-zen outline
+inspekt outline
 
 # Extract some data
-zen links
+inspekt links
 
 # Get page info
-zen info
+inspekt info
 ```
 
 **Why CLI is better**: Nice formatted output, colors, easy to read.
@@ -166,13 +166,13 @@ Quick tasks you run occasionally:
 
 ```bash
 # Take a screenshot
-zen screenshot output.png
+inspekt screenshot output.png
 
 # Get a page summary
-zen summarize
+inspekt summarize
 
 # Execute some JavaScript
-zen eval "document.title"
+inspekt eval "document.title"
 ```
 
 **Why CLI is better**: No need to start a server, just run and done.
@@ -185,10 +185,10 @@ Simple automation in bash/zsh scripts:
 #!/bin/bash
 # check-website.sh
 
-zen open "https://mysite.com"
+inspekt open "https://mysite.com"
 sleep 2
 
-if zen eval "document.querySelector('.error')" >/dev/null 2>&1; then
+if inspekt eval "document.querySelector('.error')" >/dev/null 2>&1; then
     echo "❌ Error found on page"
     exit 1
 else
@@ -203,7 +203,7 @@ fi
 When you need output formatted for humans:
 
 ```bash
-zen info
+inspekt info
 ```
 
 ```
@@ -225,13 +225,13 @@ Commands that need user interaction:
 
 ```bash
 # Control browser with keyboard
-zen control
+inspekt control
 
 # Interactive REPL
-zen repl
+inspekt repl
 
 # Download with interactive selection
-zen download
+inspekt download
 ```
 
 **Why CLI is better**: These features require terminal interaction, prompts, keyboard input.
@@ -296,15 +296,15 @@ Part of a larger system:
 ```yaml
 # docker-compose.yml
 services:
-  zen-api:
-    image: zen-bridge-api
+  inspekt-api:
+    image: inspekt-bridge-api
     ports:
       - "8767:8767"
 
   monitor-service:
     image: website-monitor
     environment:
-      - ZEN_API=http://zen-api:8767
+      - INSPEKT_API=http://inspekt-api:8767
 ```
 
 **Why API is better**: Containers, service discovery, standard HTTP protocols.
@@ -428,9 +428,9 @@ You don't have to choose just one! Here are patterns that use both:
 
 ```bash
 # During development - use CLI for exploration
-zen open "https://example.com"
-zen outline
-zen info
+inspekt open "https://example.com"
+inspekt outline
+inspekt info
 
 # Once you know what you need, automate with API
 curl http://localhost:8767/api/extraction/info > data.json
@@ -457,22 +457,22 @@ done
 
 # Nice output: CLI for final report
 echo "\nFull report:"
-zen info --extended
+inspekt info --extended
 ```
 
 ### Pattern 3: CLI for Setup, API for Execution
 
 ```bash
 # Use CLI to start servers
-zen server start
-uvicorn zen.app.api.server:app --host 127.0.0.1 --port 8767 &
+inspekt server start
+uvicorn inspekt.app.api.server:app --host 127.0.0.1 --port 8767 &
 
 # Use API for the heavy lifting
 python automation_script.py  # Uses HTTP API
 
 # Use CLI for final checks
-zen info
-zen screenshot final-state.png
+inspekt info
+inspekt screenshot final-state.png
 ```
 
 ## Performance Optimization Tips
@@ -483,22 +483,22 @@ If you need better CLI performance:
 
 1. **Use `--json` flag** for faster output:
    ```bash
-   zen info --json | jq
+   inspekt info --json | jq
    ```
 
 2. **Batch commands** in shell scripts:
    ```bash
    # Slower: Multiple commands
-   zen eval "document.title"
-   zen eval "document.URL"
+   inspekt eval "document.title"
+   inspekt eval "document.URL"
 
    # Faster: One command
-   zen eval "({title: document.title, url: document.URL})" --format json
+   inspekt eval "({title: document.title, url: document.URL})" --format json
    ```
 
 3. **Keep bridge server running**:
    ```bash
-   zen server start --daemon  # Only start once
+   inspekt server start --daemon  # Only start once
    ```
 
 ### For API Users
@@ -542,14 +542,14 @@ To maximize API performance:
 #!/bin/bash
 # daily-check.sh - Run once per day
 
-zen open "https://mysite.com"
+inspekt open "https://mysite.com"
 sleep 3
 
 # Get summary
-zen describe > summary.txt
+inspekt describe > summary.txt
 
 # Take screenshot
-zen screenshot website-$(date +%Y%m%d).png
+inspekt screenshot website-$(date +%Y%m%d).png
 
 # Email report
 mail -s "Daily Website Check" admin@example.com < summary.txt

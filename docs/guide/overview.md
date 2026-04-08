@@ -228,9 +228,9 @@ Live JavaScript session:
 
 ```bash
 inspekt repl
-zen> document.querySelectorAll('p').length
+inspekt> document.querySelectorAll('p').length
 2
-zen> exit
+inspekt> exit
 ```
 
 ### Element Interaction

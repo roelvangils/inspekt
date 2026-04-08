@@ -21,7 +21,7 @@ Inspekt services layer implements the core business logic following a clean arch
 
 Wraps the BridgeClient to provide standardized execution flow for browser commands.
 
-**Location:** `zen/services/bridge_executor.py`
+**Location:** `inspekt/services/bridge_executor.py`
 
 ### Purpose
 
@@ -207,7 +207,7 @@ def execute_with_script(
 
 **Parameters:**
 
-- `script_name` (str): Name of script file in zen/scripts/
+- `script_name` (str): Name of script file in inspekt/scripts/
 - `substitutions` (dict[str, str] | None): Dictionary of placeholder → value substitutions
 - `timeout` (float): Maximum time to wait for result in seconds
 - `retry_on_timeout` (bool): If True, retry on TimeoutError
@@ -343,7 +343,7 @@ def get_executor(
 **Example:**
 
 ```python
-from zen.services.bridge_executor import get_executor
+from inspekt.services.bridge_executor import get_executor
 
 executor = get_executor()
 result = executor.execute("document.title")
@@ -355,7 +355,7 @@ result = executor.execute("document.title")
 
 Handles language detection and AI tool orchestration for content analysis commands.
 
-**Location:** `zen/services/ai_integration.py`
+**Location:** `inspekt/services/ai_integration.py`
 
 ### Purpose
 
@@ -728,7 +728,7 @@ def get_ai_service(prompts_dir: Path | None = None) -> AIIntegrationService
 **Example:**
 
 ```python
-from zen.services.ai_integration import get_ai_service
+from inspekt.services.ai_integration import get_ai_service
 
 service = get_ai_service()
 description = service.generate_description(page_structure)
@@ -740,7 +740,7 @@ description = service.generate_description(page_structure)
 
 Manages control mode state and notifications.
 
-**Location:** `zen/services/control_manager.py`
+**Location:** `inspekt/services/control_manager.py`
 
 ### Purpose
 
@@ -1004,7 +1004,7 @@ def get_control_manager(
 **Example:**
 
 ```python
-from zen.services.control_manager import get_control_manager
+from inspekt.services.control_manager import get_control_manager
 
 manager = get_control_manager()
 notifications = manager.check_notifications()
@@ -1014,13 +1014,13 @@ notifications = manager.check_notifications()
 
 ## ScriptLoader
 
-Loads and caches JavaScript scripts from the zen/scripts/ directory.
+Loads and caches JavaScript scripts from the inspekt/scripts/ directory.
 
-**Location:** `zen/services/script_loader.py`
+**Location:** `inspekt/services/script_loader.py`
 
 ### Purpose
 
-- Load JavaScript files from zen/scripts/ directory
+- Load JavaScript files from inspekt/scripts/ directory
 - Cache scripts in memory for performance
 - Handle template substitution (placeholders)
 - Provide both sync and async interfaces
@@ -1037,7 +1037,7 @@ class ScriptLoader:
 
 **Parameters:**
 
-- `scripts_dir` (Path | None): Directory containing JavaScript files. If None, uses zen/scripts/
+- `scripts_dir` (Path | None): Directory containing JavaScript files. If None, uses inspekt/scripts/
 
 ---
 
@@ -1356,9 +1356,9 @@ print(cached)  # ["control.js"]
 Services are designed to work together. Here's a common pattern:
 
 ```python
-from zen.services.bridge_executor import get_executor
-from zen.services.ai_integration import get_ai_service
-from zen.services.script_loader import ScriptLoader
+from inspekt.services.bridge_executor import get_executor
+from inspekt.services.ai_integration import get_ai_service
+from inspekt.services.script_loader import ScriptLoader
 
 # Get singleton instances
 executor = get_executor()
@@ -1383,7 +1383,7 @@ print(description)
 All services follow consistent error handling:
 
 ```python
-from zen.services.bridge_executor import get_executor
+from inspekt.services.bridge_executor import get_executor
 
 executor = get_executor()
 
@@ -1410,7 +1410,7 @@ Services accept dependencies for testability:
 
 ```python
 from pathlib import Path
-from zen.services.script_loader import ScriptLoader
+from inspekt.services.script_loader import ScriptLoader
 
 # Custom scripts directory for testing
 loader = ScriptLoader(scripts_dir=Path("/custom/scripts"))

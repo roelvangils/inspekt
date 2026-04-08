@@ -181,38 +181,38 @@ return {
 
 ### Built-in Scripts
 
-Inspekt includes several ready-to-use scripts in the `zen/scripts/` directory:
+Inspekt includes several ready-to-use scripts in the `inspekt/scripts/` directory:
 
 ```bash
 # Extract all images
-inspekt exec zen/scripts/extract_images.js
+inspekt exec inspekt/scripts/extract_images.js
 
 # Extract table data
-inspekt exec zen/scripts/extract_table.js
+inspekt exec inspekt/scripts/extract_table.js
 
 # Get SEO metadata
-inspekt exec zen/scripts/extract_metadata.js
+inspekt exec inspekt/scripts/extract_metadata.js
 
 # Performance metrics
-inspekt exec zen/scripts/performance_metrics.js
+inspekt exec inspekt/scripts/performance_metrics.js
 
 # Inject jQuery
-inspekt exec zen/scripts/inject_jquery.js
+inspekt exec inspekt/scripts/inject_jquery.js
 
 # Highlight elements
-inspekt exec zen/scripts/highlight_selector.js
+inspekt exec inspekt/scripts/highlight_selector.js
 ```
 
 ### Creating Your Own Scripts
 
 **1. Create a script directory:**
 ```bash
-mkdir -p ~/zen-scripts
+mkdir -p ~/inspekt-scripts
 ```
 
 **2. Write your script:**
 ```javascript
-// ~/zen-scripts/extract-prices.js
+// ~/inspekt-scripts/extract-prices.js
 const prices = Array.from(document.querySelectorAll('.price'));
 return prices.map(p => ({
   text: p.textContent,
@@ -222,7 +222,7 @@ return prices.map(p => ({
 
 **3. Execute:**
 ```bash
-inspekt exec ~/zen-scripts/extract-prices.js --format json
+inspekt exec ~/inspekt-scripts/extract-prices.js --format json
 ```
 
 ---
@@ -629,13 +629,13 @@ inspekt eval "
 **Store data globally:**
 ```bash
 # Set
-inspekt eval "window.zenData = {extracted: Date.now(), items: [1,2,3]}"
+inspekt eval "window.inspektData = {extracted: Date.now(), items: [1,2,3]}"
 
 # Get
-inspekt eval "window.zenData"
+inspekt eval "window.inspektData"
 
 # Update
-inspekt eval "window.zenData.items.push(4); window.zenData"
+inspekt eval "window.inspektData.items.push(4); window.inspektData"
 ```
 
 ### Console Integration
@@ -796,9 +796,9 @@ Open browser console while running commands to see:
 
 ```bash
 inspekt repl
-zen> document.querySelector('.complex-selector')
-zen> Array.from(document.querySelectorAll('.items')).length
-zen> exit
+inspekt> document.querySelector('.complex-selector')
+inspekt> Array.from(document.querySelectorAll('.items')).length
+inspekt> exit
 ```
 
 ### 3. Break Down Complex Code

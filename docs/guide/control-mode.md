@@ -365,7 +365,7 @@ while True:
 
 ```javascript
 // control.js (injected in browser)
-document.addEventListener('zenControl', (event) => {
+document.addEventListener('inspektControl', (event) => {
   const {key, shiftKey, ctrlKey, altKey} = event.detail;
 
   // Simulate keyboard event

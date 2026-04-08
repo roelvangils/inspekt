@@ -62,7 +62,7 @@ Inspekt is a command-line tool that enables execution of JavaScript code in a br
 │                      APPLICATION LAYER (Layer 3)                    │
 │  ┌──────────────────────────────────────────────────────────────┐  │
 │  │                      CLI Application                         │  │
-│  │  zen/app/cli/                                                │  │
+│  │  inspekt/app/cli/                                                │  │
 │  │    ├─ __init__.py (105 lines) - Main CLI group              │  │
 │  │    ├─ base.py (145 lines) - Shared utilities                │  │
 │  │    ├─ exec.py (105 lines) - eval, exec, repl                │  │
@@ -79,7 +79,7 @@ Inspekt is a command-line tool that enables execution of JavaScript code in a br
 │                                                                     │
 │  ┌──────────────────────────────────────────────────────────────┐  │
 │  │                   WebSocket Server                           │  │
-│  │  zen/bridge_ws.py (396 lines)                               │  │
+│  │  inspekt/bridge_ws.py (396 lines)                               │  │
 │  │    - HTTP handlers (/run, /result, /health, /notifications) │  │
 │  │    - WebSocket handler (/ws)                                │  │
 │  │    - Request/response state management                      │  │
@@ -89,9 +89,9 @@ Inspekt is a command-line tool that enables execution of JavaScript code in a br
 ┌─────────────────────────▼───────────────────────────────────────────┐
 │                     SERVICES LAYER (Layer 2)                        │
 │  ┌──────────────────────────────────────────────────────────────┐  │
-│  │  zen/services/                                               │  │
+│  │  inspekt/services/                                               │  │
 │  │    ├─ script_loader.py (207 lines)                          │  │
-│  │    │    - Load JavaScript files from zen/scripts/           │  │
+│  │    │    - Load JavaScript files from inspekt/scripts/           │  │
 │  │    │    - In-memory caching for performance                 │  │
 │  │    │    - Template substitution (placeholders)              │  │
 │  │    │    - Sync & async interfaces                           │  │
@@ -119,7 +119,7 @@ Inspekt is a command-line tool that enables execution of JavaScript code in a br
 ┌─────────────────────────▼───────────────────────────────────────────┐
 │                     ADAPTERS LAYER (Layer 1)                        │
 │  ┌──────────────────────────────────────────────────────────────┐  │
-│  │  zen/adapters/                                               │  │
+│  │  inspekt/adapters/                                               │  │
 │  │    └─ filesystem.py (176 lines)                             │  │
 │  │         - read_text_async() / read_text_sync()              │  │
 │  │         - read_binary_async() / read_binary_sync()          │  │
@@ -136,7 +136,7 @@ Inspekt is a command-line tool that enables execution of JavaScript code in a br
 ┌─────────────────────────▼───────────────────────────────────────────┐
 │                      DOMAIN LAYER (Layer 0)                         │
 │  ┌──────────────────────────────────────────────────────────────┐  │
-│  │  zen/domain/                                                 │  │
+│  │  inspekt/domain/                                                 │  │
 │  │    └─ models.py (398 lines) - Pydantic models               │  │
 │  │         ┌────────────────────────────────────────┐           │  │
 │  │         │ WebSocket Messages (8 models):         │           │  │
@@ -157,7 +157,7 @@ Inspekt is a command-line tool that enables execution of JavaScript code in a br
 │  │         ┌────────────────────────────────────────┐           │  │
 │  │         │ Configuration Models (2 models):       │           │  │
 │  │         │  - ControlConfig (18 fields)           │           │  │
-│  │         │  - ZenConfig                           │           │  │
+│  │         │  - InspektConfig                           │           │  │
 │  │         └────────────────────────────────────────┘           │  │
 │  │         ┌────────────────────────────────────────┐           │  │
 │  │         │ Helper Functions:                      │           │  │
@@ -168,14 +168,14 @@ Inspekt is a command-line tool that enables execution of JavaScript code in a br
 │  └──────────────────────────────────────────────────────────────┘  │
 │                                                                     │
 │  ┌──────────────────────────────────────────────────────────────┐  │
-│  │  zen/config.py (213 lines)                                   │  │
-│  │    - Configuration loading (./config.json, ~/.zen/)          │  │
+│  │  inspekt/config.py (213 lines)                                   │  │
+│  │    - Configuration loading (./config.json, ~/.inspekt/)          │  │
 │  │    - Default config values                                   │  │
 │  │    - Config merging logic                                    │  │
 │  └──────────────────────────────────────────────────────────────┘  │
 │                                                                     │
 │  ┌──────────────────────────────────────────────────────────────┐  │
-│  │  zen/client.py (250 lines)                                   │  │
+│  │  inspekt/client.py (250 lines)                                   │  │
 │  │    - BridgeClient HTTP wrapper                               │  │
 │  │    - Version checking logic                                  │  │
 │  │    - Health/status queries                                   │  │
@@ -184,7 +184,7 @@ Inspekt is a command-line tool that enables execution of JavaScript code in a br
 
 ┌─────────────────────────────────────────────────────────────────────┐
 │                      JAVASCRIPT SCRIPTS (25 files)                  │
-│  zen/scripts/                                                       │
+│  inspekt/scripts/                                                       │
 │    - control.js (799 lines) - Keyboard navigation                  │
 │    - extract_*.js (8 scripts) - Data extraction                    │
 │    - click_element.js, send_keys.js, wait_for.js - Interaction     │
@@ -229,7 +229,7 @@ Rule: Higher layers can import lower layers, but NOT vice versa
 └────────────────────────┬─────────────────────────────────────────────┘
                          │
 ┌────────────────────────▼─────────────────────────────────────────────┐
-│ 2. CLI LAYER (zen/app/cli/exec.py)                                  │
+│ 2. CLI LAYER (inspekt/app/cli/exec.py)                                  │
 │    @cli.command()                                                    │
 │    def eval(code, timeout, format):                                 │
 │        executor = get_executor()  # Service singleton               │
@@ -239,7 +239,7 @@ Rule: Higher layers can import lower layers, but NOT vice versa
 └────────────────────────┬─────────────────────────────────────────────┘
                          │
 ┌────────────────────────▼─────────────────────────────────────────────┐
-│ 3. SERVICE LAYER (zen/services/bridge_executor.py)                  │
+│ 3. SERVICE LAYER (inspekt/services/bridge_executor.py)                  │
 │    class BridgeExecutor:                                             │
 │        def execute(code, timeout):                                   │
 │            self.ensure_server_running()                              │
@@ -250,7 +250,7 @@ Rule: Higher layers can import lower layers, but NOT vice versa
 └────────────────────────┬─────────────────────────────────────────────┘
                          │
 ┌────────────────────────▼─────────────────────────────────────────────┐
-│ 4. CLIENT LAYER (zen/client.py)                                     │
+│ 4. CLIENT LAYER (inspekt/client.py)                                     │
 │    class BridgeClient:                                               │
 │        def execute(code, timeout):                                   │
 │            # POST /run                                               │
@@ -271,7 +271,7 @@ Rule: Higher layers can import lower layers, but NOT vice versa
 └────────────────────────┬─────────────────────────────────────────────┘
                          │ HTTP POST
 ┌────────────────────────▼─────────────────────────────────────────────┐
-│ 5. SERVER LAYER (zen/bridge_ws.py)                                  │
+│ 5. SERVER LAYER (inspekt/bridge_ws.py)                                  │
 │    async def handle_http_run(request):                              │
 │        data = await request.json()                                  │
 │        validated = RunRequest(**data)  # Pydantic validation        │
@@ -321,7 +321,7 @@ Rule: Higher layers can import lower layers, but NOT vice versa
 └────────────────────────┬─────────────────────────────────────────────┘
                          │ WebSocket
 ┌────────────────────────▼─────────────────────────────────────────────┐
-│ 7. SERVER RECEIVES RESULT (zen/bridge_ws.py)                       │
+│ 7. SERVER RECEIVES RESULT (inspekt/bridge_ws.py)                       │
 │    async def websocket_handler(request):                            │
 │        async for msg in ws:                                         │
 │            data = json.loads(msg.data)                              │
@@ -335,13 +335,13 @@ Rule: Higher layers can import lower layers, but NOT vice versa
 └────────────────────────┬─────────────────────────────────────────────┘
                          │
 ┌────────────────────────▼─────────────────────────────────────────────┐
-│ 8. CLIENT POLLS AND RETRIEVES (zen/client.py)                      │
+│ 8. CLIENT POLLS AND RETRIEVES (inspekt/client.py)                      │
 │    GET /result?request_id=...                                       │
 │    ← {"ok": true, "result": "Example Domain", "url": "...", ...}   │
 └────────────────────────┬─────────────────────────────────────────────┘
                          │
 ┌────────────────────────▼─────────────────────────────────────────────┐
-│ 9. CLI FORMATS AND DISPLAYS (zen/app/cli/exec.py)                  │
+│ 9. CLI FORMATS AND DISPLAYS (inspekt/app/cli/exec.py)                  │
 │    Output: Example Domain                                           │
 └──────────────────────────────────────────────────────────────────────┘
 ```
@@ -354,7 +354,7 @@ Rule: Higher layers can import lower layers, but NOT vice versa
 
 **Purpose**: Pure data structures and validation logic with no I/O or external dependencies.
 
-#### `zen/domain/models.py` (398 lines)
+#### `inspekt/domain/models.py` (398 lines)
 
 **Responsibility**: Define all protocol messages and configuration schemas using Pydantic.
 
@@ -407,7 +407,7 @@ class ControlConfig(BaseModel):
             raise ValueError("focus_color must be a non-empty string")
         return v
 
-class ZenConfig(BaseModel):
+class InspektConfig(BaseModel):
     """Top-level configuration."""
     ai_language: str = "auto"
     control: ControlConfig = Field(default_factory=ControlConfig)
@@ -441,7 +441,7 @@ def parse_incoming_message(data: dict[str, Any]) -> IncomingMessage:
 
 **Purpose**: Handle all interactions with external systems (filesystem, network, etc.).
 
-#### `zen/adapters/filesystem.py` (176 lines)
+#### `inspekt/adapters/filesystem.py` (176 lines)
 
 **Responsibility**: Abstract file operations with both sync and async interfaces.
 
@@ -469,7 +469,7 @@ def dir_exists(path: Path) -> bool
 
 ```python
 # In async context (bridge_ws.py)
-from zen.adapters import filesystem
+from inspekt.adapters import filesystem
 
 script_content = await filesystem.read_text_async(script_path)
 
@@ -485,12 +485,12 @@ content = filesystem.read_text_sync(config_path)
 
 #### Future Adapters (Planned - Phase 3)
 
-**`zen/adapters/websocket.py`**:
+**`inspekt/adapters/websocket.py`**:
 - WebSocket connection management
 - Reconnection logic
 - Connection pooling for multiple tabs
 
-**`zen/adapters/http.py`**:
+**`inspekt/adapters/http.py`**:
 - HTTP client wrapper
 - Retry logic
 - Timeout handling
@@ -501,7 +501,7 @@ content = filesystem.read_text_sync(config_path)
 
 **Purpose**: Orchestrate business logic and coordinate between adapters and application layer.
 
-#### `zen/services/script_loader.py` (207 lines)
+#### `inspekt/services/script_loader.py` (207 lines)
 
 **Responsibility**: Load, cache, and substitute JavaScript scripts.
 
@@ -567,7 +567,7 @@ script = await loader.load_script_async("control.js", use_cache=True)
 - **After**: 1 file read on first use, cached thereafter
 - **Result**: ~50-100ms saved per command
 
-#### `zen/services/bridge_executor.py` (263 lines)
+#### `inspekt/services/bridge_executor.py` (263 lines)
 
 **Responsibility**: Standardized execution flow with retry logic and error handling.
 
@@ -630,7 +630,7 @@ def get_executor(
 
 ```python
 # In CLI commands
-from zen.services.bridge_executor import get_executor
+from inspekt.services.bridge_executor import get_executor
 
 @cli.command()
 def my_command():
@@ -657,7 +657,7 @@ def my_command():
 - ✅ Version compatibility warnings
 - ✅ Singleton pattern for resource efficiency
 
-#### `zen/services/ai_integration.py` (367 lines)
+#### `inspekt/services/ai_integration.py` (367 lines)
 
 **Responsibility**: AI-powered content analysis and language handling.
 
@@ -725,7 +725,7 @@ def get_ai_service(prompts_dir: Path | None = None) -> AIIntegrationService
 
 ```python
 # In CLI describe command
-from zen.services.ai_integration import get_ai_service
+from inspekt.services.ai_integration import get_ai_service
 
 @cli.command()
 @click.option("--language", help="Target language")
@@ -755,7 +755,7 @@ def describe(language, debug):
 - ✅ Debug mode for prompt inspection
 - ✅ Graceful error handling
 
-#### `zen/services/control_manager.py` (230 lines)
+#### `inspekt/services/control_manager.py` (230 lines)
 
 **Responsibility**: State management for keyboard control mode.
 
@@ -813,7 +813,7 @@ def get_control_manager(
 
 ```python
 # In control mode implementation
-from zen.services.control_manager import get_control_manager
+from inspekt.services.control_manager import get_control_manager
 
 manager = get_control_manager()
 
@@ -849,7 +849,7 @@ if manager.check_needs_restart(result):
 
 #### CLI Module Breakdown
 
-The CLI has been split into 12 focused modules, replacing the monolithic 4,093-line `zen/cli.py`:
+The CLI has been split into 12 focused modules, replacing the monolithic 4,093-line `inspekt/cli.py`:
 
 | Module | Lines | Purpose | Commands |
 |--------|-------|---------|----------|
@@ -871,23 +871,23 @@ The CLI has been split into 12 focused modules, replacing the monolithic 4,093-l
 
 ```python
 # All CLI modules import from services and domain layers
-from zen.services.bridge_executor import get_executor
-from zen.services.script_loader import ScriptLoader
-from zen.services.ai_integration import get_ai_service
-from zen.services.control_manager import get_control_manager
-from zen.domain.models import ControlConfig, ZenConfig
+from inspekt.services.bridge_executor import get_executor
+from inspekt.services.script_loader import ScriptLoader
+from inspekt.services.ai_integration import get_ai_service
+from inspekt.services.control_manager import get_control_manager
+from inspekt.domain.models import ControlConfig, InspektConfig
 from inspekt import config
 
 # No CLI module imports from other CLI modules (flat structure)
 ```
 
-**Example CLI Module Structure** (`zen/app/cli/exec.py`):
+**Example CLI Module Structure** (`inspekt/app/cli/exec.py`):
 
 ```python
 """Execution commands - eval, exec, repl."""
 
 import click
-from zen.services.bridge_executor import get_executor
+from inspekt.services.bridge_executor import get_executor
 
 @click.group()
 def exec_group():
@@ -925,7 +925,7 @@ def repl():
 
     while True:
         try:
-            code = input("zen> ")
+            code = input("inspekt> ")
             if code in ("exit", "quit"):
                 break
 
@@ -938,7 +938,7 @@ def repl():
             break
 ```
 
-#### WebSocket Server (`zen/bridge_ws.py`)
+#### WebSocket Server (`inspekt/bridge_ws.py`)
 
 **Responsibility**: Bidirectional communication between CLI and browser.
 
@@ -1169,11 +1169,11 @@ async def websocket_handler(request) -> web.WebSocketResponse:
 ┌─────────────────────────────────────────────────────────────────────┐
 │                     APPLICATION LAYER (Layer 3)                     │
 │  ┌────────────────────────────────────────────────────────────┐    │
-│  │ zen/app/cli/*.py (12 modules)                              │    │
+│  │ inspekt/app/cli/*.py (12 modules)                              │    │
 │  │   - __init__.py, base.py, exec.py, extraction.py, ...      │    │
 │  └────────────────────────────────────────────────────────────┘    │
 │  ┌────────────────────────────────────────────────────────────┐    │
-│  │ zen/bridge_ws.py (WebSocket server)                        │    │
+│  │ inspekt/bridge_ws.py (WebSocket server)                        │    │
 │  └────────────────────────────────────────────────────────────┘    │
 └──────────────────────────────┬──────────────────────────────────────┘
                                │ imports
@@ -1181,7 +1181,7 @@ async def websocket_handler(request) -> web.WebSocketResponse:
 ┌─────────────────────────────────────────────────────────────────────┐
 │                      SERVICES LAYER (Layer 2)                       │
 │  ┌────────────────────────────────────────────────────────────┐    │
-│  │ zen/services/                                              │    │
+│  │ inspekt/services/                                              │    │
 │  │   ├─ script_loader.py (207 lines)                         │    │
 │  │   ├─ bridge_executor.py (263 lines)                       │    │
 │  │   ├─ ai_integration.py (367 lines)                        │    │
@@ -1193,7 +1193,7 @@ async def websocket_handler(request) -> web.WebSocketResponse:
 ┌─────────────────────────────────────────────────────────────────────┐
 │                      ADAPTERS LAYER (Layer 1)                       │
 │  ┌────────────────────────────────────────────────────────────┐    │
-│  │ zen/adapters/                                              │    │
+│  │ inspekt/adapters/                                              │    │
 │  │   └─ filesystem.py (176 lines)                            │    │
 │  │       - read_text_async/sync                              │    │
 │  │       - write_text_async/sync                             │    │
@@ -1205,20 +1205,20 @@ async def websocket_handler(request) -> web.WebSocketResponse:
 ┌─────────────────────────────────────────────────────────────────────┐
 │                       DOMAIN LAYER (Layer 0)                        │
 │  ┌────────────────────────────────────────────────────────────┐    │
-│  │ zen/domain/models.py (398 lines)                           │    │
+│  │ inspekt/domain/models.py (398 lines)                           │    │
 │  │   - ExecuteRequest, ExecuteResult                          │    │
 │  │   - ReinitControlRequest, RefocusNotification              │    │
 │  │   - PingMessage, PongMessage                               │    │
-│  │   - ControlConfig, ZenConfig                               │    │
+│  │   - ControlConfig, InspektConfig                               │    │
 │  │   - parse_incoming_message()                               │    │
 │  └────────────────────────────────────────────────────────────┘    │
 │  ┌────────────────────────────────────────────────────────────┐    │
-│  │ zen/config.py (213 lines)                                  │    │
+│  │ inspekt/config.py (213 lines)                                  │    │
 │  │   - load_config(), find_config_file()                      │    │
 │  │   - DEFAULT_CONFIG                                         │    │
 │  └────────────────────────────────────────────────────────────┘    │
 │  ┌────────────────────────────────────────────────────────────┐    │
-│  │ zen/client.py (250 lines)                                  │    │
+│  │ inspekt/client.py (250 lines)                                  │    │
 │  │   - BridgeClient HTTP wrapper                              │    │
 │  │   - execute(), is_alive(), get_status()                    │    │
 │  └────────────────────────────────────────────────────────────┘    │
@@ -1264,7 +1264,7 @@ CLI → ScriptLoader.load_script_sync("control.js")
          ↓
       Filesystem Adapter
          ↓
-      Read from disk (zen/scripts/control.js)
+      Read from disk (inspekt/scripts/control.js)
          ↓
       Store in cache {"control.js": "...content..."}
          ↓
@@ -1309,13 +1309,13 @@ Optional: speak message via TTS (macOS 'say')
 **Step 1**: Choose the appropriate CLI module (or create a new one):
 
 ```python
-# zen/app/cli/my_feature.py
+# inspekt/app/cli/my_feature.py
 
 """My feature commands."""
 
 import click
-from zen.services.bridge_executor import get_executor
-from zen.services.script_loader import ScriptLoader
+from inspekt.services.bridge_executor import get_executor
+from inspekt.services.script_loader import ScriptLoader
 
 @click.group()
 def my_feature_group():
@@ -1345,9 +1345,9 @@ def my_command(arg, flag):
 **Step 2**: Register in main CLI group:
 
 ```python
-# zen/app/cli/__init__.py
+# inspekt/app/cli/__init__.py
 
-from zen.app.cli.my_feature import my_feature_group
+from inspekt.app.cli.my_feature import my_feature_group
 
 cli.add_command(my_feature_group, name="my-feature")
 ```
@@ -1355,7 +1355,7 @@ cli.add_command(my_feature_group, name="my-feature")
 **Step 3**: Create JavaScript script:
 
 ```javascript
-// zen/scripts/my_script.js
+// inspekt/scripts/my_script.js
 
 (function() {
     // Your code here
@@ -1374,7 +1374,7 @@ cli.add_command(my_feature_group, name="my-feature")
 **Step 1**: Create service class:
 
 ```python
-# zen/services/my_service.py
+# inspekt/services/my_service.py
 
 """My service - does something useful."""
 
@@ -1406,7 +1406,7 @@ def get_my_service(config: dict | None = None) -> MyService:
 **Step 2**: Use in CLI:
 
 ```python
-from zen.services.my_service import get_my_service
+from inspekt.services.my_service import get_my_service
 
 @cli.command()
 def my_command():
@@ -1420,7 +1420,7 @@ def my_command():
 **Standard Pattern**:
 
 ```javascript
-// zen/scripts/my_feature.js
+// inspekt/scripts/my_feature.js
 
 (function() {
     'use strict';
@@ -1458,7 +1458,7 @@ def my_command():
 **With Template Substitution**:
 
 ```javascript
-// zen/scripts/my_configurable.js
+// inspekt/scripts/my_configurable.js
 
 (function() {
     'use strict';
@@ -1501,7 +1501,7 @@ script = loader.load_with_substitution_sync(
 **Step 1**: Add new Pydantic model:
 
 ```python
-# zen/domain/models.py
+# inspekt/domain/models.py
 
 class MyNewMessage(BaseModel):
     """My new message type."""
@@ -1524,7 +1524,7 @@ IncomingMessage = (
 **Step 2**: Update parser:
 
 ```python
-# zen/domain/models.py
+# inspekt/domain/models.py
 
 def parse_incoming_message(data: dict[str, Any]) -> IncomingMessage:
     msg_type = data.get("type")
@@ -1537,7 +1537,7 @@ def parse_incoming_message(data: dict[str, Any]) -> IncomingMessage:
 **Step 3**: Handle in server:
 
 ```python
-# zen/bridge_ws.py
+# inspekt/bridge_ws.py
 
 async def websocket_handler(request):
     async for msg in ws:
@@ -1609,7 +1609,7 @@ class BridgeExecutor:
 
 ```python
 # Adapter abstracts file I/O
-from zen.adapters import filesystem
+from inspekt.adapters import filesystem
 
 # In production
 content = await filesystem.read_text_async(path)
@@ -1708,7 +1708,7 @@ script = loader.load_script_sync("control.js")  # Cached automatically
 
 2. **Environment variables** (planned - Phase 3)
    ```bash
-   export ZEN_TIMEOUT=30
+   export INSPEKT_TIMEOUT=30
    ```
 
 3. **Local config file** (`./config.json`)
@@ -1716,12 +1716,12 @@ script = loader.load_script_sync("control.js")  # Cached automatically
    {"ai-language": "nl", "control": {"verbose": true}}
    ```
 
-4. **User config file** (`~/.zen/config.json`)
+4. **User config file** (`~/.inspekt/config.json`)
    ```json
    {"ai-language": "en", "control": {"verbose": false}}
    ```
 
-5. **Default config** (`zen/config.py:DEFAULT_CONFIG`)
+5. **Default config** (`inspekt/config.py:DEFAULT_CONFIG`)
    ```python
    DEFAULT_CONFIG = {
        "ai-language": "auto",
@@ -1738,7 +1738,7 @@ script = loader.load_script_sync("control.js")  # Cached automatically
 
 **User Config** (user-wide):
 ```
-~/.zen/config.json
+~/.inspekt/config.json
 ```
 
 ### Configuration Schema
@@ -1746,7 +1746,7 @@ script = loader.load_script_sync("control.js")  # Cached automatically
 **Complete Schema** (validated by Pydantic):
 
 ```python
-class ZenConfig(BaseModel):
+class InspektConfig(BaseModel):
     ai_language: str = "auto"  # auto, en, nl, fr, de, es, ...
 
     control: ControlConfig = Field(default_factory=ControlConfig)
@@ -1792,20 +1792,20 @@ Future support for environment variables:
 
 ```bash
 # Server settings
-export ZEN_HOST=127.0.0.1
-export ZEN_PORT=8765
+export INSPEKT_HOST=127.0.0.1
+export INSPEKT_PORT=8765
 
 # Timeouts
-export ZEN_TIMEOUT=30
-export ZEN_WS_TIMEOUT=60
+export INSPEKT_TIMEOUT=30
+export INSPEKT_WS_TIMEOUT=60
 
 # AI settings
-export ZEN_AI_LANGUAGE=en
-export ZEN_MODS_ARGS="--model gpt-4"
+export INSPEKT_AI_LANGUAGE=en
+export INSPEKT_MODS_ARGS="--model gpt-4"
 
 # Debugging
-export ZEN_DEBUG=1
-export ZEN_VERBOSE=1
+export INSPEKT_DEBUG=1
+export INSPEKT_VERBOSE=1
 ```
 
 ---
@@ -1857,7 +1857,7 @@ tests/
 ```python
 import pytest
 from pathlib import Path
-from zen.services.script_loader import ScriptLoader
+from inspekt.services.script_loader import ScriptLoader
 
 def test_load_script_sync_caches():
     loader = ScriptLoader()
@@ -1897,7 +1897,7 @@ async def test_load_script_async():
 import pytest
 import asyncio
 from aiohttp import web
-from zen.bridge_ws import create_app
+from inspekt.bridge_ws import create_app
 
 @pytest.mark.integration
 @pytest.mark.asyncio
@@ -1956,14 +1956,14 @@ from playwright.sync_api import sync_playwright
 import subprocess
 
 @pytest.fixture
-def zen_server():
+def inspekt_server():
     """Start inspekt server in background."""
-    proc = subprocess.Popen(['zen', 'server', 'start'])
+    proc = subprocess.Popen(['inspekt', 'server', 'start'])
     yield
     proc.terminate()
 
 @pytest.mark.e2e
-def test_eval_command(zen_server):
+def test_eval_command(inspekt_server):
     """Test inspekt eval command in real browser."""
     with sync_playwright() as p:
         browser = p.chromium.launch()
@@ -1979,7 +1979,7 @@ def test_eval_command(zen_server):
 
         # Run CLI command
         result = subprocess.run(
-            ['zen', 'eval', 'document.title'],
+            ['inspekt', 'eval', 'document.title'],
             capture_output=True,
             text=True
         )
@@ -2002,7 +2002,7 @@ pytest tests/ --cov=inspekt --cov-report=html --cov-report=term
 pytest tests/unit/ --cov=inspekt --cov-report=html
 
 # Integration tests
-pytest tests/integration/ -m integration --cov=zen
+pytest tests/integration/ -m integration --cov=inspekt
 
 # E2E tests
 pytest tests/e2e/ -m e2e
@@ -2021,8 +2021,8 @@ open htmlcov/index.html
 ### A. File Tree
 
 ```
-zen_bridge/
-├── zen/
+inspekt_bridge/
+├── inspekt/
 │   ├── __init__.py
 │   ├── cli.py (4,093 lines - legacy, to be deprecated)
 │   ├── client.py (250 lines)

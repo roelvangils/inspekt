@@ -12,7 +12,7 @@ def execute_javascript(request: EvalRequest):
     """
     Execute JavaScript code in the browser.
 
-    This endpoint mirrors the `zen eval` CLI command.
+    This endpoint mirrors the `inspekt eval` CLI command.
 
     Args:
         request: JavaScript code and timeout

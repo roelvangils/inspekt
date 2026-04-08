@@ -17,7 +17,7 @@ The file is located in the **project root directory** where you installed Inspek
 !!! tip "Create Config File"
     If `config.json` doesn't exist, create it in the project root:
     ```bash
-    cd /path/to/zen-bridge
+    cd /path/to/inspekt-bridge
     touch config.json
     ```
 
@@ -743,7 +743,7 @@ Page structure:
 
 Configuration is loaded in the following order (later values override earlier ones):
 
-1. **Default values** (hardcoded in `zen/domain/models.py`)
+1. **Default values** (hardcoded in `inspekt/domain/models.py`)
 2. **`config.json`** (project root)
 3. **Command-line flags** (where applicable)
 
@@ -820,14 +820,14 @@ inspektcontrol --verbose
 You can load and validate configuration programmatically:
 
 ```python
-from zen.domain.models import ZenConfig
+from inspekt.domain.models import InspektConfig
 
 # Load from file
 with open('config.json') as f:
     config_dict = json.load(f)
 
 # Validate with Pydantic
-config = ZenConfig(**config_dict)
+config = InspektConfig(**config_dict)
 
 # Access settings
 print(config.ai_language)  # "auto"

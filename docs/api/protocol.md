@@ -527,8 +527,8 @@ Triggered when:
 
 ### Current Version
 
-**Userscript Version**: 3.4 (defined in `window.__ZEN_BRIDGE_VERSION__`)
-**Server Version**: 1.0.0 (defined in `zen/__init__.py`)
+**Userscript Version**: 3.4 (defined in `window.__INSPEKT_BRIDGE_VERSION__`)
+**Server Version**: 1.0.0 (defined in `inspekt/__init__.py`)
 
 ### Version Checking
 
@@ -536,7 +536,7 @@ Triggered when:
 
 ```python
 # In client.py
-installed_version = client.execute("window.__ZEN_BRIDGE_VERSION__ || 'unknown'")
+installed_version = client.execute("window.__INSPEKT_BRIDGE_VERSION__ || 'unknown'")
 expected_version = get_expected_userscript_version()  # From userscript_ws.js
 
 if installed_version != expected_version:
@@ -765,8 +765,8 @@ if installed_version != expected_version:
 - CONTRIBUTING.md - Development guide
 - REFACTOR_PLAN.md - Protocol validation plan (Phase 1)
 - userscript_ws.js - Browser-side implementation
-- zen/bridge_ws.py - Server-side implementation
-- zen/client.py - HTTP client implementation
+- inspekt/bridge_ws.py - Server-side implementation
+- inspekt/client.py - HTTP client implementation
 
 ---
 
