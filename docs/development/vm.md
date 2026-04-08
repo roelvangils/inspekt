@@ -2,18 +2,36 @@
 
 The `inspekt vm` command runs a Docker container with a full browser environment (Chromium + noVNC + Inspekt). The container is built from `docker/browser-vm/Dockerfile`.
 
-## Starting the VM
-
-The **recommended** way to start the VM is via the `inspekt` CLI:
+## Quick Start
 
 ```bash
-inspekt vm start       # From the source repo: auto-enables dev mode
+bun run build          # Bundle assets, rebuild Docker image, and start VM
+bun run dev            # Restart VM in dev mode (mounts source files for live editing)
+bun run start          # Start VM (uses existing image)
+bun run bundle         # Generate dist/ files only (no Docker build)
 inspekt vm stop        # Stop the VM
-inspekt vm restart     # Restart (picks up Dockerfile changes automatically)
 inspekt vm status      # Check status and mode
 ```
 
+| Command | What it does | Use when |
+|---------|-------------|----------|
+| `bun run build` | Bundles CSS/JS, rebuilds the Docker image, starts the VM | First time setup, or after changing Dockerfile / entrypoint / supervisord |
+| `bun run dev` | Restarts the VM with source files mounted (no bundling) | Day-to-day development — edits to CSS, JS, HTML, or Python |
+| `bun run start` | Starts the VM using the existing Docker image | Starting the VM after a stop |
+| `bun run bundle` | Generates `dist/` files without touching Docker | Testing the bundle output |
+
+**Typical workflow:**
+
+1. `bun run build` — once, to create the Docker image
+2. `bun run dev` — for daily development (mounts source files from your repo)
+3. After editing CSS/JS/HTML: `bun run dev` again to pick up changes
+
 Once running, open **`http://127.0.0.1:6080/control.html`** in your browser.
+
+### Production vs Dev Mode
+
+- **Production** (`bun run build`): CSS and JS are bundled into `dist/app.min.css` and `dist/app.min.js`, baked into the Docker image. Smaller, faster, no source files needed.
+- **Dev mode** (`bun run dev`): Your local source files (`css/`, `js/`, `control-panel.html`) are mounted into the container. Changes are picked up on restart without rebuilding the image.
 
 !!! warning "Use `127.0.0.1`, not `localhost`"
     On some systems, `localhost` resolves to IPv6 (`::1`) which may not reach the container. Always use `http://127.0.0.1:6080/control.html`.
@@ -69,9 +87,12 @@ In dev mode, these files are mounted from the host into the container:
 | Host Path | Container Path | Hot-Reload? |
 |-----------|----------------|-------------|
 | `docker/browser-vm/control-panel.html` | `/usr/share/novnc/control.html` | Restart required (noVNC caches) |
+| `docker/browser-vm/css/` | `/usr/share/novnc/css/` | Restart required (noVNC caches) |
+| `docker/browser-vm/js/` | `/usr/share/novnc/js/` | Restart required (noVNC caches) |
 | `docker/browser-vm/fonts/` | `/usr/share/novnc/fonts/` | Restart required (noVNC caches) |
-| `docker/browser-vm/control-server.py` | `/opt/control-server.py` | `supervisorctl restart control-server` |
-| `docker/browser-vm/terminal-server.py` | `/opt/terminal-server.py` | `supervisorctl restart terminal` |
+| `docker/browser-vm/servers/control-server.py` | `/opt/control-server.py` | `supervisorctl restart control-server` |
+| `docker/browser-vm/servers/terminal-server.py` | `/opt/terminal-server.py` | `supervisorctl restart terminal-server` |
+| `docker/browser-vm/servers/audio-server.py` | `/opt/audio-server.py` | `supervisorctl restart audio-server` |
 | `inspekt/` | `/opt/inspekt/inspekt/` | **Instant** (Python reloads on each CLI call) |
 | `extensions/` | `/opt/inspekt/extensions/` | Restart required (Chromium reloads extension) |
 
@@ -85,7 +106,7 @@ docker exec inspekt-browser-vm supervisorctl restart control-server
 
 # Restart the terminal server (after editing terminal-server.py)
 # Note: This will disconnect the current terminal session
-docker exec inspekt-browser-vm supervisorctl restart terminal
+docker exec inspekt-browser-vm supervisorctl restart terminal-server
 
 # Restart only the bridge server
 docker exec inspekt-browser-vm supervisorctl restart inspekt-bridge
@@ -101,20 +122,22 @@ docker exec inspekt-browser-vm supervisorctl status
 
 The following changes **require a full container rebuild**:
 
-| File/Directory | Reason | Dev Mode? |
-|----------------|--------|-----------|
-| `docker/browser-vm/Dockerfile` | Container build instructions | Rebuild required |
-| `docker/browser-vm/supervisord.conf` | Process manager config | Rebuild required |
-| `docker/browser-vm/entrypoint.sh` | Container startup script | Rebuild required |
-| `docker/browser-vm/control-panel.html` | VM control UI | Restart only (mounted) |
-| `docker/browser-vm/fonts/` | Web fonts for terminal | Restart only (mounted) |
-| `docker/browser-vm/control-server.py` | Control panel REST API | Restart + supervisorctl (mounted) |
-| `docker/browser-vm/terminal-server.py` | WebSocket terminal server | Restart + supervisorctl (mounted) |
-| `docker/browser-vm/*.sh` | Shell scripts | Rebuild required |
-| `docker/browser-vm/*.css` | Stylesheets | Rebuild required |
-| `inspekt/` source code | Inspekt CLI inside container | **Instant** (mounted) |
-| `extensions/` | Chrome extension files | Rebuild required |
-| `pyproject.toml` | Python dependencies | Rebuild required |
+| File/Directory | Dev Mode | Production |
+|----------------|----------|------------|
+| `docker/browser-vm/Dockerfile` | Rebuild required (`bun run build`) | Rebuild required |
+| `docker/browser-vm/supervisord.conf` | Rebuild required | Rebuild required |
+| `docker/browser-vm/entrypoint.sh` | Rebuild required | Rebuild required |
+| `docker/browser-vm/scripts/*.sh` | Rebuild required | Rebuild required |
+| `pyproject.toml` | Rebuild required | Rebuild required |
+| `docker/browser-vm/control-panel.html` | Restart only (`bun run dev`) | Rebuild required |
+| `docker/browser-vm/css/` | Restart only | Rebuild required |
+| `docker/browser-vm/js/` | Restart only | Rebuild required |
+| `docker/browser-vm/fonts/` | Restart only | Rebuild required |
+| `docker/browser-vm/servers/control-server.py` | `supervisorctl restart control-server` | Rebuild required |
+| `docker/browser-vm/servers/terminal-server.py` | `supervisorctl restart terminal-server` | Rebuild required |
+| `docker/browser-vm/servers/audio-server.py` | `supervisorctl restart audio-server` | Rebuild required |
+| `inspekt/` source code | **Instant** (mounted) | Rebuild required |
+| `extensions/` | Restart only (Chromium reloads) | Rebuild required |
 
 ## Critical: noVNC File Caching
 
@@ -181,18 +204,19 @@ For faster iteration, use `inspekt vm start` from the source repo — it auto-en
 
 ## Verifying Changes
 
-After rebuilding, verify your changes are being served:
+After restarting, verify your changes are being served:
 
 ```bash
-# Check CSS changes
-curl -s http://localhost:6080/control.html | grep -A5 ".terminal-overlay {"
+# Check that CSS/JS modules load (should return 200)
+curl -s -o /dev/null -w "%{http_code}" http://localhost:6080/css/tokens.css
+curl -s -o /dev/null -w "%{http_code}" http://localhost:6080/js/config.js
 
 # Check font availability
 curl -sI http://localhost:6080/fonts/JetBrainsMonoNerdFont-Regular.woff2 | head -3
 
-# Compare file in container vs HTTP response
-docker exec <container-id> md5sum /usr/share/novnc/control.html
-curl -s http://localhost:6080/control.html | md5
+# In production mode, check bundled assets
+curl -s -o /dev/null -w "%{http_code}" http://localhost:6080/dist/app.min.css
+curl -s -o /dev/null -w "%{http_code}" http://localhost:6080/dist/app.min.js
 ```
 
 ## Dynamic VNC Viewport Resize
@@ -333,7 +357,7 @@ docker exec inspekt-browser-vm python3 /opt/terminal-server.py
 **Common Causes:**
 
 - **Permission denied**: Host file mounted without execute permission
-  - Fix: `chmod +x docker/browser-vm/terminal-server.py`
+  - Fix: `chmod +x docker/browser-vm/servers/terminal-server.py`
 - **Port already in use**: Previous terminal server didn't clean up
   - Fix: `docker exec inspekt-browser-vm pkill terminal-server` then restart
 - **Python module missing**: websockets not installed
