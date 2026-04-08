@@ -393,9 +393,6 @@ COPY docker/browser-vm/terminal-server.py /opt/terminal-server.py
 COPY docker/browser-vm/dist/control.html /usr/share/novnc/control.html
 COPY docker/browser-vm/dist/app.min.css /usr/share/novnc/dist/app.min.css
 COPY docker/browser-vm/dist/app.min.js /usr/share/novnc/dist/app.min.js
-COPY docker/browser-vm/toolbar.css /usr/share/novnc/toolbar.css
-COPY docker/browser-vm/vision-sim.css /usr/share/novnc/vision-sim.css
-COPY docker/browser-vm/motor-sim.css /usr/share/novnc/motor-sim.css
 COPY docker/browser-vm/css /usr/share/novnc/css
 COPY docker/browser-vm/fonts /usr/share/novnc/fonts
 COPY docker/browser-vm/vendor/codemirror.min.js /usr/share/novnc/vendor/codemirror.min.js
