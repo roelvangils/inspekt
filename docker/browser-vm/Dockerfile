@@ -384,8 +384,8 @@ RUN chmod -R a+rX /opt/inspekt/.venv && \
 
 # Copy VM configuration files
 COPY docker/browser-vm/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
-COPY docker/browser-vm/openbox-autostart /root/.config/openbox/autostart
-COPY docker/browser-vm/openbox-rc.xml /root/.config/openbox/rc.xml
+COPY docker/browser-vm/config/openbox-autostart /root/.config/openbox/autostart
+COPY docker/browser-vm/config/openbox-rc.xml /root/.config/openbox/rc.xml
 COPY docker/browser-vm/entrypoint.sh /entrypoint.sh
 COPY docker/browser-vm/servers/control-server.py /opt/control-server.py
 COPY docker/browser-vm/servers/terminal-server.py /opt/terminal-server.py
@@ -405,19 +405,19 @@ COPY docker/browser-vm/vendor/xterm-addon-web-links.min.js /usr/share/novnc/vend
 COPY docker/browser-vm/js /usr/share/novnc/js
 COPY docker/browser-vm/scripts/inspekt-chromium.sh /opt/inspekt-chromium.sh
 COPY docker/browser-vm/scripts/devtools-manager.sh /opt/devtools-manager.sh
-COPY docker/browser-vm/xorg.conf /etc/X11/xorg.conf
+COPY docker/browser-vm/config/xorg.conf /etc/X11/xorg.conf
 COPY docker/browser-vm/scripts/resize-display.sh /opt/resize-display.sh
 COPY docker/browser-vm/scripts/download.sh /usr/local/bin/download
 COPY docker/browser-vm/audio-proxy.sh /opt/audio-proxy.sh
 COPY docker/browser-vm/servers/audio-server.py /opt/audio-server.py
-COPY docker/browser-vm/pulse-config.pa /etc/pulse/default.pa
+COPY docker/browser-vm/config/pulse-config.pa /etc/pulse/default.pa
 COPY docker/browser-vm/proxy-scripts /opt/proxy-scripts
 COPY docker/browser-vm/pages /opt/pages
 
 # Shell config with inspekt completion
-COPY docker/browser-vm/bashrc /root/.bashrc
-COPY docker/browser-vm/inputrc /root/.inputrc
-COPY docker/browser-vm/zshrc /root/.zshrc
+COPY docker/browser-vm/config/bashrc /root/.bashrc
+COPY docker/browser-vm/config/inputrc /root/.inputrc
+COPY docker/browser-vm/config/zshrc /root/.zshrc
 
 # Copy Python binary into venv (not symlink) so inspekt CLI works
 # after chmod o-x on system Python. This must run BEFORE chmod.
@@ -447,7 +447,7 @@ RUN chmod o-x /usr/bin/python3 /usr/bin/python3.12 2>/dev/null; \
 # ZDOTDIR tells zsh where to look for startup files. By pointing it to a
 # root-owned directory, the user cannot create/modify .zshenv, .zshrc, etc.
 RUN mkdir -p /etc/inspekt-shell
-COPY docker/browser-vm/zshrc-restricted /etc/inspekt-shell/.zshrc
+COPY docker/browser-vm/config/zshrc-restricted /etc/inspekt-shell/.zshrc
 RUN touch /etc/inspekt-shell/.zshenv && \
     chown -R root:root /etc/inspekt-shell && \
     chmod 755 /etc/inspekt-shell && \
