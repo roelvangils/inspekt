@@ -226,12 +226,25 @@ def _verify_vm_serving_correctly(timeout: int = 10) -> tuple[bool, str | None]:
 
 def _build_image(vm_dir: Path) -> bool:
     """Build the Docker image."""
-    click.echo("  • Building Docker image (this may take a few minutes)...")
-
     # Build from project root with Dockerfile in docker/browser-vm
     project_root = vm_dir.parent.parent
     dockerfile_path = vm_dir / "Dockerfile"
 
+    # Bundle control panel assets (CSS + JS → minified bundles)
+    bundle_script = project_root / "scripts" / "bundle-vm.mjs"
+    click.echo("  • Bundling control panel assets...")
+    bundle_result = subprocess.run(
+        ["node", str(bundle_script)],
+        cwd=project_root,
+        capture_output=True,
+        text=True,
+    )
+    if bundle_result.returncode != 0:
+        click.echo(f"  ✗ Bundle failed: {bundle_result.stderr.strip()}", err=True)
+        return False
+    click.echo(f"    {bundle_result.stdout.strip()}")
+
+    click.echo("  • Building Docker image (this may take a few minutes)...")
     result = subprocess.run(
         ["docker", "build", "-t", IMAGE_NAME, "-f", str(dockerfile_path), "."],
         cwd=project_root,

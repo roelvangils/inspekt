@@ -20,7 +20,7 @@
             : /Win/.test(navigator.platform || navigator.userAgent) ? 'windows' : 'other';
         document.documentElement.classList.add('os-' + _platform);
     </script>
-    <!-- Extracted CSS modules -->
+    <!-- APP_CSS_START -->
     <link rel="stylesheet" href="/css/tokens.css">
     <link rel="stylesheet" href="/css/reset.css">
     <link rel="stylesheet" href="/css/splash.css">
@@ -36,8 +36,10 @@
     <link rel="stylesheet" href="/css/scrollbar.css">
     <link rel="stylesheet" href="/toolbar.css">
     <link rel="stylesheet" href="/vision-sim.css">
+    <link rel="stylesheet" href="/motor-sim.css">
+    <!-- APP_CSS_END -->
     <script src="/vendor/sortable.min.js"></script>
-    <!-- Extracted modules -->
+    <!-- APP_JS_START -->
     <script src="/js/config.js" defer></script>
     <script src="/js/screen-reader.js" defer></script>
     <script src="/js/command-palette.js" defer></script>
@@ -64,11 +66,10 @@
     <script src="/audio.js" defer></script>
     <script src="/zoom.js" defer></script>
     <script src="/scrollbar.js" defer></script>
-    <!-- Existing extracted modules -->
     <script src="/toolbar.js" defer></script>
     <script src="/vision-sim.js" defer></script>
-    <link rel="stylesheet" href="/motor-sim.css">
     <script src="/motor-sim.js" defer></script>
+    <!-- APP_JS_END -->
 </head>
 <body>
     <!-- Splash Screen -->

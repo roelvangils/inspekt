@@ -389,7 +389,10 @@ COPY docker/browser-vm/openbox-rc.xml /root/.config/openbox/rc.xml
 COPY docker/browser-vm/entrypoint.sh /entrypoint.sh
 COPY docker/browser-vm/control-server.py /opt/control-server.py
 COPY docker/browser-vm/terminal-server.py /opt/terminal-server.py
-COPY docker/browser-vm/control-panel.html /usr/share/novnc/control.html
+# Production: use bundled control panel (built by scripts/bundle-vm.mjs)
+COPY docker/browser-vm/dist/control.html /usr/share/novnc/control.html
+COPY docker/browser-vm/dist/app.min.css /usr/share/novnc/dist/app.min.css
+COPY docker/browser-vm/dist/app.min.js /usr/share/novnc/dist/app.min.js
 COPY docker/browser-vm/toolbar.css /usr/share/novnc/toolbar.css
 COPY docker/browser-vm/toolbar.js /usr/share/novnc/toolbar.js
 COPY docker/browser-vm/vision-sim.js /usr/share/novnc/vision-sim.js

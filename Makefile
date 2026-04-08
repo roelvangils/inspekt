@@ -1,6 +1,7 @@
 .PHONY: help dev install clean test test-unit test-integration test-e2e lint format typecheck pre-commit all \
        vm-start vm-stop vm-restart vm-rebuild vm-status vm-logs vm-shell vm-services vm-health \
-       vm-restart-control vm-restart-terminal vm-restart-chromium vm-restart-proxy
+       vm-restart-control vm-restart-terminal vm-restart-chromium vm-restart-proxy \
+       vm-bundle
 
 # Default target
 help:
@@ -102,6 +103,9 @@ vm-stop:
 
 vm-restart:
 	inspekt vm restart
+
+vm-bundle:
+	@node scripts/bundle-vm.mjs
 
 vm-rebuild:
 	inspekt vm restart --rebuild
