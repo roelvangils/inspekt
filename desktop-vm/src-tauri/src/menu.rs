@@ -469,7 +469,7 @@ pub fn create_menu(app: &AppHandle) -> Result<Menu<Wry>, tauri::Error> {
                         AboutMetadataBuilder::new()
                             .name(Some("Inspekt Browser VM"))
                             .version(Some("0.1.0"))
-                            .copyright(Some("\u{00a9} 2025 Fronteers"))
+                            .copyright(Some("\u{00a9} 2026 Eleven Ways"))
                             .website(Some("https://inspekt.dev"))
                             .website_label(Some("Visit Inspekt"))
                             .build(),
