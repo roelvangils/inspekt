@@ -34,7 +34,7 @@ urlencoding = "2"
 
 # macOS native APIs for reading system accent color and accessibility settings
 [target.'cfg(target_os = "macos")'.dependencies]
-objc2-app-kit = { version = "0.3", features = ["NSColor", "NSColorSpace", "NSWorkspace", "NSWindow", "NSResponder"] }
+objc2-app-kit = { version = "0.3", features = ["NSColor", "NSColorSpace", "NSWorkspace"] }
 
 [profile.release]
 panic = "abort"

@@ -9,7 +9,7 @@ use tauri_plugin_clipboard_manager::ClipboardExt;
 use window_vibrancy::{apply_vibrancy, NSVisualEffectMaterial};
 
 #[cfg(target_os = "macos")]
-use objc2_app_kit::{NSColor, NSColorSpace, NSWindow, NSWorkspace};
+use objc2_app_kit::{NSColor, NSColorSpace, NSWorkspace};
 
 const CONTROL_SERVER: &str = "http://localhost:8888";
 
@@ -81,6 +81,7 @@ fn get_accessibility_settings() -> AccessibilitySettings {
 fn start_dragging(window: tauri::WebviewWindow) -> Result<(), String> {
     window.start_dragging().map_err(|e| e.to_string())
 }
+
 
 #[tauri::command]
 async fn resize_preferences_window(app: tauri::AppHandle, height: f64) -> Result<(), String> {
@@ -312,23 +313,6 @@ async fn open_vm_window(app: tauri::AppHandle) -> Result<(), String> {
         .traffic_light_position(tauri::Position::Logical(tauri::LogicalPosition::new(16.0, 18.0)))
         .build()
         .map_err(|e| format!("Failed to create VM window: {}", e))?;
-
-    // Enable native macOS window dragging from the background.
-    // Since the webview loads an external URL, Tauri's JS APIs (__TAURI__)
-    // and data-tauri-drag-region are not available. Instead we set the
-    // native NSWindow.isMovableByWindowBackground flag, which lets macOS
-    // handle drag from any non-interactive area (the control bar gaps,
-    // padding, dividers) without any JS involvement.
-    #[cfg(target_os = "macos")]
-    {
-        let ns_win_ptr = _vm_window.ns_window().map_err(|e| e.to_string())?;
-        let ptr = ns_win_ptr as usize; // usize is Send-safe
-        // NSWindow operations must run on the main thread.
-        let _ = _vm_window.run_on_main_thread(move || unsafe {
-            let window: &NSWindow = &*(ptr as *const NSWindow);
-            window.setMovableByWindowBackground(true);
-        });
-    }
 
     // Hide the launcher window
     if let Some(main_window) = app.get_webview_window("main") {
