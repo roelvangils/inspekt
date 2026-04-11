@@ -19,6 +19,7 @@ tauri-plugin-shell = "2"
 tauri-plugin-notification = "2"
 tauri-plugin-os = "2"
 tauri-plugin-clipboard-manager = "2"
+tauri-plugin-global-shortcut = "2"
 
 window-vibrancy = "0.5"
 
@@ -33,7 +34,7 @@ urlencoding = "2"
 
 # macOS native APIs for reading system accent color and accessibility settings
 [target.'cfg(target_os = "macos")'.dependencies]
-objc2-app-kit = { version = "0.3", features = ["NSColor", "NSColorSpace", "NSWorkspace"] }
+objc2-app-kit = { version = "0.3", features = ["NSColor", "NSColorSpace", "NSWorkspace", "NSWindow", "NSResponder"] }
 
 [profile.release]
 panic = "abort"

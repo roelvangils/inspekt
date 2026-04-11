@@ -2,7 +2,7 @@
   "$schema": "https://schemas.tauri.app/config/2/capability",
   "identifier": "default",
   "description": "Default capability for local windows",
-  "windows": ["main", "preferences"],
+  "windows": ["main", "preferences", "vm"],
   "permissions": [
     "core:default",
     "core:window:default",
@@ -11,9 +11,11 @@
     "core:window:allow-hide",
     "core:window:allow-set-focus",
     "core:window:allow-close",
+    "core:window:allow-start-dragging",
     "core:event:default",
     "shell:default",
     "notification:default",
-    "os:default"
+    "os:default",
+    "global-shortcut:default"
   ]
 }

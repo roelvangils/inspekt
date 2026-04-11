@@ -11,6 +11,11 @@
     flex-shrink: 0;
 }
 
+/* When running inside Tauri with overlay title bar, add space for macOS traffic lights */
+.tauri-app .control-bar {
+    padding-left: 100px;
+}
+
 .logo {
     display: flex;
     align-items: center;

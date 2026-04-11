@@ -9,7 +9,7 @@ use tauri_plugin_clipboard_manager::ClipboardExt;
 use window_vibrancy::{apply_vibrancy, NSVisualEffectMaterial};
 
 #[cfg(target_os = "macos")]
-use objc2_app_kit::{NSColor, NSColorSpace, NSWorkspace};
+use objc2_app_kit::{NSColor, NSColorSpace, NSWindow, NSWorkspace};
 
 const CONTROL_SERVER: &str = "http://localhost:8888";
 
@@ -75,6 +75,11 @@ fn get_accessibility_settings() -> AccessibilitySettings {
 #[tauri::command]
 fn get_accessibility_settings() -> AccessibilitySettings {
     AccessibilitySettings::default()
+}
+
+#[tauri::command]
+fn start_dragging(window: tauri::WebviewWindow) -> Result<(), String> {
+    window.start_dragging().map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -220,7 +225,7 @@ async fn start_vm(app: tauri::AppHandle) -> Result<(), String> {
         .args(["vm", "start", "--no-open"])
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped())
-        .status()
+        .output()
         .await
         .map_err(|e| {
             let msg = format!("Failed to run inspekt: {}. Is the inspekt CLI installed?", e);
@@ -228,10 +233,18 @@ async fn start_vm(app: tauri::AppHandle) -> Result<(), String> {
             msg
         })?;
 
-    if !output.success() {
-        let msg = "inspekt vm start failed".to_string();
-        let _ = app.emit("vm-error", &msg);
-        return Err(msg);
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let detail = if !stderr.is_empty() {
+            stderr.trim().to_string()
+        } else if !stdout.is_empty() {
+            stdout.trim().to_string()
+        } else {
+            "inspekt vm start failed (no output)".to_string()
+        };
+        let _ = app.emit("vm-error", &detail);
+        return Err(detail);
     }
 
     // Poll health endpoint until ready
@@ -288,14 +301,34 @@ async fn open_vm_window(app: tauri::AppHandle) -> Result<(), String> {
         .parse()
         .map_err(|e: url::ParseError| e.to_string())?;
 
-    WebviewWindowBuilder::new(&app, "vm", WebviewUrl::External(url))
+    let _vm_window = WebviewWindowBuilder::new(&app, "vm", WebviewUrl::External(url))
         .title("Inspekt Browser VM")
         .inner_size(1440.0, 900.0)
         .min_inner_size(1024.0, 700.0)
         .center()
         .focused(true)
+        .title_bar_style(tauri::TitleBarStyle::Overlay)
+        .hidden_title(true)
+        .traffic_light_position(tauri::Position::Logical(tauri::LogicalPosition::new(16.0, 18.0)))
         .build()
         .map_err(|e| format!("Failed to create VM window: {}", e))?;
+
+    // Enable native macOS window dragging from the background.
+    // Since the webview loads an external URL, Tauri's JS APIs (__TAURI__)
+    // and data-tauri-drag-region are not available. Instead we set the
+    // native NSWindow.isMovableByWindowBackground flag, which lets macOS
+    // handle drag from any non-interactive area (the control bar gaps,
+    // padding, dividers) without any JS involvement.
+    #[cfg(target_os = "macos")]
+    {
+        let ns_win_ptr = _vm_window.ns_window().map_err(|e| e.to_string())?;
+        let ptr = ns_win_ptr as usize; // usize is Send-safe
+        // NSWindow operations must run on the main thread.
+        let _ = _vm_window.run_on_main_thread(move || unsafe {
+            let window: &NSWindow = &*(ptr as *const NSWindow);
+            window.setMovableByWindowBackground(true);
+        });
+    }
 
     // Hide the launcher window
     if let Some(main_window) = app.get_webview_window("main") {
@@ -551,6 +584,7 @@ pub fn run() {
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_os::init())
         .plugin(tauri_plugin_clipboard_manager::init())
+        // .plugin(tauri_plugin_global_shortcut::Builder::new().build())  // temporarily disabled
         .setup(|app| {
             // Set up native menu
             let menu = menu::create_menu(app.handle())?;
@@ -981,6 +1015,7 @@ pub fn run() {
             get_system_accent_color,
             get_accessibility_settings,
             resize_preferences_window,
+            start_dragging,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
