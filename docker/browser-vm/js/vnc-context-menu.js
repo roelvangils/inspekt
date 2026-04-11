@@ -13,15 +13,10 @@ function canGoForward() {
     return h.index < h.entries.length - 1;
 }
 
-// ── Clipboard abstraction (Tauri invoke → navigator.clipboard → execCommand) ──
+// ── Clipboard abstraction (Tauri plugin → navigator.clipboard → execCommand) ──
 // In the Tauri desktop app, WKWebView blocks navigator.clipboard.writeText()
-// after async operations (user activation expires). We bypass this entirely by
-// calling custom Tauri commands that write to the OS clipboard from Rust.
-//
-// Two Tauri commands are available:
-//   - copy_to_clipboard({ text })  — copies text directly
-//   - copy_inspekt_to_clipboard({ command })  — fetches inspekt output AND copies
-//
+// after async operations (user activation expires). We bypass this by using
+// Tauri's clipboard-manager plugin which writes directly to the OS clipboard.
 // In a regular browser, we fall back to navigator.clipboard, then execCommand.
 
 function _hasTauriIPC() {
@@ -29,13 +24,13 @@ function _hasTauriIPC() {
 }
 
 async function writeClipboard(text) {
-    // Try Tauri IPC first (works in Tauri desktop app)
+    // Try Tauri clipboard plugin first (bypasses WKWebView restrictions)
     if (_hasTauriIPC()) {
         try {
-            await window.__TAURI_INTERNALS__.invoke('copy_to_clipboard', { text });
+            await window.__TAURI_INTERNALS__.invoke('plugin:clipboard-manager|write_text', { text });
             return true;
         } catch (e) {
-            console.warn('[Clipboard] Tauri copy_to_clipboard failed:', e);
+            console.warn('[Clipboard] Tauri write_text failed:', e);
         }
     }
     // Browser fallback
@@ -595,8 +590,8 @@ function handleDragEnd(e) {
     draggedTab = null;
 }
 
-// Poll for tab updates every 2 seconds
-setInterval(fetchTabs, 2000);
+// Slow fallback poll for tabs (catches external CDP tab creation)
+setInterval(fetchTabs, 15000);
 
 // Re-apply CDP keep-alive for persisted keep-alive tabs after initial load
 setTimeout(() => {
@@ -620,7 +615,9 @@ setTimeout(() => {
 // Terminal visibility state polling (for recording workflow)
 // When inspekt record starts, the CLI signals the control server to hide the terminal
 // When recording stops, the CLI signals to show it again
+// Only polls during active recordings to avoid wasteful requests.
 let lastTerminalHiddenState = false;
+let _terminalStateTimer = null;
 
 async function checkTerminalState() {
     try {
@@ -638,6 +635,7 @@ async function checkTerminalState() {
                 } else if (!data.hidden && !isTerminalOpen) {
                     // Recording stopped - show terminal again
                     toggleTerminal();
+                    stopTerminalStatePolling();
                 }
             }
         }
@@ -646,8 +644,17 @@ async function checkTerminalState() {
     }
 }
 
-// Poll terminal state every 1 second
-setInterval(checkTerminalState, 1000);
+function startTerminalStatePolling() {
+    if (_terminalStateTimer) return;
+    _terminalStateTimer = setInterval(checkTerminalState, 1000);
+}
+
+function stopTerminalStatePolling() {
+    if (_terminalStateTimer) {
+        clearInterval(_terminalStateTimer);
+        _terminalStateTimer = null;
+    }
+}
 
 // Check if running in dev mode and update title
 async function checkDevMode() {

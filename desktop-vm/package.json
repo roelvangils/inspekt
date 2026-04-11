@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "clean-cache": "rm -rf ~/Library/WebKit/be.fronteers.inspekt-browser-vm ~/Library/Caches/be.fronteers.inspekt-browser-vm 2>/dev/null || true",
+    "dev": "bun run clean-cache && vite",
     "build": "vite build",
     "preview": "vite preview",
     "check": "svelte-check --tsconfig ./tsconfig.json",
