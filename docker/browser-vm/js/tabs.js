@@ -557,9 +557,35 @@ async function fetchTabs() {
             }
             // Update back/forward button state
             fetchHistoryState();
+
+            // Handle ?focus= param from tab tear-off (activate the target tab)
+            _handleFocusParam();
         }
     } catch (e) {
         console.error('[Tabs] Failed to fetch tabs:', e);
+    }
+}
+
+// Handle ?focus=<tabId> query parameter (used by tab tear-off).
+// On first tab fetch, activate the specified tab and filter the tab bar
+// to only show that one tab.
+let _focusTabHandled = false;
+let _singleTabId = null; // When set, only this tab is shown in the tab bar
+
+function _handleFocusParam() {
+    if (_focusTabHandled) return;
+    const params = new URLSearchParams(window.location.search);
+    const focusId = params.get('focus');
+    if (!focusId) { _focusTabHandled = true; return; }
+    const tab = tabs.find(t => t.id === focusId);
+    if (tab) {
+        _focusTabHandled = true;
+        _singleTabId = focusId;
+        activateTab(focusId);
+        renderTabs(); // Re-render to apply single-tab filter
+        // Clean up the URL so it doesn't re-trigger on reload
+        const cleanUrl = window.location.pathname;
+        window.history.replaceState(null, '', cleanUrl);
     }
 }
 
@@ -633,6 +659,9 @@ function renderTabs() {
     // Sort: pinned tabs first, then unpinned (stable sort preserves relative order)
     tabs.sort((a, b) => (a.pinned ? 0 : 1) - (b.pinned ? 0 : 1));
 
+    // In single-tab mode (tear-off window), only show the focused tab
+    const visibleTabs = _singleTabId ? tabs.filter(t => t.id === _singleTabId) : tabs;
+
     // Persist tab session to localStorage (debounced to avoid thrashing on rapid updates)
     _scheduleSaveTabSession();
 
@@ -652,7 +681,7 @@ function renderTabs() {
     // Get only .tab children (exclude the new-tab button) for index calculations
     const tabChildren = () => Array.from(container.querySelectorAll('.tab'));
 
-    tabs.forEach((tab, index) => {
+    visibleTabs.forEach((tab, index) => {
         processedIds.add(tab.id);
         let tabEl = existingTabMap.get(tab.id);
 
@@ -1230,6 +1259,9 @@ function showTabContextMenu(e, tabId) {
             { label: 'As Cloud Tab', action: () => duplicateTab(tabId) },
             { label: 'As Local Tab', action: () => duplicateAsLocalTab(tabId) },
         ]});
+    }
+    if (_hasTauriIPC()) {
+        items.push({ label: 'Open in New Window', action: () => tearOffTab(tab) });
     }
     items.push(
         { label: 'Move Tab Left', action: () => moveTab(tabId, -1), disabled: tabIndex === 0 },

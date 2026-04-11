@@ -590,6 +590,27 @@ function handleDragEnd(e) {
     draggedTab = null;
 }
 
+async function tearOffTab(tab) {
+    try {
+        showToast('Opening in new window...', '', 2000);
+        // Duplicate the tab in the VM's Chromium (creates a new cloud tab)
+        const newTabId = await _addCloudTab(tab.url);
+        if (!newTabId) {
+            showToast('Failed to tear off tab', 'error');
+            return;
+        }
+        // Open a new Tauri window focused on the duplicated tab
+        await window.__TAURI_INTERNALS__.invoke('open_tab_window', {
+            tabUrl: tab.url,
+            title: tab.title || '',
+            focusTabId: newTabId,
+        });
+    } catch (err) {
+        console.warn('[tabs] Tab tear-off failed:', err);
+        showToast('Failed to open new window', 'error');
+    }
+}
+
 // Slow fallback poll for tabs (catches external CDP tab creation)
 setInterval(fetchTabs, 15000);
 

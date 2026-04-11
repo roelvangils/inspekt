@@ -322,6 +322,48 @@ async fn open_vm_window(app: tauri::AppHandle) -> Result<(), String> {
     Ok(())
 }
 
+/// Open a new VM window focused on a specific tab.
+/// Used for tab tear-off: dragging a tab out of the tab bar creates a new window.
+#[tauri::command]
+async fn open_tab_window(
+    app: tauri::AppHandle,
+    _tab_url: String,
+    title: String,
+    focus_tab_id: String,
+) -> Result<(), String> {
+    let label = format!("vm-{}", std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis());
+
+    let url: url::Url = format!(
+        "http://localhost:6080/control.html?focus={}",
+        urlencoding::encode(&focus_tab_id)
+    )
+        .parse()
+        .map_err(|e: url::ParseError| e.to_string())?;
+
+    let window_title = if title.is_empty() {
+        "Inspekt Browser VM".to_string()
+    } else {
+        format!("{title} — Inspekt Browser VM")
+    };
+
+    WebviewWindowBuilder::new(&app, &label, WebviewUrl::External(url))
+        .title(&window_title)
+        .inner_size(1440.0, 900.0)
+        .min_inner_size(1024.0, 700.0)
+        .center()
+        .focused(true)
+        .title_bar_style(tauri::TitleBarStyle::Overlay)
+        .hidden_title(true)
+        .traffic_light_position(tauri::Position::Logical(tauri::LogicalPosition::new(16.0, 18.0)))
+        .build()
+        .map_err(|e| format!("Failed to create tab window: {}", e))?;
+
+    Ok(())
+}
+
 /// Single health check attempt against the control server.
 async fn check_health_once() -> bool {
     let client = reqwest::Client::builder()
@@ -1000,6 +1042,7 @@ pub fn run() {
             get_accessibility_settings,
             resize_preferences_window,
             start_dragging,
+            open_tab_window,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

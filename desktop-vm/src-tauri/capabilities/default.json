@@ -2,7 +2,7 @@
   "$schema": "https://schemas.tauri.app/config/2/capability",
   "identifier": "default",
   "description": "Default capability for local windows",
-  "windows": ["main", "preferences", "vm"],
+  "windows": ["main", "preferences", "vm", "vm-*"],
   "permissions": [
     "core:default",
     "core:window:default",
