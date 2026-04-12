@@ -20,7 +20,7 @@ TARBALL_URL="https://github.com/roelvangils/inspekt/archive/refs/heads/feature/v
 INSTALL_DIR="${INSPEKT_DIR:-$HOME/inspekt}"
 SCRIPT_URL="https://raw.githubusercontent.com/roelvangils/inspekt/feature/vm-install-script/install-vm.sh"
 
-INSTALLER_VERSION="0.13"
+INSTALLER_VERSION="0.14"
 
 IMAGE_NAME="inspekt-browser-vm"
 CONTAINER_NAME="inspekt-browser-vm"
@@ -72,6 +72,19 @@ preflight() {
   # Check that curl exists (needed for tarball fallback and health checks)
   if ! command -v curl &>/dev/null; then
     fatal "curl is required but not found"
+  fi
+
+  # Check for Xcode Command Line Tools (needed by Homebrew and Rust)
+  if ! xcode-select -p &>/dev/null; then
+    warn "Xcode Command Line Tools not installed"
+    info "Installing Command Line Tools (this may open a dialog)..."
+    xcode-select --install 2>/dev/null || true
+    echo ""
+    echo "  If a dialog appeared, click ${BOLD}Install${RESET} and wait for it to finish."
+    echo "  Then re-run this script:"
+    rerun_hint
+    echo ""
+    exit 0
   fi
 }
 
@@ -210,6 +223,125 @@ install_via_brew() {
 
   info "Installing ${name} via Homebrew..."
   brew install $brew_args
+}
+
+# ── Step 1b: Check development dependencies ───────────────────────────────
+
+check_python() {
+  # Check for Python 3.11+ (required by inspekt)
+  local py=""
+  for candidate in python3.13 python3.12 python3.11 python3; do
+    if command -v "$candidate" &>/dev/null; then
+      local ver
+      ver=$("$candidate" --version 2>&1 | grep -oE '[0-9]+\.[0-9]+' | head -1)
+      local major minor
+      major=$(echo "$ver" | cut -d. -f1)
+      minor=$(echo "$ver" | cut -d. -f2)
+      if [[ "$major" -ge 3 && "$minor" -ge 11 ]]; then
+        py="$candidate"
+        break
+      fi
+    fi
+  done
+
+  if [[ -n "$py" ]]; then
+    success "Python 3.11+ found ($($py --version 2>&1))"
+  else
+    warn "Python 3.11+ not found (required by inspekt)"
+    if command -v brew &>/dev/null; then
+      info "Installing Python 3.13 via Homebrew..."
+      brew install python@3.13
+      success "Python 3.13 installed"
+    else
+      install_via_brew "Python 3.13" "python@3.13"
+    fi
+  fi
+}
+
+check_uv() {
+  if command -v uv &>/dev/null; then
+    success "uv is installed ($(uv --version 2>&1 | head -1))"
+    return 0
+  fi
+
+  info "Installing uv (fast Python package manager)..."
+  if command -v brew &>/dev/null; then
+    brew install uv
+  else
+    curl -LsSf https://astral.sh/uv/install.sh | sh
+    export PATH="$HOME/.local/bin:$PATH"
+  fi
+  success "uv installed"
+}
+
+check_bun() {
+  # Check PATH and common install location
+  if command -v bun &>/dev/null; then
+    success "bun is installed ($(bun --version 2>&1))"
+    return 0
+  fi
+  if [[ -x "$HOME/.bun/bin/bun" ]]; then
+    export PATH="$HOME/.bun/bin:$PATH"
+    success "bun is installed ($(bun --version 2>&1))"
+    return 0
+  fi
+
+  info "Installing bun (JavaScript runtime)..."
+  curl -fsSL https://bun.sh/install | bash
+  export PATH="$HOME/.bun/bin:$PATH"
+  success "bun installed"
+}
+
+check_rust() {
+  # Check PATH and common install location
+  if command -v cargo &>/dev/null; then
+    success "Rust is installed ($(rustc --version 2>&1))"
+    return 0
+  fi
+  if [[ -f "$HOME/.cargo/env" ]]; then
+    source "$HOME/.cargo/env"
+    if command -v cargo &>/dev/null; then
+      success "Rust is installed ($(rustc --version 2>&1))"
+      return 0
+    fi
+  fi
+
+  warn "Rust is not installed (required for the desktop app)"
+  echo ""
+  echo "  The Inspekt desktop app (Tauri) requires Rust to build."
+  echo ""
+  if ask "  Install Rust now?"; then
+    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y </dev/tty
+    source "$HOME/.cargo/env"
+    success "Rust installed ($(rustc --version 2>&1))"
+  else
+    warn "Skipping Rust — the desktop app won't build, but the VM will still work"
+  fi
+}
+
+setup_venv() {
+  # Set up Python virtual environment with uv if not already present
+  if [[ -d "$INSTALL_DIR/.venv" && -f "$INSTALL_DIR/.venv/bin/inspekt" ]]; then
+    success "Python virtual environment already set up"
+    return 0
+  fi
+
+  info "Setting up Python virtual environment..."
+  (
+    cd "$INSTALL_DIR"
+    uv venv --python 3.13 2>/dev/null || uv venv --python 3.12 2>/dev/null || uv venv --python 3.11
+    # shellcheck disable=SC1091
+    source .venv/bin/activate
+    uv pip install -e .
+  )
+  success "Python environment ready (activate with: source .venv/bin/activate)"
+}
+
+check_dev_dependencies() {
+  check_python
+  check_uv
+  check_bun
+  check_rust
 }
 
 # ── Step 2: Detect Docker runtime ───────────────────────────────────────────
@@ -443,6 +575,8 @@ main() {
   check_docker
   detect_docker_runtime
   get_source
+  check_dev_dependencies
+  setup_venv
   check_ports
   cleanup_existing
   build_image
