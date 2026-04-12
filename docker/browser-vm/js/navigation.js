@@ -760,6 +760,8 @@ async function updateCurrentUrl() {
                 // maybeFetchSitemap resets _sitemapNav synchronously before its
                 // first await, so stale data is cleared immediately.
                 maybeFetchSitemap(currentUrl);
+                // Voice: update speech recognition language for new page
+                if (typeof updateVoicePageLang === 'function') updateVoicePageLang();
                 refreshSitemapNav(currentUrl);
             }
             // Auto-detect internal URL: if Chrome navigated to http://inspekt/,
@@ -785,8 +787,8 @@ async function updateCurrentUrl() {
     }
 }
 
-// Poll for URL updates every 2 seconds
-setInterval(updateCurrentUrl, 2000);
+// Poll for URL updates (catches in-VM navigations that bypass the control panel)
+setInterval(updateCurrentUrl, 4000);
 
 // --- Loading Progress Indicator ---
 
@@ -883,6 +885,9 @@ function completeLoading() {
     // Restore reload button and clear spinner
     setReloadButtonMode('reload');
     if (activeTabId) setTabLoading(activeTabId, false);
+
+    // Refresh tab list (title/favicon may have changed after navigation)
+    if (typeof fetchTabs === 'function') fetchTabs();
 
     // Reset after fade-out
     setTimeout(() => {

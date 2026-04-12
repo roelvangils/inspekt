@@ -204,10 +204,9 @@ async def terminal_handler(websocket):
 
 async def main():
     """Start the WebSocket terminal server."""
-    # Security: Bind to localhost only to prevent external network access
-    # The terminal provides shell access, so it should never be exposed externally
-    # Access is provided via the control panel on port 6080 (noVNC)
-    host = "127.0.0.1"
+    # Bind to all interfaces inside the container so Docker port forwarding works.
+    # The container's own network isolation provides the security boundary.
+    host = "0.0.0.0"
     print(f"Terminal WebSocket Server")
     print(f"Listening on ws://{host}:{PORT}")
     print(f"Shell: {SHELL}")

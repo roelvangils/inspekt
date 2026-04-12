@@ -579,6 +579,8 @@ function connectTerminal() {
             setTimeout(() => {
                 toggleTerminal(); // Close terminal and focus VNC
             }, 100);
+            // Start polling terminal state so we know when recording ends
+            if (typeof startTerminalStatePolling === 'function') startTerminalStatePolling();
         }
 
         // Strip escape sequences before writing to terminal

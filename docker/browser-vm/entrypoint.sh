@@ -2,6 +2,8 @@
 set -e
 
 echo "=== Inspekt Browser VM ==="
+
+
 echo "Resolution: ${VNC_RESOLUTION}"
 echo "noVNC Port: ${NOVNC_PORT}"
 echo "Home URL: ${HOME_URL}"

@@ -1,0 +1,105 @@
+/* =============================================
+   Voice Command Pill (Push-to-Talk)
+   ============================================= */
+
+.voice-overlay {
+    position: fixed;
+    top: 96px;
+    left: 12px;
+    z-index: 99999;
+    pointer-events: none;
+    opacity: 0;
+    transform: translateY(-8px);
+    transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.voice-overlay.active {
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
+}
+
+.voice-overlay-content {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 14px 6px 10px;
+    border-radius: 20px;
+    background: rgba(30, 30, 30, 0.85);
+    -webkit-backdrop-filter: blur(12px) saturate(180%);
+    backdrop-filter: blur(12px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
+}
+
+/* Mic icon — small red dot with pulse */
+.voice-mic-icon {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #ff3b30;
+    flex-shrink: 0;
+    position: relative;
+}
+
+.voice-mic-icon svg {
+    display: none;
+}
+
+.voice-mic-icon::before {
+    content: '';
+    position: absolute;
+    inset: -4px;
+    border-radius: 50%;
+    border: 1.5px solid rgba(255, 59, 48, 0.5);
+    animation: voicePulse 1.2s ease-in-out infinite;
+}
+
+@keyframes voicePulse {
+    0%   { transform: scale(1); opacity: 0.6; }
+    50%  { transform: scale(1.4); opacity: 0; }
+    100% { transform: scale(1); opacity: 0.6; }
+}
+
+/* Live transcript */
+.voice-transcript {
+    font-size: 13px;
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.9);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 300px;
+    line-height: 1;
+}
+
+.voice-transcript.interim {
+    color: rgba(255, 255, 255, 0.5);
+}
+
+/* Language badge */
+.voice-lang {
+    font-size: 10px;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.4);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+/* Hint text — hidden by default, shown in continuous mode via JS */
+.voice-hint {
+    display: none;
+    font-size: 10px;
+    color: rgba(255, 255, 255, 0.35);
+    white-space: nowrap;
+}
+
+/* Error state */
+.voice-overlay.error .voice-mic-icon {
+    background: #ff9500;
+}
+
+.voice-overlay.error .voice-mic-icon::before {
+    animation: none;
+    border-color: rgba(255, 149, 0, 0.3);
+}
