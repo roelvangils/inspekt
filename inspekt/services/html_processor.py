@@ -6,11 +6,17 @@ Provides:
 - Compact mode that removes classes and truncates long text
 """
 
+import re
 import shutil
 import subprocess
 
 import click
 from bs4 import BeautifulSoup
+
+
+def strip_empty_comments(html: str) -> str:
+    """Remove empty or whitespace-only HTML comments (<!-- -->, <!---->)."""
+    return re.sub(r'<!--\s*-->', '', html)
 
 
 def is_prettier_installed() -> bool:

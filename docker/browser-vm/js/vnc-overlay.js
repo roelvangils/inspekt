@@ -233,6 +233,8 @@ async function _navigateInspect(direction) {
         const data = await resp.json();
         if (data.ok && data.rect) {
             _positionInspectOverlay(data.rect, data.selector, data);
+            // Refresh the info panel with the new element's details
+            _showInspectInfoPanel();
             // Flash tooltip orange on auto-climb (moved to parent because no sibling)
             if (data.autoClimbed) {
                 const entry = vncOverlay._overlays['inspect-tooltip'];
