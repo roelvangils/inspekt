@@ -102,43 +102,184 @@ def format_html_with_prettier(html_content: str, indent: int = 2) -> str | None:
         return None
 
 
+def _truncate_url(url: str, max_segments: int = 3) -> str:
+    """Shorten a URL by collapsing middle path segments."""
+    if len(url) < 60:
+        return url
+    # Preserve protocol + domain
+    from urllib.parse import urlparse, urlunparse
+    try:
+        parsed = urlparse(url)
+    except Exception:
+        return url
+    if not parsed.scheme or not parsed.netloc:
+        return url
+    parts = [p for p in parsed.path.split('/') if p]
+    if len(parts) <= max_segments:
+        return url
+    # Keep first segment and last segment, collapse middle
+    shortened_path = '/' + parts[0] + '/…/' + parts[-1]
+    return urlunparse((parsed.scheme, parsed.netloc, shortened_path, '', parsed.query, ''))
+
+
+def _is_hash_like(s: str) -> bool:
+    """Check if a string looks like a hash/random ID (20+ hex-like chars)."""
+    if len(s) < 20:
+        return False
+    alnum_count = sum(1 for c in s if c.isalnum())
+    return alnum_count >= 20 and alnum_count / max(len(s), 1) > 0.8
+
+
+def _replace_hashes_in_url(url: str) -> str:
+    """Replace hash-like segments in a URL path with [STRING]."""
+    from urllib.parse import urlparse, urlunparse
+    try:
+        parsed = urlparse(url)
+    except Exception:
+        return url
+    if not parsed.path:
+        return url
+    parts = parsed.path.split('/')
+    new_parts = []
+    for part in parts:
+        # Split off file extension
+        if '.' in part and not part.startswith('.'):
+            name, ext = part.rsplit('.', 1)
+            if _is_hash_like(name):
+                new_parts.append(f'[STRING].{ext}')
+                continue
+        if _is_hash_like(part):
+            new_parts.append('[STRING]')
+            continue
+        new_parts.append(part)
+    new_path = '/'.join(new_parts)
+    return urlunparse((parsed.scheme, parsed.netloc, new_path, '', parsed.query, parsed.fragment))
+
+
+_EVENT_ATTRS = {
+    'onclick', 'ondblclick', 'onmousedown', 'onmouseup', 'onmouseover',
+    'onmouseout', 'onmousemove', 'onmouseenter', 'onmouseleave',
+    'onkeydown', 'onkeyup', 'onkeypress', 'onfocus', 'onblur',
+    'onchange', 'oninput', 'onsubmit', 'onreset', 'onload', 'onerror',
+    'onscroll', 'onresize', 'ontouchstart', 'ontouchend', 'ontouchmove',
+}
+
+_URL_ATTRS = {'href', 'src', 'action', 'poster', 'formaction', 'cite'}
+
+_MAX_ATTR_LEN = 30  # Truncate long id/for/name/aria-* values
+
+
 def compact_html(html_content: str) -> str:
     """
-    Compact HTML by removing unnecessary elements for code examples.
+    Compact HTML for documentation — strips noise while preserving semantic structure.
 
-    Rules:
-    - Remove ALL class attributes
-    - Replace text content longer than 20 words with "(…)"
-    - Keep all other attributes (id, href, src, etc.)
-    - Keep all HTML structure and tags
-
-    Args:
-        html_content: HTML string to compact
-
-    Returns:
-        Compacted HTML string
+    Transformations:
+    - Remove class, style, and data-* attributes
+    - Truncate long URLs (keep domain + first/last path segment)
+    - Replace hash-like strings in URLs with [STRING]
+    - Shorten srcset URLs (preserve size descriptors)
+    - Replace inline event handlers with [JAVASCRIPT]
+    - Replace integrity hashes with [HASH] and nonces with [NONCE]
+    - Truncate long id/for/name/aria-* values
+    - Replace base64 data with [DATA]
+    - Replace SVG path d="" data with [PATH DATA]
+    - Replace polygon/polyline points with [POINTS]
+    - Remove empty HTML comments
+    - Truncate text nodes longer than 20 words
     """
     soup = BeautifulSoup(html_content, 'html.parser')
 
-    # Remove all class attributes
-    for tag in soup.find_all(class_=True):
-        del tag['class']
+    for tag in soup.find_all(True):
+        attrs_to_delete = []
+
+        for attr_name in list(tag.attrs.keys()):
+            attr_val = tag[attr_name]
+            # Normalize list attributes (class, etc.) to string
+            if isinstance(attr_val, list):
+                attr_val = ' '.join(attr_val)
+
+            # Remove class, style, data-* attributes
+            if attr_name == 'class' or attr_name == 'style' or attr_name.startswith('data-'):
+                attrs_to_delete.append(attr_name)
+                continue
+
+            # Replace event handlers with [JAVASCRIPT]
+            if attr_name.lower() in _EVENT_ATTRS:
+                tag[attr_name] = '[JAVASCRIPT]'
+                continue
+
+            # Replace integrity hashes
+            if attr_name == 'integrity':
+                tag[attr_name] = '[HASH]'
+                continue
+
+            # Replace nonces
+            if attr_name == 'nonce':
+                tag[attr_name] = '[NONCE]'
+                continue
+
+            # Handle srcset (multiple URLs with descriptors)
+            if attr_name == 'srcset':
+                entries = [e.strip() for e in attr_val.split(',') if e.strip()]
+                new_entries = []
+                for entry in entries:
+                    parts = entry.split()
+                    if parts:
+                        url = _replace_hashes_in_url(parts[0])
+                        url = _truncate_url(url)
+                        descriptor = ' '.join(parts[1:]) if len(parts) > 1 else ''
+                        new_entries.append(f'{url} {descriptor}'.strip())
+                tag[attr_name] = ', '.join(new_entries)
+                continue
+
+            # Shorten URLs and replace hashes in URL attributes
+            if attr_name.lower() in _URL_ATTRS and isinstance(attr_val, str):
+                if attr_val.startswith('data:'):
+                    # Base64 data URI → keep MIME type, replace data
+                    semi = attr_val.find(';')
+                    if semi > 0:
+                        tag[attr_name] = attr_val[:semi + 1] + 'base64,[DATA]'
+                    else:
+                        tag[attr_name] = '[DATA]'
+                    continue
+                attr_val = _replace_hashes_in_url(attr_val)
+                attr_val = _truncate_url(attr_val)
+                tag[attr_name] = attr_val
+                continue
+
+            # Truncate long id, for, name, aria-* values
+            if attr_name in ('id', 'for', 'name') or attr_name.startswith('aria-'):
+                if isinstance(attr_val, str) and len(attr_val) > _MAX_ATTR_LEN:
+                    tag[attr_name] = attr_val[:_MAX_ATTR_LEN] + '…'
+                continue
+
+        for attr_name in attrs_to_delete:
+            del tag[attr_name]
+
+        # SVG: replace path d="" with [PATH DATA]
+        if tag.name == 'path' and tag.get('d'):
+            tag['d'] = '[PATH DATA]'
+
+        # SVG: replace polygon/polyline points with [POINTS]
+        if tag.name in ('polygon', 'polyline') and tag.get('points'):
+            tag['points'] = '[POINTS]'
 
     # Truncate long text nodes
     for element in soup.find_all(string=True):
-        # Skip script and style tags
-        if element.parent.name in ['script', 'style']:
+        if element.parent.name in ('script', 'style'):
             continue
-
         text = str(element).strip()
         if not text:
             continue
-
-        # Count words
         words = text.split()
         if len(words) > 20:
-            # Replace with ellipsis
             element.replace_with('…')
+
+    # Remove empty comments
+    from bs4 import Comment
+    for comment in soup.find_all(string=lambda t: isinstance(t, Comment)):
+        if not comment.strip():
+            comment.extract()
 
     return str(soup)
 
