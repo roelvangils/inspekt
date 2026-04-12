@@ -163,26 +163,101 @@ _EVENT_ATTRS = {
 
 _URL_ATTRS = {'href', 'src', 'action', 'poster', 'formaction', 'cite'}
 
+# src/poster are simplified to filename only; href keeps path for navigation context
+_FILENAME_ONLY_ATTRS = {'src', 'poster'}
+
 _MAX_ATTR_LEN = 30  # Truncate long id/for/name/aria-* values
+
+
+def _get_tag_skeleton(tag) -> str:
+    """Return a structural fingerprint of a tag: its name + recursive child tag names.
+
+    Used to detect repeated siblings with the same structure (ignoring text/attributes).
+    Example: <li><a><img><span></span></a></li> → "li>a>img+span"
+    """
+    from bs4 import Tag
+    children = [c for c in tag.children if isinstance(c, Tag)]
+    if not children:
+        return tag.name
+    child_skeletons = '+'.join(_get_tag_skeleton(c) for c in children)
+    return f'{tag.name}>{child_skeletons}'
+
+
+def _collapse_repeated_siblings(soup) -> None:
+    """Replace 3+ consecutive siblings with the same tag skeleton with a comment.
+
+    Keeps the first 2 siblings so the reader sees the pattern, then adds
+    <!-- … and N more <tag> --> in place of the rest.
+    """
+    from bs4 import Comment, Tag
+
+    for parent in soup.find_all(True):
+        children = [c for c in parent.children if isinstance(c, Tag)]
+        if len(children) < 3:
+            continue
+
+        # Group consecutive siblings by skeleton
+        i = 0
+        while i < len(children):
+            skeleton = _get_tag_skeleton(children[i])
+            run_start = i
+            while i < len(children) and _get_tag_skeleton(children[i]) == skeleton:
+                i += 1
+            run_length = i - run_start
+
+            if run_length >= 3:
+                tag_name = children[run_start].name
+                # Keep first 2, remove the rest and insert a comment
+                to_remove = children[run_start + 2:i]
+                collapse_count = len(to_remove)
+                # Insert comment before the first element to be removed
+                comment = Comment(f' … and {collapse_count} more <{tag_name}> ')
+                to_remove[0].insert_before(comment)
+                for el in to_remove:
+                    el.decompose()
+
+
+def _unwrap_purposeless_wrappers(soup) -> None:
+    """Remove <div> and <span> wrappers that have no attributes and a single child element.
+
+    Runs in a loop since unwrapping may expose new single-child wrappers.
+    """
+    from bs4 import Tag
+
+    for _ in range(10):  # Max iterations to prevent infinite loops
+        found = False
+        for tag in soup.find_all(['div', 'span']):
+            if tag.attrs:  # Has meaningful attributes (id, aria-*, etc.)
+                continue
+            element_children = [c for c in tag.children if isinstance(c, Tag)]
+            # Only unwrap if there's exactly one child element and no significant text
+            if len(element_children) != 1:
+                continue
+            non_element_text = ''.join(
+                str(c).strip() for c in tag.children if not isinstance(c, Tag)
+            )
+            if non_element_text:  # Has text content alongside the child — div provides grouping
+                continue
+            tag.unwrap()
+            found = True
+        if not found:
+            break
 
 
 def compact_html(html_content: str) -> str:
     """
     Compact HTML for documentation — strips noise while preserving semantic structure.
 
-    Transformations:
-    - Remove class, style, and data-* attributes
-    - Truncate long URLs (keep domain + first/last path segment)
-    - Replace hash-like strings in URLs with [STRING]
-    - Shorten srcset URLs (preserve size descriptors)
-    - Replace inline event handlers with [JAVASCRIPT]
-    - Replace integrity hashes with [HASH] and nonces with [NONCE]
-    - Truncate long id/for/name/aria-* values
-    - Replace base64 data with [DATA]
-    - Replace SVG path d="" data with [PATH DATA]
-    - Replace polygon/polyline points with [POINTS]
-    - Remove empty HTML comments
-    - Truncate text nodes longer than 20 words
+    Transformations (in order):
+    1. Remove class, style, and data-* attributes
+    2. Replace event handlers, integrity hashes, nonces
+    3. Shorten URLs, replace hashes, simplify src to filename
+    4. Truncate long id/for/name/aria-* values
+    5. Collapse inline <script>/<style> content to /* … */
+    6. Replace SVG path/polygon data
+    7. Truncate text nodes longer than 20 words
+    8. Remove purposeless wrapper <div>/<span> elements
+    9. Collapse 3+ repeated siblings into <!-- … and N more -->
     """
     soup = BeautifulSoup(html_content, 'html.parser')
 
@@ -240,7 +315,17 @@ def compact_html(html_content: str) -> str:
                         tag[attr_name] = '[DATA]'
                     continue
                 attr_val = _replace_hashes_in_url(attr_val)
-                attr_val = _truncate_url(attr_val)
+                # src/poster: simplify to filename only; href: keep path for context
+                if attr_name.lower() in _FILENAME_ONLY_ATTRS:
+                    try:
+                        path = urlparse(attr_val).path
+                        filename = path.rsplit('/', 1)[-1] if '/' in path else path
+                        if filename:
+                            attr_val = filename
+                    except Exception:
+                        pass
+                else:
+                    attr_val = _truncate_url(attr_val)
                 tag[attr_name] = attr_val
                 continue
 
@@ -252,6 +337,11 @@ def compact_html(html_content: str) -> str:
 
         for attr_name in attrs_to_delete:
             del tag[attr_name]
+
+        # Collapse inline <script>/<style> content — keep the tag, replace body with /* … */
+        if tag.name in ('script', 'style') and not tag.get('src'):
+            if tag.string and tag.string.strip():
+                tag.string = '/* … */'
 
         # SVG: replace path d="" with [PATH DATA]
         if tag.name == 'path' and tag.get('d'):
@@ -271,6 +361,10 @@ def compact_html(html_content: str) -> str:
         words = text.split()
         if len(words) > 20:
             element.replace_with('…')
+
+    # Structural cleanup (runs after content cleanup for accurate analysis)
+    _unwrap_purposeless_wrappers(soup)
+    _collapse_repeated_siblings(soup)
 
     return str(soup)
 
