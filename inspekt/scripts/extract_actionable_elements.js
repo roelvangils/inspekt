@@ -31,6 +31,15 @@
     // Textareas and selects
     if (el.tagName === 'TEXTAREA' || el.tagName === 'SELECT') return true;
 
+    // Summary elements (accordion/details triggers)
+    if (el.tagName === 'SUMMARY') return true;
+
+    // Labels that focus an associated input
+    if (el.tagName === 'LABEL' && (el.htmlFor || el.querySelector('input, select, textarea'))) return true;
+
+    // Contenteditable elements
+    if (el.getAttribute('contenteditable') === 'true') return true;
+
     // Elements with role="button", role="link", etc.
     const role = el.getAttribute('role');
     if (role && ['button', 'link', 'menuitem', 'tab', 'option', 'checkbox', 'radio', 'switch'].includes(role)) {
@@ -42,9 +51,6 @@
 
     // Elements with tabindex (focusable)
     if (el.hasAttribute('tabindex') && el.getAttribute('tabindex') !== '-1') return true;
-
-    // Images inside links (but we already catch the link)
-    // Forms (though we catch individual inputs)
 
     return false;
   }
@@ -104,6 +110,9 @@
     }
     else if (el.tagName === 'TEXTAREA') type = 'textarea';
     else if (el.tagName === 'SELECT') type = 'select';
+    else if (el.tagName === 'SUMMARY') type = 'accordion';
+    else if (el.tagName === 'LABEL') type = 'label';
+    else if (el.getAttribute('contenteditable') === 'true') type = 'editable';
     else if (el.getAttribute('role')) type = el.getAttribute('role');
 
     const description = {
@@ -115,6 +124,21 @@
       role: el.getAttribute('role') || null,
       ariaLabel: el.getAttribute('aria-label') || null,
     };
+
+    // Enrich with form element state
+    if (el.tagName === 'SELECT') {
+      description.options = Array.from(el.options).map(opt => ({
+        value: opt.value,
+        text: opt.text.trim(),
+        selected: opt.selected
+      }));
+    }
+    if (el.tagName === 'INPUT' && (el.type === 'checkbox' || el.type === 'radio')) {
+      description.checked = el.checked;
+    }
+    if (el.tagName === 'INPUT' && el.type !== 'hidden') {
+      description.value = el.value || '';
+    }
 
     // Add context (parent heading or landmark)
     const context = findContext(el);
@@ -228,10 +252,53 @@
     return headings;
   }
 
+  // Detect active modal/overlay that should scope interaction
+  function detectActiveModal() {
+    // 1. Native <dialog> with open attribute
+    const openDialog = document.querySelector('dialog[open]');
+    if (openDialog) return { type: 'dialog', element: openDialog };
+
+    // 2. ARIA modal dialogs
+    const ariaModal = document.querySelector('[aria-modal="true"]:not([aria-hidden="true"])');
+    if (ariaModal) return { type: 'aria-modal', element: ariaModal };
+
+    // 3. Known cookie consent SDKs
+    const cookieConsents = [
+      '#usercentrics-cmp-ui',
+      '#onetrust-consent-sdk',
+      '#CybotCookiebotDialog',
+      '.cmp-root',
+      '[data-testid="uc-main-banner"]',
+    ];
+    for (const selector of cookieConsents) {
+      const consent = document.querySelector(selector);
+      if (consent) {
+        const style = window.getComputedStyle(consent);
+        if (style.display !== 'none' && style.visibility !== 'hidden') {
+          return { type: 'cookie-consent', element: consent };
+        }
+      }
+    }
+
+    // 4. Generic modal patterns (Bootstrap, etc.)
+    const genericModals = document.querySelectorAll(
+      '.modal.show, .modal.open, .modal--open, .modal[aria-hidden="false"], ' +
+      '[role="dialog"]:not([aria-hidden="true"])'
+    );
+    for (const modal of genericModals) {
+      const style = window.getComputedStyle(modal);
+      if (style.display !== 'none' && style.visibility !== 'hidden') {
+        return { type: 'modal', element: modal };
+      }
+    }
+
+    return null;
+  }
+
   // Main processing: Find all actionable elements
   function processActionableElements() {
     // Get all potentially actionable elements
-    const allElements = document.querySelectorAll('a, button, input, textarea, select, [role="button"], [role="link"], [onclick], [tabindex]');
+    const allElements = document.querySelectorAll('a, button, input, textarea, select, summary, label[for], [contenteditable="true"], [role="button"], [role="link"], [role="menuitem"], [role="tab"], [role="option"], [role="checkbox"], [role="radio"], [role="switch"], [onclick], [tabindex]');
 
     allElements.forEach(el => {
       if (!isVisible(el)) return;
@@ -255,8 +322,9 @@
   const headings = extractHeadings();
   processActionableElements();
 
-  // Return structured data
-  return {
+  // Detect active modal and scope elements accordingly
+  const activeModalInfo = detectActiveModal();
+  const result = {
     pageTitle: document.title,
     pageUrl: window.location.href,
     language: document.documentElement.lang || 'unknown',
@@ -265,4 +333,28 @@
     actionableElements: actionableElements,
     totalActions: actionCounter
   };
+
+  if (activeModalInfo) {
+    const modalEl = activeModalInfo.element;
+    const modalElements = [];
+    const backgroundElements = [];
+
+    for (const desc of actionableElements) {
+      const el = document.querySelector('.' + desc.actionId);
+      if (el && modalEl.contains(el)) {
+        modalElements.push(desc);
+      } else {
+        backgroundElements.push(desc);
+      }
+    }
+
+    result.activeModal = {
+      type: activeModalInfo.type,
+      modalElements: modalElements,
+      backgroundElements: backgroundElements,
+      modalElementCount: modalElements.length
+    };
+  }
+
+  return result;
 })()

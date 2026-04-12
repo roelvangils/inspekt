@@ -154,5 +154,27 @@
       "de": ["datenschutz", "datenschutzerklärung", "privatsphäre"],
       "es": ["privacidad", "política de privacidad", "protección de datos"]
     }
+  },
+
+  "accept_cookies": {
+    "texts": {
+      "en": ["accept", "accept all", "accept cookies", "allow all", "agree", "i agree", "got it", "ok", "consent", "allow cookies"],
+      "nl": ["accepteren", "alles accepteren", "cookies accepteren", "akkoord", "ik ga akkoord", "alles toestaan"],
+      "fr": ["accepter", "tout accepter", "accepter les cookies", "j'accepte", "d'accord", "autoriser"],
+      "de": ["akzeptieren", "alle akzeptieren", "cookies akzeptieren", "einverstanden", "zustimmen", "alle zulassen"],
+      "es": ["aceptar", "aceptar todo", "aceptar cookies", "de acuerdo", "acepto", "permitir todo"]
+    },
+    "aria_labels": ["accept", "consent", "agree", "cookie"]
+  },
+
+  "dismiss": {
+    "texts": {
+      "en": ["close", "dismiss", "decline", "reject", "no thanks", "not now", "later", "deny", "skip", "maybe later"],
+      "nl": ["sluiten", "afwijzen", "weigeren", "nee bedankt", "niet nu", "later", "overslaan"],
+      "fr": ["fermer", "refuser", "rejeter", "non merci", "pas maintenant", "plus tard", "ignorer"],
+      "de": ["schließen", "ablehnen", "nein danke", "nicht jetzt", "später", "überspringen", "abweisen"],
+      "es": ["cerrar", "rechazar", "no gracias", "ahora no", "más tarde", "omitir", "denegar"]
+    },
+    "aria_labels": ["close", "dismiss", "decline"]
   }
 }

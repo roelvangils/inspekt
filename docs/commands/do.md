@@ -11,8 +11,14 @@ inspekt do "go to homepage"
 # Click a button
 inspekt do "click login button"
 
-# Search
-inspekt do "search"
+# Accept a cookie banner
+inspekt do "accept cookies"
+
+# Search for something (finds input, types query, presses Enter)
+inspekt do "search for cats"
+
+# Select a dropdown option
+inspekt do "select English"
 
 # With flags
 inspekt do "about us" --force-ai  # Force AI matching
@@ -31,15 +37,19 @@ User Action
    ↓ (miss)
 2. ANALYZE PAGE (extract all actionable elements)
    ↓
+   DETECT MODAL? → scope to modal elements only
+   ↓
 3. TRY LITERAL MATCHING ✓ (text/URL matching)
    ↓ (no match)
-4. TRY COMMON ACTIONS ✓ (home, login, search, etc.)
+4. TRY COMMON ACTIONS ✓ (home, login, search, cookies, etc.)
    ↓ (no match)
-5. TRY ADVANCED MATCHING ✓ (fuzzy text, synonyms)
+5. TRY SUBSTRING MATCHING ✓ ("bewijs" → "Bewijsstukken")
    ↓ (no match)
-6. USE AI 🤖 (last resort)
+6. TRY ADVANCED MATCHING ✓ (fuzzy text, synonyms)
+   ↓ (no match)
+7. USE AI 🤖 (last resort, supports multi-step plans)
    ↓
-EXECUTE ACTION & CACHE RESULT
+SMART EXECUTE & CACHE RESULT
 ```
 
 ### Phase 1: Cache Lookup
@@ -124,6 +134,8 @@ inspekt do "go to about page"  # → [CACHED] instant!
 - **settings**: /settings, /preferences, "settings", "preferences"
 - **profile**: /profile, /account, "profile", "my account"
 - **help**: /help, /faq, "help", "support", "faq"
+- **accept_cookies**: "accept", "accept all", "allow all", "agree", "I agree", "got it", "OK"
+- **dismiss**: "close", "dismiss", "decline", "no thanks", "not now", "later"
 
 **Example**:
 ```bash
@@ -134,7 +146,23 @@ inspekt do "log in"
 inspekt do "authenticate"
 ```
 
-### Phase 4: Advanced Matching
+### Phase 4: Substring Matching
+
+**What it does**: Finds elements where the action text is a substring of the element text, or vice versa.
+
+**Benefits**:
+- Handles partial matches in any language
+- Works well for compound words (common in Dutch, German)
+
+**Examples**:
+
+| Your Action | Element Text | Match Type | Result |
+|------------|--------------|------------|--------|
+| "bewijs" | "Bewijsstukken" | action_in_element | Match |
+| "nederlands" | "Nederlands" | action_in_element | Match |
+| "datenschutz" | "Datenschutzerklärung" | action_in_element | Match |
+
+### Phase 5: Advanced Matching
 
 **Fuzzy Matching**: Handles typos and variations.
 ```bash
@@ -158,9 +186,9 @@ inspekt do "main page" # Finds "Home" link
 - products → catalog, shop, store, items
 - settings → preferences, config, options
 
-### Phase 5: AI Matching
+### Phase 6: AI Matching
 
-**What it does**: Uses AI (via `mods`) to understand your intent and find the best match.
+**What it does**: Uses AI to understand your intent and find the best match. For multi-step actions, it returns a step-by-step execution plan.
 
 **When it's used**:
 - No automatic match found (< 80% confidence)
@@ -170,9 +198,10 @@ inspekt do "main page" # Finds "Home" link
 **Benefits**:
 - Understands natural language
 - Handles complex intents
+- Plans multi-step actions (search, form filling, login)
 - Provides reasoning for matches
 
-**Example output**:
+**Example output (single action)**:
 ```
 inspekt do "I want to learn about their long-term strategy"
 
@@ -186,6 +215,135 @@ Found 2 matching action(s):
 
 High confidence match! Executing action... [AI]
 ```
+
+**Example output (multi-step)**:
+```
+inspekt do "search for accessibility guidelines"
+
+AI planned 3 step(s):
+
+  1. click → inspekt-action-005
+     Click the search input to focus it
+  2. type → "accessibility guidelines"
+     Type the search query
+  3. press → Enter
+     Submit the search
+
+Executing multi-step action…
+  Step 1/3: Click the search input to focus it
+  Step 2/3: Type the search query
+  Step 3/3: Submit the search
+✓ Completed 3 steps
+```
+
+---
+
+## Modal & Overlay Awareness
+
+When a modal dialog, cookie consent banner, or overlay is active, `inspekt do` automatically detects it and restricts matching to elements inside the modal. This prevents accidentally matching background elements that the user can't interact with.
+
+**Detected overlay types**:
+- Native `<dialog>` elements
+- ARIA modal dialogs (`aria-modal="true"`)
+- Known cookie consent SDKs (OneTrust, Cookiebot, UserCentrics)
+- Generic modal patterns (Bootstrap, etc.)
+
+```bash
+# On a page with a cookie banner:
+inspekt do "accept cookies"
+
+Detected cookie-consent overlay — restricting search to 3 modal elements
+Found 3 actionable elements (prioritizing 3 in viewport)
+✓ Found common action match in viewport (score: 90%) [COMMON]
+✓ Action executed successfully!
+  Clicked: <button>
+  Text: Accept All Cookies
+```
+
+---
+
+## Smart Form Interaction
+
+The `inspekt do` command understands compound instructions and interacts with form elements intelligently.
+
+### Search
+
+```bash
+# Finds the search input, types the query, and presses Enter
+inspekt do "search for cats"
+inspekt do "find accessibility guidelines"
+inspekt do "look for pricing plans"
+```
+
+### Dropdowns
+
+```bash
+# Finds a <select> element and picks the matching option
+inspekt do "select English"
+inspekt do "choose monthly billing"
+inspekt do "pick large size"
+```
+
+### Checkboxes
+
+```bash
+# Checks the current state and only clicks if needed
+inspekt do "check remember me"
+inspekt do "uncheck notifications"
+```
+
+### Type into inputs
+
+```bash
+# Focuses the input and types the text
+inspekt do "type hello@example.com"
+inspekt do "enter John Smith"
+```
+
+### How it works
+
+Compound instructions are parsed into an action and a payload:
+
+| Instruction | Action | Payload |
+|------------|--------|---------|
+| "search for cats" | search | cats |
+| "select English" | select | English |
+| "check remember me" | check | remember me |
+| "type hello" | type | hello |
+| "login" | login | *(none — regular click)* |
+
+When there's no payload, the command behaves as before (simple click/navigate).
+
+---
+
+## Tie-Breaking
+
+When multiple elements match with equal scores (e.g., two "Login" links), small prominence bonuses determine the winner:
+
+| Factor | Bonus | Logic |
+|--------|-------|-------|
+| **Size** | +0.02 max | Larger elements are more likely primary CTAs |
+| **Position** | +0.01 | Elements near the top of the page are preferred |
+| **Element type** | +0.01 | Buttons beat links (buttons are typically primary actions) |
+| **Landmark** | +0.01 | Elements in `<nav>` or `<main>` beat those in `<footer>` |
+
+These bonuses are tiny (max +0.05 total) and only matter when scores are tied. They never override a genuinely better match.
+
+---
+
+## Element Detection
+
+The command detects these interactive element types:
+
+- Links (`<a>` with href)
+- Buttons (`<button>`)
+- Inputs (`<input>`, excluding hidden)
+- Textareas and selects
+- Accordion triggers (`<summary>`)
+- Labels (`<label>` with `for` attribute)
+- Editable content (`contenteditable="true"`)
+- ARIA roles: button, link, menuitem, tab, option, checkbox, radio, switch
+- Elements with click handlers or tabindex
 
 ---
 
@@ -252,6 +410,7 @@ The following common actions are available in all 5 languages:
 - **Authentication**: login, logout, register
 - **Account**: profile, settings
 - **E-commerce**: cart, checkout
+- **Dialogs**: accept cookies, dismiss
 
 ### Adding New Languages
 
@@ -398,10 +557,22 @@ inspekt do "logout"            # Sign out
 inspekt do "register"          # Sign up
 ```
 
+### Cookie Consent & Overlays
+
+```bash
+inspekt do "accept cookies"    # Accept cookie banner (auto-scopes to modal)
+inspekt do "dismiss"           # Close/dismiss a dialog
+inspekt do "decline"           # Reject cookies or dismiss overlay
+inspekt do "akkoord"           # Dutch: accept (works on Dutch pages)
+```
+
 ### Search & Forms
 
 ```bash
-inspekt do "search"            # Focus search field
+inspekt do "search for cats"   # Find input, type "cats", press Enter
+inspekt do "select English"    # Pick option from dropdown
+inspekt do "check remember me" # Toggle checkbox to checked
+inspekt do "type hello@me.com" # Type into focused input
 inspekt do "submit form"       # Submit current form
 inspekt do "apply now"         # Click apply button
 ```
@@ -412,6 +583,7 @@ inspekt do "apply now"         # Click apply button
 inspekt do "learn more about their services"  # Uses AI
 inspekt do "I want to contact support"        # Uses AI
 inspekt do "show me the documentation"        # Uses AI
+inspekt do "log in as admin"                  # AI plans multi-step: fill form + submit
 ```
 
 ### With Options
@@ -433,12 +605,13 @@ The command shows which method was used with indicators:
 
 | Indicator | Method | Speed | Description |
 |-----------|--------|-------|-------------|
-| `[CACHED]` | Cache | ⚡ Instant | Previously used action |
-| `[LITERAL]` | Literal | ⚡⚡ Very fast | Text/URL matching |
-| `[COMMON]` | Common | ⚡⚡ Very fast | Known action pattern |
-| `[FUZZY]` | Fuzzy | ⚡⚡ Very fast | Typo-tolerant matching |
-| `[SYNONYM]` | Synonym | ⚡⚡ Very fast | Synonym expansion |
-| `[AI]` | AI | 🤖 2-5 seconds | Natural language understanding |
+| `[CACHED]` | Cache | Instant | Previously used action |
+| `[LITERAL]` | Literal | Very fast | Text/URL matching |
+| `[COMMON]` | Common | Very fast | Known action pattern (cookies, login, etc.) |
+| `[SUBSTRING]` | Substring | Very fast | Partial text matching |
+| `[FUZZY]` | Fuzzy | Very fast | Typo-tolerant matching |
+| `[SYNONYM]` | Synonym | Very fast | Synonym expansion |
+| `[AI]` | AI | 2-5 seconds | Natural language understanding + multi-step plans |
 
 ## Cache Management
 

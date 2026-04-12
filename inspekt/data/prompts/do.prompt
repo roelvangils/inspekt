@@ -7,20 +7,25 @@ The page structure below includes:
 - **Landmarks**: Major page sections (navigation, main, header, footer, etc.)
 - **Headings**: The page's heading hierarchy
 - **Actionable Elements**: All clickable/interactive elements with their:
-  - actionId: Unique identifier (e.g., "zen-action-001")
-  - type: Element type (link, button, input, etc.)
+  - actionId: Unique identifier (e.g., "inspekt-action-001")
+  - type: Element type (link, button, input-text, input-search, select, checkbox, etc.)
   - text: Visible text or accessible name
   - href: URL (for links)
   - context: Nearby heading or landmark
   - position: Location on page
+  - options: Available options (for select elements)
+  - checked: Current state (for checkboxes/radios)
+  - value: Current value (for inputs)
 
 CRITICAL: Your response must be ONLY valid JSON. Do NOT wrap it in markdown code blocks (```json). Do NOT add any backticks, text, or formatting before or after the JSON.
 
-Required JSON structure:
+## Response Format
+
+For **simple actions** (click a link, press a button), return matches:
 {
   "matches": [
     {
-      "actionId": "zen-action-XXX",
+      "actionId": "inspekt-action-XXX",
       "probability": 0.95,
       "reasoning": "Brief explanation of why this element matches"
     }
@@ -28,29 +33,41 @@ Required JSON structure:
   "interpretation": "Brief explanation of what you understood the user wants to do"
 }
 
-Guidelines:
-1. Return 1-5 matches, ordered by probability (highest first)
-2. Probability should be between 0.0 and 1.0
-3. Only include matches with probability >= 0.3
-4. Consider:
+For **multi-step actions** (search for something, fill a form, log in), return a steps plan:
+{
+  "interpretation": "Brief explanation of the multi-step action",
+  "steps": [
+    { "action": "click", "actionId": "inspekt-action-005", "reasoning": "Click the search input to focus it" },
+    { "action": "type", "text": "search query here", "reasoning": "Type the search term" },
+    { "action": "press", "key": "Enter", "reasoning": "Submit the search" }
+  ]
+}
+
+### Available step actions:
+- `click` — Click an element. Requires `actionId`.
+- `type` — Type text into the currently focused element. Requires `text`.
+- `press` — Press a key. Requires `key` (e.g., "Enter", "Tab", "Escape").
+- `select` — Select an option from a dropdown. Requires `actionId` and `value` (the option text).
+
+## Guidelines
+
+1. For simple single-element actions, return `matches` (1-5 matches, ordered by probability)
+2. For multi-step actions (searching, form filling, logging in), return `steps`
+3. Probability should be between 0.0 and 1.0
+4. Only include matches with probability >= 0.3
+5. Consider:
    - Exact text matches (highest priority)
    - Partial text matches
    - Element type matching user intent (e.g., "search" → search input or search button)
    - Context (is it in navigation, main content, footer?)
    - Common patterns (e.g., "go home" → link with "home" in text or href)
-5. Be smart about synonyms and intent:
+6. Be smart about synonyms and intent:
    - "click login" / "sign in" / "log in" → login/signin buttons or links
    - "go to homepage" / "go home" → home/index links
-   - "search for X" → search inputs or search buttons
+   - "search for X" → focus search input, type X, press Enter
    - "next page" → pagination next buttons
    - "submit" / "send" → submit buttons in forms
-
-Example user instructions:
-- "Go to the homepage"
-- "Click the login button"
-- "Search for products"
-- "Open the about page"
-- "Submit the form"
-- "Navigate to contact us"
+7. When the instruction implies filling in data (e.g., "search for cats", "log in as admin"),
+   use `steps` to plan the full interaction sequence.
 
 Return ONLY the JSON response, no additional text.

@@ -160,8 +160,9 @@ class ActionMatcher:
             if score > 0:
                 matches.append({"element": element, "score": score, "matched_words": overlap})
 
-        # Sort by score
+        # Sort by score with prominence tie-breaking
         matches.sort(key=lambda x: x["score"], reverse=True)
+        matches = self._apply_prominence_bonus(matches)
 
         threshold = self.config.get("literal_match_threshold", 0.8)
 
@@ -262,8 +263,62 @@ class ActionMatcher:
             if score > 0:
                 matches.append({"element": element, "score": score})
 
-        # Sort by score and return best
+        # Sort by score with prominence tie-breaking
         matches.sort(key=lambda x: x["score"], reverse=True)
+        matches = self._apply_prominence_bonus(matches)
+        if matches:
+            return matches[0]
+
+        return None
+
+    def find_substring_match(
+        self, action_normalized: str, actionable_elements: list[dict]
+    ) -> dict | None:
+        """
+        Find element whose text contains the action as a substring, or vice versa.
+
+        Handles cases like "bewijs" matching "Bewijsstukken" or "nederlands" matching
+        "Nederlands". Returns best match with score and match_type, or None.
+        """
+        if not action_normalized:
+            return None
+
+        matches = []
+
+        for element in actionable_elements:
+            element_text = self._normalize_text(element.get("text", ""))
+            if not element_text:
+                continue
+
+            match_type = None
+            score = 0.0
+
+            if action_normalized in element_text:
+                # Action is a substring of element text
+                match_type = "action_in_element"
+                score = len(action_normalized) / len(element_text)
+            elif element_text in action_normalized:
+                # Element text is a substring of action
+                match_type = "element_in_action"
+                score = len(element_text) / len(action_normalized)
+
+            # Also check href
+            if not match_type and element.get("href"):
+                href_normalized = self._normalize_text(element["href"])
+                if action_normalized in href_normalized:
+                    match_type = "action_in_href"
+                    score = len(action_normalized) / len(href_normalized)
+
+            if match_type and score >= 0.4:
+                matches.append({
+                    "element": element,
+                    "score": score,
+                    "match_type": match_type,
+                })
+
+        matches.sort(key=lambda x: x["score"], reverse=True)
+        matches = self._apply_prominence_bonus(matches)
+
         if matches:
             return matches[0]
 
@@ -296,6 +351,7 @@ class ActionMatcher:
                 matches.append({"element": element, "score": score})
 
         matches.sort(key=lambda x: x["score"], reverse=True)
+        matches = self._apply_prominence_bonus(matches)
 
         threshold = 0.8
 
@@ -334,6 +390,7 @@ class ActionMatcher:
                 matches.append({"element": element, "score": score})
 
         matches.sort(key=lambda x: x["score"], reverse=True)
+        matches = self._apply_prominence_bonus(matches)
 
         threshold = 0.8
 
@@ -341,6 +398,43 @@ class ActionMatcher:
             return matches[0]
 
         return None
+
+    def _apply_prominence_bonus(self, matches: list[dict]) -> list[dict]:
+        """
+        Apply tiny tie-breaking bonuses based on element prominence.
+
+        Bonuses are small enough (max +0.05) to only matter when scores are
+        tied or nearly tied. They never override a genuinely better match.
+        """
+        for match in matches:
+            el = match["element"]
+            bonus = 0.0
+
+            # Size bonus: larger clickable area (capped at +0.02)
+            pos = el.get("position", {})
+            area = pos.get("width", 0) * pos.get("height", 0)
+            if area > 0:
+                bonus += min(area / 50000, 0.02)
+
+            # Position bonus: higher on page
+            if pos.get("y", 9999) < 500:
+                bonus += 0.01
+
+            # Element type bonus: buttons over links
+            if el.get("type") == "button":
+                bonus += 0.01
+
+            # Landmark bonus: nav or main over footer
+            context = el.get("context", {})
+            if isinstance(context, dict):
+                landmark = context.get("role") or context.get("tag", "")
+                if landmark in ("navigation", "nav", "main"):
+                    bonus += 0.01
+
+            match["score"] = min(match["score"] + bonus, 1.0)
+
+        matches.sort(key=lambda x: x["score"], reverse=True)
+        return matches
 
     def _normalize_text(self, text: str) -> str:
         """Normalize text for comparison (lowercase, remove special chars)."""

@@ -29,7 +29,7 @@ from PIL import Image
 
 from inspekt.app.cli.base import builtin_open, get_ai_language
 from inspekt.app.cli.url_builder import url_scheme
-from inspekt.app.cli.interaction import _focus_browser_if_requested
+from inspekt.app.cli.interaction import _focus_browser_if_requested, _send_text
 from inspekt.services.formatting_utils import format_filesize
 from inspekt.app.cli.icons import success, error, cached as cached_icon, get_indicator, analyze as analyze_icon, generate as generate_icon
 from inspekt.app.cli.table import print_wrapped
@@ -521,7 +521,48 @@ def describe(language, debug, force_refresh, output_json):
         sys.exit(1)
 
 
-def _execute_element_action(client: BridgeClient, action_id: str, element: dict):
+def _parse_compound_instruction(instruction: str) -> tuple[str, str | None]:
+    """
+    Parse a compound instruction into (action, payload).
+
+    Examples:
+        "search for cats"    → ("search", "cats")
+        "select English"     → ("select", "English")
+        "check remember me"  → ("check", "remember me")
+        "login"              → ("login", None)
+        "type hello world"   → ("type", "hello world")
+    """
+    instruction = instruction.strip()
+    lower = instruction.lower()
+
+    # Patterns: "verb + preposition + payload" or "verb + payload"
+    compound_patterns = [
+        # "search for X", "look for X", "find X"
+        (r"^(?:search|look|find)\s+(?:for\s+)?(.+)$", "search"),
+        # "type X", "enter X", "write X", "input X"
+        (r"^(?:type|enter|write|input)\s+(.+)$", "type"),
+        # "select X", "choose X", "pick X"
+        (r"^(?:select|choose|pick)\s+(.+)$", "select"),
+        # "check X", "enable X", "turn on X"
+        (r"^(?:check|enable|tick)\s+(.+)$", "check"),
+        # "uncheck X", "disable X", "turn off X"
+        (r"^(?:uncheck|disable|untick)\s+(.+)$", "uncheck"),
+    ]
+
+    import re
+    for pattern, action in compound_patterns:
+        m = re.match(pattern, lower)
+        if m:
+            # Use original case for the payload
+            payload_start = m.start(1)
+            payload = instruction[payload_start:]
+            return action, payload
+
+    return instruction, None
+
+
+def _execute_element_action(client: BridgeClient, action_id: str, element: dict,
+                            instruction: str | None = None):
     """Helper function to execute an action on an element."""
     # Step 1: Get element info and highlight it
     inspect_script = f"""
@@ -582,7 +623,14 @@ def _execute_element_action(client: BridgeClient, action_id: str, element: dict)
     element_info = action_result.get("element", {})
     action_type = action_result.get("action", "click")
 
-    # Step 2: Execute the action (navigate or click)
+    # Parse compound instruction for smart form interaction
+    parsed_action, payload = None, None
+    if instruction:
+        parsed_action, payload = _parse_compound_instruction(instruction)
+
+    el_type = element.get("type", "")
+
+    # Step 2: Smart execution based on element type and instruction
     if action_type == "navigate":
         # Navigate using window.location.href
         navigate_script = f"""
@@ -608,8 +656,96 @@ def _execute_element_action(client: BridgeClient, action_id: str, element: dict)
 
         if element_info.get('text'):
             click.echo(f"  Text: {element_info.get('text')}")
+
+    elif el_type == "select" and payload:
+        # Smart select: find matching option and select it
+        escaped_payload = json.dumps(payload)
+        select_script = f"""
+(function() {{
+    const el = document.querySelector('.{action_id}');
+    if (!el || el.tagName !== 'SELECT') return {{ ok: false, error: 'Not a select element' }};
+    const payload = {escaped_payload}.toLowerCase();
+    let matched = null;
+    for (const opt of el.options) {{
+        if (opt.text.trim().toLowerCase().includes(payload) || opt.value.toLowerCase().includes(payload)) {{
+            matched = opt;
+            break;
+        }}
+    }}
+    if (!matched) return {{ ok: false, error: 'No matching option found for: ' + payload }};
+    el.value = matched.value;
+    el.dispatchEvent(new Event('change', {{ bubbles: true }}));
+    return {{ ok: true, selected: matched.text.trim() }};
+}})();
+"""
+        select_result = client.execute(select_script, timeout=5.0)
+        select_data = select_result.get("result", {})
+        if select_data.get("ok"):
+            click.echo(click.style(success("Action executed successfully!"), fg="green", bold=True))
+            click.echo(f"  Selected: {select_data.get('selected')}")
+        else:
+            click.echo(click.style(error(select_data.get("error", "Failed to select option")), fg="red"), err=True)
+
+    elif el_type.startswith("input-") and el_type in ("input-checkbox", "input-radio") and parsed_action in ("check", "uncheck"):
+        # Smart checkbox/radio: set to desired state
+        want_checked = parsed_action == "check"
+        current_checked = element.get("checked", False)
+        if want_checked == current_checked:
+            click.echo(click.style(success("Already in desired state"), fg="green", bold=True))
+            click.echo(f"  {'Checked' if current_checked else 'Unchecked'}: {element.get('text', 'N/A')[:80]}")
+        else:
+            click_script = f"""
+(function() {{
+    const el = document.querySelector('.{action_id}');
+    if (el) el.click();
+    return {{ ok: true }};
+}})();
+"""
+            client.execute(click_script, timeout=5.0)
+            click.echo(click.style(success("Action executed successfully!"), fg="green", bold=True))
+            click.echo(f"  {'Checked' if want_checked else 'Unchecked'}: {element.get('text', 'N/A')[:80]}")
+
+    elif el_type.startswith("input-") and payload and parsed_action in ("search", "type"):
+        # Smart input: focus and type the payload
+        focus_script = f"""
+(function() {{
+    const el = document.querySelector('.{action_id}');
+    if (!el) return {{ ok: false, error: 'Element not found' }};
+    el.focus();
+    el.value = '';
+    return {{ ok: true }};
+}})();
+"""
+        client.execute(focus_script, timeout=5.0)
+
+        # Use _send_text to type the payload
+        _send_text(payload, f".{action_id}", 0, clear=True)
+
+        click.echo(click.style(success("Action executed successfully!"), fg="green", bold=True))
+        click.echo(f"  Typed into <{element_info.get('tag')}>: {payload}")
+
+        # If this was a search action, also press Enter
+        if parsed_action == "search":
+            import time
+            time.sleep(0.3)
+            press_script = """
+(function() {
+    const el = document.activeElement;
+    if (el) {
+        el.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', keyCode: 13, bubbles: true }));
+        el.dispatchEvent(new KeyboardEvent('keyup', { key: 'Enter', code: 'Enter', keyCode: 13, bubbles: true }));
+        // Also try submitting the parent form
+        const form = el.closest('form');
+        if (form) form.submit();
+    }
+    return { ok: true };
+})();
+"""
+            client.execute(press_script, timeout=5.0)
+            click.echo(f"  Submitted search")
+
     else:
-        # Regular click for non-links
+        # Default: regular click for non-links
         click_script = f"""
 (function() {{
     const element = document.querySelector('.{action_id}');
@@ -626,6 +762,107 @@ def _execute_element_action(client: BridgeClient, action_id: str, element: dict)
         click.echo(f"  Clicked: <{element_info.get('tag')}>")
         if element_info.get('text'):
             click.echo(f"  Text: {element_info.get('text')}")
+
+
+def _execute_multi_step(client: BridgeClient, steps: list[dict], actionable_elements: list[dict]):
+    """
+    Execute a multi-step action plan returned by AI.
+
+    Supported step actions: click, type, press, select.
+    """
+    import time
+
+    total = len(steps)
+    for i, step in enumerate(steps, 1):
+        action = step.get("action")
+        reasoning = step.get("reasoning", "")
+        click.echo(f"  Step {i}/{total}: {reasoning}", err=True)
+
+        if action == "click":
+            action_id = step.get("actionId")
+            if not action_id:
+                click.echo(click.style("    Skipped: no actionId", fg="yellow"), err=True)
+                continue
+            click_script = f"""
+(function() {{
+    const el = document.querySelector('.{action_id}');
+    if (!el) return {{ ok: false, error: 'Element not found' }};
+    el.scrollIntoView({{ behavior: 'smooth', block: 'center' }});
+    el.click();
+    return {{ ok: true }};
+}})();
+"""
+            result = client.execute(click_script, timeout=10.0)
+            if not result.get("ok") or not result.get("result", {}).get("ok", True):
+                err_msg = result.get("result", {}).get("error", result.get("error", "Unknown error"))
+                click.echo(click.style(f"    Failed: {err_msg}", fg="red"), err=True)
+
+        elif action == "type":
+            text = step.get("text", "")
+            if not text:
+                click.echo(click.style("    Skipped: no text", fg="yellow"), err=True)
+                continue
+            escaped_text = json.dumps(text)
+            type_script = f"""
+(function() {{
+    const el = document.activeElement;
+    if (!el) return {{ ok: false, error: 'No focused element' }};
+    el.value = {escaped_text};
+    el.dispatchEvent(new Event('input', {{ bubbles: true }}));
+    el.dispatchEvent(new Event('change', {{ bubbles: true }}));
+    return {{ ok: true }};
+}})();
+"""
+            client.execute(type_script, timeout=5.0)
+
+        elif action == "press":
+            key = step.get("key", "Enter")
+            press_script = f"""
+(function() {{
+    const el = document.activeElement || document.body;
+    el.dispatchEvent(new KeyboardEvent('keydown', {{ key: '{key}', code: '{key}', bubbles: true }}));
+    el.dispatchEvent(new KeyboardEvent('keyup', {{ key: '{key}', code: '{key}', bubbles: true }}));
+    if ('{key}' === 'Enter') {{
+        const form = el.closest('form');
+        if (form) form.submit();
+    }}
+    return {{ ok: true }};
+}})();
+"""
+            client.execute(press_script, timeout=5.0)
+
+        elif action == "select":
+            action_id = step.get("actionId")
+            value = step.get("value", "")
+            if not action_id or not value:
+                click.echo(click.style("    Skipped: missing actionId or value", fg="yellow"), err=True)
+                continue
+            escaped_value = json.dumps(value)
+            select_script = f"""
+(function() {{
+    const el = document.querySelector('.{action_id}');
+    if (!el || el.tagName !== 'SELECT') return {{ ok: false, error: 'Not a select element' }};
+    const target = {escaped_value}.toLowerCase();
+    for (const opt of el.options) {{
+        if (opt.text.trim().toLowerCase().includes(target)) {{
+            el.value = opt.value;
+            el.dispatchEvent(new Event('change', {{ bubbles: true }}));
+            return {{ ok: true }};
+        }}
+    }}
+    return {{ ok: false, error: 'No matching option' }};
+}})();
+"""
+            client.execute(select_script, timeout=5.0)
+
+        else:
+            click.echo(click.style(f"    Unknown action: {action}", fg="yellow"), err=True)
+
+        # Brief pause between steps for page responsiveness
+        if i < total:
+            time.sleep(0.3)
+
+    click.echo(click.style(success(f"Completed {total} steps"), fg="green", bold=True))
 
 
 def _partition_elements_by_viewport(actionable_elements: list[dict]) -> tuple[list[dict], list[dict]]:
@@ -873,6 +1110,21 @@ def do(instruction, debug, no_execute, force_ai, no_cache, focus, verbose):
             click.echo("No actionable elements found on this page.", err=True)
             sys.exit(0)
 
+        # Check for active modal — try modal elements first, fall back to all
+        active_modal = page_data.get("activeModal")
+        all_elements = actionable_elements  # keep original list for fallback
+        if active_modal:
+            modal_type = active_modal.get("type", "modal")
+            modal_count = active_modal.get("modalElementCount", 0)
+            click.echo(click.style(
+                f"Detected {modal_type} overlay — trying {modal_count} modal elements first",
+                fg="yellow"
+            ), err=True)
+            actionable_elements = active_modal.get("modalElements", actionable_elements)
+            total_actions = len(actionable_elements)
+            page_data["actionableElements"] = actionable_elements
+            page_data["totalActions"] = total_actions
+
         # Display element counts including viewport info
         viewport_count = page_data.get("viewportActionsCount", 0)
         click.echo(f"Found {total_actions} actionable elements (prioritizing {viewport_count} in viewport)", err=True)
@@ -966,6 +1218,27 @@ def do(instruction, debug, no_execute, force_ai, no_cache, focus, verbose):
                 if matched_element:
                     search_scope = "off-screen"
 
+            # PHASE 3: If modal was active but no match found, retry with ALL elements
+            if not matched_element and active_modal and all_elements:
+                click.echo(click.style(
+                    "No match in modal — expanding search to full page",
+                    fg="yellow"
+                ), err=True)
+                full_viewport, full_offscreen = _partition_elements_by_viewport(all_elements)
+                for scope_els, scope_name in [(full_viewport, "full-page viewport"), (full_offscreen, "full-page off-screen")]:
+                    if matched_element or not scope_els:
+                        continue
+                    matched_element, match_method, match_score = _try_matching_strategies(
+                        matcher=matcher, cache=cache,
+                        action_normalized=action_normalized,
+                        elements=scope_els, languages=languages,
+                        current_url=current_url, page_data=page_data,
+                        scope_label=scope_name, verbose=verbose,
+                        skip_cache=no_cache,
+                    )
+                    if matched_element:
+                        search_scope = scope_name
+
         # If we found a match without AI, skip to execution
         if matched_element and not debug:
             # Determine execution based on match score
@@ -995,7 +1268,7 @@ def do(instruction, debug, no_execute, force_ai, no_cache, focus, verbose):
 
                 # Execute using the existing execution logic (will add below)
                 # For now, set a flag to skip AI and use this element
-                _execute_element_action(client, action_id, matched_element)
+                _execute_element_action(client, action_id, matched_element, instruction)
 
                 # Store in cache for future use (skip if --no-cache)
                 if cache.is_enabled() and match_method != "CACHED" and not no_cache:
@@ -1114,6 +1387,46 @@ def do(instruction, debug, no_execute, force_ai, no_cache, focus, verbose):
         click.echo(f"Interpretation: {response.get('interpretation', 'N/A')}")
         click.echo()
 
+        # Check for multi-step action plan from AI
+        steps = response.get("steps")
+        if steps and isinstance(steps, list) and len(steps) > 0:
+            click.echo(f"AI planned {len(steps)} step(s):")
+            click.echo()
+            for i, step in enumerate(steps, 1):
+                action = step.get("action", "?")
+                reasoning = step.get("reasoning", "")
+                detail = ""
+                if action == "click":
+                    detail = f" → {step.get('actionId', '?')}"
+                elif action == "type":
+                    detail = f" → \"{step.get('text', '')}\""
+                elif action == "press":
+                    detail = f" → {step.get('key', '?')}"
+                elif action == "select":
+                    detail = f" → {step.get('value', '?')}"
+                click.echo(f"  {i}. {action}{detail}")
+                if reasoning:
+                    click.echo(f"     {reasoning}")
+            click.echo()
+
+            if not no_execute:
+                click.echo(click.style("Executing multi-step action…", fg="green", bold=True))
+                click.echo()
+                try:
+                    _execute_multi_step(client, steps, actionable_elements)
+
+                    # Cache the first element for future single-step use
+                    first_action_id = next((s.get("actionId") for s in steps if s.get("actionId")), None)
+                    if first_action_id and cache.is_enabled() and not no_cache:
+                        first_element = next((el for el in actionable_elements if el.get("actionId") == first_action_id), None)
+                        if first_element:
+                            cache.store_action(current_url, instruction, action_normalized, first_element, page_data)
+                except (ConnectionError, TimeoutError, RuntimeError) as e:
+                    click.echo(click.style(error(f"Error during multi-step execution: {e}"), fg="red"), err=True)
+                    sys.exit(1)
+
+            return  # Done — skip single-match handling
+
         matches = response.get("matches", [])
         if not matches:
             click.echo("No matching actions found.")
@@ -1201,7 +1514,7 @@ def do(instruction, debug, no_execute, force_ai, no_cache, focus, verbose):
                 click.echo("Executing action...", err=True)
 
                 try:
-                    _execute_element_action(client, top_action_id, top_element)
+                    _execute_element_action(client, top_action_id, top_element, instruction)
 
                     # Store in cache for future use [AI] (skip if --no-cache)
                     if cache.is_enabled() and not no_cache:
