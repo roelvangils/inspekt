@@ -663,7 +663,13 @@ button.inspect-active {
         &:hover { color: #fff; }
     }
 
-    & .panel-body { padding: var(--space-3); }
+    & .panel-body {
+        display: block;
+        flex: none;
+        overflow-y: auto;
+        position: static;
+        padding: var(--space-3);
+    }
 
     & .selector-box {
         background: #252540;

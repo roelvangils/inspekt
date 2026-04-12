@@ -803,6 +803,58 @@ function _setupCanvasEventInterceptors() {
         }, true);
     }
     _attachHoverMoveListener();
+
+    // Arrow key interception for DOM navigation during inspect mode.
+    // noVNC's RFB grabs keyboard events on the canvas and sends them to the VM,
+    // so arrow keys never reach the document-level keydown handler in vnc-overlay.js.
+    // We intercept at the capture phase on the container to block RFB from getting them.
+    container.addEventListener('keydown', (e) => {
+        if (!_inspectTrackingActive) return;
+        if (_isMenuOpen()) return;
+
+        // Don't intercept when terminal or input is active
+        const termOverlay = document.getElementById('terminalOverlay');
+        if (termOverlay && termOverlay.classList.contains('open')) return;
+        if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) return;
+
+        const directionMap = {
+            'ArrowUp': 'up',
+            'ArrowDown': 'down',
+            'ArrowLeft': 'left',
+            'ArrowRight': 'right'
+        };
+        const direction = directionMap[e.key];
+
+        if (direction) {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            _navigateInspect(direction);
+            return;
+        }
+
+        // Copy selector with 'c' key
+        if (e.key === 'c' && !e.metaKey && !e.ctrlKey) {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            const entry = vncOverlay._overlays['inspect-tooltip'];
+            if (entry) {
+                const selector = entry.element.textContent.split(' \u2022 ')[0].split(' (')[0];
+                writeClipboard(selector);
+                showToast(`Copied: ${selector}`, 'success');
+            }
+            return;
+        }
+
+        // Escape to dismiss inspect overlay (block from reaching RFB)
+        if (e.key === 'Escape') {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            if (activeTabId) _tabInspectState[activeTabId] = { wasTracking: false };
+            _cleanupAllInspectState();
+            vncOverlay.dismissAll(true);
+            return;
+        }
+    }, true);  // capture phase — runs before noVNC's RFB handler
 }
 
 // Note: Escape key dismissal for inspect overlay is handled in the

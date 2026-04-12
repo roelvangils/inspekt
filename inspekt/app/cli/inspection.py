@@ -1270,7 +1270,12 @@ def html(file_path, open_after, reveal_after, include_css, bundled, all_properti
     is_flag=True,
     help="Compact CSS by shortening data URIs, long URLs, var() names, and animation names.",
 )
-def css(file_path, open_after, reveal_after, raw, copy, output_json, all_properties, include_defaults, optimize, oklch, alphabetize, rounding, heuristic_comments, two_columns, three_columns, compact):
+@click.option(
+    "--authored",
+    is_flag=True,
+    help="Show original authored CSS values (e.g., clamp(), var(), rem) instead of browser-computed values.",
+)
+def css(file_path, open_after, reveal_after, raw, copy, output_json, all_properties, include_defaults, optimize, oklch, alphabetize, rounding, heuristic_comments, two_columns, three_columns, compact, authored):
     """
     Extract computed CSS styles as nested CSS.
 
@@ -1296,6 +1301,7 @@ def css(file_path, open_after, reveal_after, raw, copy, output_json, all_propert
         inspekt inspected css --all-properties   # All ~300 properties
         inspekt inspected css --include-defaults # Include browser defaults
         inspekt inspected css --compact          # Shorten data URIs, long URLs, var() names
+        inspekt inspected css --authored         # Show original authored values (clamp(), var(), rem)
         inspekt inspected css --copy             # Copy CSS to clipboard
         inspekt inspected css --raw              # No syntax highlighting
     """
@@ -1350,6 +1356,27 @@ def css(file_path, open_after, reveal_after, raw, copy, output_json, all_propert
         stripped_as_default = stats.get("strippedAsDefault", 0)
         stripped_as_inherited = stats.get("strippedAsInherited", 0)
 
+        # Optionally fetch and merge authored CSS values via CDP
+        authored_count = 0
+        if authored:
+            authored_script = loader.load_with_substitution_sync(
+                "get_authored_css_cdp.js",
+                {"SOURCE_TYPE_PLACEHOLDER": "inspected", "ELEMENT_COUNT_PLACEHOLDER": element_count}
+            )
+            try:
+                authored_result = executor.execute(authored_script, timeout=30.0)
+                if authored_result.get("ok"):
+                    authored_response = authored_result.get("result", {})
+                    if authored_response.get("ok"):
+                        from inspekt.services.css_authored_merger import merge_authored_css
+                        authored_map = authored_response.get("elements", {})
+                        root = merge_authored_css(root, authored_map)
+                        from inspekt.services.css_generator import collect_authored_props
+                        authored_count = len(collect_authored_props(root))
+            except Exception:
+                from inspekt.app.cli.table import print_warning
+                print_warning("Could not retrieve authored CSS values. Showing computed values only.")
+
         # Generate nested CSS
         css_content = generate_nested_css(root)
         property_count = count_properties(root)
@@ -1367,6 +1394,11 @@ def css(file_path, open_after, reveal_after, raw, copy, output_json, all_propert
         optimized = optimize or oklch or alphabetize or heuristic_comments or two_columns or three_columns
         if optimized:
             from inspekt.services.css_optimizer import optimize_css
+            # Collect cross-reference values (authored → computed) when authored mode is active
+            cross_ref = None
+            if authored and authored_count > 0:
+                from inspekt.services.css_generator import collect_cross_ref_values
+                cross_ref = collect_cross_ref_values(root)
             css_content = optimize_css(
                 css_content,
                 convert_to_oklch=oklch,
@@ -1376,6 +1408,7 @@ def css(file_path, open_after, reveal_after, raw, copy, output_json, all_propert
                 computed_props=computed_props,
                 heuristic_comments=heuristic_comments,
                 column_format="two" if two_columns else ("three" if three_columns else None),
+                cross_ref_values=cross_ref,
             )
             # Count properties after optimization to track merged shorthands
             optimized_property_count = count_css_properties_in_string(css_content)
@@ -1461,6 +1494,9 @@ def css(file_path, open_after, reveal_after, raw, copy, output_json, all_propert
         if stripped_as_inherited > 0:
             inherited_word = pluralize(stripped_as_inherited, "inherited duplicate", "inherited duplicates")
             stats_rows.append(["Removed", f"{stripped_as_inherited} {inherited_word}"])
+        if authored and authored_count > 0:
+            authored_word = pluralize(authored_count, "property", "properties")
+            stats_rows.append(["Authored", f"{authored_count} {authored_word} resolved from source stylesheets"])
         if optimized and merged_count > 0:
             merged_word = pluralize(merged_count, "property", "properties")
             shorthand_word = pluralize(shorthand_count, "shorthand", "shorthands")
@@ -1470,10 +1506,11 @@ def css(file_path, open_after, reveal_after, raw, copy, output_json, all_propert
 
         # Display statistics table
         click.echo()
+        css_title = "Authored + Computed CSS" if authored and authored_count > 0 else "Computed CSS"
         table = Table(
             ["Metric", "Value"],
             alignments=["left", "left"],
-            title=f"Computed CSS from {element_count} {elem_word}",
+            title=f"{css_title} from {element_count} {elem_word}",
             icon="\ue749"  # CSS icon
         )
         table.set_data(stats_rows)
@@ -1528,6 +1565,8 @@ def css(file_path, open_after, reveal_after, raw, copy, output_json, all_propert
             tips.append(("`--two-columns`", "Align properties and values in columns", None))
         if not compact:
             tips.append(("`--compact`", "Shorten data URIs, URLs, and long text (breaks CSS; for documentation only)", None))
+        if not authored:
+            tips.append(("`--authored`", "Show original authored values (clamp(), var(), rem) via Chrome DevTools Protocol", None))
 
         if tips:
             click.echo()
@@ -2314,7 +2353,12 @@ def html(file_path, open_after, reveal_after, include_css, bundled, all_properti
     is_flag=True,
     help="Compact CSS by shortening data URIs, long URLs, var() names, and animation names.",
 )
-def css(file_path, open_after, reveal_after, raw, copy, output_json, all_properties, include_defaults, optimize, oklch, alphabetize, rounding, heuristic_comments, two_columns, three_columns, compact):
+@click.option(
+    "--authored",
+    is_flag=True,
+    help="Show original authored CSS values (e.g., clamp(), var(), rem) instead of browser-computed values.",
+)
+def css(file_path, open_after, reveal_after, raw, copy, output_json, all_properties, include_defaults, optimize, oklch, alphabetize, rounding, heuristic_comments, two_columns, three_columns, compact, authored):
     """
     Extract computed CSS styles as nested CSS from the focused element.
 
@@ -2367,6 +2411,27 @@ def css(file_path, open_after, reveal_after, raw, copy, output_json, all_propert
         stripped_as_default = stats.get("strippedAsDefault", 0)
         stripped_as_inherited = stats.get("strippedAsInherited", 0)
 
+        # Optionally fetch and merge authored CSS values via CDP
+        authored_count = 0
+        if authored:
+            authored_script = loader.load_with_substitution_sync(
+                "get_authored_css_cdp.js",
+                {"SOURCE_TYPE_PLACEHOLDER": "focused", "ELEMENT_COUNT_PLACEHOLDER": element_count}
+            )
+            try:
+                authored_result = executor.execute(authored_script, timeout=30.0)
+                if authored_result.get("ok"):
+                    authored_response = authored_result.get("result", {})
+                    if authored_response.get("ok"):
+                        from inspekt.services.css_authored_merger import merge_authored_css
+                        authored_map = authored_response.get("elements", {})
+                        root = merge_authored_css(root, authored_map)
+                        from inspekt.services.css_generator import collect_authored_props
+                        authored_count = len(collect_authored_props(root))
+            except Exception:
+                from inspekt.app.cli.table import print_warning
+                print_warning("Could not retrieve authored CSS values. Showing computed values only.")
+
         css_content = generate_nested_css(root)
         property_count = count_properties(root)
 
@@ -2379,6 +2444,11 @@ def css(file_path, open_after, reveal_after, raw, copy, output_json, all_propert
         optimized = optimize or oklch or alphabetize or heuristic_comments or two_columns or three_columns
         if optimized:
             from inspekt.services.css_optimizer import optimize_css
+            # Collect cross-reference values (authored → computed) when authored mode is active
+            cross_ref = None
+            if authored and authored_count > 0:
+                from inspekt.services.css_generator import collect_cross_ref_values
+                cross_ref = collect_cross_ref_values(root)
             css_content = optimize_css(
                 css_content,
                 convert_to_oklch=oklch,
@@ -2388,6 +2458,7 @@ def css(file_path, open_after, reveal_after, raw, copy, output_json, all_propert
                 computed_props=computed_props,
                 heuristic_comments=heuristic_comments,
                 column_format="two" if two_columns else ("three" if three_columns else None),
+                cross_ref_values=cross_ref,
             )
             optimized_property_count = count_css_properties_in_string(css_content)
             merged_count = original_property_count - optimized_property_count
@@ -2463,6 +2534,9 @@ def css(file_path, open_after, reveal_after, raw, copy, output_json, all_propert
         if stripped_as_inherited > 0:
             inherited_word = pluralize(stripped_as_inherited, "inherited duplicate", "inherited duplicates")
             stats_rows.append(["Removed", f"{stripped_as_inherited} {inherited_word}"])
+        if authored and authored_count > 0:
+            authored_word = pluralize(authored_count, "property", "properties")
+            stats_rows.append(["Authored", f"{authored_count} {authored_word} resolved from source stylesheets"])
         if optimized and merged_count > 0:
             merged_word = pluralize(merged_count, "property", "properties")
             shorthand_word = pluralize(shorthand_count, "shorthand", "shorthands")
@@ -2471,10 +2545,11 @@ def css(file_path, open_after, reveal_after, raw, copy, output_json, all_propert
         stats_rows.append(["Kept", f"{property_count} {prop_word}"])
 
         click.echo()
+        css_title = "Authored + Computed CSS" if authored and authored_count > 0 else "Computed CSS"
         table = Table(
             ["Metric", "Value"],
             alignments=["left", "left"],
-            title=f"Computed CSS from {element_count} {elem_word}",
+            title=f"{css_title} from {element_count} {elem_word}",
             icon="\ue749"
         )
         table.set_data(stats_rows)
@@ -2528,6 +2603,8 @@ def css(file_path, open_after, reveal_after, raw, copy, output_json, all_propert
             tips.append(("`--two-columns`", "Align properties and values in columns", None))
         if not compact:
             tips.append(("`--compact`", "Shorten data URIs, URLs, and long text (breaks CSS; for documentation only)", None))
+        if not authored:
+            tips.append(("`--authored`", "Show original authored values (clamp(), var(), rem) via Chrome DevTools Protocol", None))
 
         if tips:
             click.echo()

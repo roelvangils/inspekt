@@ -64,6 +64,33 @@
             }
         }
 
+        // Handle GET_AUTHORED_CSS requests from MAIN world (CDP-based authored CSS extraction)
+        if (message && message.type === 'INSPEKT_GET_AUTHORED_CSS' && message.source === 'inspekt-page') {
+            try {
+                const response = await chrome.runtime.sendMessage({
+                    type: 'GET_AUTHORED_CSS',
+                    source: message.elementSource,
+                    elementCount: message.elementCount
+                });
+                window.postMessage({
+                    type: 'INSPEKT_AUTHORED_CSS_RESPONSE',
+                    source: 'inspekt-extension',
+                    requestId: message.requestId,
+                    response: response
+                }, location.origin);
+            } catch (error) {
+                window.postMessage({
+                    type: 'INSPEKT_AUTHORED_CSS_RESPONSE',
+                    source: 'inspekt-extension',
+                    requestId: message.requestId,
+                    response: {
+                        ok: false,
+                        error: String(error)
+                    }
+                }, location.origin);
+            }
+        }
+
         // Handle GET_OVERLAY_POSITION requests from MAIN world
         if (message && message.type === 'INSPEKT_GET_OVERLAY_POSITION' && message.source === 'inspekt-page') {
             try {
