@@ -3,12 +3,13 @@ HTML processing utilities for formatting and compacting HTML.
 
 Provides:
 - Prettier integration for formatting HTML
-- Compact mode that removes classes and truncates long text
+- Compact mode for documentation-friendly output (strips noise, preserves structure)
 """
 
 import re
 import shutil
 import subprocess
+from urllib.parse import urlparse, urlunparse
 
 import click
 from bs4 import BeautifulSoup
@@ -103,11 +104,9 @@ def format_html_with_prettier(html_content: str, indent: int = 2) -> str | None:
 
 
 def _truncate_url(url: str, max_segments: int = 3) -> str:
-    """Shorten a URL by collapsing middle path segments."""
+    """Shorten a URL by collapsing middle path segments, preserving query and fragment."""
     if len(url) < 60:
         return url
-    # Preserve protocol + domain
-    from urllib.parse import urlparse, urlunparse
     try:
         parsed = urlparse(url)
     except Exception:
@@ -117,9 +116,8 @@ def _truncate_url(url: str, max_segments: int = 3) -> str:
     parts = [p for p in parsed.path.split('/') if p]
     if len(parts) <= max_segments:
         return url
-    # Keep first segment and last segment, collapse middle
     shortened_path = '/' + parts[0] + '/…/' + parts[-1]
-    return urlunparse((parsed.scheme, parsed.netloc, shortened_path, '', parsed.query, ''))
+    return urlunparse((parsed.scheme, parsed.netloc, shortened_path, '', parsed.query, parsed.fragment))
 
 
 def _is_hash_like(s: str) -> bool:
@@ -132,7 +130,6 @@ def _is_hash_like(s: str) -> bool:
 
 def _replace_hashes_in_url(url: str) -> str:
     """Replace hash-like segments in a URL path with [STRING]."""
-    from urllib.parse import urlparse, urlunparse
     try:
         parsed = urlparse(url)
     except Exception:
@@ -274,12 +271,6 @@ def compact_html(html_content: str) -> str:
         words = text.split()
         if len(words) > 20:
             element.replace_with('…')
-
-    # Remove empty comments
-    from bs4 import Comment
-    for comment in soup.find_all(string=lambda t: isinstance(t, Comment)):
-        if not comment.strip():
-            comment.extract()
 
     return str(soup)
 
