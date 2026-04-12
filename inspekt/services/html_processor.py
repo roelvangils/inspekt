@@ -58,12 +58,13 @@ def install_prettier_via_npm() -> bool:
         return False
 
 
-def format_html_with_prettier(html_content: str) -> str | None:
+def format_html_with_prettier(html_content: str, indent: int = 2) -> str | None:
     """
     Format HTML using prettier.
 
     Args:
         html_content: Raw HTML string to format
+        indent: Number of spaces for indentation (default 2)
 
     Returns:
         Formatted HTML string, or None if prettier not available
@@ -87,7 +88,7 @@ def format_html_with_prettier(html_content: str) -> str | None:
                 "prettier",
                 "--stdin-filepath", "index.html",
                 "--print-width", "80",
-                "--tab-width", "2",
+                "--tab-width", str(indent),
                 "--html-whitespace-sensitivity", "ignore",
             ],
             input=html_content,
@@ -144,31 +145,41 @@ def compact_html(html_content: str) -> str:
 
 def process_html(
     html_content: str,
-    prettier: bool = False,
-    compact: bool = False
+    format: bool = False,
+    compact: bool = False,
+    remove_comments: bool = False,
+    indent: int = 2,
 ) -> str:
     """
-    Process HTML with optional prettier formatting and/or compacting.
+    Process HTML with optional formatting, compacting, and comment removal.
 
     Args:
         html_content: Raw HTML string
-        prettier: If True, format with prettier
+        format: If True, format with prettier
         compact: If True, remove classes and truncate long text
+        remove_comments: If True, strip all HTML comments
+        indent: Indentation width for prettier (default 2)
 
     Returns:
         Processed HTML string
     """
     result = html_content
 
-    # Apply compact first (before prettier)
+    # Always strip empty comments
+    result = strip_empty_comments(result)
+
+    # Remove all comments if requested
+    if remove_comments:
+        result = re.sub(r'<!--[\s\S]*?-->', '', result)
+
+    # Apply compact (before prettier)
     if compact:
         result = compact_html(result)
 
     # Apply prettier last (for best formatting)
-    if prettier:
-        formatted = format_html_with_prettier(result)
+    if format:
+        formatted = format_html_with_prettier(result, indent=indent)
         if formatted is not None:
             result = formatted
-        # If prettier failed, result remains as-is
 
     return result
