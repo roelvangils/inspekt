@@ -12,7 +12,7 @@ import subprocess
 from urllib.parse import urlparse, urlunparse
 
 import click
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, Comment, Tag
 
 
 def strip_empty_comments(html: str) -> str:
@@ -175,7 +175,6 @@ def _get_tag_skeleton(tag) -> str:
     Used to detect repeated siblings with the same structure (ignoring text/attributes).
     Example: <li><a><img><span></span></a></li> → "li>a>img+span"
     """
-    from bs4 import Tag
     children = [c for c in tag.children if isinstance(c, Tag)]
     if not children:
         return tag.name
@@ -189,29 +188,25 @@ def _collapse_repeated_siblings(soup) -> None:
     Keeps the first 2 siblings so the reader sees the pattern, then adds
     <!-- … and N more <tag> --> in place of the rest.
     """
-    from bs4 import Comment, Tag
-
     for parent in soup.find_all(True):
         children = [c for c in parent.children if isinstance(c, Tag)]
         if len(children) < 3:
             continue
 
+        # Compute skeletons once per child
+        skeletons = [_get_tag_skeleton(c) for c in children]
+
         # Group consecutive siblings by skeleton
         i = 0
         while i < len(children):
-            skeleton = _get_tag_skeleton(children[i])
             run_start = i
-            while i < len(children) and _get_tag_skeleton(children[i]) == skeleton:
+            while i < len(children) and skeletons[i] == skeletons[run_start]:
                 i += 1
-            run_length = i - run_start
 
-            if run_length >= 3:
+            if i - run_start >= 3:
                 tag_name = children[run_start].name
-                # Keep first 2, remove the rest and insert a comment
                 to_remove = children[run_start + 2:i]
-                collapse_count = len(to_remove)
-                # Insert comment before the first element to be removed
-                comment = Comment(f' … and {collapse_count} more <{tag_name}> ')
+                comment = Comment(f' … and {len(to_remove)} more <{tag_name}> ')
                 to_remove[0].insert_before(comment)
                 for el in to_remove:
                     el.decompose()
@@ -222,8 +217,6 @@ def _unwrap_purposeless_wrappers(soup) -> None:
 
     Runs in a loop since unwrapping may expose new single-child wrappers.
     """
-    from bs4 import Tag
-
     for _ in range(10):  # Max iterations to prevent infinite loops
         found = False
         for tag in soup.find_all(['div', 'span']):
