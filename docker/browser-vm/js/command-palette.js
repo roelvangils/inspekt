@@ -577,6 +577,89 @@ function formatConsoleOutput(data) {
     return html;
 }
 
+// ── Page analysis output formatters ──
+
+function formatPerformanceOutput(metrics) {
+    const rows = [
+        ['Page Load Time', metrics.page_load_time + ' ms'],
+        ['DOM Interactive', metrics.dom_interactive + ' ms'],
+        ['DOM Processing', metrics.dom_processing + ' ms'],
+        ['DNS Lookup', metrics.dns_lookup + ' ms'],
+        ['TCP Connection', metrics.tcp_connection + ' ms'],
+        ['Request Time', metrics.request_time + ' ms'],
+        ['Response Time', metrics.response_time + ' ms'],
+        ['Navigation Type', metrics.navigation_type],
+        ['Redirects', metrics.redirect_count],
+        ['Resources', metrics.resource_count],
+    ];
+    if (metrics.memory) {
+        rows.push(['JS Heap Used', metrics.memory.used_heap + ' MB']);
+        rows.push(['JS Heap Total', metrics.memory.total_heap + ' MB']);
+        rows.push(['JS Heap Limit', metrics.memory.heap_limit + ' MB']);
+    }
+    let html = '<table><thead><tr><th>Metric</th><th>Value</th></tr></thead><tbody>';
+    rows.forEach(([metric, value]) => {
+        html += `<tr><td>${escapeHtml(metric)}</td><td style="font-family: monospace;">${escapeHtml(String(value))}</td></tr>`;
+    });
+    html += '</tbody></table>';
+    return html;
+}
+
+function formatImageAnalysisOutput(data) {
+    if (!data.images || data.images.length === 0) {
+        return `<div style="padding: 20px; text-align: center; color: #888;">No visible images found (${data.totalImages} total, all hidden).</div>`;
+    }
+    let html = `<div style="margin-bottom: 10px; color: #94a3b8;">${data.visibleImages} visible of ${data.totalImages} total images</div>`;
+    html += '<table><thead><tr><th>#</th><th>Alt Text</th><th>Size</th><th>Rendered</th><th>Loaded</th></tr></thead><tbody>';
+    data.images.forEach(img => {
+        const altColor = img.alt ? '#10b981' : '#ef4444';
+        const altText = img.alt || '(missing)';
+        html += `<tr>
+            <td>${img.index}</td>
+            <td style="color: ${altColor}; max-width: 200px; overflow: hidden; text-overflow: ellipsis;">${escapeHtml(altText)}</td>
+            <td style="font-family: monospace;">${img.naturalWidth}\u00d7${img.naturalHeight}</td>
+            <td style="font-family: monospace;">${img.width}\u00d7${img.height}</td>
+            <td>${img.complete ? '\u2705' : '\u274c'}</td>
+        </tr>`;
+    });
+    html += '</tbody></table>';
+    return html;
+}
+
+function formatTablesOutput(data) {
+    if (!data.tables || data.tables.length === 0) {
+        return '<div style="padding: 20px; text-align: center; color: #888;">No tables found.</div>';
+    }
+    let html = `<div style="margin-bottom: 10px; color: #94a3b8;">Found ${data.count} table(s)</div>`;
+    data.tables.forEach((table, idx) => {
+        html += `<div style="margin-bottom: 16px;">`;
+        html += `<div style="font-weight: 600; margin-bottom: 6px;">Table ${idx + 1} (${table.rows} rows \u00d7 ${table.columns} cols)</div>`;
+        if (table.data.length === 0) {
+            html += '<div style="color: #888; font-style: italic;">Empty table</div>';
+        } else if (Array.isArray(table.data[0])) {
+            // Array rows (no headers)
+            html += '<table><tbody>';
+            table.data.slice(0, 20).forEach(row => {
+                html += '<tr>' + row.map(cell => `<td>${escapeHtml(cell)}</td>`).join('') + '</tr>';
+            });
+            html += '</tbody></table>';
+        } else {
+            // Object rows (with headers)
+            const keys = Object.keys(table.data[0]);
+            html += '<table><thead><tr>' + keys.map(k => `<th>${escapeHtml(k)}</th>`).join('') + '</tr></thead><tbody>';
+            table.data.slice(0, 20).forEach(row => {
+                html += '<tr>' + keys.map(k => `<td>${escapeHtml(row[k] || '')}</td>`).join('') + '</tr>';
+            });
+            html += '</tbody></table>';
+        }
+        if (table.data.length > 20) {
+            html += `<div style="color: #888; font-size: 11px; margin-top: 4px;">\u2026 and ${table.data.length - 20} more rows</div>`;
+        }
+        html += '</div>';
+    });
+    return html;
+}
+
 // Initialize command palette
 async function initCommandPalette() {
     // Wait for config to load before checking if palette is disabled

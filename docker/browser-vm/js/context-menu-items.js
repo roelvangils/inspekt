@@ -155,6 +155,67 @@ function buildVNCContextMenuItems(ctx) {
     ]});
     items.push({ label: 'Screenshot', children: screenshotChildren });
 
+    // ── Debug submenu ──
+    const debugChildren = [];
+    debugChildren.push({ label: 'Performance Metrics', action: async () => {
+        try {
+            const resp = await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/inspect/performance`);
+            const data = await resp.json();
+            if (data.ok) {
+                openOutputPanel('Performance Metrics', '\u23f1', formatPerformanceOutput(data.metrics));
+            } else {
+                showToast(data.error || 'Failed to get metrics', 'error');
+            }
+        } catch (e) { showToast('Failed to get performance metrics', 'error'); }
+    }});
+    debugChildren.push({ label: 'Image Analysis', action: async () => {
+        try {
+            const resp = await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/inspect/images`);
+            const data = await resp.json();
+            if (data.ok) {
+                openOutputPanel('Image Analysis', '\ud83d\uddbc', formatImageAnalysisOutput(data));
+            } else {
+                showToast(data.error || 'Failed to analyze images', 'error');
+            }
+        } catch (e) { showToast('Failed to analyze images', 'error'); }
+    }});
+    debugChildren.push({ label: 'Extract Tables', action: async () => {
+        try {
+            const resp = await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/inspect/tables`);
+            const data = await resp.json();
+            if (data.ok) {
+                if (data.count === 0) {
+                    showToast('No tables found on this page', 'info');
+                } else {
+                    openOutputPanel('Tables', '\ud83d\udcca', formatTablesOutput(data));
+                }
+            } else {
+                showToast(data.error || 'Failed to extract tables', 'error');
+            }
+        } catch (e) { showToast('Failed to extract tables', 'error'); }
+    }});
+    if (hasElement) {
+        debugChildren.push({ separator: true });
+        debugChildren.push({ label: `Highlight Similar \u2039${selectorLabel}\u203a`, action: async () => {
+            // Build a selector from the inspected element's tag + first class
+            const tag = info.elementTag || '';
+            let sel = tag;
+            if (info.elementSelector && info.elementSelector.includes('.')) {
+                sel = info.elementSelector.split(' ')[0]; // Use first part of selector
+            }
+            try {
+                const resp = await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/inspect/highlight?selector=${encodeURIComponent(sel)}`);
+                const data = await resp.json();
+                if (data.ok) {
+                    showToast(data.message, 'success');
+                } else {
+                    showToast(data.error || 'Failed to highlight', 'error');
+                }
+            } catch (e) { showToast('Failed to highlight elements', 'error'); }
+        }});
+    }
+    items.push({ label: 'Debug', children: debugChildren });
+
     // ── Footer actions ──
     items.push({ separator: true });
     items.push({ label: 'Copy Page URL', action: () => copyToClipboard(currentUrl || '') });

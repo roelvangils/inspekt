@@ -2263,6 +2263,185 @@ class ControlHandler(BaseHTTPRequestHandler):
                 self.send_json({'ok': False, 'error': str(e)}, 500)
 
         # =============================================
+        # Page Analysis Endpoints (disconnected scripts)
+        # =============================================
+
+        elif path == '/inspect/performance':
+            # Collect page performance metrics via Performance API.
+            query = parse_qs(urlparse(self.path).query)
+            tab = get_requested_tab(query)
+            if not tab or not tab.get('webSocketDebuggerUrl'):
+                self.send_json({'ok': False, 'error': 'No active tab'}, 500)
+                return
+            js_code = '''
+(() => {
+    const perf = performance.timing;
+    const nav = performance.navigation;
+    return {
+        ok: true,
+        metrics: {
+            dns_lookup: perf.domainLookupEnd - perf.domainLookupStart,
+            tcp_connection: perf.connectEnd - perf.connectStart,
+            request_time: perf.responseStart - perf.requestStart,
+            response_time: perf.responseEnd - perf.responseStart,
+            dom_processing: perf.domComplete - perf.domLoading,
+            dom_interactive: perf.domInteractive - perf.navigationStart,
+            page_load_time: perf.loadEventEnd - perf.navigationStart,
+            navigation_type: ['navigate', 'reload', 'back_forward', 'prerender'][nav.type],
+            redirect_count: nav.redirectCount,
+            memory: performance.memory ? {
+                used_heap: Math.round(performance.memory.usedJSHeapSize / 1048576),
+                total_heap: Math.round(performance.memory.totalJSHeapSize / 1048576),
+                heap_limit: Math.round(performance.memory.jsHeapSizeLimit / 1048576)
+            } : null,
+            resource_count: performance.getEntriesByType('resource').length
+        }
+    };
+})()
+'''
+            try:
+                ws_url = tab['webSocketDebuggerUrl']
+                result = send_cdp_command(ws_url, 'Runtime.evaluate', {
+                    'expression': js_code,
+                    'returnByValue': True
+                })
+                value = result.get('result', {}).get('result', {}).get('value', {})
+                self.send_json(value if value.get('ok') else {'ok': False, 'error': 'Failed to collect metrics'})
+            except Exception as e:
+                self.send_json({'ok': False, 'error': str(e)}, 500)
+
+        elif path == '/inspect/tables':
+            # Extract all HTML tables from the page as structured data.
+            query = parse_qs(urlparse(self.path).query)
+            tab = get_requested_tab(query)
+            if not tab or not tab.get('webSocketDebuggerUrl'):
+                self.send_json({'ok': False, 'error': 'No active tab'}, 500)
+                return
+            js_code = '''
+(() => {
+    function tableToArray(table) {
+        const headers = Array.from(table.querySelectorAll('th')).map(th => th.textContent.trim());
+        const rows = Array.from(table.querySelectorAll('tbody tr, tr')).filter(tr => !tr.querySelector('th'));
+        return rows.map(row => {
+            const cells = Array.from(row.querySelectorAll('td'));
+            if (headers.length > 0) {
+                const obj = {};
+                cells.forEach((cell, i) => { obj[headers[i] || 'column_' + i] = cell.textContent.trim(); });
+                return obj;
+            }
+            return cells.map(cell => cell.textContent.trim());
+        });
+    }
+    const tables = Array.from(document.querySelectorAll('table'));
+    if (tables.length === 0) return { ok: true, tables: [], count: 0 };
+    return {
+        ok: true,
+        count: tables.length,
+        tables: tables.map((table, i) => ({
+            index: i,
+            rows: table.rows.length,
+            columns: table.rows[0] ? table.rows[0].cells.length : 0,
+            data: tableToArray(table)
+        }))
+    };
+})()
+'''
+            try:
+                ws_url = tab['webSocketDebuggerUrl']
+                result = send_cdp_command(ws_url, 'Runtime.evaluate', {
+                    'expression': js_code,
+                    'returnByValue': True
+                })
+                value = result.get('result', {}).get('result', {}).get('value', {})
+                self.send_json(value if value.get('ok') else {'ok': False, 'error': 'Failed to extract tables'})
+            except Exception as e:
+                self.send_json({'ok': False, 'error': str(e)}, 500)
+
+        elif path == '/inspect/images':
+            # Analyze all images on the page: src, alt, dimensions, load status.
+            query = parse_qs(urlparse(self.path).query)
+            tab = get_requested_tab(query)
+            if not tab or not tab.get('webSocketDebuggerUrl'):
+                self.send_json({'ok': False, 'error': 'No active tab'}, 500)
+                return
+            js_code = '''
+(() => {
+    const allImages = document.querySelectorAll('img');
+    const images = [];
+    allImages.forEach((img, idx) => {
+        if (img.style.display === 'none' || img.style.visibility === 'hidden') return;
+        images.push({
+            index: idx,
+            src: img.src,
+            alt: img.alt || '',
+            naturalWidth: img.naturalWidth,
+            naturalHeight: img.naturalHeight,
+            width: img.width,
+            height: img.height,
+            complete: img.complete,
+            classList: Array.from(img.classList).join(' ')
+        });
+    });
+    return { ok: true, totalImages: allImages.length, visibleImages: images.length, images: images };
+})()
+'''
+            try:
+                ws_url = tab['webSocketDebuggerUrl']
+                result = send_cdp_command(ws_url, 'Runtime.evaluate', {
+                    'expression': js_code,
+                    'returnByValue': True
+                })
+                value = result.get('result', {}).get('result', {}).get('value', {})
+                self.send_json(value if value.get('ok') else {'ok': False, 'error': 'Failed to analyze images'})
+            except Exception as e:
+                self.send_json({'ok': False, 'error': str(e)}, 500)
+
+        elif path == '/inspect/highlight':
+            # Highlight all elements matching a CSS selector on the page.
+            query = parse_qs(urlparse(self.path).query)
+            selector = query.get('selector', [''])[0]
+            if not selector:
+                self.send_json({'ok': False, 'error': 'Missing selector parameter'}, 400)
+                return
+            tab = get_requested_tab(query)
+            if not tab or not tab.get('webSocketDebuggerUrl'):
+                self.send_json({'ok': False, 'error': 'No active tab'}, 500)
+                return
+            # Escape selector for safe embedding in JS string
+            safe_selector = selector.replace('\\', '\\\\').replace("'", "\\'")
+            js_code = f'''
+(() => {{
+    const selector = '{safe_selector}';
+    // Remove previous highlights
+    document.querySelectorAll('[data-inspekt-highlight]').forEach(el => {{
+        el.style.outline = '';
+        el.removeAttribute('data-inspekt-highlight');
+    }});
+    try {{
+        const elements = document.querySelectorAll(selector);
+        if (elements.length === 0) return {{ ok: true, count: 0, message: 'No elements found matching: ' + selector }};
+        elements.forEach((el, i) => {{
+            el.style.outline = '3px solid #ff6b6b';
+            el.setAttribute('data-inspekt-highlight', i);
+        }});
+        return {{ ok: true, count: elements.length, message: 'Highlighted ' + elements.length + ' element(s)' }};
+    }} catch (e) {{
+        return {{ ok: false, error: 'Invalid selector: ' + e.message }};
+    }}
+}})()
+'''
+            try:
+                ws_url = tab['webSocketDebuggerUrl']
+                result = send_cdp_command(ws_url, 'Runtime.evaluate', {
+                    'expression': js_code,
+                    'returnByValue': True
+                })
+                value = result.get('result', {}).get('result', {}).get('value', {})
+                self.send_json(value)
+            except Exception as e:
+                self.send_json({'ok': False, 'error': str(e)}, 500)
+
+        # =============================================
         # Screenshot Download Endpoints
         # =============================================
 
@@ -3285,6 +3464,19 @@ class ControlHandler(BaseHTTPRequestHandler):
     def do_POST(self):
         global auto_scan_enabled, terminal_hidden, clipboard_data, upload_state
         path = urlparse(self.path).path
+
+        if path == '/api/internal/log':
+            # POST /api/internal/log — append to /tmp/voice.log
+            try:
+                content_length = int(self.headers.get('Content-Length', 0))
+                body = json.loads(self.rfile.read(content_length).decode('utf-8'))
+                line = body.get('message', '')
+                with open('/tmp/voice.log', 'a') as f:
+                    f.write(line + '\n')
+                self.send_json({'ok': True})
+            except Exception as e:
+                self.send_json({'ok': False, 'error': str(e)}, 500)
+            return
 
         if path == '/file/write':
             # POST /file/write — save file contents from the editor panel
