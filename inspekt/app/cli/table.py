@@ -27,6 +27,8 @@ import re
 import shutil
 from typing import Optional
 
+from contextlib import contextmanager
+
 import click
 
 
@@ -794,10 +796,52 @@ def print_step(label: str, status: str = "running", **kwargs) -> None:
     click.echo(f"  {icon} {label}")
 
 
-def print_checkbox_step(label: str, checked: bool = False, **kwargs) -> None:
-    """Print a checkbox-style step indicator."""
-    icon = click.style("✓", fg="green") if checked else click.style("○", fg="bright_black")
+@contextmanager
+def print_checkbox_step(label: str, checked: bool = False, **kwargs):
+    """Context manager that prints a checkbox-style step indicator.
+
+    Shows ○ on entry, ✓ on success, ✗ on failure.
+    """
+    icon = click.style("○", fg="bright_black")
     click.echo(f"  {icon} {label}")
+    try:
+        yield
+        # Overwrite with success
+        click.echo(f"\033[1A\033[2K  {click.style('✓', fg='green')} {label}")
+    except Exception:
+        click.echo(f"\033[1A\033[2K  {click.style('✗', fg='red')} {label}")
+        raise
+
+
+class ProgressChecklist:
+    """A checklist that displays step progress with checkbox indicators."""
+
+    def __init__(self, step_names: list[str]):
+        self.step_names = step_names
+
+    def start(self):
+        """Print all steps as pending."""
+        for name in self.step_names:
+            icon = click.style("○", fg="bright_black")
+            click.echo(f"  {icon} {name}")
+
+    @contextmanager
+    def step(self, index: int):
+        """Context manager that marks a step as in-progress, then done."""
+        name = self.step_names[index]
+        # Move up to the correct line and mark as in-progress
+        lines_up = len(self.step_names) - index
+        click.echo(f"\033[{lines_up}A\033[2K  {click.style('◉', fg='cyan')} {name}", nl=False)
+        click.echo(f"\033[{lines_up}B\r", nl=False)
+        try:
+            yield
+            # Mark as done
+            click.echo(f"\033[{lines_up}A\033[2K  {click.style('✓', fg='green')} {name}", nl=False)
+            click.echo(f"\033[{lines_up}B\r", nl=False)
+        except Exception:
+            click.echo(f"\033[{lines_up}A\033[2K  {click.style('✗', fg='red')} {name}", nl=False)
+            click.echo(f"\033[{lines_up}B\r", nl=False)
+            raise
 
 
 def print_success(message: str, bold: bool = False) -> None:

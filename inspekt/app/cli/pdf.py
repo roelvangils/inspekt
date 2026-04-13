@@ -821,7 +821,6 @@ def check(ctx, files: tuple[str, ...], engine: str, profile: str, json_output: b
                 pdf_path=file_path,
                 config_overrides=config_overrides if config_overrides else None,
                 show_progress=not emitter,  # Don't show CLI progress if using structured emitter
-                progress_emitter=emitter,
             )
             # Success message is now shown by the checklist's "Save report" step
 
