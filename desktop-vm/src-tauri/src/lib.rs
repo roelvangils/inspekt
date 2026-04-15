@@ -349,7 +349,7 @@ async fn open_tab_window(
         format!("{title} — Inspekt Browser VM")
     };
 
-    WebviewWindowBuilder::new(&app, &label, WebviewUrl::External(url))
+    let _tab_window = WebviewWindowBuilder::new(&app, &label, WebviewUrl::External(url))
         .title(&window_title)
         .inner_size(1440.0, 900.0)
         .min_inner_size(1024.0, 700.0)

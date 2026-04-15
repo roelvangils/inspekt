@@ -212,12 +212,17 @@ function initSplitDragHandle() {
     });
 }
 
+const LIGHT_TERMINAL_THEMES = new Set(['tomorrow', 'github', 'catppuccin-latte', 'solarized-light']);
+
 function applyTerminalTheme(themeName) {
     if (!terminal) return;
     const theme = TERMINAL_THEMES[themeName];
     if (theme) {
         terminal.options.theme = theme;
         localStorage.setItem('terminalTheme', themeName);
+        // Tag overlay so CSS can match the theme's light/dark scheme
+        const overlay = document.querySelector('.terminal-overlay');
+        if (overlay) overlay.dataset.terminalScheme = LIGHT_TERMINAL_THEMES.has(themeName) ? 'light' : 'dark';
         // Sync editor theme with terminal
         syncEditorTheme();
     }
@@ -257,8 +262,10 @@ function connectTerminal() {
             lineHeight: 1.2,
             letterSpacing: 0
         });
-        // Set dropdown to match saved theme
+        // Set dropdown to match saved theme and tag overlay for CSS
         document.getElementById('terminalTheme').value = savedTheme;
+        const overlay = document.querySelector('.terminal-overlay');
+        if (overlay) overlay.dataset.terminalScheme = LIGHT_TERMINAL_THEMES.has(savedTheme) ? 'light' : 'dark';
 
         fitAddon = new FitAddon.FitAddon();
         terminal.loadAddon(fitAddon);

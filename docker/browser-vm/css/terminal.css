@@ -10,7 +10,7 @@
     right: 20px;
     width: calc(50% - 40px);
     height: calc(100% - 92px);
-    background: rgba(15, 15, 25, 0.5);
+    background: rgba(15, 15, 25, 0.8);
     backdrop-filter: blur(40px) saturate(150%);
     -webkit-backdrop-filter: blur(40px) saturate(150%);
     border-radius: var(--radius-2xl);
@@ -151,12 +151,13 @@ body.split-dragging {
     }
 }
 
-/* Light mode split adjustments */
-@media (prefers-color-scheme: light) {
-    body.split-mode .terminal-overlay {
-        background: rgba(245, 245, 250, 0.95) !important;
-    }
+/* Light-theme terminal in split mode */
+body.split-mode .terminal-overlay[data-terminal-scheme="light"] {
+    background: rgba(245, 245, 250, 0.95) !important;
+}
 
+/* Light mode split adjustments (non-terminal UI) */
+@media (prefers-color-scheme: light) {
     .split-flip-btn {
         background: var(--bg-bar);
         border-color: rgba(0, 0, 0, 0.15);
@@ -729,30 +730,28 @@ button.inspect-active {
     }
 }
 
-/* Light mode adjustments */
-@media (prefers-color-scheme: light) {
-    .terminal-overlay {
-        background: rgba(255, 255, 255, 0.5);
-        box-shadow:
-            0 25px 50px -12px rgba(0, 0, 0, 0.15),
-            0 12px 24px -8px rgba(0, 0, 0, 0.08),
-            inset 0 1px 0 rgba(255, 255, 255, 0.9),
-            inset 0 0 0 1px rgba(0, 0, 0, 0.08);
-    }
+/* Light-theme terminal overlay (driven by selected theme, not system preference) */
+.terminal-overlay[data-terminal-scheme="light"] {
+    background: rgba(255, 255, 255, 0.8);
+    box-shadow:
+        0 25px 50px -12px rgba(0, 0, 0, 0.15),
+        0 12px 24px -8px rgba(0, 0, 0, 0.08),
+        inset 0 1px 0 rgba(255, 255, 255, 0.9),
+        inset 0 0 0 1px rgba(0, 0, 0, 0.08);
 
-    .terminal-header {
+    & .terminal-header {
         background: rgba(0, 0, 0, 0.04);
         border-bottom: 1px solid rgba(0, 0, 0, 0.08);
     }
 
-    .terminal-title { color: #333; }
+    & .terminal-title { color: #333; }
 
-    .terminal-close {
+    & .terminal-close {
         color: #666;
         &:hover { background: rgba(0, 0, 0, 0.08); color: #000; }
     }
 
-    .terminal-header-btn {
+    & .terminal-header-btn {
         color: #666;
         &:hover { background: rgba(0, 0, 0, 0.08); color: #000; }
     }
