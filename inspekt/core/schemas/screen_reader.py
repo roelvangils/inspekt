@@ -57,7 +57,7 @@ class SRElementAnnouncement(BaseModel):
     index: int = Field(..., description="Position in reading order")
     selector: str = Field(..., description="CSS selector for the element")
     tag: str = Field(..., description="HTML tag name")
-    role: str = Field(..., description="ARIA role")
+    role: Optional[str] = Field(default="", description="ARIA role")
     name: str = Field(..., description="Accessible name")
     language: str = Field(default="en", description="Detected language")
     jaws: Optional[str] = Field(default=None, description="JAWS announcement")
@@ -125,7 +125,7 @@ class SRDifference(BaseModel):
 
     index: int = Field(..., description="Position in reading order")
     selector: str = Field(..., description="CSS selector")
-    role: str = Field(..., description="ARIA role")
+    role: Optional[str] = Field(default="", description="ARIA role")
     name: str = Field(..., description="Accessible name")
     jaws: Optional[str] = Field(default=None, description="JAWS announcement")
     nvda: Optional[str] = Field(default=None, description="NVDA announcement")
