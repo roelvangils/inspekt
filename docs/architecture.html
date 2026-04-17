@@ -2,13 +2,15 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<title>Inspekt — Architecture Map</title>
+<title>Inspekt — Architecture &amp; Cheat Sheet</title>
 <style>
   :root {
     --bg: #0e1117;
     --panel: #161b22;
     --panel-2: #1c232d;
+    --panel-3: #21262d;
     --border: #30363d;
+    --border-soft: #21262d;
     --text: #e6edf3;
     --muted: #8b949e;
     --blue: #58a6ff;
@@ -18,175 +20,344 @@
     --red: #f85149;
     --yellow: #d29922;
     --cyan: #39c5cf;
+    --pink: #ff7b9c;
   }
   * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
   body {
-    margin: 0;
     background: var(--bg);
     color: var(--text);
-    font: 14px/1.5 ui-monospace, Menlo, Consolas, monospace;
-    padding: 32px 24px 64px;
+    font: 14px/1.55 ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    padding: 28px 20px 96px;
   }
-  h1, h2, h3 { font-family: -apple-system, "SF Pro", system-ui, sans-serif; }
-  h1 { font-size: 28px; margin: 0 0 4px; }
+  h1, h2, h3, .ui {
+    font-family: -apple-system, "SF Pro Display", system-ui, sans-serif;
+  }
+  h1 { font-size: 30px; margin: 0 0 4px; letter-spacing: -0.01em; }
+  h1 .badge {
+    display: inline-block;
+    font-size: 12px;
+    font-family: ui-monospace, Menlo, monospace;
+    background: var(--panel-3);
+    color: var(--green);
+    padding: 3px 10px;
+    border-radius: 20px;
+    vertical-align: middle;
+    margin-left: 10px;
+  }
   h2 {
-    font-size: 20px;
-    margin: 40px 0 16px;
-    padding-bottom: 6px;
+    font-size: 22px;
+    margin: 48px 0 16px;
+    padding-bottom: 8px;
     border-bottom: 1px solid var(--border);
   }
-  h3 { font-size: 15px; margin: 18px 0 8px; color: var(--blue); }
-  .subtitle { color: var(--muted); margin: 0 0 8px; }
-  .wrap { max-width: 1240px; margin: 0 auto; }
-  code, kbd { background: var(--panel-2); padding: 1px 5px; border-radius: 3px; color: var(--yellow); }
+  h2 .num {
+    display: inline-block;
+    width: 28px; height: 28px;
+    line-height: 28px;
+    text-align: center;
+    border-radius: 50%;
+    background: var(--panel-2);
+    color: var(--blue);
+    font-size: 14px;
+    margin-right: 10px;
+    vertical-align: middle;
+  }
+  h3 { font-size: 15px; margin: 20px 0 10px; color: var(--blue); }
+  p { margin: 8px 0; }
+  .subtitle { color: var(--muted); margin: 0 0 8px; font-size: 15px; }
+  .wrap { max-width: 1280px; margin: 0 auto; }
+  code, kbd {
+    background: var(--panel-3);
+    padding: 1.5px 6px;
+    border-radius: 3px;
+    color: var(--yellow);
+    font-size: 12.5px;
+  }
   a { color: var(--blue); }
-  hr { border: 0; border-top: 1px solid var(--border); margin: 32px 0; }
 
-  /* Folder tree */
-  .tree {
+  /* ── Quick nav ───────────────────────────────────── */
+  nav.toc {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
     background: var(--panel);
     border: 1px solid var(--border);
     border-radius: 8px;
-    padding: 20px 24px;
+    padding: 12px 14px;
+    margin: 20px 0 0;
+    font-size: 12px;
+  }
+  nav.toc a {
+    background: var(--panel-2);
+    color: var(--text);
+    text-decoration: none;
+    padding: 5px 11px;
+    border-radius: 14px;
+    border: 1px solid var(--border-soft);
+  }
+  nav.toc a:hover { background: var(--panel-3); color: var(--blue); }
+
+  /* ── Folder tree ─────────────────────────────────── */
+  .tree {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px 26px;
     font-size: 13px;
   }
-  .tree ul { list-style: none; padding-left: 20px; margin: 0; }
+  .tree ul { list-style: none; padding-left: 22px; margin: 0; }
   .tree > ul { padding-left: 0; }
   .tree li { position: relative; padding: 2px 0 2px 22px; }
   .tree li::before {
     content: "";
-    position: absolute; left: 0; top: 10px;
-    width: 14px; height: 1px; background: var(--border);
+    position: absolute; left: 0; top: 11px;
+    width: 16px; height: 1px; background: var(--border);
   }
   .tree li.folder > .label::before {
-    content: "▸ ";
-    color: var(--orange);
+    content: "▸ "; color: var(--orange);
   }
   .tree li.file > .label::before {
-    content: "• ";
-    color: var(--muted);
+    content: "• "; color: var(--muted);
   }
   .tree .name { color: var(--text); font-weight: 600; }
   .tree .desc { color: var(--muted); margin-left: 6px; font-weight: normal; }
   .tree .tag {
     display: inline-block;
     font-size: 10px;
-    background: #21262d;
+    background: var(--panel-3);
     color: var(--cyan);
-    padding: 1px 6px;
+    padding: 1px 7px;
     border-radius: 10px;
     margin-left: 8px;
     vertical-align: middle;
+    letter-spacing: 0.02em;
   }
-  .tag.py { color: var(--green); }
-  .tag.ts { color: var(--blue); }
-  .tag.tauri { color: var(--purple); }
+  .tag.py     { color: var(--green); }
+  .tag.ts     { color: var(--blue); }
+  .tag.tauri  { color: var(--purple); }
   .tag.docker { color: var(--cyan); }
-  .tag.ext { color: var(--orange); }
-  .tag.build { color: var(--yellow); }
-  .tag.doc { color: var(--muted); }
+  .tag.ext    { color: var(--orange); }
+  .tag.build  { color: var(--yellow); }
+  .tag.doc    { color: var(--muted); }
 
-  /* Mode cards */
-  .modes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  /* ── Mode cards ──────────────────────────────────── */
+  .modes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
   .mode {
     background: var(--panel);
     border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 16px;
+    border-radius: 10px;
+    padding: 18px;
+    position: relative;
+    overflow: hidden;
   }
+  .mode::before {
+    content: "";
+    position: absolute; left: 0; top: 0; bottom: 0;
+    width: 3px;
+  }
+  .mode.m1::before { background: var(--blue); }
+  .mode.m2::before { background: var(--orange); }
+  .mode.m3::before { background: var(--purple); }
   .mode h3 { margin-top: 0; }
+  .mode .tag {
+    display: inline-block;
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    margin-right: 6px;
+    vertical-align: middle;
+    color: var(--muted);
+    background: var(--panel-3);
+  }
   .mode .flow {
     background: var(--panel-2);
     border-radius: 4px;
-    padding: 10px 12px;
-    font-size: 12px;
+    padding: 10px 14px;
+    font-size: 11.5px;
     white-space: pre-wrap;
-    line-height: 1.7;
-    color: var(--text);
+    line-height: 1.8;
     margin: 10px 0;
     overflow-x: auto;
   }
   .mode .ports { font-size: 11px; color: var(--muted); }
   .mode .ports code { color: var(--cyan); }
 
-  /* Data flow diagrams (SVG) */
+  /* ── Diagrams / SVG ──────────────────────────────── */
   .diagram-wrap {
     background: var(--panel);
     border: 1px solid var(--border);
-    border-radius: 8px;
+    border-radius: 10px;
     padding: 20px;
-    margin-bottom: 16px;
+    margin-bottom: 14px;
     overflow-x: auto;
   }
   svg { display: block; margin: 0 auto; }
   .node-label { font: 11px ui-monospace, Menlo, monospace; fill: var(--text); }
   .node-sub { font: 10px ui-monospace, Menlo, monospace; fill: var(--muted); }
 
-  /* Tables */
+  /* ── Tables ─────────────────────────────────────── */
   table {
     width: 100%;
     border-collapse: collapse;
     background: var(--panel);
     border: 1px solid var(--border);
-    border-radius: 8px;
+    border-radius: 10px;
     overflow: hidden;
     font-size: 12.5px;
   }
   th, td {
-    padding: 9px 12px;
+    padding: 10px 14px;
     text-align: left;
-    border-bottom: 1px solid var(--border);
+    border-bottom: 1px solid var(--border-soft);
     vertical-align: top;
   }
-  th { background: var(--panel-2); color: var(--blue); font-weight: 600; }
+  th {
+    background: var(--panel-2);
+    color: var(--blue);
+    font-weight: 600;
+    font-family: -apple-system, "SF Pro Text", system-ui, sans-serif;
+    letter-spacing: 0.02em;
+  }
   tr:last-child td { border-bottom: none; }
+  td code { background: var(--panel-3); padding: 2px 6px; font-size: 12px; }
   td.dim { color: var(--muted); }
-  td code { background: #21262d; padding: 1px 6px; }
+  td.cmd { white-space: nowrap; font-weight: 600; }
 
-  /* Alerts / pain points */
-  .grid2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
-  .pain {
-    background: var(--panel);
-    border-left: 3px solid var(--red);
-    border-radius: 4px;
-    padding: 10px 14px;
-    font-size: 12.5px;
+  /* ── Cheat-sheet cards ───────────────────────────── */
+  .sheet-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 14px;
   }
-  .pain .where { color: var(--muted); font-size: 11px; display: block; margin-top: 4px; }
-  .rec {
+  .sheet {
     background: var(--panel);
-    border-left: 3px solid var(--green);
-    border-radius: 4px;
-    padding: 10px 14px;
-    font-size: 12.5px;
-    margin-bottom: 8px;
-  }
-  .rec .tag {
-    display: inline-block;
-    font-size: 10px;
-    padding: 1px 6px;
-    background: #0c2d1d;
-    color: var(--green);
+    border: 1px solid var(--border);
     border-radius: 10px;
+    padding: 18px 20px;
+  }
+  .sheet.full { grid-column: 1 / -1; }
+  .sheet h3 {
+    margin: 0 0 12px;
+    color: var(--text);
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .sheet h3 .icon {
+    font-size: 14px;
+    width: 24px; height: 24px;
+    border-radius: 6px;
+    background: var(--panel-3);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .sheet h3 .hint {
+    margin-left: auto;
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: normal;
+  }
+  .sheet pre {
+    background: var(--panel-2);
+    color: var(--text);
+    padding: 12px 14px;
+    margin: 0 0 8px;
+    border-radius: 6px;
+    font-size: 12.5px;
+    line-height: 1.6;
+    overflow-x: auto;
+    white-space: pre;
+  }
+  .sheet pre .c { color: var(--muted); }
+  .sheet pre .cmd { color: var(--green); }
+  .sheet pre .arg { color: var(--yellow); }
+  .sheet pre .flag { color: var(--orange); }
+  .sheet pre .path { color: var(--cyan); }
+  .sheet p { margin: 0 0 10px; font-size: 13px; color: var(--text); }
+  .sheet .note {
+    font-size: 11.5px;
+    color: var(--muted);
+    border-left: 2px solid var(--border);
+    padding-left: 10px;
+    margin: 8px 0 0;
+  }
+  .sheet .step {
+    display: inline-block;
+    width: 20px; height: 20px;
+    line-height: 20px;
+    text-align: center;
+    border-radius: 50%;
+    background: var(--panel-3);
+    color: var(--blue);
+    font-size: 11px;
     margin-right: 6px;
-    vertical-align: middle;
+    font-family: ui-monospace, Menlo, monospace;
+  }
+
+  /* ── Port grid ───────────────────────────────────── */
+  .ports-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 8px;
+  }
+  .port {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 12px;
+  }
+  .port .num {
+    font-size: 18px;
+    color: var(--cyan);
+    font-weight: 700;
+    display: block;
+  }
+  .port .role { color: var(--text); }
+  .port .where { color: var(--muted); font-size: 10.5px; margin-top: 2px; }
+
+  hr { border: 0; border-top: 1px solid var(--border); margin: 28px 0; }
+  .kbd {
+    display: inline-block;
+    padding: 1px 6px;
+    border: 1px solid var(--border);
+    background: var(--panel-2);
+    border-radius: 3px;
+    font-size: 11px;
+    color: var(--text);
+  }
+  .two-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
   }
 </style>
 </head>
 <body>
 <div class="wrap">
 
-<h1>Inspekt — Architecture Map</h1>
-<p class="subtitle">What lives where, how the three run-modes hang together, and how to tame the moving parts.</p>
+<h1>Inspekt <span class="badge">v1.0.0</span></h1>
+<p class="subtitle">Architecture map &amp; daily-driver command reference. Three run modes, one shared core.</p>
 
-<h2>1. Top-level layout, at a glance</h2>
+<nav class="toc">
+  <a href="#layout">Folder layout</a>
+  <a href="#modes">Three modes</a>
+  <a href="#extension">Extension flow</a>
+  <a href="#setup">Install &amp; setup</a>
+  <a href="#install-ext">Install extension</a>
+  <a href="#dev">Dev commands</a>
+  <a href="#build">Build artifacts</a>
+  <a href="#version">Versioning</a>
+  <a href="#doctor">Coherence</a>
+  <a href="#ports">Port map</a>
+</nav>
 
-<p>Three things cause most of the confusion, and they're worth naming up front:</p>
-<ul>
-  <li><code>inspekt/inspekt/</code> — the outer folder is the repo; the inner is the importable Python package. This is <strong>standard Python convention</strong> (same as <code>requests/requests/</code>), not a mistake.</li>
-  <li><code>apps/desktop/</code> — <strong>not</strong> the VM. It is a <strong>Tauri native shell</strong> that loads the VM's control panel over HTTP.</li>
-  <li><code>vm/</code> — <strong>this</strong> is the actual VM: a Docker image running Chromium + the extension + control panel.</li>
-</ul>
+<h2 id="layout"><span class="num">1</span>Folder layout</h2>
+
+<p>The repo has <strong>four top-level folders</strong> you'll actually work in: the Python package, the extension source, the VM image, and the Tauri apps. Everything else (<code>docs/</code>, <code>scripts/</code>, <code>archive/</code>) is support.</p>
 
 <div class="tree">
 <ul>
@@ -194,72 +365,75 @@
     <ul>
       <li class="folder"><span class="label"><span class="name">inspekt/</span> <span class="tag py">python pkg</span> <span class="desc">the CLI, bridge, services, scripts (core product)</span></span>
         <ul>
-          <li class="file"><span class="label"><span class="name">app/cli/</span> <span class="desc">~45 Click command modules (entry: <code>inspekt = inspekt.app.cli:main</code>)</span></span></li>
-          <li class="file"><span class="label"><span class="name">app/api/</span> <span class="desc">FastAPI surface for programmatic use</span></span></li>
+          <li class="file"><span class="label"><span class="name">app/cli/</span> <span class="desc">45 Click command modules — entry: <code>inspekt = inspekt.app.cli:main</code></span></span></li>
+          <li class="file"><span class="label"><span class="name">app/api/</span> <span class="desc">FastAPI surface</span></span></li>
           <li class="file"><span class="label"><span class="name">app/mcp/</span> <span class="desc">MCP server exposing 33 tools to Claude Desktop</span></span></li>
-          <li class="file"><span class="label"><span class="name">bridge_ws.py</span> <span class="desc">WebSocket server (browser ⇄ CLI message broker)</span></span></li>
-          <li class="file"><span class="label"><span class="name">client.py</span> <span class="desc">BridgeClient — HTTP/socket client used by every CLI command</span></span></li>
-          <li class="file"><span class="label"><span class="name">config.py</span> <span class="desc"><code>get_bridge_port()</code> — 8765 host, 8767 VM mode</span></span></li>
-          <li class="file"><span class="label"><span class="name">core/</span> <span class="desc">command registry, handlers, introspection</span></span></li>
+          <li class="file"><span class="label"><span class="name">bridge_ws.py</span> <span class="desc">WebSocket broker — browser ⇄ CLI (ports 8765 host / 8767 VM)</span></span></li>
+          <li class="file"><span class="label"><span class="name">client.py</span> <span class="desc"><code>BridgeClient</code> — transport-agnostic HTTP/socket client</span></span></li>
+          <li class="file"><span class="label"><span class="name">config.py</span> <span class="desc"><code>get_bridge_port()</code> — single source of truth for the port</span></span></li>
           <li class="file"><span class="label"><span class="name">services/</span> <span class="desc">~79 modules: browser control, a11y, extraction, AI…</span></span></li>
-          <li class="file"><span class="label"><span class="name">transport/</span> <span class="desc">unix-socket + tcp fallback for bridge client</span></span></li>
           <li class="file"><span class="label"><span class="name">scripts/</span> <span class="desc">65+ JS files injected into the browser (DOM, axe, record, replay)</span></span></li>
-          <li class="file"><span class="label"><span class="name">man/</span> <span class="desc">pre-built man pages committed for the wheel</span></span></li>
+          <li class="file"><span class="label"><span class="name">man/</span> <span class="desc">pre-built man pages (shipped with the wheel)</span></span></li>
         </ul>
       </li>
-      <li class="folder"><span class="label"><span class="name">extensions/</span> <span class="tag ext">browser ext</span> <span class="desc">WebExtension source (single source of truth)</span></span>
+
+      <li class="folder"><span class="label"><span class="name">extensions/</span> <span class="tag ext">browser ext</span> <span class="desc">single source of truth — one repo, three sinks</span></span>
         <ul>
-          <li class="file"><span class="label"><span class="name">chrome/</span> <span class="desc">MV3 (service worker, DevTools panel, offscreen doc)</span></span></li>
-          <li class="file"><span class="label"><span class="name">firefox/</span> <span class="desc">MV2 (persistent background page)</span></span></li>
-          <li class="file"><span class="label"><span class="name">shared/</span> <span class="desc">permissions, websocket client, postMessage bridge</span></span></li>
+          <li class="file"><span class="label"><span class="name">chrome/</span> <span class="desc">MV3 — service worker, DevTools panel, offscreen document</span></span></li>
+          <li class="file"><span class="label"><span class="name">firefox/</span> <span class="desc">MV2 — persistent background page</span></span></li>
+          <li class="file"><span class="label"><span class="name">shared/</span> <span class="desc">permissions, websocket-client, main-world-bridge</span></span></li>
         </ul>
       </li>
-      <li class="folder"><span class="label"><span class="name">docker/</span> <span class="tag docker">virtual machine</span> <span class="desc">the actual "VM" that runs everywhere</span></span>
+
+      <li class="folder"><span class="label"><span class="name">vm/</span> <span class="tag docker">docker image</span> <span class="desc">the actual virtual browser — Alpine + Chromium + noVNC + supervisord</span></span>
         <ul>
-          <li class="file"><span class="label"><span class="name">browser-vm/</span> <span class="desc">Alpine + Chromium + noVNC + supervisord + control-panel.html + control/terminal/bridge servers</span></span></li>
-          <li class="file"><span class="label"><span class="name">headless/</span> <span class="desc">stripped-down variant (no noVNC) — looks orphaned</span></span></li>
+          <li class="file"><span class="label"><span class="name">Dockerfile</span> <span class="desc">multi-stage: bun-bundle → alpine runtime (self-bundles assets)</span></span></li>
+          <li class="file"><span class="label"><span class="name">control-panel.html</span> <span class="desc">1400-line SPA served at <code>:6080/control.html</code></span></span></li>
+          <li class="file"><span class="label"><span class="name">servers/</span> <span class="desc">control-server (8888), terminal-server (8889)</span></span></li>
+          <li class="file"><span class="label"><span class="name">variants/headless/</span> <span class="desc">stripped-down variant (no noVNC)</span></span></li>
         </ul>
       </li>
-      <li class="folder"><span class="label"><span class="name">apps/desktop/</span> <span class="tag tauri">tauri shell</span> <span class="desc">native wrapper — NOT the VM, just a webview into it</span></span>
+
+      <li class="folder"><span class="label"><span class="name">apps/</span> <span class="desc">thin native shells around the core</span>
         <ul>
-          <li class="file"><span class="label"><span class="name">src/</span> <span class="desc">Svelte launcher (Docker check, starts VM, then opens main window)</span></span></li>
-          <li class="file"><span class="label"><span class="name">src-tauri/</span> <span class="desc">Rust shell; loads <code>http://localhost:6080/control.html</code> as external URL</span></span></li>
-          <li class="file"><span class="label"><span class="name">src-tauri/capabilities/clipboard-remote.json</span> <span class="desc">critical — permissions for the remote VM URL</span></span></li>
-        </ul>
-      </li>
-      <li class="folder"><span class="label"><span class="name">apps/pdf-viewer/</span> <span class="tag tauri">tauri app</span> <span class="desc">separate PDF-report viewer; bolted on, not part of core flow</span></span></li>
-      <li class="folder"><span class="label"><span class="name">scripts/</span> <span class="tag build">build tools</span> <span class="desc">bundle-vm, watch-extensions, build_man, build_popover_css…</span></span></li>
-      <li class="folder"><span class="label"><span class="name">docs/</span> <span class="tag doc">mkdocs</span></span></li>
-      <li class="folder"><span class="label"><span class="name">archive/</span> <span class="tag doc">history</span> <span class="desc">old refactoring notes — could use a README or a cull</span></span></li>
-      <li class="file"><span class="label"><span class="name">Makefile</span> <span class="tag build">~25 targets</span> <span class="desc">test/lint/typecheck, VM lifecycle, man-pages</span></span></li>
-      <li class="file"><span class="label"><span class="name">package.json</span> <span class="tag build">root</span> <span class="desc"><code>bundle</code>, <code>build</code>, <code>preview</code>, <code>start</code>, <code>dev</code> — wraps VM workflow</span></span></li>
-      <li class="file"><span class="label"><span class="name">pyproject.toml</span> <span class="tag build">py</span> <span class="desc">console script, deps, lint config</span></span></li>
+          <li class="file"><span class="label"><span class="name">desktop/</span> <span class="tag tauri">tauri</span> <span class="desc">native wrapper around the VM control panel (Svelte launcher + WKWebView)</span></span></li>
+          <li class="file"><span class="label"><span class="name">pdf-viewer/</span> <span class="tag tauri">tauri</span> <span class="desc">PDF accessibility report viewer (separate app)</span></span></li>
+        </ul></span></li>
+
+      <li class="file"><span class="label"><span class="name">scripts/</span> <span class="tag build">build tools</span> <span class="desc"><code>bundle-vm.mjs</code>, <code>bump_version.py</code>, <code>watch-extensions.js</code>, <code>build_man.py</code></span></span></li>
+      <li class="file"><span class="label"><span class="name">docs/</span> <span class="tag doc">mkdocs</span> <span class="desc">you're reading <code>docs/architecture.html</code></span></span></li>
+      <li class="file"><span class="label"><span class="name">Makefile</span> <span class="tag build">entry</span> <span class="desc">single source of truth for every command — see §5-8</span></span></li>
+      <li class="file"><span class="label"><span class="name">VERSION</span> <span class="tag build">semver</span> <span class="desc">one file, 9 manifests follow — see §7</span></span></li>
+      <li class="file"><span class="label"><span class="name">Procfile.dev</span> <span class="desc">process list for <code>make dev-all</code> (overmind)</span></span></li>
+      <li class="file"><span class="label"><span class="name">pyproject.toml</span> <span class="tag py">py</span> <span class="desc">console script + deps</span></span></li>
     </ul>
   </li>
 </ul>
 </div>
 
-<h2>2. The three execution modes</h2>
+<p class="subtitle" style="font-size:12.5px;"><strong>Why is there an outer <code>inspekt/</code> and an inner <code>inspekt/</code>?</strong> The outer is the git repo; the inner is the importable Python package. This is standard Python convention — same as <code>requests/requests/</code>.</p>
 
-<p>Every mode ultimately routes through the same <strong>bridge</strong> (<code>bridge_ws.py</code>) and the same <strong>extension code</strong> (<code>extensions/chrome/</code>). What differs is <em>where</em> the browser runs and <em>who</em> drives commands.</p>
+<h2 id="modes"><span class="num">2</span>Three execution modes</h2>
+
+<p>Every mode funnels through the same <code>bridge_ws.py</code> server and the same extension code. What changes is <em>where</em> the browser runs and <em>who</em> sends commands.</p>
 
 <div class="modes">
 
-  <div class="mode">
-    <h3>Mode 1 — CLI + Local Browser</h3>
-    <p class="dim" style="color:var(--muted); font-size:12px;">User installs extension in <strong>their</strong> Chrome/Firefox. CLI runs on host.</p>
+  <div class="mode m1">
+    <h3><span class="tag">1</span>CLI + your browser</h3>
+    <p class="subtitle" style="font-size:12px;">You install the extension in your own Chrome/Firefox. CLI runs on host.</p>
 <div class="flow">terminal
   └─ inspekt &lt;cmd&gt;
       └─ BridgeClient (HTTP)
           └─ bridge_ws.py :8765
               └─ WebSocket → extension
                   └─ MAIN-world JS → DOM</div>
-    <div class="ports">Ports: bridge <code>8765</code> only.<br>Start: <code>inspekt start</code> (daemon).</div>
+    <div class="ports">Start: <code>inspekt start</code> (or <code>make dev-cli</code>). Extension: manually load-unpacked.</div>
   </div>
 
-  <div class="mode">
-    <h3>Mode 2 — Control Panel + VM</h3>
-    <p class="dim" style="color:var(--muted); font-size:12px;">Browser <em>inside</em> Docker. User opens <code>http://localhost:6080/</code> in any browser.</p>
+  <div class="mode m2">
+    <h3><span class="tag">2</span>Control panel + VM</h3>
+    <p class="subtitle" style="font-size:12px;">Browser lives inside Docker. You point any browser at <code>:6080</code>.</p>
 <div class="flow">any browser → :6080
   └─ control-panel.html
       └─ fetch :8888/inspekt/&lt;cmd&gt;
@@ -268,234 +442,330 @@
                   └─ bridge_ws.py :8767
                       └─ WS → bundled extension
                           └─ Chromium (via VNC)</div>
-    <div class="ports">Ports: noVNC <code>6080</code>, control <code>8888</code>, terminal <code>8889</code>, bridge <code>8767</code>, CDP <code>9222</code>, mitm <code>8080</code>.<br>Start: <code>inspekt vm start</code>.</div>
+    <div class="ports">Start: <code>make vm-start</code>. Ports: noVNC <code>6080</code>, control <code>8888</code>, bridge <code>8767</code>, CDP <code>9222</code>.</div>
   </div>
 
-  <div class="mode">
-    <h3>Mode 3 — Tauri Desktop + VM</h3>
-    <p class="dim" style="color:var(--muted); font-size:12px;">Identical to Mode 2 — Tauri is just a native window around the same URL.</p>
+  <div class="mode m3">
+    <h3><span class="tag">3</span>Tauri desktop + VM</h3>
+    <p class="subtitle" style="font-size:12px;">Native window around the same URL as mode 2, plus OS integrations.</p>
 <div class="flow">Tauri launcher (Svelte :1421)
   └─ check_docker / start VM
-      └─ opens main window →
+      └─ main window →
           WKWebView loads :6080/control.html
               └─ (same stack as Mode 2)
               + __TAURI_INTERNALS__
                 (clipboard, drag, notify)</div>
-    <div class="ports">Extra plumbing: <code>capabilities/clipboard-remote.json</code> gates native APIs for the remote URL.<br>Start: <code>cd apps/desktop && bun run dev</code>.</div>
+    <div class="ports">Start: <code>make dev-desktop</code>. Permissions in <code>apps/desktop/src-tauri/capabilities/clipboard-remote.json</code>.</div>
   </div>
 
 </div>
 
-<h2>3. Where does the extension live, and how does it stay in sync?</h2>
+<h2 id="extension"><span class="num">3</span>How the extension reaches each mode</h2>
 
-<p>There is one source of truth — <code>extensions/chrome/</code> and <code>extensions/firefox/</code> — and <strong>three copies at runtime</strong>. Only the third (inside the Docker image) is automated; the others are manual.</p>
+<p>One source (<code>extensions/chrome/</code>, <code>extensions/firefox/</code>), three sinks at runtime. Keeping them in sync is what the new <code>make sync-extension</code> and <code>make verify-extension-sync</code> targets are for.</p>
 
 <div class="diagram-wrap">
-<svg viewBox="0 0 1100 360" width="100%" height="360" xmlns="http://www.w3.org/2000/svg">
+<svg viewBox="0 0 1100 340" width="100%" height="340" xmlns="http://www.w3.org/2000/svg">
   <defs>
-    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
       <path d="M0,0 L10,5 L0,10 z" fill="#58a6ff"/>
     </marker>
-    <marker id="arrowOrange" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+    <marker id="arrO" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
       <path d="M0,0 L10,5 L0,10 z" fill="#f0883e"/>
-    </marker>
-    <marker id="arrowRed" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
-      <path d="M0,0 L10,5 L0,10 z" fill="#f85149"/>
     </marker>
   </defs>
 
-  <!-- Source box -->
-  <rect x="30" y="140" width="200" height="80" rx="6" fill="#161b22" stroke="#3fb950" stroke-width="2"/>
-  <text x="130" y="170" text-anchor="middle" class="node-label" font-weight="700" fill="#3fb950">SOURCE</text>
-  <text x="130" y="188" text-anchor="middle" class="node-label">extensions/chrome/</text>
-  <text x="130" y="204" text-anchor="middle" class="node-label">extensions/firefox/</text>
+  <rect x="30" y="130" width="200" height="80" rx="6" fill="#161b22" stroke="#3fb950" stroke-width="2"/>
+  <text x="130" y="160" text-anchor="middle" class="node-label" font-weight="700" fill="#3fb950">SOURCE</text>
+  <text x="130" y="178" text-anchor="middle" class="node-label">extensions/chrome/</text>
+  <text x="130" y="194" text-anchor="middle" class="node-label">extensions/firefox/</text>
 
-  <!-- Target 1: dev browser -->
-  <rect x="340" y="30" width="240" height="70" rx="6" fill="#161b22" stroke="#58a6ff"/>
-  <text x="460" y="55" text-anchor="middle" class="node-label" font-weight="700" fill="#58a6ff">Dev browser (host)</text>
-  <text x="460" y="73" text-anchor="middle" class="node-sub">loaded unpacked, manual</text>
-  <text x="460" y="89" text-anchor="middle" class="node-sub">npm run watch:extensions → reload</text>
+  <rect x="340" y="20" width="240" height="70" rx="6" fill="#161b22" stroke="#58a6ff"/>
+  <text x="460" y="45" text-anchor="middle" class="node-label" font-weight="700" fill="#58a6ff">Your browser</text>
+  <text x="460" y="63" text-anchor="middle" class="node-sub">load unpacked in dev</text>
+  <text x="460" y="79" text-anchor="middle" class="node-sub">make dev-extension for watch</text>
 
-  <!-- Target 2: store zip -->
-  <rect x="340" y="140" width="240" height="80" rx="6" fill="#161b22" stroke="#58a6ff"/>
-  <text x="460" y="167" text-anchor="middle" class="node-label" font-weight="700" fill="#58a6ff">Store zip</text>
-  <text x="460" y="185" text-anchor="middle" class="node-sub">manual zip → Chrome/Firefox store</text>
-  <text x="460" y="201" text-anchor="middle" class="node-sub">manifest version ≠ pyproject version</text>
+  <rect x="340" y="125" width="240" height="80" rx="6" fill="#161b22" stroke="#58a6ff"/>
+  <text x="460" y="152" text-anchor="middle" class="node-label" font-weight="700" fill="#58a6ff">Store zip</text>
+  <text x="460" y="170" text-anchor="middle" class="node-sub">make build-extensions</text>
+  <text x="460" y="186" text-anchor="middle" class="node-sub">dist/inspekt-chrome-1.0.0.zip</text>
 
-  <!-- Target 3: docker image -->
-  <rect x="340" y="250" width="240" height="80" rx="6" fill="#161b22" stroke="#f0883e"/>
-  <text x="460" y="277" text-anchor="middle" class="node-label" font-weight="700" fill="#f0883e">Docker image</text>
-  <text x="460" y="295" text-anchor="middle" class="node-sub">Dockerfile COPYs extensions/chrome/</text>
-  <text x="460" y="311" text-anchor="middle" class="node-sub">Chromium --load-extension=…</text>
+  <rect x="340" y="235" width="240" height="80" rx="6" fill="#161b22" stroke="#f0883e"/>
+  <text x="460" y="262" text-anchor="middle" class="node-label" font-weight="700" fill="#f0883e">Docker image</text>
+  <text x="460" y="280" text-anchor="middle" class="node-sub">COPY extensions/chrome/ →</text>
+  <text x="460" y="296" text-anchor="middle" class="node-sub">/opt/inspekt/extensions/</text>
 
-  <!-- Arrows source → target -->
-  <line x1="230" y1="170" x2="340" y2="65" stroke="#58a6ff" stroke-width="2" marker-end="url(#arrow)"/>
-  <line x1="230" y1="180" x2="340" y2="180" stroke="#58a6ff" stroke-width="2" marker-end="url(#arrow)"/>
-  <line x1="230" y1="195" x2="340" y2="290" stroke="#f0883e" stroke-width="2" marker-end="url(#arrowOrange)"/>
+  <line x1="230" y1="160" x2="340" y2="55"  stroke="#58a6ff" stroke-width="2" marker-end="url(#arr)"/>
+  <line x1="230" y1="170" x2="340" y2="165" stroke="#58a6ff" stroke-width="2" marker-end="url(#arr)"/>
+  <line x1="230" y1="185" x2="340" y2="275" stroke="#f0883e" stroke-width="2" marker-end="url(#arrO)"/>
 
-  <!-- From docker to runtime containers -->
-  <rect x="720" y="30" width="320" height="90" rx="6" fill="#161b22" stroke="#bc8cff"/>
-  <text x="880" y="55" text-anchor="middle" class="node-label" font-weight="700" fill="#bc8cff">Running VM (Chromium in Docker)</text>
-  <text x="880" y="75" text-anchor="middle" class="node-sub">reaches bridge on :8767 inside container</text>
-  <text x="880" y="91" text-anchor="middle" class="node-sub">sync = make vm-restart-chromium (soft)</text>
-  <text x="880" y="107" text-anchor="middle" class="node-sub">or inspekt vm restart --rebuild (hard)</text>
+  <rect x="720" y="20" width="320" height="90" rx="6" fill="#161b22" stroke="#bc8cff"/>
+  <text x="880" y="45" text-anchor="middle" class="node-label" font-weight="700" fill="#bc8cff">Running VM (Chromium in Docker)</text>
+  <text x="880" y="65" text-anchor="middle" class="node-sub">hot-swap: make sync-extension</text>
+  <text x="880" y="81" text-anchor="middle" class="node-sub">verify: make verify-extension-sync</text>
+  <text x="880" y="97" text-anchor="middle" class="node-sub">full rebuild: make build-vm</text>
 
-  <rect x="720" y="150" width="320" height="90" rx="6" fill="#161b22" stroke="#bc8cff"/>
-  <text x="880" y="175" text-anchor="middle" class="node-label" font-weight="700" fill="#bc8cff">Tauri desktop window</text>
-  <text x="880" y="195" text-anchor="middle" class="node-sub">sees the VM's extension via :6080/control.html</text>
-  <text x="880" y="211" text-anchor="middle" class="node-sub">Tauri never bundles the extension itself</text>
-  <text x="880" y="227" text-anchor="middle" class="node-sub">— so syncing the VM image syncs the desktop app</text>
+  <rect x="720" y="140" width="320" height="75" rx="6" fill="#161b22" stroke="#bc8cff"/>
+  <text x="880" y="165" text-anchor="middle" class="node-label" font-weight="700" fill="#bc8cff">Tauri window</text>
+  <text x="880" y="183" text-anchor="middle" class="node-sub">inherits the VM's extension via :6080</text>
+  <text x="880" y="199" text-anchor="middle" class="node-sub">no separate bundling step</text>
 
-  <line x1="580" y1="290" x2="720" y2="75" stroke="#f0883e" stroke-width="2" marker-end="url(#arrowOrange)"/>
-  <line x1="580" y1="290" x2="720" y2="195" stroke="#f0883e" stroke-width="2" marker-end="url(#arrowOrange)"/>
+  <line x1="580" y1="275" x2="720" y2="65"  stroke="#f0883e" stroke-width="2" marker-end="url(#arrO)"/>
+  <line x1="580" y1="275" x2="720" y2="175" stroke="#f0883e" stroke-width="2" marker-end="url(#arrO)"/>
 
-  <!-- Legend for pain -->
-  <rect x="720" y="265" width="320" height="65" rx="6" fill="#161b22" stroke="#f85149"/>
-  <text x="880" y="288" text-anchor="middle" class="node-label" font-weight="700" fill="#f85149">Pain points</text>
-  <text x="880" y="305" text-anchor="middle" class="node-sub">no auto-bundle in Dockerfile; manual zips;</text>
-  <text x="880" y="321" text-anchor="middle" class="node-sub">manifest versions drift from CLI version</text>
+  <rect x="720" y="240" width="320" height="80" rx="6" fill="#161b22" stroke="#3fb950"/>
+  <text x="880" y="265" text-anchor="middle" class="node-label" font-weight="700" fill="#3fb950">Defence in depth</text>
+  <text x="880" y="283" text-anchor="middle" class="node-sub">Multi-stage Dockerfile bundles assets inside</text>
+  <text x="880" y="299" text-anchor="middle" class="node-sub">build, so fresh clone never ships stale dist/</text>
 </svg>
 </div>
 
-<h2>4. Current commands — where everything is invoked today</h2>
+<h2 id="setup"><span class="num">4</span>Setup — once per machine</h2>
 
-<table>
-<thead><tr><th>Surface</th><th>Command</th><th>What it does</th></tr></thead>
-<tbody>
-<tr><td rowspan="6">Root <code>Makefile</code></td>
-  <td><code>make dev</code></td><td>Install Python pkg editable with dev extras</td></tr>
-<tr><td><code>make all</code></td><td>format + lint + typecheck + test</td></tr>
-<tr><td><code>make vm-start / stop / restart</code></td><td>Lifecycle via <code>inspekt vm</code></td></tr>
-<tr><td><code>make vm-bundle</code></td><td>Run <code>bun scripts/bundle-vm.mjs</code> (control panel CSS/JS)</td></tr>
-<tr><td><code>make vm-rebuild</code></td><td>Restart VM and rebuild Docker image</td></tr>
-<tr><td><code>make vm-restart-{control,terminal,chromium,proxy}</code></td><td>Hot-swap one supervisord process</td></tr>
+<div class="sheet-grid">
 
-<tr><td rowspan="5">Root <code>package.json</code></td>
-  <td><code>bun run bundle</code></td><td>Same as <code>make vm-bundle</code></td></tr>
-<tr><td><code>bun run build</code></td><td>bundle + <code>inspekt vm restart --rebuild</code></td></tr>
-<tr><td><code>bun run preview</code></td><td>bundle + rebuild in non-dev mode</td></tr>
-<tr><td><code>bun run start</code></td><td><code>inspekt vm start</code></td></tr>
-<tr><td><code>bun run dev</code></td><td><code>inspekt vm restart</code></td></tr>
+  <div class="sheet">
+    <h3><span class="icon">📦</span>Python side</h3>
+    <pre><span class="c"># clone and enter</span>
+git clone https://github.com/roelvangils/inspekt
+cd inspekt
 
-<tr><td rowspan="3"><code>apps/desktop/package.json</code></td>
-  <td><code>bun run dev</code></td><td>Vite :1421 for Svelte launcher (Tauri dev picks this up)</td></tr>
-<tr><td><code>bun run tauri dev</code></td><td>Run the Tauri shell in dev mode</td></tr>
-<tr><td><code>bun run tauri build</code></td><td>Produce signed .app / .exe / .AppImage</td></tr>
+<span class="c"># install in dev mode with all extras</span>
+<span class="cmd">make</span> <span class="arg">dev</span>
 
-<tr><td rowspan="2">Ad-hoc</td>
-  <td><code>npm run watch:extensions</code></td><td>Watcher in <code>scripts/watch-extensions.js</code></td></tr>
-<tr><td><code>python scripts/build_popover_css.py --apply</code></td><td>Rebuild a11y popover CSS into injected JS</td></tr>
-</tbody>
-</table>
+<span class="c"># or manually:</span>
+pip install -e <span class="arg">".[dev]"</span></pre>
+    <p class="note">Uses your active virtualenv. <code>make dev</code> is equivalent to <code>pip install -e ".[dev]"</code> plus a friendly reminder to run <code>make pre-commit</code>.</p>
+  </div>
 
-<h2>5. What makes this confusing today</h2>
+  <div class="sheet">
+    <h3><span class="icon">🛠</span>Host prerequisites</h3>
+    <pre><span class="c"># on macOS (homebrew)</span>
+brew install docker bun overmind
 
-<div class="grid2">
-  <div class="pain"><strong>Name collision: <code>apps/desktop/</code> vs <code>vm/</code></strong>. The "apps/desktop" folder contains no VM; the Docker one does. New contributors regularly guess wrong.<span class="where">fix: rename <code>apps/desktop/</code> → <code>desktop/</code> (it's a Tauri shell)</span></div>
+<span class="c"># optional but recommended</span>
+brew install pandoc      <span class="c"># for make build-man</span>
+cargo install cargo      <span class="c"># for tauri builds</span></pre>
+    <p class="note"><code>overmind</code> only needed for <code>make dev-all</code>. <code>bun</code> is required for the VM bundle step and the Tauri apps. <code>docker</code> must be running before any VM command.</p>
+  </div>
 
-  <div class="pain"><strong>Three npm/bun surfaces</strong>: root, <code>apps/desktop/</code>, <code>apps/pdf-viewer/</code>. Each has its own <code>bun.lock</code>; none share scripts. "What do I run?" has different answers depending on which folder you happen to be in.<span class="where">fix: document the workflow at the root, or adopt a workspace (pnpm/bun workspace)</span></div>
-
-  <div class="pain"><strong>Control panel source ≠ what runs</strong>. Edits to <code>vm/control-panel.html</code> need <code>make vm-bundle</code> + <code>make vm-restart</code> to take effect. Forgetting either step silently shows stale UI.<span class="where">fix: let the container serve the un-bundled panel in dev mode</span></div>
-
-  <div class="pain"><strong>Extension manifest version drifts</strong> from <code>pyproject.toml</code> and <code>apps/desktop/Cargo.toml</code>. Four separate version fields with no single bump command.<span class="where">fix: one <code>VERSION</code> file + a bump script</span></div>
-
-  <div class="pain"><strong>Dockerfile does not run <code>bundle-vm.mjs</code></strong>. The build expects <code>dist/</code> to be pre-populated. A fresh clone + <code>docker build</code> ships stale assets.<span class="where">fix: add a pre-build step, or multi-stage build with a bun stage</span></div>
-
-  <div class="pain"><strong><code>vm/variants/headless/</code> and <code>archive/</code> are orphaned</strong>. No README, no current user, no decision recorded. They raise uncertainty about what's load-bearing.<span class="where">fix: add a one-line README in each; delete if confirmed dead</span></div>
-
-  <div class="pain"><strong>Two "bridges"</strong> share a name: <code>bridge_ws.py</code> (WS server) and <code>shared/core/main-world-bridge.js</code> (postMessage bridge). Grepping "bridge" conflates them.<span class="where">fix: rename in-extension one to <code>dom-bridge.js</code> / <code>main-world-bridge.js</code></span></div>
-
-  <div class="pain"><strong>No "dev everything" command</strong>. Three terminals for a full round-trip: <code>inspekt start</code>, <code>npm run watch:extensions</code>, <code>bun run tauri dev</code>. No single entry point for a new contributor.<span class="where">fix: add <code>make dev-all</code> (overmind/foreman)</span></div>
 </div>
 
-<h2>6. Suggested renames (breaking, but one-time)</h2>
+<h2 id="install-ext"><span class="num">5</span>Install the browser extension</h2>
 
-<table>
-<thead><tr><th>Today</th><th>Proposed</th><th>Why</th></tr></thead>
-<tbody>
-<tr><td><code>apps/desktop/</code></td><td><code>apps/desktop/</code> <em>or</em> <code>tauri-shell/</code></td><td>It's a Tauri wrapper, not a VM. Pairs with <code>apps/pdf-viewer/</code>.</td></tr>
-<tr><td><code>vm/</code></td><td><code>vm/</code> (top-level)</td><td>This <em>is</em> the VM. Make it unmissable. Keeps Dockerfile alongside its configs and servers.</td></tr>
-<tr><td><code>vm/variants/headless/</code></td><td>delete or <code>vm/variants/headless/</code></td><td>Only if you actually use it. Otherwise it's noise.</td></tr>
-<tr><td><code>apps/pdf-viewer/</code></td><td><code>apps/pdf-viewer/</code></td><td>Clarifies it's a sibling app, not part of the VM stack.</td></tr>
-<tr><td><code>inspekt/inspekt/</code></td><td><strong>keep</strong></td><td>Standard Python layout; changing it breaks every import. Just document it in the root README.</td></tr>
-<tr><td><code>extensions/shared/core/main-world-bridge.js</code></td><td><code>main-world-bridge.js</code></td><td>Disambiguate from <code>bridge_ws.py</code>.</td></tr>
-<tr><td><code>archive/</code></td><td><code>archive/README.md</code> + cull</td><td>Historical notes are fine, but point at the 3 that are still useful.</td></tr>
-</tbody>
-</table>
+<div class="sheet-grid">
 
-<p>End-state tree after renames:</p>
+  <div class="sheet">
+    <h3><span class="icon">🧭</span>Chrome / Edge / Brave <span class="hint">dev mode</span></h3>
+    <pre><span class="c"># 1. Open the extensions page</span>
+<span class="cmd">open</span> <span class="path">chrome://extensions</span>
 
-<div class="tree">
-<ul>
-  <li class="folder"><span class="label"><span class="name">inspekt/</span></span>
-    <ul>
-      <li class="file"><span class="label"><span class="name">inspekt/</span> <span class="tag py">python pkg</span></span></li>
-      <li class="file"><span class="label"><span class="name">extensions/</span> <span class="tag ext">browser</span></span></li>
-      <li class="folder"><span class="label"><span class="name">vm/</span> <span class="tag docker">docker image</span>
-        <span class="desc">= today's vm</span></span></li>
-      <li class="folder"><span class="label"><span class="name">apps/</span> <span class="desc">thin shells around the core</span>
-        <ul>
-          <li class="file"><span class="label"><span class="name">desktop/</span> <span class="tag tauri">tauri</span> <span class="desc">= today's apps/desktop</span></span></li>
-          <li class="file"><span class="label"><span class="name">pdf-viewer/</span> <span class="tag tauri">tauri</span> <span class="desc">= today's apps/pdf-viewer</span></span></li>
-        </ul></span></li>
-      <li class="file"><span class="label"><span class="name">scripts/</span> <span class="tag build">build tools</span></span></li>
-      <li class="file"><span class="label"><span class="name">docs/</span></span></li>
-    </ul>
-  </li>
-</ul>
+<span class="c"># 2. Toggle "Developer mode" (top-right)</span>
+
+<span class="c"># 3. Click "Load unpacked" and pick:</span>
+<span class="path">/path/to/inspekt/extensions/chrome</span>
+
+<span class="c"># 4. Start the bridge on the host:</span>
+<span class="cmd">inspekt</span> <span class="arg">start</span>
+
+<span class="c"># 5. Visit any site → extension icon lights up</span></pre>
+    <p class="note">Reload the extension (<span class="kbd">⟳</span> button on the card) whenever you edit files in <code>extensions/chrome/</code>. Use <code>make dev-extension</code> for a watcher that prints the reload hint on each change.</p>
+  </div>
+
+  <div class="sheet">
+    <h3><span class="icon">🦊</span>Firefox <span class="hint">temporary add-on</span></h3>
+    <pre><span class="c"># 1. Open the debug page</span>
+<span class="cmd">open</span> <span class="path">about:debugging#/runtime/this-firefox</span>
+
+<span class="c"># 2. Click "Load Temporary Add-on…"</span>
+
+<span class="c"># 3. Pick the manifest:</span>
+<span class="path">/path/to/inspekt/extensions/firefox/manifest.json</span>
+
+<span class="c"># 4. Start the bridge:</span>
+<span class="cmd">inspekt</span> <span class="arg">start</span></pre>
+    <p class="note">Temporary add-ons disappear on restart. That's a Firefox constraint, not ours — use the Chrome workflow for a persistent dev install, or <code>make build-extensions</code> for a signable xpi.</p>
+  </div>
+
+  <div class="sheet">
+    <h3><span class="icon">📦</span>Release zips</h3>
+    <pre><span class="cmd">make</span> <span class="arg">build-extensions</span>
+<span class="c"># → dist/inspekt-chrome-1.0.0.zip</span>
+<span class="c"># → dist/inspekt-firefox-1.0.0.zip</span></pre>
+    <p class="note">Ready for Chrome Web Store / Firefox Add-ons submission. The version in the zip filename comes from <code>VERSION</code> — bump it with <code>make version NEW=x.y.z</code> first.</p>
+  </div>
+
+  <div class="sheet">
+    <h3><span class="icon">🐳</span>Inside the VM</h3>
+    <pre><span class="c"># the Docker image already bundles the extension.</span>
+<span class="c"># to propagate changes after editing:</span>
+
+<span class="c"># soft (no rebuild, seconds):</span>
+<span class="cmd">make</span> <span class="arg">sync-extension</span>
+
+<span class="c"># hard (full image rebuild, ~5 min):</span>
+<span class="cmd">make</span> <span class="arg">build-vm</span>
+
+<span class="c"># verify host == container:</span>
+<span class="cmd">make</span> <span class="arg">verify-extension-sync</span></pre>
+    <p class="note"><code>sync-extension</code> does <code>docker cp</code> + restarts Chromium. It's the right tool 95% of the time.</p>
+  </div>
+
 </div>
 
-<h2>7. Proposed build/dev commands</h2>
+<h2 id="dev"><span class="num">6</span>Development — one command per surface</h2>
 
-<p>The goal is: <strong>one command per intent</strong>, all discoverable from the repo root.</p>
-
-<h3>Development — "I changed X, what do I run?"</h3>
 <table>
-<thead><tr><th>You changed</th><th>New command</th><th>What it does (today's equivalent)</th></tr></thead>
+<thead><tr><th>You changed…</th><th class="cmd">Run</th><th>What it does</th></tr></thead>
 <tbody>
-<tr><td>Python in <code>inspekt/</code></td><td><code>make dev-cli</code></td><td>Starts bridge; hot-reloads via editable install (<em>today: <code>inspekt start</code></em>)</td></tr>
-<tr><td>Code in <code>extensions/</code></td><td><code>make dev-extension</code></td><td>Runs the watcher + prints reload hint (<em>today: <code>npm run watch:extensions</code></em>)</td></tr>
-<tr><td>Control panel HTML/CSS/JS</td><td><code>make dev-vm</code></td><td>Bundles on change, hot-swaps control-server inside container (<em>today: manual bundle + vm-restart</em>)</td></tr>
-<tr><td>Tauri Rust / Svelte launcher</td><td><code>make dev-desktop</code></td><td>Ensures VM is up, then <code>bun run tauri dev</code> in <code>apps/desktop/</code></td></tr>
-<tr><td>Everything at once</td><td><code>make dev-all</code></td><td>overmind/foreman: runs CLI + extension watcher + VM hot-reload + desktop dev in parallel panes</td></tr>
-<tr><td>Extension inside running VM</td><td><code>make sync-extension</code></td><td>Copies <code>extensions/chrome/</code> into the running container and restarts Chromium — no full rebuild</td></tr>
+<tr><td>Python in <code>inspekt/</code></td><td class="cmd"><code>make dev-cli</code></td><td>Starts <code>bridge_ws.py</code>; editable install hot-reloads imports</td></tr>
+<tr><td>Files in <code>extensions/</code></td><td class="cmd"><code>make dev-extension</code></td><td>File watcher; prints "reload the extension" on every change</td></tr>
+<tr><td>Control panel (<code>vm/control-panel.html</code>, <code>vm/css/*</code>, <code>vm/js/*</code>)</td><td class="cmd"><code>make dev-vm</code></td><td>Re-bundles assets and hot-restarts the in-container control-server</td></tr>
+<tr><td>Tauri shell (<code>apps/desktop/</code>)</td><td class="cmd"><code>make dev-desktop</code></td><td>Ensures the VM is up, then <code>bun run tauri dev</code></td></tr>
+<tr><td><em>all of the above at once</em></td><td class="cmd"><code>make dev-all</code></td><td>Runs the four under <code>overmind start -f Procfile.dev</code></td></tr>
+<tr><td>Extension in the running VM</td><td class="cmd"><code>make sync-extension</code></td><td><code>docker cp</code> → restart Chromium. No rebuild.</td></tr>
 </tbody>
 </table>
 
-<h3>Build — release artifacts</h3>
+<h3>Individual VM service restarts <span style="color: var(--muted); font-weight: normal;">(rarely needed)</span></h3>
 <table>
-<thead><tr><th>Artifact</th><th>New command</th><th>Today</th></tr></thead>
+<thead><tr><th>Changed</th><th class="cmd">Run</th></tr></thead>
 <tbody>
-<tr><td>Python wheel</td><td><code>make build-cli</code></td><td><code>python -m build</code> (implicit)</td></tr>
-<tr><td>VM Docker image</td><td><code>make build-vm</code></td><td><code>bun run bundle && inspekt vm restart --rebuild</code> — but <em>with the bundle step folded into the Dockerfile</em></td></tr>
-<tr><td>Chrome / Firefox zips</td><td><code>make build-extensions</code></td><td>(new) reads <code>VERSION</code>, zips <code>extensions/chrome/</code> + <code>extensions/firefox/</code> into <code>dist/</code></td></tr>
-<tr><td>Desktop apps</td><td><code>make build-desktop</code></td><td><code>cd apps/desktop && bun run tauri build</code></td></tr>
-<tr><td>PDF viewer app</td><td><code>make build-pdf-viewer</code></td><td><code>cd apps/pdf-viewer && bun run tauri build</code></td></tr>
-<tr><td>Everything</td><td><code>make build-all</code></td><td>Runs the five above, writes to <code>dist/</code></td></tr>
-<tr><td>Bump version everywhere</td><td><code>make version NEW=4.3.0</code></td><td>(new) rewrites <code>pyproject.toml</code>, <code>extensions/*/manifest.json</code>, <code>apps/desktop/src-tauri/{Cargo.toml,tauri.conf.json}</code>, <code>apps/pdf-viewer/…</code></td></tr>
+<tr><td><code>vm/servers/control-server.py</code></td><td class="cmd"><code>make vm-restart-control</code></td></tr>
+<tr><td><code>vm/servers/terminal-server.py</code></td><td class="cmd"><code>make vm-restart-terminal</code></td></tr>
+<tr><td>Extension in VM</td><td class="cmd"><code>make vm-restart-chromium</code></td></tr>
+<tr><td><code>vm/proxy-scripts/*</code></td><td class="cmd"><code>make vm-restart-proxy</code></td></tr>
+<tr><td><code>vm/Dockerfile</code>, <code>supervisord.conf</code>, <code>entrypoint.sh</code></td><td class="cmd"><code>make vm-rebuild</code></td></tr>
 </tbody>
 </table>
 
-<h3>Coherence checks — "am I running the right bits together?"</h3>
-<div class="rec"><span class="tag">NEW</span><code>make doctor</code> — prints bridge port, VM container state, image SHA vs expected, extension version in container vs source, bundle dist mtime vs control-panel.html mtime. Surfaces "you forgot to bundle" before you see stale UI.</div>
-<div class="rec"><span class="tag">NEW</span><code>make verify-extension-sync</code> — hashes <code>extensions/chrome/</code> on host and inside the running container; exits non-zero if they differ. Perfect for a CI gate and for the <code>dev-all</code> loop.</div>
-<div class="rec"><span class="tag">NEW</span>Dockerfile runs <code>bun scripts/bundle-vm.mjs</code> in a builder stage, so <code>docker build .</code> from a clean clone produces correct assets without the user remembering.</div>
-<div class="rec"><span class="tag">NEW</span>Dev mode mounts <code>extensions/chrome/</code> and <code>vm/{js,css,control-panel.html}</code> as volumes, so iteration loops are "save file → <code>make sync-extension</code>" with no rebuild.</div>
+<h2 id="build"><span class="num">7</span>Build artifacts</h2>
 
-<h2>8. Recommendations, ranked by payoff</h2>
+<table>
+<thead><tr><th class="cmd">Command</th><th>Output</th><th>Time</th></tr></thead>
+<tbody>
+<tr><td class="cmd"><code>make build-cli</code></td><td><code>dist/inspekt-1.0.0-py3-none-any.whl</code></td><td>~5s</td></tr>
+<tr><td class="cmd"><code>make build-extensions</code></td><td><code>dist/inspekt-chrome-1.0.0.zip</code><br><code>dist/inspekt-firefox-1.0.0.zip</code></td><td>~1s</td></tr>
+<tr><td class="cmd"><code>make build-vm</code></td><td>Docker image <code>inspekt-browser-vm:latest</code> (~1.5 GB)</td><td>3-8 min</td></tr>
+<tr><td class="cmd"><code>make build-desktop</code></td><td><code>apps/desktop/src-tauri/target/release/bundle/macos/Inspekt Browser VM.app</code><br><code>…/bundle/dmg/Inspekt Browser VM_1.0.0_aarch64.dmg</code></td><td>5-15 min first build, 1-3 min incremental</td></tr>
+<tr><td class="cmd"><code>make build-pdf-viewer</code></td><td>Same shape under <code>apps/pdf-viewer/…</code></td><td>5-15 min</td></tr>
+<tr><td class="cmd"><code>make build-all</code></td><td>All of the above except <code>pdf-viewer</code> (opt-in)</td><td>~10-15 min</td></tr>
+</tbody>
+</table>
 
-<ol>
-  <li><strong>Ship a one-page "How the pieces fit" doc</strong> (this page, essentially) and link it from <code>README.md</code>. Most of the confusion is semantic, not structural.</li>
-  <li><strong>Rename <code>apps/desktop/</code> → <code>apps/desktop/</code></strong> and <strong><code>vm/</code> → <code>vm/</code></strong>. Biggest cognitive win, small code impact (git mv, update Dockerfile COPY paths, <code>bundle-vm.mjs</code>, Makefile targets, docs).</li>
-  <li><strong>Centralise versioning</strong>: a <code>VERSION</code> file plus <code>make version NEW=…</code> that rewrites every manifest. Kill the drift at its source.</li>
-  <li><strong>Fold <code>bundle-vm.mjs</code> into the Dockerfile</strong> (multi-stage build with a bun stage). Removes the silent-staleness failure mode.</li>
-  <li><strong>Add <code>make dev-all</code></strong> with overmind/foreman. First-day-contributor experience becomes one command.</li>
-  <li><strong>Add <code>make doctor</code> and <code>make sync-extension</code></strong>. These pay for themselves the first time someone debugs stale UI.</li>
-  <li><strong>Dispose of <code>vm/variants/headless/</code> and annotate <code>archive/</code></strong>. Reduces "is this load-bearing?" anxiety.</li>
-</ol>
+<p class="note" style="color: var(--muted); font-size: 12px; margin-top: 10px;"><code>build-vm</code> stops and recreates the running container. <code>build-desktop</code> recompiles ~400 Rust crates on a clean tree. Both are idempotent, both use incremental caches.</p>
+
+<h2 id="version"><span class="num">8</span>Versioning</h2>
+
+<div class="sheet-grid">
+
+  <div class="sheet">
+    <h3><span class="icon">🏷</span>Bump everything at once</h3>
+    <pre><span class="cmd">make</span> <span class="arg">version</span> <span class="flag">NEW=</span><span class="arg">1.1.0</span></pre>
+    <p>Writes the new value to <code>VERSION</code> and propagates to every manifest:</p>
+    <pre><span class="path">pyproject.toml</span>
+<span class="path">extensions/chrome/manifest.json</span>
+<span class="path">extensions/firefox/manifest.json</span>
+<span class="path">apps/desktop/package.json</span>
+<span class="path">apps/desktop/src-tauri/tauri.conf.json</span>
+<span class="path">apps/desktop/src-tauri/Cargo.toml</span>
+<span class="path">apps/pdf-viewer/package.json</span>
+<span class="path">apps/pdf-viewer/src-tauri/tauri.conf.json</span>
+<span class="path">apps/pdf-viewer/src-tauri/Cargo.toml</span></pre>
+  </div>
+
+  <div class="sheet">
+    <h3><span class="icon">🔧</span>Under the hood</h3>
+    <p>Implemented in <code>scripts/bump_version.py</code>. Uses targeted regex per file (not full TOML/JSON reserialize) so diff noise stays zero. Idempotent — running twice is a no-op.</p>
+    <pre><span class="c"># idempotency check</span>
+<span class="cmd">python</span> <span class="path">scripts/bump_version.py</span>
+<span class="c"># → already at 1.0.0</span></pre>
+    <p class="note">To check all versions agree right now: <code>make doctor</code> reads each one.</p>
+  </div>
+
+</div>
+
+<h2 id="doctor"><span class="num">9</span>Coherence checks</h2>
+
+<div class="sheet-grid">
+
+  <div class="sheet">
+    <h3><span class="icon">🩺</span><code>make doctor</code></h3>
+    <pre>── Inspekt 1.0.0 ──────────────────
+Bridge port:        8765
+VM container:       inspekt-browser-vm
+VM image id:        sha:0437fd6efe4c
+Extension (host):   1.0.0
+Extension (in VM):  1.0.0
+Bundle dist:        vm/dist/control.html ok</pre>
+    <p class="note">Exits non-zero if <code>vm/control-panel.html</code> is newer than <code>vm/dist/control.html</code> — tells you when you've forgotten to re-bundle.</p>
+  </div>
+
+  <div class="sheet">
+    <h3><span class="icon">🔍</span><code>make verify-extension-sync</code></h3>
+    <pre><span class="cmd">make</span> <span class="arg">verify-extension-sync</span>
+<span class="c"># ✓ extension in sync (d71a516138b26c95)</span>
+<span class="c"># or:</span>
+<span class="c"># ✗ drift: host=abc vm=def</span>
+<span class="c">#   run: make sync-extension</span></pre>
+    <p class="note">Hashes every file in <code>extensions/chrome/</code> on both host and container. Portable — uses <code>find + shasum</code>, works across bsd-tar and gnu-tar.</p>
+  </div>
+
+</div>
+
+<h2 id="ports"><span class="num">10</span>Port map</h2>
+
+<div class="ports-grid">
+  <div class="port"><span class="num">6080</span><span class="role">noVNC</span><div class="where">VM, HTTP — open this in a browser</div></div>
+  <div class="port"><span class="num">8765</span><span class="role">Bridge WS</span><div class="where">Host mode (CLI + your browser)</div></div>
+  <div class="port"><span class="num">8767</span><span class="role">Bridge WS</span><div class="where">VM mode (isolated from host)</div></div>
+  <div class="port"><span class="num">8888</span><span class="role">Control server</span><div class="where">VM — control-server.py REST API</div></div>
+  <div class="port"><span class="num">8889</span><span class="role">Terminal WS</span><div class="where">VM — terminal-server.py (xterm.js)</div></div>
+  <div class="port"><span class="num">9222</span><span class="role">Chromium CDP</span><div class="where">VM — remote debugging</div></div>
+  <div class="port"><span class="num">8080</span><span class="role">mitmproxy</span><div class="where">VM — HTTP interception</div></div>
+  <div class="port"><span class="num">1421</span><span class="role">Vite</span><div class="where">Tauri dev — Svelte launcher</div></div>
+</div>
+
+<h2 id="keys">Quick reference — one-screen cheat sheet</h2>
+
+<div class="sheet-grid">
+
+  <div class="sheet full">
+    <h3><span class="icon">⚡</span>From zero to running — first-time setup</h3>
+    <pre><span class="step">1</span><span class="cmd">make</span> <span class="arg">dev</span>                              <span class="c"># install Python pkg editable</span>
+<span class="step">2</span><span class="cmd">inspekt</span> <span class="arg">start</span>                         <span class="c"># start bridge daemon</span>
+<span class="step">3</span><span class="c"># load extensions/chrome/ unpacked in Chrome (see §5)</span>
+<span class="step">4</span><span class="cmd">inspekt</span> <span class="arg">display info</span>                  <span class="c"># smoke test — should return page info</span>
+
+<span class="c"># or, for Mode 2 / Mode 3:</span>
+<span class="step">1</span><span class="cmd">make</span> <span class="arg">dev</span>
+<span class="step">2</span><span class="cmd">make</span> <span class="arg">vm-start</span>                          <span class="c"># Mode 2 — open http://localhost:6080/</span>
+<span class="step">3</span><span class="cmd">make</span> <span class="arg">dev-desktop</span>                       <span class="c"># Mode 3 — native window</span></pre>
+  </div>
+
+  <div class="sheet">
+    <h3><span class="icon">🚀</span>Daily drivers</h3>
+    <pre><span class="cmd">make</span> <span class="arg">dev-all</span>             <span class="c"># all four dev loops (overmind)</span>
+<span class="cmd">make</span> <span class="arg">doctor</span>              <span class="c"># sanity-check state</span>
+<span class="cmd">make</span> <span class="arg">sync-extension</span>      <span class="c"># push ext changes to VM</span>
+<span class="cmd">make</span> <span class="arg">vm-restart-control</span>  <span class="c"># hot-swap control-server</span>
+<span class="cmd">make</span> <span class="arg">all</span>                 <span class="c"># format + lint + typecheck + test</span></pre>
+  </div>
+
+  <div class="sheet">
+    <h3><span class="icon">📤</span>Release</h3>
+    <pre><span class="cmd">make</span> <span class="arg">version</span> <span class="flag">NEW=</span><span class="arg">1.1.0</span>  <span class="c"># bump all manifests</span>
+<span class="cmd">make</span> <span class="arg">build-all</span>           <span class="c"># produce every artifact</span>
+<span class="cmd">ls</span> dist/                  <span class="c"># wheel + ext zips</span>
+<span class="cmd">ls</span> apps/desktop/src-tauri/target/release/bundle</pre>
+  </div>
+
+</div>
 
 <hr>
-<p style="color: var(--muted); font-size: 12px;">Generated from a read-through of the repo on 2026-04-17. Sources: <code>Makefile</code>, <code>pyproject.toml</code>, <code>package.json</code>, <code>scripts/bundle-vm.mjs</code>, <code>apps/desktop/CLAUDE.md</code>, <code>CLAUDE.md</code>, <code>extensions/EXTENSION_ARCHITECTURE.md</code>, and <code>vm/</code>.</p>
+<p style="color: var(--muted); font-size: 12px; margin: 0;">
+  <code>docs/architecture.html</code> — regenerate by hand; there's no build step for this file. Paths and commands reflect the repo state on <strong>2026-04-17</strong> after commit <code>15432e6</code>.
+</p>
 
 </div>
 </body>
