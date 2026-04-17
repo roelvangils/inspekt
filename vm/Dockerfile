@@ -7,6 +7,24 @@
 #   docker run -d --network host --shm-size=2g inspekt-browser-vm
 #   Open http://localhost:6080/control.html in your browser
 
+# ── Stage 1: bundle the control panel assets ─────────────────
+# Produces vm/dist/{control.html,app.min.css,app.min.js} from the
+# source CSS/JS listed between the APP_*_START/END markers in
+# control-panel.html. Running this inside the Docker build removes
+# the silent-staleness failure mode where a fresh clone would ship
+# an old dist/ with the image.
+FROM oven/bun:1-alpine AS bundle
+WORKDIR /work
+COPY package.json ./
+# Install both prod + dev deps — esbuild (used by bundle-vm.mjs) is a devDep.
+RUN bun install
+COPY scripts/bundle-vm.mjs ./scripts/
+COPY vm/control-panel.html ./vm/
+COPY vm/css ./vm/css
+COPY vm/js ./vm/js
+RUN bun scripts/bundle-vm.mjs
+
+# ── Stage 2: the VM image ───────────────────────────────────
 FROM alpine:3.21
 
 LABEL maintainer="Inspekt" \
@@ -389,10 +407,10 @@ COPY vm/config/openbox-rc.xml /root/.config/openbox/rc.xml
 COPY vm/entrypoint.sh /entrypoint.sh
 COPY vm/servers/control-server.py /opt/control-server.py
 COPY vm/servers/terminal-server.py /opt/terminal-server.py
-# Production: use bundled control panel (built by scripts/bundle-vm.mjs)
-COPY vm/dist/control.html /usr/share/novnc/control.html
-COPY vm/dist/app.min.css /usr/share/novnc/dist/app.min.css
-COPY vm/dist/app.min.js /usr/share/novnc/dist/app.min.js
+# Production: use bundled control panel (built by the `bundle` stage above)
+COPY --from=bundle /work/vm/dist/control.html /usr/share/novnc/control.html
+COPY --from=bundle /work/vm/dist/app.min.css /usr/share/novnc/dist/app.min.css
+COPY --from=bundle /work/vm/dist/app.min.js /usr/share/novnc/dist/app.min.js
 COPY vm/css /usr/share/novnc/css
 COPY vm/fonts /usr/share/novnc/fonts
 COPY vm/vendor/codemirror.min.js /usr/share/novnc/vendor/codemirror.min.js
