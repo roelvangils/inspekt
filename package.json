@@ -3,12 +3,29 @@
     "material-icons": "^1.13.14"
   },
   "scripts": {
+    "help": "printf '\\n  Every script here forwards to make. The Makefile is the source of truth.\\n  Type `bun run <name>` to run one, or `make help` for the full reference.\\n\\n' && make help",
     "dev": "make dev-all",
+    "dev:cli": "make dev-cli",
+    "dev:extension": "make dev-extension",
+    "dev:vm": "make dev-vm",
+    "dev:desktop": "make dev-desktop",
     "build": "make build-all",
-    "bundle": "make vm-bundle",
-    "start": "make vm-start",
+    "build:cli": "make build-cli",
+    "build:vm": "make build-vm",
+    "build:extensions": "make build-extensions",
+    "build:desktop": "make build-desktop",
+    "build:pdf-viewer": "make build-pdf-viewer",
+    "vm:start": "make vm-start",
+    "vm:stop": "make vm-stop",
+    "vm:restart": "make vm-restart",
+    "vm:rebuild": "make vm-rebuild",
+    "vm:status": "make vm-status",
+    "vm:logs": "make vm-logs",
+    "vm:bundle": "make vm-bundle",
+    "sync:ext": "make sync-extension",
+    "verify:ext": "make verify-extension-sync",
     "doctor": "make doctor",
-    "preview": "bun run bundle && inspekt vm restart --rebuild --no-dev"
+    "preview": "make vm-bundle && inspekt vm restart --rebuild --no-dev"
   },
   "devDependencies": {
     "@siteimprove/alfa-act": "^0.108.2",
