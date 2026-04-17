@@ -65,6 +65,11 @@ node_modules/
 bun.lock
 package-lock.json
 
+# Rust / Tauri build artifacts
+target/
+apps/*/dist/
+vm/dist/
+
 # Recordings and replays (generated test files)
 recording_*.yaml
 sensoa.yaml
