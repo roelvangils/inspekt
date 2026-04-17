@@ -166,6 +166,9 @@ def add_domain(request: DomainAddRequest):
             "already_exists": already_exists
         }
 
+    except HTTPException:
+        # Already well-formed (e.g. 503 from bridge proxy) — don't rewrap as 500
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
 
@@ -220,6 +223,9 @@ def remove_domain(request: DomainRemoveRequest):
             "not_found": not_found
         }
 
+    except HTTPException:
+        # Already well-formed (e.g. 503 from bridge proxy) — don't rewrap as 500
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
 
@@ -285,6 +291,9 @@ def list_domains():
             "domains": domains
         }
 
+    except HTTPException:
+        # Already well-formed (e.g. 503 from bridge proxy) — don't rewrap as 500
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
 
@@ -370,6 +379,9 @@ def set_bypass(request: DomainBypassRequest):
         )
     except requests.exceptions.Timeout:
         raise HTTPException(status_code=504, detail="Request to bridge server timed out")
+    except HTTPException:
+        # Already well-formed (e.g. 503 from bridge proxy) — don't rewrap as 500
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
 
@@ -469,6 +481,9 @@ def toggle_global_csp(request: CspGlobalRequest):
         )
     except requests.exceptions.Timeout:
         raise HTTPException(status_code=504, detail="Request to bridge server timed out")
+    except HTTPException:
+        # Already well-formed (e.g. 503 from bridge proxy) — don't rewrap as 500
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
 
@@ -519,6 +534,9 @@ def get_global_csp_status():
         )
     except requests.exceptions.Timeout:
         raise HTTPException(status_code=504, detail="Request to bridge server timed out")
+    except HTTPException:
+        # Already well-formed (e.g. 503 from bridge proxy) — don't rewrap as 500
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
 
