@@ -2,16 +2,44 @@
        vm-start vm-stop vm-restart vm-rebuild vm-status vm-logs vm-shell vm-services vm-health \
        vm-restart-control vm-restart-terminal vm-restart-chromium vm-restart-proxy \
        vm-bundle \
-       build-man install-man clean-man
+       build-man install-man clean-man \
+       dev-cli dev-extension dev-vm dev-desktop dev-all sync-extension \
+       build-cli build-vm build-extensions build-desktop build-pdf-viewer build-all \
+       version doctor verify-extension-sync
+
+VERSION := $(shell cat VERSION 2>/dev/null || echo 0.0.0)
 
 # Default target
 help:
-	@echo "Inspekt - Development Commands"
+	@echo "Inspekt $(VERSION) — Development Commands"
 	@echo ""
 	@echo "Setup:"
 	@echo "  make dev          Install package in development mode with all dependencies"
 	@echo "  make install      Install package for production use"
 	@echo "  make clean        Remove build artifacts and caches"
+	@echo ""
+	@echo "Development (one command per surface):"
+	@echo "  make dev-cli       Start the bridge daemon"
+	@echo "  make dev-extension Watch extensions/ for changes"
+	@echo "  make dev-vm        Bundle control panel on change + hot-swap in container"
+	@echo "  make dev-desktop   Start the Tauri desktop shell (apps/desktop)"
+	@echo "  make dev-all       Run all four under overmind (Procfile.dev)"
+	@echo "  make sync-extension  Copy extensions/chrome into running VM + restart Chromium"
+	@echo ""
+	@echo "Build (release artifacts):"
+	@echo "  make build-cli        Python wheel (dist/)"
+	@echo "  make build-vm         Docker image (self-bundles assets)"
+	@echo "  make build-extensions Chrome + Firefox zips (dist/)"
+	@echo "  make build-desktop    Tauri desktop app (apps/desktop/src-tauri/target)"
+	@echo "  make build-pdf-viewer Tauri PDF viewer (apps/pdf-viewer/src-tauri/target)"
+	@echo "  make build-all        All five above"
+	@echo ""
+	@echo "Versioning:"
+	@echo "  make version NEW=x.y.z   Write VERSION, propagate to all manifests"
+	@echo ""
+	@echo "Coherence:"
+	@echo "  make doctor              Print state + exit non-zero on mismatches"
+	@echo "  make verify-extension-sync  Extension on host == extension in running VM"
 	@echo ""
 	@echo "Testing:"
 	@echo "  make test         Run all tests with coverage"
@@ -24,9 +52,12 @@ help:
 	@echo "  make format       Format code (ruff format)"
 	@echo "  make typecheck    Run type checker (mypy)"
 	@echo "  make pre-commit   Install and run pre-commit hooks"
+	@echo "  make all          format + lint + typecheck + test"
 	@echo ""
-	@echo "Combined:"
-	@echo "  make all          Run format, lint, typecheck, and test"
+	@echo "VM internals (rarely invoked directly):"
+	@echo "  make vm-start / vm-stop / vm-restart / vm-rebuild / vm-status / vm-logs / vm-shell"
+	@echo "  make vm-restart-{control,terminal,chromium,proxy}"
+	@echo "  make vm-services / vm-health / vm-bundle"
 	@echo ""
 	@echo "Man pages (requires pandoc):"
 	@echo "  make build-man    Regenerate man pages and copy to inspekt/man/"
@@ -55,6 +86,8 @@ clean:
 	rm -rf htmlcov/
 	rm -rf .coverage
 	rm -rf coverage.xml
+	rm -rf vm/dist
+	rm -rf apps/*/dist
 	find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
 	find . -type f -name "*.pyc" -delete
 	@echo "✓ Cleaned build artifacts"
@@ -96,7 +129,96 @@ all: format lint typecheck test
 	@echo ""
 	@echo "✓ All checks passed!"
 
-# ── Browser VM ──────────────────────────────────────────────
+# ── Public dev surface ──────────────────────────────────────
+
+dev-cli:
+	inspekt start
+
+dev-extension:
+	@node scripts/watch-extensions.js
+
+dev-vm:
+	@echo "• Bundling control panel on change (Ctrl+C to stop)"
+	@bun scripts/bundle-vm.mjs
+	@$(MAKE) --no-print-directory vm-restart-control
+	@echo "• Tip: edit vm/control-panel.html then rerun 'make dev-vm'"
+
+dev-desktop:
+	@$(MAKE) --no-print-directory vm-start
+	cd apps/desktop && bun run tauri dev
+
+dev-all:
+	@command -v overmind >/dev/null 2>&1 || { echo "Install overmind: brew install overmind"; exit 1; }
+	@$(MAKE) --no-print-directory vm-start
+	overmind start -f Procfile.dev
+
+sync-extension:
+	@if [ -z "$(VM_CONTAINER)" ]; then echo "Error: No VM container running"; exit 1; fi
+	docker cp extensions/chrome/. $(VM_CONTAINER):/opt/inspekt/extensions/chrome/
+	@$(MAKE) --no-print-directory vm-restart-chromium
+	@echo "✓ Extension synced"
+
+# ── Public build surface ────────────────────────────────────
+
+build-cli:
+	python -m build --wheel --outdir dist/
+
+build-vm:
+	inspekt vm restart --rebuild
+
+build-extensions:
+	@mkdir -p dist
+	@cd extensions && zip -qr "../dist/inspekt-chrome-$(VERSION).zip" chrome shared
+	@cd extensions && zip -qr "../dist/inspekt-firefox-$(VERSION).zip" firefox shared
+	@echo "✓ dist/inspekt-chrome-$(VERSION).zip"
+	@echo "✓ dist/inspekt-firefox-$(VERSION).zip"
+
+build-desktop:
+	cd apps/desktop && bun run tauri build
+
+build-pdf-viewer:
+	cd apps/pdf-viewer && bun run tauri build
+
+build-all: build-cli build-extensions build-vm build-desktop build-pdf-viewer
+	@echo ""
+	@echo "✓ All artifacts in dist/ and apps/*/src-tauri/target/"
+
+# ── Versioning ──────────────────────────────────────────────
+
+version:
+	@if [ -z "$(NEW)" ]; then echo "Usage: make version NEW=x.y.z"; exit 1; fi
+	@echo "$(NEW)" > VERSION
+	@python scripts/bump_version.py
+
+# ── Coherence / health ─────────────────────────────────────
+
+doctor:
+	@echo "── Inspekt $(VERSION) ─────────────────────────────"
+	@printf "Bridge port:        " && python -c "from inspekt.config import get_bridge_port; print(get_bridge_port())" 2>/dev/null || echo "?"
+	@printf "VM container:       " && [ -n "$(VM_CONTAINER)" ] && echo "$(VM_CONTAINER)" || echo "(not running)"
+	@printf "VM image id:        " && docker images --format '{{.ID}}' inspekt-browser-vm 2>/dev/null | head -1 | sed 's/^/sha:/' || echo "?"
+	@printf "Extension (host):   " && python -c "import json; print(json.load(open('extensions/chrome/manifest.json'))['version'])" 2>/dev/null || echo "?"
+	@if [ -n "$(VM_CONTAINER)" ]; then \
+		printf "Extension (in VM):  " ; \
+		docker exec $(VM_CONTAINER) cat /opt/inspekt/extensions/chrome/manifest.json 2>/dev/null | python -c "import json,sys; print(json.load(sys.stdin)['version'])" 2>/dev/null || echo "(missing)" ; \
+	fi
+	@printf "Bundle dist:        " && [ -f vm/dist/control.html ] && echo "vm/dist/control.html ok" || echo "(run: make vm-bundle)"
+	@if [ -f vm/dist/control.html ] && [ vm/control-panel.html -nt vm/dist/control.html ]; then \
+		echo "  ⚠  vm/control-panel.html newer than bundle — run: make vm-bundle" ; \
+		exit 1 ; \
+	fi
+
+verify-extension-sync:
+	@if [ -z "$(VM_CONTAINER)" ]; then echo "Error: No VM container running"; exit 1; fi
+	@HOST_HASH=$$(cd extensions/chrome && find . -type f -not -path '*/\.*' | LC_ALL=C sort | xargs shasum -a 256 2>/dev/null | shasum -a 256 | cut -c1-16); \
+	VM_HASH=$$(docker exec $(VM_CONTAINER) sh -c 'cd /opt/inspekt/extensions/chrome && find . -type f -not -path "*/\.*" | LC_ALL=C sort | xargs sha256sum 2>/dev/null | sha256sum' | cut -c1-16); \
+	if [ "$$HOST_HASH" = "$$VM_HASH" ]; then \
+		echo "✓ extension in sync ($$HOST_HASH)" ; \
+	else \
+		echo "✗ drift: host=$$HOST_HASH vm=$$VM_HASH"; echo "  run: make sync-extension"; exit 1 ; \
+	fi
+
+# ── Browser VM (internal plumbing) ──────────────────────────
 
 # Auto-detect container name (CLI creates "inspekt-browser-vm", Compose creates "inspekt-browser")
 VM_CONTAINER := $(shell docker ps --format '{{.Names}}' --filter 'name=inspekt-browser' 2>/dev/null | head -1)

@@ -1,7 +1,7 @@
 {
   "manifest_version": 2,
   "name": "Inspekt",
-  "version": "4.3.1",
+  "version": "1.0.0",
   "description": "Execute JavaScript in your browser from the command line. Works on all websites, bypasses CSP restrictions.",
 
   "icons": {
