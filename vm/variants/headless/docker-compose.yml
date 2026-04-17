@@ -20,7 +20,7 @@ services:
   headless:
     build:
       context: ../..
-      dockerfile: docker/headless/Dockerfile
+      dockerfile: vm/variants/headless/Dockerfile
     image: inspekt-headless:latest
     volumes:
       - ./output:/output

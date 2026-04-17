@@ -141,13 +141,13 @@ When running from the Inspekt source repository, development mode is **automatic
 
 | Local Path | Container Path |
 |------------|----------------|
-| `docker/browser-vm/control-panel.html` | `/usr/share/novnc/control.html` |
-| `docker/browser-vm/css/` | `/usr/share/novnc/css/` |
-| `docker/browser-vm/js/` | `/usr/share/novnc/js/` |
-| `docker/browser-vm/fonts/` | `/usr/share/novnc/fonts/` |
-| `docker/browser-vm/servers/control-server.py` | `/opt/control-server.py` |
-| `docker/browser-vm/servers/terminal-server.py` | `/opt/terminal-server.py` |
-| `docker/browser-vm/servers/audio-server.py` | `/opt/audio-server.py` |
+| `vm/control-panel.html` | `/usr/share/novnc/control.html` |
+| `vm/css/` | `/usr/share/novnc/css/` |
+| `vm/js/` | `/usr/share/novnc/js/` |
+| `vm/fonts/` | `/usr/share/novnc/fonts/` |
+| `vm/servers/control-server.py` | `/opt/control-server.py` |
+| `vm/servers/terminal-server.py` | `/opt/terminal-server.py` |
+| `vm/servers/audio-server.py` | `/opt/audio-server.py` |
 | `inspekt/` | `/opt/inspekt/inspekt/` |
 | `extensions/` | `/opt/inspekt/extensions/` |
 

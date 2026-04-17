@@ -42,7 +42,7 @@ site
 *.png
 *.jpg
 *.html
-!docker/browser-vm/*.html
+!vm/*.html
 tests
 .claude
 Claude.md

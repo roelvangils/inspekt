@@ -34,7 +34,7 @@ user-invocable: true
 ## 3. Container Name Detection
 
 Two workflows produce different container names:
-- **Compose** (`docker compose -f docker/browser-vm/docker-compose.yml up -d`): creates `inspekt-browser`
+- **Compose** (`docker compose -f vm/docker-compose.yml up -d`): creates `inspekt-browser`
 - **CLI** (`inspekt vm start`): creates `inspekt-browser-vm`
 
 Before running `docker exec`, always detect which is running:

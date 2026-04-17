@@ -1,6 +1,6 @@
 # Browser VM Development
 
-The `inspekt vm` command runs a Docker container with a full browser environment (Chromium + noVNC + Inspekt). The container is built from `docker/browser-vm/Dockerfile`.
+The `inspekt vm` command runs a Docker container with a full browser environment (Chromium + noVNC + Inspekt). The container is built from `vm/Dockerfile`.
 
 ## Quick Start
 
@@ -41,7 +41,7 @@ Once running, open **`http://127.0.0.1:6080/control.html`** in your browser.
 You can also start the VM with Docker Compose from the **repo root**:
 
 ```bash
-docker compose -f docker/browser-vm/docker-compose.yml up --build -d
+docker compose -f vm/docker-compose.yml up --build -d
 ```
 
 ### Required Ports
@@ -86,13 +86,13 @@ In dev mode, these files are mounted from the host into the container:
 
 | Host Path | Container Path | Hot-Reload? |
 |-----------|----------------|-------------|
-| `docker/browser-vm/control-panel.html` | `/usr/share/novnc/control.html` | Restart required (noVNC caches) |
-| `docker/browser-vm/css/` | `/usr/share/novnc/css/` | Restart required (noVNC caches) |
-| `docker/browser-vm/js/` | `/usr/share/novnc/js/` | Restart required (noVNC caches) |
-| `docker/browser-vm/fonts/` | `/usr/share/novnc/fonts/` | Restart required (noVNC caches) |
-| `docker/browser-vm/servers/control-server.py` | `/opt/control-server.py` | `supervisorctl restart control-server` |
-| `docker/browser-vm/servers/terminal-server.py` | `/opt/terminal-server.py` | `supervisorctl restart terminal-server` |
-| `docker/browser-vm/servers/audio-server.py` | `/opt/audio-server.py` | `supervisorctl restart audio-server` |
+| `vm/control-panel.html` | `/usr/share/novnc/control.html` | Restart required (noVNC caches) |
+| `vm/css/` | `/usr/share/novnc/css/` | Restart required (noVNC caches) |
+| `vm/js/` | `/usr/share/novnc/js/` | Restart required (noVNC caches) |
+| `vm/fonts/` | `/usr/share/novnc/fonts/` | Restart required (noVNC caches) |
+| `vm/servers/control-server.py` | `/opt/control-server.py` | `supervisorctl restart control-server` |
+| `vm/servers/terminal-server.py` | `/opt/terminal-server.py` | `supervisorctl restart terminal-server` |
+| `vm/servers/audio-server.py` | `/opt/audio-server.py` | `supervisorctl restart audio-server` |
 | `inspekt/` | `/opt/inspekt/inspekt/` | **Instant** (Python reloads on each CLI call) |
 | `extensions/` | `/opt/inspekt/extensions/` | Restart required (Chromium reloads extension) |
 
@@ -124,18 +124,18 @@ The following changes **require a full container rebuild**:
 
 | File/Directory | Dev Mode | Production |
 |----------------|----------|------------|
-| `docker/browser-vm/Dockerfile` | Rebuild required (`bun run build`) | Rebuild required |
-| `docker/browser-vm/supervisord.conf` | Rebuild required | Rebuild required |
-| `docker/browser-vm/entrypoint.sh` | Rebuild required | Rebuild required |
-| `docker/browser-vm/scripts/*.sh` | Rebuild required | Rebuild required |
+| `vm/Dockerfile` | Rebuild required (`bun run build`) | Rebuild required |
+| `vm/supervisord.conf` | Rebuild required | Rebuild required |
+| `vm/entrypoint.sh` | Rebuild required | Rebuild required |
+| `vm/scripts/*.sh` | Rebuild required | Rebuild required |
 | `pyproject.toml` | Rebuild required | Rebuild required |
-| `docker/browser-vm/control-panel.html` | Restart only (`bun run dev`) | Rebuild required |
-| `docker/browser-vm/css/` | Restart only | Rebuild required |
-| `docker/browser-vm/js/` | Restart only | Rebuild required |
-| `docker/browser-vm/fonts/` | Restart only | Rebuild required |
-| `docker/browser-vm/servers/control-server.py` | `supervisorctl restart control-server` | Rebuild required |
-| `docker/browser-vm/servers/terminal-server.py` | `supervisorctl restart terminal-server` | Rebuild required |
-| `docker/browser-vm/servers/audio-server.py` | `supervisorctl restart audio-server` | Rebuild required |
+| `vm/control-panel.html` | Restart only (`bun run dev`) | Rebuild required |
+| `vm/css/` | Restart only | Rebuild required |
+| `vm/js/` | Restart only | Rebuild required |
+| `vm/fonts/` | Restart only | Rebuild required |
+| `vm/servers/control-server.py` | `supervisorctl restart control-server` | Rebuild required |
+| `vm/servers/terminal-server.py` | `supervisorctl restart terminal-server` | Rebuild required |
+| `vm/servers/audio-server.py` | `supervisorctl restart audio-server` | Rebuild required |
 | `inspekt/` source code | **Instant** (mounted) | Rebuild required |
 | `extensions/` | Restart only (Chromium reloads) | Rebuild required |
 
@@ -150,7 +150,7 @@ The following changes **require a full container rebuild**:
 ## Correct Rebuild Procedure
 
 !!! important "Build context must be the repo root"
-    The Dockerfile uses `COPY` paths relative to the repo root (e.g., `COPY inspekt /opt/inspekt/inspekt`). Always run builds from the repo root — **not** from `docker/browser-vm/`.
+    The Dockerfile uses `COPY` paths relative to the repo root (e.g., `COPY inspekt /opt/inspekt/inspekt`). Always run builds from the repo root — **not** from `vm/`.
 
 **Using `inspekt vm` (recommended):**
 ```bash
@@ -160,7 +160,7 @@ inspekt vm restart     # Rebuilds and restarts, preserves dev mode
 **Using Docker Compose:**
 ```bash
 # From the repo root
-docker compose -f docker/browser-vm/docker-compose.yml up --build -d
+docker compose -f vm/docker-compose.yml up --build -d
 ```
 
 **Manual build:**
@@ -169,7 +169,7 @@ docker compose -f docker/browser-vm/docker-compose.yml up --build -d
 docker rm -f inspekt-browser-vm
 
 # 2. Rebuild from repo root (use --no-cache if Docker layer caching is stale)
-docker build -t inspekt-browser-vm -f docker/browser-vm/Dockerfile .
+docker build -t inspekt-browser-vm -f vm/Dockerfile .
 
 # 3. Start fresh — note: all 3 ports must be published!
 docker run -d --name inspekt-browser-vm \
@@ -357,7 +357,7 @@ docker exec inspekt-browser-vm python3 /opt/terminal-server.py
 **Common Causes:**
 
 - **Permission denied**: Host file mounted without execute permission
-  - Fix: `chmod +x docker/browser-vm/servers/terminal-server.py`
+  - Fix: `chmod +x vm/servers/terminal-server.py`
 - **Port already in use**: Previous terminal server didn't clean up
   - Fix: `docker exec inspekt-browser-vm pkill terminal-server` then restart
 - **Python module missing**: websockets not installed

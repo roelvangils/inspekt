@@ -20,7 +20,7 @@ npm init -y && npm install ninja-keys@1.2.2
 echo 'import "ninja-keys";' > entry.js
 npx esbuild entry.js --bundle --format=esm --minify --outfile=ninja-keys.bundled.min.js --target=es2020
 
-cp ninja-keys.bundled.min.js /path/to/inspekt/docker/browser-vm/vendor/ninja-keys.min.js
+cp ninja-keys.bundled.min.js /path/to/inspekt/vm/vendor/ninja-keys.min.js
 ```
 
 ## Patch 1: `dist/ninja-action.js`

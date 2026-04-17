@@ -3,7 +3,7 @@
  * Bundle CodeMirror 6 into a single IIFE file for the Inspekt Browser VM.
  *
  * Usage: node scripts/build_codemirror.mjs
- * Output: docker/browser-vm/vendor/codemirror.min.js
+ * Output: vm/vendor/codemirror.min.js
  *
  * Exposes everything on window.CM so control-panel.html can use:
  *   new CM.EditorView({ ... })
@@ -16,7 +16,7 @@ import { dirname, resolve } from "path";
 import { fileURLToPath } from "url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const outfile = resolve(__dirname, "../docker/browser-vm/vendor/codemirror.min.js");
+const outfile = resolve(__dirname, "../vm/vendor/codemirror.min.js");
 
 // Ensure output directory exists
 mkdirSync(dirname(outfile), { recursive: true });

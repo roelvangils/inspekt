@@ -13,7 +13,7 @@ HTML templates are read from /opt/pages/ and support these placeholders:
   {{ERROR_CODE}}  — Error code string (e.g. ERR_NAME_NOT_RESOLVED)
 
 Templates are plain HTML files you can freely customise.
-Location: docker/browser-vm/pages/
+Location: vm/pages/
 
 Config:
   intercept_http_errors: bool — Replace HTTP 4xx/5xx pages (default: false)

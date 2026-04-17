@@ -184,8 +184,8 @@
 <p>Three things cause most of the confusion, and they're worth naming up front:</p>
 <ul>
   <li><code>inspekt/inspekt/</code> — the outer folder is the repo; the inner is the importable Python package. This is <strong>standard Python convention</strong> (same as <code>requests/requests/</code>), not a mistake.</li>
-  <li><code>desktop-vm/</code> — <strong>not</strong> the VM. It is a <strong>Tauri native shell</strong> that loads the VM's control panel over HTTP.</li>
-  <li><code>docker/browser-vm/</code> — <strong>this</strong> is the actual VM: a Docker image running Chromium + the extension + control panel.</li>
+  <li><code>apps/desktop/</code> — <strong>not</strong> the VM. It is a <strong>Tauri native shell</strong> that loads the VM's control panel over HTTP.</li>
+  <li><code>vm/</code> — <strong>this</strong> is the actual VM: a Docker image running Chromium + the extension + control panel.</li>
 </ul>
 
 <div class="tree">
@@ -220,14 +220,14 @@
           <li class="file"><span class="label"><span class="name">headless/</span> <span class="desc">stripped-down variant (no noVNC) — looks orphaned</span></span></li>
         </ul>
       </li>
-      <li class="folder"><span class="label"><span class="name">desktop-vm/</span> <span class="tag tauri">tauri shell</span> <span class="desc">native wrapper — NOT the VM, just a webview into it</span></span>
+      <li class="folder"><span class="label"><span class="name">apps/desktop/</span> <span class="tag tauri">tauri shell</span> <span class="desc">native wrapper — NOT the VM, just a webview into it</span></span>
         <ul>
           <li class="file"><span class="label"><span class="name">src/</span> <span class="desc">Svelte launcher (Docker check, starts VM, then opens main window)</span></span></li>
           <li class="file"><span class="label"><span class="name">src-tauri/</span> <span class="desc">Rust shell; loads <code>http://localhost:6080/control.html</code> as external URL</span></span></li>
           <li class="file"><span class="label"><span class="name">src-tauri/capabilities/clipboard-remote.json</span> <span class="desc">critical — permissions for the remote VM URL</span></span></li>
         </ul>
       </li>
-      <li class="folder"><span class="label"><span class="name">desktop-pdf/</span> <span class="tag tauri">tauri app</span> <span class="desc">separate PDF-report viewer; bolted on, not part of core flow</span></span></li>
+      <li class="folder"><span class="label"><span class="name">apps/pdf-viewer/</span> <span class="tag tauri">tauri app</span> <span class="desc">separate PDF-report viewer; bolted on, not part of core flow</span></span></li>
       <li class="folder"><span class="label"><span class="name">scripts/</span> <span class="tag build">build tools</span> <span class="desc">bundle-vm, watch-extensions, build_man, build_popover_css…</span></span></li>
       <li class="folder"><span class="label"><span class="name">docs/</span> <span class="tag doc">mkdocs</span></span></li>
       <li class="folder"><span class="label"><span class="name">archive/</span> <span class="tag doc">history</span> <span class="desc">old refactoring notes — could use a README or a cull</span></span></li>
@@ -281,7 +281,7 @@
               └─ (same stack as Mode 2)
               + __TAURI_INTERNALS__
                 (clipboard, drag, notify)</div>
-    <div class="ports">Extra plumbing: <code>capabilities/clipboard-remote.json</code> gates native APIs for the remote URL.<br>Start: <code>cd desktop-vm && bun run dev</code>.</div>
+    <div class="ports">Extra plumbing: <code>capabilities/clipboard-remote.json</code> gates native APIs for the remote URL.<br>Start: <code>cd apps/desktop && bun run dev</code>.</div>
   </div>
 
 </div>
@@ -377,7 +377,7 @@
 <tr><td><code>bun run start</code></td><td><code>inspekt vm start</code></td></tr>
 <tr><td><code>bun run dev</code></td><td><code>inspekt vm restart</code></td></tr>
 
-<tr><td rowspan="3"><code>desktop-vm/package.json</code></td>
+<tr><td rowspan="3"><code>apps/desktop/package.json</code></td>
   <td><code>bun run dev</code></td><td>Vite :1421 for Svelte launcher (Tauri dev picks this up)</td></tr>
 <tr><td><code>bun run tauri dev</code></td><td>Run the Tauri shell in dev mode</td></tr>
 <tr><td><code>bun run tauri build</code></td><td>Produce signed .app / .exe / .AppImage</td></tr>
@@ -391,19 +391,19 @@
 <h2>5. What makes this confusing today</h2>
 
 <div class="grid2">
-  <div class="pain"><strong>Name collision: <code>desktop-vm/</code> vs <code>docker/browser-vm/</code></strong>. The "desktop-vm" folder contains no VM; the Docker one does. New contributors regularly guess wrong.<span class="where">fix: rename <code>desktop-vm/</code> → <code>desktop/</code> (it's a Tauri shell)</span></div>
+  <div class="pain"><strong>Name collision: <code>apps/desktop/</code> vs <code>vm/</code></strong>. The "apps/desktop" folder contains no VM; the Docker one does. New contributors regularly guess wrong.<span class="where">fix: rename <code>apps/desktop/</code> → <code>desktop/</code> (it's a Tauri shell)</span></div>
 
-  <div class="pain"><strong>Three npm/bun surfaces</strong>: root, <code>desktop-vm/</code>, <code>desktop-pdf/</code>. Each has its own <code>bun.lock</code>; none share scripts. "What do I run?" has different answers depending on which folder you happen to be in.<span class="where">fix: document the workflow at the root, or adopt a workspace (pnpm/bun workspace)</span></div>
+  <div class="pain"><strong>Three npm/bun surfaces</strong>: root, <code>apps/desktop/</code>, <code>apps/pdf-viewer/</code>. Each has its own <code>bun.lock</code>; none share scripts. "What do I run?" has different answers depending on which folder you happen to be in.<span class="where">fix: document the workflow at the root, or adopt a workspace (pnpm/bun workspace)</span></div>
 
-  <div class="pain"><strong>Control panel source ≠ what runs</strong>. Edits to <code>docker/browser-vm/control-panel.html</code> need <code>make vm-bundle</code> + <code>make vm-restart</code> to take effect. Forgetting either step silently shows stale UI.<span class="where">fix: let the container serve the un-bundled panel in dev mode</span></div>
+  <div class="pain"><strong>Control panel source ≠ what runs</strong>. Edits to <code>vm/control-panel.html</code> need <code>make vm-bundle</code> + <code>make vm-restart</code> to take effect. Forgetting either step silently shows stale UI.<span class="where">fix: let the container serve the un-bundled panel in dev mode</span></div>
 
-  <div class="pain"><strong>Extension manifest version drifts</strong> from <code>pyproject.toml</code> and <code>desktop-vm/Cargo.toml</code>. Four separate version fields with no single bump command.<span class="where">fix: one <code>VERSION</code> file + a bump script</span></div>
+  <div class="pain"><strong>Extension manifest version drifts</strong> from <code>pyproject.toml</code> and <code>apps/desktop/Cargo.toml</code>. Four separate version fields with no single bump command.<span class="where">fix: one <code>VERSION</code> file + a bump script</span></div>
 
   <div class="pain"><strong>Dockerfile does not run <code>bundle-vm.mjs</code></strong>. The build expects <code>dist/</code> to be pre-populated. A fresh clone + <code>docker build</code> ships stale assets.<span class="where">fix: add a pre-build step, or multi-stage build with a bun stage</span></div>
 
-  <div class="pain"><strong><code>docker/headless/</code> and <code>archive/</code> are orphaned</strong>. No README, no current user, no decision recorded. They raise uncertainty about what's load-bearing.<span class="where">fix: add a one-line README in each; delete if confirmed dead</span></div>
+  <div class="pain"><strong><code>vm/variants/headless/</code> and <code>archive/</code> are orphaned</strong>. No README, no current user, no decision recorded. They raise uncertainty about what's load-bearing.<span class="where">fix: add a one-line README in each; delete if confirmed dead</span></div>
 
-  <div class="pain"><strong>Two "bridges"</strong> share a name: <code>bridge_ws.py</code> (WS server) and <code>shared/core/message-bridge.js</code> (postMessage bridge). Grepping "bridge" conflates them.<span class="where">fix: rename in-extension one to <code>dom-bridge.js</code> / <code>main-world-bridge.js</code></span></div>
+  <div class="pain"><strong>Two "bridges"</strong> share a name: <code>bridge_ws.py</code> (WS server) and <code>shared/core/main-world-bridge.js</code> (postMessage bridge). Grepping "bridge" conflates them.<span class="where">fix: rename in-extension one to <code>dom-bridge.js</code> / <code>main-world-bridge.js</code></span></div>
 
   <div class="pain"><strong>No "dev everything" command</strong>. Three terminals for a full round-trip: <code>inspekt start</code>, <code>npm run watch:extensions</code>, <code>bun run tauri dev</code>. No single entry point for a new contributor.<span class="where">fix: add <code>make dev-all</code> (overmind/foreman)</span></div>
 </div>
@@ -413,12 +413,12 @@
 <table>
 <thead><tr><th>Today</th><th>Proposed</th><th>Why</th></tr></thead>
 <tbody>
-<tr><td><code>desktop-vm/</code></td><td><code>apps/desktop/</code> <em>or</em> <code>tauri-shell/</code></td><td>It's a Tauri wrapper, not a VM. Pairs with <code>apps/pdf-viewer/</code>.</td></tr>
-<tr><td><code>docker/browser-vm/</code></td><td><code>vm/</code> (top-level)</td><td>This <em>is</em> the VM. Make it unmissable. Keeps Dockerfile alongside its configs and servers.</td></tr>
-<tr><td><code>docker/headless/</code></td><td>delete or <code>vm/variants/headless/</code></td><td>Only if you actually use it. Otherwise it's noise.</td></tr>
-<tr><td><code>desktop-pdf/</code></td><td><code>apps/pdf-viewer/</code></td><td>Clarifies it's a sibling app, not part of the VM stack.</td></tr>
+<tr><td><code>apps/desktop/</code></td><td><code>apps/desktop/</code> <em>or</em> <code>tauri-shell/</code></td><td>It's a Tauri wrapper, not a VM. Pairs with <code>apps/pdf-viewer/</code>.</td></tr>
+<tr><td><code>vm/</code></td><td><code>vm/</code> (top-level)</td><td>This <em>is</em> the VM. Make it unmissable. Keeps Dockerfile alongside its configs and servers.</td></tr>
+<tr><td><code>vm/variants/headless/</code></td><td>delete or <code>vm/variants/headless/</code></td><td>Only if you actually use it. Otherwise it's noise.</td></tr>
+<tr><td><code>apps/pdf-viewer/</code></td><td><code>apps/pdf-viewer/</code></td><td>Clarifies it's a sibling app, not part of the VM stack.</td></tr>
 <tr><td><code>inspekt/inspekt/</code></td><td><strong>keep</strong></td><td>Standard Python layout; changing it breaks every import. Just document it in the root README.</td></tr>
-<tr><td><code>extensions/shared/core/message-bridge.js</code></td><td><code>main-world-bridge.js</code></td><td>Disambiguate from <code>bridge_ws.py</code>.</td></tr>
+<tr><td><code>extensions/shared/core/main-world-bridge.js</code></td><td><code>main-world-bridge.js</code></td><td>Disambiguate from <code>bridge_ws.py</code>.</td></tr>
 <tr><td><code>archive/</code></td><td><code>archive/README.md</code> + cull</td><td>Historical notes are fine, but point at the 3 that are still useful.</td></tr>
 </tbody>
 </table>
@@ -432,11 +432,11 @@
       <li class="file"><span class="label"><span class="name">inspekt/</span> <span class="tag py">python pkg</span></span></li>
       <li class="file"><span class="label"><span class="name">extensions/</span> <span class="tag ext">browser</span></span></li>
       <li class="folder"><span class="label"><span class="name">vm/</span> <span class="tag docker">docker image</span>
-        <span class="desc">= today's docker/browser-vm</span></span></li>
+        <span class="desc">= today's vm</span></span></li>
       <li class="folder"><span class="label"><span class="name">apps/</span> <span class="desc">thin shells around the core</span>
         <ul>
-          <li class="file"><span class="label"><span class="name">desktop/</span> <span class="tag tauri">tauri</span> <span class="desc">= today's desktop-vm</span></span></li>
-          <li class="file"><span class="label"><span class="name">pdf-viewer/</span> <span class="tag tauri">tauri</span> <span class="desc">= today's desktop-pdf</span></span></li>
+          <li class="file"><span class="label"><span class="name">desktop/</span> <span class="tag tauri">tauri</span> <span class="desc">= today's apps/desktop</span></span></li>
+          <li class="file"><span class="label"><span class="name">pdf-viewer/</span> <span class="tag tauri">tauri</span> <span class="desc">= today's apps/pdf-viewer</span></span></li>
         </ul></span></li>
       <li class="file"><span class="label"><span class="name">scripts/</span> <span class="tag build">build tools</span></span></li>
       <li class="file"><span class="label"><span class="name">docs/</span></span></li>
@@ -480,22 +480,22 @@
 <div class="rec"><span class="tag">NEW</span><code>make doctor</code> — prints bridge port, VM container state, image SHA vs expected, extension version in container vs source, bundle dist mtime vs control-panel.html mtime. Surfaces "you forgot to bundle" before you see stale UI.</div>
 <div class="rec"><span class="tag">NEW</span><code>make verify-extension-sync</code> — hashes <code>extensions/chrome/</code> on host and inside the running container; exits non-zero if they differ. Perfect for a CI gate and for the <code>dev-all</code> loop.</div>
 <div class="rec"><span class="tag">NEW</span>Dockerfile runs <code>bun scripts/bundle-vm.mjs</code> in a builder stage, so <code>docker build .</code> from a clean clone produces correct assets without the user remembering.</div>
-<div class="rec"><span class="tag">NEW</span>Dev mode mounts <code>extensions/chrome/</code> and <code>docker/browser-vm/{js,css,control-panel.html}</code> as volumes, so iteration loops are "save file → <code>make sync-extension</code>" with no rebuild.</div>
+<div class="rec"><span class="tag">NEW</span>Dev mode mounts <code>extensions/chrome/</code> and <code>vm/{js,css,control-panel.html}</code> as volumes, so iteration loops are "save file → <code>make sync-extension</code>" with no rebuild.</div>
 
 <h2>8. Recommendations, ranked by payoff</h2>
 
 <ol>
   <li><strong>Ship a one-page "How the pieces fit" doc</strong> (this page, essentially) and link it from <code>README.md</code>. Most of the confusion is semantic, not structural.</li>
-  <li><strong>Rename <code>desktop-vm/</code> → <code>apps/desktop/</code></strong> and <strong><code>docker/browser-vm/</code> → <code>vm/</code></strong>. Biggest cognitive win, small code impact (git mv, update Dockerfile COPY paths, <code>bundle-vm.mjs</code>, Makefile targets, docs).</li>
+  <li><strong>Rename <code>apps/desktop/</code> → <code>apps/desktop/</code></strong> and <strong><code>vm/</code> → <code>vm/</code></strong>. Biggest cognitive win, small code impact (git mv, update Dockerfile COPY paths, <code>bundle-vm.mjs</code>, Makefile targets, docs).</li>
   <li><strong>Centralise versioning</strong>: a <code>VERSION</code> file plus <code>make version NEW=…</code> that rewrites every manifest. Kill the drift at its source.</li>
   <li><strong>Fold <code>bundle-vm.mjs</code> into the Dockerfile</strong> (multi-stage build with a bun stage). Removes the silent-staleness failure mode.</li>
   <li><strong>Add <code>make dev-all</code></strong> with overmind/foreman. First-day-contributor experience becomes one command.</li>
   <li><strong>Add <code>make doctor</code> and <code>make sync-extension</code></strong>. These pay for themselves the first time someone debugs stale UI.</li>
-  <li><strong>Dispose of <code>docker/headless/</code> and annotate <code>archive/</code></strong>. Reduces "is this load-bearing?" anxiety.</li>
+  <li><strong>Dispose of <code>vm/variants/headless/</code> and annotate <code>archive/</code></strong>. Reduces "is this load-bearing?" anxiety.</li>
 </ol>
 
 <hr>
-<p style="color: var(--muted); font-size: 12px;">Generated from a read-through of the repo on 2026-04-17. Sources: <code>Makefile</code>, <code>pyproject.toml</code>, <code>package.json</code>, <code>scripts/bundle-vm.mjs</code>, <code>desktop-vm/CLAUDE.md</code>, <code>CLAUDE.md</code>, <code>extensions/EXTENSION_ARCHITECTURE.md</code>, and <code>docker/browser-vm/</code>.</p>
+<p style="color: var(--muted); font-size: 12px;">Generated from a read-through of the repo on 2026-04-17. Sources: <code>Makefile</code>, <code>pyproject.toml</code>, <code>package.json</code>, <code>scripts/bundle-vm.mjs</code>, <code>apps/desktop/CLAUDE.md</code>, <code>CLAUDE.md</code>, <code>extensions/EXTENSION_ARCHITECTURE.md</code>, and <code>vm/</code>.</p>
 
 </div>
 </body>

@@ -30,7 +30,7 @@ from inspekt.core.schemas.display import (
 
 logger = logging.getLogger(__name__)
 
-# VM control server port (matches docker/browser-vm/control-server.py)
+# VM control server port (matches vm/control-server.py)
 VM_CONTROL_PORT = 8888
 
 

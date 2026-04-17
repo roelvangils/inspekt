@@ -31,16 +31,16 @@ FIT=0.8.0
 WEBLINKS=0.9.0
 
 curl -sL "https://cdn.jsdelivr.net/npm/xterm@${XTERM}/css/xterm.css" \
-  -o docker/browser-vm/vendor/xterm.css
+  -o vm/vendor/xterm.css
 curl -sL "https://cdn.jsdelivr.net/npm/xterm@${XTERM}/lib/xterm.min.js" \
-  -o docker/browser-vm/vendor/xterm.min.js
+  -o vm/vendor/xterm.min.js
 curl -sL "https://cdn.jsdelivr.net/npm/xterm-addon-fit@${FIT}/lib/xterm-addon-fit.min.js" \
-  -o docker/browser-vm/vendor/xterm-addon-fit.min.js
+  -o vm/vendor/xterm-addon-fit.min.js
 curl -sL "https://cdn.jsdelivr.net/npm/xterm-addon-web-links@${WEBLINKS}/lib/xterm-addon-web-links.min.js" \
-  -o docker/browser-vm/vendor/xterm-addon-web-links.min.js
+  -o vm/vendor/xterm-addon-web-links.min.js
 
 # Verify downloads
-ls -la docker/browser-vm/vendor/xterm*
+ls -la vm/vendor/xterm*
 
 # Update version numbers in this file, then rebuild
 make vm-rebuild

@@ -34,7 +34,7 @@
       "js": [
         "shared/core/permissions.js",
         "shared/core/websocket-client.js",
-        "shared/core/message-bridge.js",
+        "shared/core/main-world-bridge.js",
         "shared/modules/hidden-elements.js",
         "content.js"
       ],

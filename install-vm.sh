@@ -371,14 +371,14 @@ detect_docker_runtime() {
 # ── Step 3: Get the source code ─────────────────────────────────────────────
 
 get_source() {
-  if [[ -f "docker/browser-vm/Dockerfile" ]]; then
+  if [[ -f "vm/Dockerfile" ]]; then
     # Already inside the repo (user cloned it or ran script from repo root)
     INSTALL_DIR="$(pwd)"
     success "Already in the Inspekt repo"
     return 0
   fi
 
-  if [[ -d "$INSTALL_DIR" && -f "$INSTALL_DIR/docker/browser-vm/Dockerfile" ]]; then
+  if [[ -d "$INSTALL_DIR" && -f "$INSTALL_DIR/vm/Dockerfile" ]]; then
     success "Inspekt repo found at $INSTALL_DIR"
     return 0
   fi
@@ -447,7 +447,7 @@ build_image() {
 
   if ! docker build \
     -t "$IMAGE_NAME" \
-    -f "$INSTALL_DIR/docker/browser-vm/Dockerfile" \
+    -f "$INSTALL_DIR/vm/Dockerfile" \
     "$INSTALL_DIR"; then
     echo ""
     fatal "Docker build failed. Check the output above for errors."

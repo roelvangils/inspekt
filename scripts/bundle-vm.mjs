@@ -3,13 +3,13 @@
 /**
  * Bundle control panel CSS + JS for production.
  *
- * Reads docker/browser-vm/control-panel.html, extracts file lists from
+ * Reads vm/control-panel.html, extracts file lists from
  * APP_CSS_START/END and APP_JS_START/END marker comments, concatenates
  * them in order, minifies with esbuild, and writes:
  *
- *   docker/browser-vm/dist/control.html  (production HTML with bundle refs)
- *   docker/browser-vm/dist/app.min.css   (all app CSS, minified)
- *   docker/browser-vm/dist/app.min.js    (all app JS, minified)
+ *   vm/dist/control.html  (production HTML with bundle refs)
+ *   vm/dist/app.min.css   (all app CSS, minified)
+ *   vm/dist/app.min.js    (all app JS, minified)
  *
  * Usage: bun scripts/bundle-vm.mjs
  */
@@ -21,7 +21,7 @@ import { transformSync } from "esbuild";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const projectRoot = resolve(__dirname, "..");
-const vmDir = resolve(projectRoot, "docker/browser-vm");
+const vmDir = resolve(projectRoot, "vm");
 const distDir = resolve(vmDir, "dist");
 
 // --- Parse HTML markers ---

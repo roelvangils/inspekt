@@ -56,7 +56,7 @@ inspekt vm restart         # Same auto-detection on restart
 
 ```bash
 # Build the image (from project root)
-docker build -t inspekt-browser-vm -f docker/browser-vm/Dockerfile .
+docker build -t inspekt-browser-vm -f vm/Dockerfile .
 
 # Run with host networking (recommended for macOS/OrbStack)
 docker run -d --network host --shm-size=2g --name inspekt-vm inspekt-browser-vm

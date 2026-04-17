@@ -4,7 +4,7 @@
 # Includes Chrome and common fonts for consistent rendering.
 #
 # Build:
-#   docker build -t inspekt-headless -f docker/headless/Dockerfile .
+#   docker build -t inspekt-headless -f vm/variants/headless/Dockerfile .
 #
 # Usage:
 #   docker run --rm inspekt-headless inspekt screenshot node \

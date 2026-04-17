@@ -3,7 +3,7 @@
 # Based on Alpine Linux for minimal image size
 #
 # Build from project root:
-#   docker build -t inspekt-browser-vm -f docker/browser-vm/Dockerfile .
+#   docker build -t inspekt-browser-vm -f vm/Dockerfile .
 #   docker run -d --network host --shm-size=2g inspekt-browser-vm
 #   Open http://localhost:6080/control.html in your browser
 
@@ -285,7 +285,7 @@ RUN for cmd in eval exec repl plugin yolo domain vm do mcp autostart open edit; 
     done
 
 # Copy proxy-scripts early (needed by allowed-bin setup below)
-COPY docker/browser-vm/proxy-scripts /opt/proxy-scripts
+COPY vm/proxy-scripts /opt/proxy-scripts
 
 # 2) Allowed system utilities — curated symlinks
 #    Removed dangerous utils: awk (system()), env (exec), less (!sh escape),
@@ -371,7 +371,7 @@ RUN mkdir -p /opt/inspekt/allowed-bin && \
         > /opt/inspekt/allowed-bin/man && chmod +x /opt/inspekt/allowed-bin/man
 
 # Inspekt config must be copied before the permissions step that copies it to /home/inspekt
-COPY docker/browser-vm/inspekt-config.yaml /root/.config/inspekt.yaml
+COPY vm/inspekt-config.yaml /root/.config/inspekt.yaml
 
 # File permissions for restricted user
 RUN chmod -R a+rX /opt/inspekt/.venv && \
@@ -383,40 +383,40 @@ RUN chmod -R a+rX /opt/inspekt/.venv && \
     chown -R inspekt:inspekt /home/inspekt
 
 # Copy VM configuration files
-COPY docker/browser-vm/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
-COPY docker/browser-vm/config/openbox-autostart /root/.config/openbox/autostart
-COPY docker/browser-vm/config/openbox-rc.xml /root/.config/openbox/rc.xml
-COPY docker/browser-vm/entrypoint.sh /entrypoint.sh
-COPY docker/browser-vm/servers/control-server.py /opt/control-server.py
-COPY docker/browser-vm/servers/terminal-server.py /opt/terminal-server.py
+COPY vm/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+COPY vm/config/openbox-autostart /root/.config/openbox/autostart
+COPY vm/config/openbox-rc.xml /root/.config/openbox/rc.xml
+COPY vm/entrypoint.sh /entrypoint.sh
+COPY vm/servers/control-server.py /opt/control-server.py
+COPY vm/servers/terminal-server.py /opt/terminal-server.py
 # Production: use bundled control panel (built by scripts/bundle-vm.mjs)
-COPY docker/browser-vm/dist/control.html /usr/share/novnc/control.html
-COPY docker/browser-vm/dist/app.min.css /usr/share/novnc/dist/app.min.css
-COPY docker/browser-vm/dist/app.min.js /usr/share/novnc/dist/app.min.js
-COPY docker/browser-vm/css /usr/share/novnc/css
-COPY docker/browser-vm/fonts /usr/share/novnc/fonts
-COPY docker/browser-vm/vendor/codemirror.min.js /usr/share/novnc/vendor/codemirror.min.js
-COPY docker/browser-vm/vendor/ninja-keys.min.js /usr/share/novnc/vendor/ninja-keys.min.js
-COPY docker/browser-vm/vendor/sortable.min.js /usr/share/novnc/vendor/sortable.min.js
-COPY docker/browser-vm/vendor/xterm.css /usr/share/novnc/vendor/xterm.css
-COPY docker/browser-vm/vendor/xterm.min.js /usr/share/novnc/vendor/xterm.min.js
-COPY docker/browser-vm/vendor/xterm-addon-fit.min.js /usr/share/novnc/vendor/xterm-addon-fit.min.js
-COPY docker/browser-vm/vendor/xterm-addon-web-links.min.js /usr/share/novnc/vendor/xterm-addon-web-links.min.js
-COPY docker/browser-vm/js /usr/share/novnc/js
-COPY docker/browser-vm/scripts/inspekt-chromium.sh /opt/inspekt-chromium.sh
-COPY docker/browser-vm/scripts/devtools-manager.sh /opt/devtools-manager.sh
-COPY docker/browser-vm/config/xorg.conf /etc/X11/xorg.conf
-COPY docker/browser-vm/scripts/resize-display.sh /opt/resize-display.sh
-COPY docker/browser-vm/scripts/download.sh /usr/local/bin/download
-COPY docker/browser-vm/servers/audio-server.py /opt/audio-server.py
-COPY docker/browser-vm/config/pulse-config.pa /etc/pulse/default.pa
-COPY docker/browser-vm/proxy-scripts /opt/proxy-scripts
-COPY docker/browser-vm/pages /opt/pages
+COPY vm/dist/control.html /usr/share/novnc/control.html
+COPY vm/dist/app.min.css /usr/share/novnc/dist/app.min.css
+COPY vm/dist/app.min.js /usr/share/novnc/dist/app.min.js
+COPY vm/css /usr/share/novnc/css
+COPY vm/fonts /usr/share/novnc/fonts
+COPY vm/vendor/codemirror.min.js /usr/share/novnc/vendor/codemirror.min.js
+COPY vm/vendor/ninja-keys.min.js /usr/share/novnc/vendor/ninja-keys.min.js
+COPY vm/vendor/sortable.min.js /usr/share/novnc/vendor/sortable.min.js
+COPY vm/vendor/xterm.css /usr/share/novnc/vendor/xterm.css
+COPY vm/vendor/xterm.min.js /usr/share/novnc/vendor/xterm.min.js
+COPY vm/vendor/xterm-addon-fit.min.js /usr/share/novnc/vendor/xterm-addon-fit.min.js
+COPY vm/vendor/xterm-addon-web-links.min.js /usr/share/novnc/vendor/xterm-addon-web-links.min.js
+COPY vm/js /usr/share/novnc/js
+COPY vm/scripts/inspekt-chromium.sh /opt/inspekt-chromium.sh
+COPY vm/scripts/devtools-manager.sh /opt/devtools-manager.sh
+COPY vm/config/xorg.conf /etc/X11/xorg.conf
+COPY vm/scripts/resize-display.sh /opt/resize-display.sh
+COPY vm/scripts/download.sh /usr/local/bin/download
+COPY vm/servers/audio-server.py /opt/audio-server.py
+COPY vm/config/pulse-config.pa /etc/pulse/default.pa
+COPY vm/proxy-scripts /opt/proxy-scripts
+COPY vm/pages /opt/pages
 
 # Shell config with inspekt completion
-COPY docker/browser-vm/config/bashrc /root/.bashrc
-COPY docker/browser-vm/config/inputrc /root/.inputrc
-COPY docker/browser-vm/config/zshrc /root/.zshrc
+COPY vm/config/bashrc /root/.bashrc
+COPY vm/config/inputrc /root/.inputrc
+COPY vm/config/zshrc /root/.zshrc
 
 # Copy Python binary into venv (not symlink) so inspekt CLI works
 # after chmod o-x on system Python. This must run BEFORE chmod.
@@ -446,14 +446,14 @@ RUN chmod o-x /usr/bin/python3 /usr/bin/python3.12 2>/dev/null; \
 # ZDOTDIR tells zsh where to look for startup files. By pointing it to a
 # root-owned directory, the user cannot create/modify .zshenv, .zshrc, etc.
 RUN mkdir -p /etc/inspekt-shell
-COPY docker/browser-vm/config/zshrc-restricted /etc/inspekt-shell/.zshrc
+COPY vm/config/zshrc-restricted /etc/inspekt-shell/.zshrc
 RUN touch /etc/inspekt-shell/.zshenv && \
     chown -R root:root /etc/inspekt-shell && \
     chmod 755 /etc/inspekt-shell && \
     chmod 644 /etc/inspekt-shell/.zshrc /etc/inspekt-shell/.zshenv
 
 # Replace noVNC base CSS with custom minimal theme
-COPY docker/browser-vm/novnc-base.css /usr/share/novnc/app/styles/base.css
+COPY vm/novnc-base.css /usr/share/novnc/app/styles/base.css
 
 # Write version info for the `about` command (needs root to query chromium)
 RUN mkdir -p /etc/inspekt-versions && \

@@ -249,8 +249,8 @@ The JSON cache stores the full `SitemapResult`:
 | `inspekt/app/api/routers/sitemap.py` | API layer: 3 FastAPI endpoints, recursive tree builder, BFS enrichment, 404 detection |
 | `inspekt/app/api/server.py` | Router registration at `/api/sitemaps` |
 | `inspekt/app/cli/sitemap.py` | CLI command: tree display, interactive picker, cache-aware title fetching |
-| `docker/browser-vm/control-panel.html` | Frontend: auto-fetch, tree pre-loading, recursive submenu builder, abort controller |
-| `docker/browser-vm/js/context-menu.js` | Generic context menu system (recursive submenus, depth limit of 6) |
+| `vm/control-panel.html` | Frontend: auto-fetch, tree pre-loading, recursive submenu builder, abort controller |
+| `vm/js/context-menu.js` | Generic context menu system (recursive submenus, depth limit of 6) |
 
 ## Design Decisions
 

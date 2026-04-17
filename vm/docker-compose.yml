@@ -2,7 +2,7 @@ services:
   browser:
     build:
       context: ../..
-      dockerfile: docker/browser-vm/Dockerfile
+      dockerfile: vm/Dockerfile
     container_name: inspekt-browser
     ports:
       - "6080:6080"   # noVNC web UI

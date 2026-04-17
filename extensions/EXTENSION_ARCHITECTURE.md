@@ -16,7 +16,7 @@ extensions/
 │   ├── core/
 │   │   ├── permissions.js           # Domain permission manager
 │   │   ├── websocket-client.js      # WebSocket connection handler
-│   │   └── message-bridge.js        # Window message bridge pattern
+│   │   └── main-world-bridge.js        # Window message bridge pattern
 │   └── popup/
 │       ├── popup-base.html          # Popup UI template
 │       ├── popup-base.css           # Popup styling (cross-browser)
@@ -86,7 +86,7 @@ extensions/
   InspektWebSocketClient.isConnected()
   ```
 
-#### `shared/core/message-bridge.js`
+#### `shared/core/main-world-bridge.js`
 - **Purpose**: Window message bridge for MAIN world ↔ content script communication
 - **Features**:
   - Enables MAIN world scripts to access extension APIs
@@ -180,7 +180,7 @@ Firefox now includes shared modules in manifest.json:
     "js": [
       "../shared/core/permissions.js",
       "../shared/core/websocket-client.js",
-      "../shared/core/message-bridge.js",
+      "../shared/core/main-world-bridge.js",
       "content.js"
     ]
   }
@@ -202,7 +202,7 @@ Update `extensions/chrome/manifest.json`:
     "js": [
       "../shared/core/permissions.js",
       "../shared/core/websocket-client.js",
-      "../shared/core/message-bridge.js",
+      "../shared/core/main-world-bridge.js",
       "content.js"
     ]
   }
@@ -324,4 +324,4 @@ When adding browser-specific features:
 
 - [Chrome Extension MV3 Docs](https://developer.chrome.com/docs/extensions/mv3/)
 - [Firefox WebExtensions Docs](https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/)
-- [Window Message Bridge Pattern](https://github.com/roelvangils/inspekt/blob/main/CLAUDE.md#window-message-bridge-pattern)
+- [Window Message Bridge Pattern](https://github.com/roelvangils/inspekt/blob/main/CLAUDE.md#window-main-world-bridge-pattern)

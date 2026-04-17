@@ -37,7 +37,7 @@ REQUIRED_FILES=(
     "../shared/popup/popup-base.css"
     "../shared/core/permissions.js"
     "../shared/core/websocket-client.js"
-    "../shared/core/message-bridge.js"
+    "../shared/core/main-world-bridge.js"
     "../shared/modules/hidden-elements.js"
     "css/material-icons.css"
     "fonts/material-icons.woff2"

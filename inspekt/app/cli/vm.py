@@ -23,17 +23,18 @@ NOVNC_PORT = 6080
 CONTROL_PORT = 8888
 VM_PORTS = [6080, 6081, 8767, 8768, 8889, 9222]  # All ports the VM uses
 
-# Path to docker/browser-vm directory
+# Path to vm directory
 def get_vm_dir() -> Path:
-    """Get the path to the browser-vm directory."""
-    # Try to find it relative to the package
-    package_dir = Path(__file__).parent.parent.parent.parent
-    vm_dir = package_dir / "docker" / "browser-vm"
+    """Get the path to the vm/ directory (at the repo root)."""
+    # Try to find it relative to the package: <repo>/inspekt/app/cli/vm.py
+    # → repo root is four parents up.
+    repo_root = Path(__file__).parent.parent.parent.parent
+    vm_dir = repo_root / "vm"
     if vm_dir.exists():
         return vm_dir
 
     # Fallback: try current working directory
-    cwd_vm_dir = Path.cwd() / "docker" / "browser-vm"
+    cwd_vm_dir = Path.cwd() / "vm"
     if cwd_vm_dir.exists():
         return cwd_vm_dir
 
@@ -49,8 +50,7 @@ def _is_dev_environment() -> bool:
     """
     vm_dir = get_vm_dir()
     if vm_dir:
-        project_root = vm_dir.parent.parent
-        # Check for pyproject.toml (indicates source repo)
+        project_root = vm_dir.parent
         return (project_root / "pyproject.toml").exists()
     return False
 
@@ -223,8 +223,8 @@ def _verify_vm_serving_correctly(timeout: int = 10) -> tuple[bool, str | None]:
 
 def _build_image(vm_dir: Path) -> bool:
     """Build the Docker image."""
-    # Build from project root with Dockerfile in docker/browser-vm
-    project_root = vm_dir.parent.parent
+    # Build from project root; Dockerfile sits in vm/.
+    project_root = vm_dir.parent
     dockerfile_path = vm_dir / "Dockerfile"
 
     # Bundle control panel assets (CSS + JS → minified bundles)
@@ -259,7 +259,7 @@ def _start_container(dev_mode: bool = False, vm_dir: Path = None) -> bool:
 
     Args:
         dev_mode: If True, mount source files for live editing.
-        vm_dir: Path to the browser-vm directory (required if dev_mode is True).
+        vm_dir: Path to the vm/ directory (required if dev_mode is True).
     """
     if dev_mode:
         click.echo("  • Starting container in development mode...")
@@ -290,7 +290,7 @@ def _start_container(dev_mode: bool = False, vm_dir: Path = None) -> bool:
 
     # Add volume mounts for development mode
     if dev_mode and vm_dir:
-        project_root = vm_dir.parent.parent
+        project_root = vm_dir.parent
 
         # Disable Python bytecode caching so mounted source files are always used
         # Without this, Python uses stale .pyc files from the Docker build
@@ -464,7 +464,7 @@ def start(rebuild, no_open, dev, no_dev):
     # Get VM directory
     vm_dir = get_vm_dir()
     if not vm_dir:
-        click.echo("Error: Could not find docker/browser-vm directory", err=True)
+        click.echo("Error: Could not find vm directory", err=True)
         click.echo("\nMake sure you're in the Inspekt project directory or have it installed properly.", err=True)
         sys.exit(1)
 
@@ -597,7 +597,7 @@ def restart(rebuild, dev, no_dev):
     # Get VM directory
     vm_dir = get_vm_dir()
     if not vm_dir:
-        click.echo("Error: Could not find docker/browser-vm directory", err=True)
+        click.echo("Error: Could not find vm directory", err=True)
         sys.exit(1)
 
     # Auto-detect dev environment

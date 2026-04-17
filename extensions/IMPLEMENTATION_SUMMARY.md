@@ -14,7 +14,7 @@ Created a reusable codebase that both Chrome and Firefox extensions can benefit 
   - Updates `window.__INSPEKT_WS_CONNECTED__` status
   - Handles visibility-based connect/disconnect
 
-- **`shared/core/message-bridge.js`** (130 lines)
+- **`shared/core/main-world-bridge.js`** (130 lines)
   - Window message bridge pattern for MAIN world → extension communication
   - Pre-configured handlers for:
     - `INSPEKT_GET_COOKIES_ENHANCED` (chrome.cookies API access)
@@ -46,7 +46,7 @@ Updated Firefox extension from v4.0.0 to v4.2.1 with critical bug fixes and shar
     "js": [
 +     "../shared/core/permissions.js",
 +     "../shared/core/websocket-client.js",
-+     "../shared/core/message-bridge.js",
++     "../shared/core/main-world-bridge.js",
       "content.js"
     ]
   }]
@@ -115,7 +115,7 @@ shared/
 ├── core/
 │   ├── permissions.js           [280 lines] Cross-browser domain management
 │   ├── websocket-client.js      [220 lines] WebSocket + keepalive
-│   └── message-bridge.js        [130 lines] MAIN world ↔ extension bridge
+│   └── main-world-bridge.js        [130 lines] MAIN world ↔ extension bridge
 └── popup/
     ├── popup-base.html          [100 lines] Popup UI
     ├── popup-base.css           [340 lines] Styling
@@ -164,7 +164,7 @@ Update `extensions/chrome/manifest.json` to use shared modules:
   "js": [
     "../shared/core/permissions.js",
     "../shared/core/websocket-client.js",
-    "../shared/core/message-bridge.js",
+    "../shared/core/main-world-bridge.js",
     "content.js"
   ]
 }]

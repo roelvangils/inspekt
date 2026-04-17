@@ -31,7 +31,7 @@ Tauri's permission system distinguishes between **local** (bundled frontend) and
 
 ## The Bridge (Control Server)
 
-The control server (`docker/browser-vm/servers/control-server.py`) on port **8888** is the bridge between the control panel JS and the Inspekt CLI running inside the Docker container.
+The control server (`vm/servers/control-server.py`) on port **8888** is the bridge between the control panel JS and the Inspekt CLI running inside the Docker container.
 
 ### Pattern: Running Inspekt commands
 ```javascript
@@ -89,4 +89,4 @@ For the VM window, prefer plugin commands over custom commands since they just n
 | `capabilities/*.json` | Restart `bun run tauri dev` |
 | `Cargo.toml` | Restart `bun run tauri dev` |
 
-Note: `make vm-restart` must be run from `/Users/demo/Repos/inspekt` (repo root), not from `desktop-vm/`.
+Note: `make vm-restart` must be run from `/Users/demo/Repos/inspekt` (repo root), not from `apps/desktop/`.
