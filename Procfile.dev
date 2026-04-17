@@ -1,4 +1,4 @@
 cli:       inspekt start
-extension: node scripts/watch-extensions.js
-vm:        bun scripts/bundle-vm.mjs
+extension: bun scripts/watch-extensions.js
+vm:        bun scripts/bundle-vm.mjs --watch
 desktop:   cd apps/desktop && bun run tauri dev

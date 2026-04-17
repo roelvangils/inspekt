@@ -135,7 +135,7 @@ dev-cli:
 	inspekt start
 
 dev-extension:
-	@node scripts/watch-extensions.js
+	@bun scripts/watch-extensions.js
 
 dev-vm:
 	@echo "• Bundling control panel on change (Ctrl+C to stop)"
