@@ -108,7 +108,7 @@
     @keyframes inspekt-typing-dots {
       0%, 20% { content: '.'; }
       40% { content: '..'; }
-      60%, 100% { content: '...'; }
+      60%, 100% { content: '…'; }
     }
 
     #inspekt-overlay {
@@ -165,7 +165,7 @@
     }
 
     #inspekt-typing::after {
-      content: '...';
+      content: '…';
       animation: inspekt-typing-dots 1s steps(1) infinite;
     }
 
@@ -2012,7 +2012,7 @@
      * Format a step for display in the overlay
      */
     formatStep(step) {
-      if (!step) return 'Starting replay...';
+      if (!step) return 'Starting replay…';
 
       const action = step.action || 'unknown';
       const target = step.target || {};
@@ -2061,7 +2061,7 @@
       // Format based on action type
       if (action === 'navigate') {
         const url = step.url || '';
-        const shortUrl = url.length > 40 ? url.substring(0, 40) + '...' : url;
+        const shortUrl = url.length > 40 ? url.substring(0, 40) + '…' : url;
         return `${icon} Navigate to ${shortUrl}`;
       }
 
@@ -2122,7 +2122,7 @@
       if (action === 'jsdialog') {
         const dialogType = step.dialog_type || 'alert';
         const message = step.message || '';
-        const shortMessage = message.length > 30 ? message.substring(0, 30) + '...' : message;
+        const shortMessage = message.length > 30 ? message.substring(0, 30) + '…' : message;
         const typeLabels = { alert: 'Alert', confirm: 'Confirm', prompt: 'Prompt' };
         const typeLabel = typeLabels[dialogType] || dialogType;
         if (message) {
@@ -2578,7 +2578,7 @@
      * Show assertion overlay in "checking" state
      */
     showChecking(expect, mainCorner) {
-      const message = expect?.message || this.generateDescription(expect) || 'Checking assertions...';
+      const message = expect?.message || this.generateDescription(expect) || 'Checking assertions…';
       const details = this.generateDescription(expect);
 
       this.show({

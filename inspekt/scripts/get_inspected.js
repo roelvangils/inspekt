@@ -63,7 +63,7 @@
     let textContent = element.textContent || '';
     textContent = textContent.trim();
     if (textContent.length > 100) {
-        textContent = textContent.substring(0, 100) + '...';
+        textContent = textContent.substring(0, 100) + '…';
     }
 
     // Compute accessible name following ARIA specification
@@ -103,7 +103,7 @@
             const label = document.querySelector(`label[for="${el.id}"]`);
             if (label) {
                 name = label.textContent.trim();
-                source = '<label for="..."> element';
+                source = '<label for="…"> element';
                 return { name, source };
             }
         }

@@ -866,7 +866,7 @@ class PDFBasicChecker:
             return self._make_result(
                 "title",
                 "pass",
-                f"Document title is set and displayed: \"{title[:50]}{'...' if len(title) > 50 else ''}\"",
+                f"Document title is set and displayed: \"{title[:50]}{'…' if len(title) > 50 else ''}\"",
                 {"title": title, "display_doc_title": True},
             )
         elif has_title and not display_doc_title:
@@ -1510,7 +1510,7 @@ class VeraPDFChecker:
                     "Try: brew install verapdf (for native ARM64 support)"
                 )
             else:
-                error_msg = f"Failed to parse veraPDF output: {json_output[:150]}..."
+                error_msg = f"Failed to parse veraPDF output: {json_output[:150]}…"
 
             return VeraPDFResult(
                 profile=profile,

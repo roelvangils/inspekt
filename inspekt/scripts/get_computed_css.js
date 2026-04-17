@@ -454,8 +454,8 @@
      * Get default styles for a tag by creating a temporary element.
      *
      * For certain elements, we need to include attributes that affect default styling:
-     * - <a href="...">: links have different cursor/text-decoration than plain <a>
-     * - <input type="...">: different types have different defaults
+     * - <a href="…">: links have different cursor/text-decoration than plain <a>
+     * - <input type="…">: different types have different defaults
      * - <button>: has different defaults than other elements
      */
     function getDefaultStyles(tagName, element) {

@@ -87,8 +87,8 @@ The command automatically handles common scenarios:
 | Scenario | Adjustment | Feedback |
 |----------|------------|----------|
 | Element off-screen | Scrolls into view | ` Element was scrolled into view before capture.` |
-| Element larger than viewport | Uses CDP fallback | ` Element (1500×2000) exceeds viewport...` |
-| Very large element (>10000px) | Captures with warning | ` Large element captured: 12000×800...` |
+| Element larger than viewport | Uses CDP fallback | ` Element (1500×2000) exceeds viewport…` |
+| Very large element (>10000px) | Captures with warning | ` Large element captured: 12000×800…` |
 
 ### Options
 
@@ -410,7 +410,7 @@ inspekt screenshot node -s ".card" -o form-blur.png --redact-style blur
 |---------|---------|
 | Credit card numbers | `4532 1234 5678 9012` |
 | US Social Security Numbers | `123-45-6789` |
-| JWT tokens | `eyJhbGciOiJIUzI1NiIs...` |
+| JWT tokens | `eyJhbGciOiJIUzI1NiIs…` |
 | AWS access keys | `AKIAIOSFODNN7EXAMPLE` |
 | Long API keys | 32+ character alphanumeric strings |
 

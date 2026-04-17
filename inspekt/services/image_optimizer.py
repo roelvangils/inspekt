@@ -54,8 +54,8 @@ def install_oxipng_via_cargo() -> bool:
         click.echo("Then run: cargo install oxipng", err=True)
         return False
 
-    click.echo("\n📦 Installing oxipng via cargo...")
-    click.echo("This may take a few minutes...")
+    click.echo("\n📦 Installing oxipng via cargo…")
+    click.echo("This may take a few minutes…")
 
     try:
         # Run cargo install oxipng

@@ -58,7 +58,7 @@ def _truncate(s: str, max_len: int) -> str:
     """Truncate string to max length with ellipsis."""
     if len(s) <= max_len:
         return s
-    return s[: max_len - 3] + "..."
+    return s[: max_len - 3] + "…"
 
 
 def _display_table(entries: list, show_domain: bool = False, summary: dict = None):

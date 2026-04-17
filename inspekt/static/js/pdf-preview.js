@@ -10,7 +10,7 @@
  *
  * Usage:
  *   const preview = new PDFInteractivePreview(containerId, {
- *     pageImage: 'data:image/png;base64,...',
+ *     pageImage: 'data:image/png;base64,…',
  *     tags: [...],
  *     imageWidth: 1275,  // Pre-calculated: pageWidth * (dpi / 72)
  *     imageHeight: 1650, // Pre-calculated: pageHeight * (dpi / 72)
@@ -1787,7 +1787,7 @@ class PDFInteractivePreview {
         let textPreviewSection = '';
         if (tag.text_preview) {
             const isTruncated = tag.text_preview.length >= 200;
-            const displayText = this.escapeHtml(tag.text_preview) + (isTruncated ? '...' : '');
+            const displayText = this.escapeHtml(tag.text_preview) + (isTruncated ? '…' : '');
             const langCode = tag.detected_language || (typeof DOCUMENT_LANGUAGE !== 'undefined' ? DOCUMENT_LANGUAGE : 'en');
             textPreviewSection = `
                 <div class="detail-section">

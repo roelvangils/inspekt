@@ -23,7 +23,7 @@ This guide explains how to install the Inspekt extension permanently in Firefox.
 ### Steps:
 
 1. Navigate to `about:debugging#/runtime/this-firefox`
-2. Click "Load Temporary Add-on..."
+2. Click "Load Temporary Add-on…"
 3. Select `manifest.json` from the `extensions/firefox/` directory
 
 **Note:** You'll need to repeat these steps each time you restart Firefox.
@@ -76,7 +76,7 @@ This creates `build/zen-browser-bridge-4.0.0.xpi`
 **Option B: File Picker**
 1. Navigate to `about:addons`
 2. Click the gear icon (⚙️)
-3. Select "Install Add-on From File..."
+3. Select "Install Add-on From File…"
 4. Choose `build/zen-browser-bridge-4.0.0.xpi`
 5. Click "Add" when prompted
 

@@ -363,7 +363,7 @@ class AIIntegrationService:
         """
         try:
             # Download the image
-            click.echo(f"Downloading image from {image_url[:80]}...", err=True)
+            click.echo(f"Downloading image from {image_url[:80]}…", err=True)
             response = requests.get(image_url, timeout=10)
             response.raise_for_status()
 
@@ -482,7 +482,7 @@ class AIIntegrationService:
             return None
 
         # Call AI
-        click.echo("Generating description...", err=True)
+        click.echo("Generating description…", err=True)
         return self.call_thoth_text(full_prompt)
 
     def generate_summary(

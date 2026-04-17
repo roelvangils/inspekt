@@ -370,7 +370,7 @@ function renderMetaTab(d) {
             html += row(esc(name), esc(content));
         });
         if (d.metaTags.length > 15) {
-            html += row('...', `+${d.metaTags.length - 15} more`);
+            html += row('…', `+${d.metaTags.length - 15} more`);
         }
     }
     return html;
@@ -404,7 +404,7 @@ function renderSecurityTab(d) {
     return [
         row('HTTPS', d.isSecure ? badge('Secure', 'good') : badge('Not Secure', 'bad')),
         row('Mixed Content', d.hasMixedContent ? badge('Detected', 'bad') : badge('None', 'good')),
-        row('CSP (meta)', d.cspMeta ? esc(d.cspMeta).substring(0, 80) + (d.cspMeta.length > 80 ? '...' : '') : '—'),
+        row('CSP (meta)', d.cspMeta ? esc(d.cspMeta).substring(0, 80) + (d.cspMeta.length > 80 ? '…' : '') : '—'),
         row('Referrer Policy', d.referrerPolicy ? esc(d.referrerPolicy) : '—'),
     ].join('');
 }

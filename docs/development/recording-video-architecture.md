@@ -63,7 +63,7 @@ sequenceDiagram
 
     User->>Browser: Type text
     Browser->>Extension: input/keydown events
-    Extension->>Bridge: POST /action {type: type, value: "..."}
+    Extension->>Bridge: POST /action {type: type, value: "…"}
     Bridge->>CLI: WebSocket message
 
     User->>Browser: Press Tab

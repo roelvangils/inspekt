@@ -857,7 +857,7 @@ def _format_detailed_violation_output(violations: list[dict], url: str, rule_id:
             click.echo(click.style("   HTML:", bold=True))
             # Truncate very long HTML snippets
             if len(html) > 200:
-                html = html[:197] + "..."
+                html = html[:197] + "…"
             click.echo(f"   {click.style(html, fg='bright_black')}")
             click.echo()
 
@@ -4530,7 +4530,7 @@ def _extract_engine_rule_details(engine_results: dict, engine_list: list[str]) -
                     rule_groups[rule_id] = {"count": 0, "message": issue.get("message", ""), "nodes": []}
                 rule_groups[rule_id]["count"] += 1
                 if len(rule_groups[rule_id]["nodes"]) < 10:
-                    # path can be a dict {"dom": "..."} or a plain string
+                    # path can be a dict {"dom": "…"} or a plain string
                     path = issue.get("path", "")
                     if isinstance(path, dict):
                         dom_path = path.get("dom", "")
@@ -5390,7 +5390,7 @@ def a11y(engines, list_engines, level, output_format, timeout, show_passes, incl
                     code = axe_script.replace("OPTIONS_PLACEHOLDER", json_module.dumps(axe_options))
 
                     if not output_format:
-                        click.echo("Running axe-core audit...", err=True)
+                        click.echo("Running axe-core audit…", err=True)
 
                     result = await ctx.execute_script(code)
 

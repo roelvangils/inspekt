@@ -772,7 +772,7 @@
 
                 <div class="search-box">
                     <span class="search-icon material-icons md-18">search</span>
-                    <input type="text" class="search-input" id="search-input" placeholder="Search plugins..." oninput="filterPlugins()">
+                    <input type="text" class="search-input" id="search-input" placeholder="Search plugins…" oninput="filterPlugins()">
                 </div>
 
                 <div class="filter-row">
@@ -818,7 +818,7 @@
 
                 <div class="form-group">
                     <label for="plugin-credits">Credits</label>
-                    <textarea id="plugin-credits" placeholder="Original author, source URL, license..."></textarea>
+                    <textarea id="plugin-credits" placeholder="Original author, source URL, license…"></textarea>
                 </div>
 
                 <div class="form-group" style="flex: 1;">
@@ -1355,7 +1355,7 @@
 
             try {
                 btn.disabled = true;
-                textEl.textContent = 'Formatting...';
+                textEl.textContent = 'Formatting…';
 
                 const formatted = await prettier.format(code, {
                     parser: 'babel',
@@ -1651,7 +1651,7 @@
 
             const btn = document.getElementById('save-btn');
             btn.disabled = true;
-            btn.innerHTML = '<span class="loading"></span> Saving...';
+            btn.innerHTML = '<span class="loading"></span> Saving…';
 
             try {
                 const response = await fetch(`${API_BASE}/${selectedPluginId}`, {
@@ -1696,7 +1696,7 @@
             const textEl = document.getElementById('test-btn-text');
 
             btn.disabled = true;
-            textEl.innerHTML = '<span class="loading"></span> Running...';
+            textEl.innerHTML = '<span class="loading"></span> Running…';
 
             // Show console panel
             document.getElementById('console-panel').style.display = 'block';

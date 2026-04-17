@@ -164,7 +164,7 @@ Webctl implements multiple security layers for domain control, sensitive data ha
 
 **Sensitive Data Redaction** (`redaction.py:9-56` [4]):
 ```python
-SENSITIVE_LABELS = r"password|secret|token|api_key|..."
+SENSITIVE_LABELS = r"password|secret|token|api_key|…"
 PATTERNS = [
     r"\d{4}[- ]?\d{4}[- ]?\d{4}[- ]?\d{4}",  # Credit cards
     r"\d{3}-\d{2}-\d{4}",                      # SSN
@@ -190,7 +190,7 @@ Inspekt uses localhost binding and a domain permission system, but lacks enforce
 ```python
 # Permission-based (not enforcement):
 add_domain("example.com")     # Add to allowlist
-is_domain_allowed("...")      # Check permission
+is_domain_allowed("…")      # Check permission
 enable_yolo_mode(60)          # Bypass all checks for 60 minutes
 
 # Key difference: Inspekt PROMPTS user, webctl BLOCKS navigation
@@ -216,7 +216,7 @@ enable_yolo_mode(60)          # Bypass all checks for 60 minutes
 **[REC-SEC-1] ADOPT: Domain Policy Enforcement** (High Priority)
 - Add `DomainPolicy` class with allow/deny/both modes
 - Check policy BEFORE executing JavaScript, not just prompting
-- Return error if domain blocked: `{"error": "domain_blocked", "reason": "..."}`
+- Return error if domain blocked: `{"error": "domain_blocked", "reason": "…"}`
 - **Benefit**: Prevents accidental execution on malicious sites
 - **Reference**: `webctl/security/domain_policy.py:58-83` [2]
 

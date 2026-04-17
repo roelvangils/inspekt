@@ -320,7 +320,7 @@ Article content here...
 **JSON output:**
 ```json
 {
-  "markdown": "---\ntitle: Article Title\n...",
+  "markdown": "---\ntitle: Article Title\n…",
   "metadata": {
     "title": "Article Title",
     "author": "Jane Doe",

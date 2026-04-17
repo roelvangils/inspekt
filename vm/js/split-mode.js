@@ -246,7 +246,7 @@ function connectTerminal() {
         return;
     }
     terminalInitialized = true;
-    console.log('[Terminal] Initializing connection...');
+    console.log('[Terminal] Initializing connection…');
 
     const container = document.getElementById('terminalContainer');
 

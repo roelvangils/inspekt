@@ -140,7 +140,7 @@ def format_percent_filter(value: float | None, decimals: int = 0) -> str:
         return f"{value:.{decimals}f}%"
 
 
-def truncate_text_filter(text: str | None, length: int = 50, suffix: str = "...") -> str:
+def truncate_text_filter(text: str | None, length: int = 50, suffix: str = "…") -> str:
     """
     Truncate text to a maximum length.
 

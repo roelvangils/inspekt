@@ -616,9 +616,9 @@ def check(ctx, files: tuple[str, ...], engine: str, profile: str, json_output: b
             # Fall back to Docker
             if pull_vera or not vera_checker.is_image_available():
                 if not vera_checker.is_image_available():
-                    click.echo(f"Pulling veraPDF Docker image ({VeraPDFChecker.DOCKER_IMAGE})...")
+                    click.echo(f"Pulling veraPDF Docker image ({VeraPDFChecker.DOCKER_IMAGE})…")
                 elif pull_vera:
-                    click.echo(f"Updating veraPDF Docker image...")
+                    click.echo(f"Updating veraPDF Docker image…")
 
                 if not vera_checker.pull_image(quiet=json_output):
                     print_error("Failed to pull veraPDF Docker image")

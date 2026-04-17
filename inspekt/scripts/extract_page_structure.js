@@ -49,7 +49,7 @@
       return cleanText(match[0].trim());
     }
     // If no sentence ending found, return first 150 chars
-    const truncated = text.substring(0, 150) + (text.length > 150 ? '...' : '');
+    const truncated = text.substring(0, 150) + (text.length > 150 ? '…' : '');
     return cleanText(truncated);
   }
 

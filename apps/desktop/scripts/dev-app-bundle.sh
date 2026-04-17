@@ -23,7 +23,7 @@ CONTENTS="${APP_DIR}/Contents"
 rm -rf ~/Library/WebKit/be.fronteers.inspekt-browser-vm ~/Library/Caches/be.fronteers.inspekt-browser-vm 2>/dev/null || true
 
 # Start Vite dev server in background (serves preferences.html etc.)
-echo "Starting Vite dev server..."
+echo "Starting Vite dev server…"
 bun run vite --port 1421 &
 VITE_PID=$!
 trap "kill $VITE_PID 2>/dev/null" EXIT
@@ -37,7 +37,7 @@ for i in $(seq 1 30); do
 done
 
 # Build the debug binary
-echo "Building debug binary..."
+echo "Building debug binary…"
 cargo build --manifest-path src-tauri/Cargo.toml
 
 # Create .app structure
@@ -81,7 +81,7 @@ else
 fi
 
 echo "Built: ${APP_DIR}"
-echo "Opening app (Vite server running in background, Ctrl+C to stop)..."
+echo "Opening app (Vite server running in background, Ctrl+C to stop)…"
 open "${APP_DIR}"
 
 # Keep script alive so Vite stays running until Ctrl+C

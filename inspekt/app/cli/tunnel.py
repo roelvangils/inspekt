@@ -66,7 +66,7 @@ def _ensure_bore(verbose: bool = False) -> str:
             click.echo(f"  bore client v{version} found")
         return str(manager.binary_path)
 
-    click.echo("  Downloading bore tunnel client...")
+    click.echo("  Downloading bore tunnel client…")
     try:
         path = manager.install()
         version = manager.get_installed_version() or "unknown"

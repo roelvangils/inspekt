@@ -184,7 +184,7 @@ def _first_sentence(text: str) -> str:
         return ""
     # Restrict to the first paragraph so we don't pull a sentence from a
     # later one when the first paragraph happens to be a single sentence
-    # without a trailing space (e.g. "...page.\n\nAnalyzes...").
+    # without a trailing space (e.g. "...page.\n\nAnalyzes…").
     first_para = text.split("\n\n", 1)[0].strip()
     for sep in (". ", ".\n"):
         idx = first_para.find(sep)
@@ -448,7 +448,7 @@ def _render_arguments_table(arguments: list[dict]) -> str:
     for arg in arguments:
         metavar = arg.get("metavar") or arg["name"].upper()
         nargs = arg.get("nargs", 1)
-        suffix = "..." if nargs == -1 else ""
+        suffix = "…" if nargs == -1 else ""
         required = "required" if arg.get("required") else "optional"
         lines.append(f"*{metavar}*{suffix}")
         lines.append(f":   {required} {arg.get('type', 'TEXT').lower()} argument")
@@ -496,7 +496,7 @@ def _format_command_synopsis(name: str, meta: dict) -> str:
     for arg in meta.get("arguments", []):
         metavar = arg.get("metavar") or arg["name"].upper()
         nargs = arg.get("nargs", 1)
-        suffix = "..." if nargs == -1 else ""
+        suffix = "…" if nargs == -1 else ""
         if arg.get("required"):
             parts.append(f"*{metavar}*{suffix}")
         else:
@@ -505,7 +505,7 @@ def _format_command_synopsis(name: str, meta: dict) -> str:
 
 
 def _format_group_synopsis(name: str) -> str:
-    return f"**inspekt** **{name}** [*OPTIONS*] *SUBCOMMAND* [*ARGS*]..."
+    return f"**inspekt** **{name}** [*OPTIONS*] *SUBCOMMAND* [*ARGS*]…"
 
 
 def _render_description(meta: dict, cmd_def: Any, registry: Any) -> str:

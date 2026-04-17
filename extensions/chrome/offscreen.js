@@ -27,7 +27,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
     // Video capture: Start recording
     if (message.type === 'OFFSCREEN_START_VIDEO_CAPTURE') {
-        console.log('[Offscreen] Starting video capture...');
+        console.log('[Offscreen] Starting video capture…');
         startVideoCapture(message.streamId, message.settings)
             .then(() => {
                 console.log('[Offscreen] Video capture started successfully');
@@ -42,7 +42,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
     // Video capture: Stop recording and get video data
     if (message.type === 'OFFSCREEN_STOP_VIDEO_CAPTURE') {
-        console.log('[Offscreen] Stopping video capture...');
+        console.log('[Offscreen] Stopping video capture…');
         stopVideoCapture()
             .then((videoData) => {
                 console.log('[Offscreen] Video capture stopped, data size:', videoData?.size || 0);
@@ -67,7 +67,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }
 
     if (message.type === 'OFFSCREEN_COPY_IMAGE') {
-        console.log('[Offscreen] Processing clipboard copy request...');
+        console.log('[Offscreen] Processing clipboard copy request…');
 
         copyImageToClipboard(message.dataUrl)
             .then(() => {
@@ -121,7 +121,7 @@ async function copyImageToClipboard(dataUrl) {
  * @returns {Promise<void>}
  */
 async function writeImageToClipboardViaDOM(blob) {
-    console.log('[Offscreen] Using button-click workaround for clipboard write...');
+    console.log('[Offscreen] Using button-click workaround for clipboard write…');
 
     return new Promise((resolve, reject) => {
         // Create a button that will trigger the clipboard write
@@ -135,7 +135,7 @@ async function writeImageToClipboardViaDOM(blob) {
         // Add click handler that does the clipboard write
         button.addEventListener('click', async () => {
             try {
-                console.log('[Offscreen] Button clicked, writing to clipboard...');
+                console.log('[Offscreen] Button clicked, writing to clipboard…');
 
                 // Create ClipboardItem with the image
                 const clipboardItem = new ClipboardItem({
@@ -158,7 +158,7 @@ async function writeImageToClipboardViaDOM(blob) {
         });
 
         // Programmatically click the button to trigger the handler
-        console.log('[Offscreen] Programmatically clicking button...');
+        console.log('[Offscreen] Programmatically clicking button…');
         button.click();
     });
 }
@@ -259,7 +259,7 @@ async function startVideoCapture(streamId, settings = {}) {
  * @returns {Promise<object>} Object with base64 video data and metadata
  */
 async function stopVideoCapture() {
-    console.log('[Offscreen] Stopping video capture...');
+    console.log('[Offscreen] Stopping video capture…');
 
     if (!mediaRecorder) {
         console.log('[Offscreen] No active recording');

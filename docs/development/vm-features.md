@@ -72,7 +72,7 @@ Connect your **local** Chrome DevTools to the VM browser. Click the **DevTools**
 ### Option 1: Direct Connection (Local/Trusted Network)
 
 1. Open `chrome://inspect/#devices` in your local Chrome
-2. Click "Configure..." next to "Discover network targets"
+2. Click "Configure…" next to "Discover network targets"
 3. Add `localhost:9222` (or `<vm-host>:9222`)
 4. Click "inspect" on the VM browser target
 
@@ -494,7 +494,7 @@ The control server (port 8888) provides a REST API for browser control:
 | `/back` | GET | Navigate back |
 | `/forward` | GET | Navigate forward |
 | `/reload-page` | GET | Reload current page |
-| `/navigate?url=...` | GET | Navigate to URL |
+| `/navigate?url=…` | GET | Navigate to URL |
 | `/url` | GET | Get current URL |
 
 ### Tab Management
@@ -502,7 +502,7 @@ The control server (port 8888) provides a REST API for browser control:
 | Endpoint | Method | Description |
 |----------|--------|-------------|
 | `/tabs` | GET | List all tabs |
-| `/tabs/new?url=...` | GET | Create new tab |
+| `/tabs/new?url=…` | GET | Create new tab |
 | `/tabs/{id}/activate` | GET | Switch to tab |
 | `/tabs/{id}/close` | GET | Close tab |
 | `/tabs/{id}/screenshot` | GET | Capture tab screenshot |

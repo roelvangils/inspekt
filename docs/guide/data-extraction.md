@@ -388,7 +388,7 @@ The `--compact` flag creates documentation-friendly HTML by removing:
 - Base64 content → `[DATA]`
 - Long random strings → `[STRING]`
 - Empty comments
-- Long text (20+ words) → `...`
+- Long text (20+ words) → `…`
 
 **Example:**
 ```bash

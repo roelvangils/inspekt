@@ -51,7 +51,7 @@
                 // Truncate long HTML
                 htmlSnippet = msg.element.outerHTML;
                 if (htmlSnippet.length > 500) {
-                    htmlSnippet = htmlSnippet.substring(0, 500) + '...';
+                    htmlSnippet = htmlSnippet.substring(0, 500) + '…';
                 }
             }
 

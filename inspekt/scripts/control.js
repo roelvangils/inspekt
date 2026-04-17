@@ -309,7 +309,7 @@
         console.log('[Zen Bridge] Existing selectors:', window.__ZEN_CONTROL_REFOCUS_SELECTORS__);
 
         if (autoRefocus === 'always' || autoRefocus === 'only-spa') {
-            console.log('[Zen Bridge] Setting up auto-refocus...');
+            console.log('[Zen Bridge] Setting up auto-refocus…');
             // Store the current URL to detect navigation
             window.__ZEN_CONTROL_INITIAL_URL__ = location.href;
 
@@ -421,7 +421,7 @@
                 console.log('[Zen Bridge] Stored selectors:', window.__ZEN_CONTROL_REFOCUS_SELECTORS__);
                 // Wait a bit for the page to settle, then trigger
                 setTimeout(() => {
-                    console.log('[Zen Bridge] Executing delayed refocus trigger...');
+                    console.log('[Zen Bridge] Executing delayed refocus trigger…');
                     refocusHandler();
                 }, 100);
             } else {
@@ -621,7 +621,7 @@
 
                 // Store opening message for verbose output
                 if (verbose && elementName) {
-                    window.__ZEN_CONTROL_OPENING_MESSAGE__ = `Opening '${elementName}'...`;
+                    window.__ZEN_CONTROL_OPENING_MESSAGE__ = `Opening '${elementName}'…`;
                 }
 
                 const performClick = () => {

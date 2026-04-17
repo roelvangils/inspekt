@@ -33,7 +33,7 @@ class TestPressCommandCLI:
         """Calling press with no arguments shows an error."""
         result = runner.invoke(cli, ["press"])
         assert result.exit_code != 0
-        # Click will show "Missing argument 'KEYS...'"
+        # Click will show "Missing argument 'KEYS…'"
 
     def test_invalid_key_shows_error(self, runner):
         """Invalid key names produce a clear error message."""

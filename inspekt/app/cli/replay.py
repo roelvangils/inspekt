@@ -2494,7 +2494,7 @@ def replay(
         # Apply zoom matching if requested
         if match_zoom_level and zoom_mismatch:
             if verbose:
-                click.echo(format_system_message(f"Setting zoom level to {recorded_zoom:.0%}..."))
+                click.echo(format_system_message(f"Setting zoom level to {recorded_zoom:.0%}…"))
 
             set_zoom_code = f"""
             (async () => {{
@@ -2550,7 +2550,7 @@ def replay(
             target_height = recorded_viewport.height
 
             if verbose:
-                click.echo(format_system_message(f"Resizing viewport to {target_width}×{target_height}..."))
+                click.echo(format_system_message(f"Resizing viewport to {target_width}×{target_height}…"))
 
             # Import config functions for caching
             from inspekt.config import get_viewport_offsets, save_viewport_offsets
@@ -2617,7 +2617,7 @@ def replay(
                     resize_success = True
                 elif actual_w is not None:
                     if verbose:
-                        click.echo(format_system_message(f"Cached offsets outdated (got {actual_w}×{actual_h}), calibrating..."))
+                        click.echo(format_system_message(f"Cached offsets outdated (got {actual_w}×{actual_h}), calibrating…"))
                     cached_offsets = None  # Fall through to calibration
 
             # Calibration loop if cached offsets didn't work
@@ -2707,7 +2707,7 @@ def replay(
             target_height = viewport.height
 
             if verbose:
-                click.echo(format_system_message(f"Restoring viewport to {target_width}x{target_height}..."))
+                click.echo(format_system_message(f"Restoring viewport to {target_width}x{target_height}…"))
 
             # Try to resize the browser window
             resize_code = f"""
@@ -2759,7 +2759,7 @@ def replay(
         starting_url = recording.metadata.starting_url
         if starting_url:
             if verbose:
-                click.echo(format_system_message(f"Navigating to {starting_url}..."))
+                click.echo(format_system_message(f"Navigating to {starting_url}…"))
 
             # Navigate to the starting URL
             nav_code = f"""
@@ -2808,7 +2808,7 @@ def replay(
             # Verify preconditions if present
             if recording.preconditions and recording.preconditions.required:
                 if verbose:
-                    click.echo(format_system_message("Checking preconditions..."))
+                    click.echo(format_system_message("Checking preconditions…"))
 
                 for precondition in recording.preconditions.required:
                     check_code = f"""
@@ -2840,7 +2840,7 @@ def replay(
             if verify_checksum and recording.state.checksum:
                 import hashlib
                 if verbose:
-                    click.echo(format_system_message("Verifying DOM checksum..."))
+                    click.echo(format_system_message("Verifying DOM checksum…"))
 
                 checksum_code = """
                     (function() {
@@ -2871,7 +2871,7 @@ def replay(
             should_restore_cookies = restore_state or restore_cookies
             if should_restore_cookies and recording.state.cookies:
                 if verbose:
-                    click.echo(format_system_message("Restoring cookies..."))
+                    click.echo(format_system_message("Restoring cookies…"))
 
                 try:
                     cookies_json = base64.b64decode(recording.state.cookies).decode()
@@ -2956,7 +2956,7 @@ def replay(
                 scroll_x = recording.state.scroll.x
                 scroll_y = recording.state.scroll.y
                 if verbose:
-                    click.echo(format_system_message(f"Restoring scroll position to ({scroll_x}, {scroll_y})..."))
+                    click.echo(format_system_message(f"Restoring scroll position to ({scroll_x}, {scroll_y})…"))
 
                 scroll_code = f"window.scrollTo({scroll_x}, {scroll_y})"
                 client.execute(scroll_code, timeout=2.0)
@@ -3050,7 +3050,7 @@ def replay(
                         )
                         click.echo(
                             click.style("  Press Enter", fg="cyan", bold=True)
-                            + " to start playback..."
+                            + " to start playback…"
                         )
                         input()
                         # Resume audio context after user interaction
@@ -3578,7 +3578,7 @@ def replay(
             timeout_ms = step.wait_for.timeout or 5000  # Default 5 seconds
 
             if verbose and not progress:
-                click.echo(format_system_message(f"waiting for condition (timeout: {timeout_ms}ms)..."))
+                click.echo(format_system_message(f"waiting for condition (timeout: {timeout_ms}ms)…"))
 
             wait_result = wait_for_condition(
                 client,
@@ -4074,9 +4074,9 @@ def replay(
                         if navigated or may_navigate:
                             if verbose:
                                 if navigated:
-                                    click.echo(format_system_message("Waiting for page to load..."))
+                                    click.echo(format_system_message("Waiting for page to load…"))
                                 elif may_navigate:
-                                    click.echo(format_system_message("Link clicked, checking for navigation..."))
+                                    click.echo(format_system_message("Link clicked, checking for navigation…"))
 
                             # Wait for the page to be fully loaded (document.readyState === 'complete')
                             # Use shorter timeout for mayNavigate since it might not actually navigate
@@ -4194,7 +4194,7 @@ def replay(
             # Check if this step was the most recent failure
             if result.failures and result.failures[-1]["step"] == actual_index + 1:
                 click.echo()
-                click.secho("    Paused on failure. Press Enter to continue, 'q' to quit...", fg="yellow")
+                click.secho("    Paused on failure. Press Enter to continue, 'q' to quit…", fg="yellow")
                 user_input = click.getchar()
                 if user_input.lower() == 'q':
                     click.echo("\n    Replay aborted by user.")

@@ -81,7 +81,7 @@ state:
   viewport:
     width: 1920
     height: 1080
-  checksum: "sha256:a1b2c3d4e5f6..."
+  checksum: "sha256:a1b2c3d4e5f6…"
 ```
 
 The checksum is a SHA-256 hash of the DOM structure (tags only, ignoring text content and attributes). This helps detect when page structure has changed.
@@ -106,7 +106,7 @@ metadata:
   created_at: "2025-12-12T10:30:00+00:00"
   duration_ms: 45200
   starting_url: "https://example.com"
-  user_agent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)..."
+  user_agent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)…"
   recorded_on:
     platform: "darwin"
     browser: "Chrome"
@@ -120,10 +120,10 @@ state:
   scroll:
     x: 0
     y: 250
-  cookies: "W3sibmFtZSI6InNlc3Npb24iLC..."    # Base64-encoded JSON
+  cookies: "W3sibmFtZSI6InNlc3Npb24iLC…"    # Base64-encoded JSON
   local_storage: "eyJ0aGVtZSI6ImRhcmsifQ=="   # Base64-encoded JSON
   session_storage: "eyJjYXJ0IjoiW10ifQ=="      # Base64-encoded JSON
-  checksum: "sha256:a1b2c3d4e5f6g7h8i9j0..."   # DOM structure hash
+  checksum: "sha256:a1b2c3d4e5f6g7h8i9j0…"   # DOM structure hash
 
 preconditions:
   required:
@@ -148,7 +148,7 @@ steps:
 | `cookies` | string | Base64-encoded JSON array of cookie objects |
 | `local_storage` | string | Base64-encoded JSON object of key-value pairs |
 | `session_storage` | string | Base64-encoded JSON object of key-value pairs |
-| `checksum` | string | DOM structure hash (`sha256:...`) |
+| `checksum` | string | DOM structure hash (`sha256:…`) |
 
 ### Storage Format
 

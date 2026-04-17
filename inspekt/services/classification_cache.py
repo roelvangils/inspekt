@@ -202,13 +202,13 @@ class ClassificationCache:
 
             # Check cache version - invalidate if format changed
             if cached.cache_version != CURRENT_CACHE_VERSION:
-                logger.debug(f"Cache version mismatch for bytes hash {image_hash[:8]}...")
+                logger.debug(f"Cache version mismatch for bytes hash {image_hash[:8]}…")
                 cache_path.unlink(missing_ok=True)
                 return None
 
             # Check if expired
             if cached.is_expired(self.ttl_days):
-                logger.debug(f"Cache expired for bytes hash {image_hash[:8]}...")
+                logger.debug(f"Cache expired for bytes hash {image_hash[:8]}…")
                 cache_path.unlink(missing_ok=True)
                 return None
 
@@ -218,7 +218,7 @@ class ClassificationCache:
                 cache_path.unlink(missing_ok=True)
                 return None
 
-            logger.debug(f"Cache hit for bytes hash {image_hash[:8]}...")
+            logger.debug(f"Cache hit for bytes hash {image_hash[:8]}…")
             return cached.to_classification_result()
 
         except Exception as e:
@@ -265,7 +265,7 @@ class ClassificationCache:
                 json.dump(asdict(cached), f, indent=2)
 
             temp_path.rename(cache_path)
-            logger.debug(f"Cached classification for bytes hash {image_hash[:8]}...")
+            logger.debug(f"Cached classification for bytes hash {image_hash[:8]}…")
             return True
 
         except Exception as e:
@@ -636,7 +636,7 @@ class AltTextCache:
 
             # Check if expired
             if cached.is_expired(self.ttl_days):
-                logger.debug(f"Alt-text cache expired for {image_hash[:8]}...")
+                logger.debug(f"Alt-text cache expired for {image_hash[:8]}…")
                 cache_path.unlink(missing_ok=True)
                 return None
 

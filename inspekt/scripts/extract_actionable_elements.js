@@ -92,7 +92,7 @@
     // Try text content (truncated)
     const text = el.textContent.trim().replace(/\s+/g, ' ');
     if (text && text.length < 200) return text;
-    if (text && text.length >= 200) return text.substring(0, 197) + '...';
+    if (text && text.length >= 200) return text.substring(0, 197) + '…';
 
     return '';
   }

@@ -59,8 +59,8 @@ class AxeUpdater:
             Dictionary with version info or None if check fails
             {
                 "version": "4.12.0",
-                "tarball": "https://...",
-                "shasum": "abc123...",
+                "tarball": "https://…",
+                "shasum": "abc123…",
                 "release_date": "2025-10-09T16:39:18.813Z"
             }
         """
@@ -274,21 +274,21 @@ class AxeUpdater:
                 return False, "Unable to check for updates (network error)"
             return False, f"Already on latest version ({current})"
 
-        progress(f"Downloading axe-core@{latest}...")
+        progress(f"Downloading axe-core@{latest}…")
 
         # Download new version
         temp_path = self.download_version(latest)
         if not temp_path:
             return False, "Download failed"
 
-        progress("Verifying integrity...")
+        progress("Verifying integrity…")
 
         # Backup current version
         if not self.backup_current_version():
             temp_path.unlink(missing_ok=True)
             return False, "Failed to backup current version"
 
-        progress("Installing...")
+        progress("Installing…")
 
         # Install new version
         if not self.install_version(temp_path, latest):
@@ -296,7 +296,7 @@ class AxeUpdater:
             self.restore_backup()
             return False, "Installation failed"
 
-        progress("Testing...")
+        progress("Testing…")
 
         # Test installation
         if not self.test_installation():

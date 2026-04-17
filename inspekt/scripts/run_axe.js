@@ -1836,7 +1836,7 @@
         // Load and apply CSS Anchor Positioning polyfill AFTER badges/popovers are created
         if (interactiveBadges && badgeStats.badgesCreated > 0 && needsPolyfill) {
             try {
-                console.log('[Inspekt] CSS Anchor Positioning not supported, setting up polyfill...');
+                console.log('[Inspekt] CSS Anchor Positioning not supported, setting up polyfill…');
 
                 // Generate dynamic CSS rules for each badge/popover pair
                 // The polyfill parses stylesheets, so we need anchor positioning in CSS, not inline styles
@@ -1861,7 +1861,7 @@
                 console.log('[Inspekt] Injected anchor positioning CSS for', badges.length, 'badges');
 
                 // Load the auto-applying polyfill
-                console.log('[Inspekt] Loading CSS Anchor Positioning polyfill...');
+                console.log('[Inspekt] Loading CSS Anchor Positioning polyfill…');
                 const polyfillScript = document.createElement('script');
                 polyfillScript.src = 'https://unpkg.com/@oddbird/css-anchor-positioning@0.8.0/dist/css-anchor-positioning.umd.cjs';
                 document.head.appendChild(polyfillScript);

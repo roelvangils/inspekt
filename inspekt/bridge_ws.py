@@ -2321,7 +2321,7 @@ async def handle_http_navigate(request):
 
         # Send to browser
         await most_recent_connection.send_json(message)
-        print(f"[Bridge /navigate] Message sent, waiting for callback...")
+        print(f"[Bridge /navigate] Message sent, waiting for callback…")
 
         # Wait for response (with timeout - navigation can take longer)
         event = asyncio.Event()
@@ -3165,9 +3165,9 @@ async def handle_screencast_start(request):
         "type": "START_SCREENCAST"
     }
 
-    print(f"[Bridge] Sending START_SCREENCAST to browser, requestId={request_id[:8]}...")
+    print(f"[Bridge] Sending START_SCREENCAST to browser, requestId={request_id[:8]}…")
     await most_recent_connection.send_json(message)
-    print(f"[Bridge] START_SCREENCAST sent, waiting for acknowledgment...")
+    print(f"[Bridge] START_SCREENCAST sent, waiting for acknowledgment…")
 
     # Wait for acknowledgment
     event = asyncio.Event()

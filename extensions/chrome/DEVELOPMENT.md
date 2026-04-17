@@ -29,7 +29,7 @@ After making changes to any extension files, follow these steps to test:
 
 1. Check the connection indicator in the Inspekt panel header
 2. Should show **"Connected"** (green dot) when server is running
-3. If showing "Checking..." or "Disconnected", check:
+3. If showing "Checking…" or "Disconnected", check:
    - Server is running (`inspekt server start`)
    - No JavaScript errors in DevTools console
    - Check page console for WebSocket connection logs
@@ -48,7 +48,7 @@ To debug the Inspekt panel itself:
 
 ### Common Issues
 
-#### "Checking..." Status Persists
+#### "Checking…" Status Persists
 
 **Cause**: Extension not reloaded or cached version still active
 
@@ -197,7 +197,7 @@ The extension operates in multiple JavaScript contexts:
 
 ### Connection Status Not Updating
 
-**Symptom**: Shows "Checking..." despite WebSocket connected
+**Symptom**: Shows "Checking…" despite WebSocket connected
 
 **Check**:
 1. Extension reloaded in `chrome://extensions/`

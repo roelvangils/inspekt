@@ -88,7 +88,7 @@ class HeadlessAPIServer:
         print()
 
         # Pre-warm Chrome pool
-        print("Warming up Chrome pool...")
+        print("Warming up Chrome pool…")
         await HeadlessChromePool.warmup()
         print("Ready!")
         print()
@@ -410,7 +410,7 @@ async def main():
     try:
         await server.start()
     except KeyboardInterrupt:
-        print("\nShutting down...")
+        print("\nShutting down…")
         await server.stop()
 
 

@@ -23,7 +23,7 @@ let harLog = null;
  * Captures all network requests for HAR export
  */
 function initNetworkMonitoring() {
-    console.log('[Inspekt DevTools] Initializing network monitoring...');
+    console.log('[Inspekt DevTools] Initializing network monitoring…');
 
     // Listen for completed network requests
     chrome.devtools.network.onRequestFinished.addListener((request) => {
@@ -373,7 +373,7 @@ function connectToBackground() {
     });
 
     backgroundConnection.onDisconnect.addListener(() => {
-        console.log('[Inspekt DevTools] Disconnected from background, reconnecting...');
+        console.log('[Inspekt DevTools] Disconnected from background, reconnecting…');
         backgroundConnection = null;
         // Reconnect after a short delay
         setTimeout(connectToBackground, 1000);

@@ -82,7 +82,7 @@ Tree nodes created:
   root (stad.gent)      ← full_path="/"
     └── nl               ← full_path="/nl"           entry=None  (VIRTUAL)
          └── burgerzaken  ← full_path="/nl/burgerzaken"  entry=None  (VIRTUAL)
-              └── identiteitskaart  ← entry=SitemapEntry(loc="https://...")
+              └── identiteitskaart  ← entry=SitemapEntry(loc="https://…")
 ```
 
 Only the **deepest node** gets the `SitemapEntry` attached. Intermediate path segments are "virtual" nodes — they exist for tree structure but don't have a corresponding entry in the sitemap XML.

@@ -65,8 +65,8 @@ class IbmUpdater:
             Dictionary with version info or None if check fails
             {
                 "version": "3.1.72",
-                "tarball": "https://...",
-                "shasum": "abc123...",
+                "tarball": "https://…",
+                "shasum": "abc123…",
                 "release_date": "2025-10-09T16:39:18.813Z"
             }
         """
@@ -288,21 +288,21 @@ class IbmUpdater:
             return False, f"Already on latest version ({current})"
 
         action = "Installing" if current is None else "Downloading"
-        progress(f"{action} IBM Equal Access@{latest}...")
+        progress(f"{action} IBM Equal Access@{latest}…")
 
         # Download new version
         temp_path = self.download_version(latest)
         if not temp_path:
             return False, "Download failed"
 
-        progress("Verifying integrity...")
+        progress("Verifying integrity…")
 
         # Backup current version (if exists)
         if not self.backup_current_version():
             temp_path.unlink(missing_ok=True)
             return False, "Failed to backup current version"
 
-        progress("Installing...")
+        progress("Installing…")
 
         # Install new version
         if not self.install_version(temp_path, latest):
@@ -310,7 +310,7 @@ class IbmUpdater:
             self.restore_backup()
             return False, "Installation failed"
 
-        progress("Testing...")
+        progress("Testing…")
 
         # Test installation
         if not self.test_installation():

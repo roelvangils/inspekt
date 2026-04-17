@@ -1441,7 +1441,7 @@ def process_download_files(recording: Recording, filepath: Path) -> None:
 
         # Truncate data URLs (they contain the full file content which is redundant)
         if download_info.url and download_info.url.startswith("data:"):
-            # Extract just the MIME type from data URL, e.g., "data:application/json;base64,..."
+            # Extract just the MIME type from data URL, e.g., "data:application/json;base64,…"
             # becomes "data:application/json (content saved to external_path)"
             mime_part = download_info.url.split(",")[0] if "," in download_info.url else download_info.url
             download_info.url = f"{mime_part} (content saved to external_path)"
@@ -3172,7 +3172,7 @@ def record(
                 inactivity_warning_shown = True
 
             try:
-                debug_log("Sending poll request...")
+                debug_log("Sending poll request…")
                 # Always target the specific browser tab where recording started
                 result = client.execute(poll_code, timeout=2.0, browser_index=recording_browser_index)
                 debug_log(f"Poll result: ok={result.get('ok')}, has_result={result.get('result') is not None}")
@@ -3412,7 +3412,7 @@ def record(
                                 pass
 
                         resume_code = get_resume_code(elapsed_ms)
-                        debug_log("Sending resume command...")
+                        debug_log("Sending resume command…")
                         # Target the specific browser tab where recording started
                         resume_result = client.execute(resume_code, timeout=5.0, browser_index=recording_browser_index)
                         debug_log(f"Resume result: ok={resume_result.get('ok')}, result={resume_result.get('result')}")

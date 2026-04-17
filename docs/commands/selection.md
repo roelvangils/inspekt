@@ -360,7 +360,7 @@ The `--compact` flag transforms HTML into documentation-friendly output by remov
 | **Security** | `nonce` values | `[NONCE]` |
 | **IDs** | Long `id`, `for`, `name`, `aria-*` attributes | Truncated with `…` |
 | **Binary** | Base64-encoded content | `[DATA]` |
-| **Graphics** | SVG `<path d="...">` data | `[PATH DATA]` |
+| **Graphics** | SVG `<path d="…">` data | `[PATH DATA]` |
 | **Graphics** | Polygon/polyline points | `[POINTS]` |
 | **Hashes** | Long random strings (20+ chars) | `[STRING]` |
 | **Comments** | Empty HTML comments | Removed |
@@ -474,14 +474,14 @@ Here's a real-world example showing all compact transformations:
 
 Notice how:
 
-- **Classes and styles removed** — No `class="..."` or `style="..."` clutter
+- **Classes and styles removed** — No `class="…"` or `style="…"` clutter
 - **Data attributes removed** — `data-testid`, `data-analytics-id` gone
 - **URLs truncated** — Long paths become `https://example.com/first/…/last`
 - **srcset preserved** — URLs shortened but `1x`, `2x` descriptors kept
 - **Event handlers replaced** — `onclick="trackClick(event)"` → `onclick="[JAVASCRIPT]"`
 - **Long IDs truncated** — `ember-view-12345-article-container-wrapper` → `ember-view-12345-article-co…`
 - **Long aria-* truncated** — References to long IDs are also shortened
-- **Integrity hashes hidden** — `sha384-...` → `[HASH]`
+- **Integrity hashes hidden** — `sha384-…` → `[HASH]`
 - **Nonces hidden** — Random values → `[NONCE]`
 - **SVG paths simplified** — Complex path data → `[PATH DATA]`
 - **Long text truncated** — Paragraphs over 20 words → `…`

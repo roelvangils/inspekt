@@ -22,7 +22,7 @@ However, Inspekt tools are better when you need:
 We've enhanced all tool descriptions to be more compelling and explicitly mention advantages over simple HTTP fetch.
 
 **Key improvements**:
-- `navigate_to_url`: Now says "Use this instead of simple HTTP fetch when you need..."
+- `navigate_to_url`: Now says "Use this instead of simple HTTP fetch when you need…"
 - `extract_links`: Says "Better than parsing HTML as it uses the live DOM"
 - `extract_outline`: Says "Use this when asked about page structure, headings, or outline"
 
@@ -96,13 +96,13 @@ Use language that triggers browser tool usage:
 
 | Phrase | Likely Tool |
 |--------|-------------|
-| "Fetch from..." | Built-in Fetch |
-| "Navigate to..." | navigate_to_url |
-| "Open in browser..." | navigate_to_url |
-| "Use the browser to..." | Inspekt tools |
-| "Extract from current page..." | Inspekt tools |
-| "Get links from..." | Could be either |
-| "Get links from the browser..." | extract_links |
+| "Fetch from…" | Built-in Fetch |
+| "Navigate to…" | navigate_to_url |
+| "Open in browser…" | navigate_to_url |
+| "Use the browser to…" | Inspekt tools |
+| "Extract from current page…" | Inspekt tools |
+| "Get links from…" | Could be either |
+| "Get links from the browser…" | extract_links |
 
 ---
 

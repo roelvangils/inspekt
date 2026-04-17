@@ -89,7 +89,7 @@ function openDevToolsInVM() {
 // Run Inspekt command via the control server bridge and copy output to clipboard.
 async function runInspektForClipboard(command, label) {
     try {
-        showToast(`Copying ${label}...`);
+        showToast(`Copying ${label}…`);
         const response = await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/inspekt/${encodeURIComponent(command)}`);
         const data = await response.json();
         if (data.ok && data.output) {
@@ -106,7 +106,7 @@ async function runInspektForClipboard(command, label) {
 // Run a slow Inspekt command (AI-powered) with persistent loading toast
 async function runInspektAI(command, loadingLabel, successLabel) {
     try {
-        showToast(`${loadingLabel}...`, '', 60000);  // persistent toast during AI processing
+        showToast(`${loadingLabel}…`, '', 60000);  // persistent toast during AI processing
         const response = await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/inspekt/${encodeURIComponent(command)}`);
         const data = await response.json();
         if (data.ok && data.output) {
@@ -126,7 +126,7 @@ let _lastScreenshotRegion = null;  // { x, y, w, h } in VM CSS pixels
 // Download a screenshot from the given endpoint
 async function screenshotToDownload(endpoint, filename) {
     try {
-        showToast('Capturing screenshot...', '', 15000);
+        showToast('Capturing screenshot…', '', 15000);
         const resp = await fetch(`http://${VNC_HOST}:${CONTROL_PORT}${endpoint}`);
         const data = await resp.json();
         if (!data.ok) { showToast(data.error || 'Screenshot failed', 'error'); return; }
@@ -370,7 +370,7 @@ function showAskDialog(scope) {
 // Run Inspekt command
 async function runInspekt(command) {
     document.querySelectorAll('.dropdown-menu').forEach(m => m.classList.remove('show'));
-    showToast(`Running inspekt ${command}...`);
+    showToast(`Running inspekt ${command}…`);
 
     try {
         const response = await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/inspekt/${command}`);

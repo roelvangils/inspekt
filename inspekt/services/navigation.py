@@ -75,7 +75,7 @@ async def navigate(
 
     # If failed and on macOS, try AppleScript fallback
     if not result["success"] and use_applescript_fallback and platform.system() == "Darwin":
-        logger.info("Bridge navigation failed, trying AppleScript fallback...")
+        logger.info("Bridge navigation failed, trying AppleScript fallback…")
 
         try:
             from inspekt.services.applescript_navigation import navigate_applescript

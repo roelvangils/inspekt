@@ -76,7 +76,7 @@ def save_local(filename: str, data: dict) -> None:
 
 def list_remote_roles() -> list[str]:
     """List all ARIA role files from a11ysupport.io."""
-    print("Fetching role list from a11ysupport.io...")
+    print("Fetching role list from a11ysupport.io…")
     data = fetch_json(A11Y_SUPPORT_API_ARIA)
     if not data:
         print("  Error: Could not fetch directory listing", file=sys.stderr)
@@ -373,14 +373,14 @@ class SyncReport:
 
 def fetch_all_upstream_failures() -> list[dict]:
     """Fetch all test files from a11ysupport.io and extract failures."""
-    print("Fetching test result file list...")
+    print("Fetching test result file list…")
     test_files = list_remote_test_files()
     print(f"  Found {len(test_files)} test files")
 
     all_failures = []
     for i, test_file in enumerate(test_files):
         if i % 10 == 0:
-            print(f"  Fetching {i + 1}/{len(test_files)}...", end="\r")
+            print(f"  Fetching {i + 1}/{len(test_files)}…", end="\r")
 
         data = fetch_test_result(test_file)
         if not data:

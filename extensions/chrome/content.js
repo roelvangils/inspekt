@@ -733,7 +733,7 @@
             return;
         }
 
-        console.log('[Inspekt] Connecting to WebSocket server...');
+        console.log('[Inspekt] Connecting to WebSocket server…');
 
         try {
             ws = new WebSocket(WS_URL);
@@ -1293,7 +1293,7 @@
             };
 
             ws.onclose = (event) => {
-                console.log('[Inspekt] Disconnected (code:', event.code, '). Reconnecting...');
+                console.log('[Inspekt] Disconnected (code:', event.code, '). Reconnecting…');
                 ws = null;
                 window.__inspekt_ws__ = null;
 
@@ -1372,7 +1372,7 @@
         if (isFrontTab()) {
             // Always connect to allow bridge to send bypass commands
             // The permission check happens in the message handler before executing code
-            console.log('[Inspekt] Initializing connection...');
+            console.log('[Inspekt] Initializing connection…');
             connect();
         }
     }
@@ -1383,10 +1383,10 @@
         if (isFrontTab()) {
             const allowed = await InspektPermissions.isAllowed();
             if (allowed && (!ws || ws.readyState !== WebSocket.OPEN)) {
-                console.log('[Inspekt] Permissions changed - domain now allowed, reconnecting...');
+                console.log('[Inspekt] Permissions changed - domain now allowed, reconnecting…');
                 connect();
             } else if (!allowed && ws && ws.readyState === WebSocket.OPEN) {
-                console.log('[Inspekt] Permissions changed - domain no longer allowed, disconnecting...');
+                console.log('[Inspekt] Permissions changed - domain no longer allowed, disconnecting…');
                 ws.close();
                 ws = null;
                 window.__inspekt_ws__ = null;

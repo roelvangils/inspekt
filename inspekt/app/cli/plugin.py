@@ -118,8 +118,8 @@ def plugin_add(name, code, file_path, url, description, category, tags, mcp, ret
         inspekt plugin add "Dark Mode" --code "(function(){...})();"
         inspekt plugin add "Text Spacing" --url "javascript:(function(){...})();"
         inspekt plugin add "Custom" --file ./my-plugin.js --category utility
-        inspekt plugin add "Extractor" --code "..." --returns-data --mcp
-        inspekt plugin add "Dark Mode" --code "..." --update
+        inspekt plugin add "Extractor" --code "…" --returns-data --mcp
+        inspekt plugin add "Dark Mode" --code "…" --update
     """
     try:
         # Validate input sources
@@ -334,7 +334,7 @@ def plugin_run(name_or_id, interactive, category, timeout, output_json, quiet):
                 if page_title or page_url:
                     display = page_title or page_url
                     if len(display) > 60:
-                        display = display[:57] + "..."
+                        display = display[:57] + "…"
                     click.secho(f"  on {display}", fg="bright_black")
 
                 # Show return value if present
@@ -679,7 +679,7 @@ def _interactive_plugin_select(category: str | None = None) -> str | None:
     for p in plugins:
         desc = p.get("description") or ""
         if len(desc) > 50:
-            desc = desc[:47] + "..."
+            desc = desc[:47] + "…"
         cat = p.get("category")
         if desc and cat:
             line = f"{p['name']} ({cat}) — {desc}"
@@ -701,7 +701,7 @@ def _interactive_plugin_select(category: str | None = None) -> str | None:
             [
                 "gum", "filter",
                 "--header", header,
-                "--placeholder", "Type to search...",
+                "--placeholder", "Type to search…",
                 "--height", str(max(10, min(len(lines) + 2, 20))),
                 "--header.foreground", "39",
                 "--indicator.foreground", "39",
@@ -904,7 +904,7 @@ def _display_plugin_details(plugin: dict) -> None:
         click.echo(f"  Last run: {dt.astimezone().strftime('%Y-%m-%d %H:%M')}")
 
     if plugin.get("source_url"):
-        click.echo(f"  Source URL: {plugin['source_url'][:60]}...")
+        click.echo(f"  Source URL: {plugin['source_url'][:60]}…")
 
     # Show code preview
     code = plugin.get("code", "")
@@ -913,7 +913,7 @@ def _display_plugin_details(plugin: dict) -> None:
     for line in lines:
         click.echo(f"    {line[:80]}")
     if len(code.split("\n")) > 10:
-        click.echo("    ...")
+        click.echo("    …")
 
     # Show unload code if custom mode
     if unload_mode == "custom" and plugin.get("unload_code"):
@@ -923,4 +923,4 @@ def _display_plugin_details(plugin: dict) -> None:
         for line in lines:
             click.echo(f"    {line[:80]}")
         if len(unload_code.split("\n")) > 5:
-            click.echo("    ...")
+            click.echo("    …")

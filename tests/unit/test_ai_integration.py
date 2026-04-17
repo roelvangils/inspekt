@@ -182,7 +182,7 @@ def test_extract_page_language_markdown_pattern(service):
 
 def test_extract_page_language_json_pattern(service):
     """Test extracting language from JSON pattern '"lang": "xx"'."""
-    content = '{"title": "Test", "lang": "fr", "content": "..."}'
+    content = '{"title": "Test", "lang": "fr", "content": "…"}'
 
     result = service.extract_page_language(content)
 

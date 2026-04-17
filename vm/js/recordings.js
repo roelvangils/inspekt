@@ -137,7 +137,7 @@ async function performRestartBrowser() {
     if (keepTabs) saveTabsToStorage();
 
     closeRestartModal();
-    showToast('Restarting browser...');
+    showToast('Restarting browser…');
 
     try {
         await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/restart-browser`);
@@ -174,7 +174,7 @@ async function performRestartAll() {
     if (keepTabs) saveTabsToStorage();
 
     closeRestartModal();
-    showToast('Restarting all services...');
+    showToast('Restarting all services…');
     updateStatus(false);
 
     try {

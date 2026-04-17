@@ -335,7 +335,7 @@ async function executeInspektCommand(cmd, outputMode) {
     if (promptDef === 'terminal') {
         // Interactive command — open terminal and let user type
         toggleTerminal();
-        showToast(`Opening terminal for ${title}...`);
+        showToast(`Opening terminal for ${title}…`);
         setTimeout(() => {
             if (terminalSocket && terminalSocket.readyState === WebSocket.OPEN) {
                 terminalSocket.send(`inspekt ${cliName} `);
@@ -354,7 +354,7 @@ async function executeInspektCommand(cmd, outputMode) {
 
     if (outputMode === 'terminal') {
         toggleTerminal();
-        showToast(`Running ${title}...`);
+        showToast(`Running ${title}…`);
         setTimeout(() => {
             if (terminalSocket && terminalSocket.readyState === WebSocket.OPEN) {
                 terminalSocket.send(`inspekt ${commandStr}\n`);
@@ -364,7 +364,7 @@ async function executeInspektCommand(cmd, outputMode) {
     }
 
     if (outputMode === 'toast') {
-        showToast(`Running ${title}...`);
+        showToast(`Running ${title}…`);
         try {
             const response = await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/inspekt/${encodeURIComponent(commandStr)}`);
             const data = await response.json();
@@ -380,7 +380,7 @@ async function executeInspektCommand(cmd, outputMode) {
     }
 
     // Default: panel output
-    showToast(`Running ${title}...`);
+    showToast(`Running ${title}…`);
     try {
         const response = await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/inspekt/${encodeURIComponent(commandStr)}`);
         const data = await response.json();
@@ -548,7 +548,7 @@ function formatStorageOutput(data) {
         const value = item.value || '';
         html += `<tr>
             <td style="font-family: monospace;">${escapeHtml(name)}</td>
-            <td style="max-width: 400px; overflow: hidden; text-overflow: ellipsis;">${escapeHtml(value.substring(0, 100))}${value.length > 100 ? '...' : ''}</td>
+            <td style="max-width: 400px; overflow: hidden; text-overflow: ellipsis;">${escapeHtml(value.substring(0, 100))}${value.length > 100 ? '…' : ''}</td>
         </tr>`;
     });
     html += '</tbody></table>';

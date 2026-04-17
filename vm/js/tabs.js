@@ -944,7 +944,7 @@ async function openUrlsFromClipboard() {
 
         const urls = unique.slice(0, 15);
         const truncated = unique.length > 15 ? ` (capped at 15 of ${unique.length})` : '';
-        showToast(`Opening ${urls.length} tab${urls.length > 1 ? 's' : ''}${truncated}...`, 'success');
+        showToast(`Opening ${urls.length} tab${urls.length > 1 ? 's' : ''}${truncated}…`, 'success');
 
         for (const url of urls) {
             try {

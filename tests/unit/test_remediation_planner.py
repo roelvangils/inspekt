@@ -123,10 +123,10 @@ class TestRemediationTask:
             steps=[],
         )
 
-        # Should truncate with "..." or show summary
+        # Should truncate with "…" or show summary
         assert len(task.pages_summary) < 300
         # For many pages, should use the summarized format
-        assert "pages" in task.pages_summary.lower() or "..." in task.pages_summary
+        assert "pages" in task.pages_summary.lower() or "…" in task.pages_summary
 
     def test_pages_summary_all_pages(self):
         """Test pages_summary for no specific pages."""

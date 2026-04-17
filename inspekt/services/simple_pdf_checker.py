@@ -396,7 +396,7 @@ class SimplePDFChecker:
             return self._make_result(
                 "title",
                 "pass",
-                f"Document title is set and displayed: \"{title[:50]}{'...' if len(title) > 50 else ''}\"",
+                f"Document title is set and displayed: \"{title[:50]}{'…' if len(title) > 50 else ''}\"",
                 {"title": title, "display_doc_title": True},
             )
         elif has_title and not display_doc_title:

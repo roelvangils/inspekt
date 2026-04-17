@@ -13,19 +13,19 @@
     "fr": {
       "no_structure_warning": {
         "heading": "Important : Ce PDF n'est pas balisé (pas de structure).",
-        "explanation": "...",
-        "consequence": "...",
-        "tip_with_tool": "...",
-        "tip_without_tool": "..."
+        "explanation": "…",
+        "consequence": "…",
+        "tip_with_tool": "…",
+        "tip_without_tool": "…"
       }
     },
     "nl": {
       "no_structure_warning": {
         "heading": "Belangrijk: Deze PDF heeft geen tags (geen structuur).",
-        "explanation": "...",
-        "consequence": "...",
-        "tip_with_tool": "...",
-        "tip_without_tool": "..."
+        "explanation": "…",
+        "consequence": "…",
+        "tip_with_tool": "…",
+        "tip_without_tool": "…"
       }
     }
   }

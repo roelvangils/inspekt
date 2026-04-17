@@ -372,7 +372,7 @@ inspekt eval "
     scrolls++;
     if (scrolls >= 10) clearInterval(interval);
   }, 500);
-  'Auto-scrolling...'
+  'Auto-scrolling…'
 "
 ```
 

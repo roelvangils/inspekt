@@ -912,7 +912,7 @@ class ControlHandler(BaseHTTPRequestHandler):
             # Picks up config changes (inspekt-config.json flags).
             # VNC, proxy, terminal, all other services stay running.
             try:
-                self.send_json({'ok': True, 'message': 'Restarting browser...'})
+                self.send_json({'ok': True, 'message': 'Restarting browser…'})
                 subprocess.Popen(
                     ['supervisorctl', 'restart', 'chromium'],
                     stdout=subprocess.DEVNULL,
@@ -926,7 +926,7 @@ class ControlHandler(BaseHTTPRequestHandler):
             # VNC disconnects briefly, then auto-reconnects.
             # Container stays running, all data preserved.
             try:
-                self.send_json({'ok': True, 'message': 'Restarting all services...'})
+                self.send_json({'ok': True, 'message': 'Restarting all services…'})
                 subprocess.Popen(
                     ['supervisorctl', 'restart', 'all'],
                     stdout=subprocess.DEVNULL,
@@ -940,7 +940,7 @@ class ControlHandler(BaseHTTPRequestHandler):
             # will recreate it with a fresh filesystem (clean Chromium profile).
             # Bind-mounted volumes and persistent data survive.
             try:
-                self.send_json({'ok': True, 'message': 'Resetting environment...'})
+                self.send_json({'ok': True, 'message': 'Resetting environment…'})
                 subprocess.Popen(
                     ['supervisorctl', 'shutdown'],
                     stdout=subprocess.DEVNULL,
@@ -2028,7 +2028,7 @@ class ControlHandler(BaseHTTPRequestHandler):
     for (let i = 0; i < Math.min(el.attributes.length, 10); i++) {
         const a = el.attributes[i];
         if (a.name !== 'class' && a.name !== 'id' && a.name !== 'style') {
-            const v = a.value.length > 50 ? a.value.slice(0, 50) + '...' : a.value;
+            const v = a.value.length > 50 ? a.value.slice(0, 50) + '…' : a.value;
             attrs.push({ name: a.name, value: v });
         }
     }
@@ -2040,7 +2040,7 @@ class ControlHandler(BaseHTTPRequestHandler):
         tag: tag,
         rect: { left: r.left, top: r.top, width: r.width, height: r.height },
         attributes: attrs,
-        text: text + (el.textContent && el.textContent.trim().length > 120 ? '...' : ''),
+        text: text + (el.textContent && el.textContent.trim().length > 120 ? '…' : ''),
         styles: {
             fontSize: cs.fontSize,
             color: cs.color,
@@ -3480,7 +3480,7 @@ class ControlHandler(BaseHTTPRequestHandler):
 
         if path == '/file/write':
             # POST /file/write — save file contents from the editor panel
-            # Body: { "path": "/home/inspekt/file.json", "content": "..." }
+            # Body: { "path": "/home/inspekt/file.json", "content": "…" }
             try:
                 content_length = int(self.headers.get('Content-Length', 0))
                 if content_length > 1_100_000:  # ~1 MB + JSON overhead
@@ -3756,7 +3756,7 @@ class ControlHandler(BaseHTTPRequestHandler):
                     self.send_json({
                         'ok': True,
                         'theme': theme,
-                        'message': f'Theme changed to {theme}, Chrome restarting...',
+                        'message': f'Theme changed to {theme}, Chrome restarting…',
                         'changed': True
                     })
                 else:
@@ -4066,6 +4066,6 @@ class ControlHandler(BaseHTTPRequestHandler):
 
 
 if __name__ == '__main__':
-    print(f"Starting control server on port {PORT}...")
+    print(f"Starting control server on port {PORT}…")
     server = ThreadingHTTPServer(('0.0.0.0', PORT), ControlHandler)
     server.serve_forever()

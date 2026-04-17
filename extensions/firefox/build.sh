@@ -27,7 +27,7 @@ XPI_NAME="inspekt-${VERSION}.xpi"
 rm -f "$BUILD_DIR"/*.zip "$BUILD_DIR"/*.xpi
 
 # Validate required files exist
-echo "Validating files..."
+echo "Validating files…"
 REQUIRED_FILES=(
     "manifest.json"
     "background.js"
@@ -63,7 +63,7 @@ fi
 
 echo -e "${GREEN}✓${NC} All required files present"
 echo ""
-echo "Packaging extension..."
+echo "Packaging extension…"
 
 # Create temporary staging directory
 STAGING_DIR=$(mktemp -d)

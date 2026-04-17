@@ -75,7 +75,7 @@ export class ElementDisplay {
 
         if (element.textContent) {
             const shortText = element.textContent.length > 60
-                ? element.textContent.substring(0, 60) + '...'
+                ? element.textContent.substring(0, 60) + '…'
                 : element.textContent;
             infoContainer.appendChild(this.createInfoRow('Text', shortText));
         }

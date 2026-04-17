@@ -390,7 +390,7 @@ def _extract_missing_excerpts(
         if ocr_text and not pdf_text:
             excerpt = ocr_text[:max_excerpt_len].strip()
             if len(ocr_text) > max_excerpt_len:
-                excerpt += "..."
+                excerpt += "…"
             return [excerpt] if excerpt else []
         return []
 
@@ -420,7 +420,7 @@ def _extract_missing_excerpts(
                 excerpt = " ".join(missing_words)
                 if len(excerpt) >= min_excerpt_len:
                     if len(excerpt) > max_excerpt_len:
-                        excerpt = excerpt[:max_excerpt_len].rsplit(" ", 1)[0] + "..."
+                        excerpt = excerpt[:max_excerpt_len].rsplit(" ", 1)[0] + "…"
                     excerpts.append(excerpt)
 
     return excerpts

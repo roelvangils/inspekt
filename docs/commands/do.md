@@ -359,7 +359,7 @@ The `inspekt do` command supports **5 languages** with automatic language detect
 
 ### How It Works
 
-1. **Automatic Detection**: Reads page language from `<html lang="...">` attribute
+1. **Automatic Detection**: Reads page language from `<html lang="…">` attribute
 2. **Smart Normalization**: Removes filler words in the detected language
 3. **Multilingual Matching**: Tries action patterns in the page's language first
 4. **Fallback**: Always includes English as a fallback

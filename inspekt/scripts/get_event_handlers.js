@@ -102,7 +102,7 @@
         if (match && match[0].length <= maxLength) {
             return match[0];
         }
-        return outerHTML.substring(0, maxLength) + '...';
+        return outerHTML.substring(0, maxLength) + '…';
     }
 
     /**
@@ -112,7 +112,7 @@
         const handlers = [];
 
         for (const attrName of eventAttributes) {
-            // Check for HTML attribute (e.g., onclick="...")
+            // Check for HTML attribute (e.g., onclick="…")
             const attrValue = el.getAttribute(attrName);
             if (attrValue) {
                 handlers.push({
@@ -138,7 +138,7 @@
                         selector: getMinimalSelector(el),
                         type: attrName.replace(/^on/, ''),
                         source: 'property',
-                        code: funcString.length > 200 ? funcString.substring(0, 200) + '...' : funcString,
+                        code: funcString.length > 200 ? funcString.substring(0, 200) + '…' : funcString,
                         element: getHtmlSnippet(el)
                     });
                 }

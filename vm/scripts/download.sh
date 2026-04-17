@@ -16,7 +16,7 @@ MAX_SIZE_HUMAN="5MB"
 
 if [ -z "$1" ]; then
     echo "Usage: download <file>"
-    echo "       download <file1> <file2> ..."
+    echo "       download <file1> <file2> …"
     echo ""
     echo "Files must be in: $DOWNLOAD_DIR"
     echo "Maximum file size: $MAX_SIZE_HUMAN"

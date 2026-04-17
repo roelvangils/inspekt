@@ -19,7 +19,7 @@ Example usage:
 
     # Asynchronous (for async contexts)
     async with get_transport(async_mode=True) as transport:
-        response = await transport.send(Request(method="run", params={"code": "..."}))
+        response = await transport.send(Request(method="run", params={"code": "…"}))
 """
 
 from .base import (

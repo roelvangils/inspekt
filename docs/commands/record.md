@@ -430,7 +430,7 @@ metadata:
   created_at: "2025-12-02T10:30:00+00:00"
   duration_ms: 45200
   starting_url: "https://example.com/login"
-  user_agent: "Mozilla/5.0..."
+  user_agent: "Mozilla/5.0…"
   recorded_on:
     platform: "darwin"
     browser: "Chrome"
@@ -445,10 +445,10 @@ state:
     x: 0
     y: 0
   # Optional - only if --capture-state was used:
-  cookies: "base64-encoded-json..."
-  local_storage: "base64-encoded-json..."
-  session_storage: "base64-encoded-json..."
-  checksum: "sha256:abc123..."
+  cookies: "base64-encoded-json…"
+  local_storage: "base64-encoded-json…"
+  session_storage: "base64-encoded-json…"
+  checksum: "sha256:abc123…"
 
 # Optional - manually added preconditions
 preconditions:
@@ -657,7 +657,7 @@ This protects against scenarios like:
   action: download
   download:
     filename: "report.pdf"
-    external_path: "..."
+    external_path: "…"
   expect:
     download_mime_type: "application/pdf"
     download_min_size: 1024
@@ -713,9 +713,9 @@ target:
 Selectors are generated in order of reliability:
 
 1. **ID selector** - `#element-id` (most stable)
-2. **data-testid** - `[data-testid="..."]` (test-friendly)
-3. **aria-label** - `[aria-label="..."]` (accessibility-friendly)
-4. **name attribute** - `input[name="..."]` (form-friendly)
+2. **data-testid** - `[data-testid="…"]` (test-friendly)
+3. **aria-label** - `[aria-label="…"]` (accessibility-friendly)
+4. **name attribute** - `input[name="…"]` (form-friendly)
 5. **CSS path** - `div > form > button:nth-of-type(1)` (fallback)
 
 During replay, if the primary selector fails, fallbacks are tried in order.
@@ -797,7 +797,7 @@ When a `download` action is recorded, you can add assertions to verify the downl
 
     # Content checks
     download_content_contains: "Annual Report"
-    download_checksum: "sha256:abc123..."
+    download_checksum: "sha256:abc123…"
 
     # Shell command checks (advanced)
     download_shell:
@@ -815,7 +815,7 @@ When a `download` action is recorded, you can add assertions to verify the downl
 | `download_filename_contains` | Substring that filename must contain |
 | `download_filename_matches` | Regex pattern for filename |
 | `download_content_contains` | Text that file content must contain |
-| `download_checksum` | Expected checksum (format: "sha256:..." or "md5:...") |
+| `download_checksum` | Expected checksum (format: "sha256:…" or "md5:…") |
 | `download_shell` | Run allowlisted shell command on file |
 
 **Allowlisted shell commands:**

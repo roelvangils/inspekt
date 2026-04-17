@@ -149,7 +149,7 @@
     const fullTextContent = (element.textContent || '').trim();
     let textContent = fullTextContent;
     if (textContent.length > 100) {
-        textContent = textContent.substring(0, 100) + '...';
+        textContent = textContent.substring(0, 100) + '…';
     }
 
     // Get full HTML content (outerHTML includes the element itself)
@@ -192,7 +192,7 @@
             const label = document.querySelector(`label[for="${el.id}"]`);
             if (label) {
                 name = label.textContent.trim();
-                source = '<label for="..."> element';
+                source = '<label for="…"> element';
                 return { name, source };
             }
         }

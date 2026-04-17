@@ -22,7 +22,7 @@ if [ -f "${ZIP_FILE}" ]; then
     rm "${ZIP_FILE}"
 fi
 
-echo "📦 Creating ZIP package..."
+echo "📦 Creating ZIP package…"
 
 # Create ZIP with only necessary files
 zip -r "${ZIP_FILE}" \

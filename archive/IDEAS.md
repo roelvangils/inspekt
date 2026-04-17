@@ -46,7 +46,7 @@ inspekt a11y persona --list  # Show available personas
 - Priority of fixes for this persona
 - Success rate for common tasks
 
-**Why unique:** Most tools show generic issues. This shows "Marcus can't complete checkout because..."
+**Why unique:** Most tools show generic issues. This shows "Marcus can't complete checkout because…"
 
 ---
 

@@ -158,7 +158,7 @@
     const label = el.getAttribute('aria-label');
     if (label) return label;
 
-    // <label for="...">
+    // <label for="…">
     if (el.id) {
       const labelEl = document.querySelector(`label[for="${CSS.escape(el.id)}"]`);
       if (labelEl) return normalizeWhitespace(labelEl.textContent || '');

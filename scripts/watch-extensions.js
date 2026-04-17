@@ -28,7 +28,7 @@ const C = {
   dim:   "\x1b[2m",
 };
 
-console.log(`${C.bold}${C.cyan}👀 Watching extension files for changes…${C.reset}`);
+console.log(`${C.bold}${C.cyan}Watching extension files for changes…${C.reset}`);
 for (const r of ROOTS) {
   console.log(`${C.dim}monitoring${C.reset} ${r}/**/*.{html,css,js}`);
 }
@@ -51,7 +51,7 @@ function componentType(file) {
 function printReloadSteps(type, file) {
   const rel = relative(ROOT, file);
   const ext = extname(file).slice(1).toUpperCase();
-  console.log(`${C.bold}${C.green}✨ changed${C.reset} ${C.cyan}${rel}${C.reset} ${C.dim}(${type} · ${ext})${C.reset}`);
+  console.log(`${C.bold}${C.green}changed${C.reset} ${C.cyan}${rel}${C.reset} ${C.dim}(${type} · ${ext})${C.reset}`);
 
   const steps = {
     popup: [
@@ -108,11 +108,11 @@ for (const root of ROOTS) {
       printReloadSteps(componentType(full), full);
     });
   } catch (err) {
-    console.error(`${C.yellow}⚠ could not watch ${root}:${C.reset}`, err.message);
+    console.error(`${C.yellow}[warn] could not watch ${root}:${C.reset}`, err.message);
   }
 }
 
 process.on("SIGINT", () => {
-  console.log(`\n${C.cyan}👋 stopping file watcher${C.reset}`);
+  console.log(`\n${C.cyan}stopping file watcher${C.reset}`);
   process.exit(0);
 });

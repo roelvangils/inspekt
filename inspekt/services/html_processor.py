@@ -44,7 +44,7 @@ def install_prettier_via_npm() -> bool:
         click.echo("Please install Node.js and npm first: https://nodejs.org/", err=True)
         return False
 
-    click.echo("\n📦 Installing prettier via npm...")
+    click.echo("\n📦 Installing prettier via npm…")
     try:
         result = subprocess.run(
             ["npm", "install", "-g", "prettier"],

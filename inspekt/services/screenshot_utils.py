@@ -117,7 +117,7 @@ def decode_data_url(data_url: str) -> bytes:
     Extract and decode base64 image data from a data URL.
 
     Args:
-        data_url: Data URL string (e.g., "data:image/png;base64,...")
+        data_url: Data URL string (e.g., "data:image/png;base64,…")
 
     Returns:
         Decoded image bytes

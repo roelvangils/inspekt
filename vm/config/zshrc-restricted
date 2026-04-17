@@ -60,7 +60,7 @@ command() {
 
 # Block common interpreter and system tool names via shell functions.
 # Functions take precedence over external commands in zsh, effectively
-# preventing "python3 -c 'import os; ...'" even if the user guesses a
+# preventing "python3 -c 'import os; …'" even if the user guesses a
 # full path. Combined with:
 #   - Locked PATH (only inspekt commands + curated utils)
 #   - chmod o-x on interpreters (python3, node, env, etc.)

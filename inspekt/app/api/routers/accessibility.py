@@ -251,7 +251,7 @@ async def run_autocomplete_check(request: AutocompleteRequest):
                 "confidence": 0.85,
                 "status": "missing",
                 "level": "violation",
-                "message": "Missing autocomplete attribute...",
+                "message": "Missing autocomplete attribute…",
                 "wcagCompliant": false
               }
             ]

@@ -500,7 +500,7 @@ class LinkAudit:
         if not self.destination:
             return "Unknown"
         if len(self.destination) > 60:
-            return self.destination[:57] + "..."
+            return self.destination[:57] + "…"
         return self.destination
 
     @property
@@ -852,7 +852,7 @@ class PDFContentAuditor:
             max_size: Maximum dimension (width or height) in pixels
 
         Returns:
-            Base64-encoded PNG suitable for <img src="data:image/png;base64,...">
+            Base64-encoded PNG suitable for <img src="data:image/png;base64,…">
             Returns None if extraction fails
         """
         if not self._fitz_doc:

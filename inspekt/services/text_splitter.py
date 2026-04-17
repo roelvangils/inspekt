@@ -198,8 +198,8 @@ def truncate_at_sentence_boundary(
         truncated = text[:max_chars]
         last_space = truncated.rfind(' ')
         if last_space > max_chars // 2:  # Only use if we keep at least half
-            return truncated[:last_space] + '...'
-        return truncated + '...'
+            return truncated[:last_space] + '…'
+        return truncated + '…'
 
     return ' '.join(result)
 

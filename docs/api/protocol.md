@@ -470,12 +470,12 @@ When JavaScript execution fails in browser:
 ```json
 {
     "type": "result",
-    "request_id": "...",
+    "request_id": "…",
     "ok": false,
     "result": null,
     "error": "ReferenceError: foo is not defined",
-    "url": "...",
-    "title": "..."
+    "url": "…",
+    "title": "…"
 }
 ```
 
@@ -635,7 +635,7 @@ if installed_version != expected_version:
 3. Server creates request_id: a3f2b1c0-...
    Stores in pending_requests:
    {
-     "a3f2b1c0-...": {
+     "a3f2b1c0-…": {
        "code": "document.title",
        "timestamp": 1698765432.123
      }
@@ -644,7 +644,7 @@ if installed_version != expected_version:
 4. Server broadcasts via WebSocket:
    {
      "type": "execute",
-     "request_id": "a3f2b1c0-...",
+     "request_id": "a3f2b1c0-…",
      "code": "document.title"
    }
 
@@ -654,7 +654,7 @@ if installed_version != expected_version:
 6. Browser sends:
    {
      "type": "result",
-     "request_id": "a3f2b1c0-...",
+     "request_id": "a3f2b1c0-…",
      "ok": true,
      "result": "Example Domain",
      "url": "https://example.com",
@@ -663,7 +663,7 @@ if installed_version != expected_version:
 
 7. Server moves to completed_requests:
    {
-     "a3f2b1c0-...": {
+     "a3f2b1c0-…": {
        "ok": true,
        "result": "Example Domain",
        "url": "https://example.com",

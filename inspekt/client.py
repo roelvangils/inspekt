@@ -618,7 +618,7 @@ class BridgeClient(SocketClientMixin):
 
                         # Check if CSP bypass was auto-enabled (yolo mode)
                         if "CSP_AUTO_ENABLED" in error:
-                            _verbose_log("CSP bypass auto-enabled, refreshing page and retrying...")
+                            _verbose_log("CSP bypass auto-enabled, refreshing page and retrying…")
                             # Reload the page to apply CSP bypass
                             try:
                                 reload_response = self._session.post(

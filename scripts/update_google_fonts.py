@@ -45,9 +45,9 @@ def main() -> None:
     removed = set(old) - set(families)
     print(f"Total font families: {len(families)}")
     if added:
-        print(f"  + {len(added)} new: {', '.join(sorted(added)[:10])}{'...' if len(added) > 10 else ''}")
+        print(f"  + {len(added)} new: {', '.join(sorted(added)[:10])}{'…' if len(added) > 10 else ''}")
     if removed:
-        print(f"  - {len(removed)} removed: {', '.join(sorted(removed)[:10])}{'...' if len(removed) > 10 else ''}")
+        print(f"  - {len(removed)} removed: {', '.join(sorted(removed)[:10])}{'…' if len(removed) > 10 else ''}")
     if not added and not removed:
         print("  No changes.")
     print(f"Written to {OUTPUT_PATH}")

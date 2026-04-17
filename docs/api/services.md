@@ -447,7 +447,7 @@ Looks for patterns like:
 
 ```python
 service = AIIntegrationService()
-content = "**Language:** en\n\nPage content..."
+content = "**Language:** en\n\nPage content…"
 lang = service.extract_page_language(content)
 # Returns: "en"
 ```
@@ -602,7 +602,7 @@ def call_mods(
 ```python
 service = AIIntegrationService()
 response = service.call_mods(
-    "Describe this page:\n\nPage content...",
+    "Describe this page:\n\nPage content…",
     timeout=30.0
 )
 ```
@@ -626,7 +626,7 @@ def show_debug_prompt(self, prompt: str) -> None
 
 ```python
 service = AIIntegrationService()
-service.show_debug_prompt("Full prompt here...")
+service.show_debug_prompt("Full prompt here…")
 ```
 
 ---
@@ -660,7 +660,7 @@ def generate_description(
 ```python
 service = AIIntegrationService()
 description = service.generate_description(
-    page_structure="# Main Heading\n...",
+    page_structure="# Main Heading\n…",
     language_override="en"
 )
 ```
@@ -698,7 +698,7 @@ service = AIIntegrationService()
 summary = service.generate_summary(
     article={
         "title": "Article Title",
-        "content": "Article content...",
+        "content": "Article content…",
         "lang": "en"
     }
 )
@@ -946,7 +946,7 @@ def format_restart_message(self, verbose: bool = False) -> str
 ```python
 manager = ControlManager()
 msg = manager.format_restart_message(verbose=True)
-print(msg)  # "🔄 Reinitializing control mode after navigation (verbose mode)..."
+print(msg)  # "🔄 Reinitializing control mode after navigation (verbose mode)…"
 ```
 
 ---

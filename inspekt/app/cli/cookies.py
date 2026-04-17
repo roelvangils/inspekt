@@ -179,9 +179,9 @@ def _format_json_cookie_value(name: str, parsed_value, indent: int = 0) -> list[
                 # Nested JSON - show on next line
                 val_str = json.dumps(val)
                 if len(val_str) > 50:
-                    val_str = val_str[:50] + "..."
+                    val_str = val_str[:50] + "…"
             elif isinstance(val, str) and len(val) > 50:
-                val_str = val[:50] + "..."
+                val_str = val[:50] + "…"
             else:
                 val_str = str(val)
 
@@ -192,7 +192,7 @@ def _format_json_cookie_value(name: str, parsed_value, indent: int = 0) -> list[
     elif isinstance(parsed_value, list):
         for i, item in enumerate(parsed_value):
             if isinstance(item, str) and len(item) > 50:
-                item_str = item[:50] + "..."
+                item_str = item[:50] + "…"
             else:
                 item_str = str(item)
             lines.append(f"{prefix}[{i}] {item_str}")
@@ -226,7 +226,7 @@ def _display_enhanced_cookies(cookies: list):
                     click.echo(f"    {line}")
         else:
             # Simple value
-            display_value = value if len(value) <= 80 else value[:80] + "..."
+            display_value = value if len(value) <= 80 else value[:80] + "…"
             click.echo(f"    Value: {display_value}")
 
         # Display metadata if available
@@ -280,7 +280,7 @@ def _display_legacy_cookies(cookies_dict: dict):
             # Regular cookie - display on one line
             padding = " " * (max_name_len - len(name))
             # Truncate long values
-            display_value = value if len(value) <= 60 else value[:60] + "..."
+            display_value = value if len(value) <= 60 else value[:60] + "…"
             click.echo(f"{name}{padding}    {display_value}")
 
 

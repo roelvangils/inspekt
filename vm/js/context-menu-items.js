@@ -242,7 +242,7 @@ function buildTabBarContextMenuItems(ctx) {
 
     if (ctx.closedTabs.length > 0) {
         const last = ctx.closedTabs[ctx.closedTabs.length - 1];
-        const label = last.title.length > 30 ? last.title.slice(0, 30) + '...' : last.title;
+        const label = last.title.length > 30 ? last.title.slice(0, 30) + '…' : last.title;
         items.push({ separator: true });
         items.push({ label: `Reopen Closed Tab (${label})`, action: () => reopenClosedTab() });
         if (ctx.closedTabs.length > 1) {

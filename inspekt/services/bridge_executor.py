@@ -208,7 +208,7 @@ class BridgeExecutor:
             except TimeoutError as e:
                 if attempt < retries - 1:
                     click.echo(
-                        f"Timeout on attempt {attempt + 1}/{retries}, retrying in {delay:.1f}s...",
+                        f"Timeout on attempt {attempt + 1}/{retries}, retrying in {delay:.1f}s…",
                         err=True,
                     )
                     time.sleep(delay)

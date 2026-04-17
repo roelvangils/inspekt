@@ -65,7 +65,7 @@ class SitemapEntry:
     canonical_url: str = ""   # From <link rel="canonical">
     content_length: int = 0
     etag: str = ""
-    lang: str = ""            # From <html lang="...">
+    lang: str = ""            # From <html lang="…">
 
 
 @dataclass
@@ -691,7 +691,7 @@ def _extract_canonical(text: str) -> str:
 
 
 def _extract_lang(text: str) -> str:
-    """Extract language from <html lang="..."> attribute. Normalizes to base code."""
+    """Extract language from <html lang="…"> attribute. Normalizes to base code."""
     m = _HTML_LANG_RE.search(text)
     if not m:
         return ""

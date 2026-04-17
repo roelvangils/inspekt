@@ -456,7 +456,7 @@ def get_robots_txt(
           ],
           "sitemaps": ["https://example.com/sitemap.xml"],
           "comments": [],
-          "raw": "User-agent: *\\nDisallow: /admin\\n..."
+          "raw": "User-agent: *\\nDisallow: /admin\\n…"
         }
         ```
     """

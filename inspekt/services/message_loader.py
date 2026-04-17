@@ -72,11 +72,11 @@ def get_message(key: str, lang: str = "en", **kwargs: Any) -> dict:
         Dictionary with message fields, with placeholders replaced
 
     Example:
-        >>> get_message("no_structure_warning", "en", tool_name="Adobe InDesign", docs_url="https://...")
+        >>> get_message("no_structure_warning", "en", tool_name="Adobe InDesign", docs_url="https://…")
         {
-            "heading": "Important: This PDF isn't tagged...",
-            "explanation": "...",
-            "tip_with_tool": "This file originated from <strong>Adobe InDesign</strong>..."
+            "heading": "Important: This PDF isn't tagged…",
+            "explanation": "…",
+            "tip_with_tool": "This file originated from <strong>Adobe InDesign</strong>…"
         }
     """
     messages = load_messages(lang)

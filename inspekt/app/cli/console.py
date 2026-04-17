@@ -263,7 +263,7 @@ def list_logs(level, limit, output_json, tail):
 
                 # Truncate very long single-line messages, but keep multiline intact
                 if '\n' not in message and len(message) > 200 and not output_json:
-                    display_message = message[:200] + "..."
+                    display_message = message[:200] + "…"
 
                 click.echo(
                     f"{click.style(time_str, dim=True)} "

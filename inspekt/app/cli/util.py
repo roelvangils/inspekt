@@ -503,7 +503,7 @@ def download(output, list_only, output_json, timeout, open_after, reveal_after):
         click.echo(f"Error: find_downloads.js script not found at {script_path}", err=True)
         sys.exit(1)
 
-    click.echo("Scanning page for downloadable files...")
+    click.echo("Scanning page for downloadable files…")
 
     try:
         result = client.execute_file(str(script_path), timeout=timeout)
@@ -692,11 +692,11 @@ def download(output, list_only, output_json, timeout, open_after, reveal_after):
         if selected_data["type"] == "category":
             # Download all files in category
             files_to_download = selected_data["files"]
-            click.echo(f"\nDownloading {len(files_to_download)} files...")
+            click.echo(f"\nDownloading {len(files_to_download)} files…")
         elif selected_data["type"] == "file":
             # Download file(s) - can be a list
             files_to_download = selected_data["files"]
-            click.echo(f"\nDownloading {len(files_to_download)} file(s)...")
+            click.echo(f"\nDownloading {len(files_to_download)} file(s)…")
 
         # Create output directory if needed
         downloads_dir.mkdir(parents=True, exist_ok=True)
@@ -716,7 +716,7 @@ def download(output, list_only, output_json, timeout, open_after, reveal_after):
             output_path = downloads_dir / filename
 
             try:
-                click.echo(f"  Downloading {filename}...")
+                click.echo(f"  Downloading {filename}…")
                 response = requests.get(url, timeout=30, **_download_kwargs)
                 response.raise_for_status()
 

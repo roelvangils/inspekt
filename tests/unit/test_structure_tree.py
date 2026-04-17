@@ -80,8 +80,8 @@ class TestBuildTreeHtml:
         node = StructureNode(tag_type="H1", children=[], text_content=long_text)
         html = _build_tree_html(node)
 
-        # Should be truncated to 30 chars + "..."
-        assert "A" * 30 + "..." in html
+        # Should be truncated to 30 chars + "…"
+        assert "A" * 30 + "…" in html
         assert "A" * 50 not in html
 
     def test_non_heading_text_preview(self):
@@ -136,7 +136,7 @@ class TestBuildTreeHtml:
         node = StructureNode(tag_type="Figure", children=[], alt_text=long_alt)
         html = _build_tree_html(node)
 
-        assert "B" * 30 + "..." in html
+        assert "B" * 30 + "…" in html
         assert "B" * 50 not in html
 
     def test_has_issues_class(self):

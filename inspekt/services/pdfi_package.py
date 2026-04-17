@@ -764,7 +764,7 @@ def _serialize_structure_tree_for_package(node: Any, depth: int = 0) -> dict:
     """
     # Prevent infinite recursion
     if depth > 100:
-        return {"tag_type": "...", "children": []}
+        return {"tag_type": "…", "children": []}
 
     serialized = {
         "tag_type": getattr(node, "tag_type", "Unknown"),

@@ -68,7 +68,7 @@ help:
 dev:
 	pip install -e ".[dev]"
 	@echo ""
-	@echo "✓ Development environment ready!"
+	@echo "[ok] Development environment ready!"
 	@echo "  Run 'make pre-commit' to install pre-commit hooks"
 	@echo "  Run 'make test' to run the test suite"
 
@@ -90,13 +90,13 @@ clean:
 	rm -rf apps/*/dist
 	find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
 	find . -type f -name "*.pyc" -delete
-	@echo "✓ Cleaned build artifacts"
+	@echo "[ok] Cleaned build artifacts"
 
 # Testing
 test:
 	pytest tests/ -v --cov=inspekt --cov-report=term-missing --cov-report=html
 	@echo ""
-	@echo "✓ Tests complete. Coverage report: htmlcov/index.html"
+	@echo "[ok] Tests complete. Coverage report: htmlcov/index.html"
 
 test-unit:
 	pytest tests/unit/ -v -m unit
@@ -113,7 +113,7 @@ lint:
 
 format:
 	ruff format inspekt/ tests/
-	@echo "✓ Code formatted"
+	@echo "[ok] Code formatted"
 
 typecheck:
 	mypy inspekt/ --config-file=pyproject.toml
@@ -122,12 +122,12 @@ typecheck:
 pre-commit:
 	pre-commit install
 	pre-commit run --all-files
-	@echo "✓ Pre-commit hooks installed and run"
+	@echo "[ok] Pre-commit hooks installed and run"
 
 # Run all checks
 all: format lint typecheck test
 	@echo ""
-	@echo "✓ All checks passed!"
+	@echo "[ok] All checks passed!"
 
 # ── Public dev surface ──────────────────────────────────────
 
@@ -150,13 +150,14 @@ dev-desktop:
 dev-all:
 	@command -v overmind >/dev/null 2>&1 || { echo "Install overmind: brew install overmind"; exit 1; }
 	@$(MAKE) --no-print-directory vm-start
-	overmind start -f Procfile.dev
+	@#    cli=blue  extension=green  vm=yellow  desktop=magenta
+	OVERMIND_COLORS=4,2,3,5 overmind start -f Procfile.dev
 
 sync-extension:
 	@if [ -z "$(VM_CONTAINER)" ]; then echo "Error: No VM container running"; exit 1; fi
 	docker cp extensions/chrome/. $(VM_CONTAINER):/opt/inspekt/extensions/chrome/
 	@$(MAKE) --no-print-directory vm-restart-chromium
-	@echo "✓ Extension synced"
+	@echo "[ok] Extension synced"
 
 # ── Public build surface ────────────────────────────────────
 
@@ -170,8 +171,8 @@ build-extensions:
 	@mkdir -p dist
 	@cd extensions && zip -qr "../dist/inspekt-chrome-$(VERSION).zip" chrome shared
 	@cd extensions && zip -qr "../dist/inspekt-firefox-$(VERSION).zip" firefox shared
-	@echo "✓ dist/inspekt-chrome-$(VERSION).zip"
-	@echo "✓ dist/inspekt-firefox-$(VERSION).zip"
+	@echo "[ok] dist/inspekt-chrome-$(VERSION).zip"
+	@echo "[ok] dist/inspekt-firefox-$(VERSION).zip"
 
 build-desktop:
 	cd apps/desktop && bun run tauri build
@@ -185,7 +186,7 @@ build-pdf-viewer:
 # `make build-pdf-viewer` once its source tree is fixed.
 build-all: build-cli build-extensions build-vm build-desktop
 	@echo ""
-	@echo "✓ All artifacts in dist/ and apps/desktop/src-tauri/target/"
+	@echo "[ok] All artifacts in dist/ and apps/desktop/src-tauri/target/"
 
 # ── Versioning ──────────────────────────────────────────────
 
@@ -208,7 +209,7 @@ doctor:
 	fi
 	@printf "Bundle dist:        " && [ -f vm/dist/control.html ] && echo "vm/dist/control.html ok" || echo "(run: make vm-bundle)"
 	@if [ -f vm/dist/control.html ] && [ vm/control-panel.html -nt vm/dist/control.html ]; then \
-		echo "  ⚠  vm/control-panel.html newer than bundle — run: make vm-bundle" ; \
+		echo "[warn]  vm/control-panel.html newer than bundle — run: make vm-bundle" ; \
 		exit 1 ; \
 	fi
 
@@ -217,9 +218,9 @@ verify-extension-sync:
 	@HOST_HASH=$$(cd extensions/chrome && find . -type f -not -path '*/\.*' | LC_ALL=C sort | xargs shasum -a 256 2>/dev/null | shasum -a 256 | cut -c1-16); \
 	VM_HASH=$$(docker exec $(VM_CONTAINER) sh -c 'cd /opt/inspekt/extensions/chrome && find . -type f -not -path "*/\.*" | LC_ALL=C sort | xargs sha256sum 2>/dev/null | sha256sum' | cut -c1-16); \
 	if [ "$$HOST_HASH" = "$$VM_HASH" ]; then \
-		echo "✓ extension in sync ($$HOST_HASH)" ; \
+		echo "[ok] extension in sync ($$HOST_HASH)" ; \
 	else \
-		echo "✗ drift: host=$$HOST_HASH vm=$$VM_HASH"; echo "  run: make sync-extension"; exit 1 ; \
+		echo "[fail] drift: host=$$HOST_HASH vm=$$VM_HASH"; echo "  run: make sync-extension"; exit 1 ; \
 	fi
 
 # ── Browser VM (internal plumbing) ──────────────────────────
@@ -275,9 +276,9 @@ vm-services:
 
 # Health check all endpoints (hits host ports, no container exec needed)
 vm-health:
-	@printf "Control server (8888): " && curl -sf http://localhost:8888/health > /dev/null && echo "✓" || echo "✗"
-	@printf "noVNC (6080):          " && curl -sf http://localhost:6080/ > /dev/null && echo "✓" || echo "✗"
-	@printf "CDP (9222):            " && curl -sf http://localhost:9222/json/version > /dev/null && echo "✓" || echo "✗"
+	@printf "Control server (8888): " && curl -sf http://localhost:8888/health > /dev/null && echo "[ok]" || echo "[fail]"
+	@printf "noVNC (6080):          " && curl -sf http://localhost:6080/ > /dev/null && echo "[ok]" || echo "[fail]"
+	@printf "CDP (9222):            " && curl -sf http://localhost:9222/json/version > /dev/null && echo "[ok]" || echo "[fail]"
 
 # ── Man pages ───────────────────────────────────────────────
 
@@ -285,7 +286,7 @@ vm-health:
 # under inspekt/man/ so the wheel can ship them without pandoc on the build host.
 build-man:
 	python scripts/build_man.py --output-dir build/man --commit-to-package
-	@echo "✓ Man pages written to build/man/ and inspekt/man/"
+	@echo "[ok] Man pages written to build/man/ and inspekt/man/"
 
 # Install the shipped man pages for the current user (no sudo required).
 install-man:
@@ -293,4 +294,4 @@ install-man:
 
 clean-man:
 	rm -rf build/man inspekt/man/*.1 inspekt/man/*.7
-	@echo "✓ Removed generated man pages"
+	@echo "[ok] Removed generated man pages"

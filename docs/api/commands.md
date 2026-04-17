@@ -899,7 +899,7 @@ Default mode shows:
 ```
 Selected Text (145 characters):
 
-"This is the selected text from the browser..."
+"This is the selected text from the browser…"
 
 Position:
   x=120, y=340

@@ -69,8 +69,8 @@ class ReadabilityUpdater:
             Dictionary with version info or None if check fails
             {
                 "version": "0.6.0",
-                "tarball": "https://...",
-                "shasum": "abc123...",
+                "tarball": "https://…",
+                "shasum": "abc123…",
                 "release_date": "2024-03-15T12:00:00.000Z"
             }
         """
@@ -318,26 +318,26 @@ class ReadabilityUpdater:
             return False, f"Already on latest version ({current})"
 
         action = "Installing" if current is None else "Downloading"
-        progress(f"{action} @mozilla/readability@{latest}...")
+        progress(f"{action} @mozilla/readability@{latest}…")
 
         temp_path = self.download_version(latest)
         if not temp_path:
             return False, "Download failed"
 
-        progress("Verifying integrity...")
+        progress("Verifying integrity…")
 
         if not self.backup_current_version():
             temp_path.unlink(missing_ok=True)
             return False, "Failed to backup current version"
 
-        progress("Installing...")
+        progress("Installing…")
 
         if not self.install_version(temp_path, latest):
             temp_path.unlink(missing_ok=True)
             self.restore_backup()
             return False, "Installation failed"
 
-        progress("Testing...")
+        progress("Testing…")
 
         if not self.test_installation():
             self.restore_backup()

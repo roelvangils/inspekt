@@ -100,7 +100,7 @@ function updateRunAxe(minifiedCSS) {
 }
 
 // Main
-console.log('Building Axe Popover CSS...');
+console.log('Building Axe Popover CSS…');
 console.log(`  Source: ${CSS_DIR}`);
 
 const minifiedCSS = buildCSS();

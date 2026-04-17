@@ -201,7 +201,7 @@ class PluginService:
             unload_code: Custom JavaScript code for unloading (when unload_mode='custom')
 
         Returns:
-            {"ok": True, "plugin": {...}} or {"ok": False, "error": "..."}
+            {"ok": True, "plugin": {...}} or {"ok": False, "error": "…"}
         """
         plugin_id = generate_slug(name)
         timestamp = int(time.time())
@@ -298,7 +298,7 @@ class PluginService:
             **kwargs: Additional plugin attributes
 
         Returns:
-            {"ok": True, "plugin": {...}, "warnings": [...]} or {"ok": False, "error": "..."}
+            {"ok": True, "plugin": {...}, "warnings": [...]} or {"ok": False, "error": "…"}
         """
         code, warnings = parse_bookmarklet(bookmarklet)
 
@@ -381,7 +381,7 @@ class PluginService:
             **updates: Fields to update (name, code, description, etc.)
 
         Returns:
-            {"ok": True, "plugin": {...}} or {"ok": False, "error": "..."}
+            {"ok": True, "plugin": {...}} or {"ok": False, "error": "…"}
         """
         # Get existing plugin
         existing = self.get_plugin(plugin_id)
@@ -478,7 +478,7 @@ class PluginService:
             plugin_id: Plugin slug ID
 
         Returns:
-            {"ok": True, "deleted": True} or {"ok": False, "error": "..."}
+            {"ok": True, "deleted": True} or {"ok": False, "error": "…"}
         """
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()

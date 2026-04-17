@@ -438,7 +438,7 @@ def _display_element_details(response):
     if response.get("textContent"):
         text = response["textContent"]
         if len(text) > 60:
-            text = text[:60] + "..."
+            text = text[:60] + "…"
         click.echo(f"Text:     {text}")
 
     # Selection source
@@ -496,7 +496,7 @@ def _display_element_details(response):
     if accessible_name:
         # Truncate if too long
         display_name = (
-            accessible_name if len(accessible_name) <= 50 else accessible_name[:50] + "..."
+            accessible_name if len(accessible_name) <= 50 else accessible_name[:50] + "…"
         )
         click.echo(f'  Accessible Name: "{display_name}"')
         click.echo(f"  Name computed from: {name_source}")
@@ -554,7 +554,7 @@ def _display_element_details(response):
         click.echo("\nAttributes:")
         for key, value in response["attributes"].items():
             if len(str(value)) > 50:
-                value = str(value)[:50] + "..."
+                value = str(value)[:50] + "…"
             click.echo(f"  {key}: {value}")
 
 
@@ -4792,7 +4792,7 @@ def screenshot_selection(
     try:
         # Start selection mode
         if not quiet and not json_output:
-            click.echo(crosshair_icon("Starting selection mode..."))
+            click.echo(crosshair_icon("Starting selection mode…"))
             click.echo("  Drag to select a region. Press Enter or click to confirm, Escape to cancel.")
 
         start_result = executor.execute(start_code, timeout=10.0)

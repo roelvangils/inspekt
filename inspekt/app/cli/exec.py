@@ -69,7 +69,7 @@ def _format_console_entry(entry: dict) -> str:
     for prefix, pcolor in prefix_colors.items():
         if message.startswith(prefix):
             if prefix == '[table:json]':
-                display_msg = click.style('[table]', fg='blue') + ' ...'
+                display_msg = click.style('[table]', fg='blue') + ' …'
             else:
                 display_msg = click.style(prefix, fg=pcolor) + message[len(prefix):]
             break

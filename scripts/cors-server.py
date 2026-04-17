@@ -62,7 +62,7 @@ class CORSRequestHandler(SimpleHTTPRequestHandler):
 
 def build_css(script_dir):
     """Run the CSS build script."""
-    print("\n📦 Building CSS for production...")
+    print("\n📦 Building CSS for production…")
     build_script = os.path.join(script_dir, "build-axe-css.js")
 
     if not os.path.exists(build_script):
@@ -118,7 +118,7 @@ def main():
     finally:
         # Ignore further Ctrl+C during cleanup
         signal.signal(signal.SIGINT, signal.SIG_IGN)
-        print("\n👋 Stopping server...")
+        print("\n👋 Stopping server…")
         server.server_close()
         build_css(script_dir)
 

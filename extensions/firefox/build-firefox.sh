@@ -1,7 +1,7 @@
 #!/bin/bash
 # Build script for Firefox extension - copies shared files
 
-echo "Building Firefox extension..."
+echo "Building Firefox extension…"
 
 # Create shared directory in firefox extension
 mkdir -p shared/core shared/popup

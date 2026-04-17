@@ -307,12 +307,12 @@ Full structured data:
     {
       "id": "color-contrast",
       "impact": "serious",
-      "description": "Ensure the contrast...",
+      "description": "Ensure the contrast…",
       "nodes": [
         {
           "html": "<button>Submit</button>",
           "target": [".btn-primary"],
-          "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast..."
+          "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast…"
         }
       ]
     }

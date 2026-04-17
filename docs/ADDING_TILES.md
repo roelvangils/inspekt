@@ -172,7 +172,7 @@ export function handleMyAction(context) {
 
     // Update tile text
     const label = tile.querySelector('.action-label');
-    label.textContent = 'Processing...';
+    label.textContent = 'Processing…';
 
     // Perform async action
     await doSomethingAsync();

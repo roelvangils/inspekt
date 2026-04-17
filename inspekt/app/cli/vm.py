@@ -180,7 +180,7 @@ def _stop_all_vm_containers(verbose: bool = True) -> int:
     count = 0
     for container_id in containers:
         if verbose:
-            click.echo(f"  • Stopping container {container_id[:12]}...")
+            click.echo(f"  • Stopping container {container_id[:12]}…")
         subprocess.run(["docker", "stop", container_id], capture_output=True)
         subprocess.run(["docker", "rm", container_id], capture_output=True)
         count += 1
@@ -229,9 +229,9 @@ def _build_image(vm_dir: Path) -> bool:
 
     # Bundle control panel assets (CSS + JS → minified bundles)
     bundle_script = project_root / "scripts" / "bundle-vm.mjs"
-    click.echo("  • Bundling control panel assets...")
+    click.echo("  • Bundling control panel assets…")
     if not shutil.which("bun"):
-        click.echo("  ✗ 'bun' is not installed. Install it: https://bun.sh", err=True)
+        click.echo("  [fail] 'bun' is not installed. Install it: https://bun.sh", err=True)
         return False
     bundle_result = subprocess.run(
         ["bun", str(bundle_script)],
@@ -240,11 +240,11 @@ def _build_image(vm_dir: Path) -> bool:
         text=True,
     )
     if bundle_result.returncode != 0:
-        click.echo(f"  ✗ Bundle failed: {bundle_result.stderr.strip()}", err=True)
+        click.echo(f"  [fail] Bundle failed: {bundle_result.stderr.strip()}", err=True)
         return False
     click.echo(f"    {bundle_result.stdout.strip()}")
 
-    click.echo("  • Building Docker image (this may take a few minutes)...")
+    click.echo("  • Building Docker image (this may take a few minutes)…")
     result = subprocess.run(
         ["docker", "build", "-t", IMAGE_NAME, "-f", str(dockerfile_path), "."],
         cwd=project_root,
@@ -262,9 +262,9 @@ def _start_container(dev_mode: bool = False, vm_dir: Path = None) -> bool:
         vm_dir: Path to the vm/ directory (required if dev_mode is True).
     """
     if dev_mode:
-        click.echo("  • Starting container in development mode...")
+        click.echo("  • Starting container in development mode…")
     else:
-        click.echo("  • Starting container...")
+        click.echo("  • Starting container…")
 
     cmd = [
         "docker", "run", "-d",
@@ -341,7 +341,7 @@ def _start_container(dev_mode: bool = False, vm_dir: Path = None) -> bool:
     result = subprocess.run(cmd, capture_output=True, text=True)
 
     if result.returncode != 0:
-        click.echo(f"  ✗ Failed to start container: {result.stderr}", err=True)
+        click.echo(f"  [fail] Failed to start container: {result.stderr}", err=True)
         return False
 
     return True
@@ -369,7 +369,7 @@ def _wait_for_vm(timeout: int = 30) -> bool:
     """Wait for the VM to be ready."""
     import socket
 
-    click.echo("  • Waiting for VM to be ready...")
+    click.echo("  • Waiting for VM to be ready…")
 
     start_time = time.time()
     while time.time() - start_time < timeout:
@@ -447,14 +447,14 @@ def start(rebuild, no_open, dev, no_dev):
     # SAFEGUARD 1: Check for orphaned containers from old image versions
     orphaned = _get_all_vm_containers()
     if orphaned:
-        click.echo(f"  ⚠ Found {len(orphaned)} orphaned container(s) from previous sessions")
+        click.echo(f"  [warn] Found {len(orphaned)} orphaned container(s) from previous sessions")
         stopped = _stop_all_vm_containers()
-        click.echo(f"  ✓ Cleaned up {stopped} container(s)")
+        click.echo(f"  [ok] Cleaned up {stopped} container(s)")
 
     # SAFEGUARD 2: Check for port conflicts
     port_conflicts = _check_ports_available()
     if port_conflicts:
-        click.echo("  ⚠ Port conflicts detected:", err=True)
+        click.echo("  [warn] Port conflicts detected:", err=True)
         for port, desc in port_conflicts:
             click.echo(f"    • Port {port} in use ({desc})", err=True)
         click.echo("\n  Run 'inspekt vm cleanup' to stop all VM containers,", err=True)
@@ -478,15 +478,15 @@ def start(rebuild, no_open, dev, no_dev):
     # Build image if needed
     if rebuild or not _image_exists():
         if not _build_image(vm_dir):
-            click.echo("\n✗ Failed to build Docker image", err=True)
+            click.echo("\n[fail] Failed to build Docker image", err=True)
             sys.exit(1)
-        click.echo("  ✓ Docker image built")
+        click.echo("  [ok] Docker image built")
     else:
         click.echo("  • Using existing Docker image")
 
     # Remove old container if exists (by name)
     if _container_exists():
-        click.echo("  • Removing old container...")
+        click.echo("  • Removing old container…")
         _stop_container()
         _remove_container()
 
@@ -496,29 +496,29 @@ def start(rebuild, no_open, dev, no_dev):
 
     # Wait for VM to be ready
     if not _wait_for_vm():
-        click.echo("  ✗ VM failed to start within timeout", err=True)
+        click.echo("  [fail] VM failed to start within timeout", err=True)
         sys.exit(1)
 
     # SAFEGUARD 3: Verify correct content is being served
-    click.echo("  • Verifying VM is serving correctly...")
+    click.echo("  • Verifying VM is serving correctly…")
     success, error = _verify_vm_serving_correctly()
     if not success:
-        click.echo(f"  ✗ VM verification failed: {error}", err=True)
+        click.echo(f"  [fail] VM verification failed: {error}", err=True)
         click.echo("\n  This usually means an old container is still occupying ports.", err=True)
         click.echo("  Run 'inspekt vm cleanup' and try again.", err=True)
         sys.exit(1)
 
-    click.echo("  ✓ VM started and verified")
+    click.echo("  [ok] VM started and verified")
 
     elapsed = time.time() - start_time
     elapsed_str = f" in {elapsed:.1f}s" if elapsed >= 1 else ""
 
     if dev:
-        click.echo(f"\n✓ Inspekt Browser VM is running{elapsed_str} (development mode)\n")
-        click.echo("  ⚠ Note: Container restart required for file changes")
+        click.echo(f"\n[ok] Inspekt Browser VM is running{elapsed_str} (development mode)\n")
+        click.echo("  [warn] Note: Container restart required for file changes")
         click.echo("         (noVNC caches files at startup)\n")
     else:
-        click.echo(f"\n✓ Inspekt Browser VM is running{elapsed_str}\n")
+        click.echo(f"\n[ok] Inspekt Browser VM is running{elapsed_str}\n")
     click.echo(f"  Control panel: http://localhost:{NOVNC_PORT}/control.html")
     click.echo(f"  VNC viewer:    http://localhost:{NOVNC_PORT}/vnc.html")
 
@@ -529,7 +529,7 @@ def start(rebuild, no_open, dev, no_dev):
 
     # Open control panel
     if not no_open:
-        click.echo("\nOpening control panel in your browser...")
+        click.echo("\nOpening control panel in your browser…")
         webbrowser.open(f"http://localhost:{NOVNC_PORT}/control.html")
 
 
@@ -550,15 +550,15 @@ def stop():
         click.echo("VM is not running")
         return
 
-    click.echo("Stopping Inspekt Browser VM...")
+    click.echo("Stopping Inspekt Browser VM…")
 
     if _stop_container():
-        click.echo("✓ VM stopped")
+        click.echo("[ok] VM stopped")
 
         # Also remove the container so it can be started fresh
         _remove_container()
     else:
-        click.echo("✗ Failed to stop VM", err=True)
+        click.echo("[fail] Failed to stop VM", err=True)
         sys.exit(1)
 
 
@@ -590,9 +590,9 @@ def restart(rebuild, dev, no_dev):
     # Stop and remove all VM containers (running, stopped, or orphaned)
     all_containers = _get_all_vm_containers()
     if all_containers:
-        click.echo("  • Stopping VM...")
+        click.echo("  • Stopping VM…")
         stopped = _stop_all_vm_containers(verbose=False)
-        click.echo(f"  ✓ Cleaned up {stopped} container(s)")
+        click.echo(f"  [ok] Cleaned up {stopped} container(s)")
 
     # Get VM directory
     vm_dir = get_vm_dir()
@@ -610,9 +610,9 @@ def restart(rebuild, dev, no_dev):
     # Rebuild if requested
     if rebuild:
         if not _build_image(vm_dir):
-            click.echo("\n✗ Failed to build Docker image", err=True)
+            click.echo("\n[fail] Failed to build Docker image", err=True)
             sys.exit(1)
-        click.echo("  ✓ Docker image rebuilt")
+        click.echo("  [ok] Docker image rebuilt")
 
     # Start container
     if not _start_container(dev_mode=dev, vm_dir=vm_dir):
@@ -620,19 +620,19 @@ def restart(rebuild, dev, no_dev):
 
     # Wait for VM to be ready
     if not _wait_for_vm():
-        click.echo("  ✗ VM failed to start within timeout", err=True)
+        click.echo("  [fail] VM failed to start within timeout", err=True)
         sys.exit(1)
 
-    click.echo("  ✓ VM started")
+    click.echo("  [ok] VM started")
 
     elapsed = time.time() - start_time
     elapsed_str = f" in {elapsed:.1f}s" if elapsed >= 1 else ""
 
     if dev:
-        click.echo(f"\n✓ Inspekt Browser VM restarted{elapsed_str} (development mode)\n")
-        click.echo("  ⚠ Note: Container restart required for file changes\n")
+        click.echo(f"\n[ok] Inspekt Browser VM restarted{elapsed_str} (development mode)\n")
+        click.echo("  [warn] Note: Container restart required for file changes\n")
     else:
-        click.echo(f"\n✓ Inspekt Browser VM restarted{elapsed_str}\n")
+        click.echo(f"\n[ok] Inspekt Browser VM restarted{elapsed_str}\n")
     click.echo(f"  Control panel: http://localhost:{NOVNC_PORT}/control.html")
 
 
@@ -657,7 +657,7 @@ def open_panel():
         sys.exit(1)
 
     url = f"http://localhost:{NOVNC_PORT}/control.html"
-    click.echo(f"Opening {url}...")
+    click.echo(f"Opening {url}…")
     webbrowser.open(url)
 
 
@@ -791,7 +791,7 @@ def shell():
         click.echo(_style_with_inline_code("\nStart it with: `inspekt vm start`", base_fg="red"), err=True)
         sys.exit(1)
 
-    click.echo("Opening shell in VM container...")
+    click.echo("Opening shell in VM container…")
     click.echo("Type 'exit' to return.\n")
 
     subprocess.run(["docker", "exec", "-it", CONTAINER_NAME, "/bin/bash"])
@@ -848,15 +848,15 @@ def cleanup(force):
             click.echo("Cancelled.")
             return
 
-    click.echo("\nCleaning up...")
+    click.echo("\nCleaning up…")
     stopped = _stop_all_vm_containers()
-    click.echo(f"✓ Removed {stopped} container(s)")
+    click.echo(f"[ok] Removed {stopped} container(s)")
 
     # Verify ports are now free
     remaining_conflicts = _check_ports_available()
     if remaining_conflicts:
-        click.echo("\n⚠ Some ports are still in use (may be non-Docker processes):")
+        click.echo("\n[warn] Some ports are still in use (may be non-Docker processes):")
         for port, desc in remaining_conflicts:
             click.echo(f"  • Port {port} ({desc})")
     else:
-        click.echo("✓ All VM ports are now available")
+        click.echo("[ok] All VM ports are now available")

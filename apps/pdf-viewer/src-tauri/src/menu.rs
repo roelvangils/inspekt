@@ -13,7 +13,7 @@ pub fn create_menu(app: &AppHandle) -> Result<Menu<Wry>, tauri::Error> {
     // File menu
     let file_menu = SubmenuBuilder::new(app, "File")
         .items(&[
-            &MenuItemBuilder::with_id("open", "Open...")
+            &MenuItemBuilder::with_id("open", "Open…")
                 .accelerator("CmdOrCtrl+O")
                 .build(app)?,
             &MenuItemBuilder::with_id("open_recent", "Open Recent")
@@ -23,7 +23,7 @@ pub fn create_menu(app: &AppHandle) -> Result<Menu<Wry>, tauri::Error> {
             &MenuItemBuilder::with_id("save", "Save")
                 .accelerator("CmdOrCtrl+S")
                 .build(app)?,
-            &MenuItemBuilder::with_id("save_as", "Save As...")
+            &MenuItemBuilder::with_id("save_as", "Save As…")
                 .accelerator("CmdOrCtrl+Shift+S")
                 .build(app)?,
             &PredefinedMenuItem::separator(app)?,
@@ -112,7 +112,7 @@ pub fn create_menu(app: &AppHandle) -> Result<Menu<Wry>, tauri::Error> {
                     ),
                 )?,
                 &PredefinedMenuItem::separator(app)?,
-                &MenuItemBuilder::with_id("preferences", "Settings...")
+                &MenuItemBuilder::with_id("preferences", "Settings…")
                     .accelerator("CmdOrCtrl+,")
                     .build(app)?,
                 &PredefinedMenuItem::separator(app)?,
@@ -151,7 +151,7 @@ pub fn create_menu(app: &AppHandle) -> Result<Menu<Wry>, tauri::Error> {
                 &PredefinedMenuItem::paste(app, Some("Paste"))?,
                 &PredefinedMenuItem::select_all(app, Some("Select All"))?,
                 &PredefinedMenuItem::separator(app)?,
-                &MenuItemBuilder::with_id("preferences", "Settings...")
+                &MenuItemBuilder::with_id("preferences", "Settings…")
                     .accelerator("CmdOrCtrl+,")
                     .build(app)?,
             ])

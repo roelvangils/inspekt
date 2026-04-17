@@ -38,7 +38,7 @@ def get_ffmpeg_version() -> str | None:
             text=True,
             timeout=5,
         )
-        # Parse version from first line: "ffmpeg version 6.1.1 Copyright..."
+        # Parse version from first line: "ffmpeg version 6.1.1 Copyright…"
         first_line = result.stdout.split("\n")[0]
         if "version" in first_line:
             parts = first_line.split()
@@ -362,7 +362,7 @@ def merge_audio_video(
             error_msg = result.stderr.strip() if result.stderr else "Unknown error"
             # Truncate long error messages
             if len(error_msg) > 500:
-                error_msg = error_msg[:500] + "..."
+                error_msg = error_msg[:500] + "…"
             return {
                 "ok": False,
                 "error": f"FFmpeg failed: {error_msg}"

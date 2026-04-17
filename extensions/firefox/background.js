@@ -1014,7 +1014,7 @@ async function setBypassIcon(tabId, minutes) {
  * Set icon to "connecting" state (yellow with dots)
  */
 async function setConnectingIcon(tabId) {
-    await browser.browserAction.setBadgeText({ tabId, text: '...' });
+    await browser.browserAction.setBadgeText({ tabId, text: '…' });
     await browser.browserAction.setBadgeBackgroundColor({ tabId, color: '#FFEB3B' });
 }
 
@@ -1149,7 +1149,7 @@ async function handleNavigation(tabId, url, waitFor, timeout = 30) {
                             if (exactMatch || hostsMatch) {
                                 // Handle networkidle wait
                                 if (waitFor === 'networkidle') {
-                                    console.log('[Inspekt] Waiting for network idle...');
+                                    console.log('[Inspekt] Waiting for network idle…');
                                     await new Promise(r => setTimeout(r, 500));
                                 }
 

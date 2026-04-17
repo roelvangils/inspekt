@@ -86,7 +86,7 @@ to understand what the page offers at a glance.
 
 Returns a conversational description like:
 "This is a news article page with a main navigation menu,
- 3 featured stories, and a sidebar with recent posts..."
+ 3 featured stories, and a sidebar with recent posts…"
 
 Ideal for:
 - Screen reader users getting page orientation

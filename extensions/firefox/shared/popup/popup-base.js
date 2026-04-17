@@ -181,14 +181,14 @@ async function checkConnectionStatus() {
                             '✅ Connected to localhost:8766');
                     } else if (status === 'loaded') {
                         setStatus(statusDot, statusText, 'checking',
-                            '⏳ Extension loaded, connecting to server...');
+                            '⏳ Extension loaded, connecting to server…');
                     } else {
                         setStatus(statusDot, statusText, 'checking',
-                            '⏳ Extension loading...');
+                            '⏳ Extension loading…');
                     }
                 } else {
                     setStatus(statusDot, statusText, 'checking',
-                        '⏳ Initializing...');
+                        '⏳ Initializing…');
                 }
             }
             // For Firefox: use message passing to content script with timeout
@@ -209,16 +209,16 @@ async function checkConnectionStatus() {
                             '✅ Connected to localhost:8766');
                     } else if (status === 'loaded') {
                         setStatus(statusDot, statusText, 'checking',
-                            '⏳ Extension loaded, connecting to server...');
+                            '⏳ Extension loaded, connecting to server…');
                     } else {
                         setStatus(statusDot, statusText, 'checking',
-                            '⏳ Extension loading...');
+                            '⏳ Extension loading…');
                     }
                 } else {
                     // Response received but no status - content script is loading
                     console.warn('[Inspekt Popup] No valid status in response:', response);
                     setStatus(statusDot, statusText, 'checking',
-                        '⏳ Extension loading...');
+                        '⏳ Extension loading…');
                 }
             }
         } catch (error) {

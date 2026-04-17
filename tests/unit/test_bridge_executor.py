@@ -157,10 +157,10 @@ class TestCodeExecution:
         # Check retry messages
         assert mock_echo.call_count == 2
         mock_echo.assert_any_call(
-            "Timeout on attempt 1/3, retrying in 0.5s...", err=True
+            "Timeout on attempt 1/3, retrying in 0.5s…", err=True
         )
         mock_echo.assert_any_call(
-            "Timeout on attempt 2/3, retrying in 1.0s...", err=True
+            "Timeout on attempt 2/3, retrying in 1.0s…", err=True
         )
 
         # Check exponential backoff

@@ -175,7 +175,7 @@
 
         // --- AXE AUDIT ---
         if (engines.includes('axe')) {
-            console.log('[Inspekt A11Y] Running axe-core...');
+            console.log('[Inspekt A11Y] Running axe-core…');
             const axeConfig = {
                 resultTypes: ['violations', 'incomplete'],
                 elementRef: true,
@@ -206,7 +206,7 @@
 
         // --- IBM EQUAL ACCESS (EAC) AUDIT ---
         if (engines.includes('eac')) {
-            console.log('[Inspekt A11Y] Running IBM Equal Access...');
+            console.log('[Inspekt A11Y] Running IBM Equal Access…');
             try {
                 const checker = new ace.Checker();
                 const guidelines = config.ibmGuidelines || ['WCAG_2_2'];
@@ -252,7 +252,7 @@
 
         // --- HTML CODESNIFFER (HCS) AUDIT ---
         if (engines.includes('hcs')) {
-            console.log('[Inspekt A11Y] Running HTML CodeSniffer...');
+            console.log('[Inspekt A11Y] Running HTML CodeSniffer…');
             try {
                 const hcsResults = await new Promise((resolve, reject) => {
                     const standard = config.hcsStandard || 'WCAG2AA';
@@ -290,7 +290,7 @@
 
         // --- SITEIMPROVE ALFA (SIA) AUDIT ---
         if (engines.includes('sia')) {
-            console.log('[Inspekt A11Y] Running Siteimprove Alfa...');
+            console.log('[Inspekt A11Y] Running Siteimprove Alfa…');
             try {
                 // Alfa uses runAudit() which returns outcomes array
                 const conformance = config.siaConformance || 'WCAG2.2:AA';

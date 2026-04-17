@@ -38,7 +38,7 @@ The control server (`vm/servers/control-server.py`) on port **8888** is the brid
 // JS fetches from the control server, which runs the command in Docker
 const response = await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/inspekt/${encodeURIComponent(command)}`);
 const data = await response.json();
-// data = { ok: true, output: "...", error: null }
+// data = { ok: true, output: "…", error: null }
 ```
 
 ### Pattern: Clipboard operations

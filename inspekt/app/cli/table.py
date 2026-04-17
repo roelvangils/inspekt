@@ -550,7 +550,7 @@ def wrap_text(
         Wrapped text as a single string with newlines
 
     Example:
-        >>> wrap_text("This is a long warning message...", indent="  ")
+        >>> wrap_text("This is a long warning message…", indent="  ")
         "  This is a long warning message that
           wraps nicely to fit the terminal."
     """
@@ -603,7 +603,7 @@ def print_wrapped(
         err: Whether to print to stderr
 
     Example:
-        >>> print_wrapped("This is a long warning...", fg="yellow")
+        >>> print_wrapped("This is a long warning…", fg="yellow")
     """
     wrapped = wrap_text(text, width, indent, subsequent_indent)
 
@@ -711,7 +711,7 @@ def format_icon_message(
         Wrapped text with icon prefix and 2-space continuation indent
 
     Example:
-        >>> format_icon_message("Long warning message...", icon="⚠")
+        >>> format_icon_message("Long warning message…", icon="⚠")
         "⚠ Long warning message that
           wraps to next line."
     """

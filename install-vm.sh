@@ -77,7 +77,7 @@ preflight() {
   # Check for Xcode Command Line Tools (needed by Homebrew and Rust)
   if ! xcode-select -p &>/dev/null; then
     warn "Xcode Command Line Tools not installed"
-    info "Installing Command Line Tools (this may open a dialog)..."
+    info "Installing Command Line Tools (this may open a dialog)…"
     xcode-select --install 2>/dev/null || true
     echo ""
     echo "  If a dialog appeared, click ${BOLD}Install${RESET} and wait for it to finish."
@@ -99,7 +99,7 @@ check_docker() {
   if command -v docker &>/dev/null; then
     warn "Docker is installed but not running"
     echo ""
-    echo "  Trying to start it..."
+    echo "  Trying to start it…"
     # Try starting whichever Docker app is installed
     open -a OrbStack 2>/dev/null || open -a Docker 2>/dev/null || true
     wait_for_docker
@@ -175,7 +175,7 @@ check_docker() {
 }
 
 wait_for_docker() {
-  info "Waiting for Docker to be ready..."
+  info "Waiting for Docker to be ready…"
 
   local max_wait=300
   local waited=0
@@ -207,7 +207,7 @@ install_via_brew() {
   local brew_args="$2"
 
   if ! command -v brew &>/dev/null; then
-    info "Installing Homebrew first..."
+    info "Installing Homebrew first…"
     echo ""
     # Redirect stdin from /dev/tty so Homebrew runs interactively even under curl | bash
     /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" </dev/tty
@@ -221,7 +221,7 @@ install_via_brew() {
     echo ""
   fi
 
-  info "Installing ${name} via Homebrew..."
+  info "Installing ${name} via Homebrew…"
   brew install $brew_args
 }
 
@@ -249,7 +249,7 @@ check_python() {
   else
     warn "Python 3.11+ not found (required by inspekt)"
     if command -v brew &>/dev/null; then
-      info "Installing Python 3.13 via Homebrew..."
+      info "Installing Python 3.13 via Homebrew…"
       brew install python@3.13
       success "Python 3.13 installed"
     else
@@ -264,7 +264,7 @@ check_uv() {
     return 0
   fi
 
-  info "Installing uv (fast Python package manager)..."
+  info "Installing uv (fast Python package manager)…"
   if command -v brew &>/dev/null; then
     brew install uv
   else
@@ -286,7 +286,7 @@ check_bun() {
     return 0
   fi
 
-  info "Installing bun (JavaScript runtime)..."
+  info "Installing bun (JavaScript runtime)…"
   curl -fsSL https://bun.sh/install | bash
   export PATH="$HOME/.bun/bin:$PATH"
   success "bun installed"
@@ -326,7 +326,7 @@ setup_venv() {
     return 0
   fi
 
-  info "Setting up Python virtual environment..."
+  info "Setting up Python virtual environment…"
   (
     cd "$INSTALL_DIR"
     uv venv --python 3.13 2>/dev/null || uv venv --python 3.12 2>/dev/null || uv venv --python 3.11
@@ -384,13 +384,13 @@ get_source() {
   fi
 
   echo ""
-  info "Fetching the Inspekt source code..."
+  info "Fetching the Inspekt source code…"
 
   if command -v git &>/dev/null; then
-    info "Cloning via Git..."
+    info "Cloning via Git…"
     git clone --depth 1 "$REPO_URL" "$INSTALL_DIR"
   else
-    info "Git not found — downloading tarball instead..."
+    info "Git not found — downloading tarball instead…"
     mkdir -p "$INSTALL_DIR"
     curl -fsSL "$TARBALL_URL" | tar xz -C "$INSTALL_DIR" --strip-components=1
   fi
@@ -441,7 +441,7 @@ cleanup_existing() {
 
 build_image() {
   echo ""
-  info "Building the Docker image..."
+  info "Building the Docker image…"
   echo "  ${DIM}This takes 15-30 minutes the first time (subsequent builds are cached).${RESET}"
   echo ""
 
@@ -460,7 +460,7 @@ build_image() {
 # ── Step 7: Start the container ─────────────────────────────────────────────
 
 start_container() {
-  info "Starting Inspekt VM..."
+  info "Starting Inspekt VM…"
 
   local run_args=(
     -d
@@ -504,7 +504,7 @@ start_container() {
 # ── Step 8: Wait for services ───────────────────────────────────────────────
 
 wait_for_ready() {
-  info "Waiting for services to come up..."
+  info "Waiting for services to come up…"
 
   local max_wait=120
   local waited=0

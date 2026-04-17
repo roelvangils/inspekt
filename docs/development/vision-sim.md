@@ -248,7 +248,7 @@ overlayMaskFn: (x, y) => `radial-gradient(circle at ${x} ${y},
 3. **Add a command palette entry** in `control-panel.html` (search for `ui:vision-`):
    ```js
    { id: 'ui:vision-my', title: 'Vision: My Condition', section: 'Accessibility',
-     keywords: 'vision ...', handler: () => setVisionSimulation('my-condition'),
+     keywords: 'vision …', handler: () => setVisionSimulation('my-condition'),
      content: 'Description' },
    ```
 

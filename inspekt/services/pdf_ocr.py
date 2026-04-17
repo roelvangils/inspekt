@@ -395,8 +395,8 @@ def generate_character_diff(
                 # Add ellipsis placeholder for long unchanged sections
                 diffs.append(TextDiff(
                     diff_type="equal",
-                    pdf_segment="...",
-                    ocr_segment="...",
+                    pdf_segment="…",
+                    ocr_segment="…",
                     position=position,
                 ))
 

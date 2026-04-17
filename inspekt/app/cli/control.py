@@ -975,11 +975,11 @@ def status(ctx, output_json):
                     info_parts = []
                     url = browser.get('url', '')
                     if url:
-                        display_url = url if len(url) <= 45 else url[:42] + '...'
+                        display_url = url if len(url) <= 45 else url[:42] + '…'
                         info_parts.append(display_url)
                     title = browser.get('title', '')
                     if title:
-                        display_title = title if len(title) <= 45 else title[:42] + '...'
+                        display_title = title if len(title) <= 45 else title[:42] + '…'
                         info_parts.append(click.style(display_title, fg="bright_black"))
 
                     # Extension version and connection duration
@@ -1096,7 +1096,7 @@ def status_web(port):
         click.echo(_style_with_inline_code("\nStart it with: `inspekt start`", base_fg="red"), err=True)
         sys.exit(1)
 
-    click.echo(f"Opening {url} in your browser...")
+    click.echo(f"Opening {url} in your browser…")
     webbrowser.open(url)
 
 

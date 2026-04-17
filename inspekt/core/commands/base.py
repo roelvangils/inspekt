@@ -85,7 +85,7 @@ class CommandDefinition:
             id="navigate_to_url",
             name="Navigate to URL",
             category=Category.NAVIGATION,
-            description="Navigate to a URL in the browser...",
+            description="Navigate to a URL in the browser…",
             params_schema=NavigateParams,
             response_schema=NavigateResponse,
             handler="inspekt.core.handlers.navigation.navigate_to_url",

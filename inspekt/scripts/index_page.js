@@ -73,7 +73,7 @@
     // Try text content (truncated)
     const text = el.textContent.trim().replace(/\s+/g, ' ');
     if (text && text.length < 300) return text;
-    if (text && text.length >= 300) return text.substring(0, 297) + '...';
+    if (text && text.length >= 300) return text.substring(0, 297) + '…';
 
     return '';
   }
@@ -331,7 +331,7 @@
     // Debug: Check if this container has any img descendants (recursive)
     const hasImgDescendant = el.querySelector('img') !== null;
     if (hasImgDescendant) {
-      console.log('[Zen Index] Container', tag, 'has IMG descendant, processing', children.length, 'children...');
+      console.log('[Zen Index] Container', tag, 'has IMG descendant, processing', children.length, 'children…');
     }
 
     children.forEach((child, idx) => {

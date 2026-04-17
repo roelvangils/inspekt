@@ -139,7 +139,7 @@ class TestArticleExtractionLogic:
                 "title": "Long Article",
                 "byline": None,
                 "content": long_content,
-                "excerpt": long_content[:200] + "...",
+                "excerpt": long_content[:200] + "…",
                 "length": 300,
                 "url": "https://example.com",
                 "lang": "en"
@@ -149,8 +149,8 @@ class TestArticleExtractionLogic:
         result = mock_client.execute("script")
 
         assert result["result"]["excerpt"]
-        assert result["result"]["excerpt"].endswith("...")
-        assert len(result["result"]["excerpt"]) <= 203  # 200 + "..."
+        assert result["result"]["excerpt"].endswith("…")
+        assert len(result["result"]["excerpt"]) <= 203  # 200 + "…"
 
     def test_handles_missing_article_content(self, mock_client):
         """Test error handling when no article content is found."""

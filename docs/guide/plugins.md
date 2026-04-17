@@ -44,7 +44,7 @@ inspekt plugins
 
 1. Click **Add Plugin** in the header
 2. Choose your import method:
-   - **From Bookmarklet URL**: Paste a `javascript:...` URL
+   - **From Bookmarklet URL**: Paste a `javascript:…` URL
    - **Paste Code**: Enter raw JavaScript directly
 3. Give your plugin a name and click **Add Plugin**
 
@@ -293,7 +293,7 @@ inspekt plugin run <name-or-id> --json
 inspekt plugin unload <name-or-id>
 
 # Create a plugin
-inspekt plugin create "Name" --code "..."
+inspekt plugin create "Name" --code "…"
 inspekt plugin create "Name" --file script.js
 
 # Delete a plugin

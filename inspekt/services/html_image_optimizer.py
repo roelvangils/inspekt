@@ -52,7 +52,7 @@ def parse_data_uri(data_uri: str) -> tuple[str, bytes] | None:
     Parse a data URI into mime type and decoded bytes.
 
     Args:
-        data_uri: Data URI string (e.g., "data:image/jpeg;base64,...")
+        data_uri: Data URI string (e.g., "data:image/jpeg;base64,…")
 
     Returns:
         Tuple of (mime_type, bytes) or None if parsing fails
@@ -247,7 +247,7 @@ def optimize_html_images(
     stats = ImageOptimizationStats()
 
     # Find all img tags with data URIs
-    # Pattern matches <img ... src="data:image/..." ...>
+    # Pattern matches <img ... src="data:image/…" ...>
     img_pattern = re.compile(
         r'(<img\s[^>]*?src\s*=\s*["\'])(data:image/[^"\']+)(["\'][^>]*>)',
         re.IGNORECASE | re.DOTALL,

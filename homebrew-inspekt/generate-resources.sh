@@ -33,7 +33,7 @@ if [ ! -f "../pyproject.toml" ]; then
     exit 1
 fi
 
-echo "Generating resource blocks..."
+echo "Generating resource blocks…"
 echo "Note: This requires inspekt to be installable from PyPI or locally"
 echo
 

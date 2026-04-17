@@ -20,8 +20,8 @@ def get_all_cli_commands(cli_group: Group, prefix: str = "") -> dict[str, dict]:
 
     Returns a dict mapping command paths to metadata:
     {
-        "record": {"name": "record", "help": "...", "hidden": False},
-        "cookies.list": {"name": "list", "help": "...", "hidden": False},
+        "record": {"name": "record", "help": "…", "hidden": False},
+        "cookies.list": {"name": "list", "help": "…", "hidden": False},
     }
 
     Args:

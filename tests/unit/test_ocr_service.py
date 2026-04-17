@@ -238,7 +238,7 @@ class TestOCRResult:
             has_meaningful_text=True,
         )
         assert len(result.preview) == 100
-        assert result.preview.endswith("...")
+        assert result.preview.endswith("…")
 
 
 class TestOCRServiceSingleton:

@@ -152,7 +152,7 @@ class HiddenElementsManager {
      * Reload hidden elements from API and reapply
      */
     async reload() {
-        console.log('[Hidden Elements] Reloading...');
+        console.log('[Hidden Elements] Reloading…');
         await this.loadHiddenElements();
         this.applyHiding();
     }

@@ -50,7 +50,7 @@ export class QuickActionsManager {
      * Initialize manager
      */
     async init() {
-        console.log('[Quick Actions] Initializing manager...');
+        console.log('[Quick Actions] Initializing manager…');
         console.log('[Quick Actions] Dependencies:', {
             elementDisplay: this.elementDisplay,
             elementPicker: this.elementPicker,
@@ -147,7 +147,7 @@ export class QuickActionsManager {
      * Render all action tiles
      */
     render() {
-        console.log('[Quick Actions] Rendering tiles...');
+        console.log('[Quick Actions] Rendering tiles…');
         console.log('[Quick Actions] Grid element:', this.grid);
 
         // Clear grid

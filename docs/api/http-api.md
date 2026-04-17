@@ -142,7 +142,7 @@ uvicorn inspekt.app.api.server:app --workers 4
 ├──────────────┼─────────────────────┼─────────────────┤
 │ Introduction │ POST /navigation/   │ Request:        │
 │              │ open                │ {               │
-│ Navigation   │                     │   "url": "...", │
+│ Navigation   │                     │   "url": "…", │
 │  - open      │ Navigate to a URL   │   "wait": true  │
 │  - back      │                     │ }               │
 │  - forward   │ Parameters:         │                 │
@@ -541,7 +541,7 @@ curl -X POST http://localhost:8000/api/inspection/screenshot \
 {
   "ok": true,
   "result": {
-    "dataUrl": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUg...",
+    "dataUrl": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUg…",
     "width": 800,
     "height": 600
   }
@@ -990,7 +990,7 @@ The API server sends commands to the bridge server, which sends them to the brow
 
 1. Bridge server running (`inspekt server start`)
 2. Browser with extension/userscript
-3. API server running (`uvicorn ...`)
+3. API server running (`uvicorn …`)
 
 ### Q: Why are there two documentation interfaces (Swagger + ReDoc)?
 

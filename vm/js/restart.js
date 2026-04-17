@@ -48,7 +48,7 @@ async function restoreTabsFromStorage() {
 
         if (tabData.length === 0) return;
 
-        showToast(`Restoring ${tabData.length} tab(s)...`);
+        showToast(`Restoring ${tabData.length} tab(s)…`);
         console.log('[Restart] Restoring tabs:', tabData);
 
         // Collect pinned URLs to restore pinned state after tabs are created

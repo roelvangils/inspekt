@@ -941,7 +941,7 @@ def _try_matching_strategies(
         return None, None, 0.0
 
     if verbose:
-        click.echo(f"  Trying {len(elements)} elements in {scope_label}...", err=True)
+        click.echo(f"  Trying {len(elements)} elements in {scope_label}…", err=True)
 
     # 1. TRY CACHE (skip if --no-cache flag is set)
     if cache.is_enabled() and not matched_element and not skip_cache:
@@ -1179,7 +1179,7 @@ def do(instruction, debug, no_execute, force_ai, no_cache, focus, verbose):
             # PHASE 1: Search within viewport elements first
             if viewport_elements:
                 if verbose:
-                    click.echo("Phase 1: Searching in viewport...", err=True)
+                    click.echo("Phase 1: Searching in viewport…", err=True)
 
                 matched_element, match_method, match_score = _try_matching_strategies(
                     matcher=matcher,
@@ -1200,7 +1200,7 @@ def do(instruction, debug, no_execute, force_ai, no_cache, focus, verbose):
             # PHASE 2: If no viewport match, search off-screen elements
             if not matched_element and offscreen_elements:
                 if verbose:
-                    click.echo("Phase 2: Expanding search to off-screen elements...", err=True)
+                    click.echo("Phase 2: Expanding search to off-screen elements…", err=True)
 
                 matched_element, match_method, match_score = _try_matching_strategies(
                     matcher=matcher,
@@ -1280,9 +1280,9 @@ def do(instruction, debug, no_execute, force_ai, no_cache, focus, verbose):
         # If no match found or --force-ai, continue to AI
         if not matched_element or force_ai:
             if force_ai:
-                click.echo(click.style("Forcing AI matching (--force-ai)...", fg="yellow"), err=True)
+                click.echo(click.style("Forcing AI matching (--force-ai)…", fg="yellow"), err=True)
             else:
-                click.echo(click.style("No automatic match found, using AI...", fg="yellow"), err=True)
+                click.echo(click.style("No automatic match found, using AI…", fg="yellow"), err=True)
 
         # Read the prompt
         prompt_path = Path(__file__).parent.parent.parent.parent / "prompts" / "do.prompt"
@@ -1334,7 +1334,7 @@ def do(instruction, debug, no_execute, force_ai, no_cache, focus, verbose):
             click.echo("=" * 80)
             return
 
-        click.echo("Finding matching actions with AI...", err=True)
+        click.echo("Finding matching actions with AI…", err=True)
 
         # Call AI service using the multi-provider system
         # The 'do' command uses a fast model for simple text matching
@@ -1490,7 +1490,7 @@ def do(instruction, debug, no_execute, force_ai, no_cache, focus, verbose):
                     click.echo(f"  → {top_element.get('type')}: {top_element.get('text', 'N/A')[:80]}")
                     if top_element.get('href'):
                         click.echo(f"  → URL: {top_element.get('href')}")
-                click.echo(click.style("Auto-executing...", fg="green"))
+                click.echo(click.style("Auto-executing…", fg="green"))
                 should_execute = True
             else:
                 # Lower confidence - ask for confirmation
@@ -1511,7 +1511,7 @@ def do(instruction, debug, no_execute, force_ai, no_cache, focus, verbose):
             if should_execute:
                 # Execute the action
                 click.echo()
-                click.echo("Executing action...", err=True)
+                click.echo("Executing action…", err=True)
 
                 try:
                     _execute_element_action(client, top_action_id, top_element, instruction)
@@ -1819,7 +1819,7 @@ def _enrich_link_metadata(url: str) -> dict:
                     title = re.sub(r"\s+", " ", title)  # Normalize whitespace
                     enrichment["page_title"] = title
 
-                # Extract language from <html lang="...">
+                # Extract language from <html lang="…">
                 if not enrichment["page_language"]:
                     lang_match = re.search(
                         r'<html[^>]+lang=["\']?([^"\'\s>]+)', html_content, re.IGNORECASE
@@ -1987,7 +1987,7 @@ def links(only_internal, only_external, alphabetically, only_urls, output_json, 
                 href = link["href"]
                 # Truncate long text
                 if len(text) > 60:
-                    text = text[:57] + "..."
+                    text = text[:57] + "…"
                 # Show type indicator
                 ext_icon = get_indicator("external") or "↗"
                 int_icon = get_indicator("internal") or "→"
@@ -2015,7 +2015,7 @@ def links(only_internal, only_external, alphabetically, only_urls, output_json, 
                     if link.get("page_title"):
                         title = link["page_title"]
                         if len(title) > 60:
-                            title = title[:57] + "..."
+                            title = title[:57] + "…"
                         enrichment_lines.append(f"Title: {title}")
 
                     if link.get("page_language"):
@@ -2407,7 +2407,7 @@ def index(no_cache, output, headless, mirror_session, headless_url):
                     timeout=30.0,
                 ) as ctx:
                     click.echo(f"URL: {ctx.url}", err=True)
-                    click.echo("Indexing page structure...", err=True)
+                    click.echo("Indexing page structure…", err=True)
 
                     result = await ctx.execute_script(script)
                     return {"ok": True, "result": result, "url": ctx.url}
@@ -2470,7 +2470,7 @@ def index(no_cache, output, headless, mirror_session, headless_url):
         with builtin_open(script_path) as f:
             script = f.read()
 
-        click.echo("Indexing page structure...", err=True)
+        click.echo("Indexing page structure…", err=True)
         result = client.execute(script, timeout=30.0)
 
         if not result.get("ok"):
@@ -2511,7 +2511,7 @@ def index(no_cache, output, headless, mirror_session, headless_url):
                     image_data_url = ai_service.download_and_convert_image(largest_image["url"])
 
                 if image_data_url:
-                    click.echo("Analyzing largest image with vision AI...", err=True)
+                    click.echo("Analyzing largest image with vision AI…", err=True)
                     vision_description = ai_service.get_image_description(image_data_url)
                 else:
                     click.echo("Warning: No image data available for analysis", err=True)
@@ -2523,7 +2523,7 @@ def index(no_cache, output, headless, mirror_session, headless_url):
                     img_width = largest_image.get("width", 0)
                     img_height = largest_image.get("height", 0)
 
-                    click.echo(f"Inserting description for image: alt='{img_alt[:50]}...', size={img_width}x{img_height}", err=True)
+                    click.echo(f"Inserting description for image: alt='{img_alt[:50]}…', size={img_width}x{img_height}", err=True)
 
                     # Create pattern to find this specific image
                     if img_alt:
@@ -2699,9 +2699,9 @@ def ask(question, debug, no_cache):
                         indexed_content = f.read()
                     click.echo(cached_icon("Using cached index for current page"), err=True)
                 else:
-                    click.echo("No cache found for current page, indexing...", err=True)
+                    click.echo("No cache found for current page, indexing…", err=True)
             else:
-                click.echo("No cache directory, indexing...", err=True)
+                click.echo("No cache directory, indexing…", err=True)
         except Exception as e:
             click.echo(f"Warning: Could not check cache: {e}", err=True)
 
@@ -2717,7 +2717,7 @@ def ask(question, debug, no_cache):
             with builtin_open(script_path) as f:
                 script = f.read()
 
-            click.echo("Indexing current page...", err=True)
+            click.echo("Indexing current page…", err=True)
             result = client.execute(script, timeout=30.0)
 
             if not result.get("ok"):
@@ -2754,7 +2754,7 @@ You will be provided with a comprehensive index of a web page that includes:
 
 Answer the user's question based ONLY on the information provided in the page index.
 Be concise and accurate. If the information is not available in the index, say so.
-Provide specific references when possible (e.g., "In the Main Content section..." or "The navigation includes...").
+Provide specific references when possible (e.g., "In the Main Content section…" or "The navigation includes…").
 
 User Question: {question}
 
@@ -2778,7 +2778,7 @@ PAGE INDEX:
         click.echo("=" * 80)
         return
 
-    click.echo("Asking AI...", err=True)
+    click.echo("Asking AI…", err=True)
     click.echo()
 
     # Call AI service

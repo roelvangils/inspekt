@@ -221,7 +221,7 @@ class ImageClassifier:
             import torch
             from transformers import CLIPModel, CLIPProcessor
 
-            logger.info("Loading CLIP model (first time only)...")
+            logger.info("Loading CLIP model (first time only)…")
 
             # Use a smaller, faster CLIP model
             model_name = "openai/clip-vit-base-patch32"

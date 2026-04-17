@@ -23,7 +23,7 @@ echo ""
 
 # Check if running uninstall
 if [ "$1" = "remove" ] || [ "$1" = "uninstall" ]; then
-    echo "🗑️  Uninstalling Inspekt URL handler..."
+    echo "🗑️  Uninstalling Inspekt URL handler…"
 
     if [ -d "$APP_DIR" ]; then
         sudo rm -rf "$APP_DIR"
@@ -53,17 +53,17 @@ echo "  4. Register inspekt:// protocol"
 echo ""
 
 # Create app bundle structure
-echo "📁 Creating app bundle..."
+echo "📁 Creating app bundle…"
 sudo mkdir -p "$APP_DIR/Contents/MacOS"
 sudo mkdir -p "$APP_DIR/Contents/Resources"
 
 # Copy handler script
-echo "📄 Copying handler script..."
+echo "📄 Copying handler script…"
 sudo cp "$HANDLER_SCRIPT" "$APP_DIR/Contents/Resources/"
 sudo chmod +x "$APP_DIR/Contents/Resources/inspekt_url_handler.py"
 
 # Create launcher script
-echo "🚀 Creating launcher..."
+echo "🚀 Creating launcher…"
 sudo tee "$APP_DIR/Contents/MacOS/Inspekt" > /dev/null <<'EOF'
 #!/bin/bash
 # Inspekt URL Handler Launcher
@@ -81,7 +81,7 @@ EOF
 sudo chmod +x "$APP_DIR/Contents/MacOS/Inspekt"
 
 # Create Info.plist
-echo "⚙️  Creating Info.plist..."
+echo "⚙️  Creating Info.plist…"
 sudo tee "$APP_DIR/Contents/Info.plist" > /dev/null <<'EOF'
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -123,7 +123,7 @@ sudo tee "$APP_DIR/Contents/Info.plist" > /dev/null <<'EOF'
 EOF
 
 # Register with LaunchServices
-echo "🔗 Registering protocol with macOS..."
+echo "🔗 Registering protocol with macOS…"
 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/LaunchServices.framework/Versions/A/Support/lsregister -f "$APP_DIR"
 
 # Wait a moment for registration
@@ -131,7 +131,7 @@ sleep 1
 
 # Verify registration
 echo ""
-echo "🔍 Verifying installation..."
+echo "🔍 Verifying installation…"
 if /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/LaunchServices.framework/Versions/A/Support/lsregister -dump | grep -q "inspekt:"; then
     echo "✓ Protocol registered successfully!"
 else

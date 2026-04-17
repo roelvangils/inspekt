@@ -182,7 +182,7 @@ function showSplash(message) {
     const splash = document.getElementById('splashScreen');
     if (splash) {
         splash.classList.remove('hidden');
-        updateSplashStatus(message || 'Reconnecting...');
+        updateSplashStatus(message || 'Reconnecting…');
     }
 }
 
@@ -202,7 +202,7 @@ function showReconnectOverlay(message) {
     }
     overlay.innerHTML = `
         <div style="width:24px;height:24px;border:2px solid #555;border-top-color:#aaa;border-radius:50%;animation:spin 1s linear infinite"></div>
-        <div>${message || 'Reconnecting...'}</div>
+        <div>${message || 'Reconnecting…'}</div>
         <style>@keyframes spin{to{transform:rotate(360deg)}}</style>
     `;
     overlay.style.display = 'flex';
@@ -309,9 +309,9 @@ async function connectVNC() {
 
     // Show appropriate UI: full splash on first load, canvas-only overlay on reconnect
     if (_isReconnect) {
-        showReconnectOverlay('Reconnecting...');
+        showReconnectOverlay('Reconnecting…');
     } else {
-        updateSplashStatus('Connecting to VM...');
+        updateSplashStatus('Connecting to VM…');
     }
 
     // Clean up previous RFB instance on reconnect.
@@ -350,12 +350,12 @@ async function connectVNC() {
         });
     } catch (err) {
         // RFB constructor or import failed (e.g. websockify not available yet)
-        console.warn('[VNC] Connection failed, retrying...', err);
+        console.warn('[VNC] Connection failed, retrying…', err);
         _isConnecting = false;
         const delay = Math.min(1000 * Math.pow(2, _rfbReconnectAttempts), _RFB_MAX_RECONNECT_DELAY);
         _rfbReconnectAttempts++;
         _isReconnect = true;
-        showReconnectOverlay(`Connection failed. Retrying in ${Math.round(delay/1000)}s...`);
+        showReconnectOverlay(`Connection failed. Retrying in ${Math.round(delay/1000)}s…`);
         setTimeout(connectVNC, delay);
         return;
     }
@@ -373,7 +373,7 @@ async function connectVNC() {
         _isReconnect = true;
         const delay = Math.min(1000 * Math.pow(2, _rfbReconnectAttempts), _RFB_MAX_RECONNECT_DELAY);
         _rfbReconnectAttempts++;
-        showReconnectOverlay('Connection timed out. Retrying...');
+        showReconnectOverlay('Connection timed out. Retrying…');
         setTimeout(connectVNC, delay);
     }, 5000);
 
@@ -431,7 +431,7 @@ async function connectVNC() {
         const delay = Math.min(1000 * Math.pow(2, _rfbReconnectAttempts), _RFB_MAX_RECONNECT_DELAY);
         _rfbReconnectAttempts++;
         console.log(`[VNC] Disconnected after ${timeSinceConnect}ms, retrying in ${delay}ms`);
-        showReconnectOverlay('Connection lost. Reconnecting...');
+        showReconnectOverlay('Connection lost. Reconnecting…');
         setTimeout(connectVNC, delay);
     });
 
@@ -564,7 +564,7 @@ document.addEventListener('click', (e) => {
 
 // Show Chrome browser
 async function showChrome() {
-    showToast('Focusing Chrome...');
+    showToast('Focusing Chrome…');
     try {
         const response = await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/chrome`);
         const data = await response.json();

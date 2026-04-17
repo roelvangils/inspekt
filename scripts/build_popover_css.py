@@ -116,7 +116,7 @@ def update_js_file(js_path: Path, minified_css: str, function_name: str) -> bool
 
     Looks for a function like:
         function getPopoverCSS() {
-            return `...`;
+            return `…`;
         }
 
     And replaces the content between the backticks.
@@ -190,7 +190,7 @@ def main():
 
     # Check for --apply flag
     if '--apply' in sys.argv:
-        print("\nApplying changes...")
+        print("\nApplying changes…")
 
         updated_files = []
 
@@ -221,7 +221,7 @@ def main():
             print("No files were updated (CSS may already be up to date)")
     else:
         print("\n--- Base Minified CSS ---")
-        print(minified_css[:500] + "..." if len(minified_css) > 500 else minified_css)
+        print(minified_css[:500] + "…" if len(minified_css) > 500 else minified_css)
         print("\n--- End ---")
         print("\nTo apply changes to run_axe.js, run_ibm.js, and run_a11y.js, run:")
         print("  python scripts/build_popover_css.py --apply")

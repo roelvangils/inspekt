@@ -440,7 +440,7 @@ def selected(raw, output_json):
         click.echo(f'"{text_content}"')
     else:
         # Show first 200 chars with ellipsis
-        click.echo(f'"{text_content[:200]}..."')
+        click.echo(f'"{text_content[:200]}…"')
         click.echo("")
         click.echo(f"(showing first 200 of {len(text_content)} characters)")
 
@@ -467,4 +467,4 @@ def selected(raw, output_json):
         if len(html) <= 200:
             click.echo(f"  {html}")
         else:
-            click.echo(f"  {html[:200]}...")
+            click.echo(f"  {html[:200]}…")

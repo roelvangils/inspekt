@@ -234,7 +234,7 @@ The Firefox extension provides **full compatibility** with all websites, includi
    ```
 
 3. **Load the extension**:
-   - Click "Load Temporary Add-on..."
+   - Click "Load Temporary Add-on…"
    - Select the `manifest.json` file from `extensions/firefox/`
 
 4. **Verify installation**:

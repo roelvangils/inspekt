@@ -317,7 +317,7 @@ class ProcessManager:
         def handle_signal(sig: int) -> None:
             if self.shutdown_requested:
                 # Second signal - force shutdown
-                click.echo("\nForce shutting down...")
+                click.echo("\nForce shutting down…")
                 self.shutdown_event.set()
                 return
 
@@ -354,7 +354,7 @@ class ProcessManager:
             self.shutdown_event.set()
         else:
             self.shutdown_requested = False
-            click.echo("Continuing...")
+            click.echo("Continuing…")
 
     async def shutdown_all(self, force: bool = False) -> None:
         """Stop all managed processes gracefully."""

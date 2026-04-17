@@ -43,7 +43,7 @@ Both extensions now include **explicit opt-in per domain**:
 **Installation:**
 1. Download the extension files
 2. Navigate to `about:debugging#/runtime/this-firefox`
-3. Click "Load Temporary Add-on..."
+3. Click "Load Temporary Add-on…"
 4. Select `manifest.json` from `extensions/firefox/`
 
 [Read full Firefox guide →](firefox/README.md)

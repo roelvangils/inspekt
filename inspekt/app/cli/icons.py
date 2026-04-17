@@ -418,51 +418,37 @@ def get_platform_icon() -> str | None:
 
 
 def success(message: str) -> str:
-    """
-    Format a success message with appropriate icon.
+    """Format a success message with a status prefix.
 
-    Args:
-        message: The success message text
-
-    Returns:
-        Message prefixed with  (nerdfont) or ✓ (fallback)
+    Returns "<icon> message" where <icon> is the nerdfont glyph when
+    nerdfonts are enabled, otherwise the plain-text label "[ok]".
     """
     from inspekt.config import is_nerdfont_enabled
 
-    icon = STATUS_ICONS["pass"] if is_nerdfont_enabled() else "\u2713"
+    icon = STATUS_ICONS["pass"] if is_nerdfont_enabled() else "[ok]"
     return f"{icon} {message}"
 
 
 def error(message: str) -> str:
-    """
-    Format an error message with appropriate icon.
+    """Format an error message with a status prefix.
 
-    Args:
-        message: The error message text
-
-    Returns:
-        Message prefixed with  (nerdfont) or ✗ (fallback)
+    Nerdfont glyph when available, otherwise "[fail]".
     """
     from inspekt.config import is_nerdfont_enabled
 
-    icon = STATUS_ICONS["fail"] if is_nerdfont_enabled() else "\u2717"
+    icon = STATUS_ICONS["fail"] if is_nerdfont_enabled() else "[fail]"
     return f"{icon} {message}"
 
 
 def warning(message: str) -> str:
-    """
-    Format a warning message with appropriate icon.
+    """Format a warning message with a status prefix.
 
-    Args:
-        message: The warning message text
-
-    Returns:
-        Message prefixed with  (nerdfont) or ⚠ (fallback)
+    Nerdfont glyph when available, otherwise "[warn]".
     """
     from inspekt.config import is_nerdfont_enabled
 
-    icon = STATUS_ICONS["warning"] if is_nerdfont_enabled() else "\u26a0"
-    return f"{icon}  {message}"
+    icon = STATUS_ICONS["warning"] if is_nerdfont_enabled() else "[warn]"
+    return f"{icon} {message}"
 
 
 def info(message: str) -> str:

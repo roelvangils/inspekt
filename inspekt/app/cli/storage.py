@@ -510,14 +510,14 @@ def _display_cookie_list(cookies):
         if value_parsed and value_parsed != value:
             # Value was successfully parsed
             click.echo(f"    {name}:")
-            click.echo(f"      Value: {value[:50]}..." if len(value) > 50 else f"      Value: {value}")
+            click.echo(f"      Value: {value[:50]}…" if len(value) > 50 else f"      Value: {value}")
             if isinstance(value_parsed, (dict, list)):
                 parsed_str = json.dumps(value_parsed, indent=2)
                 for line in parsed_str.split("\n"):
                     click.echo(f"      {line}")
         else:
             # Plain value
-            display_value = value if len(value) <= 50 else value[:50] + "..."
+            display_value = value if len(value) <= 50 else value[:50] + "…"
             click.echo(f"    {name} = {display_value}")
 
         # Show key metadata
@@ -551,7 +551,7 @@ def _display_key_value_items(items, indent="  "):
                 click.echo(f"{indent}  - {item}")
         else:
             # Plain value
-            display_value = str(value) if len(str(value)) <= 60 else str(value)[:60] + "..."
+            display_value = str(value) if len(str(value)) <= 60 else str(value)[:60] + "…"
             click.echo(f"{indent}{key} = {display_value}")
 
 

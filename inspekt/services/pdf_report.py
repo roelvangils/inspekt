@@ -2920,7 +2920,7 @@ def _generate_about_document_section(
     if custom_metadata:
         for key, value in custom_metadata.items():
             # Truncate long values
-            display_value = value[:100] + "..." if len(value) > 100 else value
+            display_value = value[:100] + "…" if len(value) > 100 else value
 
             # Check if it's a code-styled field
             if key in CODE_STYLED_FIELDS:
@@ -3097,7 +3097,7 @@ def _generate_issue_screenshots_section(
             <img src="{viz.screenshot_path}" alt="Screenshot of issue: {_escape_html(viz.rule_id)}" loading="lazy">
             <div class="issue-card-body">
                 <h4 class="issue-card-title">{_escape_html(viz.rule_id)}</h4>
-                <p class="issue-card-desc">{_escape_html(viz.description[:150])}{'...' if len(viz.description) > 150 else ''}</p>
+                <p class="issue-card-desc">{_escape_html(viz.description[:150])}{'…' if len(viz.description) > 150 else ''}</p>
                 <p class="issue-card-page">Page {viz.page_num + 1}</p>
             </div>
         </div>
@@ -3619,15 +3619,15 @@ def _build_tree_html(node, depth: int = 0, figure_thumbnails: dict | None = None
 
     # For headings (H1-H6), show bold preview text
     if node.is_heading and node.text_content:
-        preview = node.text_content[:30] + "..." if len(node.text_content) > 30 else node.text_content
+        preview = node.text_content[:30] + "…" if len(node.text_content) > 30 else node.text_content
         content += f' <span class="heading-preview">{_escape_html(preview)}</span>'
     elif node.text_content:
         # Non-heading text preview
-        preview = node.text_content[:50] + "..." if len(node.text_content) > 50 else node.text_content
+        preview = node.text_content[:50] + "…" if len(node.text_content) > 50 else node.text_content
         content += f' <span class="tag-preview">"{_escape_html(preview)}"</span>'
 
     if node.alt_text:
-        alt_preview = node.alt_text[:30] + "..." if len(node.alt_text) > 30 else node.alt_text
+        alt_preview = node.alt_text[:30] + "…" if len(node.alt_text) > 30 else node.alt_text
         content += f' <span class="tag-alt">[alt: {_escape_html(alt_preview)}]</span>'
     if node.has_issues:
         content += ' <span class="tag-warning">⚠</span>'
@@ -4688,7 +4688,7 @@ def _generate_content_audit_section(
                         logger.info(f"Limiting classification to first {max_classification} of {len(result.images)} images")
                         images_to_classify = result.images[:max_classification]
                     else:
-                        logger.info(f"Classifying {len(result.images)} images...")
+                        logger.info(f"Classifying {len(result.images)} images…")
 
                     auditor.classify_images(
                         images_to_classify,
@@ -4713,7 +4713,7 @@ def _generate_content_audit_section(
                         doc_title = None
 
                     images_for_alt = result.images[:max_alt_text] if max_alt_text > 0 else result.images
-                    logger.info(f"Generating AI alt-text suggestions for {len(images_for_alt)} images...")
+                    logger.info(f"Generating AI alt-text suggestions for {len(images_for_alt)} images…")
                     auditor.generate_alt_text_suggestions(
                         images_for_alt,
                         ai_provider=ai_provider,
@@ -5058,7 +5058,7 @@ def _generate_content_audit_section(
                 dest_html = ""
                 if link.destination:
                     dest_escaped = _escape_html(link.destination)
-                    dest_truncated = link.destination[:60] + "..." if len(link.destination) > 60 else link.destination
+                    dest_truncated = link.destination[:60] + "…" if len(link.destination) > 60 else link.destination
                     if link.destination_type == "uri" and link.destination.startswith(("http://", "https://")):
                         # External link - make clickable
                         dest_html = f'<a href="{dest_escaped}" target="_blank" rel="noopener noreferrer" class="link-url" title="{dest_escaped}">{_escape_html(dest_truncated)}</a>'
@@ -5120,7 +5120,7 @@ def _generate_content_audit_section(
                 issues_html = ""
                 if lst.issues:
                     issues_escaped = "; ".join(_escape_html(i) for i in lst.issues[:2])
-                    issues_html = f'<span class="list-issues" title="{issues_escaped}">{issues_escaped[:40]}{"..." if len(issues_escaped) > 40 else ""}</span>'
+                    issues_html = f'<span class="list-issues" title="{issues_escaped}">{issues_escaped[:40]}{"…" if len(issues_escaped) > 40 else ""}</span>'
                 else:
                     issues_html = '<span class="no-issues">None</span>'
 

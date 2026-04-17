@@ -366,7 +366,7 @@ class PreviewTreePanel {
         let textPreview = '';
         if (node.text_content) {
             const preview = node.text_content.length > 35
-                ? node.text_content.substring(0, 35) + '...'
+                ? node.text_content.substring(0, 35) + '…'
                 : node.text_content;
             textPreview = `<span class="tree-text-preview">"${this.escapeHtml(preview)}"</span>`;
         }
@@ -374,7 +374,7 @@ class PreviewTreePanel {
         // Heading preview (bold)
         if (node.is_heading && node.text_content) {
             const preview = node.text_content.length > 30
-                ? node.text_content.substring(0, 30) + '...'
+                ? node.text_content.substring(0, 30) + '…'
                 : node.text_content;
             textPreview = `<span class="tree-heading-preview">${this.escapeHtml(preview)}</span>`;
         }
@@ -509,7 +509,7 @@ class PreviewTreePanel {
             let textPreview = '';
             if (tag.text_preview) {
                 const preview = tag.text_preview.length > 35
-                    ? tag.text_preview.substring(0, 35) + '...'
+                    ? tag.text_preview.substring(0, 35) + '…'
                     : tag.text_preview;
                 textPreview = `<span class="tree-text-preview">"${this.escapeHtml(preview)}"</span>`;
             }

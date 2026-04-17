@@ -592,7 +592,7 @@ function handleDragEnd(e) {
 
 async function tearOffTab(tab) {
     try {
-        showToast('Opening in new window...', '', 2000);
+        showToast('Opening in new window…', '', 2000);
         // Duplicate the tab in the VM's Chromium (creates a new cloud tab)
         const newTabId = await _addCloudTab(tab.url);
         if (!newTabId) {
@@ -865,7 +865,7 @@ function _setupCanvasEventInterceptors() {
 
 // Initialize
 window.addEventListener('load', () => {
-    updateSplashStatus('Loading...');
+    updateSplashStatus('Loading…');
     initToolbar();
     initVisionSimulator();
     initMotorSimulator();

@@ -288,7 +288,7 @@ pub async fn check_pdf(
     let _ = app.emit(
         "check-progress",
         CheckProgress {
-            step: "Starting PDF check...".to_string(),
+            step: "Starting PDF check…".to_string(),
             percentage: 0,
         },
     );
@@ -301,7 +301,7 @@ pub async fn check_pdf(
             timestamp_ms: 0,
             step_id: None,
             substep_id: None,
-            label: Some("Starting PDF check...".to_string()),
+            label: Some("Starting PDF check…".to_string()),
             note: None,
             progress_percent: Some(0),
             current: None,
@@ -362,7 +362,7 @@ pub async fn check_pdf(
     let _ = app.emit(
         "check-progress",
         CheckProgress {
-            step: "Analyzing PDF structure...".to_string(),
+            step: "Analyzing PDF structure…".to_string(),
             percentage: 10,
         },
     );
@@ -435,7 +435,7 @@ pub async fn check_pdf(
                         event
                             .step_id
                             .clone()
-                            .unwrap_or_else(|| "Processing...".to_string())
+                            .unwrap_or_else(|| "Processing…".to_string())
                     });
                     let legacy_pct = event.progress_percent.unwrap_or(50);
                     let _ = app_clone.emit(
@@ -518,7 +518,7 @@ pub async fn check_pdf(
     let _ = app.emit(
         "check-progress",
         CheckProgress {
-            step: "Processing results...".to_string(),
+            step: "Processing results…".to_string(),
             percentage: 90,
         },
     );

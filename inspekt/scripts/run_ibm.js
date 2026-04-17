@@ -229,11 +229,11 @@
             if (tagMatch) {
                 const openTag = tagMatch[0];
                 if (openTag.length <= maxLength) {
-                    return openTag + '...';
+                    return openTag + '…';
                 }
             }
 
-            return outer.substring(0, maxLength) + '...';
+            return outer.substring(0, maxLength) + '…';
         }
 
         /**

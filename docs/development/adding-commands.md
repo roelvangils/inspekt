@@ -208,7 +208,7 @@ def my_command(my_arg, my_option, debug):
             script = f.read()
 
         # 4. Execute script
-        click.echo("Processing...", err=True)
+        click.echo("Processing…", err=True)
         result = client.execute(script, timeout=30.0)
 
         if not result.get("ok"):
@@ -494,7 +494,7 @@ except (ConnectionError, TimeoutError, RuntimeError) as e:
 
 **Solution**: Use `err=True` for progress/status messages:
 ```python
-click.echo("Processing...", err=True)  # Goes to stderr
+click.echo("Processing…", err=True)  # Goes to stderr
 click.echo(actual_output)              # Goes to stdout
 ```
 

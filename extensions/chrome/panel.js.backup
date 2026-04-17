@@ -287,7 +287,7 @@ function updateCurrentElement(element) {
 
     if (element.textContent) {
         const shortText = element.textContent.length > 60
-            ? element.textContent.substring(0, 60) + '...'
+            ? element.textContent.substring(0, 60) + '…'
             : element.textContent;
         infoContainer.appendChild(createInfoRow('Text', shortText));
     }
@@ -685,7 +685,7 @@ function activateElementPicker() {
                     }
 
                     // Show feedback
-                    btnPickElement.textContent = 'Picking...';
+                    btnPickElement.textContent = 'Picking…';
                     btnPickElement.disabled = true;
                     btnPickElement.classList.add('success-flash');
 

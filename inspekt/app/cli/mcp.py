@@ -173,7 +173,7 @@ def info(output_json):
                 # Truncate description to first sentence for cleaner output
                 desc = tool.description.split(". ")[0]
                 if len(desc) > 60:
-                    desc = desc[:57] + "..."
+                    desc = desc[:57] + "…"
 
                 click.echo(f"  • {tool.name}")
                 click.echo(f"    {desc}")
@@ -329,7 +329,7 @@ def test():
     # Check bridge server
     client = BridgeClient()
 
-    click.echo("1. Checking bridge server...")
+    click.echo("1. Checking bridge server…")
     if not client.is_alive():
         from inspekt.app.cli.table import _style_with_inline_code
         click.echo("   ✗ Bridge server is NOT running", err=True)
@@ -355,7 +355,7 @@ def test():
         click.echo("   Browser connected: False")
 
     # Test basic JavaScript execution
-    click.echo("\n2. Testing JavaScript execution...")
+    click.echo("\n2. Testing JavaScript execution…")
     try:
         result = client.execute("1 + 1", timeout=5.0)
         if result.get("ok") and result.get("result") == 2:
@@ -368,7 +368,7 @@ def test():
         sys.exit(1)
 
     # Test script loading
-    click.echo("\n3. Testing script loader...")
+    click.echo("\n3. Testing script loader…")
     try:
         from inspekt.services.script_loader import ScriptLoader
 
@@ -384,7 +384,7 @@ def test():
         sys.exit(1)
 
     # Test MCP resources
-    click.echo("\n4. Testing MCP resources...")
+    click.echo("\n4. Testing MCP resources…")
     try:
         from inspekt.app.mcp.resources import ResourceProvider
         from inspekt.services.bridge_executor import BridgeExecutor
@@ -409,7 +409,7 @@ def test():
         sys.exit(1)
 
     # Test MCP tool
-    click.echo("\n5. Testing MCP tools...")
+    click.echo("\n5. Testing MCP tools…")
     try:
         from inspekt.app.mcp.tools import ToolProvider
         from inspekt.app.mcp import schemas

@@ -433,7 +433,7 @@ const InspektWebSocketClient = (() => {
             return;
         }
 
-        console.log('[Inspekt] Connecting to WebSocket server...');
+        console.log('[Inspekt] Connecting to WebSocket server…');
 
         try {
             ws = new WebSocket(WS_URL);
@@ -458,7 +458,7 @@ const InspektWebSocketClient = (() => {
             ws.onmessage = handleMessage;
 
             ws.onclose = (event) => {
-                console.log('[Inspekt] Disconnected (code:', event.code, '). Reconnecting...');
+                console.log('[Inspekt] Disconnected (code:', event.code, '). Reconnecting…');
                 ws = null;
                 updateMainWorldStatus(false);
                 clearKeepaliveTimer();
@@ -494,7 +494,7 @@ const InspektWebSocketClient = (() => {
      */
     async function initialize() {
         if (isFrontTab()) {
-            console.log('[Inspekt] Initializing WebSocket connection...');
+            console.log('[Inspekt] Initializing WebSocket connection…');
             connect();
         }
     }
@@ -535,7 +535,7 @@ const InspektWebSocketClient = (() => {
             // Always try to connect/reconnect when permissions change
             // The permission check happens per-request in ws.onmessage
             if (!ws || ws.readyState !== WebSocket.OPEN) {
-                console.log('[Inspekt] Permissions changed, reconnecting...');
+                console.log('[Inspekt] Permissions changed, reconnecting…');
                 connect();
             }
         }

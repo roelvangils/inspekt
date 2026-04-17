@@ -97,7 +97,7 @@ def _truncate_value(value: str, max_len: int = 55) -> str:
     """Truncate a value with ellipsis if too long."""
     if len(value) <= max_len:
         return value
-    return value[: max_len - 3] + "..."
+    return value[: max_len - 3] + "…"
 
 
 def _get_bridge_client() -> BridgeClient:

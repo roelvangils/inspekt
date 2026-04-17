@@ -96,7 +96,7 @@ inspekt> document.querySelectorAll('h1')[0].textContent
 
 // Create an array of links
 inspekt> Array.from(document.links).map(a => ({text: a.textContent, href: a.href}))
-[{text: "More information...", href: "https://www.iana.org/domains/example"}]
+[{text: "More information…", href: "https://www.iana.org/domains/example"}]
 
 // Exit the REPL
 inspekt> exit

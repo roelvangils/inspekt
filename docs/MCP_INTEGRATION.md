@@ -229,7 +229,7 @@ Once configured, Claude Desktop can use Inspekt tools during conversations. You 
 >
 > **Claude:** *Uses `navigate_to_url` and `extract_links` tools automatically*
 >
-> "I've navigated to example.com and found 5 links on the page: ..."
+> "I've navigated to example.com and found 5 links on the page: …"
 
 **Page analysis:**
 
@@ -237,7 +237,7 @@ Once configured, Claude Desktop can use Inspekt tools during conversations. You 
 >
 > **Claude:** *Uses `extract_article` tool*
 >
-> "I've extracted the main article content. It's about..."
+> "I've extracted the main article content. It's about…"
 
 **Browser interaction:**
 
@@ -245,7 +245,7 @@ Once configured, Claude Desktop can use Inspekt tools during conversations. You 
 >
 > **Claude:** *Uses `click_element` and `type_text` tools*
 >
-> "I've clicked the Sign In button and entered your email..."
+> "I've clicked the Sign In button and entered your email…"
 
 ### Checking Available Tools
 

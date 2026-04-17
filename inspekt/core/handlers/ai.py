@@ -773,7 +773,7 @@ def _format_event_handlers_section(handlers_data: dict) -> str:
         event_type = h.get("type", "unknown")
         code = h.get("code", "")
         if len(code) > 100:
-            code = code[:100] + "..."
+            code = code[:100] + "…"
 
         if source == "addEventListener":
             line_info = ""
@@ -1219,7 +1219,7 @@ def _format_element_context(element_data: dict) -> str:
     # Text content (truncated)
     text = element_data.get("textContent", "")
     if text:
-        lines.append(f"Text Content: \"{text[:100]}{'...' if len(text) > 100 else ''}\"")
+        lines.append(f"Text Content: \"{text[:100]}{'…' if len(text) > 100 else ''}\"")
 
     return "\n".join(lines)
 
@@ -1918,7 +1918,7 @@ async def element_ask(params: ElementAskParams) -> ElementAskResponse:
         url_code = "(function() { return window.location.href; })()"
         url_result = await asyncio.to_thread(executor.execute, url_code, 5.0)
         current_url = url_result.get("result", "") if url_result.get("ok") else ""
-        debug_print(f"Step 0: Got URL for cache: {current_url[:50]}...")
+        debug_print(f"Step 0: Got URL for cache: {current_url[:50]}…")
 
         # Step 1: Get element data
         debug_print(f"Step 1: Getting element data for source='{params.source}'")
@@ -1938,7 +1938,7 @@ async def element_ask(params: ElementAskParams) -> ElementAskResponse:
         if not params.debug and current_url and content_cache.is_enabled("element_ask"):
             fingerprint = content_cache.create_element_ask_fingerprint(element_data, params.question)
             cache_key = content_cache.get_element_cache_key(element_data, params.question)
-            debug_print(f"Step 1.5: Checking cache with key={cache_key[:16]}...")
+            debug_print(f"Step 1.5: Checking cache with key={cache_key[:16]}…")
 
             cached = content_cache.get_cached_content(
                 url=current_url,

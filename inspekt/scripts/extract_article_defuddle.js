@@ -60,7 +60,7 @@
     // Create excerpt (first 200 chars of text)
     var excerpt = textContent.substring(0, 200);
     if (textContent.length > 200) {
-      excerpt += '...';
+      excerpt += '…';
     }
 
     // Get published date - Defuddle returns it directly

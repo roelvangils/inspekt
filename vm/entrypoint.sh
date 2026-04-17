@@ -94,7 +94,7 @@ chmod 666 /var/cache/inspekt/sitemaps/*.json 2>/dev/null || true
 # the extension loads fresh code from the bind-mounted source files
 CHROMIUM_PROFILE="/root/.config/chromium"
 if [ -d "$CHROMIUM_PROFILE/Default" ]; then
-    echo "Clearing Chromium caches..."
+    echo "Clearing Chromium caches…"
     rm -rf \
         "$CHROMIUM_PROFILE/Default/Service Worker" \
         "$CHROMIUM_PROFILE/Default/Extension Scripts" \

@@ -123,7 +123,7 @@ class OCRResult:
         """Get a short preview of the extracted text (max 100 chars)."""
         if len(self.cleaned_text) <= 100:
             return self.cleaned_text
-        return self.cleaned_text[:97] + "..."
+        return self.cleaned_text[:97] + "…"
 
 
 # ═══════════════════════════════════════════════════════════════

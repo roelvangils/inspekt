@@ -183,7 +183,7 @@ def inject_userscript(page: Page, ws_port: int = 8766) -> None:
                 }};
 
                 ws.onclose = () => {{
-                    console.log('[Inspekt] Disconnected, reconnecting...');
+                    console.log('[Inspekt] Disconnected, reconnecting…');
                     setTimeout(connect, 1000);
                 }};
             }}

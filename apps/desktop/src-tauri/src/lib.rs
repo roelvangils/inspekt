@@ -204,7 +204,7 @@ async fn check_vm_status() -> Result<VmStatus, String> {
 /// Start the VM, emitting progress events to the frontend.
 #[tauri::command]
 async fn start_vm(app: tauri::AppHandle) -> Result<(), String> {
-    let _ = app.emit("vm-progress", "Checking Docker...");
+    let _ = app.emit("vm-progress", "Checking Docker…");
 
     let docker_ok = check_docker().await.unwrap_or(false);
     if !docker_ok {
@@ -219,7 +219,7 @@ async fn start_vm(app: tauri::AppHandle) -> Result<(), String> {
         return Ok(());
     }
 
-    let _ = app.emit("vm-progress", "Starting VM...");
+    let _ = app.emit("vm-progress", "Starting VM…");
 
     // Shell out to `inspekt vm start --no-open` which handles all Docker logic
     let output = tokio::process::Command::new("inspekt")
@@ -249,7 +249,7 @@ async fn start_vm(app: tauri::AppHandle) -> Result<(), String> {
     }
 
     // Poll health endpoint until ready
-    let _ = app.emit("vm-progress", "Waiting for VM to become ready...");
+    let _ = app.emit("vm-progress", "Waiting for VM to become ready…");
 
     for i in 0..60 {
         if check_health_once().await {
@@ -271,7 +271,7 @@ async fn start_vm(app: tauri::AppHandle) -> Result<(), String> {
 /// Stop the VM.
 #[tauri::command]
 async fn stop_vm(app: tauri::AppHandle) -> Result<(), String> {
-    let _ = app.emit("vm-progress", "Stopping VM...");
+    let _ = app.emit("vm-progress", "Stopping VM…");
 
     let output = tokio::process::Command::new("inspekt")
         .args(["vm", "stop"])
@@ -479,7 +479,7 @@ fn show_vm_toast(app: &tauri::AppHandle, message: &str, toast_type: &str) {
 
 /// Copy inspekt output to clipboard and show a toast in the VM webview.
 async fn copy_inspekt_with_toast(app: tauri::AppHandle, command: &str, label: &str) {
-    show_vm_toast(&app, &format!("Copying {label}..."), "");
+    show_vm_toast(&app, &format!("Copying {label}…"), "");
     match copy_inspekt_output(app.clone(), command).await {
         Ok(_) => show_vm_toast(&app, &format!("{label} copied!"), "success"),
         Err(e) => show_vm_toast(&app, &e, "error"),

@@ -434,7 +434,7 @@ inspekt axe --level 21aa
 # Create git hook: .git/hooks/pre-commit
 #!/bin/bash
 
-echo "Running accessibility audit..."
+echo "Running accessibility audit…"
 
 inspekt open http://localhost:3000 --wait
 RESULT=$(inspekt axe --level 21aa --json)
@@ -607,7 +607,7 @@ PAGES=(
 )
 
 for page in "${PAGES[@]}"; do
-  echo "Testing $page..."
+  echo "Testing $page…"
   inspekt open "https://example.com$page" --wait
   inspekt axe --level 21aa --json > "audit-${page//\//-}.json"
 done

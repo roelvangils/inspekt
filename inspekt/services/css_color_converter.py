@@ -139,8 +139,8 @@ def add_cross_ref_comments(css_content: str, cross_ref_values: dict[str, str]) -
             comment_end = stripped.index("*/")
             existing_text = stripped[comment_start:comment_end].strip()
 
-            # "which" flows naturally after variable references ("Uses --foo which resolves to...")
-            # A semicolon works better after descriptive comments ("2.6rem relative to root; resolves to...")
+            # "which" flows naturally after variable references ("Uses --foo which resolves to…")
+            # A semicolon works better after descriptive comments ("2.6rem relative to root; resolves to…")
             if existing_text.startswith("Uses "):
                 connector = f"which {xref} "
             else:

@@ -337,7 +337,7 @@ Rule: Higher layers can import lower layers, but NOT vice versa
 ┌────────────────────────▼─────────────────────────────────────────────┐
 │ 8. CLIENT POLLS AND RETRIEVES (inspekt/client.py)                      │
 │    GET /result?request_id=...                                       │
-│    ← {"ok": true, "result": "Example Domain", "url": "...", ...}   │
+│    ← {"ok": true, "result": "Example Domain", "url": "…", ...}   │
 └────────────────────────┬─────────────────────────────────────────────┘
                          │
 ┌────────────────────────▼─────────────────────────────────────────────┐
@@ -1266,7 +1266,7 @@ CLI → ScriptLoader.load_script_sync("control.js")
          ↓
       Read from disk (inspekt/scripts/control.js)
          ↓
-      Store in cache {"control.js": "...content..."}
+      Store in cache {"control.js": "...content…"}
          ↓
       Return content
 

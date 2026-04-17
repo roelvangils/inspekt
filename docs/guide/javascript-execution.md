@@ -818,7 +818,7 @@ inspekt eval "Array.from(document.querySelectorAll('.product')).map(p => p.query
 
 ```bash
 inspekt eval "
-  console.log('Starting extraction...');
+  console.log('Starting extraction…');
   const products = document.querySelectorAll('.product');
   console.log('Found products:', products.length);
   const data = Array.from(products).map(p => {

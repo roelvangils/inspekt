@@ -67,7 +67,7 @@ Now interact with the page normally:
 Each action appears in real-time:
 
 ```
-  click: a "More information..."
+  click: a "More information…"
   navigate: https://www.iana.org/help/example-domains
   click: #search-input "Search"
   type: #search-input (6 chars)
@@ -120,8 +120,8 @@ steps:
       selector: "a"
       fallback_selectors:
         - "body > div > p:nth-of-type(2) > a"
-      text: "More information..."
-      accessible_name: "More information..."
+      text: "More information…"
+      accessible_name: "More information…"
       tag: a
     position:
       x: 245
@@ -145,10 +145,10 @@ Every recording starts with metadata and state information (v1.1 format):
 ```yaml
 metadata:
   version: "1.1"              # Recording format version
-  created_at: "2025-12-02..." # When recorded
+  created_at: "2025-12-02…" # When recorded
   duration_ms: 23500          # Total duration
-  starting_url: "https://..." # Starting page
-  user_agent: "Mozilla/5.0..."
+  starting_url: "https://…" # Starting page
+  user_agent: "Mozilla/5.0…"
   recorded_on:
     platform: "darwin"        # OS platform
     browser: "Chrome"
@@ -163,9 +163,9 @@ state:
     x: 0                      # Initial scroll X
     y: 0                      # Initial scroll Y
   # Optional (with --capture-state):
-  cookies: "base64..."        # Captured cookies
-  local_storage: "base64..."  # Captured storage
-  checksum: "sha256:..."      # DOM structure hash
+  cookies: "base64…"        # Captured cookies
+  local_storage: "base64…"  # Captured storage
+  checksum: "sha256:…"      # DOM structure hash
 ```
 
 See [State Management](state-management.md) for details on capturing and restoring page state.
@@ -267,7 +267,7 @@ File input interactions:
       type: "image/jpeg"
       size: 45678
       lastModified: 1702500000000
-      content: "data:image/jpeg;base64,/9j/4AAQSkZJRg..."
+      content: "data:image/jpeg;base64,/9j/4AAQSkZJRg…"
 ```
 
 **How file uploads work:**
@@ -291,7 +291,7 @@ File input interactions:
     - name: "cover.jpg"
       type: "image/jpeg"
       size: 32000
-      content: "data:image/jpeg;base64,..."
+      content: "data:image/jpeg;base64,…"
 ```
 
 **Large file storage:**
@@ -337,9 +337,9 @@ target:
 **Selector Priority** (from most to least stable):
 
 1. ID: `#element-id`
-2. Test ID: `[data-testid="..."]`
-3. ARIA label: `[aria-label="..."]`
-4. Name attribute: `input[name="..."]`
+2. Test ID: `[data-testid="…"]`
+3. ARIA label: `[aria-label="…"]`
+4. Name attribute: `input[name="…"]`
 5. CSS path: `div > form > button`
 
 ### Shadow DOM Support
@@ -824,7 +824,7 @@ URL: https://example.com
 Steps: 8 of 8
 
   [1] navigate → https://example.com OK
-  [2] click → a "More information..." OK
+  [2] click → a "More information…" OK
   [3] navigate → https://www.iana.org/help/example-domains OK
   [4] click → #search-input "Search" OK
   [5] type → #search-input (6 chars) OK
@@ -1290,7 +1290,7 @@ steps:
 
 set -e  # Exit on first failure
 
-echo "Starting Inspekt tests..."
+echo "Starting Inspekt tests…"
 
 # Ensure server is running
 inspekt start

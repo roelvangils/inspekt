@@ -641,7 +641,7 @@ def validate_ai_config(config: dict[str, Any]) -> dict[str, Any]:
     validated["command-defaults"] = ai_config.get("command-defaults", {})
 
     # providers: per-provider configuration
-    # Example: {"anthropic": {"enabled": true, "default-text-model": "..."}}
+    # Example: {"anthropic": {"enabled": true, "default-text-model": "…"}}
     validated["providers"] = ai_config.get("providers", {})
 
     # fallback-chain: order to try providers if primary is unavailable

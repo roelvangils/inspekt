@@ -233,7 +233,7 @@
     // Create excerpt (first 200 chars)
     var excerpt = content.substring(0, 200);
     if (content.length > 200) {
-      excerpt += '...';
+      excerpt += '…';
     }
 
     return {

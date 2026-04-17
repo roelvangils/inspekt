@@ -139,14 +139,14 @@ retry_command() {
   local delay=2
 
   while [ $attempt -le $max_attempts ]; do
-    echo "Attempt $attempt/$max_attempts..."
+    echo "Attempt $attempt/$max_attempts…"
 
     if "$@"; then
       return 0
     fi
 
     if [ $attempt -lt $max_attempts ]; then
-      echo "Failed. Retrying in ${delay}s..."
+      echo "Failed. Retrying in ${delay}s…"
       sleep $delay
       delay=$((delay * 2))
     fi
@@ -217,7 +217,7 @@ echo "All pages processed"
 #!/bin/bash
 # Automated form filling and submission
 
-echo "Starting form automation..."
+echo "Starting form automation…"
 
 # Navigate to form page
 inspekt open "https://example.com/contact"
@@ -257,7 +257,7 @@ total_pages=5
 > "$output_file"  # Clear file
 
 for page in $(seq 1 $total_pages); do
-  echo "Scraping page $page/$total_pages..."
+  echo "Scraping page $page/$total_pages…"
 
   # Navigate
   inspekt open "${base_url}?page=${page}" --wait
@@ -435,7 +435,7 @@ test:
 ```bash
 #!/bin/bash
 
-echo "Running browser tests..."
+echo "Running browser tests…"
 
 # Start server if not running
 if ! inspekt server status &>/dev/null; then

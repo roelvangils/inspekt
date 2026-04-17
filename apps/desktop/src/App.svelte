@@ -8,12 +8,12 @@
   type AppState = "checking" | "docker-missing" | "starting" | "ready" | "error" | "stopped";
 
   let state: AppState = $state("checking");
-  let statusMessage = $state("Checking system requirements...");
+  let statusMessage = $state("Checking system requirements…");
   let errorMessage = $state("");
 
   async function checkAndStart() {
     state = "checking";
-    statusMessage = "Checking Docker...";
+    statusMessage = "Checking Docker…";
 
     try {
       const dockerOk = await invoke<boolean>("check_docker");
@@ -31,7 +31,7 @@
       }>("check_vm_status");
 
       if (status.containerRunning && status.healthOk) {
-        statusMessage = "VM is running. Opening...";
+        statusMessage = "VM is running. Opening…";
         await invoke("open_vm_window");
         state = "ready";
         return;
@@ -39,7 +39,7 @@
 
       // Start the VM
       state = "starting";
-      statusMessage = "Starting VM...";
+      statusMessage = "Starting VM…";
       await invoke("start_vm");
     } catch (err) {
       state = "error";
@@ -53,7 +53,7 @@
   }
 
   async function handleStop() {
-    statusMessage = "Stopping VM...";
+    statusMessage = "Stopping VM…";
     state = "starting";
     try {
       await invoke("stop_vm");
@@ -71,7 +71,7 @@
     });
 
     listen<string>("vm-ready", async () => {
-      statusMessage = "VM is ready. Opening...";
+      statusMessage = "VM is ready. Opening…";
       try {
         await invoke("open_vm_window");
         state = "ready";

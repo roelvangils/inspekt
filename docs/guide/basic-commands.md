@@ -458,7 +458,7 @@ inspekt> document.querySelector('.main-content')
 [object HTMLDivElement]
 
 inspekt> $0.textContent  // if using DevTools
-"Main content here..."
+"Main content here…"
 ```
 
 **Experimenting with APIs:**
