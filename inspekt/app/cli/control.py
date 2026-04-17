@@ -534,7 +534,10 @@ async def _start_foreground(
 @click.option("--host", default="127.0.0.1", help="Host to bind to (default: 127.0.0.1)")
 @click.option("--docs", is_flag=True, help="Start local MkDocs documentation server")
 @click.option("--docs-port", type=int, default=8008, help="MkDocs server port (default: 8008)")
-def start(bridge_only, api_only, foreground, api_port, bridge_port, host, docs, docs_port):
+@click.option("--no-update-check", is_flag=True,
+              help="Skip the startup engine/library update check (useful for non-interactive contexts like overmind)")
+def start(bridge_only, api_only, foreground, api_port, bridge_port, host, docs, docs_port,
+          no_update_check):
     """Start Inspekt servers (bridge + API).
 
     By default, starts both bridge and API servers in background (daemon mode).
@@ -550,10 +553,17 @@ def start(bridge_only, api_only, foreground, api_port, bridge_port, host, docs, 
         inspekt start --foreground         # Run all servers with unified output
         inspekt start --foreground --docs  # Include docs in foreground mode
         inspekt start --api-port 3000      # Use custom API port
+        inspekt start --no-update-check    # Skip interactive engine update prompts
     """
-    # Check for engine and library updates automatically
-    _check_engine_updates()
-    _check_readability_updates()
+    # Interactive engine/library update checks block under process managers
+    # (overmind, supervisor, systemd) that don't provide a TTY. Auto-skip when
+    # stdin isn't a TTY, or when --no-update-check is passed explicitly.
+    if no_update_check or not sys.stdin.isatty():
+        if not no_update_check:
+            click.echo("Skipping engine update check (non-interactive stdin)", err=True)
+    else:
+        _check_engine_updates()
+        _check_readability_updates()
 
     click.echo("Starting Inspekt servers...\n")
 

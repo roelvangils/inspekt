@@ -28,11 +28,10 @@ const C = {
   dim:   "\x1b[2m",
 };
 
-console.log(`${C.bold}${C.cyan}👀 Watching extension files for changes…${C.reset}\n`);
+console.log(`${C.bold}${C.cyan}👀 Watching extension files for changes…${C.reset}`);
 for (const r of ROOTS) {
-  console.log(`  ${C.dim}monitoring${C.reset} ${r}/**/*.{html,css,js}`);
+  console.log(`${C.dim}monitoring${C.reset} ${r}/**/*.{html,css,js}`);
 }
-console.log();
 
 function shouldIgnore(file) {
   if (!WATCH_EXT.has(extname(file))) return true;
@@ -85,9 +84,9 @@ function printReloadSteps(type, file) {
   }[type];
 
   for (let i = 0; i < steps.length; i++) {
-    console.log(`  ${C.dim}${i + 1}.${C.reset} ${steps[i]}`);
+    console.log(`${C.dim}${i + 1}.${C.reset} ${steps[i]}`);
   }
-  console.log(`${C.dim}${"─".repeat(72)}${C.reset}\n`);
+  console.log(`${C.dim}${"─".repeat(60)}${C.reset}`);
 }
 
 // Debounce: many editors fire multiple events per save.

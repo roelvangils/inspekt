@@ -104,7 +104,7 @@ if (!watchMode) {
 
 // --- Watch mode ---
 
-console.log(`Watching vm/{control-panel.html,css,js} — Ctrl+C to stop\n`);
+console.log(`Watching vm/{control-panel.html,css,js} — Ctrl+C to stop`);
 
 const debounceMs = 120;
 let pending = null;
