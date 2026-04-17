@@ -161,7 +161,7 @@ sync-extension:
 # ── Public build surface ────────────────────────────────────
 
 build-cli:
-	python -m build --wheel --outdir dist/
+	uv build --wheel --out-dir dist/
 
 build-vm:
 	inspekt vm restart --rebuild
@@ -179,9 +179,13 @@ build-desktop:
 build-pdf-viewer:
 	cd apps/pdf-viewer && bun run tauri build
 
-build-all: build-cli build-extensions build-vm build-desktop build-pdf-viewer
+# NOTE: build-pdf-viewer is deliberately excluded from build-all.
+# The pdf-viewer app has broken imports (src/main.ts references
+# src/lib/utils/platform which doesn't exist). Run it explicitly with
+# `make build-pdf-viewer` once its source tree is fixed.
+build-all: build-cli build-extensions build-vm build-desktop
 	@echo ""
-	@echo "✓ All artifacts in dist/ and apps/*/src-tauri/target/"
+	@echo "✓ All artifacts in dist/ and apps/desktop/src-tauri/target/"
 
 # ── Versioning ──────────────────────────────────────────────
 

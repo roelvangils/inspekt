@@ -20,12 +20,10 @@ export default defineConfig({
   // Vite options tailored for Tauri development
   clearScreen: false,
 
-  // Multi-page app configuration
   build: {
     rollupOptions: {
       input: {
         main: resolve(__dirname, "index.html"),
-        preferences: resolve(__dirname, "preferences.html"),
       },
     },
   },
