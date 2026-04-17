@@ -1168,18 +1168,20 @@ make format                        # Auto-format code
 ### Project Structure
 
 ```
-inspekt/
-├── domain/          # Core models (Pydantic)
-├── adapters/        # I/O adapters (filesystem, etc.)
-├── services/        # Business logic
-│   ├── bridge_executor.py
-│   ├── ai_integration.py
-│   ├── control_manager.py
-│   └── script_loader.py
-└── app/
-    ├── cli/         # CLI commands (12 modules)
-    └── bridge_ws.py # WebSocket server
+inspekt/              # repo root
+├── inspekt/          # Python package (CLI, bridge, services, scripts)
+├── extensions/       # browser extensions (chrome, firefox, shared)
+├── vm/               # Docker image for the standalone virtual browser
+├── apps/
+│   ├── desktop/      # Tauri shell around the VM control panel
+│   └── pdf-viewer/   # Tauri PDF accessibility report viewer
+├── scripts/          # build/dev helpers (bundle-vm, bump_version, …)
+└── docs/             # mkdocs site + architecture.html (visual map)
 ```
+
+For a visual walk-through of how the three run modes (CLI + extension,
+control-panel + VM, Tauri + VM) wire together, open
+[`docs/architecture.html`](docs/architecture.html) in a browser.
 
 ### Documentation
 

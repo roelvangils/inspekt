@@ -3,11 +3,12 @@
     "material-icons": "^1.13.14"
   },
   "scripts": {
-    "bundle": "bun scripts/bundle-vm.mjs",
-    "build": "bun run bundle && inspekt vm restart --rebuild",
-    "preview": "bun run bundle && inspekt vm restart --rebuild --no-dev",
-    "start": "inspekt vm start",
-    "dev": "inspekt vm restart"
+    "dev": "make dev-all",
+    "build": "make build-all",
+    "bundle": "make vm-bundle",
+    "start": "make vm-start",
+    "doctor": "make doctor",
+    "preview": "bun run bundle && inspekt vm restart --rebuild --no-dev"
   },
   "devDependencies": {
     "@siteimprove/alfa-act": "^0.108.2",
