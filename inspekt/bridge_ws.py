@@ -2088,8 +2088,14 @@ async def handle_http_domain_bypass(request):
                 status=400
             )
 
-        # Send message to extension via WebSocket
+        # Status queries (duration=-1) and disable requests (duration=0)
+        # are answerable without a browser: if nothing is connected, no
+        # bypass can be active, and there's nothing to disable. Returning
+        # a sensible 200 here avoids flooding the API log with 503s when
+        # the control panel polls these endpoints on an empty bridge.
         if not most_recent_connection or most_recent_connection not in active_connections:
+            if duration in (-1, 0):
+                return web.json_response({"ok": True, "enabled": False})
             return web.json_response(
                 {"ok": False, "error": "No browser connected. If Chrome is open, make sure you're on a regular webpage (not chrome://, new tab, or extension pages where content scripts can't run)."},
                 status=503
@@ -2646,12 +2652,11 @@ async def handle_http_csp_bypass_global(request):
 async def handle_http_csp_bypass_global_status(request):
     """HTTP endpoint: Get global CSP bypass status."""
     try:
-        # Send message to extension via WebSocket
+        # Status query: if no browser is connected, there's no CSP bypass
+        # active by definition. Return 200 instead of 503 so UI clients
+        # that poll this on an empty bridge don't spam the log.
         if not most_recent_connection or most_recent_connection not in active_connections:
-            return web.json_response(
-                {"ok": False, "error": "No browser connected. If Chrome is open, make sure you're on a regular webpage (not chrome://, new tab, or extension pages where content scripts can't run)."},
-                status=503
-            )
+            return web.json_response({"ok": True, "enabled": False})
 
         request_id = str(uuid.uuid4())
         message = {
