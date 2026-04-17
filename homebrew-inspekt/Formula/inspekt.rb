@@ -131,6 +131,14 @@ class Inspekt < Formula
 
   def install
     virtualenv_install_with_resources
+
+    # Man pages shipped inside the wheel under inspekt/man/.
+    site_packages = Dir["#{libexec}/lib/python*/site-packages/inspekt/man"].first
+    if site_packages
+      man_src = Pathname.new(site_packages)
+      man1.install Dir[man_src/"*.1"]
+      man7.install Dir[man_src/"*.7"]
+    end
   end
 
   def caveats
@@ -149,6 +157,15 @@ class Inspekt < Formula
 
       For shell completions, run:
            inspekt completions install
+
+      Read the manuals:
+           man inspekt
+           man inspekt-axe          # or any other command
+           man 7 inspekt-plugins    # plugin system overview
+
+      To personalize inspekt-plugins(7) with the plugins installed on this
+      machine, run:
+           inspekt man rebuild
 
       Documentation: https://inspekt.dev
     EOS

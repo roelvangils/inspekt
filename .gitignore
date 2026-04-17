@@ -57,6 +57,9 @@ data.db
 # Documentation
 site/
 
+# Generated man-page intermediates (committed copies live in inspekt/man/)
+build/man/
+
 # Node.js
 node_modules/
 bun.lock

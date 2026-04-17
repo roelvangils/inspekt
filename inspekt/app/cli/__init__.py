@@ -566,6 +566,9 @@ cli.add_lazy_command("tunnel", "tunnel", "tunnel")
 cli.add_lazy_command("zoom", "display", "zoom")
 cli.add_lazy_command("viewport", "display", "viewport")
 
+# Man page management (from man.py)
+cli.add_lazy_command("man", "man", "man")
+
 
 # ============================================================================
 # VM Restricted Mode

@@ -313,6 +313,164 @@ def get_cli_command_details(command_path: str) -> dict[str, Any] | None:
     }
 
 
+def get_all_cli_commands_detailed(
+    cli_group: Group,
+    prefix: str = "",
+) -> dict[str, dict]:
+    """
+    Like get_all_cli_commands, but includes full option/argument metadata.
+
+    For each command, the metadata dict contains:
+        name, help, short_help, hidden, deprecated, is_group,
+        options:   list of dicts (name, short, type, required, default, is_flag, help, multiple)
+        arguments: list of dicts (name, type, required, nargs, metavar)
+        examples:  list of strings parsed from the docstring
+        aliases:   list of CLI aliases as registered in the CommandRegistry (if any)
+    """
+    from click import Argument, Context, Group, Option
+
+    commands: dict[str, dict] = {}
+    ctx = Context(cli_group)
+
+    for name in cli_group.list_commands(ctx):
+        try:
+            cmd = cli_group.get_command(ctx, name)
+            if cmd is None:
+                continue
+
+            path = f"{prefix}.{name}" if prefix else name
+            help_text = cmd.help or ""
+
+            options: list[dict] = []
+            arguments: list[dict] = []
+            for param in getattr(cmd, "params", []):
+                if isinstance(param, Option):
+                    if param.hidden:
+                        continue
+                    options.append(_describe_option(param))
+                elif isinstance(param, Argument):
+                    arguments.append(_describe_argument(param))
+
+            metadata = {
+                "name": name,
+                "help": help_text,
+                "short_help": _short_help(help_text),
+                "hidden": getattr(cmd, "hidden", False),
+                "deprecated": getattr(cmd, "deprecated", False),
+                "is_group": isinstance(cmd, Group),
+                "options": options,
+                "arguments": arguments,
+                "examples": _extract_examples_from_help(help_text),
+            }
+
+            commands[path] = metadata
+
+            if isinstance(cmd, Group):
+                commands.update(get_all_cli_commands_detailed(cmd, prefix=path))
+
+        except Exception:
+            continue
+
+    return commands
+
+
+def _describe_option(param: Any) -> dict:
+    """Describe a Click Option as a serializable dict."""
+    long_name = None
+    short_name = None
+    for opt in param.opts:
+        if opt.startswith("--"):
+            long_name = opt
+        elif opt.startswith("-") and len(opt) == 2:
+            short_name = opt
+
+    secondary = None
+    for opt in getattr(param, "secondary_opts", []):
+        if opt.startswith("--"):
+            secondary = opt
+            break
+
+    return {
+        "name": long_name or (param.opts[0] if param.opts else param.name),
+        "short": short_name,
+        "secondary": secondary,
+        "type": _type_name(param),
+        "required": bool(param.required),
+        "default": _serializable_default(param),
+        "is_flag": bool(getattr(param, "is_flag", False)),
+        "multiple": bool(getattr(param, "multiple", False)),
+        "help": param.help or "",
+        "metavar": param.metavar,
+    }
+
+
+def _describe_argument(param: Any) -> dict:
+    """Describe a Click Argument as a serializable dict."""
+    nargs = getattr(param, "nargs", 1)
+    return {
+        "name": param.name,
+        "type": _type_name(param),
+        "required": bool(param.required),
+        "nargs": nargs,
+        "metavar": param.metavar or param.name.upper(),
+    }
+
+
+def _type_name(param: Any) -> str:
+    """Pick a friendly type label for an Option/Argument."""
+    if getattr(param, "is_flag", False):
+        return "FLAG"
+
+    ptype = getattr(param, "type", None)
+    if ptype is None:
+        return "TEXT"
+
+    cls_name = ptype.__class__.__name__
+    if cls_name == "Choice":
+        choices = getattr(ptype, "choices", [])
+        return f"[{'|'.join(choices)}]" if choices else "CHOICE"
+    if cls_name == "Path":
+        file_okay = getattr(ptype, "file_okay", True)
+        dir_okay = getattr(ptype, "dir_okay", True)
+        if file_okay and not dir_okay:
+            return "FILE"
+        if dir_okay and not file_okay:
+            return "DIRECTORY"
+        return "PATH"
+    if cls_name in {"IntRange", "IntParamType"}:
+        return "INTEGER"
+    if cls_name in {"FloatRange", "FloatParamType"}:
+        return "FLOAT"
+
+    name = getattr(ptype, "name", None)
+    return name.upper() if name else "TEXT"
+
+
+def _serializable_default(param: Any) -> Any:
+    """Coerce param.default to something safe to embed in templates."""
+    if getattr(param, "is_flag", False):
+        return None
+    default = param.default
+    if callable(default):
+        return None
+    if default is None:
+        return None
+    if isinstance(default, (list, tuple)) and len(default) == 0:
+        return None
+    if isinstance(default, (str, int, float, bool)):
+        return default
+    return str(default)
+
+
+def _short_help(help_text: str) -> str:
+    """First non-empty line of a docstring."""
+    for line in help_text.split("\n"):
+        line = line.strip()
+        if line:
+            return line
+    return ""
+
+
 def _extract_examples_from_help(help_text: str) -> list[str]:
     """
     Extract examples from Click docstring help text.

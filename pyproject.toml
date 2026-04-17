@@ -81,7 +81,7 @@ packages = ["inspekt"]
 include-package-data = true
 
 [tool.setuptools.package-data]
-inspekt = ["scripts/*.js", "templates/*"]
+inspekt = ["scripts/*.js", "templates/*", "man/*.1", "man/*.7"]
 
 # Ruff configuration - Linting and formatting
 [tool.ruff]

@@ -1,7 +1,8 @@
 .PHONY: help dev install clean test test-unit test-integration test-e2e lint format typecheck pre-commit all \
        vm-start vm-stop vm-restart vm-rebuild vm-status vm-logs vm-shell vm-services vm-health \
        vm-restart-control vm-restart-terminal vm-restart-chromium vm-restart-proxy \
-       vm-bundle
+       vm-bundle \
+       build-man install-man clean-man
 
 # Default target
 help:
@@ -26,6 +27,11 @@ help:
 	@echo ""
 	@echo "Combined:"
 	@echo "  make all          Run format, lint, typecheck, and test"
+	@echo ""
+	@echo "Man pages (requires pandoc):"
+	@echo "  make build-man    Regenerate man pages and copy to inspekt/man/"
+	@echo "  make install-man  Install shipped man pages for the current user"
+	@echo "  make clean-man    Remove generated man-page intermediates"
 
 # Development setup
 dev:
@@ -146,3 +152,19 @@ vm-health:
 	@printf "Control server (8888): " && curl -sf http://localhost:8888/health > /dev/null && echo "✓" || echo "✗"
 	@printf "noVNC (6080):          " && curl -sf http://localhost:6080/ > /dev/null && echo "✓" || echo "✗"
 	@printf "CDP (9222):            " && curl -sf http://localhost:9222/json/version > /dev/null && echo "✓" || echo "✗"
+
+# ── Man pages ───────────────────────────────────────────────
+
+# Regenerate every man page from the live CLI + registry, then commit a copy
+# under inspekt/man/ so the wheel can ship them without pandoc on the build host.
+build-man:
+	python scripts/build_man.py --output-dir build/man --commit-to-package
+	@echo "✓ Man pages written to build/man/ and inspekt/man/"
+
+# Install the shipped man pages for the current user (no sudo required).
+install-man:
+	inspekt man install --user
+
+clean-man:
+	rm -rf build/man inspekt/man/*.1 inspekt/man/*.7
+	@echo "✓ Removed generated man pages"
