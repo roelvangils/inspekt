@@ -1,4 +1,4 @@
-cli:       inspekt start --no-update-check 2>&1 | scripts/dev-clean-output.sh
+cli:       inspekt start --foreground --no-update-check 2>&1 | scripts/dev-clean-output.sh
 extension: bun scripts/watch-extensions.js 2>&1 | scripts/dev-clean-output.sh
 vm:        bun scripts/bundle-vm.mjs --watch 2>&1 | scripts/dev-clean-output.sh
 desktop:   (cd apps/desktop && bun run tauri dev) 2>&1 | scripts/dev-clean-output.sh

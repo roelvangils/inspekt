@@ -150,6 +150,9 @@ dev-desktop:
 dev-all:
 	@command -v overmind >/dev/null 2>&1 || { echo "Install overmind: brew install overmind"; exit 1; }
 	@$(MAKE) --no-print-directory vm-start
+	@# Stop any lingering background bridge/API daemon so the Procfile's
+	@# `inspekt start --foreground` can bind cleanly. Ignore if nothing's there.
+	@inspekt stop >/dev/null 2>&1 || true
 	@#    cli=blue  extension=green  vm=yellow  desktop=magenta
 	OVERMIND_COLORS=4,2,3,5 overmind start -f Procfile.dev
 
