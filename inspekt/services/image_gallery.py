@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import base64
 import html
+import re
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -33,6 +34,22 @@ class GalleryImage:
     original_url: str
     is_optimized: bool = False
     svg_content: str | None = None  # SVG source code (for code preview)
+    # When set, the card's <img> uses this as src instead of the sibling
+    # thumbnail file (e.g. a "data:image/webp;base64,…" URI for self-contained
+    # galleries shipped as zips to a host machine).
+    thumbnail_data_uri: str | None = None
+    # When set, the lightbox's data-full-src points at this value instead of
+    # the sibling filename — used to reference publicly-reachable originals
+    # by absolute URL so they don't need bundling.
+    full_src_override: str | None = None
+    # Accessibility context (populated by the JS extractor). These feed the
+    # per-card accessible-name line and the _compute_acc_hints heuristics.
+    source_type: str = "img"  # "img" | "css-background"
+    accessible_name: str = ""
+    accessible_name_source: str = "alt attribute"
+    is_linked: bool = False
+    link_href: str = ""
+    nearest_heading_text: str = ""
 
 
 def _escape_html(text: str) -> str:
@@ -48,6 +65,113 @@ def _format_file_size(size_bytes: int) -> str:
         return f"{size_bytes / 1024:.1f} KB"
     else:
         return f"{size_bytes / (1024 * 1024):.1f} MB"
+
+
+_PLACEHOLDER_NAMES = {
+    "placeholder", "untitled", "image", "img", "photo", "picture",
+    "banner", "graphic", "thumbnail", "icon",
+}
+_REDUNDANT_PREFIXES = ("image of", "picture of", "photo of", "graphic of", "image showing", "photo showing")
+_CLICK_WORDS_RE = re.compile(r"\b(?:click|tap|press)\b", re.IGNORECASE)
+_URL_RE = re.compile(r"https?://|\bwww\.", re.IGNORECASE)
+_DIMENSIONS_RE = re.compile(r"\b\d+\s*[x×]\s*\d+\b|\b\d+\s*px\b", re.IGNORECASE)
+_NUMERIC_ID_RE = re.compile(r"^(?:#?\d+|(?:item|asset)[-_]\d+)$", re.IGNORECASE)
+_HTML_TAG_RE = re.compile(r"<\w+[\s/>]")
+_ENCODED_CHARS_RE = re.compile(r"&(?:[a-z]+|#\d+);|\n")
+_COPYRIGHT_RE = re.compile(r"[©®™]|\(c\)", re.IGNORECASE)
+_LOGO_RE = re.compile(r"\blogo\b", re.IGNORECASE)
+
+
+def _compute_acc_hints(img: GalleryImage) -> list[str]:
+    """
+    Return human-readable accessibility hints for an image's accessible name.
+
+    Each hint is a short HTML-safe fragment. Hints are ordered by structural
+    issues first (missing alt, decorative in link, css-background) followed
+    by name-quality issues (length, placeholders, HTML, encoding, etc.).
+    Empty names only trigger structural hints — name-quality rules require
+    non-empty content to avoid spamming decorative images.
+    """
+    hints: list[str] = []
+    name = img.accessible_name or ""
+    stripped = name.strip()
+    src_type = img.source_type
+    name_source = img.accessible_name_source
+
+    # Structural — apply regardless of name emptiness.
+
+    if name_source == "missing alt attribute" and src_type != "css-background":
+        hints.append("Image has no <code>alt</code> attribute.")
+
+    if img.is_linked and name_source == "empty alt (decorative)":
+        hints.append("Decorative image inside a link — the link has no accessible name.")
+
+    if src_type == "css-background":
+        hints.append("CSS background image — cannot receive an accessible name via markup.")
+
+    # Name-quality heuristics — require a non-empty trimmed name.
+    if not stripped:
+        return hints
+
+    # H18 — irregular spacing (check original vs. trimmed, and internal doubles).
+    if name != stripped or "  " in stripped:
+        hints.append("Name has irregular spacing.")
+
+    # H5 — very short.
+    if len(stripped) < 3:
+        hints.append("Name is very short.")
+
+    # H6 — too long.
+    if len(stripped) > 80:
+        hints.append("Name should be under 80 characters.")
+
+    # H7 — redundant "image of" / "photo of" / "picture of" prefix.
+    lower = stripped.lower()
+    if any(lower.startswith(prefix) for prefix in _REDUNDANT_PREFIXES):
+        hints.append("Name starts with a redundant prefix (e.g. &ldquo;Image of&hellip;&rdquo;).")
+
+    # H8 — generic placeholder.
+    if lower in _PLACEHOLDER_NAMES:
+        hints.append("Name is a generic placeholder.")
+
+    # H11 — copyright / trademark symbols.
+    if _COPYRIGHT_RE.search(stripped):
+        hints.append("Name contains copyright or trademark symbols.")
+
+    # H12 — raw HTML tags in the name.
+    if _HTML_TAG_RE.search(stripped):
+        hints.append("Name contains HTML tags.")
+
+    # H13 — HTML-encoded characters or stray newlines (check raw, not stripped).
+    if _ENCODED_CHARS_RE.search(name):
+        hints.append("Name contains encoded characters or line breaks.")
+
+    # H14 — all caps (ignore short abbreviations like FAQ/PDF/SVG — require 4+ letters).
+    letters = [c for c in stripped if c.isalpha()]
+    if len(letters) >= 4 and all(c.isupper() for c in letters):
+        hints.append("Name is in all caps.")
+
+    # H15 — linked logo.
+    if img.is_linked and _LOGO_RE.search(stripped):
+        hints.append("Logo inside a link — ensure the name describes where the link goes, not just the logo.")
+
+    # H16 — URL in the accessible name.
+    if _URL_RE.search(stripped):
+        hints.append("Name contains a URL.")
+
+    # H17 — numeric ID (pure digits, #123, item-45, asset_67).
+    if _NUMERIC_ID_RE.match(stripped):
+        hints.append("Name looks like a numeric ID.")
+
+    # H19 — dimensions in the name.
+    if _DIMENSIONS_RE.search(stripped):
+        hints.append("Name contains image dimensions.")
+
+    # H20 — interaction instructions baked into the name.
+    if _CLICK_WORDS_RE.search(stripped):
+        hints.append("Name contains interaction instructions.")
+
+    return hints
 
 
 def generate_gallery_html(
@@ -79,10 +203,14 @@ def generate_gallery_html(
         return "jpeg" if ext == "jpg" else ext
 
     file_types: set[str] = set()
+    any_bg = False
     for img in images:
         ext = Path(img.filename).suffix.lower().lstrip(".")
         if ext:
             file_types.add(normalize_ext(ext))
+        if img.source_type == "css-background":
+            any_bg = True
+    any_hints = False  # set inside the card loop below when hints are emitted
     file_types_sorted = sorted(file_types)
 
     # Build file type options HTML
@@ -96,8 +224,13 @@ def generate_gallery_html(
     for i, img in enumerate(images):
         # Use thumbnail if available, otherwise use full image
         # Thumbnails are in a 'thumbnails/' subdirectory
-        thumb_src = f"thumbnails/{img.thumbnail_path.name}" if img.thumbnail_path else img.filename
-        full_src = img.filename
+        if img.thumbnail_data_uri:
+            thumb_src = img.thumbnail_data_uri
+        elif img.thumbnail_path:
+            thumb_src = f"thumbnails/{img.thumbnail_path.name}"
+        else:
+            thumb_src = img.full_src_override or img.filename
+        full_src = img.full_src_override or img.filename
 
         # Get file extension for filtering (normalize jpg -> jpeg)
         file_ext = normalize_ext(Path(img.filename).suffix.lower().lstrip("."))
@@ -116,8 +249,41 @@ def generate_gallery_html(
             svg_b64 = base64.b64encode(img.svg_content.encode("utf-8")).decode("ascii")
             svg_data_attr = f'\n                    data-svg-source="{svg_b64}"'
 
+        # Build badge row — format is always present; source/link/hints conditional.
+        badges = [f'<span class="gallery-badge badge-format">{_escape_html(file_ext.upper())}</span>']
+        if img.source_type == "css-background":
+            badges.append('<span class="gallery-badge badge-source" title="CSS background image">BG</span>')
+        elif img.original_url.startswith("data:"):
+            badges.append('<span class="gallery-badge badge-source" title="Originally a data URI">64</span>')
+        if img.is_linked:
+            badges.append(
+                f'<span class="gallery-badge badge-link" title="Wrapped in a link">↗</span>'
+            )
+        hints = _compute_acc_hints(img)
+        if hints:
+            any_hints = True
+            badges.append(
+                f'<span class="gallery-badge badge-hints" '
+                f'aria-label="{len(hints)} accessibility hint{"s" if len(hints) != 1 else ""}" '
+                f'title="{len(hints)} accessibility hint{"s" if len(hints) != 1 else ""}">'
+                f'⚠ {len(hints)}</span>'
+            )
+        badges_html = "\n                    ".join(badges)
+
+        # Accessible-name line. Empty name gets a warning pill so it's visible.
+        if img.accessible_name:
+            acc_name_display = img.accessible_name[:120] + "…" if len(img.accessible_name) > 120 else img.accessible_name
+            acc_name_html = f'<span class="acc-name">{_escape_html(acc_name_display)}</span>'
+        else:
+            acc_name_html = '<span class="no-name">— no accessible name —</span>'
+        name_source_html = f'<span class="name-source">{_escape_html(img.accessible_name_source)}</span>'
+
+        # Hints encoded for the lightbox as JSON (lightbox JS parses and renders).
+        import json as _json_mod
+        hints_json = _json_mod.dumps(hints) if hints else "[]"
+
         cards_html.append(f"""
-        <article class="gallery-card" data-index="{i}" data-ext="{file_ext}" data-width="{img.width}" data-height="{img.height}">
+        <article class="gallery-card" data-index="{i}" data-ext="{file_ext}" data-width="{img.width}" data-height="{img.height}" data-source-type="{_escape_html(img.source_type)}" data-has-hints="{'1' if hints else '0'}">
             <button type="button" class="gallery-thumbnail"
                     aria-label="View {_escape_html(img.filename)} in lightbox"
                     data-full-src="{_escape_html(full_src)}"
@@ -127,7 +293,13 @@ def generate_gallery_html(
                     data-height="{img.height}"
                     data-size="{file_size_str}"
                     data-size-bytes="{img.file_size}"
-                    data-url="{_escape_html(img.original_url)}"{svg_data_attr}>
+                    data-url="{_escape_html(img.original_url)}"
+                    data-acc-name="{_escape_html(img.accessible_name)}"
+                    data-acc-name-source="{_escape_html(img.accessible_name_source)}"
+                    data-hints="{_escape_html(hints_json)}"{svg_data_attr}>
+                <div class="gallery-badges">
+                    {badges_html}
+                </div>
                 <img src="{_escape_html(thumb_src)}"
                      alt="{_escape_html(img.alt) or 'Image ' + str(i + 1)}"
                      loading="lazy"
@@ -139,7 +311,10 @@ def generate_gallery_html(
                     <span class="dimensions">{dimensions}</span>
                     <span class="size">{file_size_str}</span>
                 </div>
-                {f'<span class="alt-text" title="{_escape_html(img.alt)}">{alt_escaped}</span>' if img.alt else ''}
+                <div class="accessible-name" title="{_escape_html(img.accessible_name) or 'no accessible name'}">
+                    {acc_name_html}
+                    {name_source_html}
+                </div>
             </div>
         </article>
         """)
@@ -523,6 +698,107 @@ def generate_gallery_html(
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
+        }}
+
+        /* Accessible-name line — replaces the plain alt display so the user
+           sees both the computed name and where it came from. */
+        .gallery-card-info .accessible-name {{
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            line-height: 1.35;
+            overflow: hidden;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+        }}
+        .gallery-card-info .accessible-name .acc-name {{
+            font-style: italic;
+        }}
+        .gallery-card-info .accessible-name .no-name {{
+            color: #b25400;
+            font-style: normal;
+            font-weight: 500;
+        }}
+        [data-theme="dark"] .gallery-card-info .accessible-name .no-name {{
+            color: #f0883e;
+        }}
+        .gallery-card-info .name-source {{
+            display: block;
+            font-size: 0.65rem;
+            color: var(--text-muted);
+            font-variant-numeric: tabular-nums;
+        }}
+
+        /* Image-type badges (format, source, link, hints). Copied from
+           inspekt/static/gallery/gallery.css so the template stays
+           self-contained for host-side downloads. */
+        .gallery-badges {{
+            position: absolute;
+            top: 6px;
+            left: 6px;
+            display: flex;
+            gap: 4px;
+            z-index: 5;
+            pointer-events: none;
+            flex-wrap: wrap;
+            max-width: calc(100% - 12px);
+        }}
+        .gallery-badge {{
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 2px 5px;
+            font-size: 0.625rem;
+            font-weight: 600;
+            font-family: ui-monospace, 'SF Mono', Monaco, monospace;
+            text-transform: uppercase;
+            letter-spacing: 0.02em;
+            border-radius: 4px;
+            background: rgba(0, 0, 0, 0.6);
+            color: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
+            line-height: 1;
+        }}
+        .gallery-badge.badge-source {{ background: rgba(100, 70, 150, 0.75); }}
+        .gallery-badge.badge-format {{ background: rgba(0, 0, 0, 0.55); }}
+        .gallery-badge.badge-link   {{ background: rgba(9, 105, 218, 0.75); }}
+        .gallery-badge.badge-hints  {{ background: rgba(178, 84, 0, 0.85); color: #fff; }}
+
+        .gallery-thumbnail:hover .gallery-badge {{ background: rgba(0, 0, 0, 0.8); }}
+        .gallery-thumbnail:hover .gallery-badge.badge-source {{ background: rgba(100, 70, 150, 0.9); }}
+        .gallery-thumbnail:hover .gallery-badge.badge-link {{ background: rgba(9, 105, 218, 0.9); }}
+        .gallery-thumbnail:hover .gallery-badge.badge-hints {{ background: rgba(178, 84, 0, 1); }}
+
+        [data-theme="dark"] .gallery-badge {{
+            background: rgba(255, 255, 255, 0.15);
+            color: rgba(255, 255, 255, 0.9);
+        }}
+        [data-theme="dark"] .gallery-badge.badge-source {{ background: rgba(150, 120, 200, 0.4); }}
+        [data-theme="dark"] .gallery-badge.badge-link {{ background: rgba(88, 166, 255, 0.4); }}
+        [data-theme="dark"] .gallery-badge.badge-hints {{ background: rgba(240, 136, 62, 0.5); color: #fff; }}
+        [data-theme="dark"] .gallery-thumbnail:hover .gallery-badge {{ background: rgba(255, 255, 255, 0.25); }}
+        [data-theme="dark"] .gallery-thumbnail:hover .gallery-badge.badge-source {{ background: rgba(150, 120, 200, 0.6); }}
+        [data-theme="dark"] .gallery-thumbnail:hover .gallery-badge.badge-link {{ background: rgba(88, 166, 255, 0.6); }}
+        [data-theme="dark"] .gallery-thumbnail:hover .gallery-badge.badge-hints {{ background: rgba(240, 136, 62, 0.75); }}
+
+        /* Lightbox hints panel */
+        .lightbox-hints {{
+            padding: 8px 12px;
+            background: rgba(178, 84, 0, 0.1);
+            border-left: 3px solid #b25400;
+            margin: 8px 0;
+            font-size: 0.85rem;
+            line-height: 1.4;
+            max-height: 180px;
+            overflow-y: auto;
+        }}
+        .lightbox-hints:empty {{ display: none; }}
+        .lightbox-hints ul {{ margin: 0; padding-left: 18px; }}
+        .lightbox-hints li {{ margin: 2px 0; }}
+        [data-theme="dark"] .lightbox-hints {{
+            background: rgba(240, 136, 62, 0.1);
+            border-left-color: #f0883e;
         }}
 
         /* ═══════════════════════════════════════════════════════════════
@@ -1056,6 +1332,14 @@ def generate_gallery_html(
                 {file_type_options_html}
             </select>
         </div>
+        {'''<div class="filter-group">
+            <label for="filter-source">Source</label>
+            <select id="filter-source">
+                <option value="">All sources</option>
+                <option value="img">&lt;img&gt; elements</option>
+                <option value="css-background">CSS backgrounds</option>
+            </select>
+        </div>''' if any_bg else ''}
         <div class="filter-group">
             <label for="filter-min-width">Min. width</label>
             <input type="number" id="filter-min-width" min="0" placeholder="px">
@@ -1074,6 +1358,12 @@ def generate_gallery_html(
                 Merge identical images
             </label>
         </div>
+        {'''<div class="filter-group filter-group-checkbox">
+            <label for="filter-only-issues">
+                <input type="checkbox" id="filter-only-issues">
+                Only with a11y issues
+            </label>
+        </div>''' if any_hints else ''}
         <div class="filter-results" aria-live="polite">
             Showing <strong id="visible-count">{len(images)}</strong> of {len(images)} images
         </div>
@@ -1151,6 +1441,8 @@ def generate_gallery_html(
                 <div class="lightbox-filename"></div>
                 <div class="lightbox-meta"></div>
                 <div class="lightbox-alt"></div>
+                <div class="lightbox-acc-name"></div>
+                <div class="lightbox-hints" aria-live="polite"></div>
             </div>
         </div>
     </div>
@@ -1187,10 +1479,12 @@ def generate_gallery_html(
 
             // Filter functionality
             const filterType = document.getElementById('filter-type');
+            const filterSource = document.getElementById('filter-source');          // may be absent
             const filterMinWidth = document.getElementById('filter-min-width');
             const filterMinHeight = document.getElementById('filter-min-height');
             const filterBgColor = document.getElementById('filter-bg-color');
             const filterMergeDuplicates = document.getElementById('filter-merge-duplicates');
+            const filterOnlyIssues = document.getElementById('filter-only-issues');  // may be absent
             const visibleCount = document.getElementById('visible-count');
             const cards = document.querySelectorAll('.gallery-card');
             const thumbnails = document.querySelectorAll('.gallery-thumbnail');
@@ -1218,22 +1512,28 @@ def generate_gallery_html(
 
             function applyFilters() {{
                 const typeFilter = filterType.value.toLowerCase();
+                const sourceFilter = filterSource ? filterSource.value : '';
                 const minWidth = parseInt(filterMinWidth.value) || 0;
                 const minHeight = parseInt(filterMinHeight.value) || 0;
                 const mergeDuplicates = filterMergeDuplicates.checked;
+                const onlyIssues = filterOnlyIssues ? filterOnlyIssues.checked : false;
 
-                // First pass: apply basic filters (type, dimensions)
+                // First pass: apply basic filters (type, source, dimensions, hints)
                 const basicFiltered = [];
                 cards.forEach(function(card) {{
                     const ext = card.dataset.ext || '';
                     const width = parseInt(card.dataset.width) || 0;
                     const height = parseInt(card.dataset.height) || 0;
+                    const src = card.dataset.sourceType || 'img';
+                    const hasHints = card.dataset.hasHints === '1';
 
                     const matchesType = !typeFilter || ext === typeFilter;
+                    const matchesSource = !sourceFilter || src === sourceFilter;
                     const matchesWidth = width >= minWidth;
                     const matchesHeight = height >= minHeight;
+                    const matchesIssues = !onlyIssues || hasHints;
 
-                    if (matchesType && matchesWidth && matchesHeight) {{
+                    if (matchesType && matchesSource && matchesWidth && matchesHeight && matchesIssues) {{
                         basicFiltered.push(card);
                         card.classList.remove('hidden');
                     }} else {{
@@ -1286,6 +1586,8 @@ def generate_gallery_html(
             filterMinWidth.addEventListener('input', applyFilters);
             filterMinHeight.addEventListener('input', applyFilters);
             filterMergeDuplicates.addEventListener('change', applyFilters);
+            if (filterSource) filterSource.addEventListener('change', applyFilters);
+            if (filterOnlyIssues) filterOnlyIssues.addEventListener('change', applyFilters);
 
             // Lightbox functionality
             const lightbox = document.querySelector('.lightbox');
@@ -1297,6 +1599,8 @@ def generate_gallery_html(
             const lightboxFilename = document.querySelector('.lightbox-filename');
             const lightboxMeta = document.querySelector('.lightbox-meta');
             const lightboxAlt = document.querySelector('.lightbox-alt');
+            const lightboxAccName = document.querySelector('.lightbox-acc-name');
+            const lightboxHints = document.querySelector('.lightbox-hints');
             const closeBtn = document.querySelector('.lightbox-close');
             const prevBtn = document.querySelector('.lightbox-prev');
             const nextBtn = document.querySelector('.lightbox-next');
@@ -1391,6 +1695,32 @@ def generate_gallery_html(
                 lightboxFilename.textContent = filename;
                 lightboxMeta.textContent = thumb.dataset.width + '×' + thumb.dataset.height + ' · ' + thumb.dataset.size;
                 lightboxAlt.textContent = thumb.dataset.alt ? '"' + thumb.dataset.alt + '"' : '';
+
+                // Accessible name + source
+                if (lightboxAccName) {{
+                    const accName = thumb.dataset.accName || '';
+                    const accSource = thumb.dataset.accNameSource || '';
+                    if (accName) {{
+                        lightboxAccName.innerHTML = '<span class="acc-label">Accessible name:</span> <em>' + accName.replace(/[<>&]/g, c => ({{'<':'&lt;','>':'&gt;','&':'&amp;'}}[c])) + '</em> <small>(' + accSource + ')</small>';
+                    }} else if (accSource === 'none') {{
+                        lightboxAccName.innerHTML = '<span class="acc-label" style="color:#f0883e">⚠ No accessible name</span>';
+                    }} else {{
+                        lightboxAccName.innerHTML = '<span class="acc-label" style="color:#f0883e">⚠ No accessible name (' + accSource + ')</span>';
+                    }}
+                }}
+
+                // Accessibility hints
+                if (lightboxHints) {{
+                    let hints = [];
+                    try {{ hints = JSON.parse(thumb.dataset.hints || '[]'); }} catch (_) {{}}
+                    if (hints.length > 0) {{
+                        lightboxHints.innerHTML = '<strong>Accessibility hints:</strong><ul>' +
+                            hints.map(h => '<li>' + h + '</li>').join('') +
+                            '</ul>';
+                    }} else {{
+                        lightboxHints.innerHTML = '';
+                    }}
+                }}
 
                 // Update navigation state based on visible images
                 const posIndex = visibleIndices.indexOf(index);

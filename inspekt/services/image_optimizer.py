@@ -7,6 +7,7 @@ Provides PNG optimization using oxipng (a Rust-based PNG optimizer).
 import shutil
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 import click
@@ -149,6 +150,36 @@ def optimize_png(file_path: Path, level: int = 3, strip: bool = True) -> int | N
 
     except Exception as e:
         raise RuntimeError(f"Unexpected error during optimization: {e}")
+
+
+def optimize_png_data(png_bytes: bytes, level: int = 3, strip: bool = True) -> bytes:
+    """
+    Optimize PNG bytes in-memory via oxipng.
+
+    Writes to a temp file, runs oxipng, reads the result back. Returns the
+    original bytes unchanged when oxipng is missing or the call fails, so
+    callers can treat this as a best-effort pass.
+    """
+    if not is_oxipng_installed():
+        return png_bytes
+
+    with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
+        tmp.write(png_bytes)
+        tmp_path = Path(tmp.name)
+
+    try:
+        args = ["oxipng", str(tmp_path), f"-o{level}", "--quiet"]
+        if strip:
+            args.append("--strip=all")
+        subprocess.run(args, check=True, capture_output=True)
+        return tmp_path.read_bytes()
+    except subprocess.CalledProcessError:
+        return png_bytes
+    finally:
+        try:
+            tmp_path.unlink()
+        except FileNotFoundError:
+            pass
 
 
 def optimize_png_batch(file_paths: list[Path], level: int = 3, strip: bool = True) -> dict[Path, int]:

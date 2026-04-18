@@ -308,6 +308,7 @@ def extract():
 )
 @click.option(
     "--json",
+    "-j",
     "output_json",
     is_flag=True,
     help="Output as JSON with metadata",
@@ -685,7 +686,8 @@ return ({extraction_script})
                     1 for p in cached_paths.values() if p is not None
                 )
 
-        click.echo(json.dumps(json_output, indent=2, ensure_ascii=False))
+        from inspekt.app.cli.table import print_json
+        print_json(json_output, summary="extracted article")
 
     elif output:
         output_path = Path(output)
@@ -815,6 +817,7 @@ return ({extraction_script})
 )
 @click.option(
     "--json",
+    "-j",
     "output_json",
     is_flag=True,
     help="Output results as JSON",
@@ -983,10 +986,11 @@ def images(
 
     filtered_images = [img for img in all_images if passes_dimension_filter(img)]
 
-    # Filter out data URIs and blob URIs (we'll handle them separately if needed)
+    # Blob URIs can't be dereferenced server-side — browser-only scheme. Skip.
+    # Data URIs are decoded inline in download_image() below.
     external_images = [
         img for img in filtered_images
-        if not img.get("isDataUri") and not img.get("isBlobUri")
+        if not img.get("isBlobUri")
     ]
 
     if not external_images:
@@ -995,7 +999,7 @@ def images(
 
     skipped_count = len(all_images) - len(external_images)
     if skipped_count > 0 and not quiet:
-        click.echo(f"  Skipped {skipped_count} images (filtered or data URIs)", err=True)
+        click.echo(f"  Skipped {skipped_count} images (filtered or blob URIs)", err=True)
 
     # Determine output directory
     if output_dir:
@@ -1028,19 +1032,41 @@ def images(
         if not url:
             return {"success": False, "error": "No URL", "img": img}
 
-        # Generate filename
-        original_filename = img.get("filename")
-        if not original_filename:
-            # Generate from URL hash
-            parsed = urlparse(url)
-            path_parts = parsed.path.split("/")
-            original_filename = path_parts[-1] if path_parts else "image"
-            if not original_filename or original_filename == "":
-                url_hash = hashlib.sha256(url.encode()).hexdigest()[:12]
-                original_filename = f"image_{url_hash}.jpg"
+        is_data_uri = bool(img.get("isDataUri"))
 
-        # URL-decode filename (converts %20 to spaces, etc.)
-        original_filename = unquote(original_filename)
+        _MIME_TO_EXT = {
+            "image/png": ".png", "image/jpeg": ".jpg", "image/jpg": ".jpg",
+            "image/gif": ".gif", "image/webp": ".webp", "image/svg+xml": ".svg",
+            "image/avif": ".avif", "image/bmp": ".bmp", "image/x-icon": ".ico",
+        }
+
+        data_uri_bytes = None
+        if is_data_uri:
+            # Decode up-front so the filename can include the content hash and
+            # the correct mime-derived extension. The same bytes feed the main
+            # processing path further down.
+            from inspekt.services.html_image_optimizer import parse_data_uri
+            parsed = parse_data_uri(url)
+            if not parsed:
+                return {"success": False, "error": "Malformed data URI", "img": img}
+            mime_type, data_uri_bytes = parsed
+            data_ext = _MIME_TO_EXT.get(mime_type, ".bin")
+            data_hash = hashlib.sha256(data_uri_bytes).hexdigest()[:12]
+            original_filename = f"data_{data_hash}{data_ext}"
+        else:
+            # Generate filename
+            original_filename = img.get("filename")
+            if not original_filename:
+                # Generate from URL hash
+                parsed = urlparse(url)
+                path_parts = parsed.path.split("/")
+                original_filename = path_parts[-1] if path_parts else "image"
+                if not original_filename or original_filename == "":
+                    url_hash = hashlib.sha256(url.encode()).hexdigest()[:12]
+                    original_filename = f"image_{url_hash}.jpg"
+
+            # URL-decode filename (converts %20 to spaces, etc.)
+            original_filename = unquote(original_filename)
 
         # Clean filename (converts spaces to underscores, removes invalid chars)
         safe_filename = sanitize_filename(Path(original_filename).stem, max_length=80)
@@ -1064,6 +1090,7 @@ def images(
                     if potential_thumb.exists():
                         thumb_path = potential_thumb
 
+                cached_url = (url[:60] + "…" if is_data_uri and len(url) > 60 else url)
                 return {
                     "success": True,
                     "cached": True,
@@ -1075,9 +1102,13 @@ def images(
                     "file_size": file_size,
                     "alt": img.get("alt", ""),
                     "title": img.get("title", ""),
-                    "original_url": url,
+                    "original_url": cached_url,
                     "was_resized": False,
                     "was_optimized": False,
+                    # Data URIs are never publicly reachable; for normal URLs,
+                    # unknown — if VM rich-output needs this it fills in via
+                    # a HEAD probe after the download loop.
+                    "publicly_reachable": False if is_data_uri else None,
                     "img": img,
                 }
             except Exception:
@@ -1091,18 +1122,20 @@ def images(
                 counter += 1
 
         try:
-            response = requests.get(
-                url,
-                timeout=30.0,
-                stream=True,
-                headers={
-                    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-                    "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-                },
-            )
-            response.raise_for_status()
-
-            image_bytes = response.content
+            if is_data_uri:
+                image_bytes = data_uri_bytes
+            else:
+                response = requests.get(
+                    url,
+                    timeout=30.0,
+                    stream=True,
+                    headers={
+                        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                        "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+                    },
+                )
+                response.raise_for_status()
+                image_bytes = response.content
 
             # Check for duplicate content
             content_hash = hashlib.md5(image_bytes).hexdigest()
@@ -1224,6 +1257,17 @@ def images(
                 except Exception:
                     thumb_path = None  # Use original as thumbnail
 
+            # Data URIs can't be "fetched" from outside, so mark unreachable
+            # and store a truncated marker instead of the full base64 blob.
+            if is_data_uri:
+                stored_url = url[:60] + "…" if len(url) > 60 else url
+                publicly_reachable = False
+            else:
+                # Just fetched successfully with no cookies/auth/referer,
+                # so the URL is reachable from any client that can speak HTTP.
+                stored_url = url
+                publicly_reachable = True
+
             return {
                 "success": True,
                 "path": final_path,
@@ -1234,9 +1278,10 @@ def images(
                 "file_size": file_size,
                 "alt": img.get("alt", ""),
                 "title": img.get("title", ""),
-                "original_url": url,
+                "original_url": stored_url,
                 "was_resized": was_resized,
                 "was_optimized": was_optimized,
+                "publicly_reachable": publicly_reachable,
                 "img": img,
             }
 
@@ -1357,6 +1402,7 @@ def images(
                 except Exception:
                     pass  # Skip if can't read
 
+            js_img = r.get("img") or {}
             gallery_images.append(
                 GalleryImage(
                     filename=r["filename"],
@@ -1370,8 +1416,70 @@ def images(
                     original_url=r.get("original_url", ""),
                     is_optimized=r.get("was_optimized", False),
                     svg_content=svg_content,
+                    source_type=js_img.get("sourceType", "img"),
+                    accessible_name=js_img.get("accessibleName", ""),
+                    accessible_name_source=js_img.get("accessibleNameSource", "alt attribute"),
+                    is_linked=bool(js_img.get("isLinked", False)),
+                    link_href=js_img.get("linkHref", ""),
+                    nearest_heading_text=js_img.get("nearestHeadingText", ""),
                 )
             )
+
+        from inspekt.config import is_isolated_mode
+
+        vm_bundle = is_isolated_mode()
+
+        if vm_bundle:
+            # HEAD-probe cached images to determine which originals are still
+            # publicly reachable; downloaded ones already know from their GET.
+            unknown_idx = [
+                i for i, r in enumerate(successful)
+                if r.get("publicly_reachable") is None and r.get("original_url")
+            ]
+
+            def _probe(url: str) -> bool:
+                try:
+                    resp = requests.head(
+                        url,
+                        timeout=5.0,
+                        allow_redirects=True,
+                        headers={"Referer": page_url} if page_url else None,
+                    )
+                    if resp.status_code == 405:
+                        resp = requests.get(
+                            url,
+                            timeout=5.0,
+                            stream=True,
+                            headers={"Referer": page_url} if page_url else None,
+                        )
+                        resp.close()
+                    return 200 <= resp.status_code < 400
+                except requests.exceptions.RequestException:
+                    return False
+
+            if unknown_idx:
+                with ThreadPoolExecutor(max_workers=8) as probe_pool:
+                    futures = {
+                        probe_pool.submit(_probe, successful[i]["original_url"]): i
+                        for i in unknown_idx
+                    }
+                    for fut in as_completed(futures):
+                        successful[futures[fut]]["publicly_reachable"] = fut.result()
+
+            # Inline thumbnails as data URIs and set full_src override per image.
+            import base64
+            import mimetypes
+            for gimg, r in zip(gallery_images, successful):
+                thumb_path = r.get("thumb_path")
+                if thumb_path and thumb_path.exists():
+                    thumb_bytes = thumb_path.read_bytes()
+                    thumb_mime = mimetypes.guess_type(thumb_path.name)[0] or "image/webp"
+                    gimg.thumbnail_data_uri = (
+                        f"data:{thumb_mime};base64,"
+                        + base64.b64encode(thumb_bytes).decode("ascii")
+                    )
+                if r.get("publicly_reachable") and r.get("original_url"):
+                    gimg.full_src_override = r["original_url"]
 
         gallery_html = generate_gallery_html(
             images=gallery_images,
@@ -1387,9 +1495,40 @@ def images(
         if not quiet:
             click.echo(success_icon(f"Gallery created: {gallery_path}"), err=True)
 
-        # Open gallery in browser
         from inspekt.app.cli.util import open_or_download
-        open_or_download(gallery_path)
+
+        if vm_bundle:
+            # Build /tmp/gallery-{domain}.zip containing gallery.html plus any
+            # originals that weren't publicly reachable (so the host can open
+            # it offline). Publicly reachable ones are referenced by URL.
+            import zipfile
+
+            domain = extract_domain_from_url(page_url) or "gallery"
+            zip_path = Path(f"/tmp/gallery-{sanitize_filename(domain, max_length=80)}.zip")
+            zip_path.unlink(missing_ok=True)
+
+            with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
+                zf.write(gallery_path, arcname="gallery.html")
+                for r in successful:
+                    if not r.get("publicly_reachable"):
+                        file_path = r["path"]
+                        if file_path.exists():
+                            zf.write(file_path, arcname=file_path.name)
+
+            if not quiet:
+                bundled = sum(1 for r in successful if not r.get("publicly_reachable"))
+                linked = len(successful) - bundled
+                click.echo(
+                    success_icon(
+                        f"Packaged gallery: {bundled} bundled, {linked} linked · "
+                        f"{_format_size(zip_path.stat().st_size)}"
+                    ),
+                    err=True,
+                )
+            open_or_download(zip_path)
+        else:
+            # Open gallery in browser
+            open_or_download(gallery_path)
 
     if not quiet and not rich_output:
         print_hint("Use --rich-output to generate an HTML gallery with lightbox")
@@ -1425,7 +1564,9 @@ def images(
         if rich_output:
             json_output["gallery_path"] = str(output_path / "gallery.html")
 
-        click.echo(json.dumps(json_output, indent=2, ensure_ascii=False))
+        from inspekt.app.cli.table import print_json
+        count = json_output.get("downloaded", len(json_output.get("images", [])))
+        print_json(json_output, summary=f"{count} images")
 
     # Open directory if requested
     if open_dir:
