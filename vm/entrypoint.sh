@@ -85,6 +85,22 @@ iptables -A OUTPUT -m owner --uid-owner $INSPEKT_UID -j DROP
 
 echo "Network restrictions applied for inspekt user (uid=$INSPEKT_UID)"
 
+# Route the inspekt user's outbound HTTP through the local mitmproxy.
+# The iptables rules above drop direct internet access for this UID; the
+# mitmproxy CA is already in the system trust store (Dockerfile ~line 262),
+# so HTTPS through it verifies cleanly when REQUESTS_CA_BUNDLE / SSL_CERT_FILE
+# point at the system bundle.
+cat > /etc/profile.d/inspekt-proxy.sh <<'PROFILE_EOF'
+if [ "$(id -un)" = "inspekt" ]; then
+    export HTTP_PROXY=http://localhost:8080
+    export HTTPS_PROXY=http://localhost:8080
+    export NO_PROXY=localhost,127.0.0.1
+    export REQUESTS_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt
+    export SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
+fi
+PROFILE_EOF
+chmod 644 /etc/profile.d/inspekt-proxy.sh
+
 # Sitemap cache: /var/cache/inspekt/sitemaps — accessible to all users
 mkdir -p /var/cache/inspekt/sitemaps
 chmod 777 /var/cache/inspekt/sitemaps

@@ -27,7 +27,7 @@ _refresh_inspekt_domain() {
         local d
         d=$(curl -sf --max-time 1 http://localhost:8888/url 2>/dev/null \
             | jq -r '.url // empty' 2>/dev/null \
-            | sed -n 's|^https\?://\([^/:]*\).*|\1|p')
+            | sed -n 's|^https\?://\(www\.\)\?\([^/:]*\).*|\2|p')
         [[ -n "$d" ]] && echo "$d" > "$_INSPEKT_DOMAIN_FILE"
     } &!
 }
