@@ -829,7 +829,7 @@ def restart(foreground, api_port, bridge_port, host, docs, docs_port):
 
 
 @click.group(invoke_without_command=True)
-@click.option("--json", "output_json", is_flag=True, help="Output as JSON")
+@click.option("--json", "-j", "output_json", is_flag=True, help="Output as JSON")
 @click.pass_context
 def status(ctx, output_json):
     """Check status of all Inspekt servers.
@@ -891,7 +891,8 @@ def status(ctx, output_json):
                 "port": 8000 if api_running else None
             }
         }
-        click.echo(json.dumps(output_data, indent=2))
+        from inspekt.app.cli.table import print_json
+        print_json(output_data, summary="server status")
     else:
         # Human-readable output using Table formatting
         from inspekt.app.cli.table import Table, format_status_icon
@@ -1062,6 +1063,19 @@ def status(ctx, output_json):
             api_table.print_row(row)
         api_table.print_footer()
 
+        # VM terminal: offer a "Data ready to copy" toast
+        from inspekt.app.cli.table import emit_copyable_data
+        status_rows = list(bridge_data) + list(api_data)
+        emit_copyable_data(
+            headers=["Property", "Value"],
+            rows=status_rows,
+            json_data={
+                "bridge_server": {"running": bridge_running, "status": bridge_status},
+                "api_server": {"running": api_running, "port": 8000 if api_running else None},
+            },
+            summary="server status",
+        )
+
         # Footer hint
         if api_running:
             click.echo()
@@ -1116,7 +1130,7 @@ def queue():
 
 
 @queue.command("status")
-@click.option("--json", "output_json", is_flag=True, help="Output as JSON")
+@click.option("--json", "-j", "output_json", is_flag=True, help="Output as JSON")
 def queue_status(output_json):
     """Show queue status and pending requests.
 
@@ -1140,7 +1154,8 @@ def queue_status(output_json):
         data = response.json()
 
         if output_json:
-            click.echo(json.dumps(data, indent=2))
+            from inspekt.app.cli.table import print_json
+            print_json(data, summary="queue status")
             return
 
         pending = data.get("pending_count", 0)
@@ -1173,6 +1188,19 @@ def queue_status(output_json):
                 click.echo(f"  {info(f'{req_id}... ({age_str}) - {req_type}')}")
         elif pending == 0:
             click.echo(f"\n{success('No pending requests')}")
+
+        # VM terminal: offer a "Data ready to copy" toast
+        from inspekt.app.cli.table import emit_copyable_data
+        queue_rows = [
+            [r.get("request_id", "")[:8], f"{r.get('age_seconds', 0):.1f}s", r.get("type", "")]
+            for r in pending_requests
+        ]
+        emit_copyable_data(
+            headers=["Request ID", "Age", "Type"],
+            rows=queue_rows,
+            json_data=data,
+            summary=f"{pending} pending, {completed} cached",
+        )
 
     except http_requests.RequestException as e:
         click.echo(f"Error: Failed to get queue status: {e}", err=True)

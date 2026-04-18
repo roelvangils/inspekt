@@ -305,6 +305,7 @@ def _start_container(dev_mode: bool = False, vm_dir: Path = None) -> bool:
             "-v", f"{vm_dir}/css:/usr/share/novnc/css:ro",
             "-v", f"{vm_dir}/js:/usr/share/novnc/js:ro",
             "-v", f"{vm_dir}/vendor/sortable.min.js:/usr/share/novnc/vendor/sortable.min.js:ro",
+            "-v", f"{vm_dir}/vendor/qrcode.min.js:/usr/share/novnc/vendor/qrcode.min.js:ro",
             "-v", f"{vm_dir}/fonts:/usr/share/novnc/fonts:ro",
             "-v", f"{vm_dir}/icons:/usr/share/novnc/icons:ro",
             "-v", f"{vm_dir}/servers/control-server.py:/opt/control-server.py:ro",
@@ -662,7 +663,7 @@ def open_panel():
 
 
 @vm.command()
-@click.option("--json", "output_json", is_flag=True, help="Output as JSON")
+@click.option("--json", "-j", "output_json", is_flag=True, help="Output as JSON")
 def status(output_json):
     """Check the status of the Browser VM.
 
@@ -688,7 +689,8 @@ def status(output_json):
             "control_panel_url": f"http://localhost:{NOVNC_PORT}/control.html" if container_running else None,
             "vnc_url": f"http://localhost:{NOVNC_PORT}/vnc.html" if container_running else None,
         }
-        click.echo(json.dumps(data, indent=2))
+        from inspekt.app.cli.table import print_json
+        print_json(data, summary="VM status")
         return
 
     click.echo()
@@ -743,6 +745,21 @@ def status(output_json):
         for row in urls_data:
             urls_table.print_row(row)
         urls_table.print_footer()
+
+        # VM terminal: offer a "Data ready to copy" toast
+        from inspekt.app.cli.table import emit_copyable_data
+        emit_copyable_data(
+            headers=["Component", "Status"],
+            rows=data + urls_data,
+            json_data={
+                "docker_running": docker_running,
+                "image_exists": image_exists,
+                "container_running": container_running,
+                "control_panel_url": f"http://localhost:{NOVNC_PORT}/control.html",
+                "vnc_url": f"http://localhost:{NOVNC_PORT}/vnc.html",
+            },
+            summary="VM status",
+        )
     else:
         click.echo()
         click.echo(f"  Start with: " + click.style("inspekt vm start", fg="cyan"))

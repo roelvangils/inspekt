@@ -23,9 +23,10 @@ Example usage:
     table = Table(["Name", "Status", "Size"], widths=[30, 8, 10])
 """
 
+import json as _json
 import re
 import shutil
-from typing import Optional
+from typing import Any, Optional
 
 from contextlib import contextmanager
 
@@ -40,10 +41,108 @@ NUMERIC_PATTERN = re.compile(
 # Regex pattern for stripping ANSI escape codes
 ANSI_ESCAPE_PATTERN = re.compile(r"\x1b\[[0-9;]*m")
 
+# OSC 8 hyperlink wrappers: \x1b]8;;URL\x1b\\TEXT\x1b]8;;\x1b\\
+# Keeps the visible TEXT, drops the wrapping escapes.
+OSC8_OPEN_PATTERN = re.compile(r"\x1b\]8;[^\x1b]*\x1b\\")
+OSC8_CLOSE_PATTERN = re.compile(r"\x1b\]8;;\x1b\\")
+
+# Nerdfont glyphs live in the Unicode Private Use Areas. They render as boxes
+# outside the terminal, so strip them for Markdown export.
+NERDFONT_PATTERN = re.compile(r"[\ue000-\uf8ff\U000f0000-\U000ffffd]")
+
 
 def strip_ansi(text: str) -> str:
     """Strip ANSI escape codes from text."""
     return ANSI_ESCAPE_PATTERN.sub("", text)
+
+
+def strip_for_markdown(text: str) -> str:
+    """Strip ANSI, OSC 8 hyperlinks, and Nerdfont glyphs from a cell value."""
+    if not text:
+        return ""
+    text = str(text)
+    text = OSC8_CLOSE_PATTERN.sub("", text)
+    text = OSC8_OPEN_PATTERN.sub("", text)
+    text = ANSI_ESCAPE_PATTERN.sub("", text)
+    text = NERDFONT_PATTERN.sub("", text)
+    return text.strip()
+
+
+def _markdown_cell(value: Any) -> str:
+    """Prepare a single cell for a GFM pipe table."""
+    text = strip_for_markdown("" if value is None else str(value))
+    # Escape pipes, collapse newlines — GFM cells can't span lines.
+    text = text.replace("|", "\\|").replace("\r\n", " ").replace("\n", " <br> ")
+    return text or " "
+
+
+def rows_to_markdown(headers: list[str], rows: list[list[Any]]) -> str:
+    """Render headers + rows as a GFM pipe table."""
+    clean_headers = [_markdown_cell(h) for h in headers]
+    body = [[_markdown_cell(v) for v in row] for row in rows]
+
+    header_line = "| " + " | ".join(clean_headers) + " |"
+    separator = "| " + " | ".join(["---"] * len(clean_headers)) + " |"
+    row_lines = ["| " + " | ".join(row) + " |" for row in body]
+
+    return "\n".join([header_line, separator, *row_lines])
+
+
+def emit_copyable_data(
+    *,
+    headers: Optional[list[str]] = None,
+    rows: Optional[list[list[Any]]] = None,
+    json_data: Any = None,
+    summary: str = "",
+    table_md: Optional[str] = None,
+) -> None:
+    """Emit a ``Data ready to copy`` toast signal for the VM terminal.
+
+    Gated on INSPEKT_ISOLATED=1 so it's a no-op outside the VM. Either
+    ``headers`` + ``rows`` (to auto-build a Markdown table) or a pre-built
+    ``table_md`` may be supplied — omit both for a JSON-only toast.
+    ``json_data`` is serialized with ``json.dumps(..., indent=2)``; pass
+    ``None`` for a Markdown-only toast.
+    """
+    from inspekt.config import is_isolated_mode
+
+    if not is_isolated_mode():
+        return
+
+    if table_md is None and headers is not None and rows is not None:
+        table_md = rows_to_markdown(headers, rows)
+
+    json_text: Optional[str] = None
+    if json_data is not None:
+        try:
+            json_text = _json.dumps(json_data, indent=2, ensure_ascii=False, default=str)
+        except Exception:
+            json_text = None
+
+    if not table_md and not json_text:
+        return
+
+    from inspekt.app.cli.util import _vm_data_signal
+    _vm_data_signal(json_text, table_md, summary)
+
+
+def print_json(data: Any, *, summary: str = "") -> None:
+    """Pretty-print ``data`` as JSON and, in the VM, emit a copy toast.
+
+    Centralizes the ``--json`` output path so every command's JSON mode
+    gets the [JSON] copy button in the VM terminal without each call site
+    duplicating the toast logic. Outside the VM, this is just a prettier
+    ``click.echo(json.dumps(...))``.
+    """
+    json_text = _json.dumps(data, indent=2, ensure_ascii=False, default=str)
+    click.echo(json_text)
+
+    from inspekt.config import is_isolated_mode
+    if not is_isolated_mode():
+        return
+
+    from inspekt.app.cli.util import _vm_data_signal
+    _vm_data_signal(json_text, None, summary)
 
 
 def visible_len(text: str) -> int:

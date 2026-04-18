@@ -95,7 +95,7 @@ def start(bridge_port, cache_ttl):
 
 
 @mcp.command()
-@click.option("--json", "output_json", is_flag=True, help="Output as JSON")
+@click.option("--json", "-j", "output_json", is_flag=True, help="Output as JSON")
 def info(output_json):
     """
     Show information about available MCP tools and resources.
@@ -138,7 +138,9 @@ def info(output_json):
                 "mime_type": resource.mime_type,
             })
 
-        click.echo(json.dumps({
+        from inspekt.app.cli.table import print_json
+        total_tools = len(builtin_tools) + len(plugin_tools)
+        print_json({
             "tools": tools_json,
             "resources": resources_json,
             "summary": {
@@ -146,7 +148,7 @@ def info(output_json):
                 "plugin_tools": len(plugin_tools),
                 "resources": len(resources),
             }
-        }, indent=2))
+        }, summary=f"{total_tools} MCP tools")
     else:
         # Human-readable output
         click.echo("Inspekt MCP Server - Available Tools and Resources\n")
@@ -192,10 +194,39 @@ def info(output_json):
         click.echo(f"\n\nTotal: {total_tools} tools, {len(resources)} resources")
         click.echo("\nUse 'inspekt mcp describe <tool>' for detailed documentation.")
 
+        # VM terminal: offer a "Data ready to copy" toast
+        from inspekt.app.cli.table import emit_copyable_data
+        tool_rows = []
+        for tool in builtin_tools + plugin_tools:
+            desc = (tool.description or "").split(". ")[0]
+            tool_rows.append([tool.name, tool.category, desc, format_params_summary(tool.input_schema)])
+        tools_json = [
+            {
+                "name": t.name,
+                "description": t.description,
+                "category": t.category,
+                "parameters": format_params_summary(t.input_schema),
+                "is_plugin": t.is_plugin,
+            }
+            for t in builtin_tools + plugin_tools
+        ]
+        resources_json = [
+            {"uri": r.uri, "name": r.name, "description": r.description, "mime_type": r.mime_type}
+            for r in resources
+        ]
+        emit_copyable_data(
+            headers=["Name", "Category", "Description", "Parameters"],
+            rows=tool_rows,
+            json_data={"tools": tools_json, "resources": resources_json,
+                       "summary": {"builtin_tools": builtin_count, "plugin_tools": plugin_count,
+                                   "resources": len(resources)}},
+            summary=f"{total_tools} MCP tool{'s' if total_tools != 1 else ''}",
+        )
+
 
 @mcp.command()
 @click.argument("tool_name")
-@click.option("--json", "output_json", is_flag=True, help="Output as JSON")
+@click.option("--json", "-j", "output_json", is_flag=True, help="Output as JSON")
 def describe(tool_name, output_json):
     """
     Show detailed documentation for a specific MCP tool.
@@ -235,7 +266,8 @@ def describe(tool_name, output_json):
             "response_schema": response_schema,
             "parameters": params,
         }
-        click.echo(json.dumps(output, indent=2))
+        from inspekt.app.cli.table import print_json
+        print_json(output, summary=f"MCP tool: {tool.name}")
     else:
         # Human-readable output
         click.echo(f"Tool: {tool.name}")
@@ -314,6 +346,33 @@ def describe(tool_name, output_json):
             "arguments": example_args if example_args else {},
         }
         click.echo(json.dumps(example, indent=2))
+
+        # VM terminal: offer a "Data ready to copy" toast
+        from inspekt.app.cli.table import emit_copyable_data
+        param_rows = [
+            [
+                p["name"],
+                p["type"],
+                "yes" if p["required"] else "no",
+                p.get("description", "") or "",
+                "" if p.get("default") is None else str(p["default"]),
+            ]
+            for p in params
+        ]
+        emit_copyable_data(
+            headers=["Name", "Type", "Required", "Description", "Default"],
+            rows=param_rows,
+            json_data={
+                "name": tool.name,
+                "category": tool.category,
+                "description": tool.description,
+                "is_plugin": tool.is_plugin,
+                "input_schema": tool.input_schema,
+                "response_schema": response_schema,
+                "parameters": params,
+            },
+            summary=f"tool {tool.name}",
+        )
 
 
 @mcp.command()

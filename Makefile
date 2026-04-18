@@ -149,10 +149,24 @@ dev-desktop:
 
 dev-all:
 	@command -v overmind >/dev/null 2>&1 || { echo "Install overmind: brew install overmind"; exit 1; }
+	@command -v bun >/dev/null 2>&1 || { echo "Install bun: https://bun.sh"; exit 1; }
+	@docker info >/dev/null 2>&1 || { echo "Error: Docker daemon not reachable. Start Docker Desktop and retry."; exit 1; }
 	@$(MAKE) --no-print-directory vm-start
 	@# Stop any lingering background bridge/API daemon so the Procfile's
 	@# `inspekt start --foreground` can bind cleanly. Ignore if nothing's there.
 	@inspekt stop >/dev/null 2>&1 || true
+	@# Remove stale overmind socket + tmux servers from a crashed previous run.
+	@if ! pgrep -f "overmind start" >/dev/null 2>&1; then \
+		if [ -S ./.overmind.sock ]; then \
+			echo "  • Removing stale ./.overmind.sock"; \
+			rm -f ./.overmind.sock; \
+		fi; \
+		for sock in /tmp/tmux-$$(id -u)/overmind-inspekt-*; do \
+			[ -S "$$sock" ] || continue; \
+			echo "  • Killing stale tmux server $$(basename $$sock)"; \
+			tmux -L "$$(basename $$sock)" kill-server 2>/dev/null || true; \
+		done; \
+	fi
 	@#    cli=blue  extension=green  vm=yellow  desktop=magenta
 	OVERMIND_COLORS=4,2,3,5 overmind start -f Procfile.dev
 

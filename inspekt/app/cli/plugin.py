@@ -84,7 +84,8 @@ def plugin_list(category, mcp, output_json):
         plugins = plugin_service.list_plugins(category=category, mcp_only=mcp)
 
         if output_json:
-            click.echo(json.dumps(plugins, indent=2))
+            from inspekt.app.cli.table import print_json
+            print_json(plugins, summary=f"{len(plugins)} plugins")
         else:
             _display_plugins(plugins)
 
@@ -303,7 +304,8 @@ def plugin_run(name_or_id, interactive, category, timeout, output_json, quiet):
         plugin_service.increment_run_count(plugin_data["id"])
 
         if output_json:
-            click.echo(json.dumps(result, indent=2))
+            from inspekt.app.cli.table import print_json
+            print_json(result, summary=f"ran plugin {plugin_data['name']}")
         else:
             if result.get("ok"):
                 from inspekt.app.cli.icons import get_icon
@@ -424,7 +426,8 @@ def plugin_unload(name_or_id, timeout, output_json, quiet):
         )
 
         if output_json:
-            click.echo(json.dumps(result, indent=2))
+            from inspekt.app.cli.table import print_json
+            print_json(result, summary=f"{action} plugin {plugin_data['name']}")
         else:
             if result.get("ok"):
                 click.echo(f"Plugin {action}: {plugin_data['name']}")
@@ -476,9 +479,24 @@ def plugin_show(name_or_id, output_json):
             sys.exit(1)
 
         if output_json:
-            click.echo(json.dumps(plugin_data, indent=2))
+            from inspekt.app.cli.table import print_json
+            print_json(plugin_data, summary=f"plugin {plugin_data.get('name', '')}")
         else:
             _display_plugin_details(plugin_data)
+
+            # VM terminal: offer a "Data ready to copy" toast (flat key-value)
+            from inspekt.app.cli.table import emit_copyable_data
+            rows = []
+            for k, v in plugin_data.items():
+                if k == "code":
+                    v = f"({len(str(v))} chars)"
+                rows.append([str(k), "" if v is None else str(v)])
+            emit_copyable_data(
+                headers=["Property", "Value"],
+                rows=rows,
+                json_data=plugin_data,
+                summary=f"plugin {plugin_data.get('name', plugin_data.get('id', ''))}",
+            )
 
     except Exception as e:
         click.echo(f"Error: {e}", err=True)
@@ -844,6 +862,15 @@ def _display_plugins(plugins: list[dict]) -> None:
         table.print_row(row)
 
     table.print_footer()
+
+    # VM terminal: offer a "Data ready to copy" toast
+    from inspekt.app.cli.table import emit_copyable_data
+    emit_copyable_data(
+        headers=headers,
+        rows=rows,
+        json_data={"plugins": plugins},
+        summary=f"{len(plugins)} plugin{'s' if len(plugins) != 1 else ''}",
+    )
 
     # Legend
     mcp_count = sum(1 for p in plugins if p.get("mcp_exposed"))

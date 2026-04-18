@@ -1,6 +1,7 @@
 {
   "dependencies": {
-    "material-icons": "^1.13.14"
+    "material-icons": "^1.13.14",
+    "qrcode-generator": "^2.0.4"
   },
   "scripts": {
     "help": "printf '\\n  Every script here forwards to make. The Makefile is the source of truth.\\n  Type `bun run <name>` to run one, or `make help` for the full reference.\\n\\n' && make help",

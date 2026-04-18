@@ -43,7 +43,7 @@ def _truncate(text: str, max_length: int = 40) -> str:
 
 
 @click.group(invoke_without_command=True)
-@click.option("--json", "output_json", is_flag=True, help="Output as JSON")
+@click.option("--json", "-j", "output_json", is_flag=True, help="Output as JSON")
 @click.pass_context
 def instances(ctx, output_json):
     """List and manage connected browser instances.
@@ -141,6 +141,15 @@ def _list_instances(output_json: bool) -> None:
     for row in rows:
         table.print_row(row)
     table.print_footer()
+
+    # VM terminal: offer a "Data ready to copy" toast
+    from inspekt.app.cli.table import emit_copyable_data
+    emit_copyable_data(
+        headers=["ID", "Alias", "Browser", "Title", "Status", "Last Command"],
+        rows=rows,
+        json_data={"instances": instances_list},
+        summary=f"{len(instances_list)} instance{'s' if len(instances_list) != 1 else ''}",
+    )
 
     click.echo()
     print_hint("Use `inspekt -i <ID>` or `inspekt -i <alias>` to target a specific instance.")

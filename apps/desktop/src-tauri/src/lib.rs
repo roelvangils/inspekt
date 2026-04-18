@@ -753,6 +753,16 @@ pub fn run() {
                 }
 
                 // ── Edit ─────────────────────────────────────────
+                // Cmd+C: route through the webview. JS decides whether to
+                // copy a native selection (URL bar, terminal, input) or the
+                // VM's selection via the bridge. See focus-overlay.js.
+                "smart_copy" => {
+                    if let Some(window) = app.get_webview_window("vm") {
+                        let _ = window.eval(
+                            "window.__inspektSmartCopy && window.__inspektSmartCopy()",
+                        );
+                    }
+                }
                 "copy_selection" => {
                     let handle = app.clone();
                     tauri::async_runtime::spawn(

@@ -412,11 +412,35 @@ def display_element_info(response, source_type="inspected", output_json=False):
 
     # JSON output
     if output_json:
-        click.echo(json.dumps(response, indent=2))
+        from inspekt.app.cli.table import print_json
+        print_json(response, summary=f"{source_type} element")
         return
 
     # Display the element info (code below continues with existing formatting)
     _display_element_details(response)
+
+    # VM terminal: offer a "Data ready to copy" toast
+    from inspekt.app.cli.table import emit_copyable_data
+    a11y = response.get("accessibility", {}) or {}
+    dim = response.get("dimensions", {}) or {}
+    rows = [
+        ["Tag", f"<{response.get('tag', '')}>"],
+        ["Selector", response.get("selector", "") or ""],
+        ["ID", response.get("id", "") or ""],
+        ["Classes", ", ".join(response.get("classes") or [])],
+        ["Role", a11y.get("role", "") or ""],
+        ["Accessible Name", a11y.get("accessibleName", "") or ""],
+        ["Focusable", "yes" if a11y.get("focusable") else "no"],
+        ["Visible", "yes" if response.get("visible") else "no"],
+        ["Position", f"{dim.get('left', 0)}, {dim.get('top', 0)}"],
+        ["Size", f"{dim.get('width', 0)}×{dim.get('height', 0)}px"],
+    ]
+    emit_copyable_data(
+        headers=["Property", "Value"],
+        rows=rows,
+        json_data=response,
+        summary=f"{source_type} element",
+    )
 
 
 def _display_element_details(response):
@@ -568,7 +592,7 @@ def display_inspected_info(response, output_json=False):
 
 
 @click.group(invoke_without_command=True)
-@click.option("--json", "output_json", is_flag=True, help="Output as JSON")
+@click.option("--json", "-j", "output_json", is_flag=True, help="Output as JSON")
 @click.pass_context
 def inspected(ctx, output_json):
     """
@@ -641,7 +665,7 @@ def _display_text_markdown_metadata(response):
 @inspected.command()
 @click.option("--raw", is_flag=True, help="Output raw content without formatting (auto-enabled when piped)")
 @click.option("--copy", is_flag=True, help="Copy output to clipboard")
-@click.option("--json", "output_json", is_flag=True, help="Output as JSON")
+@click.option("--json", "-j", "output_json", is_flag=True, help="Output as JSON")
 def text(raw, copy, output_json):
     """
     Get the text content of the inspected element.
@@ -684,7 +708,8 @@ def text(raw, copy, output_json):
             "tag": response.get("tag"),
             "selector": response.get("selector")
         }
-        click.echo(json.dumps(output, indent=2))
+        from inspekt.app.cli.table import print_json
+        print_json(output, summary=f"inspected text ({len(text_content)} chars)")
         return
 
     # Raw mode: just print the text
@@ -715,7 +740,7 @@ def text(raw, copy, output_json):
 @inspected.command()
 @click.option("--raw", is_flag=True, help="Output raw content without formatting (auto-enabled when piped)")
 @click.option("--copy", is_flag=True, help="Copy output to clipboard")
-@click.option("--json", "output_json", is_flag=True, help="Output as JSON")
+@click.option("--json", "-j", "output_json", is_flag=True, help="Output as JSON")
 def markdown(raw, copy, output_json):
     """
     Get the inspected element as Markdown (converted from HTML).
@@ -763,7 +788,8 @@ def markdown(raw, copy, output_json):
             "tag": response.get("tag"),
             "selector": response.get("selector")
         }
-        click.echo(json.dumps(output, indent=2))
+        from inspekt.app.cli.table import print_json
+        print_json(output, summary=f"inspected markdown ({len(markdown_content)} chars)")
         return
 
     # Raw mode: just print the markdown
@@ -1219,7 +1245,7 @@ def html(file_path, open_after, reveal_after, include_css, bundled, all_properti
 )
 @click.option("--raw", is_flag=True, help="Output raw content without formatting (auto-enabled when piped)")
 @click.option("--copy", is_flag=True, help="Copy output to clipboard")
-@click.option("--json", "output_json", is_flag=True, help="Output as JSON")
+@click.option("--json", "-j", "output_json", is_flag=True, help="Output as JSON")
 @click.option(
     "--all-properties",
     is_flag=True,
@@ -1581,7 +1607,7 @@ def css(file_path, open_after, reveal_after, raw, copy, output_json, all_propert
 @click.option(
     "--language", "--lang", type=str, default=None, help="Language for AI output (overrides config)"
 )
-@click.option("--json", "output_json", is_flag=True, help="Output as JSON")
+@click.option("--json", "-j", "output_json", is_flag=True, help="Output as JSON")
 @click.option("--debug", is_flag=True, help="Show detailed debug output (prompts, API calls, image processing)")
 def inspected_describe(language, output_json, debug):
     """
@@ -1614,12 +1640,13 @@ def inspected_describe(language, output_json, debug):
     result = asyncio.run(element_describe(params))
 
     if output_json:
-        click.echo(json.dumps({
+        from inspekt.app.cli.table import print_json
+        print_json({
             "description": result.description,
             "element_type": result.element_type,
             "accessible_name": result.accessible_name,
             "source": result.source,
-        }, indent=2))
+        }, summary=f"inspected element description")
     else:
         if result.description.startswith("Error:"):
             click.echo(result.description, err=True)
@@ -1635,7 +1662,7 @@ def inspected_describe(language, output_json, debug):
 @click.option(
     "--language", "--lang", type=str, default=None, help="Language for AI output (overrides config)"
 )
-@click.option("--json", "output_json", is_flag=True, help="Output as JSON")
+@click.option("--json", "-j", "output_json", is_flag=True, help="Output as JSON")
 @click.option("--debug", is_flag=True, help="Show detailed debug output (prompts, API calls, image processing)")
 def inspected_ask(question, language, output_json, debug):
     """
@@ -1662,12 +1689,13 @@ def inspected_ask(question, language, output_json, debug):
     result = asyncio.run(element_ask(params))
 
     if output_json:
-        click.echo(json.dumps({
+        from inspekt.app.cli.table import print_json
+        print_json({
             "question": question,
             "answer": result.answer,
             "element_type": result.element_type,
             "source": result.source,
-        }, indent=2))
+        }, summary="inspected element answer")
     else:
         if result.answer.startswith("Error:"):
             click.echo(result.answer, err=True)
@@ -1684,7 +1712,7 @@ def get_executor():
 
 
 @click.group(invoke_without_command=True)
-@click.option("--json", "output_json", is_flag=True, help="Output as JSON")
+@click.option("--json", "-j", "output_json", is_flag=True, help="Output as JSON")
 @click.pass_context
 def focused(ctx, output_json):
     """
@@ -1735,7 +1763,7 @@ def focused(ctx, output_json):
 @focused.command()
 @click.option("--raw", is_flag=True, help="Output raw content without formatting (auto-enabled when piped)")
 @click.option("--copy", is_flag=True, help="Copy output to clipboard")
-@click.option("--json", "output_json", is_flag=True, help="Output as JSON")
+@click.option("--json", "-j", "output_json", is_flag=True, help="Output as JSON")
 def text(raw, copy, output_json):
     """
     Get the text content of the focused element.
@@ -1778,7 +1806,8 @@ def text(raw, copy, output_json):
             "tag": response.get("tag"),
             "selector": response.get("selector")
         }
-        click.echo(json.dumps(output, indent=2))
+        from inspekt.app.cli.table import print_json
+        print_json(output, summary=f"focused text ({len(text_content)} chars)")
         return
 
     # Raw mode: just print the text (auto-enabled when piped)
@@ -1809,7 +1838,7 @@ def text(raw, copy, output_json):
 @focused.command()
 @click.option("--raw", is_flag=True, help="Output raw content without formatting (auto-enabled when piped)")
 @click.option("--copy", is_flag=True, help="Copy output to clipboard")
-@click.option("--json", "output_json", is_flag=True, help="Output as JSON")
+@click.option("--json", "-j", "output_json", is_flag=True, help="Output as JSON")
 def markdown(raw, copy, output_json):
     """
     Get the focused element as Markdown (converted from HTML).
@@ -1857,7 +1886,8 @@ def markdown(raw, copy, output_json):
             "tag": response.get("tag"),
             "selector": response.get("selector")
         }
-        click.echo(json.dumps(output, indent=2))
+        from inspekt.app.cli.table import print_json
+        print_json(output, summary=f"focused markdown ({len(markdown_content)} chars)")
         return
 
     # Raw mode: just print the markdown (auto-enabled when piped)
@@ -2302,7 +2332,7 @@ def html(file_path, open_after, reveal_after, include_css, bundled, all_properti
 )
 @click.option("--raw", is_flag=True, help="Output raw CSS without formatting (auto-enabled when piped)")
 @click.option("--copy", is_flag=True, help="Copy output to clipboard")
-@click.option("--json", "output_json", is_flag=True, help="Output as JSON")
+@click.option("--json", "-j", "output_json", is_flag=True, help="Output as JSON")
 @click.option(
     "--all-properties",
     is_flag=True,
@@ -2638,7 +2668,7 @@ def screenshot_element_options(func):
         click.option("--redact-style", type=click.Choice(["blur", "bar"], case_sensitive=False), default="bar", help="Redaction style: bar (████ blocks, default) or blur"),
         click.option("--redact/--no-redact", default=True, help="Redact sensitive data before capture (enabled by default for security)"),
         click.option("--metadata/--no-metadata", default=True, help="Embed metadata (URL, timestamp, viewport) in image file (default: enabled)"),
-        click.option("--json", "json_output", is_flag=True, help="Output result as JSON (for scripting)"),
+        click.option("--json", "-j", "json_output", is_flag=True, help="Output result as JSON (for scripting)"),
         click.option("--quiet", "-q", is_flag=True, help="Suppress output except errors"),
         click.option("--force", "-f", is_flag=True, help="Overwrite existing file without confirmation"),
         click.option("--clipboard", is_flag=True, help="Copy to clipboard instead of saving to file"),
@@ -3603,7 +3633,7 @@ def screenshot_focused(ctx, **kwargs):
 @click.option(
     "--language", "--lang", type=str, default=None, help="Language for AI output (overrides config)"
 )
-@click.option("--json", "output_json", is_flag=True, help="Output as JSON")
+@click.option("--json", "-j", "output_json", is_flag=True, help="Output as JSON")
 @click.option("--debug", is_flag=True, help="Show detailed debug output (prompts, API calls, image processing)")
 def focused_describe(language, output_json, debug):
     """
@@ -3636,12 +3666,13 @@ def focused_describe(language, output_json, debug):
     result = asyncio.run(element_describe(params))
 
     if output_json:
-        click.echo(json.dumps({
+        from inspekt.app.cli.table import print_json
+        print_json({
             "description": result.description,
             "element_type": result.element_type,
             "accessible_name": result.accessible_name,
             "source": result.source,
-        }, indent=2))
+        }, summary=f"focused element description")
     else:
         if result.description.startswith("Error:"):
             click.echo(result.description, err=True)
@@ -3657,7 +3688,7 @@ def focused_describe(language, output_json, debug):
 @click.option(
     "--language", "--lang", type=str, default=None, help="Language for AI output (overrides config)"
 )
-@click.option("--json", "output_json", is_flag=True, help="Output as JSON")
+@click.option("--json", "-j", "output_json", is_flag=True, help="Output as JSON")
 @click.option("--debug", is_flag=True, help="Show detailed debug output (prompts, API calls, image processing)")
 def focused_ask(question, language, output_json, debug):
     """
@@ -3685,12 +3716,13 @@ def focused_ask(question, language, output_json, debug):
     result = asyncio.run(element_ask(params))
 
     if output_json:
-        click.echo(json.dumps({
+        from inspekt.app.cli.table import print_json
+        print_json({
             "question": question,
             "answer": result.answer,
             "element_type": result.element_type,
             "source": result.source,
-        }, indent=2))
+        }, summary="focused element answer")
     else:
         if result.answer.startswith("Error:"):
             click.echo(result.answer, err=True)
@@ -3788,6 +3820,7 @@ def focused_ask(question, language, output_json, debug):
 )
 @click.option(
     "--json",
+    "-j",
     "json_output",
     is_flag=True,
     help="Output result as JSON",
@@ -4223,6 +4256,7 @@ def screenshot_viewport(output, margin, margin_color, disable_compression, enabl
 )
 @click.option(
     "--json",
+    "-j",
     "json_output",
     is_flag=True,
     help="Output result as JSON (implies --quiet for progress messages)",
@@ -4673,6 +4707,7 @@ def screenshot_page(output, margin, margin_color, disable_compression, enable_co
 )
 @click.option(
     "--json",
+    "-j",
     "json_output",
     is_flag=True,
     help="Output result as JSON",

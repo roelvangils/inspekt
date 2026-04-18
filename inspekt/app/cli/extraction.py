@@ -357,7 +357,7 @@ def _parse_page_structure(markdown_structure: str) -> dict:
 )
 @click.option("--debug", is_flag=True, help="Show the full prompt instead of calling AI")
 @click.option("--force-refresh", is_flag=True, help="Force refresh, bypass cache")
-@click.option("--json", "output_json", is_flag=True, help="Output as JSON with metadata")
+@click.option("--json", "-j", "output_json", is_flag=True, help="Output as JSON with metadata")
 def describe(language, debug, force_refresh, output_json):
     """
     Generate an AI-powered description of the page for screen reader users.
@@ -460,7 +460,8 @@ def describe(language, debug, force_refresh, output_json):
                         },
                         "ai": model_info,
                     }
-                    click.echo(json.dumps(json_output, indent=2))
+                    from inspekt.app.cli.table import print_json
+                    print_json(json_output, summary="page description (cached)")
                     return
 
                 # Format age for display
@@ -511,7 +512,8 @@ def describe(language, debug, force_refresh, output_json):
                 "generated_at": generation_timestamp,
                 "ai": model_info,
             }
-            click.echo(json.dumps(json_output, indent=2))
+            from inspekt.app.cli.table import print_json
+            print_json(json_output, summary="page description")
         else:
             click.echo()
             print_wrapped(output, fg="white", bold=False)
@@ -1595,7 +1597,7 @@ def _process_outline_headings(headings: list) -> list:
     param_map={"output_json": "json"},
     exclude_params=["truncate"],
 )
-@click.option("--json", "output_json", is_flag=True, help="Output as JSON")
+@click.option("--json", "-j", "output_json", is_flag=True, help="Output as JSON")
 @click.option("--truncate", type=int, default=None, help="Truncate headings to specified number of characters")
 def outline(output_json, truncate):
     """
@@ -1638,7 +1640,8 @@ def outline(output_json, truncate):
 
         if not headings:
             if output_json:
-                click.echo(json.dumps({"headings": [], "count": 0}, indent=2))
+                from inspekt.app.cli.table import print_json
+                print_json({"headings": [], "count": 0}, summary="0 headings")
             else:
                 click.echo("No headings found on this page.", err=True)
             sys.exit(0)
@@ -1652,17 +1655,20 @@ def outline(output_json, truncate):
         duplicate_count = len([h for h in processed_headings if h.get("is_duplicate")])
         empty_count = len([h for h in processed_headings if h.get("is_empty")])
 
+        output_data = {
+            "headings": processed_headings,
+            "count": total_real,
+            "missing_count": missing_count,
+            "duplicate_count": duplicate_count,
+            "empty_count": empty_count,
+            "url": data.get("url", ""),
+            "title": data.get("title", ""),
+        }
+        toast_summary = f"{total_real} headings"
+
         if output_json:
-            output_data = {
-                "headings": processed_headings,
-                "count": total_real,
-                "missing_count": missing_count,
-                "duplicate_count": duplicate_count,
-                "empty_count": empty_count,
-                "url": data.get("url", ""),
-                "title": data.get("title", "")
-            }
-            click.echo(json.dumps(output_data, indent=2))
+            from inspekt.app.cli.table import print_json
+            print_json(output_data, summary=toast_summary)
             return
 
         # Display the outline with proper indentation
@@ -1722,6 +1728,33 @@ def outline(output_json, truncate):
         if duplicate_count:
             summary_parts.append(click.style(f"{duplicate_count} duplicates", fg="yellow"))
         click.echo(" | ".join(summary_parts), err=True)
+
+        # VM terminal: offer a "Data ready to copy" toast in default mode too
+        from inspekt.app.cli.table import emit_copyable_data
+        outline_rows = []
+        for h in processed_headings:
+            flags = []
+            if h.get("is_missing"):
+                flags.append("missing")
+            if h.get("is_empty"):
+                flags.append("empty")
+            if h.get("is_duplicate"):
+                flags.append("duplicate")
+            if h.get("type") == "aria":
+                flags.append("aria")
+            level = h["level"]
+            text = "" if h.get("is_missing") else h.get("text", "")
+            outline_rows.append([
+                f"H{level}",
+                "  " * (level - 1) + text,
+                ", ".join(flags),
+            ])
+        emit_copyable_data(
+            headers=["Level", "Heading", "Flags"],
+            rows=outline_rows,
+            json_data=output_data,
+            summary=toast_summary,
+        )
 
     except (ConnectionError, TimeoutError, RuntimeError) as e:
         click.echo(f"Error: {e}", err=True)
@@ -1884,7 +1917,7 @@ def _enrich_external_links(links: list) -> list:
 @click.option("--alphabetically", is_flag=True, help="Sort links alphabetically")
 @click.option("--only-urls", is_flag=True, help="Show only URLs without anchor text")
 @click.option(
-    "--json", "output_json", is_flag=True, help="Output as JSON with detailed link information"
+    "--json", "-j", "output_json", is_flag=True, help="Output as JSON with detailed link information"
 )
 @click.option(
     "--enrich-external",
@@ -1972,7 +2005,8 @@ def links(only_internal, only_external, alphabetically, only_urls, output_json, 
         # If JSON output is requested, output JSON and exit
         if output_json:
             output_data = {"links": filtered_links, "total": len(filtered_links), "domain": domain}
-            click.echo(json.dumps(output_data, indent=2))
+            from inspekt.app.cli.table import print_json
+            print_json(output_data, summary=f"{len(filtered_links)} links")
             return
 
         # Output links
@@ -2035,6 +2069,19 @@ def links(only_internal, only_external, alphabetically, only_urls, output_json, 
         else:
             click.echo(f"Total: {shown} links", err=True)
 
+        # VM terminal: offer a "Data ready to copy" toast
+        from inspekt.app.cli.table import emit_copyable_data
+        link_rows = [
+            [link.get("type", ""), link.get("text", "") or "", link.get("href", "") or ""]
+            for link in filtered_links
+        ]
+        emit_copyable_data(
+            headers=["Type", "Text", "URL"],
+            rows=link_rows,
+            json_data={"links": filtered_links, "total": shown, "domain": domain},
+            summary=f"{shown} link{'s' if shown != 1 else ''}",
+        )
+
     except (ConnectionError, TimeoutError, RuntimeError) as e:
         click.echo(f"Error: {e}", err=True)
         sys.exit(1)
@@ -2057,7 +2104,7 @@ def links(only_internal, only_external, alphabetically, only_urls, output_json, 
 )
 @click.option("--debug", is_flag=True, help="Show the full prompt instead of calling AI")
 @click.option("--force-refresh", is_flag=True, help="Force refresh, bypass cache")
-@click.option("--json", "output_json", is_flag=True, help="Output as JSON with metadata")
+@click.option("--json", "-j", "output_json", is_flag=True, help="Output as JSON with metadata")
 @click.option(
     "--output", "-o",
     type=click.Path(),
@@ -2246,7 +2293,8 @@ return ({extraction_script})
                         },
                         "ai": model_info,
                     }
-                    click.echo(json.dumps(json_output, indent=2))
+                    from inspekt.app.cli.table import print_json
+                    print_json(json_output, summary="article summary (cached)")
                     return
 
                 # Format age for display
@@ -2311,7 +2359,8 @@ return ({extraction_script})
                 "generated_at": generation_timestamp,
                 "ai": model_info,
             }
-            click.echo(json.dumps(json_output, indent=2))
+            from inspekt.app.cli.table import print_json
+            print_json(json_output, summary="article summary")
         elif output:
             # Smart output detection by extension
             output_path = Path(output)

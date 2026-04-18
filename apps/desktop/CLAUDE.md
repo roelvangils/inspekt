@@ -1,82 +1,124 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
 # Claude Development Guide for Desktop VM (Tauri)
 
-The Tauri app is a thin native wrapper around the Browser VM control panel. It loads `http://localhost:6080/control.html` (served by the Docker container) in a webview. **Almost all logic lives in the control panel HTML/JS/CSS, not in Rust.**
+The Tauri app is a thin native wrapper around the Browser VM control panel running in a Docker container. Almost all UI logic lives in the control panel HTML/JS/CSS (inside `inspekt/vm/`, not here) — this app's job is to launch/manage the VM container and host the webview that loads it.
 
 ---
 
-## Architecture: External URL in a Webview
+## Commands
 
-The VM window loads an **external URL** (`localhost:6080`), not a bundled frontend. This has critical implications:
+Run from `apps/desktop/`:
 
-### What works
-- `window.__TAURI_INTERNALS__` IS available (Tauri injects it via init scripts)
-- `window.__TAURI__` and `window.isTauri` are available
-- Tauri plugin commands work (e.g. `plugin:clipboard-manager|write_text`, `plugin:window|start_dragging`)
+| Command | Purpose |
+|---|---|
+| `bun run tauri dev` | Primary dev loop. Starts Vite (port 1421) and builds/runs the Rust binary. Clears WKWebView cache first via `clean-cache`. |
+| `bun run dev:app` | Dev build packaged as a minimal `.app` bundle. Needed when testing anything that triggers macOS TCC prompts (microphone, speech recognition) — bare `tauri dev` has no Info.plist so those prompts don't fire. Script in `scripts/dev-app-bundle.sh`. |
+| `bun run check` | `svelte-check` type-check over the launcher Svelte code. |
+| `bun run build` | Vite build of `../dist` (the bundled launcher/preferences frontend). |
+| `bun run tauri build` | Full release `.app` bundle. |
+| `bun run clean-cache` | Clear `~/Library/WebKit/be.fronteers.inspekt-browser-vm` + Caches dir. See "WKWebView cache" below. |
 
-### What doesn't work
-- `initialization_script()` and `on_page_load` `eval()` do **NOT** execute on the external URL
-- `data-tauri-drag-region` attribute does **NOT** work (it relies on init script injection)
-- Any JS that needs to run must be added directly to `control-panel.html` or its JS files
-
-### Remote Capabilities (CRITICAL)
-
-Tauri's permission system distinguishes between **local** (bundled frontend) and **remote** (external URL) origins. The VM window is remote.
-
-- **`capabilities/default.json`** — `"local": true` — only applies to the bundled launcher/preferences pages
-- **`capabilities/clipboard-remote.json`** — has `"remote": { "urls": ["http://localhost:6080/*"] }` — applies to the VM window
-
-**Any new Tauri API permission for the VM window MUST go in `clipboard-remote.json`**, not `default.json`. Putting it in `default.json` will silently fail with "not allowed on window vm".
+There is no test suite here.
 
 ---
 
-## The Bridge (Control Server)
+## Two-surface architecture
 
-The control server (`vm/servers/control-server.py`) on port **8888** is the bridge between the control panel JS and the Inspekt CLI running inside the Docker container.
+The app has **two distinct frontends** living in one Tauri process. Confusing them is the most common source of bugs.
 
-### Pattern: Running Inspekt commands
+### 1. Local launcher (bundled Svelte frontend)
+
+- **Windows:** `main` (the launcher) and `preferences`
+- **Code:** `src/App.svelte`, `src/lib/components/*.svelte`, `preferences.html`
+- **Served from:** Vite dev server (`http://localhost:1421`) in dev, `../dist` at runtime in prod
+- **Capabilities:** `capabilities/default.json` (`"local": true`)
+- **What it does:** Checks Docker, calls `start_vm`/`stop_vm`, polls health, opens the VM window when ready. Emits/receives events via `@tauri-apps/api`.
+
+### 2. VM window (external URL)
+
+- **Windows:** `vm` (main VM window) and `vm-*` (tab tear-off windows, labels generated from `SystemTime`)
+- **Code:** lives in the Python repo at `vm/servers/control-panel.html` — **not in this app**
+- **Served from:** `http://localhost:6080/control.html` via WebSockify/noVNC in the Docker container
+- **Capabilities:** `capabilities/clipboard-remote.json` (`"remote": { "urls": ["http://localhost:6080/*"] }`)
+- **What it does:** hosts the VNC canvas, command palette, URL bar, popouts, toasts — the entire day-to-day UI.
+
+### Why the distinction matters
+
+Tauri's permission system is origin-scoped. A permission in `default.json` only works for the bundled launcher; the VM window sees "not allowed on window vm" silently. **Any new Tauri API permission for the VM window MUST go in `clipboard-remote.json`.**
+
+Similarly, init scripts and `on_page_load` eval only run on bundled frontends. For the VM window:
+
+- `initialization_script()` / `on_page_load` `eval()` do **NOT** execute
+- `data-tauri-drag-region` attribute does **NOT** work (depends on init script injection)
+- Any JS that needs to run must be added directly to `control-panel.html` (in the `inspekt/` repo)
+
+What DOES work on the VM window: `window.__TAURI_INTERNALS__`, `window.__TAURI__`, `window.isTauri`, and any plugin command whose permission is in `clipboard-remote.json`.
+
+---
+
+## The Bridge (control server on port 8888)
+
+The control server (`vm/servers/control-server.py` in the `inspekt/` repo) is the backbone for everything. Both the Rust side and the JS side call it to run Inspekt CLI commands, fetch page info, etc. Rust also polls it for health checks and clipboard relay.
+
+**From JS (control panel):**
 ```javascript
-// JS fetches from the control server, which runs the command in Docker
 const response = await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/inspekt/${encodeURIComponent(command)}`);
-const data = await response.json();
-// data = { ok: true, output: "…", error: null }
+const data = await response.json(); // { ok, output, error }
 ```
 
-### Pattern: Clipboard operations
-```javascript
-// 1. Fetch output via the bridge
-const data = await fetch(`http://localhost:8888/inspekt/selection text --raw`).then(r => r.json());
+**From Rust:** see `api_get`, `api_post`, `copy_inspekt_output`, `poll_clipboard_relay` in `src-tauri/src/lib.rs`.
 
-// 2. Write to clipboard via Tauri plugin (or navigator.clipboard fallback)
-if (window.__TAURI_INTERNALS__) {
-    await window.__TAURI_INTERNALS__.invoke('plugin:clipboard-manager|write_text', { text: data.output });
-} else {
-    await navigator.clipboard.writeText(data.output);
-}
-```
+**NEVER write a custom Rust command for an operation the bridge can do.** Only use Rust/Tauri for things that require native OS access: clipboard write, window management, notifications, native file dialogs (`rfd`), Docker lifecycle.
 
-**NEVER write custom Rust commands for operations that can go through the bridge.** The bridge already handles all Inspekt CLI operations. Only use Rust/Tauri for things that require native OS access (clipboard write, window management, notifications).
+---
+
+## Rust ↔ JS communication patterns
+
+- **Launcher → Rust:** `invoke<T>("command_name", args)` from `@tauri-apps/api/core`. Commands registered in `tauri::Builder::default().invoke_handler(...)` in `lib.rs::run()`.
+- **Rust → launcher:** `app.emit("event-name", payload)` on the Rust side; `listen<T>("event-name", cb)` in Svelte. Example lifecycle: `vm-progress`, `vm-ready`, `vm-error`, `vm-stopped`.
+- **Rust → VM window:** `window.eval("...")` to run arbitrary JS, or `CustomEvent('tauri-menu', { detail: { action, value } })` dispatched via eval — see `emit_to_vm` / `emit_to_vm_with_payload`. Used heavily by the native menu (`src-tauri/src/menu.rs`).
+- **Rust toasts in VM window:** `show_vm_toast(app, msg, type)` evals a call to the global `showToast(...)` JS function defined in `control-panel.html`.
 
 ---
 
 ## Window Dragging
 
-Window dragging uses `__TAURI_INTERNALS__.invoke('plugin:window|start_dragging')` called from a mousedown handler on `.control-bar` in `control-panel.html`. The handler uses event delegation to skip interactive elements (buttons, inputs, URL bar).
+Dragging uses `__TAURI_INTERNALS__.invoke('plugin:window|start_dragging')` called from a mousedown handler on `.control-bar` in `control-panel.html` (upstream repo). Event delegation skips interactive elements (buttons, inputs, URL bar).
 
-The `core:window:allow-start-dragging` permission is in `clipboard-remote.json` (the remote capability).
+The `core:window:allow-start-dragging` permission is in `clipboard-remote.json`.
 
-Previous failed approaches (for reference):
+Previous failed approaches (don't re-try):
 - `data-tauri-drag-region` — doesn't work on external URLs
-- `-webkit-app-region: drag` — Electron-only, no effect in Tauri/WKWebView
-- `NSWindow.setMovableByWindowBackground(true)` — makes entire window draggable including VNC canvas
+- `-webkit-app-region: drag` — Electron-only, no effect in WKWebView
+- `NSWindow.setMovableByWindowBackground(true)` — makes the entire window draggable including VNC canvas
 
 ---
 
-## Tauri Plugin Commands vs Custom Commands
+## Tauri plugin commands vs custom commands
 
-- **Plugin commands**: `plugin:<name>|<method>` — built into Tauri or its plugins. Need permission in capabilities JSON.
-- **Custom commands**: Registered via `invoke_handler` in Rust. Need both the Rust handler AND a permission entry.
+- **Plugin commands:** `plugin:<name>|<method>` — built into Tauri or its plugins. Only need a permission entry in capabilities JSON.
+- **Custom commands:** registered via `invoke_handler` in Rust. Need both the Rust handler AND a permission entry.
 
-For the VM window, prefer plugin commands over custom commands since they just need a permission entry in `clipboard-remote.json`.
+For the VM window, prefer plugin commands — capability entry is all that's needed.
+
+---
+
+## GUI PATH gotcha
+
+macOS GUI apps only inherit the minimal system PATH (`/usr/bin:/bin:/usr/sbin:/sbin`), so `docker`, `inspekt`, and tools in `~/.local/bin` or Homebrew are invisible. `fix_path_env()` in `lib.rs` runs `/bin/zsh -ilc 'echo $PATH'` at startup and sets `PATH` from the user's login shell. If you see "command not found" for a tool that clearly exists in Terminal, suspect this and check that `fix_path_env()` is still called first in `run()`.
+
+---
+
+## WKWebView cache
+
+WKWebView caches JS/CSS from WebSockify (port 6080) aggressively because WebSockify sends no Cache-Control headers. Changes to `control-panel.html` / CSS / JS may not appear even after `make vm-restart`.
+
+**Workaround:** `bun run clean-cache` (runs `rm -rf ~/Library/WebKit/be.fronteers.inspekt-browser-vm ~/Library/Caches/be.fronteers.inspekt-browser-vm`). This is automatically called by `bun run dev`, but the Tauri app must be **fully quit first** — cache files are locked while it's running.
+
+When the JS/CSS edits aren't taking effect, suspect this cache before anything else.
 
 ---
 
@@ -84,9 +126,11 @@ For the VM window, prefer plugin commands over custom commands since they just n
 
 | Changed | Action needed |
 |---------|--------------|
-| `control-panel.html`, CSS, JS | `make vm-restart` (from repo root) |
+| `control-panel.html`, CSS, JS (upstream) | `make vm-restart` (from `/Users/demo/Repos/inspekt`, the repo root), then quit + relaunch Tauri app if cache is sticky |
+| `src/**/*.svelte`, launcher CSS/TS | Vite HMR — no restart needed |
 | `src-tauri/src/*.rs` | Restart `bun run tauri dev` |
 | `capabilities/*.json` | Restart `bun run tauri dev` |
 | `Cargo.toml` | Restart `bun run tauri dev` |
+| `tauri.conf.json` | Restart `bun run tauri dev` |
 
-Note: `make vm-restart` must be run from `/Users/demo/Repos/inspekt` (repo root), not from `apps/desktop/`.
+`make vm-restart` is in the upstream repo's Makefile and must be run from the repo root, not from `apps/desktop/`.

@@ -21,7 +21,7 @@ import requests
 
 from inspekt.app.cli.icons import get_icon
 from inspekt.services import http_client
-from inspekt.app.cli.table import Table, format_status_icon
+from inspekt.app.cli.table import Table, format_status_icon, print_json
 from inspekt.services.bridge_executor import get_executor
 
 
@@ -36,7 +36,7 @@ except ImportError:
 
 
 @click.command()
-@click.option("--json", "output_json", is_flag=True, help="Output as JSON")
+@click.option("--json", "-j", "output_json", is_flag=True, help="Output as JSON")
 @click.option("--validate", is_flag=True, help="Show detailed validation errors and warnings")
 @click.option("--url", "override_url", type=str, help="Specify URL to inspect (overrides current page)")
 def robots(output_json, validate, override_url):
@@ -74,7 +74,7 @@ def robots(output_json, validate, override_url):
     if not robots_data.get("exists"):
         # robots.txt not found
         if output_json:
-            click.echo(json.dumps(robots_data, indent=2))
+            print_json(robots_data, summary="robots.txt not found")
         else:
             click.echo(f"robots.txt: {robots_url}")
             click.echo(f"Status: {robots_data.get('status')} - Not Found")
@@ -102,7 +102,8 @@ def robots(output_json, validate, override_url):
 
     # Output results
     if output_json:
-        click.echo(json.dumps(output_data, indent=2))
+        rule_count = sum(len(g.get("rules", [])) for g in output_data.get("groups", []))
+        print_json(output_data, summary=f"robots.txt — {rule_count} rules")
     else:
         _display_robots_txt(output_data, validate)
 

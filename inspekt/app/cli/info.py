@@ -37,6 +37,37 @@ from inspekt.client import BridgeClient
 # =============================================================================
 
 
+def _emit_info_signal(data: dict, label: str) -> None:
+    """Emit a "Data ready to copy" toast for an info-section result."""
+    from inspekt.app.cli.table import emit_copyable_data
+
+    # Flatten nested dicts to a (key, value) rows list for the Markdown table
+    rows: list[list[str]] = []
+
+    def _flatten(prefix: str, obj) -> None:
+        if isinstance(obj, dict):
+            for k, v in obj.items():
+                key = f"{prefix}.{k}" if prefix else str(k)
+                _flatten(key, v)
+        elif isinstance(obj, (list, tuple)):
+            for i, v in enumerate(obj):
+                _flatten(f"{prefix}[{i}]", v)
+        else:
+            rows.append([prefix, "" if obj is None else str(obj)])
+
+    _flatten("", data or {})
+
+    if not rows:
+        return
+
+    emit_copyable_data(
+        headers=["Property", "Value"],
+        rows=rows,
+        json_data=data,
+        summary=label,
+    )
+
+
 def _print_info_table(title: str, rows: list[tuple[str, str, str | None]]) -> None:
     """Print a key-value information table with auto-width columns and title bar."""
     if not rows:
@@ -1544,7 +1575,7 @@ def _print_layout(data: dict) -> None:
 
 @click.group(invoke_without_command=True)
 @url_scheme("info", param_map={"output_json": "json"}, exclude_params=["ctx"])
-@click.option("--json", "output_json", is_flag=True, help="Output as JSON")
+@click.option("--json", "-j", "output_json", is_flag=True, help="Output as JSON")
 @click.pass_context
 def info(ctx, output_json):
     """
@@ -1583,7 +1614,8 @@ def info(ctx, output_json):
                 data["browser"] = browser
                 data["instanceId"] = instance_id
                 data["instanceAlias"] = instance_alias
-                click.echo(json.dumps(data, indent=2))
+                from inspekt.app.cli.table import print_json
+                print_json(data, summary="page info")
             else:
                 _print_summary(data, version, bridge_type, browser, instance_id, instance_alias)
 
@@ -1608,6 +1640,7 @@ def info_all(ctx):
         url = basic.get("url", "")
         domain = basic.get("domain", "")
 
+        all_data = None
         if output_json:
             all_data = {
                 "bridgeVersion": version,
@@ -1627,7 +1660,8 @@ def info_all(ctx):
                 "responseHeaders": _get_response_headers(url),
                 "robotsTxt": _get_robots_txt(url),
             }
-            click.echo(json.dumps(all_data, indent=2))
+            from inspekt.app.cli.table import print_json
+            print_json(all_data, summary="full page info")
         else:
             # Print all sections
             summary_data = _collect_summary_data(client)
@@ -1665,6 +1699,28 @@ def info_all(ctx):
             domain_metrics = _get_domain_metrics(domain)
             _print_domain(domain_metrics)
 
+            # VM terminal: emit a toast with the full aggregated payload
+            all_data = {
+                "bridgeVersion": version,
+                "bridgeType": bridge_type,
+                "browser": browser,
+                "url": url,
+                "summary": summary_data,
+                "performance": perf_data,
+                "meta": meta_data,
+                "seo": seo_data,
+                "security": security_data,
+                "accessibility": a11y_data,
+                "resources": resources_data,
+                "storage": storage_data,
+                "tech": tech_data,
+                "layout": layout_data,
+                "domain": domain_metrics,
+                "responseHeaders": headers,
+                "robotsTxt": robots_data,
+            }
+            _emit_info_signal(all_data, "page info")
+
     except (ConnectionError, TimeoutError, RuntimeError) as e:
         if output_json:
             click.echo(json.dumps({"ok": False, "error": str(e)}))
@@ -1684,9 +1740,11 @@ def info_performance(ctx):
         data = _collect_performance_data(client)
 
         if output_json:
-            click.echo(json.dumps(data, indent=2))
+            from inspekt.app.cli.table import print_json
+            print_json(data, summary="performance info")
         else:
             _print_performance(data)
+            _emit_info_signal(data, "performance info")
 
     except (ConnectionError, TimeoutError, RuntimeError) as e:
         if output_json:
@@ -1707,9 +1765,11 @@ def info_meta(ctx):
         data = _collect_meta_data(client)
 
         if output_json:
-            click.echo(json.dumps(data, indent=2))
+            from inspekt.app.cli.table import print_json
+            print_json(data, summary="meta info")
         else:
             _print_meta(data)
+            _emit_info_signal(data, "meta info")
 
     except (ConnectionError, TimeoutError, RuntimeError) as e:
         if output_json:
@@ -1733,9 +1793,11 @@ def info_seo(ctx):
 
         if output_json:
             data["robotsTxt"] = robots_data
-            click.echo(json.dumps(data, indent=2))
+            from inspekt.app.cli.table import print_json
+            print_json(data, summary="SEO info")
         else:
             _print_seo(data, robots_data)
+            _emit_info_signal({**data, "robotsTxt": robots_data}, "SEO info")
 
     except (ConnectionError, TimeoutError, RuntimeError) as e:
         if output_json:
@@ -1759,9 +1821,11 @@ def info_security(ctx):
 
         if output_json:
             data["responseHeaders"] = headers
-            click.echo(json.dumps(data, indent=2))
+            from inspekt.app.cli.table import print_json
+            print_json(data, summary="security info")
         else:
             _print_security(data, headers)
+            _emit_info_signal({**data, "responseHeaders": headers}, "security info")
 
     except (ConnectionError, TimeoutError, RuntimeError) as e:
         if output_json:
@@ -1782,9 +1846,11 @@ def info_accessibility(ctx):
         data = _collect_accessibility_data(client)
 
         if output_json:
-            click.echo(json.dumps(data, indent=2))
+            from inspekt.app.cli.table import print_json
+            print_json(data, summary="accessibility info")
         else:
             _print_accessibility(data)
+            _emit_info_signal(data, "accessibility info")
 
     except (ConnectionError, TimeoutError, RuntimeError) as e:
         if output_json:
@@ -1805,9 +1871,11 @@ def info_resources(ctx):
         data = _collect_resources_data(client)
 
         if output_json:
-            click.echo(json.dumps(data, indent=2))
+            from inspekt.app.cli.table import print_json
+            print_json(data, summary="resources info")
         else:
             _print_resources(data)
+            _emit_info_signal(data, "resources info")
 
     except (ConnectionError, TimeoutError, RuntimeError) as e:
         if output_json:
@@ -1828,9 +1896,11 @@ def info_storage(ctx):
         data = _collect_storage_data(client)
 
         if output_json:
-            click.echo(json.dumps(data, indent=2))
+            from inspekt.app.cli.table import print_json
+            print_json(data, summary="storage info")
         else:
             _print_storage(data)
+            _emit_info_signal(data, "storage info")
 
     except (ConnectionError, TimeoutError, RuntimeError) as e:
         if output_json:
@@ -1851,9 +1921,11 @@ def info_tech(ctx):
         data = _collect_tech_data(client)
 
         if output_json:
-            click.echo(json.dumps(data, indent=2))
+            from inspekt.app.cli.table import print_json
+            print_json(data, summary="tech info")
         else:
             _print_tech(data)
+            _emit_info_signal(data, "tech info")
 
     except (ConnectionError, TimeoutError, RuntimeError) as e:
         if output_json:
@@ -1876,9 +1948,11 @@ def info_domain(ctx):
         metrics = _get_domain_metrics(domain)
 
         if output_json:
-            click.echo(json.dumps(metrics or {}, indent=2))
+            from inspekt.app.cli.table import print_json
+            print_json(metrics or {}, summary="domain info")
         else:
             _print_domain(metrics)
+            _emit_info_signal(metrics or {}, "domain info")
 
     except (ConnectionError, TimeoutError, RuntimeError) as e:
         if output_json:
@@ -1899,9 +1973,11 @@ def info_layout(ctx):
         data = _collect_layout_data(client)
 
         if output_json:
-            click.echo(json.dumps(data, indent=2))
+            from inspekt.app.cli.table import print_json
+            print_json(data, summary="layout info")
         else:
             _print_layout(data)
+            _emit_info_signal(data, "layout info")
 
     except (ConnectionError, TimeoutError, RuntimeError) as e:
         if output_json:

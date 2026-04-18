@@ -659,7 +659,11 @@ def _list_available_rules(client: BridgeClient, timeout: float, output_json: boo
 
         if output_json:
             # Output as JSON
-            click.echo(json.dumps({"rules": rules, "stats": stats, "axeVersion": data.get("axeVersion")}, indent=2))
+            from inspekt.app.cli.table import print_json
+            print_json(
+                {"rules": rules, "stats": stats, "axeVersion": data.get("axeVersion")},
+                summary=f"{len(rules)} axe rules",
+            )
             return
 
         # Group rules by WCAG level
@@ -948,6 +952,15 @@ def _format_table_output(violations: list[dict], url: str, summary: dict, compac
 
     table.print_footer()
 
+    # VM terminal: offer a "Data ready to copy" toast
+    from inspekt.app.cli.table import emit_copyable_data
+    emit_copyable_data(
+        headers=headers,
+        rows=rows,
+        json_data={"violations": violations, "summary": summary, "url": url},
+        summary=f"{len(violations)} violation{'s' if len(violations) != 1 else ''}",
+    )
+
     # Summary (skip in compact mode)
     if compact:
         return
@@ -1005,6 +1018,7 @@ def _format_table_output(violations: list[dict], url: str, summary: dict, compac
 )
 @click.option(
     "--json",
+    "-j",
     "output_json",
     is_flag=True,
     help="Output full results as JSON"
@@ -1414,7 +1428,8 @@ def axe(level, rule, list_rules, tags, include_passes, include_incomplete, outpu
             if include_incomplete:
                 output_data["incomplete"] = incomplete_checks
 
-            click.echo(json.dumps(output_data, indent=2))
+            from inspekt.app.cli.table import print_json
+            print_json(output_data, summary=f"{len(violations)} violations")
             return
 
         # Adaptive output: detailed for single rule, table for multiple rules/WCAG levels
@@ -1592,6 +1607,7 @@ def axe(level, rule, list_rules, tags, include_passes, include_incomplete, outpu
 )
 @click.option(
     "--json",
+    "-j",
     "output_json",
     is_flag=True,
     help="Output results as JSON"
@@ -1652,7 +1668,9 @@ def autocomplete(threshold, include_hidden, include_disabled, output_json, timeo
 
         if output_json:
             # JSON output
-            click.echo(json.dumps(result, indent=2))
+            from inspekt.app.cli.table import print_json
+            analyzed = result.get("summary", {}).get("analyzed", 0)
+            print_json(result, summary=f"autocomplete check ({analyzed} fields)")
             return
 
         # Check for errors
@@ -1755,6 +1773,26 @@ def autocomplete(threshold, include_hidden, include_disabled, output_json, timeo
 
         click.echo(click.style(f"Confidence threshold: {threshold} | Multi-language: EN, DE, NL, FR", fg="bright_black"))
         click.echo()
+
+        # VM terminal: offer a "Data ready to copy" toast
+        from inspekt.app.cli.table import emit_copyable_data
+        ac_rows = [
+            [
+                f.get("selector", ""),
+                f.get("level", ""),
+                f.get("label") or "",
+                f.get("currentAutocomplete") or "",
+                f.get("predictedAutocomplete") or "",
+                f"{int((f.get('confidence') or 0) * 100)}%",
+            ]
+            for f in fields
+        ]
+        emit_copyable_data(
+            headers=["Selector", "Level", "Label", "Current", "Predicted", "Confidence"],
+            rows=ac_rows,
+            json_data=result,
+            summary=f"{len(fields)} field{'s' if len(fields) != 1 else ''}",
+        )
 
         # Exit with error code if violations found
         if violations > 0:
@@ -1889,6 +1927,15 @@ def _format_ibm_table_output(issues, summary, url, compact=False):
 
     table.print_footer()
 
+    # VM terminal: offer a "Data ready to copy" toast
+    from inspekt.app.cli.table import emit_copyable_data
+    emit_copyable_data(
+        headers=headers,
+        rows=rows,
+        json_data={"issues": issues, "summary": summary, "url": url},
+        summary=f"{issue_count} issue{'s' if issue_count != 1 else ''}",
+    )
+
     if compact:
         return
 
@@ -1937,6 +1984,7 @@ def _format_ibm_table_output(issues, summary, url, compact=False):
 )
 @click.option(
     "--json",
+    "-j",
     "output_json",
     is_flag=True,
     help="Output full results as JSON"
@@ -2032,7 +2080,8 @@ def ibm(level, rule, list_rules, include_passes, include_recommendations, output
 
             data = result.get("result", {})
             if output_json:
-                click.echo(json.dumps(data, indent=2))
+                from inspekt.app.cli.table import print_json
+                print_json(data, summary=f"{len(data.get('rules', []))} IBM rules")
             else:
                 rules = data.get("rules", [])
                 stats = data.get("stats", {})
@@ -2200,7 +2249,8 @@ def ibm(level, rule, list_rules, include_passes, include_recommendations, output
                 "issues": issues,
                 "summary": summary,
             }
-            click.echo(json.dumps(output, indent=2))
+            from inspekt.app.cli.table import print_json
+            print_json(output, summary=f"{len(issues)} IBM issues")
         else:
             _format_ibm_table_output(issues, summary, url)
 
@@ -5101,6 +5151,13 @@ def _print_engine_rules_table(engine_id: str) -> None:
     help="Output format: json (machine-readable) or html (interactive report)"
 )
 @click.option(
+    "--json",
+    "-j",
+    "json_flag",
+    is_flag=True,
+    help="Output as JSON (shortcut for --format json)"
+)
+@click.option(
     "--timeout",
     type=float,
     default=60.0,
@@ -5223,7 +5280,7 @@ def _print_engine_rules_table(engine_id: str) -> None:
     default=None,
     help="URL to audit in headless mode (required with --headless unless --mirror-session)"
 )
-def a11y(engines, list_engines, level, output_format, timeout, show_passes, include_recommendations, show_badges, interactive, dev_css, all_disagreements, info, verbose, scoped, exclude, rule, disable_rule, enable_rule, persistent, no_compliance_warning, summary_only, output_file, no_open, headless, mirror_session, headless_url):
+def a11y(engines, list_engines, level, output_format, json_flag, timeout, show_passes, include_recommendations, show_badges, interactive, dev_css, all_disagreements, info, verbose, scoped, exclude, rule, disable_rule, enable_rule, persistent, no_compliance_warning, summary_only, output_file, no_open, headless, mirror_session, headless_url):
     """
     Run combined accessibility audit with selected engines.
 
@@ -5289,6 +5346,10 @@ def a11y(engines, list_engines, level, output_format, timeout, show_passes, incl
 
     # Validate and normalize engine list
     engine_list = _validate_and_normalize_engines(engines)
+
+    # --json / -j is a shortcut for --format json
+    if json_flag and not output_format:
+        output_format = "json"
 
     # Validate axe-specific options
     axe_specific_options = []
@@ -5445,7 +5506,8 @@ def a11y(engines, list_engines, level, output_format, timeout, show_passes, incl
                 Path(output_file).write_text(json_str)
                 click.echo(f"Results saved to {output_file}", err=True)
             else:
-                click.echo(json_str)
+                from inspekt.app.cli.table import print_json
+                print_json(output_data, summary=f"a11y audit ({len(violations)} violations)")
         else:
             # Print summary
             click.echo(err=True)
@@ -5575,7 +5637,8 @@ def a11y(engines, list_engines, level, output_format, timeout, show_passes, incl
                     f.write(json_str)
                 click.echo(success(f"Report saved to: {output_path}"), err=True)
             else:
-                click.echo(json_str)
+                from inspekt.app.cli.table import print_json
+                print_json(enriched, summary="a11y report")
             return
 
         if output_format == "html":
@@ -5685,6 +5748,33 @@ def a11y(engines, list_engines, level, output_format, timeout, show_passes, incl
     # Build and print pivoted table (one row per engine per WCAG SC)
     if not summary_only:
         _print_pivoted_results_table(consolidated, engine_list, sorted_scs, issues_count)
+
+    # VM terminal: offer a "Data ready to copy" toast
+    from inspekt.app.cli.table import emit_copyable_data
+    a11y_headers = ["WCAG SC"] + [f"{eng} status" for eng in engine_list] + [f"{eng} count" for eng in engine_list]
+    a11y_rows = []
+    for sc in sorted_scs:
+        d = consolidated[sc]
+        row = [sc]
+        for eng in engine_list:
+            row.append(str(d.get(f"{eng}_status", "")))
+        for eng in engine_list:
+            row.append(str(d.get(f"{eng}_count", 0)))
+        a11y_rows.append(row)
+    emit_copyable_data(
+        headers=a11y_headers,
+        rows=a11y_rows,
+        json_data={
+            "url": url,
+            "level": level,
+            "engines": engine_list,
+            "consolidated": consolidated,
+            "issues_count": issues_count,
+            "disagreements": disagreements,
+            "disparities": disparities,
+        },
+        summary=f"{issues_count} WCAG criteria with issues",
+    )
 
     # Summary - simpler for single engine
     click.echo()

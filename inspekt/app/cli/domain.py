@@ -175,9 +175,23 @@ def domain_list(output_json):
             pass
 
         if output_json:
-            click.echo(json.dumps(domains, indent=2))
+            from inspekt.app.cli.table import print_json
+            print_json(domains, summary=f"{len(domains)} domains")
         else:
             _display_domains(domains, bypass_status)
+
+            # VM terminal: offer a "Data ready to copy" toast
+            from inspekt.app.cli.table import emit_copyable_data
+            rows = [
+                [d, str(info.get("addedAt", "")), "yes" if info.get("permanent") else "no"]
+                for d, info in domains.items()
+            ]
+            emit_copyable_data(
+                headers=["Domain", "Added", "Permanent"],
+                rows=rows,
+                json_data={"domains": domains, "bypass": bypass_status},
+                summary=f"{len(domains)} domain{'s' if len(domains) != 1 else ''}",
+            )
 
     except Exception as e:
         click.echo(f"Error: {e}", err=True)

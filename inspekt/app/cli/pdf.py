@@ -458,7 +458,8 @@ def _output_json(result: "PDFFullResult") -> None:
             ],
         }
 
-    click.echo(json.dumps(output, indent=2))
+    from inspekt.app.cli.table import print_json
+    print_json(output, summary="PDF a11y audit")
 
 
 # ============================================================================
@@ -497,7 +498,7 @@ def pdf():
     default="ua1",
     help="veraPDF validation profile (default: ua1)",
 )
-@click.option("--json", "json_output", is_flag=True, help="Output results as JSON")
+@click.option("--json", "-j", "json_output", is_flag=True, help="Output results as JSON")
 @click.option("--output", "-o", "output_path", type=click.Path(), help="Save HTML report to file")
 @click.option("--json-output", "json_output_path", type=click.Path(), help="Export report data as JSON (for later regeneration)")
 @click.option("--json-only", "json_only", is_flag=True, help="Generate JSON data only, no HTML report")
@@ -1016,7 +1017,8 @@ def check(ctx, files: tuple[str, ...], engine: str, profile: str, json_output: b
                         },
                     })),
                 })
-            click.echo(json.dumps(all_output, indent=2))
+            from inspekt.app.cli.table import print_json
+            print_json(all_output, summary=f"{len(results)} PDF file{'s' if len(results) != 1 else ''}")
     else:
         for file_path, result in results:
             if len(results) > 1:

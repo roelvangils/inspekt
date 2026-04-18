@@ -17,7 +17,7 @@ def html_output_options(fn):
     fn = click.option("--colors/--no-colors", default=True, help="Enable ANSI colors in output")(fn)
     fn = click.option("--compact", is_flag=True, help="Compact single-line output")(fn)
     fn = click.option("--pretty", is_flag=True, help="Pretty-print output")(fn)
-    fn = click.option("--json", "output_json", is_flag=True, help="Output as JSON")(fn)
+    fn = click.option("--json", "-j", "output_json", is_flag=True, help="Output as JSON")(fn)
     fn = click.option("--copy", is_flag=True, help="Copy output to clipboard")(fn)
     fn = click.option("--raw", is_flag=True, help="Raw output without decorations")(fn)
     return fn
@@ -208,7 +208,7 @@ def display_selection(response, content_type="text", show_tip=True, pretty=None,
 
 
 @click.group(invoke_without_command=True)
-@click.option("--json", "output_json", is_flag=True, help="Output as JSON with all formats")
+@click.option("--json", "-j", "output_json", is_flag=True, help="Output as JSON with all formats")
 @click.pass_context
 def selection(ctx, output_json):
     """Get the current text selection in the browser."""
@@ -241,7 +241,8 @@ def selection(ctx, output_json):
             "position": response.get("position", {}),
             "container": response.get("container", {})
         }
-        click.echo(json.dumps(output, indent=2))
+        from inspekt.app.cli.table import print_json
+        print_json(output, summary=f"selection ({output['length']} chars)")
         sys.exit(0)
     elif ctx.invoked_subcommand is None:
         # No subcommand and no --json flag, show help
@@ -251,7 +252,7 @@ def selection(ctx, output_json):
 
 @selection.command()
 @click.option("--raw", is_flag=True, help="Output only the raw text without formatting")
-@click.option("--json", "output_json", is_flag=True, help="Output as JSON")
+@click.option("--json", "-j", "output_json", is_flag=True, help="Output as JSON")
 def text(raw, output_json):
     """Get selected text (plain text)."""
     response = get_selection_data()
@@ -274,7 +275,8 @@ def text(raw, output_json):
             "text": text_content,
             "length": response.get("length", 0)
         }
-        click.echo(json.dumps(output, indent=2))
+        from inspekt.app.cli.table import print_json
+        print_json(output, summary=f"selected text ({output['length']} chars)")
         return
 
     # Raw mode: just print the text, nothing else (strip trailing whitespace)
@@ -288,7 +290,7 @@ def text(raw, output_json):
 
 @selection.command()
 @click.option("--raw", is_flag=True, help="Output only the raw HTML without formatting")
-@click.option("--json", "output_json", is_flag=True, help="Output as JSON")
+@click.option("--json", "-j", "output_json", is_flag=True, help="Output as JSON")
 @click.option("--pretty/--no-pretty", default=None, help="Format HTML using prettier (default: from config)")
 @click.option("--compact/--no-compact", default=None, help="Remove classes and truncate long text (default: from config)")
 @click.option("--colors/--no-colors", default=None, help="Apply syntax highlighting (default: from config)")
@@ -340,7 +342,8 @@ def html(raw, output_json, pretty, compact, colors, theme):
             "html": html_content,
             "length": response.get("length", 0)
         }
-        click.echo(json.dumps(output, indent=2))
+        from inspekt.app.cli.table import print_json
+        print_json(output, summary=f"selected HTML ({output['length']} chars)")
         return
 
     # Raw mode: just print the HTML, nothing else (strip trailing whitespace)
@@ -354,7 +357,7 @@ def html(raw, output_json, pretty, compact, colors, theme):
 
 @selection.command()
 @click.option("--raw", is_flag=True, help="Output only the raw Markdown without formatting")
-@click.option("--json", "output_json", is_flag=True, help="Output as JSON")
+@click.option("--json", "-j", "output_json", is_flag=True, help="Output as JSON")
 def markdown(raw, output_json):
     """Get selected text as Markdown (converted from HTML)."""
     response = get_selection_data()
@@ -379,7 +382,8 @@ def markdown(raw, output_json):
             "markdown": markdown_content,
             "length": response.get("length", 0)
         }
-        click.echo(json.dumps(output, indent=2))
+        from inspekt.app.cli.table import print_json
+        print_json(output, summary=f"selected markdown ({output['length']} chars)")
         return
 
     # Raw mode: just print the markdown, nothing else (strip trailing whitespace)
@@ -394,7 +398,7 @@ def markdown(raw, output_json):
 # Keep the old 'selected' command for backward compatibility (deprecated)
 @click.command()
 @click.option("--raw", is_flag=True, help="Output only the text without formatting")
-@click.option("--json", "output_json", is_flag=True, help="Output as JSON")
+@click.option("--json", "-j", "output_json", is_flag=True, help="Output as JSON")
 def selected(raw, output_json):
     """
     [DEPRECATED] Get the current text selection in the browser.
@@ -423,7 +427,8 @@ def selected(raw, output_json):
             "text": text_content,
             "length": response.get("length", 0)
         }
-        click.echo(json.dumps(output, indent=2))
+        from inspekt.app.cli.table import print_json
+        print_json(output, summary=f"selected text ({output['length']} chars)")
         return
 
     # Raw mode: just print the text, nothing else

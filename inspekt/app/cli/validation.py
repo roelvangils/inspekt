@@ -658,6 +658,7 @@ def validate_recording_file(filepath: Path) -> ValidationResult:
 )
 @click.option(
     "--json",
+    "-j",
     "json_output",
     is_flag=True,
     help="Output results as JSON for tooling integration",

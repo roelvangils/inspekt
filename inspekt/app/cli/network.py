@@ -205,6 +205,62 @@ def _show_devtools_hint():
     print_hint("Open DevTools (`F12`) and refresh the page to see HTTP status codes, headers, and error details.")
 
 
+def _emit_network_signal(
+    entries: list,
+    source_data: dict,
+    summary: dict,
+    *,
+    source: str,
+    show_domain: bool,
+    has_status: bool,
+) -> None:
+    """Emit a copyable-data toast for network listings."""
+    from inspekt.app.cli.table import emit_copyable_data
+
+    if not entries:
+        return
+
+    headers = ["Time", "Type", "Size"]
+    if show_domain:
+        headers.append("Domain")
+    if has_status:
+        headers.append("Status")
+    headers.append("Name")
+
+    rows = []
+    for e in entries:
+        if source == "devtools":
+            total_ms = (e.get("timing") or {}).get("total", 0)
+            size_bytes = e.get("transferSize", 0)
+            row_type = e.get("type", "")
+        else:
+            total_ms = e.get("timing", {}).get("total", 0)
+            size_bytes = e.get("transferSize", 0)
+            row_type = e.get("type", "")
+        row = [format_time(int(total_ms)), row_type, format_size(size_bytes)]
+        if show_domain:
+            row.append(e.get("domain", "") or "")
+        if has_status:
+            row.append(str(e.get("status", "") or ""))
+        row.append(e.get("name", "") or "")
+        rows.append(row)
+
+    count = len(entries)
+    noun = "request" if count == 1 else "requests"
+    emit_copyable_data(
+        headers=headers,
+        rows=rows,
+        json_data={
+            "source": source,
+            "url": source_data.get("url"),
+            "timestamp": source_data.get("timestamp"),
+            "entries": entries,
+            "summary": summary,
+        },
+        summary=f"{count} {noun}",
+    )
+
+
 def _run_network_command(
     resource_type: Optional[str] = None,
     output_json: bool = False,
@@ -278,10 +334,12 @@ def _run_network_command(
                 "entries": entries,
                 "summary": summary,
             }
-            click.echo(json.dumps(output, indent=2))
+            from inspekt.app.cli.table import print_json
+            print_json(output, summary=f"{len(entries)} network requests")
         else:
             _display_har_table(entries, show_domain=show_domain, show_status=True)
             _display_har_summary(summary)
+            _emit_network_signal(entries, har_data, summary, source="devtools", show_domain=show_domain, has_status=True)
     else:
         # Fall back to Performance API (basic info)
         data = _get_network_data(executor, loader)
@@ -324,16 +382,18 @@ def _run_network_command(
                 "entries": entries,
                 "summary": summary,
             }
-            click.echo(json.dumps(output, indent=2))
+            from inspekt.app.cli.table import print_json
+            print_json(output, summary=f"{len(entries)} network requests")
         else:
             _display_table(entries, show_domain=show_domain)
             _display_summary(summary)
+            _emit_network_signal(entries, data, summary, source="performance_api", show_domain=show_domain, has_status=False)
             # Show hint about DevTools
             _show_devtools_hint()
 
 
 @click.group(invoke_without_command=True)
-@click.option("--json", "output_json", is_flag=True, help="Output as JSON")
+@click.option("--json", "-j", "output_json", is_flag=True, help="Output as JSON")
 @click.option(
     "--sort",
     "sort_by",
@@ -756,7 +816,7 @@ def _display_har_summary(summary: dict):
 
 
 @network.command(name="har")
-@click.option("--json", "output_json", is_flag=True, help="Output as JSON")
+@click.option("--json", "-j", "output_json", is_flag=True, help="Output as JSON")
 @click.option(
     "--sort",
     "sort_by",
@@ -816,7 +876,8 @@ def network_har(output_json, sort_by, show_domain, only_external, only_errors, l
     # If raw HAR requested, output and exit
     if raw_har:
         raw_data = data.get("rawHAR", data)
-        click.echo(json.dumps(raw_data, indent=2))
+        from inspekt.app.cli.table import print_json
+        print_json(raw_data, summary="raw HAR")
         return
 
     entries = data.get("entries", [])
@@ -872,7 +933,8 @@ def network_har(output_json, sort_by, show_domain, only_external, only_errors, l
             "entries": entries,
             "summary": summary,
         }
-        click.echo(json.dumps(output, indent=2))
+        from inspekt.app.cli.table import print_json
+        print_json(output, summary=f"{len(entries)} HAR entries")
     else:
         click.echo(click.style("HAR Data (DevTools)", bold=True, fg="green"))
         click.echo(click.style("Status codes and headers available!", fg="bright_black"))

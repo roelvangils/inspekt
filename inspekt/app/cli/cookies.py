@@ -49,7 +49,7 @@ def cookies():
 
 
 @cookies.command(name="list")
-@click.option("--json", "output_json", is_flag=True, help="Output as JSON")
+@click.option("--json", "-j", "output_json", is_flag=True, help="Output as JSON")
 def cookies_list(output_json):
     """
     List all cookies for the current page.
@@ -64,7 +64,7 @@ def cookies_list(output_json):
 
 @cookies.command(name="get")
 @click.argument("name")
-@click.option("--json", "output_json", is_flag=True, help="Output as JSON")
+@click.option("--json", "-j", "output_json", is_flag=True, help="Output as JSON")
 def cookies_get(name, output_json):
     """
     Get the value of a specific cookie.
@@ -325,7 +325,8 @@ def _execute_cookie_action(action, cookie_name="", cookie_value="", options=None
 
         if output_json:
             # Return enhanced data as-is for JSON output
-            click.echo(json.dumps(response, indent=2))
+            from inspekt.app.cli.table import print_json
+            print_json(response, summary=f"{count} cookie{'s' if count != 1 else ''}")
         elif count == 0:
             click.echo("No cookies found")
         else:
@@ -345,6 +346,24 @@ def _execute_cookie_action(action, cookie_name="", cookie_value="", options=None
                 # Legacy format - simple dict of name: value
                 _display_legacy_cookies(cookies_data)
 
+            # VM terminal: offer a "Data ready to copy" toast
+            from inspekt.app.cli.table import emit_copyable_data
+            if isinstance(cookies_data, list):
+                rows = [
+                    [c.get("name", ""), c.get("value", ""), c.get("domain", ""), c.get("path", "/")]
+                    for c in cookies_data if isinstance(c, dict)
+                ]
+                headers = ["Name", "Value", "Domain", "Path"]
+            else:
+                rows = [[k, str(v)] for k, v in (cookies_data or {}).items()]
+                headers = ["Name", "Value"]
+            emit_copyable_data(
+                headers=headers,
+                rows=rows,
+                json_data=response,
+                summary=f"{count} cookie{'s' if count != 1 else ''}",
+            )
+
     elif action == "get":
         name = response.get("name")
         value = response.get("value")
@@ -359,7 +378,8 @@ def _execute_cookie_action(action, cookie_name="", cookie_value="", options=None
                 "value": parsed_value,
                 "exists": exists
             }
-            click.echo(json.dumps(output_data, indent=2))
+            from inspekt.app.cli.table import print_json
+            print_json(output_data, summary=f"cookie {name}" if exists else f"cookie {name} (missing)")
             if not exists:
                 sys.exit(1)
         elif exists:

@@ -58,11 +58,13 @@ pub fn create_menu(app: &AppHandle) -> Result<Menu<Wry>, tauri::Error> {
 
     // ── Edit menu ────────────────────────────────────────────────────
 
-    // Copy submenu: copy selected text from the VM browser in various formats
+    // Copy submenu: copy selected text from the VM browser in various formats.
+    // Submenu items always do VM-side copy when clicked. The Cmd+C shortcut
+    // lives on a separate "Copy" item (`smart_copy`) that routes through the
+    // webview so native inputs/terminal/URL bar copy still works.
     let copy_submenu = SubmenuBuilder::new(app, "Copy From VM")
         .items(&[
             &MenuItemBuilder::with_id("copy_selection", "Copy as Text")
-                .accelerator("CmdOrCtrl+C")
                 .build(app)?,
             &MenuItemBuilder::with_id("copy_selection_markdown", "Copy as Markdown")
                 .build(app)?,
@@ -82,6 +84,9 @@ pub fn create_menu(app: &AppHandle) -> Result<Menu<Wry>, tauri::Error> {
             &PredefinedMenuItem::redo(app, Some("Redo"))?,
             &PredefinedMenuItem::separator(app)?,
             &PredefinedMenuItem::cut(app, Some("Cut"))?,
+            &MenuItemBuilder::with_id("smart_copy", "Copy")
+                .accelerator("CmdOrCtrl+C")
+                .build(app)?,
             &copy_submenu,
             &PredefinedMenuItem::paste(app, Some("Paste"))?,
             &PredefinedMenuItem::select_all(app, Some("Select All"))?,

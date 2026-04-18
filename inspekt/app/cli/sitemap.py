@@ -931,7 +931,7 @@ def _get_origin(override_url: str | None) -> str:
 @click.option("--refresh", is_flag=True, help="Force re-fetch (bypass cache)")
 @click.option("--no-titles", is_flag=True, help="Skip fetching page titles")
 @click.option("--debug-titles", is_flag=True, hidden=True, help="Debug title fetching")
-@click.option("--json", "output_json", is_flag=True, help="Output as JSON")
+@click.option("--json", "-j", "output_json", is_flag=True, help="Output as JSON")
 def sitemap(url, flat, filter_path, lang, open_target, interactive, where, neighbors, from_here, stats, no_flatten, refresh, no_titles, debug_titles, output_json):
     """
     Discover and browse a site's sitemap.
@@ -1192,7 +1192,8 @@ def sitemap(url, flat, filter_path, lang, open_target, interactive, where, neigh
     # Handle sitemap index (not flattened)
     if result.is_index and not result.entries:
         if output_json:
-            click.echo(json.dumps(result.to_dict(), indent=2))
+            from inspekt.app.cli.table import print_json
+            print_json(result.to_dict(), summary=f"{len(result.child_sitemaps)} child sitemaps")
             return
 
         click.echo()
@@ -1228,12 +1229,14 @@ def sitemap(url, flat, filter_path, lang, open_target, interactive, where, neigh
 
     # JSON output
     if output_json:
+        from inspekt.app.cli.table import print_json
+        entry_count = len(result.entries)
         if stats:
             output = result.to_dict()
             output["stats"] = get_stats(result)
-            click.echo(json.dumps(output, indent=2))
+            print_json(output, summary=f"sitemap stats ({entry_count} URLs)")
         else:
-            click.echo(json.dumps(result.to_dict(), indent=2))
+            print_json(result.to_dict(), summary=f"{entry_count} sitemap URLs")
         return
 
     # Stats mode
@@ -1909,6 +1912,15 @@ def _display_flat(result, filter_path: str):
             colors = ["bright_black", None, "bright_black", "yellow" if row[3] else None]
         table.print_row(row, colors=colors)
     table.print_footer()
+
+    # VM terminal: offer a "Data ready to copy" toast
+    from inspekt.app.cli.table import emit_copyable_data
+    emit_copyable_data(
+        headers=headers,
+        rows=rows,
+        json_data={"entries": [e.to_dict() if hasattr(e, "to_dict") else str(e) for e in entries]},
+        summary=count_label,
+    )
 
 
 def _estimate_time(pages: int, concurrent: int = 20, avg_response: float = 0.5) -> str:

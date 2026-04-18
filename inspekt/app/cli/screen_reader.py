@@ -151,9 +151,16 @@ def sr(ctx):
     default="table",
     help="Output format (default: table)",
 )
+@click.option(
+    "--json",
+    "-j",
+    "json_flag",
+    is_flag=True,
+    help="Output as JSON (shortcut for --format json)",
+)
 @_enrichment_options
 @click.pass_context
-def walk(ctx, screen_reader, verbosity, max_elements, output_format,
+def walk(ctx, screen_reader, verbosity, max_elements, output_format, json_flag,
          show_description, show_focusable, show_tooltip, show_href,
          show_value, show_table_headers, show_secondary, show_bugs,
          show_all):
@@ -193,14 +200,20 @@ def walk(ctx, screen_reader, verbosity, max_elements, output_format,
         show_all,
     )
 
+    if json_flag:
+        output_format = "json"
+
     if output_format == "json":
-        click.echo(json.dumps(result.model_dump(), indent=2, ensure_ascii=False))
+        from inspekt.app.cli.table import print_json
+        print_json(result.model_dump(), summary=f"sr walk ({screen_reader})")
         return
 
     if output_format == "diff" or screen_reader == "all":
         _print_comparison(result, show=show)
     else:
         _print_single_sr(result, screen_reader, show=show)
+
+    _emit_sr_walk_signal(result, screen_reader)
 
 
 # ── Compare Command ────────────────────────────────────────────
@@ -230,6 +243,13 @@ def walk(ctx, screen_reader, verbosity, max_elements, output_format,
     help="Output format (default: table)",
 )
 @click.option(
+    "--json",
+    "-j",
+    "json_flag",
+    is_flag=True,
+    help="Output as JSON (shortcut for --format json)",
+)
+@click.option(
     "--differences-only",
     "-d",
     is_flag=True,
@@ -237,7 +257,7 @@ def walk(ctx, screen_reader, verbosity, max_elements, output_format,
 )
 @_enrichment_options
 @click.pass_context
-def compare(ctx, verbosity, max_elements, output_format, differences_only,
+def compare(ctx, verbosity, max_elements, output_format, json_flag, differences_only,
             show_description, show_focusable, show_tooltip, show_href,
             show_value, show_table_headers, show_secondary, show_bugs,
          show_all):
@@ -276,11 +296,16 @@ def compare(ctx, verbosity, max_elements, output_format, differences_only,
         show_all,
     )
 
+    if json_flag:
+        output_format = "json"
+
     if output_format == "json":
-        click.echo(json.dumps(result.model_dump(), indent=2, ensure_ascii=False))
+        from inspekt.app.cli.table import print_json
+        print_json(result.model_dump(), summary="sr compare")
         return
 
     _print_comparison(result, differences_only=differences_only, show=show)
+    _emit_sr_walk_signal(result, "all", differences_only=differences_only)
 
 
 # ── Announce Command ───────────────────────────────────────────
@@ -338,6 +363,51 @@ def announce(ctx, selector, screen_reader, verbosity):
         sys.exit(1)
 
     _print_announce(result)
+
+
+# ── Copyable-data signal (VM terminal toast) ──────────────────
+
+
+def _emit_sr_walk_signal(result, screen_reader: str, differences_only: bool = False) -> None:
+    """Emit a "Data ready to copy" toast for sr walk/compare output.
+
+    Builds a plain-text Markdown table and uses the full model_dump as JSON.
+    No-op outside the VM (gated inside emit_copyable_data).
+    """
+    from inspekt.app.cli.table import emit_copyable_data
+
+    items = result.announcements
+    if differences_only:
+        items = [a for a in items if len({a.jaws, a.nvda, a.voiceover}) > 1]
+    if not items:
+        return
+
+    if screen_reader in ("jaws", "nvda", "voiceover"):
+        headers = ["#", "Role", "Announcement"]
+        rows = [
+            [str(a.index), a.role, getattr(a, screen_reader, "") or ""]
+            for a in items
+        ]
+    else:
+        headers = ["#", "Element", "JAWS", "NVDA", "VoiceOver"]
+        rows = [
+            [
+                str(a.index),
+                f"{a.role} {a.name}".strip() if a.name else a.role,
+                a.jaws or "",
+                a.nvda or "",
+                a.voiceover or "",
+            ]
+            for a in items
+        ]
+
+    summary = f"{len(items)} announcement{'s' if len(items) != 1 else ''}"
+    emit_copyable_data(
+        headers=headers,
+        rows=rows,
+        json_data=result.model_dump(),
+        summary=summary,
+    )
 
 
 # ── Enrichment Formatting Helpers ─────────────────────────────

@@ -96,7 +96,7 @@ def console():
     help='Maximum number of messages to show (default: 100)'
 )
 @click.option(
-    '--json', 'output_json',
+    '--json', '-j', 'output_json',
     is_flag=True,
     help='Output as JSON'
 )
@@ -170,12 +170,11 @@ def list_logs(level, limit, output_json, tail):
         if output_json:
             # Filter out command markers from JSON output
             json_entries = [e for e in entries if not e.get("message", "").startswith("[inspekt:cmd]")]
-            click.echo(json.dumps({
-                "ok": True,
-                "count": len(json_entries),
-                "entries": json_entries,
-                "hooked": hooked
-            }, indent=2))
+            from inspekt.app.cli.table import print_json
+            print_json(
+                {"ok": True, "count": len(json_entries), "entries": json_entries, "hooked": hooked},
+                summary=f"{len(json_entries)} console log entries",
+            )
         else:
             if not hooked:
                 click.echo("Note: Console hooks not active. Reload the page to start capturing.", err=True)
@@ -271,6 +270,19 @@ def list_logs(level, limit, output_json, tail):
                     f"{display_message}"
                 )
 
+            # VM terminal: offer a "Data ready to copy" toast
+            from inspekt.app.cli.table import emit_copyable_data
+            rows = [
+                [e.get("timestamp", ""), e.get("level", ""), e.get("message", "")]
+                for e in entries if not e.get("message", "").startswith("[inspekt:cmd]")
+            ]
+            emit_copyable_data(
+                headers=["Timestamp", "Level", "Message"],
+                rows=rows,
+                json_data={"entries": entries, "count": len(entries), "hooked": hooked},
+                summary=f"{len(rows)} console message{'s' if len(rows) != 1 else ''}",
+            )
+
     except requests.exceptions.ConnectionError:
         if output_json:
             click.echo(json.dumps({"ok": False, "error": "Could not connect to bridge server"}))
@@ -287,7 +299,7 @@ def list_logs(level, limit, output_json, tail):
 
 @console.command(name="clear")
 @click.option(
-    '--json', 'output_json',
+    '--json', '-j', 'output_json',
     is_flag=True,
     help='Output as JSON'
 )

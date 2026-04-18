@@ -106,7 +106,7 @@ class ZoomGroup(click.Group):
 @click.group(cls=ZoomGroup, invoke_without_command=True)
 @click.option("--wcag", is_flag=True, help="Set zoom to 200% (WCAG 1.4.4 Resize Text)")
 @click.option("--reflow", is_flag=True, help="Set zoom to 400% (WCAG 1.4.10 Reflow)")
-@click.option("--json", "as_json", is_flag=True, help="Output as JSON")
+@click.option("--json", "-j", "as_json", is_flag=True, help="Output as JSON")
 @click.pass_context
 def zoom(ctx, wcag, reflow, as_json):
     """Get or set browser zoom level.
@@ -283,7 +283,7 @@ class ViewportGroup(click.Group):
 
 
 @click.group(cls=ViewportGroup, invoke_without_command=True)
-@click.option("--json", "as_json", is_flag=True, help="Output as JSON")
+@click.option("--json", "-j", "as_json", is_flag=True, help="Output as JSON")
 @click.pass_context
 def viewport(ctx, as_json):
     """Get or set browser viewport dimensions.

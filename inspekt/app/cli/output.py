@@ -341,14 +341,19 @@ class JsonOutput:
         """
         return self._data
 
-    def print(self, indent: int = 2) -> None:
+    def print(self, indent: int = 2, *, summary: str = "") -> None:
         """
-        Print the JSON output to stdout.
+        Print the JSON output to stdout and emit a VM copy toast.
 
         Args:
             indent: JSON indentation level (default: 2)
+            summary: Short label for the "Data ready to copy" toast (VM only)
         """
-        click.echo(json.dumps(self._data, indent=indent))
+        if indent == 2:
+            from inspekt.app.cli.table import print_json
+            print_json(self._data, summary=summary)
+        else:
+            click.echo(json.dumps(self._data, indent=indent))
 
 
 def validate_output_options(

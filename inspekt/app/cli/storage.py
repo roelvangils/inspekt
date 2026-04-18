@@ -72,9 +72,43 @@ def storage_list(cookies, local, session, all, storage_type, output_json):
 
     # Display results
     if output_json:
-        click.echo(json.dumps(result, indent=2))
+        from inspekt.app.cli.table import print_json
+        print_json(result, summary="storage items")
     else:
         _display_unified_list_result(result)
+        _emit_storage_list_signal(result)
+
+
+def _emit_storage_list_signal(result: dict) -> None:
+    """Emit a copyable-data toast for `storage list` output."""
+    from inspekt.app.cli.table import emit_copyable_data
+
+    storage_data = result.get("storage", {}) or {}
+    rows: list[list[str]] = []
+    for storage_key in ("cookies", "localStorage", "sessionStorage"):
+        info = storage_data.get(storage_key) or {}
+        if not info.get("ok", True):
+            continue
+        items = info.get("items")
+        if isinstance(items, dict):
+            for k, v in items.items():
+                rows.append([storage_key, str(k), str(v)])
+        elif isinstance(items, list):
+            for item in items:
+                name = item.get("name", "") if isinstance(item, dict) else ""
+                value = item.get("value", "") if isinstance(item, dict) else ""
+                rows.append([storage_key, str(name), str(value)])
+
+    if not rows and not result.get("storage"):
+        return
+
+    count = len(rows)
+    emit_copyable_data(
+        headers=["Type", "Key", "Value"],
+        rows=rows,
+        json_data=result,
+        summary=f"{count} storage item{'s' if count != 1 else ''}",
+    )
 
 
 @storage.command(name="get")
@@ -126,7 +160,8 @@ def storage_get(key, cookies, local, session, storage_type, output_json):
     storage_result = result.get("storage", {}).get(storage_key, {})
 
     if output_json:
-        click.echo(json.dumps(storage_result, indent=2))
+        from inspekt.app.cli.table import print_json
+        print_json(storage_result, summary=f"{key}")
         if not storage_result.get("exists"):
             sys.exit(1)
     elif storage_result.get("exists"):

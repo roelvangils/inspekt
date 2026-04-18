@@ -193,6 +193,37 @@ def _vm_copyable_signal(text: str) -> None:
         pass  # Best-effort
 
 
+def _vm_data_signal(json_text: str | None, table_md: str | None, summary: str) -> None:
+    """Signal the control panel that a command printed a structured data table.
+
+    Posts a payload to /data and emits OSC 1337 ``data`` so the terminal
+    can render a toast with [Table] / [JSON] buttons. Either ``json_text``
+    or ``table_md`` may be None — the frontend only renders the buttons
+    for which a payload exists. Best-effort, silently no-ops on failure.
+    """
+    import json
+    import sys
+    import urllib.request
+
+    try:
+        payload = {
+            "json": json_text or "",
+            "table_md": table_md or "",
+            "summary": summary or "",
+        }
+        req = urllib.request.Request(
+            "http://localhost:8888/data",
+            data=json.dumps(payload).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        urllib.request.urlopen(req, timeout=2)
+        sys.stdout.write("\033]1337;data\007")
+        sys.stdout.flush()
+    except Exception:
+        pass  # Best-effort
+
+
 def _vm_clipboard_relay(text: str) -> None:
     """Post clipboard text to the control server and signal the control panel.
 
@@ -468,7 +499,7 @@ def userscript():
     help="Output directory (default: ~/Downloads/<domain>)",
 )
 @click.option("--list", "list_only", is_flag=True, help="Only list files without downloading")
-@click.option("--json", "output_json", is_flag=True, help="Output as JSON (requires --list)")
+@click.option("--json", "-j", "output_json", is_flag=True, help="Output as JSON (requires --list)")
 @click.option("-t", "--timeout", type=float, default=30.0, help="Timeout in seconds (default: 30)")
 @click.option("--open", "open_after", is_flag=True, help="Open downloaded file in default application")
 @click.option("--reveal", "reveal_after", is_flag=True, help="Reveal downloaded file in file explorer")
@@ -604,7 +635,8 @@ def download(output, list_only, output_json, timeout, open_after, reveal_after):
                     "url": page_url,
                     "files": files_by_category
                 }
-                click.echo(json.dumps(json_output, indent=2))
+                from inspekt.app.cli.table import print_json
+                print_json(json_output, summary=f"{total_files} files")
             else:
                 click.echo(f"\nFound {total_files} downloadable files:\n")
                 for option in options:
@@ -759,7 +791,7 @@ def download(output, list_only, output_json, timeout, open_after, reveal_after):
 
 @click.command(name="md-link")
 @url_scheme("md-link", defaults={"output_json": False})
-@click.option("--json", "output_json", is_flag=True, help="Output as JSON")
+@click.option("--json", "-j", "output_json", is_flag=True, help="Output as JSON")
 def md_link(output_json):
     """
     Get Markdown link for the current page.
@@ -818,6 +850,7 @@ def md_link(output_json):
             md_link_str = f"[{cleaned_title}]({url})"
 
             if output_json:
+                from inspekt.app.cli.table import print_json
                 output_data = {
                     "url": url,
                     "title": cleaned_title,
@@ -825,7 +858,7 @@ def md_link(output_json):
                     "website_name": website_name,
                     "markdown": md_link_str
                 }
-                click.echo(json.dumps(output_data, indent=2))
+                print_json(output_data, summary="markdown link")
             else:
                 click.echo(md_link_str)
 

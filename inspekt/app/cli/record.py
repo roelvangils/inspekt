@@ -3761,7 +3761,7 @@ def tidy(file: Optional[str], dry_run: bool, force: bool, no_comments: bool, no_
 
 @record.command("list")
 @click.option("--limit", "-n", type=int, default=None, help="Show only the last N recordings")
-@click.option("--json", "output_json", is_flag=True, help="Output as JSON")
+@click.option("--json", "-j", "output_json", is_flag=True, help="Output as JSON")
 def list_recordings(limit: Optional[int], output_json: bool):
     """
     List all saved recordings.
@@ -3820,7 +3820,8 @@ def list_recordings(limit: Optional[int], output_json: bool):
                 "assertions": r.get("assertions", 0),
                 "url": r["url"],
             })
-        click.echo(json.dumps(output, indent=2))
+        from inspekt.app.cli.table import print_json
+        print_json(output, summary=f"{len(output)} recordings")
         return
 
     # Table output using Table class
@@ -3895,6 +3896,27 @@ def list_recordings(limit: Optional[int], output_json: bool):
     # Print summary with totals
     table.print_summary(["Total", "", "", format_duration(total_duration_ms), str(total_steps), str(total_assertions)])
     table.print_footer()
+
+    # VM terminal: offer a "Data ready to copy" toast
+    from inspekt.app.cli.table import emit_copyable_data
+    _record_json_list = []
+    for r in recordings:
+        _record_json_list.append({
+            "name": r["name"],
+            "path": str(r["path"]),
+            "created_at": r["created_at"].isoformat() if hasattr(r.get("created_at"), "isoformat") else str(r.get("created_at")),
+            "modified_at": r["modified_at"].isoformat() if hasattr(r.get("modified_at"), "isoformat") else str(r.get("modified_at")),
+            "duration_ms": r["duration_ms"],
+            "steps": r["steps"],
+            "assertions": r.get("assertions", 0),
+            "url": r["url"],
+        })
+    emit_copyable_data(
+        headers=["File", "Created", "Modified", "Duration", "Steps", "Assertions"],
+        rows=[r["values"] for r in rows],
+        json_data={"recordings": _record_json_list},
+        summary=f"{len(rows)} recording{'s' if len(rows) != 1 else ''}",
+    )
 
     # Show tip if no assertions exist
     if total_assertions == 0 and len(rows) > 0:
