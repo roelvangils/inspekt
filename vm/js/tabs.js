@@ -30,6 +30,8 @@ function onTabActivated(tabId) {
     tabActivationTimes[tabId] = Date.now();
     // Also track for auto-scan
     tabVisitTimes[tabId] = { startTime: Date.now(), scanned: false };
+    // Let popouts (e.g. the emulation gear) re-fetch per-tab state.
+    document.dispatchEvent(new CustomEvent('tabactivated', { detail: { tabId } }));
 }
 
 function shouldCaptureThumbnail(tabId) {

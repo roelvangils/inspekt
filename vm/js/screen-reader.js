@@ -408,8 +408,9 @@ function toggleSRPopout() {
 }
 
 function closeSRPopout() {
-    document.getElementById('srPopout').classList.remove('show');
-    document.getElementById('srBtn').setAttribute('aria-expanded', 'false');
+    // dismissActivePopout() owns the show-class, aria-expanded, and focus
+    // return. Don't touch them manually here — that caused a stale-state
+    // bug where the trigger's focus was never restored on close.
     dismissActivePopout();
 }
 

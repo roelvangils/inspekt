@@ -416,6 +416,7 @@ COPY vm/fonts /usr/share/novnc/fonts
 COPY vm/vendor/codemirror.min.js /usr/share/novnc/vendor/codemirror.min.js
 COPY vm/vendor/ninja-keys.min.js /usr/share/novnc/vendor/ninja-keys.min.js
 COPY vm/vendor/sortable.min.js /usr/share/novnc/vendor/sortable.min.js
+COPY vm/vendor/qrcode.min.js /usr/share/novnc/vendor/qrcode.min.js
 COPY vm/vendor/xterm.css /usr/share/novnc/vendor/xterm.css
 COPY vm/vendor/xterm.min.js /usr/share/novnc/vendor/xterm.min.js
 COPY vm/vendor/xterm-addon-fit.min.js /usr/share/novnc/vendor/xterm-addon-fit.min.js

@@ -1,0 +1,292 @@
+/* =============================================
+   Accessibility Emulation Popout
+   ============================================= */
+
+/* Gear icon — between the plugin icon (6px) and the QR icon (70px). */
+.url-bar-emulation-icon {
+    position: absolute;
+    right: calc(var(--space-7) + 10px);
+    top: 50%;
+    transform: translateY(-50%);
+    width: var(--space-7);
+    height: var(--space-7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: none;
+    border-radius: var(--radius-sm);
+    color: var(--text-dim);
+    cursor: pointer;
+    padding: 0;
+    transition: background var(--duration-fast) ease, color var(--duration-fast) ease;
+}
+
+.url-bar-emulation-icon:hover {
+    background: var(--bg-btn-hover);
+    color: var(--text-bright);
+}
+
+.url-bar-emulation-icon[aria-expanded="true"] {
+    background: var(--bg-btn-hover);
+    color: var(--text-bright);
+}
+
+/* Popout panel — reuses .url-bar-popout positioning + glass styling. */
+.emulation-popout {
+    /* Anchor to the right edge of the URL bar so it opens under the gear. */
+    right: 0;
+    /* Override the base .url-bar-popout `display: flex` row default so header,
+       body, and footer stack vertically instead of sitting side-by-side. */
+    flex-direction: column;
+    /* Two-column grid for feature sections needs more horizontal room. */
+    min-width: 560px;
+    max-width: 640px;
+    padding: var(--space-3) var(--space-4) var(--space-4);
+    gap: var(--space-2);
+}
+
+.emulation-popout-header {
+    font-weight: 600;
+    font-size: var(--text-base);
+    color: var(--text-bright);
+    padding-bottom: var(--space-2);
+    border-bottom: 1px solid var(--divider);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.emulation-popout-subtitle {
+    font-size: var(--text-xs);
+    color: var(--text-dim);
+    font-weight: 400;
+}
+
+.emulation-popout-body {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    max-height: 60vh;
+    overflow-y: auto;
+}
+
+/* ── Scope toggle (This tab / Whole site) ── */
+.emulation-scope {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    padding-bottom: var(--space-2);
+    border-bottom: 1px solid var(--divider);
+}
+
+.emulation-scope-label {
+    font-size: var(--text-xs);
+    font-weight: 600;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-right: 4px;
+}
+
+.emulation-scope-btn {
+    padding: 3px 10px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--divider);
+    background: transparent;
+    color: var(--text-bright);
+    font-size: var(--text-sm);
+    cursor: pointer;
+    transition: background var(--duration-fast) ease,
+                border-color var(--duration-fast) ease;
+}
+
+.emulation-scope-btn:hover:not(:disabled) {
+    background: var(--bg-btn-hover);
+    border-color: var(--text-dim);
+}
+
+.emulation-scope-btn.selected {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: white;
+}
+
+.emulation-scope-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.emulation-scope-domain {
+    margin-left: auto;
+    font-size: var(--text-xs);
+    color: var(--text-dim);
+    max-width: 50%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ── Preset dropdown ── */
+.emulation-presets {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding-bottom: var(--space-2);
+    border-bottom: 1px solid var(--divider);
+}
+
+.emulation-preset-label {
+    font-size: var(--text-xs);
+    font-weight: 600;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.emulation-preset-select {
+    flex: 1;
+    padding: 4px 8px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--divider);
+    background: var(--bg-btn);
+    color: var(--text-bright);
+    font-size: var(--text-sm);
+    font-family: inherit;
+    cursor: pointer;
+}
+
+.emulation-preset-select:hover {
+    border-color: var(--text-dim);
+}
+
+.emulation-preset-select:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 30%, transparent);
+}
+
+/* Two-column grid: Appearance/Motion/Contrast left, the rest right. */
+.emulation-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-3) var(--space-4);
+}
+
+.emulation-section {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+}
+
+.emulation-section-label {
+    font-size: var(--text-xs);
+    font-weight: 600;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+/* Each section renders two rows: Follow on top, Pin-to group below. */
+.emulation-row-system,
+.emulation-row-pin {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px;
+}
+
+/* Leading label for the pin-to row — replaces the old inline divider. */
+.emulation-pin-divider {
+    display: inline-flex;
+    align-items: center;
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    line-height: 1;
+    margin-right: 2px;
+}
+
+/* Little eye glyph appended inside chips that have an explanatory tooltip. */
+.emulation-chip-info {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-left: 2px;
+    opacity: 0.7;
+    cursor: help;
+}
+
+.emulation-chip-info:hover {
+    opacity: 1;
+}
+
+.emulation-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--divider);
+    background: transparent;
+    color: var(--text-bright);
+    font-size: var(--text-sm);
+    cursor: pointer;
+    transition: background var(--duration-fast) ease,
+                border-color var(--duration-fast) ease,
+                color var(--duration-fast) ease;
+    white-space: nowrap;
+}
+
+.emulation-chip:hover {
+    background: var(--bg-btn-hover);
+    border-color: var(--text-dim);
+}
+
+.emulation-chip.selected {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: white;
+}
+
+.emulation-chip.selected .emulation-chip-hint {
+    color: rgba(255, 255, 255, 0.85);
+}
+
+.emulation-chip-hint {
+    color: var(--text-dim);
+    font-size: var(--text-xs);
+}
+
+.emulation-popout-footer {
+    padding-top: var(--space-2);
+    border-top: 1px solid var(--divider);
+    display: flex;
+    justify-content: flex-end;
+}
+
+.emulation-reset-btn {
+    padding: 4px 12px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--divider);
+    background: transparent;
+    color: var(--text-bright);
+    font-size: var(--text-sm);
+    cursor: pointer;
+    transition: background var(--duration-fast) ease;
+}
+
+.emulation-reset-btn:hover {
+    background: var(--bg-btn-hover);
+}
+
+.emulation-empty {
+    padding: var(--space-3) 0;
+    color: var(--text-dim);
+    font-size: var(--text-sm);
+    text-align: center;
+}

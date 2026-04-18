@@ -693,11 +693,11 @@ async function navigateTo(url) {
         if (data.ok) {
             // Focus VNC canvas so Tab goes straight to the page
             if (rfb) rfb.focus();
-            setTimeout(() => {
-                updateCurrentUrl();
-                // Add to history after title has been captured
-                addToHistory(url, currentTitle || url);
-            }, 1500);
+            // Add to history immediately — the title is refined by subsequent
+            // updateCurrentUrl() polls (fast during loading, 4s afterwards)
+            // via updateHistoryEntryTitle().
+            const activeTab = tabs.find(t => t.id === activeTabId);
+            addToHistory(url, currentTitle || url, activeTab && activeTab.favicon);
             if (activeTabId) {
                 delete thumbnailCache[activeTabId];
                 setTimeout(() => captureTabThumbnail(activeTabId), 2000);
@@ -739,6 +739,8 @@ async function updateCurrentUrl() {
                 }
             }
             currentTitle = data.title || '';
+            // Late-arriving page titles often land here — propagate to history
+            if (currentTitle && data.url) updateHistoryEntryTitle(data.url, currentTitle);
             const urlBar = document.getElementById('urlBar');
             const urlChanged = data.url !== currentUrl;
             if (document.activeElement !== urlBar && urlChanged) {
@@ -998,17 +1000,66 @@ function setTabLoading(tabId, isLoading) {
 
 // --- History data management ---
 
-function addToHistory(url, title) {
+function addToHistory(url, title, favicon) {
     if (!url || url === 'about:blank') return;
+    // Carry existing visit count + favicon forward, bump by one
+    const existing = visitedHistory.find(e => e.url === url);
+    const resolvedFavicon = favicon || (existing && existing.favicon) || '';
+    const visitCount = ((existing && existing.visitCount) || 0) + 1;
     // Remove existing entry with same URL
     visitedHistory = visitedHistory.filter(e => e.url !== url);
-    // Prepend new entry
-    visitedHistory.unshift({ url, title: title || url });
-    // Cap at 15
-    if (visitedHistory.length > 15) {
-        visitedHistory = visitedHistory.slice(0, 15);
+    // Prepend fresh entry
+    visitedHistory.unshift({
+        url,
+        title: title || url,
+        favicon: resolvedFavicon,
+        visitCount,
+        lastVisit: Date.now(),
+    });
+    // Storage cap — dropdown ranks the top N; keeping more history feeds frecency
+    if (visitedHistory.length > 100) {
+        visitedHistory = visitedHistory.slice(0, 100);
     }
     saveHistory();
+}
+
+// Refresh an entry's title as late-arriving page data comes in (many sites
+// set <title> well after navigation commits). Only upgrades — never replaces
+// a useful title with the bare URL.
+function updateHistoryEntryTitle(url, title) {
+    if (!url || !title || title === url) return;
+    const entry = visitedHistory.find(e => e.url === url);
+    if (!entry) return;
+    const hadWeakTitle = !entry.title || entry.title === entry.url;
+    if (hadWeakTitle || entry.title !== title) {
+        entry.title = title;
+        saveHistory();
+    }
+}
+
+function removeFromHistory(url) {
+    const before = visitedHistory.length;
+    visitedHistory = visitedHistory.filter(e => e.url !== url);
+    if (visitedHistory.length !== before) saveHistory();
+}
+
+// Frecency-ranked, filter-matched history for the dropdown.
+// Score = visitCount / (hours_since_last_visit + 2). Simple, good enough.
+function rankedHistory(filter, limit) {
+    const lower = (filter || '').toLowerCase().trim();
+    const now = Date.now();
+    const matches = lower
+        ? visitedHistory.filter(e =>
+            e.url.toLowerCase().includes(lower) ||
+            (e.title || '').toLowerCase().includes(lower))
+        : visitedHistory.slice();
+    const scored = matches.map(e => {
+        const hours = Math.max(0, (now - (e.lastVisit || 0)) / 3600000);
+        const score = (e.visitCount || 1) / (hours + 2);
+        return { entry: e, score };
+    });
+    scored.sort((a, b) => b.score - a.score);
+    return scored.slice(0, limit || 15).map(s => s.entry);
 }
 
 function clearHistory() {

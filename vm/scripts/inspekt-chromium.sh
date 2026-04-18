@@ -1,9 +1,8 @@
 #!/bin/bash
 # Inspekt Chromium Wrapper Script
-# Launches Chromium with theme-aware flags based on /tmp/inspekt_theme
-
-# Read theme preference (default to dark)
-THEME=$(cat /tmp/inspekt_theme 2>/dev/null || echo "dark")
+# Launches Chromium with flags sourced from inspekt-config.yaml. Media-query
+# overrides (dark mode, reduced motion, etc.) are applied at runtime via the
+# control server's /emulate endpoints, not via startup flags.
 
 # Create Chrome preferences directory
 CHROME_PROFILE="/root/.config/chromium/Default"
@@ -124,11 +123,6 @@ CHROME_ARGS=(
     # Use profile with automatic downloads enabled
     --user-data-dir=/root/.config/chromium
 )
-
-# Add dark mode flags if theme is dark
-if [ "$THEME" = "dark" ]; then
-    CHROME_ARGS+=(--force-dark-mode --enable-features=WebUIDarkMode)
-fi
 
 # ---------------------------------------------------------------
 # Toggleable Chromium flags from inspekt-config.yaml

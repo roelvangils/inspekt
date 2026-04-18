@@ -488,7 +488,8 @@ function updateStatus(connected) {
 
 // Show toast notification (supports both old and new API)
 // Old: showToast('msg', 'success', 3000)
-// New: showToast('msg', { type: 'dark', duration: 10000, dismissible: true, action: { label, icon, onClick } })
+// New: showToast('msg', { type, duration, dismissible, action: {label, icon, onClick} })
+//      or actions: [{label, icon, onClick}, ...] for multi-button toasts
 function showToast(message, optionsOrType = '', duration) {
     const toast = document.getElementById('toast');
 
@@ -497,8 +498,13 @@ function showToast(message, optionsOrType = '', duration) {
     if (typeof optionsOrType === 'string') {
         opts = { type: optionsOrType, duration: duration ?? 3000 };
     } else {
-        opts = { type: '', duration: 3000, dismissible: false, action: null, ...optionsOrType };
+        opts = { type: '', duration: 3000, dismissible: false, action: null, actions: null, ...optionsOrType };
     }
+
+    // Normalize action/actions into a single array
+    const actions = Array.isArray(opts.actions)
+        ? opts.actions.filter(Boolean)
+        : (opts.action ? [opts.action] : []);
 
     // Clear any pending dismiss timer
     clearTimeout(toast._dismissTimer);
@@ -506,9 +512,9 @@ function showToast(message, optionsOrType = '', duration) {
     // Build toast content
     let html = `<span class="toast-message">${_esc(message)}</span>`;
 
-    if (opts.action) {
-        const iconHtml = opts.action.icon || '';
-        html += `<button class="toast-action" aria-label="${_esc(opts.action.label)}">${iconHtml} ${_esc(opts.action.label)}</button>`;
+    for (const act of actions) {
+        const iconHtml = act.icon || '';
+        html += `<button class="toast-action" aria-label="${_esc(act.label)}">${iconHtml} ${_esc(act.label)}</button>`;
     }
 
     if (opts.dismissible) {
@@ -516,16 +522,19 @@ function showToast(message, optionsOrType = '', duration) {
     }
 
     toast.innerHTML = html;
-    toast.className = 'toast show' + (opts.type ? ' ' + opts.type : '');
+    toast.className = 'toast show ' + _toastPositionClass + (opts.type ? ' ' + opts.type : '');
 
-    // Wire up action button
-    if (opts.action?.onClick) {
-        toast.querySelector('.toast-action').addEventListener('click', async (e) => {
+    // Wire up action buttons (positional — one listener per rendered button)
+    const actionButtons = toast.querySelectorAll('.toast-action');
+    actions.forEach((act, i) => {
+        const btn = actionButtons[i];
+        if (!btn || !act.onClick) return;
+        btn.addEventListener('click', async (e) => {
             e.stopPropagation();
-            await opts.action.onClick();
+            await act.onClick();
             _dismissToast();
         }, { once: true });
-    }
+    });
 
     // Wire up dismiss button
     if (opts.dismissible) {

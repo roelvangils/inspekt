@@ -48,10 +48,49 @@ upload_state = {'status': 'idle', 'files': [], 'errors': [], 'timestamp': 0}
 _DOWNLOAD_EXCLUDE = frozenset({'zsh_history', 'zsh_sessions', 'zcompdump'})
 # Copyable block relay: CLI posts raw code block text, control panel shows copy button
 copyable_data = {'text': '', 'timestamp': 0}
+# Structured-data relay: CLI posts {json, table_md, summary}, control panel
+# shows a toast with [Table]/[JSON] buttons so the user can copy either format.
+data_payload = {'json': '', 'table_md': '', 'summary': '', 'timestamp': 0}
 # Canvas size: last known VNC container dimensions (set by control panel auto-resize)
 canvas_size = {'width': 0, 'height': 0}
 # Toast relay: CLI posts toast message here, control panel fetches and shows it
 toast_data = {'message': '', 'type': 'dark', 'timestamp': 0}
+
+# --- Media-query emulation state ---------------------------------------------
+# All six CSS accessibility media features tracked uniformly. Values match the
+# strings Chromium accepts in Emulation.setEmulatedMedia.
+EMULATION_FEATURES = (
+    'prefers-color-scheme',
+    'prefers-reduced-motion',
+    'prefers-contrast',
+    'prefers-reduced-transparency',
+    'forced-colors',
+    'inverted-colors',
+)
+# Default values = "no preference / off". These are applied to any feature
+# the host hasn't broadcast and any tab hasn't overridden.
+EMULATION_DEFAULTS = {
+    'prefers-color-scheme': 'no-preference',
+    'prefers-reduced-motion': 'no-preference',
+    'prefers-contrast': 'no-preference',
+    'prefers-reduced-transparency': 'no-preference',
+    'forced-colors': 'none',
+    'inverted-colors': 'none',
+}
+# Last broadcast from any connected host browser (control panel).
+host_prefs = dict(EMULATION_DEFAULTS)
+# Sparse per-tab overrides: {targetId: {feature: value}}. Missing keys fall
+# through to the domain overrides (below) and then to host_prefs.
+tab_emulation_overrides = {}
+# Sparse per-domain overrides: {hostname: {feature: value}}. Applied to every
+# tab whose URL resolves to that hostname, unless shadowed by a tab override.
+# Persists even if the tab is closed and reopened.
+domain_emulation_overrides = {}
+# Set of target IDs seen by the last /tabs reconciliation pass.
+_last_seen_target_ids = set()
+# Per-target last-seen domain — so the reconciler can detect URL changes and
+# re-push emulation when a tab navigates to a different hostname.
+_last_seen_tab_domains = {}
 
 # Dynamic command allowlist (populated from registry API on first use)
 _dynamic_allowlist = None
@@ -456,6 +495,147 @@ def cleanup_cdp_connections():
                     loop.run_until_complete(ws.close())
                 except Exception:
                     pass
+
+
+# --- Media-query emulation helpers -------------------------------------------
+
+def _extract_domain(url):
+    """Return the hostname for a tab URL, or None for opaque schemes.
+
+    Chromium's chrome://, devtools://, about:blank, etc. have no meaningful
+    domain; we treat them as non-domain-scopable.
+    """
+    if not url:
+        return None
+    try:
+        parsed = urlparse(url)
+    except Exception:
+        return None
+    scheme = (parsed.scheme or '').lower()
+    if scheme not in ('http', 'https'):
+        return None
+    return (parsed.hostname or '').lower() or None
+
+
+def _effective_features_for_tab(target_id, domain=None):
+    """Compute the full effective feature dict for a tab.
+
+    Priority per feature: tab override → domain override → host pref → default.
+    """
+    tab_overrides = tab_emulation_overrides.get(target_id, {})
+    domain_overrides = domain_emulation_overrides.get(domain, {}) if domain else {}
+    return {
+        name: tab_overrides.get(
+            name,
+            domain_overrides.get(
+                name,
+                host_prefs.get(name, EMULATION_DEFAULTS[name])
+            )
+        )
+        for name in EMULATION_FEATURES
+    }
+
+
+def _push_emulation_to_tab(tab, effective):
+    """Send Emulation.setEmulatedMedia with the given feature dict to a tab.
+
+    tab is the raw /json entry (dict with 'webSocketDebuggerUrl'). Silently
+    returns False if the CDP call fails — tabs come and go, and a failed push
+    will be retried on the next reconciliation pass.
+    """
+    ws_url = tab.get('webSocketDebuggerUrl')
+    if not ws_url:
+        return False
+    try:
+        send_cdp_command(ws_url, 'Emulation.setEmulatedMedia', {
+            'features': [{'name': k, 'value': v} for k, v in effective.items()],
+        })
+        return True
+    except Exception as e:
+        print(f"[emulate] Failed to push to {tab.get('id')}: {e}")
+        return False
+
+
+def _push_emulation_by_target_id(target_id):
+    """Look up the tab by id and push its current effective features."""
+    for tab in get_page_tabs():
+        if tab.get('id') == target_id:
+            domain = _extract_domain(tab.get('url', ''))
+            return _push_emulation_to_tab(tab, _effective_features_for_tab(target_id, domain))
+    return False
+
+
+def _reconcile_tab_emulation(page_tabs):
+    """Sync per-tab state with the current set of live tabs.
+
+    - Newly-seen targets get effective features applied via CDP.
+    - Targets that navigated to a different domain get a fresh push (domain
+      overrides for the new hostname kick in or drop out).
+    - Vanished targets are pruned from tab_emulation_overrides and the
+      domain tracker so the dicts never grow unbounded.
+    """
+    global _last_seen_target_ids
+    live_ids = set()
+    for tab in page_tabs:
+        target_id = tab.get('id')
+        if not target_id:
+            continue
+        live_ids.add(target_id)
+        domain = _extract_domain(tab.get('url', ''))
+        was_seen = target_id in _last_seen_target_ids
+        prev_domain = _last_seen_tab_domains.get(target_id)
+        if not was_seen or domain != prev_domain:
+            _last_seen_tab_domains[target_id] = domain
+            _push_emulation_to_tab(tab, _effective_features_for_tab(target_id, domain))
+
+    gone_ids = _last_seen_target_ids - live_ids
+    for target_id in gone_ids:
+        tab_emulation_overrides.pop(target_id, None)
+        _last_seen_tab_domains.pop(target_id, None)
+
+    _last_seen_target_ids = live_ids
+
+
+def _reapply_overrides_to_all_tabs(changed_features, scope='host'):
+    """Re-push effective features to every tab whose effective value for any
+    changed feature might have changed. Used after host_prefs or a domain
+    override changes.
+
+    scope is informational only (determines which tabs are skippable).
+    """
+    if not changed_features:
+        return
+    changed = set(changed_features)
+    for tab in get_page_tabs():
+        target_id = tab.get('id')
+        if not target_id:
+            continue
+        tab_overrides = tab_emulation_overrides.get(target_id, {})
+        # Tab-level overrides always win — if the tab pins every changed
+        # feature, its effective values don't move.
+        if changed.issubset(tab_overrides.keys()):
+            continue
+        domain = _extract_domain(tab.get('url', ''))
+        _push_emulation_to_tab(tab, _effective_features_for_tab(target_id, domain))
+
+
+def _reapply_domain_overrides(domain, changed_features):
+    """Push effective features to every currently-open tab on the given domain.
+    """
+    if not domain or not changed_features:
+        return
+    changed = set(changed_features)
+    for tab in get_page_tabs():
+        if _extract_domain(tab.get('url', '')) != domain:
+            continue
+        target_id = tab.get('id')
+        if not target_id:
+            continue
+        tab_overrides = tab_emulation_overrides.get(target_id, {})
+        if changed.issubset(tab_overrides.keys()):
+            continue
+        _push_emulation_to_tab(tab, _effective_features_for_tab(target_id, domain))
+
 
 def get_tab_theme_color(tab):
     """Extract theme color from a tab via CDP Runtime.evaluate.
@@ -1623,6 +1803,13 @@ class ControlHandler(BaseHTTPRequestHandler):
             # List all page tabs
             try:
                 tabs = get_page_tabs()
+                # Piggyback media-query emulation reconciliation on the poll
+                # used by the tab strip — new targets get host_prefs applied,
+                # gone targets drop out of the overrides map.
+                try:
+                    _reconcile_tab_emulation(tabs)
+                except Exception as rec_err:
+                    print(f"[emulate] Reconcile failed: {rec_err}")
                 # Return simplified tab info
                 tab_list = [{
                     'id': t.get('id'),
@@ -1633,6 +1820,31 @@ class ControlHandler(BaseHTTPRequestHandler):
                 self.send_json({'ok': True, 'tabs': tab_list})
             except Exception as e:
                 self.send_json({'ok': False, 'error': str(e)}, 500)
+
+        elif path.startswith('/emulate/'):
+            # GET /emulate/<targetId> — return overrides at each scope plus
+            # the computed effective features for the popout's initial render.
+            target_id = path.split('/emulate/', 1)[1]
+            if not target_id:
+                self.send_json({'ok': False, 'error': 'Missing target id'}, 400)
+                return
+            # Look up the tab's current domain so the UI can show which site
+            # any "Whole site" actions will apply to.
+            domain = None
+            for tab in get_page_tabs():
+                if tab.get('id') == target_id:
+                    domain = _extract_domain(tab.get('url', ''))
+                    break
+            self.send_json({
+                'ok': True,
+                'target_id': target_id,
+                'domain': domain,
+                'tab_overrides': tab_emulation_overrides.get(target_id, {}),
+                'domain_overrides': domain_emulation_overrides.get(domain, {}) if domain else {},
+                'host_prefs': host_prefs,
+                'effective': _effective_features_for_tab(target_id, domain),
+                'features': list(EMULATION_FEATURES),
+            })
 
         elif path == '/tabs/theme-colors':
             # Get theme colors for all tabs (for tab bar tinting)
@@ -3377,6 +3589,16 @@ class ControlHandler(BaseHTTPRequestHandler):
             # Return the latest copyable code block text
             self.send_json({'ok': True, 'text': copyable_data['text'], 'timestamp': copyable_data['timestamp']})
 
+        elif path == '/data':
+            # Return the latest structured-data payload (JSON + Markdown table)
+            self.send_json({
+                'ok': True,
+                'json': data_payload['json'],
+                'table_md': data_payload['table_md'],
+                'summary': data_payload['summary'],
+                'timestamp': data_payload['timestamp'],
+            })
+
         elif path == '/toast':
             # Return the latest toast message posted by CLI commands
             self.send_json({'ok': True, 'message': toast_data['message'], 'type': toast_data['type'], 'timestamp': toast_data['timestamp']})
@@ -3691,6 +3913,22 @@ class ControlHandler(BaseHTTPRequestHandler):
                 self.send_json({'ok': False, 'error': str(e)}, 500)
             return
 
+        if path == '/data':
+            # CLI posts {json, table_md, summary}; control panel shows a
+            # "Data ready to copy" toast with [Table] / [JSON] actions.
+            try:
+                content_length = int(self.headers.get('Content-Length', 0))
+                body = self.rfile.read(content_length).decode('utf-8')
+                data = json.loads(body)
+                data_payload['json'] = data.get('json', '') or ''
+                data_payload['table_md'] = data.get('table_md', '') or ''
+                data_payload['summary'] = data.get('summary', '') or ''
+                data_payload['timestamp'] = time.time()
+                self.send_json({'ok': True})
+            except Exception as e:
+                self.send_json({'ok': False, 'error': str(e)}, 500)
+            return
+
         if path == '/toast':
             # CLI posts toast message here; control panel fetches and shows it
             try:
@@ -3729,43 +3967,153 @@ class ControlHandler(BaseHTTPRequestHandler):
                 self.send_json({'ok': False, 'error': str(e)}, 500)
             return
 
-        # Theme endpoint: POST /theme/dark or POST /theme/light
-        if path.startswith('/theme/'):
-            theme = path.split('/theme/')[1]
-            if theme not in ['dark', 'light']:
-                self.send_json({'ok': False, 'error': 'Invalid theme. Use dark or light.'}, 400)
-                return
-
+        if path == '/host-prefs':
+            # POST /host-prefs — broadcast the host browser's current media-query
+            # values. Body: {feature: value, ...}. Only keys the host actually
+            # tracks are updated; anything else is ignored. After merge, the
+            # server re-applies effective features to all tabs whose overrides
+            # don't shadow the changed fields.
             try:
-                # Read current theme to check if change is needed
-                current_theme = 'dark'
-                try:
-                    with open('/tmp/inspekt_theme', 'r') as f:
-                        current_theme = f.read().strip()
-                except FileNotFoundError:
-                    pass
+                content_length = int(self.headers.get('Content-Length', 0))
+                body = self.rfile.read(content_length).decode('utf-8') if content_length else '{}'
+                data = json.loads(body) if body else {}
+                if not isinstance(data, dict):
+                    self.send_json({'ok': False, 'error': 'Body must be a JSON object'}, 400)
+                    return
+                changed = []
+                for name in EMULATION_FEATURES:
+                    if name not in data:
+                        continue
+                    value = data[name]
+                    if not isinstance(value, str):
+                        continue
+                    if host_prefs.get(name) != value:
+                        host_prefs[name] = value
+                        changed.append(name)
+                _reapply_overrides_to_all_tabs(changed)
+                self.send_json({'ok': True, 'host_prefs': host_prefs, 'changed': changed})
+            except Exception as e:
+                self.send_json({'ok': False, 'error': str(e)}, 500)
 
-                # Write theme preference
-                with open('/tmp/inspekt_theme', 'w') as f:
-                    f.write(theme)
+        elif path.startswith('/emulate/') and path.endswith('/reset'):
+            # POST /emulate/<targetId>/reset — clear overrides at the scope
+            # given in the JSON body ({"scope": "tab" | "domain" | "all"},
+            # default "tab"). Always re-pushes CDP state afterwards.
+            target_id = path[len('/emulate/'):-len('/reset')]
+            if not target_id:
+                self.send_json({'ok': False, 'error': 'Missing target id'}, 400)
+                return
+            try:
+                content_length = int(self.headers.get('Content-Length', 0))
+                body = self.rfile.read(content_length).decode('utf-8') if content_length else '{}'
+                data = json.loads(body) if body else {}
+                scope = data.get('scope', 'tab') if isinstance(data, dict) else 'tab'
+            except Exception:
+                scope = 'tab'
 
-                # Only restart Chrome if theme actually changed
-                if current_theme != theme:
-                    # Kill Chromium (supervisord will restart it with new theme)
-                    subprocess.run(['pkill', '-f', 'chromium'], capture_output=True)
-                    self.send_json({
-                        'ok': True,
-                        'theme': theme,
-                        'message': f'Theme changed to {theme}, Chrome restarting…',
-                        'changed': True
-                    })
+            # Resolve current domain from CDP so "Whole site" reset targets
+            # the right hostname even if the tab has navigated since the
+            # popout last fetched.
+            domain = None
+            for tab in get_page_tabs():
+                if tab.get('id') == target_id:
+                    domain = _extract_domain(tab.get('url', ''))
+                    break
+
+            if scope in ('tab', 'all'):
+                tab_emulation_overrides.pop(target_id, None)
+            if scope in ('domain', 'all') and domain:
+                prev_domain_overrides = domain_emulation_overrides.pop(domain, {})
+                # Push new effective state to every tab on that domain, not
+                # just the originating one.
+                if prev_domain_overrides:
+                    _reapply_domain_overrides(domain, list(prev_domain_overrides.keys()))
+            _push_emulation_by_target_id(target_id)
+            self.send_json({
+                'ok': True,
+                'target_id': target_id,
+                'domain': domain,
+                'scope': scope,
+                'tab_overrides': tab_emulation_overrides.get(target_id, {}),
+                'domain_overrides': domain_emulation_overrides.get(domain, {}) if domain else {},
+                'effective': _effective_features_for_tab(target_id, domain),
+            })
+
+        elif path.startswith('/emulate/'):
+            # POST /emulate/<targetId> — merge an overrides delta at the scope
+            # given by `scope` in the body ("tab" (default) or "domain").
+            # Body: {scope: "tab"|"domain", <feature>: value | null, ...}.
+            # null unsets the override at that scope. Unknown feature names
+            # and non-string values are silently ignored.
+            target_id = path[len('/emulate/'):]
+            if not target_id:
+                self.send_json({'ok': False, 'error': 'Missing target id'}, 400)
+                return
+            try:
+                content_length = int(self.headers.get('Content-Length', 0))
+                body = self.rfile.read(content_length).decode('utf-8') if content_length else '{}'
+                data = json.loads(body) if body else {}
+                if not isinstance(data, dict):
+                    self.send_json({'ok': False, 'error': 'Body must be a JSON object'}, 400)
+                    return
+
+                scope = data.get('scope', 'tab')
+                if scope not in ('tab', 'domain'):
+                    self.send_json({'ok': False, 'error': 'scope must be "tab" or "domain"'}, 400)
+                    return
+
+                # Resolve domain from the tab's current URL.
+                domain = None
+                for tab in get_page_tabs():
+                    if tab.get('id') == target_id:
+                        domain = _extract_domain(tab.get('url', ''))
+                        break
+
+                if scope == 'domain':
+                    if not domain:
+                        self.send_json(
+                            {'ok': False, 'error': 'Current tab has no domain (internal page)'},
+                            400,
+                        )
+                        return
+                    target_map = domain_emulation_overrides.setdefault(domain, {})
                 else:
-                    self.send_json({
-                        'ok': True,
-                        'theme': theme,
-                        'message': f'Theme already set to {theme}',
-                        'changed': False
-                    })
+                    target_map = tab_emulation_overrides.setdefault(target_id, {})
+
+                changed = []
+                for name in EMULATION_FEATURES:
+                    if name not in data:
+                        continue
+                    value = data[name]
+                    if value is None:
+                        if name in target_map:
+                            target_map.pop(name, None)
+                            changed.append(name)
+                    elif isinstance(value, str):
+                        if target_map.get(name) != value:
+                            target_map[name] = value
+                            changed.append(name)
+
+                # Prune empty override dicts so reconciliation/GET treat them
+                # as "no overrides at this scope".
+                if scope == 'domain':
+                    if not domain_emulation_overrides.get(domain):
+                        domain_emulation_overrides.pop(domain, None)
+                    _reapply_domain_overrides(domain, changed)
+                else:
+                    if not tab_emulation_overrides.get(target_id):
+                        tab_emulation_overrides.pop(target_id, None)
+                    _push_emulation_by_target_id(target_id)
+
+                self.send_json({
+                    'ok': True,
+                    'target_id': target_id,
+                    'domain': domain,
+                    'scope': scope,
+                    'tab_overrides': tab_emulation_overrides.get(target_id, {}),
+                    'domain_overrides': domain_emulation_overrides.get(domain, {}) if domain else {},
+                    'effective': _effective_features_for_tab(target_id, domain),
+                })
             except Exception as e:
                 self.send_json({'ok': False, 'error': str(e)}, 500)
 

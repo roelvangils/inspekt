@@ -94,6 +94,13 @@
     --glass-blur: blur(20px) saturate(180%);
     --glass-border: 1px solid color-mix(in srgb, var(--divider) 60%, transparent);
     --glass-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+
+    /* ── Focus ring (WCAG 2.4.7 / 1.4.11) ──
+       Double shadow: inner halo matches the nearest surface so the accent
+       ring doesn't touch the control body, keeping 3:1 contrast against
+       any background. */
+    --focus-ring: 0 0 0 2px var(--bg-page), 0 0 0 4px var(--accent);
+    --focus-ring-offset: 2px;
 }
 
 /* ── Light mode overrides ── */

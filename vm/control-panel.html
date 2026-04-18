@@ -28,6 +28,7 @@
     <link rel="stylesheet" href="/css/splash.css">
     <link rel="stylesheet" href="/css/control-bar.css">
     <link rel="stylesheet" href="/css/url-bar.css">
+    <link rel="stylesheet" href="/css/emulation.css">
     <link rel="stylesheet" href="/css/tabs.css">
     <link rel="stylesheet" href="/css/context-menu.css">
     <link rel="stylesheet" href="/css/vnc.css">
@@ -42,6 +43,8 @@
     <link rel="stylesheet" href="/css/voice-overlay.css">
     <!-- APP_CSS_END -->
     <script src="/vendor/sortable.min.js"></script>
+    <!-- QR code generator (kazuhikoarase/qrcode-generator v2.0.4, MIT) -->
+    <script src="/vendor/qrcode.min.js"></script>
     <!-- APP_JS_START -->
     <script src="/js/config.js" defer></script>
     <script src="/js/screen-reader.js" defer></script>
@@ -54,6 +57,7 @@
     <script src="/js/navigation.js" defer></script>
     <script src="/js/popout-manager.js" defer></script>
     <script src="/js/plugins.js" defer></script>
+    <script src="/js/emulation.js" defer></script>
     <script src="/js/autorun.js" defer></script>
     <script src="/js/focus-overlay.js" defer></script>
     <script src="/js/upload.js" defer></script>
@@ -74,6 +78,7 @@
     <script src="/js/vision-sim.js" defer></script>
     <script src="/js/motor-sim.js" defer></script>
     <script src="/js/voice.js" defer></script>
+    <script src="/js/qr.js" defer></script>
     <!-- APP_JS_END -->
 </head>
 <body>
@@ -123,7 +128,10 @@
                    aria-expanded="false"
                    aria-controls="urlHistoryDropdown"
                    aria-autocomplete="list"
-                   autocomplete="off">
+                   autocomplete="new-password"
+                   autocorrect="off"
+                   autocapitalize="off"
+                   spellcheck="false">
             <div class="url-history-dropdown" id="urlHistoryDropdown"
                  role="listbox"
                  aria-label="Navigation history">
@@ -131,6 +139,22 @@
             <div class="url-bar-progress" id="urlBarProgress" role="progressbar"
                  aria-label="Page loading progress" aria-valuenow="0"
                  aria-valuemin="0" aria-valuemax="100"></div>
+            <button id="urlBarQrIcon" class="url-bar-qr-icon"
+                    title="Share current URL as QR code"
+                    aria-label="Share current URL as QR code"
+                    onclick="toggleQrModal()">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true"><path d="M3 11h8V3H3v8zm2-6h4v4H5V5zM3 21h8v-8H3v8zm2-6h4v4H5v-4zm8-12v8h8V3h-8zm6 6h-4V5h4v4zm-6 12h2v-2h-2v2zm2-4h2v2h-2v-2zm4 0h-2v-2h2v2zm0 4h-2v-2h2v2zm2-4h-2v-2h2v2zm0 4h-2v-2h2v2zm-6-10v2h2v-2h-2z"/></svg>
+            </button>
+            <button id="urlBarEmulationIcon" class="url-bar-emulation-icon"
+                    title="Accessibility emulation"
+                    aria-label="Accessibility emulation"
+                    aria-expanded="false"
+                    onclick="toggleEmulationPopout()">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <circle cx="12" cy="12" r="3"/>
+                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                </svg>
+            </button>
             <button id="urlBarPluginIcon" class="url-bar-plugin-icon"
                     title="Plugins"
                     aria-label="Plugins"
@@ -138,25 +162,36 @@
                     onclick="togglePluginDropdown()">
                 <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19.439 7.85c-.049.322.059.648.289.878l1.568 1.568c.47.47.706 1.087.706 1.704s-.235 1.233-.706 1.704l-1.611 1.611a.98.98 0 0 1-.837.276c-.47-.07-.802-.48-.968-.925a2.501 2.501 0 1 0-3.214 3.214c.446.166.855.497.925.968a.979.979 0 0 1-.276.837l-1.611 1.611a2.404 2.404 0 0 1-1.704.706 2.402 2.402 0 0 1-1.704-.706l-1.568-1.568a1.026 1.026 0 0 0-.877-.29c-.493.074-.84.504-1.02.968a2.5 2.5 0 1 1-3.237-3.237c.464-.18.894-.527.967-1.02a1.026 1.026 0 0 0-.289-.877l-1.568-1.568A2.402 2.402 0 0 1 1.998 12c0-.617.236-1.234.706-1.704L4.16 8.74c.24-.24.33-.59.274-.862-.058-.284-.27-.546-.535-.728a2.5 2.5 0 1 1 3.258-3.258c.18.264.443.477.728.535.272.056.621-.034.862-.274l1.557-1.557c.47-.47 1.088-.706 1.704-.706.617 0 1.234.236 1.704.706l1.568 1.568c.23.23.556.338.877.29.493-.074.84-.504 1.02-.968a2.5 2.5 0 1 1 3.237 3.237c-.464.18-.894.527-.967 1.02Z"/></svg>
             </button>
+            <div id="emulationPopout" class="url-bar-popout emulation-popout" role="dialog" aria-label="Accessibility emulation">
+                <div class="emulation-popout-header">
+                    <span>Accessibility emulation</span>
+                </div>
+                <div id="emulationPopoutBody" class="emulation-popout-body">
+                    <div class="emulation-empty">Loading…</div>
+                </div>
+                <div class="emulation-popout-footer">
+                    <button class="emulation-reset-btn" onclick="resetEmulationForActiveTab()">Reset all</button>
+                </div>
+            </div>
             <div id="pluginDropdown" class="url-bar-popout plugin-dropdown" role="dialog" aria-label="Plugins">
                 <div class="plugin-dropdown-header">
                     <span>Plugins</span>
-                    <a onclick="openPluginManager()" title="Open plugin manager">Manage</a>
+                    <button type="button" class="plugin-dropdown-manage" onclick="openPluginManager()" title="Open plugin manager">Manage</button>
                 </div>
                 <div id="pluginList" class="plugin-list"></div>
             </div>
             <div class="url-bar-popout page-info-popout" id="pageInfoPopout">
                 <div class="page-info-tabs" role="tablist" aria-label="Page information categories">
-                    <button class="page-info-tab active" data-tab="summary" role="tab">Summary</button>
-                    <button class="page-info-tab" data-tab="performance" role="tab">Performance</button>
-                    <button class="page-info-tab" data-tab="meta" role="tab">Meta</button>
-                    <button class="page-info-tab" data-tab="seo" role="tab">SEO</button>
-                    <button class="page-info-tab" data-tab="security" role="tab">Security</button>
-                    <button class="page-info-tab" data-tab="accessibility" role="tab">Accessibility</button>
-                    <button class="page-info-tab" data-tab="resources" role="tab">Resources</button>
-                    <button class="page-info-tab" data-tab="storage" role="tab">Storage</button>
-                    <button class="page-info-tab" data-tab="tech" role="tab">Tech</button>
-                    <button class="page-info-tab" data-tab="layout" role="tab">Layout</button>
+                    <button class="page-info-tab active" data-tab="summary" role="tab" aria-selected="true" aria-controls="pageInfoContent" tabindex="0">Summary</button>
+                    <button class="page-info-tab" data-tab="performance" role="tab" aria-selected="false" aria-controls="pageInfoContent" tabindex="-1">Performance</button>
+                    <button class="page-info-tab" data-tab="meta" role="tab" aria-selected="false" aria-controls="pageInfoContent" tabindex="-1">Meta</button>
+                    <button class="page-info-tab" data-tab="seo" role="tab" aria-selected="false" aria-controls="pageInfoContent" tabindex="-1">SEO</button>
+                    <button class="page-info-tab" data-tab="security" role="tab" aria-selected="false" aria-controls="pageInfoContent" tabindex="-1">Security</button>
+                    <button class="page-info-tab" data-tab="accessibility" role="tab" aria-selected="false" aria-controls="pageInfoContent" tabindex="-1">Accessibility</button>
+                    <button class="page-info-tab" data-tab="resources" role="tab" aria-selected="false" aria-controls="pageInfoContent" tabindex="-1">Resources</button>
+                    <button class="page-info-tab" data-tab="storage" role="tab" aria-selected="false" aria-controls="pageInfoContent" tabindex="-1">Storage</button>
+                    <button class="page-info-tab" data-tab="tech" role="tab" aria-selected="false" aria-controls="pageInfoContent" tabindex="-1">Tech</button>
+                    <button class="page-info-tab" data-tab="layout" role="tab" aria-selected="false" aria-controls="pageInfoContent" tabindex="-1">Layout</button>
                 </div>
                 <div class="page-info-content" id="pageInfoContent" role="tabpanel">
                     <div class="page-info-loading">Loading...</div>
@@ -171,7 +206,7 @@
 
         <!-- SR Popout lives here, gets re-parented into SR button wrapper during render -->
         <div id="srPopoutContainer" style="display:none;">
-        <div id="srPopout" class="url-bar-popout sr-popout">
+        <div id="srPopout" class="url-bar-popout sr-popout" role="dialog" aria-label="Screen Reader Simulator">
             <div class="sr-popout-header">Screen Reader Simulator</div>
             <div class="sr-selector">
                 <button class="sr-option" data-sr="jaws" onclick="startSRSimulation('jaws')">
@@ -314,8 +349,8 @@
         <div class="focus-overlay-hint">Click anywhere to interact with browser</div>
     </div>
 
-    <!-- Toast -->
-    <div class="toast" id="toast" role="alert" aria-live="polite"></div>
+    <!-- Toast (position class overridden by showToast() per config) -->
+    <div class="toast pos-top-center" id="toast" role="alert" aria-live="polite"></div>
 
     <!-- Command Palette -->
     <ninja-keys id="commandPalette" placeholder="Type a command…" openHotkey="cmd+k,ctrl+k" hideBreadcrumbs></ninja-keys>
@@ -486,6 +521,28 @@
             </div>
         </div>
         <div class="sr-speech-log-entries" id="srSpeechLogEntries"></div>
+    </div>
+
+    <!-- QR Handoff Modal -->
+    <div class="qr-modal-overlay" id="qrModalOverlay" role="dialog" aria-modal="true" aria-labelledby="qrModalTitle">
+        <div class="qr-modal">
+            <button class="qr-modal-close-btn" onclick="toggleQrModal(false)" aria-label="Close dialog" title="Close (Esc)">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+            </button>
+            <h2 id="qrModalTitle" tabindex="-1">Open on another device</h2>
+            <p class="qr-modal-subtitle">Scan with your phone's camera to continue on mobile.</p>
+            <div id="qrModalCode" class="qr-modal-code" aria-live="polite"></div>
+            <div class="qr-modal-url-row">
+                <div class="qr-modal-url" id="qrModalUrl"></div>
+                <button type="button" class="qr-modal-url-btn" id="qrModalCopyBtn" onclick="copyQrUrl()" aria-label="Copy URL to clipboard" title="Copy URL">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
+                </button>
+                <button type="button" class="qr-modal-url-btn" id="qrModalShortenBtn" onclick="shortenQrUrl()" aria-label="Shorten URL" title="Shorten URL (is.gd)">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"/></svg>
+                </button>
+            </div>
+            <div class="qr-modal-hint">Press <kbd>Esc</kbd> to close</div>
+        </div>
     </div>
 
     <!-- Restart Modal -->

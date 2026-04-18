@@ -230,13 +230,17 @@ function _buildSitemapSubmenuItems(children, childrenTotal) {
     return items;
 }
 
-// Tab switching
+// Tab switching — keeps class, aria-selected, and roving tabindex in sync
+// for mouse and keyboard activations alike.
 document.addEventListener('click', (e) => {
     const tab = e.target.closest('.page-info-tab');
     if (!tab) return;
     pageInfoActiveTab = tab.dataset.tab;
     document.querySelectorAll('.page-info-tab').forEach(t => {
-        t.classList.toggle('active', t.dataset.tab === pageInfoActiveTab);
+        const active = t.dataset.tab === pageInfoActiveTab;
+        t.classList.toggle('active', active);
+        t.setAttribute('aria-selected', active ? 'true' : 'false');
+        t.setAttribute('tabindex', active ? '0' : '-1');
     });
     renderPageInfoTab(pageInfoActiveTab);
 });
@@ -564,43 +568,141 @@ function esc(str) {
 
 // --- Dropdown render/filter/dismiss ---
 
+// Material Design icon paths for per-row action buttons
+const HISTORY_ACTION_ICONS = {
+    cloud: 'M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM19 18H6c-2.21 0-4-1.79-4-4s1.79-4 4-4h.71C7.37 7.69 9.48 6 12 6c3.04 0 5.5 2.46 5.5 5.5v.5H19c1.66 0 3 1.34 3 3s-1.34 3-3 3z',
+    local: 'M19 4H5c-1.11 0-2 .89-2 2v12c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.11-.9-2-2-2zm0 14H5V8h14v10z',
+    host:  'M19 19H5V5h7V3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z',
+};
+
+const HISTORY_ACTION_LABELS = {
+    cloud: 'Open as Cloud Tab',
+    local: 'Open as Local Tab',
+    host:  'Open in Host Browser',
+};
+
+function renderHistoryActionButtons() {
+    let html = '<div class="history-option-actions">';
+    for (const action of ['cloud', 'local', 'host']) {
+        html += `<button type="button" class="history-action-btn history-action-${action}" data-action="${action}" title="${HISTORY_ACTION_LABELS[action]}" aria-label="${HISTORY_ACTION_LABELS[action]}" tabindex="-1">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true"><path d="${HISTORY_ACTION_ICONS[action]}"/></svg>
+        </button>`;
+    }
+    html += '</div>';
+    return html;
+}
+
+async function handleHistoryAction(action, url) {
+    dismissHistoryDropdown();
+    try {
+        if (action === 'cloud') {
+            const newTabId = await _addCloudTab(url);
+            if (newTabId && typeof activateTab === 'function') await activateTab(newTabId);
+        } else if (action === 'local') {
+            const tabId = _addLocalTab(url);
+            activeTabId = tabId;
+            if (typeof renderTabs === 'function') renderTabs();
+            if (typeof syncViewport === 'function') syncViewport();
+        } else if (action === 'host') {
+            window.open(url, '_blank');
+        }
+    } catch (err) {
+        console.warn('[urlbar] action failed:', action, err);
+        if (typeof showToast === 'function') showToast('Action failed', 'error', 2000);
+    }
+}
+
 function renderHistoryDropdown(filter) {
     const dropdown = document.getElementById('urlHistoryDropdown');
-    const lowerFilter = (filter || '').toLowerCase();
-    const filtered = lowerFilter
-        ? visitedHistory.filter(e =>
-            e.url.toLowerCase().includes(lowerFilter) ||
-            e.title.toLowerCase().includes(lowerFilter))
-        : visitedHistory;
+    const trimmedFilter = (filter || '').trim();
+    const ranked = rankedHistory(trimmedFilter, 15);
 
-    if (filtered.length === 0 && visitedHistory.length === 0) {
+    // Search-engine fallback: when the typed text isn't URL-shaped, offer
+    // a direct search as the first option (matching Chrome's default).
+    const showSearchRow = trimmedFilter.length > 0 && !looksLikeUrl(trimmedFilter);
+    const searchEngine = getConfig('browser.search-engine', 'https://duckduckgo.com/?q=');
+    let searchEngineName = 'search';
+    try { searchEngineName = new URL(searchEngine).hostname.replace(/^www\./, ''); } catch { /* ignore */ }
+    const searchUrl = showSearchRow ? searchEngine + encodeURIComponent(trimmedFilter) : '';
+
+    // Empty-state short-circuits (only when there's literally nothing to show)
+    if (!showSearchRow && ranked.length === 0 && visitedHistory.length === 0) {
         dropdown.innerHTML = '<div class="history-empty">No history yet</div>';
         return;
     }
-
-    if (filtered.length === 0) {
+    if (!showSearchRow && ranked.length === 0) {
         dropdown.innerHTML = '<div class="history-empty">No matches</div>';
         return;
     }
 
     let html = '';
-    filtered.forEach((entry, i) => {
-        const activeClass = i === historyActiveIndex ? ' active' : '';
-        const titleHtml = highlightMatch(entry.title || entry.url, filter);
-        const urlHtml = highlightMatch(stripScheme(entry.url), filter);
-        html += `<div class="history-option${activeClass}" role="option" data-index="${i}" data-url="${escapeHtml(entry.url)}">
-            <span class="history-option-title">${titleHtml}</span>
-            <span class="history-option-url">${urlHtml}</span>
+    let optionIndex = 0;
+
+    if (showSearchRow) {
+        const cls = 'history-option history-option-search' + (optionIndex === historyActiveIndex ? ' active' : '');
+        const ariaSelected = optionIndex === historyActiveIndex ? 'true' : 'false';
+        html += `<div class="${cls}" role="option" id="history-opt-${optionIndex}" data-index="${optionIndex}" data-url="${escapeHtml(searchUrl)}" aria-selected="${ariaSelected}">
+            <div class="history-search-icon">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+            </div>
+            <div class="history-option-text">
+                <span class="history-option-title">Search <em>${escapeHtml(searchEngineName)}</em> for &ldquo;${escapeHtml(trimmedFilter)}&rdquo;</span>
+            </div>
         </div>`;
+        optionIndex++;
+    }
+    ranked.forEach(entry => {
+        const cls = 'history-option' + (optionIndex === historyActiveIndex ? ' active' : '');
+        const ariaSelected = optionIndex === historyActiveIndex ? 'true' : 'false';
+        const titleHtml = highlightMatch(entry.title || entry.url, trimmedFilter);
+        const urlHtml = highlightMatch(stripScheme(entry.url), trimmedFilter);
+        const faviconHtml = entry.favicon
+            ? `<img class="history-option-favicon" src="${escapeHtml(entry.favicon)}" alt="">`
+            : `<div class="history-option-favicon-placeholder">🌐</div>`;
+        html += `<div class="${cls}" role="option" id="history-opt-${optionIndex}" data-index="${optionIndex}" data-url="${escapeHtml(entry.url)}" aria-selected="${ariaSelected}">
+            ${faviconHtml}
+            <div class="history-option-text">
+                <span class="history-option-title">${titleHtml}</span>
+                <span class="history-option-url">${urlHtml}</span>
+            </div>
+            ${renderHistoryActionButtons()}
+        </div>`;
+        optionIndex++;
     });
-    html += '<div class="history-clear" role="button">Clear history</div>';
+
+    if (ranked.length > 0) {
+        html += '<div class="history-clear" role="button">Clear history</div>';
+    }
     dropdown.innerHTML = html;
 
-    // Attach click handlers
+    // Swap broken favicons for the placeholder
+    dropdown.querySelectorAll('.history-option-favicon').forEach(img => {
+        img.addEventListener('error', () => {
+            const placeholder = document.createElement('div');
+            placeholder.className = 'history-option-favicon-placeholder';
+            placeholder.textContent = '🌐';
+            img.replaceWith(placeholder);
+        });
+    });
+
+    // Option body: navigate on mousedown (preventDefault keeps URL bar focus).
+    // We let action-button clicks fall through — they have their own handlers.
     dropdown.querySelectorAll('.history-option').forEach(opt => {
         opt.addEventListener('mousedown', (e) => {
-            e.preventDefault(); // Prevent blur
+            if (e.target.closest('.history-action-btn')) return;
+            e.preventDefault();
             navigateTo(opt.dataset.url);
+        });
+    });
+
+    // Action buttons: mousedown preventDefault keeps dropdown open on mouse click;
+    // click handles both mouse and keyboard (Enter / Space) activation.
+    dropdown.querySelectorAll('.history-action-btn').forEach(btn => {
+        btn.addEventListener('mousedown', (e) => e.preventDefault());
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const opt = btn.closest('.history-option');
+            if (opt) handleHistoryAction(btn.dataset.action, opt.dataset.url);
         });
     });
 
@@ -629,6 +731,7 @@ function dismissHistoryDropdown() {
     const urlBar = document.getElementById('urlBar');
     dropdown.classList.remove('show');
     urlBar.setAttribute('aria-expanded', 'false');
+    urlBar.removeAttribute('aria-activedescendant');
     historyDropdownOpen = false;
     historyActiveIndex = -1;
     document.removeEventListener('click', onHistoryOutsideClick, true);
@@ -643,19 +746,38 @@ function onHistoryOutsideClick(e) {
 
 // --- Keyboard handler ---
 
+let historyTypedValue = '';  // What the user actually typed — restored when arrowing past -1
+
+function syncUrlBarToActive() {
+    const urlBar = document.getElementById('urlBar');
+    const options = document.querySelectorAll('#urlHistoryDropdown .history-option');
+    if (historyActiveIndex === -1) {
+        urlBar.value = historyTypedValue;
+    } else if (options[historyActiveIndex]) {
+        urlBar.value = options[historyActiveIndex].dataset.url;
+    }
+}
+
 (function setupUrlBarKeyboard() {
     const urlBar = document.getElementById('urlBar');
 
     urlBar.addEventListener('keydown', (e) => {
+        // Skip while an IME is composing (CJK / emoji input). Enter or ArrowDown
+        // during composition would commit the wrong thing. keyCode 229 is the
+        // IE/WebKit fallback when isComposing isn't set.
+        if (e.isComposing || e.keyCode === 229) return;
         if (e.key === 'ArrowDown') {
             e.preventDefault();
             if (!historyDropdownOpen) {
+                historyTypedValue = urlBar.value;
                 showHistoryDropdown();
             } else {
                 const options = document.querySelectorAll('#urlHistoryDropdown .history-option');
                 if (options.length > 0) {
+                    if (historyActiveIndex === -1) historyTypedValue = urlBar.value;
                     historyActiveIndex = Math.min(historyActiveIndex + 1, options.length - 1);
                     updateHistoryActiveOption();
+                    syncUrlBarToActive();
                 }
             }
         } else if (e.key === 'ArrowUp') {
@@ -663,6 +785,7 @@ function onHistoryOutsideClick(e) {
                 e.preventDefault();
                 historyActiveIndex = Math.max(historyActiveIndex - 1, -1);
                 updateHistoryActiveOption();
+                syncUrlBarToActive();
             }
         } else if (e.key === 'Enter') {
             e.preventDefault();
@@ -682,26 +805,121 @@ function onHistoryOutsideClick(e) {
                 urlBar.value = displayUrl(currentUrl, false);
                 // Keep focus — second Escape (global handler) will blur
             }
+        } else if (historyDropdownOpen && historyActiveIndex >= 0 &&
+                   (e.key === 'Tab' || e.key === 'ArrowRight' || e.key === 'ArrowLeft')) {
+            // Only enters the action-button row when the user has already
+            // picked a suggestion via ArrowUp/ArrowDown. Without that guard,
+            // Tab while typing would steal focus into a button unexpectedly.
+            const options = document.querySelectorAll('#urlHistoryDropdown .history-option');
+            const opt = options[historyActiveIndex];
+            if (!opt) return;
+            const actions = opt.querySelectorAll('.history-action-btn');
+            if (actions.length === 0) return; // search row — fall through to default Tab
+            e.preventDefault();
+            const backward = e.shiftKey || e.key === 'ArrowLeft';
+            (backward ? actions[actions.length - 1] : actions[0]).focus();
+        } else if (e.key === 'Delete' && e.shiftKey) {
+            // Chrome/Firefox convention: Shift+Delete removes the highlighted
+            // history entry from the dropdown (not the search fallback row).
+            if (historyDropdownOpen && historyActiveIndex >= 0) {
+                const options = document.querySelectorAll('#urlHistoryDropdown .history-option');
+                const opt = options[historyActiveIndex];
+                if (opt && !opt.classList.contains('history-option-search')) {
+                    e.preventDefault();
+                    removeFromHistory(opt.dataset.url);
+                    renderHistoryDropdown(urlBar.value);
+                    // Clamp active index into the (possibly shorter) new list
+                    const fresh = document.querySelectorAll('#urlHistoryDropdown .history-option');
+                    historyActiveIndex = Math.min(historyActiveIndex, fresh.length - 1);
+                    updateHistoryActiveOption();
+                    syncUrlBarToActive();
+                }
+            }
         }
     });
 
     urlBar.addEventListener('input', () => {
+        historyTypedValue = urlBar.value;
         if (!historyDropdownOpen) {
             showHistoryDropdown();
         }
         historyActiveIndex = -1;
         renderHistoryDropdown(urlBar.value);
     });
+
+    // Dismiss when focus leaves the URL bar — unless it moved into the dropdown
+    // (action buttons), in which case we want to keep the dropdown open so the
+    // user can continue their keyboard flow.
+    urlBar.addEventListener('blur', (e) => {
+        if (!historyDropdownOpen) return;
+        const dropdown = document.getElementById('urlHistoryDropdown');
+        if (e.relatedTarget && dropdown.contains(e.relatedTarget)) return;
+        dismissHistoryDropdown();
+    });
+})();
+
+// Keyboard navigation inside the dropdown's action-button row.
+// Tab / ArrowRight move to the next button, Shift+Tab / ArrowLeft to the
+// previous. Past either end → return to the URL bar. Up/Down still move rows.
+(function setupHistoryActionButtonKeyboard() {
+    const dropdown = document.getElementById('urlHistoryDropdown');
+    if (!dropdown) return;
+    dropdown.addEventListener('keydown', (e) => {
+        const btn = e.target.closest && e.target.closest('.history-action-btn');
+        if (!btn) return;
+        const urlBar = document.getElementById('urlBar');
+        const opt = btn.closest('.history-option');
+        if (!opt) return;
+        const buttons = Array.from(opt.querySelectorAll('.history-action-btn'));
+        const idx = buttons.indexOf(btn);
+
+        const forward = e.key === 'ArrowRight' || (e.key === 'Tab' && !e.shiftKey);
+        const backward = e.key === 'ArrowLeft' || (e.key === 'Tab' && e.shiftKey);
+
+        if (forward) {
+            // Keyboard trap: wrap around. The only way out is Up / Down / Esc.
+            e.preventDefault();
+            buttons[(idx + 1) % buttons.length].focus();
+        } else if (backward) {
+            e.preventDefault();
+            buttons[(idx - 1 + buttons.length) % buttons.length].focus();
+        } else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+            e.preventDefault();
+            const options = document.querySelectorAll('#urlHistoryDropdown .history-option');
+            const newIndex = e.key === 'ArrowDown'
+                ? Math.min(historyActiveIndex + 1, options.length - 1)
+                : Math.max(historyActiveIndex - 1, -1);
+            // urlBar.focus() fires the focus handler in navigation.js, which
+            // calls showHistoryDropdown() and resets historyActiveIndex to -1.
+            // Set our intended index AFTER that so it isn't stomped.
+            urlBar.focus();
+            historyActiveIndex = newIndex;
+            updateHistoryActiveOption();
+            syncUrlBarToActive();
+        } else if (e.key === 'Escape') {
+            e.preventDefault();
+            e.stopPropagation();
+            urlBar.focus();
+            dismissHistoryDropdown();
+            urlBar.value = displayUrl(currentUrl, false);
+        }
+        // Enter/Space: let the default button click event fire (handled above)
+    });
 })();
 
 function updateHistoryActiveOption() {
+    const urlBar = document.getElementById('urlBar');
     const options = document.querySelectorAll('#urlHistoryDropdown .history-option');
     options.forEach((opt, i) => {
-        opt.classList.toggle('active', i === historyActiveIndex);
+        const isActive = i === historyActiveIndex;
+        opt.classList.toggle('active', isActive);
+        opt.setAttribute('aria-selected', isActive ? 'true' : 'false');
     });
-    // Scroll active option into view
     if (historyActiveIndex >= 0 && options[historyActiveIndex]) {
+        urlBar.setAttribute('aria-activedescendant', options[historyActiveIndex].id);
         options[historyActiveIndex].scrollIntoView({ block: 'nearest' });
+    } else {
+        urlBar.removeAttribute('aria-activedescendant');
     }
 }
 

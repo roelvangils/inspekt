@@ -105,6 +105,21 @@ _configReady.then(() => {
     }
 });
 
+// =============================================
+// Toast Position
+// =============================================
+// Resolved from appearance.toast-position after config loads.
+// Read by showToast() in vnc.js on every call.
+var _toastPositionClass = 'pos-top-center';
+const _TOAST_POSITIONS = [
+    'top-left', 'top-center', 'top-right',
+    'bottom-left', 'bottom-center', 'bottom-right',
+];
+_configReady.then(() => {
+    const pos = getConfig('appearance.toast-position', 'top-center');
+    _toastPositionClass = 'pos-' + (_TOAST_POSITIONS.includes(pos) ? pos : 'top-center');
+});
+
 // Notification beep via Web Audio API (no external sound file needed)
 let _audioCtx = null;
 function playNotificationBeep() {

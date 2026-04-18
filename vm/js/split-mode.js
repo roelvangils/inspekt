@@ -573,6 +573,12 @@ function connectTerminal() {
             handleToastSignal();
         }
 
+        // Check for structured-data signal and show "Data ready to copy" toast
+        DATA_SIGNAL_REGEX.lastIndex = 0;
+        if (DATA_SIGNAL_REGEX.test(data)) {
+            handleDataSignal();
+        }
+
         // Check for hide-terminal escape sequence
         // CLI tools emit this to request terminal auto-hide (e.g., when recording starts)
         HIDE_TERMINAL_REGEX.lastIndex = 0; // Reset before test (global regex)
@@ -598,6 +604,7 @@ function connectTerminal() {
         cleanData = cleanData.replace(CLIPBOARD_SIGNAL_REGEX, '');
         cleanData = cleanData.replace(COPYABLE_SIGNAL_REGEX, '');
         cleanData = cleanData.replace(TOAST_SIGNAL_REGEX, '');
+        cleanData = cleanData.replace(DATA_SIGNAL_REGEX, '');
         terminal.write(cleanData);
 
         // Scan for trigger words (debounced)

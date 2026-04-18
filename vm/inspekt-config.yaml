@@ -18,6 +18,11 @@ appearance:
   #          catppuccin-latte, solarized-light
   editor-theme: tokyo-night
 
+  # Where toast notifications appear on screen.
+  # Options: top-left, top-center, top-right,
+  #          bottom-left, bottom-center, bottom-right
+  toast-position: top-center
+
 # --------------------------------------------------
 # Browser
 # --------------------------------------------------

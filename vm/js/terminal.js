@@ -26,6 +26,59 @@ const COPYABLE_SIGNAL_REGEX = /\x1b\]1337;copyable\x07/g;
 // When detected, fetch toast message from control server and show it
 const TOAST_SIGNAL_REGEX = /\x1b\]1337;toast\x07/g;
 
+// Regex to detect structured-data signal: OSC 1337 ; data BEL
+// When detected, fetch {json, table_md, summary} from /data and show a
+// "Data ready to copy" toast with [Table] and/or [JSON] action buttons.
+const DATA_SIGNAL_REGEX = /\x1b\]1337;data\x07/g;
+
+// SVGs for the toast actions (kept here so split-mode.js stays readable).
+const TABLE_ICON_SVG = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3h18v18H3z"/><path d="M3 9h18M3 15h18M9 3v18M15 3v18"/></svg>';
+const JSON_ICON_SVG = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3a3 3 0 00-3 3v3a3 3 0 01-3 3 3 3 0 013 3v3a3 3 0 003 3"/><path d="M16 3a3 3 0 013 3v3a3 3 0 003 3 3 3 0 00-3 3v3a3 3 0 01-3 3"/></svg>';
+
+async function handleDataSignal() {
+    try {
+        const resp = await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/data`);
+        const d = await resp.json();
+        if (!d.ok) return;
+
+        const actions = [];
+        if (d.table_md) {
+            actions.push({
+                label: 'Table',
+                icon: TABLE_ICON_SVG,
+                onClick: async () => {
+                    await writeClipboard(d.table_md);
+                    showToast('Table copied', 'success');
+                },
+            });
+        }
+        if (d.json) {
+            actions.push({
+                label: 'JSON',
+                icon: JSON_ICON_SVG,
+                onClick: async () => {
+                    await writeClipboard(d.json);
+                    showToast('JSON copied', 'success');
+                },
+            });
+        }
+        if (!actions.length) return;
+
+        const message = d.summary
+            ? `Data ready to copy — ${d.summary}`
+            : 'Data ready to copy';
+
+        showToast(message, {
+            type: 'dark',
+            duration: 10000,
+            dismissible: true,
+            actions,
+        });
+    } catch (err) {
+        console.warn('[Terminal] Data relay failed:', err);
+    }
+}
+
 async function handleToastSignal() {
     try {
         const resp = await fetch(`http://${VNC_HOST}:${CONTROL_PORT}/toast`);

@@ -101,9 +101,6 @@
 
 .toast {
     position: fixed;
-    bottom: var(--space-5);
-    left: 50%;
-    transform: translateX(-50%) translateY(100px);
     display: flex;
     align-items: center;
     gap: 10px;
@@ -117,10 +114,7 @@
     background: var(--bg-bar);
     color: var(--text-bright);
 
-    &.show {
-        transform: translateX(-50%) translateY(0);
-        pointer-events: auto;
-    }
+    &.show { pointer-events: auto; }
 
     /* Type variants */
     &.success { background: var(--success); color: white; }
@@ -129,6 +123,40 @@
 
     &.success .toast-action,
     &.error .toast-action { border-color: rgba(255, 255, 255, 0.3); }
+
+    /* Position variants — hidden transform slides the toast in from the
+       nearest edge. Centred variants preserve the -50% X offset on both
+       hidden and shown state. */
+    &.pos-top-center {
+        top: var(--space-5); left: 50%;
+        transform: translateX(-50%) translateY(-120%);
+        &.show { transform: translateX(-50%) translateY(0); }
+    }
+    &.pos-bottom-center {
+        bottom: var(--space-5); left: 50%;
+        transform: translateX(-50%) translateY(120%);
+        &.show { transform: translateX(-50%) translateY(0); }
+    }
+    &.pos-top-left {
+        top: var(--space-5); left: var(--space-5);
+        transform: translateY(-120%);
+        &.show { transform: translateY(0); }
+    }
+    &.pos-top-right {
+        top: var(--space-5); right: var(--space-5);
+        transform: translateY(-120%);
+        &.show { transform: translateY(0); }
+    }
+    &.pos-bottom-left {
+        bottom: var(--space-5); left: var(--space-5);
+        transform: translateY(120%);
+        &.show { transform: translateY(0); }
+    }
+    &.pos-bottom-right {
+        bottom: var(--space-5); right: var(--space-5);
+        transform: translateY(120%);
+        &.show { transform: translateY(0); }
+    }
 }
 
 .toast-message { flex: 1; min-width: 0; }

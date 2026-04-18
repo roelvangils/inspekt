@@ -930,4 +930,219 @@
     }
 }
 
+/* ── QR Handoff Modal ── */
+
+.qr-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.55);
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
+    z-index: var(--z-restart-modal);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    animation: qrOverlayFadeIn var(--duration-normal) ease;
+
+    &.show { display: flex; }
+}
+
+@keyframes qrOverlayFadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.qr-modal {
+    position: relative;
+    background: var(--bg-bar);
+    border: 1px solid var(--divider);
+    border-radius: var(--radius-xl);
+    padding: var(--space-8) var(--space-9);
+    max-width: 420px;
+    width: calc(100% - var(--space-8));
+    text-align: center;
+    box-shadow: 0 24px 64px rgba(0, 0, 0, 0.4);
+    animation: qrModalPop 0.28s cubic-bezier(0.2, 0.9, 0.3, 1.1);
+
+    & h2 {
+        margin: 0 0 var(--space-2);
+        font-size: var(--text-xl, 20px);
+        color: var(--text);
+        outline: none;
+    }
+
+    /* Make the AT-targeted title focus look intentional without a thick ring */
+    & h2:focus-visible {
+        border-radius: var(--radius-sm);
+        outline: 2px solid var(--accent);
+        outline-offset: 4px;
+    }
+}
+
+@keyframes qrModalPop {
+    from { opacity: 0; transform: translateY(16px) scale(0.96); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.qr-modal-subtitle {
+    margin: 0 0 var(--space-6);
+    color: var(--text-dim);
+    font-size: var(--text-sm);
+}
+
+.qr-modal-code {
+    background: #fff;
+    border-radius: var(--radius-lg);
+    padding: var(--space-4);
+    margin: 0 auto var(--space-5);
+    width: 280px;
+    height: 280px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    /* The flip happens on the Y axis — give the parent some perspective so
+     * it reads as a depth rotation rather than a squash. */
+    perspective: 900px;
+    transform-style: preserve-3d;
+
+    & svg {
+        width: 100%;
+        height: 100%;
+        display: block;
+    }
+
+    &.flip-in {
+        animation: qrFlipIn 0.55s cubic-bezier(0.2, 0.8, 0.2, 1);
+    }
+}
+
+@keyframes qrFlipIn {
+    0%   { opacity: 0; transform: rotateY(-110deg); }
+    60%  { opacity: 1; }
+    100% { opacity: 1; transform: rotateY(0deg); }
+}
+
+.qr-modal-url-row {
+    display: flex;
+    align-items: stretch;
+    gap: var(--space-1);
+    background: var(--bg-btn);
+    border-radius: var(--radius-md);
+    padding: var(--space-1);
+}
+
+.qr-modal-url {
+    flex: 1;
+    min-width: 0;
+    font-family: var(--font-mono, ui-monospace, monospace);
+    font-size: var(--text-sm);
+    color: var(--text);
+    padding: var(--space-2) var(--space-2);
+    word-break: break-all;
+    max-height: 4em;
+    overflow-y: auto;
+    text-align: left;
+}
+
+.qr-modal-url-btn {
+    width: 32px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    background: transparent;
+    color: var(--text-dim);
+    cursor: pointer;
+    border-radius: var(--radius-sm);
+    padding: 0;
+    transition: color var(--duration-fast) ease, background var(--duration-fast) ease;
+
+    &:hover:not(:disabled) {
+        color: var(--text);
+        background: color-mix(in srgb, var(--text) 10%, transparent);
+    }
+
+    &:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 1px;
+    }
+
+    &:disabled {
+        cursor: default;
+    }
+
+    &.copied {
+        color: var(--success);
+    }
+
+    &.done {
+        color: var(--success);
+    }
+
+    &.loading {
+        position: relative;
+        color: transparent;
+    }
+
+    &.loading::after {
+        content: '';
+        position: absolute;
+        inset: 50% auto auto 50%;
+        width: 14px;
+        height: 14px;
+        margin: -7px 0 0 -7px;
+        border: 2px solid color-mix(in srgb, var(--text) 25%, transparent);
+        border-top-color: var(--accent);
+        border-radius: 50%;
+        animation: qrSpin 0.7s linear infinite;
+    }
+}
+
+@keyframes qrSpin {
+    to { transform: rotate(360deg); }
+}
+
+.qr-modal-hint {
+    margin-top: var(--space-4);
+    font-size: var(--text-xs);
+    color: var(--text-dim);
+
+    & kbd {
+        background: var(--bg-btn);
+        border: 1px solid var(--divider);
+        border-radius: var(--radius-sm);
+        padding: 1px 6px;
+        font-family: var(--font-mono, ui-monospace, monospace);
+        font-size: 0.85em;
+    }
+}
+
+.qr-modal-close-btn {
+    position: absolute;
+    top: var(--space-3);
+    right: var(--space-3);
+    width: var(--space-8);
+    height: var(--space-8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    background: transparent;
+    color: var(--text-dim);
+    cursor: pointer;
+    border-radius: var(--radius-md);
+    transition: color var(--duration-fast) ease, background var(--duration-fast) ease;
+
+    &:hover {
+        color: var(--text);
+        background: var(--bg-btn);
+    }
+
+    &:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 1px;
+    }
+}
+
 } /* end @layer modals */

@@ -215,21 +215,69 @@ if (/Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent)) {
     }, true);
 }
 
-// Cmd/Ctrl+C: copy selected text from VM to host clipboard.
-// Must be capture phase — noVNC calls stopPropagation() on all keys,
-// so a bubbling listener on document never sees them.
-document.addEventListener('keydown', (e) => {
-    if (e.key === 'c' && (e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey) {
-        // Only intercept when VNC canvas is active
+// Smart Cmd/Ctrl+C: copy the right thing based on current focus.
+//   - Focused <input>/<textarea>:  copy the text selection
+//   - Terminal panel open:         copy the xterm selection
+//   - Any other DOM selection:     copy window.getSelection().toString()
+//   - Otherwise (VNC canvas):      fetch the VM's selection via the bridge
+//
+// In Tauri, macOS processes menu accelerators before DOM keydown is
+// dispatched, so the native Cmd+C menu item (see menu.rs `smart_copy`)
+// invokes this function via Rust `window.eval(...)`. In a regular browser
+// (non-Tauri), the document listener below calls it directly.
+window.__inspektSmartCopy = async function() {
+    const ae = document.activeElement;
+    const tag = ae?.tagName;
+
+    // 1) <input> / <textarea>: copy the current text selection
+    if (tag === 'INPUT' || tag === 'TEXTAREA') {
+        const start = ae.selectionStart, end = ae.selectionEnd;
+        if (typeof start === 'number' && typeof end === 'number' && start !== end) {
+            await writeClipboard(ae.value.substring(start, end));
+        }
+        return;
+    }
+
+    // 2) xterm.js terminal: has its own selection model
+    const termOverlay = document.getElementById('terminalOverlay');
+    const inTerminal = termOverlay && termOverlay.classList.contains('open');
+    if (inTerminal && typeof terminal !== 'undefined' && terminal && terminal.hasSelection && terminal.hasSelection()) {
+        await writeClipboard(terminal.getSelection());
+        return;
+    }
+
+    // 3) SR simulator owns the keyboard; don't steal Cmd+C
+    if (typeof srActive !== 'undefined' && srActive) return;
+
+    // 4) Any other DOM selection (contenteditable, regular text, etc.)
+    const sel = window.getSelection && window.getSelection();
+    if (sel && sel.toString()) {
+        await writeClipboard(sel.toString());
+        return;
+    }
+
+    // 5) Nothing selected host-side → copy the VM's selection
+    runInspektForClipboard('selection text --raw', 'Text');
+};
+
+// Browser fallback: in Tauri the menu accelerator handles Cmd+C via Rust,
+// so we skip this listener there. In a plain browser, nothing else binds
+// Cmd+C, so we run the same smart logic from a capture-phase keydown.
+// Must be capture phase — noVNC calls stopPropagation() on canvas keys.
+if (!window.__TAURI_INTERNALS__) {
+    document.addEventListener('keydown', (e) => {
+        if (e.key !== 'c' || !(e.metaKey || e.ctrlKey) || e.shiftKey || e.altKey) return;
+        const ae = document.activeElement;
+        const tag = ae?.tagName;
+        // In native inputs / terminal / SR, let the browser's default copy run
         const termOverlay = document.getElementById('terminalOverlay');
         const inTerminal = termOverlay && termOverlay.classList.contains('open');
-        const inInput = ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName);
-        if (!inTerminal && !inInput && !srActive) {
-            e.preventDefault();
-            e.stopPropagation();
-            runInspektForClipboard('selection text --raw', 'Text');
-        }
-    }
-}, true);
+        const inInput = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
+        if (inTerminal || inInput || srActive) return;
+        e.preventDefault();
+        e.stopPropagation();
+        window.__inspektSmartCopy();
+    }, true);
+}
 
 
