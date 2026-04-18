@@ -31,7 +31,7 @@ export async function handleTakeNodeScreenshot(context) {
       const label = tile.querySelector(".btn-label");
       const originalLabel = label ? label.textContent : null;
       if (label) {
-        label.textContent = "Capturing...";
+        label.textContent = "Capturing…";
       }
 
       // Restore state after completion

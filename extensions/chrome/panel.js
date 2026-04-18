@@ -31,7 +31,7 @@ let elementPicker;
 
 // Initialize when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
-    console.log('[Inspekt Panel] DOMContentLoaded - Starting initialization...');
+    console.log('[Inspekt Panel] DOMContentLoaded - Starting initialization…');
 
     try {
         initializeManagers();
@@ -45,22 +45,22 @@ document.addEventListener('DOMContentLoaded', () => {
  * Initialize all managers and components
  */
 function initializeManagers() {
-    console.log('[Panel] Initializing managers...');
+    console.log('[Panel] Initializing managers…');
 
     // Core managers
-    console.log('[Panel] Creating core managers...');
+    console.log('[Panel] Creating core managers…');
     connectionManager = new ConnectionManager();
     settingsManager = new SettingsManager();
     themeManager = new ThemeManager();
 
     // Element handling
-    console.log('[Panel] Creating element handlers...');
+    console.log('[Panel] Creating element handlers…');
     elementDisplay = new ElementDisplay(); // elementHighlighter assigned below
     historyManager = new HistoryManager();
     elementMonitor = new ElementMonitor();
 
     // Components
-    console.log('[Panel] Creating components...');
+    console.log('[Panel] Creating components…');
     elementHighlighter = new ElementHighlighter(elementDisplay);
     elementPicker = new ElementPicker();
 
@@ -68,7 +68,7 @@ function initializeManagers() {
     elementDisplay.elementHighlighter = elementHighlighter;
 
     // Initialize all managers (non-async)
-    console.log('[Panel] Initializing managers...');
+    console.log('[Panel] Initializing managers…');
     connectionManager.init();
     settingsManager.init();
     themeManager.init();
@@ -76,18 +76,18 @@ function initializeManagers() {
     elementPicker.init();
 
     // Quick Actions Manager (async init)
-    console.log('[Panel] Creating QuickActionsManager...');
+    console.log('[Panel] Creating QuickActionsManager…');
     quickActionsManager = new QuickActionsManager({
         elementDisplay,
         elementPicker,
         elementHighlighter,
         settingsManager
     });
-    console.log('[Panel] QuickActionsManager created, calling init...');
+    console.log('[Panel] QuickActionsManager created, calling init…');
     quickActionsManager.init();
 
     // Start element monitoring
-    console.log('[Panel] Starting element monitoring...');
+    console.log('[Panel] Starting element monitoring…');
     elementMonitor.init();
 
     // Listen for element changes

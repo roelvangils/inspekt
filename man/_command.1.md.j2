@@ -1,0 +1,53 @@
+% INSPEKT-{{ name|upper }}(1) Inspekt {{ version }} | User Commands
+% Roel van Gils
+% {{ build_date }}
+
+# NAME
+
+inspekt-{{ name }} - {{ short_help or ("the `" ~ name ~ "` command") }}
+
+# SYNOPSIS
+
+{{ synopsis }}
+
+# DESCRIPTION
+
+{{ description }}
+{%- if aliases %}
+
+# ALIASES
+
+Also available as: {% for alias in aliases %}**inspekt {{ alias }}**{% if not loop.last %}, {% endif %}{% endfor %}.
+{%- endif %}
+{%- if arguments_section %}
+
+# ARGUMENTS
+
+{{ arguments_section }}
+{%- endif %}
+{%- if options_section %}
+
+# OPTIONS
+
+{{ options_section }}
+{%- endif %}
+{%- if subcommands_section %}
+
+# SUBCOMMANDS
+
+{{ subcommands_section }}
+{%- endif %}
+{%- if examples_section %}
+
+# EXAMPLES
+
+{{ examples_section }}
+{%- endif %}
+{%- if override %}
+
+{{ override }}
+{%- endif %}
+
+# SEE ALSO
+
+**inspekt**(1){% if related %}, {% for r in related %}**inspekt-{{ r }}**(1){% if not loop.last %}, {% endif %}{% endfor %}{% endif %}, https://inspekt.dev

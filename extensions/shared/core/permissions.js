@@ -337,7 +337,7 @@ const InspektPermissions = {
 
     /**
      * Get all allowed domains with metadata
-     * Returns object: { "github.com": { addedAt: "...", permanent: true }, ... }
+     * Returns object: { "github.com": { addedAt: "…", permanent: true }, ... }
      */
     async getAllowedDomains() {
         // Ensure migration has run

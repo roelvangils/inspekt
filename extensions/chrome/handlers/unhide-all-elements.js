@@ -32,7 +32,7 @@ export async function handleUnhideAll(context) {
                 const label = tile.querySelector('.btn-label');
                 const originalLabel = label ? label.textContent : null;
                 if (label) {
-                    label.textContent = 'Restoring...';
+                    label.textContent = 'Restoring…';
                 }
 
                 const restoreTileState = () => {

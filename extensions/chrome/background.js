@@ -761,7 +761,7 @@ async function copyImageToClipboard(dataUrl) {
         // Ensure offscreen document exists
         await setupOffscreenDocument();
 
-        console.log('[Inspekt] Sending clipboard write request to offscreen document...');
+        console.log('[Inspekt] Sending clipboard write request to offscreen document…');
 
         // Get the offscreen document context
         const offscreenContexts = await chrome.runtime.getContexts({
@@ -898,7 +898,7 @@ async function injectMainWorldVars(tabId) {
  */
 async function executeWithCSPBypass(tabId, code, requestId) {
     try {
-        console.log('[Inspekt] Executing code...');
+        console.log('[Inspekt] Executing code…');
 
         const result = await executeDirectly(tabId, code, requestId);
 
@@ -931,7 +931,7 @@ async function executeWithCSPBypass(tabId, code, requestId) {
                         return {
                             ok: false,
                             result: null,
-                            error: 'CSP_AUTO_ENABLED: CSP bypass has been automatically enabled for this domain. Refreshing page...',
+                            error: 'CSP_AUTO_ENABLED: CSP bypass has been automatically enabled for this domain. Refreshing page…',
                             requestId: requestId,
                             cspBlocked: true,
                             autoEnabled: true,
@@ -1536,7 +1536,7 @@ async function handleNavigation(tabId, url, waitFor, timeout = 30) {
                     if (exactMatch || (originMatches && pageChanged)) {
                         // Handle networkidle wait
                         if (waitFor === 'networkidle') {
-                            console.log('[Inspekt] Waiting for network idle...');
+                            console.log('[Inspekt] Waiting for network idle…');
                             await new Promise(r => setTimeout(r, 1000));
                         }
 
@@ -2357,7 +2357,7 @@ async function setBypassIcon(tabId, minutes) {
  * Set icon to "connecting" state (yellow with dots)
  */
 async function setConnectingIcon(tabId) {
-    await chrome.action.setBadgeText({ tabId, text: '...' });
+    await chrome.action.setBadgeText({ tabId, text: '…' });
     await chrome.action.setBadgeBackgroundColor({ tabId, color: '#FFEB3B' });
 }
 
@@ -2988,7 +2988,7 @@ async function getEventListenersViaCDP(tabId, source) {
                     className: listener.handler.className,
                     description: listener.handler.description ?
                         (listener.handler.description.length > 200 ?
-                            listener.handler.description.substring(0, 200) + '...' :
+                            listener.handler.description.substring(0, 200) + '…' :
                             listener.handler.description) : null
                 } : null,
                 // Include source location if available
@@ -3750,12 +3750,12 @@ async function startSmoothCapture(tabId, settings = {}) {
 
     try {
         // Ensure offscreen document exists
-        console.log('[Inspekt] Creating offscreen document...');
+        console.log('[Inspekt] Creating offscreen document…');
         await ensureOffscreenDocument();
         console.log('[Inspekt] Offscreen document ready');
 
         // Get a media stream ID for the tab
-        console.log('[Inspekt] Getting media stream ID for tab...');
+        console.log('[Inspekt] Getting media stream ID for tab…');
         const streamId = await new Promise((resolve, reject) => {
             chrome.tabCapture.getMediaStreamId({ targetTabId: tabId }, (id) => {
                 if (chrome.runtime.lastError) {
@@ -3770,10 +3770,10 @@ async function startSmoothCapture(tabId, settings = {}) {
             });
         });
 
-        console.log('[Inspekt] Got media stream ID:', streamId.substring(0, 30) + '...');
+        console.log('[Inspekt] Got media stream ID:', streamId.substring(0, 30) + '…');
 
         // Tell offscreen document to start recording
-        console.log('[Inspekt] Sending start message to offscreen document...');
+        console.log('[Inspekt] Sending start message to offscreen document…');
         const response = await chrome.runtime.sendMessage({
             type: 'OFFSCREEN_START_VIDEO_CAPTURE',
             target: 'offscreen',
@@ -3844,7 +3844,7 @@ async function stopSmoothCapture() {
 
             // Post video data to bridge server
             try {
-                console.log(`[Inspekt] Posting video to ${BRIDGE_HTTP_URL}/video/captured...`);
+                console.log(`[Inspekt] Posting video to ${BRIDGE_HTTP_URL}/video/captured…`);
                 const postResponse = await fetch(`${BRIDGE_HTTP_URL}/video/captured`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },

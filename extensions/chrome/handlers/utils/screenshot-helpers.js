@@ -71,12 +71,12 @@ export async function captureElementScreenshot(element) {
     console.log('[Screenshot Helpers] Cache miss - capturing new screenshot');
 
     // Capture the visible tab
-    console.log('[Screenshot Helpers] Capturing visible tab...');
+    console.log('[Screenshot Helpers] Capturing visible tab…');
     const dataUrl = await captureVisibleTab();
     console.log('[Screenshot Helpers] Tab captured, data URL length:', dataUrl.length);
 
     // Crop to element bounds with 2x quality and padding
-    console.log('[Screenshot Helpers] Cropping image to bounds...');
+    console.log('[Screenshot Helpers] Cropping image to bounds…');
     const blob = await cropImage(dataUrl, rect);
     console.log('[Screenshot Helpers] Blob created, size:', blob.size);
 

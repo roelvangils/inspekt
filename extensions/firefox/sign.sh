@@ -54,7 +54,7 @@ echo ""
 mkdir -p "web-ext-artifacts"
 
 echo -e "${YELLOW}Signing extension with Mozilla...${NC}"
-echo "This may take a minute..."
+echo "This may take a minute…"
 echo ""
 
 # Create temporary staging directory with all files
@@ -100,7 +100,7 @@ if [ -n "$SIGNED_FILE" ]; then
     echo "Installation instructions for Zen Browser:"
     echo "  1. Open Zen Browser"
     echo "  2. Go to about:addons"
-    echo "  3. Click the gear icon ⚙️  → 'Install Add-on From File...'"
+    echo "  3. Click the gear icon ⚙️  → 'Install Add-on From File…'"
     echo "  4. Select: ${SIGNED_FILE}"
     echo ""
     echo -e "${GREEN}The signed extension will be permanently installed!${NC}"

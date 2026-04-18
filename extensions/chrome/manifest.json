@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Inspekt",
-  "version": "4.2.1",
+  "version": "1.0.0",
   "description": "Browser automation and inspection from the command line. Inspect elements, navigate pages, and control your browser via CLI.",
 
   "icons": {

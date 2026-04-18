@@ -73,12 +73,12 @@ export class ElementPicker {
         // Restore tile text for new pick
         this.updateTileText(null);
 
-        console.log('[Element Picker] Starting picker...');
+        console.log('[Element Picker] Starting picker…');
 
         fetch(chrome.runtime.getURL('element_picker.js'))
             .then(response => response.text())
             .then(pickerScript => {
-                console.log('[Element Picker] Picker script loaded, injecting...');
+                console.log('[Element Picker] Picker script loaded, injecting…');
 
                 evalInPage(
                     pickerScript,

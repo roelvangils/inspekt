@@ -45,7 +45,7 @@ export async function handleHideElement(context) {
                 const label = tile.querySelector('.btn-label');
                 const originalLabel = label ? label.textContent : null;
                 if (label) {
-                    label.textContent = 'Hiding...';
+                    label.textContent = 'Hiding…';
                 }
 
                 const restoreTileState = () => {

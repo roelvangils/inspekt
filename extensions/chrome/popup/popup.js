@@ -67,14 +67,14 @@ async function checkConnectionStatus() {
                     '<span class="material-icons md-inline">check</span> Connected to localhost:8766');
             } else if (status === 'loaded') {
                 setStatus(statusDot, statusText, 'checking',
-                    'Extension loaded, connecting to server...');
+                    'Extension loaded, connecting to server…');
             } else {
                 setStatus(statusDot, statusText, 'checking',
-                    'Extension loading...');
+                    'Extension loading…');
             }
         } else {
             setStatus(statusDot, statusText, 'checking',
-                'Initializing...');
+                'Initializing…');
         }
 
     } catch (error) {
