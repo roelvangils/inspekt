@@ -70,12 +70,21 @@ class SocketClientMixin:
     """
 
     _socket_transport: Optional[SyncUnixSocketTransport] = None
+    # Once a socket call fails within a client instance, stop retrying it.
+    # A CLI invocation is one process, so this effectively means "if the
+    # socket path misbehaves once, use HTTP for the rest of this command."
+    _socket_unhealthy: bool = False
 
     def _get_socket_transport(self) -> SyncUnixSocketTransport:
         """Get or create socket transport (lazy initialization)."""
         if self._socket_transport is None:
             self._socket_transport = SyncUnixSocketTransport()
         return self._socket_transport
+
+    def _mark_socket_unhealthy(self) -> None:
+        """Flip the kill-switch so subsequent calls skip the socket entirely."""
+        self._socket_unhealthy = True
+        self._close_socket_transport()
 
     def _close_socket_transport(self) -> None:
         """Close the socket transport if open."""
@@ -93,7 +102,7 @@ class SocketClientMixin:
             if not transport.is_connected():
                 transport.connect()
 
-            response = transport.send(Request(method="health", params={}), timeout=5.0)
+            response = transport.send(Request(method="health", params={}), timeout=1.0)
 
             if response.success:
                 return response.data
@@ -128,7 +137,10 @@ class SocketClientMixin:
         elif browser_index is not None:
             params["browser_index"] = browser_index
 
-        response = transport.send(Request(method="run", params=params), timeout=timeout + 5)
+        # Post-fix the server's socket `run` is fire-and-forget — it replies
+        # with the request_id within milliseconds. Cap this low so a dead or
+        # misconfigured socket is detected fast and falls back to HTTP.
+        response = transport.send(Request(method="run", params=params), timeout=2.0)
 
         if not response.success:
             error = response.error or "unknown error"
@@ -349,14 +361,15 @@ class BridgeClient(SocketClientMixin):
         Uses socket transport when available, falls back to HTTP.
         """
         # Try socket first if available
-        if self._use_socket:
+        if self._use_socket and not self._socket_unhealthy:
             try:
                 health = self._socket_health()
                 if health is not None:
                     return True
             except Exception:
                 pass
-            # Socket failed, fall back to HTTP
+            # Socket failed, fall back to HTTP and stop retrying it.
+            self._mark_socket_unhealthy()
             _verbose_log("Socket health check failed, trying HTTP")
 
         # HTTP fallback
@@ -372,13 +385,14 @@ class BridgeClient(SocketClientMixin):
         Uses socket transport when available, falls back to HTTP.
         """
         # Try socket first if available
-        if self._use_socket:
+        if self._use_socket and not self._socket_unhealthy:
             try:
                 health = self._socket_health()
                 if health is not None:
                     return health
             except Exception:
                 pass
+            self._mark_socket_unhealthy()
             _verbose_log("Socket status check failed, trying HTTP")
 
         # HTTP fallback
@@ -444,7 +458,7 @@ class BridgeClient(SocketClientMixin):
         _verbose_log("BridgeClient.execute() called", {"timeout": timeout, "code_length": len(code), "browser_index": browser_index, "instance": instance, "fast_poll": _fast_poll, "use_socket": self._use_socket})
 
         # Try socket transport first (faster, more reliable)
-        if self._use_socket and not _skip_domain_check:
+        if self._use_socket and not self._socket_unhealthy and not _skip_domain_check:
             try:
                 _verbose_log("Using socket transport")
                 start_time = time.time()
@@ -492,12 +506,14 @@ class BridgeClient(SocketClientMixin):
 
             except (TransportConnectionError, TransportTimeoutError) as e:
                 _verbose_log("Socket transport failed, falling back to HTTP", str(e))
+                self._mark_socket_unhealthy()
                 # Fall through to HTTP implementation
             except RuntimeError:
                 # Re-raise RuntimeError (browser errors) as-is
                 raise
             except Exception as e:
                 _verbose_log("Socket transport unexpected error", str(e))
+                self._mark_socket_unhealthy()
                 # Fall through to HTTP implementation
 
         # HTTP implementation (fallback or primary when socket not available)
