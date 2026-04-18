@@ -50,8 +50,44 @@ if [ -f /root/.config/inspekt.yaml ]; then
     chmod 644 /home/inspekt/.config/inspekt.yaml
 fi
 
-# Initialize mitmproxy config (proxy disabled by default, scripts loaded on demand)
+# Initialize mitmproxy config. Defaults come from default_config.json
+# (strip_csp enabled); user can override per-script toggles from their
+# Inspekt YAML — currently only browser.strip-csp is wired through.
 cp /opt/proxy-scripts/default_config.json /tmp/mitmproxy_config.json
+/opt/inspekt/.venv/bin/python3 - <<'PY' || true
+import json
+from pathlib import Path
+
+try:
+    import yaml
+except ImportError:
+    raise SystemExit(0)
+
+yaml_path = Path("/root/.config/inspekt.yaml")
+if not yaml_path.exists():
+    raise SystemExit(0)
+
+try:
+    user_cfg = yaml.safe_load(yaml_path.read_text()) or {}
+except Exception:
+    raise SystemExit(0)
+
+strip_csp = bool((user_cfg.get("browser") or {}).get("strip-csp", True))
+
+cfg_path = Path("/tmp/mitmproxy_config.json")
+proxy_cfg = json.loads(cfg_path.read_text())
+scripts = proxy_cfg.setdefault("scripts", {})
+strip_csp_cfg = scripts.setdefault("strip_csp", {"enabled": True, "config": {}})
+strip_csp_cfg["enabled"] = strip_csp
+strip_csp_cfg.setdefault("config", {})["strip_meta"] = strip_csp
+
+# Tie the global proxy switch to whether any script is actually enabled,
+# so opting out of strip_csp with no other script active drops mitmproxy
+# back to zero-overhead passthrough.
+proxy_cfg["enabled"] = any(s.get("enabled") for s in scripts.values())
+
+cfg_path.write_text(json.dumps(proxy_cfg, indent=2))
+PY
 
 # Ensure shared temp files are writable by the restricted terminal user
 # Use group permissions instead of world-writable to prevent prompt injection

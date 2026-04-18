@@ -1,4 +1,6 @@
 {
-  "enabled": false,
-  "scripts": {}
+  "enabled": true,
+  "scripts": {
+    "strip_csp": {"enabled": true, "config": {"strip_meta": true}}
+  }
 }
