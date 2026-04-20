@@ -41,6 +41,33 @@ def make_file_link(path: str | Path, display_text: str | None = None) -> str:
     return f"\033]8;;{file_url}\033\\{display}\033]8;;\033\\"
 
 
+def open_in_tab(url: str) -> bool:
+    """
+    Ask the control panel to open ``url`` in a new virtual tab.
+
+    Emits OSC 1337 ; opentab=<url> BEL. The control panel's xterm.js
+    terminal intercepts the sequence, creates a new tab, and navigates
+    it to the URL — so `http://inspekt/...` URLs land in the native
+    iframe view (via the existing /internal/ reverse proxy).
+
+    Returns True when the control-panel terminal was detected and the
+    signal emitted; False when running elsewhere (e.g. docker exec),
+    in which case the URL is printed so the user can copy it.
+    """
+    import os
+
+    in_control_panel = os.environ.get('INSPEKT_TERMINAL') == 'control-panel'
+
+    if in_control_panel:
+        # Format: OSC 1337 ; opentab=<url> BEL — mirrors the download verb.
+        print(f'\033]1337;opentab={url}\007', end='')
+        print(f'↗ {url}')
+        return True
+
+    click.echo(url)
+    return False
+
+
 def _handle_vm_download(path: Path) -> bool:
     """
     Handle file download in VM environment.

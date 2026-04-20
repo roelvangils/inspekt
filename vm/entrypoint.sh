@@ -95,6 +95,14 @@ touch /tmp/.inspekt_domain
 chown root:inspekt /tmp/.inspekt_domain
 chmod 664 /tmp/.inspekt_domain
 
+# VM web root — CLI commands drop generated artifacts here (galleries,
+# reports, diffs, …) and the Inspekt API serves them at http://inspekt/<kind>/<slug>/.
+# Wiped fresh on every container start so we don't leak prior sessions.
+rm -rf /home/inspekt/www
+mkdir -p /home/inspekt/www
+chown inspekt:inspekt /home/inspekt/www
+chmod 755 /home/inspekt/www
+
 # --- Tunnel secret for bore server ---
 # Generate a random secret if not provided via environment
 if [ -z "${BORE_SECRET}" ]; then

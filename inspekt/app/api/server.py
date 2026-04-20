@@ -287,3 +287,10 @@ async def commands_ui(request: Request):
 static_dir = Path(__file__).parent.parent.parent / "static"
 if static_dir.exists():
     app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
+
+# Mount the VM web root last so registered routes keep precedence.
+# Galleries, reports and other generated artifacts are written under
+# /home/inspekt/www/<kind>/<slug>/ and reachable at http://inspekt/<kind>/<slug>/.
+www_root = Path("/home/inspekt/www")
+if www_root.exists():
+    app.mount("/", StaticFiles(directory=str(www_root), html=True), name="www")

@@ -137,6 +137,7 @@ body.split-mode {
 /* Disable interaction on panels during drag */
 body.split-dragging {
     & .vnc-container,
+    & .native-container,
     & .terminal-overlay {
         pointer-events: none;
     }

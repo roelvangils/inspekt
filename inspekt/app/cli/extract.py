@@ -951,6 +951,19 @@ def images(
     page_url = data.get("pageUrl", "")
     page_title = data.get("pageTitle", "")
 
+    # Guard against extracting from Inspekt's own pages (galleries, reports,
+    # dashboard, …). The VM web root serves galleries at http://inspekt/images/
+    # so re-extracting would nest galleries inside galleries.
+    from urllib.parse import urlparse
+    page_host = urlparse(page_url).hostname if page_url else None
+    if page_host == "inspekt":
+        click.echo(
+            "Refusing to extract images from an Inspekt page "
+            f"({page_url}). Navigate to a real website first.",
+            err=True,
+        )
+        sys.exit(1)
+
     if not all_images:
         click.echo("No images found on this page.", err=True)
         sys.exit(0)
@@ -1001,13 +1014,29 @@ def images(
     if skipped_count > 0 and not quiet:
         click.echo(f"  Skipped {skipped_count} images (filtered or blob URIs)", err=True)
 
-    # Determine output directory
+    # Determine output directory. When running inside the VM and generating
+    # a rich gallery without an explicit --output-dir, drop the artifact into
+    # the VM web root so it can be opened as a virtual tab at
+    # http://inspekt/images/<domain>/ instead of being zipped + downloaded.
+    from inspekt.config import is_isolated_mode
+
+    domain = extract_domain_from_url(page_url)
+    www_images_root = Path("/home/inspekt/www/images")
+    www_root_mode = (
+        rich_output
+        and not output_dir
+        and is_isolated_mode()
+        and bool(domain)
+        and www_images_root.parent.exists()
+    )
+
     if output_dir:
         output_path = Path(output_dir).expanduser()
+    elif www_root_mode:
+        output_path = www_images_root / domain
     else:
         paths = get_paths_config()
         downloads_dir = paths["downloads"]
-        domain = extract_domain_from_url(page_url)
         if domain:
             output_path = downloads_dir / domain / "images"
         else:
@@ -1488,47 +1517,56 @@ def images(
             output_dir=output_path,
         )
 
-        gallery_path = output_path / "gallery.html"
+        # In www-root mode the file must be named index.html so StaticFiles
+        # (html=True) serves it for http://inspekt/images/<domain>/ without a
+        # trailing filename. Legacy paths keep the historical gallery.html.
+        gallery_filename = "index.html" if www_root_mode else "gallery.html"
+        gallery_path = output_path / gallery_filename
         with open(gallery_path, "w", encoding="utf-8") as f:
             f.write(gallery_html)
 
         if not quiet:
             click.echo(success_icon(f"Gallery created: {gallery_path}"), err=True)
 
-        from inspekt.app.cli.util import open_or_download
+        if www_root_mode:
+            from inspekt.app.cli.util import open_in_tab
 
-        if vm_bundle:
-            # Build /tmp/gallery-{domain}.zip containing gallery.html plus any
-            # originals that weren't publicly reachable (so the host can open
-            # it offline). Publicly reachable ones are referenced by URL.
-            import zipfile
-
-            domain = extract_domain_from_url(page_url) or "gallery"
-            zip_path = Path(f"/tmp/gallery-{sanitize_filename(domain, max_length=80)}.zip")
-            zip_path.unlink(missing_ok=True)
-
-            with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
-                zf.write(gallery_path, arcname="gallery.html")
-                for r in successful:
-                    if not r.get("publicly_reachable"):
-                        file_path = r["path"]
-                        if file_path.exists():
-                            zf.write(file_path, arcname=file_path.name)
-
-            if not quiet:
-                bundled = sum(1 for r in successful if not r.get("publicly_reachable"))
-                linked = len(successful) - bundled
-                click.echo(
-                    success_icon(
-                        f"Packaged gallery: {bundled} bundled, {linked} linked · "
-                        f"{_format_size(zip_path.stat().st_size)}"
-                    ),
-                    err=True,
-                )
-            open_or_download(zip_path)
+            open_in_tab(f"http://inspekt/images/{domain}/")
         else:
-            # Open gallery in browser
-            open_or_download(gallery_path)
+            from inspekt.app.cli.util import open_or_download
+
+            if vm_bundle:
+                # Build /tmp/gallery-{domain}.zip containing gallery.html plus any
+                # originals that weren't publicly reachable (so the host can open
+                # it offline). Publicly reachable ones are referenced by URL.
+                import zipfile
+
+                zip_domain = extract_domain_from_url(page_url) or "gallery"
+                zip_path = Path(f"/tmp/gallery-{sanitize_filename(zip_domain, max_length=80)}.zip")
+                zip_path.unlink(missing_ok=True)
+
+                with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
+                    zf.write(gallery_path, arcname="gallery.html")
+                    for r in successful:
+                        if not r.get("publicly_reachable"):
+                            file_path = r["path"]
+                            if file_path.exists():
+                                zf.write(file_path, arcname=file_path.name)
+
+                if not quiet:
+                    bundled = sum(1 for r in successful if not r.get("publicly_reachable"))
+                    linked = len(successful) - bundled
+                    click.echo(
+                        success_icon(
+                            f"Packaged gallery: {bundled} bundled, {linked} linked · "
+                            f"{_format_size(zip_path.stat().st_size)}"
+                        ),
+                        err=True,
+                    )
+                open_or_download(zip_path)
+            else:
+                # Open gallery in browser
+                open_or_download(gallery_path)
 
     if not quiet and not rich_output:
         print_hint("Use --rich-output to generate an HTML gallery with lightbox")
@@ -1562,7 +1600,9 @@ def images(
             ],
         }
         if rich_output:
-            json_output["gallery_path"] = str(output_path / "gallery.html")
+            json_output["gallery_path"] = str(gallery_path)
+            if www_root_mode:
+                json_output["gallery_url"] = f"http://inspekt/images/{domain}/"
 
         from inspekt.app.cli.table import print_json
         count = json_output.get("downloaded", len(json_output.get("images", [])))

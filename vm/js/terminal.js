@@ -31,6 +31,11 @@ const TOAST_SIGNAL_REGEX = /\x1b\]1337;toast\x07/g;
 // "Data ready to copy" toast with [Table] and/or [JSON] action buttons.
 const DATA_SIGNAL_REGEX = /\x1b\]1337;data\x07/g;
 
+// Regex to detect open-tab signal: OSC 1337 ; opentab=<url> BEL
+// CLI commands emit this to open a generated artifact (gallery, report, …)
+// in a new virtual tab instead of triggering a host download.
+const OPENTAB_MARKER_REGEX = /\x1b\]1337;opentab=([^\x07]+)\x07/g;
+
 // SVGs for the toast actions (kept here so split-mode.js stays readable).
 const TABLE_ICON_SVG = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3h18v18H3z"/><path d="M3 9h18M3 15h18M9 3v18M15 3v18"/></svg>';
 const JSON_ICON_SVG = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3a3 3 0 00-3 3v3a3 3 0 01-3 3 3 3 0 013 3v3a3 3 0 003 3"/><path d="M16 3a3 3 0 013 3v3a3 3 0 003 3 3 3 0 00-3 3v3a3 3 0 01-3 3"/></svg>';
@@ -101,6 +106,17 @@ async function handleClipboardSignal() {
         }
     } catch (err) {
         console.warn('[Terminal] Clipboard relay failed:', err);
+    }
+}
+
+async function handleOpenTab(url) {
+    try {
+        const newTabId = await _addCloudTab(url);
+        if (newTabId && typeof activateTab === 'function') {
+            await activateTab(newTabId);
+        }
+    } catch (err) {
+        console.warn('[Terminal] Open-tab relay failed:', err);
     }
 }
 

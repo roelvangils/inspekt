@@ -579,6 +579,13 @@ function connectTerminal() {
             handleDataSignal();
         }
 
+        // Check for open-tab escape sequences and open each URL in a new tab
+        OPENTAB_MARKER_REGEX.lastIndex = 0;
+        let openTabMatch;
+        while ((openTabMatch = OPENTAB_MARKER_REGEX.exec(data)) !== null) {
+            handleOpenTab(openTabMatch[1]);
+        }
+
         // Check for hide-terminal escape sequence
         // CLI tools emit this to request terminal auto-hide (e.g., when recording starts)
         HIDE_TERMINAL_REGEX.lastIndex = 0; // Reset before test (global regex)
@@ -605,6 +612,7 @@ function connectTerminal() {
         cleanData = cleanData.replace(COPYABLE_SIGNAL_REGEX, '');
         cleanData = cleanData.replace(TOAST_SIGNAL_REGEX, '');
         cleanData = cleanData.replace(DATA_SIGNAL_REGEX, '');
+        cleanData = cleanData.replace(OPENTAB_MARKER_REGEX, '');
         terminal.write(cleanData);
 
         // Scan for trigger words (debounced)
