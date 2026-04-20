@@ -17,8 +17,106 @@ zstyle ':completion:*' group-name ''  # Suppress "unsorted" group headers from C
 zstyle ':completion:*:warnings' format '%F{red}No matches%f'
 bindkey '^[[Z' reverse-menu-complete
 
-# Inspekt tab completion (inspekt is in PATH via allowed-bin)
+# Inspekt tab completion — override Click's default _inspekt_completion with a
+# version that also surfaces flags for discoverability. Click's backend only
+# returns flags when the current word starts with "-", so after `info domain `
+# a plain TAB would show nothing. We call the backend twice (once normally,
+# once with the current word forced to "--") and merge the results so flags
+# always appear in the menu alongside any positional completions.
 eval "$(_INSPEKT_COMPLETE=zsh_source inspekt 2>/dev/null)"
+
+# Session-scoped cache of Click completion responses. Keyed by "CWORD|COMP_WORDS".
+# The CLI structure does not change within a shell session, so a plain in-memory
+# cache is correct. The flag probe (below) rewrites the current word to "--"
+# before lookup, which makes its key stable across keystrokes — every TAB after
+# the first in the same context is served from cache.
+typeset -gA _inspekt_complete_cache
+typeset -g _inspekt_click_result=""
+
+# Runs Click's zsh_complete backend (or serves from cache) and stores the raw
+# newline-separated response in the global _inspekt_click_result. We set a
+# global rather than using $(...) because subshell command substitution would
+# discard any cache writes the helper made.
+_inspekt_click_complete() {
+    local key="$2|$1"
+    if (( ${+_inspekt_complete_cache[$key]} )); then
+        _inspekt_click_result="${_inspekt_complete_cache[$key]}"
+        return
+    fi
+    _inspekt_click_result=$(env COMP_WORDS="$1" COMP_CWORD=$2 _INSPEKT_COMPLETE=zsh_complete inspekt 2>/dev/null)
+    _inspekt_complete_cache[$key]="$_inspekt_click_result"
+}
+
+# Shared dispatcher: runs Click's zsh_complete backend and, unless the user
+# is already typing a flag, also probes for flags and merges them in.
+_inspekt_complete_dispatch() {
+    # $1 = COMP_WORDS (space-joined)
+    # $2 = COMP_CWORD (0-indexed)
+    # $3 = current word the user has typed
+    local comp_words="$1"
+    local comp_cword="$2"
+    local current_word="$3"
+
+    local -a completions
+    local -a completions_with_descriptions
+    local -a response
+
+    _inspekt_click_complete "$comp_words" "$comp_cword"
+    response=("${(@f)_inspekt_click_result}")
+
+    if [[ "$current_word" != -* ]]; then
+        local -a word_arr=(${=comp_words})
+        word_arr[$((comp_cword + 1))]="--"
+        _inspekt_click_complete "${word_arr[*]}" "$comp_cword"
+        response+=("${(@f)_inspekt_click_result}")
+    fi
+
+    for type key descr in ${response}; do
+        if [[ "$type" == "plain" ]]; then
+            if [[ "$descr" == "_" ]]; then
+                completions+=("$key")
+            else
+                completions_with_descriptions+=("$key":"$descr")
+            fi
+        elif [[ "$type" == "dir" ]]; then
+            _path_files -/
+        elif [[ "$type" == "file" ]]; then
+            _path_files -f
+        fi
+    done
+
+    if [ -n "$completions_with_descriptions" ]; then
+        _describe -V unsorted completions_with_descriptions -U
+    fi
+
+    if [ -n "$completions" ]; then
+        compadd -U -V unsorted -a completions
+    fi
+}
+
+# Override Click's generated function so `inspekt <cmd> <TAB>` also shows flags.
+_inspekt_completion() {
+    (( ! $+commands[inspekt] )) && return 1
+    _inspekt_complete_dispatch "${words[*]}" $((CURRENT - 1)) "${words[$CURRENT]}"
+}
+
+# Shortcut completion: when a bare command like "info" is invoked (symlinked
+# via /opt/inspekt/commands/.wrapper), complete it as if the user had typed
+# "inspekt info ..." by prepending "inspekt" to COMP_WORDS.
+_inspekt_shortcut_completion() {
+    (( ! $+commands[inspekt] )) && return 1
+    local -a rewritten=("inspekt" "${words[@]}")
+    _inspekt_complete_dispatch "${rewritten[*]}" $CURRENT "${words[$CURRENT]}"
+}
+
+# Re-register the overridden function for `inspekt` (the eval above already
+# ran `compdef _inspekt_completion inspekt`; our redefinition replaces the body).
+# Also register the shortcut completion for every inspekt command symlink.
+# Dotfiles (.wrapper) are excluded by zsh's default glob behavior.
+() {
+    local -a _ishortcuts=(/opt/inspekt/commands/*(N:t))
+    (( ${#_ishortcuts} )) && compdef _inspekt_shortcut_completion "${_ishortcuts[@]}"
+}
 
 # Override compdump to suppress deferred exec errors — compinit lazily calls
 # compdump on first prompt, which uses exec for fd redirection. Since our exec
@@ -82,6 +180,25 @@ pip()      { _pkg_msg pip; }
 pip3()     { _pkg_msg pip3; }
 npm()      { _pkg_msg npm; }
 
+# Typo-friendly command-not-found. Fires only when zsh can't resolve a name
+# against functions, builtins, PATH, or the command palette symlinks — so shell
+# functions (python3, bash, apt, ...) and every Inspekt shortcut are handled
+# before this runs. Purely additive UX: the exit status stays 127.
+command_not_found_handler() {
+    local cmd="$1"
+    local -a matches
+    matches=(${(f)"$(/opt/inspekt/.venv/bin/inspekt suggest "$cmd" 2>/dev/null)"})
+    print -P "%F{red}zsh:%f command not found: %B$cmd%b"
+    if (( ${#matches} > 0 )); then
+        local -a coloured
+        for m in "${matches[@]}"; do coloured+=("%F{green}${m}%f"); done
+        print -P "  %F{blue}Did you mean:%f ${(j:, :)coloured}?"
+    else
+        print -P "  Type %F{green}help%f to list commands, or press %F{green}Tab%f on a blank line."
+    fi
+    return 127
+}
+
 # Dynamic prompt (domain from active tab, same as root shell)
 _INSPEKT_DOMAIN_FILE="/tmp/.inspekt_domain"
 
@@ -111,20 +228,147 @@ alias help='inspekt --help'
 HISTSIZE=1000
 SAVEHIST=1000
 HISTFILE=~/zsh_history
+setopt SHARE_HISTORY HIST_IGNORE_DUPS HIST_IGNORE_SPACE
 
-# Welcome message (only for interactive terminals)
+# Defensive: no history entry should ever contain an ESC byte. An ANSI-coloured
+# entry would be unreadable in Ctrl+R (fzf renders the escape bytes as literal
+# text) and could inject arbitrary terminal control sequences when the user
+# scrolls back. If zsh ever tries to store one (observed once when the
+# command_not_found_handler path interacted with the plugin stack), drop it
+# and log the triggering input to /tmp/inspekt-hist-debug.log for diagnosis.
+zshaddhistory() {
+    if [[ "$1" == *$'\e'* ]]; then
+        print -r -- "[$(date +%s)] REJECTED: $1" >> /tmp/inspekt-hist-debug.log 2>/dev/null
+        return 1
+    fi
+    return 0
+}
+
+# --- Shell polish plugins ---
+# Loading order matters: autosuggestions → history-substring-search → fzf
+# → syntax-highlighting (syntax-highlighting MUST be last because it hooks
+# every ZLE widget). Each `source` is guarded so a missing package (image
+# stripped, upstream rename) degrades gracefully rather than breaking the shell.
+
+[[ -r /usr/share/zsh/plugins/zsh-autosuggestions/zsh-autosuggestions.zsh ]] && \
+    source /usr/share/zsh/plugins/zsh-autosuggestions/zsh-autosuggestions.zsh
+ZSH_AUTOSUGGEST_HIGHLIGHT_STYLE='fg=242'
+ZSH_AUTOSUGGEST_STRATEGY=(history completion)
+
+[[ -r /usr/share/zsh/plugins/zsh-history-substring-search/zsh-history-substring-search.zsh ]] && \
+    source /usr/share/zsh/plugins/zsh-history-substring-search/zsh-history-substring-search.zsh
+bindkey '^[[A' history-substring-search-up
+bindkey '^[[B' history-substring-search-down
+
+# fzf pickers. Ctrl+R (history) works out of the box. Ctrl+T (file picker)
+# walks the filesystem by default with `find`, which isn't in our allowed PATH,
+# so we scope it to ~/Uploads and ~/Downloads via a zsh glob.
+export FZF_DEFAULT_COMMAND='print -rl -- ~/Uploads/**/*(.N) ~/Downloads/**/*(.N)'
+export FZF_CTRL_T_COMMAND="$FZF_DEFAULT_COMMAND"
+export FZF_DEFAULT_OPTS='--height=40% --layout=reverse --border --prompt=❯\ '
+[[ -r /usr/share/zsh/plugins/fzf/key-bindings.zsh ]] && source /usr/share/zsh/plugins/fzf/key-bindings.zsh
+[[ -r /usr/share/zsh/plugins/fzf/completion.zsh ]]   && source /usr/share/zsh/plugins/fzf/completion.zsh
+
+# Override the stock fzf-history-widget: the upstream perl path reads zsh's
+# internal $history hash, which we've seen contain ANSI-polluted entries in
+# interactive VM sessions (root cause unidentified). `fc -rl 1` has stayed
+# clean, so we force the awk-based reader for a predictable Ctrl+R experience.
+fzf-history-widget() {
+    local selected
+    setopt localoptions noglobsubst noposixbuiltins pipefail no_aliases
+    selected="$(fc -rl 1 | awk '{ cmd=$0; sub(/^[ \t]*[0-9]+\**[ \t]+/, "", cmd); if (!seen[cmd]++) print $0 }' |
+        FZF_DEFAULT_OPTS=$(__fzf_defaults "" "-n2..,.. --scheme=history --bind=ctrl-r:toggle-sort --wrap-sign '\t↳ ' --highlight-line ${FZF_CTRL_R_OPTS-} --query=${(qqq)LBUFFER} +m") \
+        FZF_DEFAULT_OPTS_FILE='' $(__fzfcmd))"
+    local ret=$?
+    if [ -n "$selected" ]; then
+        if [[ $(awk '{print $1; exit}' <<< "$selected") =~ ^[1-9][0-9]* ]]; then
+            zle vi-fetch-history -n $MATCH
+        else
+            LBUFFER="$selected"
+        fi
+    fi
+    zle reset-prompt
+    return $ret
+}
+zle -N fzf-history-widget
+
+[[ -r /usr/share/zsh/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh ]] && \
+    source /usr/share/zsh/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
+ZSH_HIGHLIGHT_STYLES[command]='fg=green'
+ZSH_HIGHLIGHT_STYLES[alias]='fg=green'
+ZSH_HIGHLIGHT_STYLES[builtin]='fg=green'
+ZSH_HIGHLIGHT_STYLES[function]='fg=green'
+ZSH_HIGHLIGHT_STYLES[unknown-token]='fg=red,bold'
+
+# --- Context-aware welcome banner ---
+# Classifies the current page from the URL alone (cheap — one curl + zsh
+# case) and picks a small, relevant suggestion set. Intentionally shell-only
+# to avoid a Python fork on every new terminal tab.
 if [[ -o interactive ]]; then
+    local _current_url _domain _kind
+    _current_url=$(curl -sf --max-time 0.5 http://localhost:8888/url 2>/dev/null \
+        | jq -r '.url // empty' 2>/dev/null)
+    _domain=${_current_url#http*://}
+    _domain=${_domain%%/*}
+    _domain=${_domain#www.}
+
+    case ${(L)_current_url} in
+        *login*|*signin*|*sign-in*|*signup*|*sign-up*|*register*|*auth*|*account*)
+            _kind=auth ;;
+        */blog/*|*/article/*|*/post/*|*/news/*|*/story/*|*/wiki/*)
+            _kind=article ;;
+        *.jpg|*.png|*.gif|*.svg|*.mp4|*.webm|*/video/*|*/photo/*|*/gallery/*)
+            _kind=media ;;
+        ""|about:blank|chrome://*)
+            _kind=blank ;;
+        *)
+            _kind=default ;;
+    esac
+
+    local -a _suggestions
+    case $_kind in
+        auth)
+            _suggestions=(
+                $'autocomplete\tCheck form autocomplete attributes'
+                $'axe\tRun an accessibility audit'
+                $'outline\tShow the heading structure'
+            ) ;;
+        article)
+            _suggestions=(
+                $'outline\tShow the heading structure'
+                $'summarize\tSummarise this page with AI'
+                $'axe\tRun an accessibility audit'
+            ) ;;
+        media)
+            _suggestions=(
+                $'screenshot\tCapture the viewport'
+                $'links\tList every link on the page'
+                $'axe\tRun an accessibility audit'
+            ) ;;
+        blank)
+            _suggestions=(
+                $'open\tNavigate to a URL'
+                $'help\tList every Inspekt command'
+                $'info\tShow page info'
+            ) ;;
+        *)
+            _suggestions=(
+                $'info\tShow page info'
+                $'axe\tRun an accessibility audit'
+                $'outline\tShow the heading structure'
+            ) ;;
+    esac
+
     print -P ""
-    print -P "  %F{cyan}Inspekt Browser VM%f"
-    print -P "  %F{white}Type a command to inspect the current page.%f"
+    print -P "  %F{cyan}Inspekt Browser VM%f   %F{242}${_domain:-no page open}%f"
     print -P ""
-    print -P "  %F{242}Examples:%f"
-    print -P "    %F{green}screenshot%f            Capture the viewport"
-    print -P "    %F{green}axe%f                   Run accessibility audit"
-    print -P "    %F{green}links%f                 Extract all links"
-    print -P "    %F{green}outline%f               Show heading structure"
-    print -P "    %F{green}ask%f %F{242}\"What is this page?\"%f    Ask AI about the page"
+    print -P "  %F{242}Try:%f"
+    for _line in $_suggestions; do
+        local _cmd=${_line%%	*}
+        local _desc=${_line#*	}
+        printf "    \e[32m%-14s\e[0m %s\n" "$_cmd" "$_desc"
+    done
     print -P ""
-    print -P "  %F{242}Tab completion is enabled. Type%f %F{green}help%f %F{242}for all commands.%f"
+    print -P "  %F{242}Tab shows flags, Ctrl+R searches history, Ctrl+T finds files. Type %F{green}help%f %F{242}for all commands.%f"
     print -P ""
 fi

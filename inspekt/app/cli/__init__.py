@@ -569,6 +569,9 @@ cli.add_lazy_command("viewport", "display", "viewport")
 # Man page management (from man.py)
 cli.add_lazy_command("man", "man", "man")
 
+# VM terminal helper: typo-tolerant command_not_found suggestions (hidden).
+cli.add_lazy_command("suggest", "suggest", "suggest")
+
 
 # ============================================================================
 # VM Restricted Mode
