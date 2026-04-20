@@ -1,7 +1,7 @@
 .PHONY: help dev install clean test test-unit test-integration test-e2e lint format typecheck pre-commit all \
        vm-start vm-stop vm-restart vm-rebuild vm-status vm-logs vm-shell vm-services vm-health \
        vm-restart-control vm-restart-terminal vm-restart-chromium vm-restart-proxy \
-       vm-bundle \
+       vm-bundle ensure-docker \
        build-man install-man clean-man \
        dev-cli dev-extension dev-vm dev-desktop dev-all sync-extension \
        build-cli build-vm build-extensions build-desktop build-pdf-viewer build-all \
@@ -147,10 +147,9 @@ dev-desktop:
 	@$(MAKE) --no-print-directory vm-start
 	cd apps/desktop && bun run tauri dev
 
-dev-all:
+dev-all: ensure-docker
 	@command -v overmind >/dev/null 2>&1 || { echo "Install overmind: brew install overmind"; exit 1; }
 	@command -v bun >/dev/null 2>&1 || { echo "Install bun: https://bun.sh"; exit 1; }
-	@docker info >/dev/null 2>&1 || { echo "Error: Docker daemon not reachable. Start Docker Desktop and retry."; exit 1; }
 	@$(MAKE) --no-print-directory vm-start
 	@# Stop any lingering background bridge/API daemon so the Procfile's
 	@# `inspekt start --foreground` can bind cleanly. Ignore if nothing's there.
@@ -245,7 +244,10 @@ verify-extension-sync:
 # Auto-detect container name (CLI creates "inspekt-browser-vm", Compose creates "inspekt-browser")
 VM_CONTAINER := $(shell docker ps --format '{{.Names}}' --filter 'name=inspekt-browser' 2>/dev/null | head -1)
 
-vm-start:
+ensure-docker:
+	@bash scripts/ensure-docker.sh
+
+vm-start: ensure-docker
 	inspekt vm start
 
 vm-stop:

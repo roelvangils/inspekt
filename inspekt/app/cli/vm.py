@@ -4,6 +4,8 @@ This module provides commands to manage the Inspekt Browser VM,
 a Docker-based virtual machine with Chromium and the Inspekt extension pre-installed.
 """
 
+import os
+import platform
 import shutil
 import subprocess
 import sys
@@ -62,6 +64,51 @@ def _is_docker_running() -> bool:
         capture_output=True
     )
     return result.returncode == 0
+
+
+def _ensure_docker_running() -> bool:
+    """Ensure Docker is reachable, auto-launching a Docker app on macOS if needed.
+
+    Returns True if the daemon is up (after optional auto-launch), False otherwise.
+    Emits its own user-facing messages. Skips auto-launch when stdout isn't a TTY,
+    when INSPEKT_NO_AUTOSTART_DOCKER=1, or on non-macOS platforms.
+    """
+    if _is_docker_running():
+        return True
+
+    if os.environ.get("INSPEKT_NO_AUTOSTART_DOCKER") == "1" or not sys.stdout.isatty():
+        click.echo("Error: Docker daemon not reachable. Start Docker Desktop or OrbStack and retry.", err=True)
+        return False
+
+    if platform.system() != "Darwin":
+        click.echo("Error: Docker daemon not reachable. Start it and retry.", err=True)
+        return False
+
+    launched = None
+    for app in ("OrbStack", "Docker"):
+        result = subprocess.run(["open", "-a", app], capture_output=True)
+        if result.returncode == 0:
+            launched = app
+            break
+
+    if not launched:
+        click.echo("Error: Docker daemon not reachable and no Docker app found (OrbStack or Docker Desktop).", err=True)
+        click.echo("Install one (https://orbstack.dev or https://docker.com) and retry.", err=True)
+        return False
+
+    click.echo(f"• Docker not running — launching {launched}…")
+    click.echo("• Waiting for Docker daemon", nl=False)
+    for _ in range(30):
+        if _is_docker_running():
+            click.echo()
+            click.echo("  [ok] Docker is ready")
+            return True
+        click.echo(".", nl=False)
+        time.sleep(1)
+
+    click.echo()
+    click.echo(f"Error: Docker didn't come up within 30s. Check {launched} manually.", err=True)
+    return False
 
 
 def _is_container_running() -> bool:
@@ -428,10 +475,7 @@ def start(rebuild, no_open, dev, no_dev):
         inspekt vm start --dev     # Explicitly enable development mode
         inspekt vm start --no-dev  # Disable auto-detected dev mode
     """
-    # Check Docker is running
-    if not _is_docker_running():
-        click.echo("Error: Docker is not running", err=True)
-        click.echo("\nPlease start Docker (Docker Desktop, OrbStack, etc.) and try again.", err=True)
+    if not _ensure_docker_running():
         sys.exit(1)
 
     # Check if already running
@@ -581,8 +625,7 @@ def restart(rebuild, dev, no_dev):
         inspekt vm restart --dev     # Explicitly enable development mode
         inspekt vm restart --no-dev  # Disable auto-detected dev mode
     """
-    if not _is_docker_running():
-        click.echo("Error: Docker is not running", err=True)
+    if not _ensure_docker_running():
         sys.exit(1)
 
     start_time = time.time()
@@ -647,8 +690,7 @@ def open_panel():
     Examples:
         inspekt vm open
     """
-    if not _is_docker_running():
-        click.echo("Error: Docker is not running", err=True)
+    if not _ensure_docker_running():
         sys.exit(1)
 
     if not _is_container_running():
@@ -775,8 +817,7 @@ def logs():
     Examples:
         inspekt vm logs
     """
-    if not _is_docker_running():
-        click.echo("Error: Docker is not running", err=True)
+    if not _ensure_docker_running():
         sys.exit(1)
 
     if not _is_container_running() and not _container_exists():
@@ -798,8 +839,7 @@ def shell():
     Examples:
         inspekt vm shell
     """
-    if not _is_docker_running():
-        click.echo("Error: Docker is not running", err=True)
+    if not _ensure_docker_running():
         sys.exit(1)
 
     if not _is_container_running():
@@ -827,8 +867,7 @@ def cleanup(force):
         inspekt vm cleanup        # Clean up with confirmation
         inspekt vm cleanup --force # Clean up without confirmation
     """
-    if not _is_docker_running():
-        click.echo("Error: Docker is not running", err=True)
+    if not _ensure_docker_running():
         sys.exit(1)
 
     # Find all VM containers
