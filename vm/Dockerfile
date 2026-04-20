@@ -25,7 +25,7 @@ COPY vm/js ./vm/js
 RUN bun scripts/bundle-vm.mjs
 
 # ── Stage 2: the VM image ───────────────────────────────────
-FROM alpine:3.21
+FROM alpine:3.23
 
 LABEL maintainer="Inspekt" \
       description="Chromium browser with Inspekt extension accessible via noVNC" \
@@ -89,10 +89,17 @@ RUN apk add --no-cache \
     wget \
     bash \
     zsh \
+    # zsh UX plugins: grey ghost-text autosuggestions, command colouring,
+    # history substring search, and fzf for Ctrl-R / Ctrl-T pickers.
+    zsh-autosuggestions \
+    zsh-syntax-highlighting \
+    zsh-history-substring-search \
+    fzf \
+    fzf-zsh-plugin \
     jq \
     # PTY allocation (needed by gum for interactive TUI in non-login terminals)
     util-linux \
-    # Git needed for pip to install Click from GitHub (until 8.3.2 is released)
+    # Git — used by build tooling and pip for any git+ dependencies
     git \
     # Video recording for inspekt replay --video
     ffmpeg \
@@ -116,8 +123,13 @@ RUN apk add --no-cache \
     # Node.js for lightningcss-cli (CSS optimization)
     nodejs \
     npm \
-    # Runtime libraries for PyMuPDF (compiled from source on musl/aarch64)
-    freetype harfbuzz jpeg openjpeg jbig2dec mupdf \
+    # Runtime libraries for PyMuPDF (compiled from source on musl/aarch64).
+    # PyMuPDF bundles its own libmupdf/libmupdfcpp inside the package, so we
+    # intentionally do NOT install Alpine's mupdf-libs/mupdf-cpp — those ship
+    # an older MuPDF (1.26) that would get picked up first by the loader and
+    # break _mupdf.so which expects MuPDF 1.27 symbols. The supporting libs
+    # below are what PyMuPDF's bundled mupdf links against.
+    freetype harfbuzz jpeg openjpeg jbig2dec \
     && \
     # Create necessary directories
     mkdir -p /var/log/supervisor /root/.config/openbox /opt/inspekt /opt/certs /run/dbus
@@ -132,7 +144,7 @@ RUN NOVNC_VERSION="1.6.0" && \
     rm /tmp/novnc.tar.gz
 
 # Install bore tunnel server (allows users to tunnel localhost to VM)
-RUN BORE_VERSION="0.5.2" && \
+RUN BORE_VERSION="0.6.0" && \
     ARCH="$(uname -m)" && \
     if [ "$ARCH" = "aarch64" ]; then BORE_TARGET="aarch64-unknown-linux-musl"; \
     else BORE_TARGET="x86_64-unknown-linux-musl"; fi && \
@@ -143,7 +155,7 @@ RUN BORE_VERSION="0.5.2" && \
     rm /tmp/bore.tar.gz
 
 # Install micro editor (modern terminal editor with intuitive keybindings)
-RUN MICRO_VERSION="2.0.14" && \
+RUN MICRO_VERSION="2.0.15" && \
     ARCH="$(uname -m)" && \
     if [ "$ARCH" = "aarch64" ]; then MICRO_ARCH="linux-arm64"; \
     else MICRO_ARCH="linux64"; fi && \
@@ -206,17 +218,21 @@ RUN mkdir -p /opt/inspekt/inspekt && \
 
 # PyMuPDF has no pre-built musl/aarch64 wheel, so we need build tools to compile it.
 # Build deps are installed and removed in the same layer to keep image small.
-RUN apk add --no-cache --virtual .build-deps \
+# The BuildKit pip cache mount keeps the compiled wheel across rebuilds so we only
+# pay the ~160s PyMuPDF compile once — subsequent rebuilds reuse the cached wheel
+# even when this layer is invalidated (e.g. Alpine/Python version bumps).
+RUN --mount=type=cache,target=/root/.cache/pip,sharing=locked \
+    apk add --no-cache --virtual .build-deps \
         gcc g++ make swig \
         python3-dev musl-dev \
         freetype-dev harfbuzz-dev jpeg-dev openjpeg-dev jbig2dec-dev \
-        mupdf-dev clang-dev && \
+        clang-dev && \
     ln -sf /usr/bin/gcc /usr/local/bin/cc && \
     ln -sf /usr/bin/g++ /usr/local/bin/c++ && \
     cd /opt/inspekt && \
     python3 -m venv .venv && \
-    .venv/bin/pip install --no-cache-dir --upgrade pip && \
-    .venv/bin/pip install --no-cache-dir -e . && \
+    .venv/bin/pip install --upgrade pip && \
+    .venv/bin/pip install -e . && \
     rm -f /usr/local/bin/cc /usr/local/bin/c++ && \
     apk del .build-deps
 
@@ -228,12 +244,13 @@ RUN apk add --no-cache --virtual .build-deps \
 # Both mitmproxy-rs AND mitmproxy depend on mitmproxy-linux==0.12.9 on Linux.
 # By installing this stub in a committed layer BEFORE pip resolves those packages,
 # pip sees the dependency as already satisfied and skips the download/build.
-RUN mkdir -p /tmp/mitmproxy-linux-stub/mitmproxy_linux && \
+RUN --mount=type=cache,target=/root/.cache/pip,sharing=locked \
+    mkdir -p /tmp/mitmproxy-linux-stub/mitmproxy_linux && \
     printf '[project]\nname = "mitmproxy-linux"\nversion = "0.12.9"\n' \
         > /tmp/mitmproxy-linux-stub/pyproject.toml && \
     printf '"""Stub: eBPF transparent proxy not needed in regular proxy mode."""\n' \
         > /tmp/mitmproxy-linux-stub/mitmproxy_linux/__init__.py && \
-    /opt/inspekt/.venv/bin/pip install --no-cache-dir /tmp/mitmproxy-linux-stub && \
+    /opt/inspekt/.venv/bin/pip install /tmp/mitmproxy-linux-stub && \
     rm -rf /tmp/mitmproxy-linux-stub
 
 # ── Phase 1c: Install mitmproxy (compiled deps + core in one shot) ──
@@ -241,13 +258,14 @@ RUN mkdir -p /tmp/mitmproxy-linux-stub/mitmproxy_linux && \
 # Uses rustup for Rust >= 1.85 (Alpine's Rust 1.83 is too old for edition2024).
 # The stub mitmproxy-linux from the previous layer satisfies that dependency.
 # Build tools are installed and removed in the same layer to keep image small.
-RUN apk add --no-cache --virtual .mitmproxy-build-deps \
+RUN --mount=type=cache,target=/root/.cache/pip,sharing=locked \
+    apk add --no-cache --virtual .mitmproxy-build-deps \
         gcc g++ make python3-dev musl-dev libffi-dev openssl-dev curl && \
     ln -sf /usr/bin/gcc /usr/local/bin/cc && \
     ln -sf /usr/bin/g++ /usr/local/bin/c++ && \
     curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal && \
     export PATH="/root/.cargo/bin:$PATH" && \
-    /opt/inspekt/.venv/bin/pip install --no-cache-dir mitmproxy && \
+    /opt/inspekt/.venv/bin/pip install mitmproxy && \
     rm -f /usr/local/bin/cc /usr/local/bin/c++ && \
     rustup self uninstall -y && \
     rm -rf /root/.cargo /root/.rustup && \
@@ -283,7 +301,7 @@ RUN adduser -D -h /home/inspekt -s /bin/zsh inspekt && \
 #    This gives tab completion and zero-prefix usage (e.g. "screenshot" instead of "inspekt screenshot")
 #    The wrapper uses zsh (not /bin/sh) and includes a denylist for restricted commands.
 RUN mkdir -p /opt/inspekt/commands && \
-    printf '#!/bin/zsh\ncmd="$(basename "$0")"\ncase "$cmd" in\n    eval|exec|repl|plugin|yolo|domain|vm|do|mcp|autostart)\n        echo "This command is not available in the VM terminal." >&2\n        exit 1\n        ;;\n    *)\n        /opt/inspekt/.venv/bin/inspekt "$cmd" "$@"\n        ;;\nesac\n' \
+    printf '#!/bin/zsh\ncmd="$(basename "$0")"\ncase "$cmd" in\n    eval|exec|repl|plugin|yolo|domain|vm|do|mcp|autostart|suggest)\n        echo "This command is not available in the VM terminal." >&2\n        exit 1\n        ;;\n    *)\n        /opt/inspekt/.venv/bin/inspekt "$cmd" "$@"\n        ;;\nesac\n' \
         > /opt/inspekt/commands/.wrapper && \
     chmod +x /opt/inspekt/commands/.wrapper
 
@@ -298,7 +316,7 @@ names = cli.list_commands(ctx); \
 print(f'Created {len(names)} command symlinks')"
 
 # Remove symlinks for restricted commands (prevents tab completion showing them)
-RUN for cmd in eval exec repl plugin yolo domain vm do mcp autostart open edit; do \
+RUN for cmd in eval exec repl plugin yolo domain vm do mcp autostart open edit suggest; do \
         rm -f /opt/inspekt/commands/$cmd; \
     done
 
@@ -315,7 +333,7 @@ RUN mkdir -p /opt/inspekt/allowed-bin && \
         echo date file stat basename dirname realpath uname \
         clear whoami which tee tree cal ps sleep bc \
         uptime base64 md5sum sha256sum watch xxd cut \
-        curl jq sed; do \
+        curl jq sed fzf; do \
         for dir in /usr/bin /bin; do \
             [ -x "$dir/$cmd" ] && ln -sf "$dir/$cmd" /opt/inspekt/allowed-bin/$cmd && break; \
         done; \
@@ -447,7 +465,7 @@ RUN PYTHON_REAL=$(readlink -f /opt/inspekt/.venv/bin/python3) && \
 
 # Remove execute permission on interpreters/tools for non-root users.
 # Root services (supervisord, bridge, API) are unaffected.
-RUN chmod o-x /usr/bin/python3 /usr/bin/python3.12 2>/dev/null; \
+RUN chmod o-x /usr/bin/python3 /usr/bin/python3.[0-9]* 2>/dev/null; \
     chmod o-x /usr/bin/npm 2>/dev/null; \
     chmod o-x /usr/bin/wget 2>/dev/null; \
     chmod o-x /usr/local/bin/mkcert 2>/dev/null; \
@@ -494,29 +512,31 @@ RUN chmod +x /entrypoint.sh /root/.config/openbox/autostart /opt/inspekt-chromiu
 # ── Final cleanup: remove build-time-only tools and dead weight ──
 # All removals in a single layer to avoid inflating the image.
 # Saves ~80 MB by stripping things only needed during docker build.
-RUN \
+# PYVER is derived at build time so the paths follow whichever Python
+# Alpine ships — don't re-introduce a hardcoded python3.xx string.
+RUN PYVER="$(/usr/bin/python3 -c 'import sys;print(f"python{sys.version_info.major}.{sys.version_info.minor}")')" && \
     # pip is only needed at build time (both system and venv copies)
-    rm -rf /opt/inspekt/.venv/lib/python3.12/site-packages/pip /opt/inspekt/.venv/lib/python3.12/site-packages/pip-*.dist-info && \
-    rm -rf /usr/lib/python3.12/site-packages/pip /usr/lib/python3.12/site-packages/pip-*.dist-info && \
+    rm -rf "/opt/inspekt/.venv/lib/$PYVER/site-packages/pip" "/opt/inspekt/.venv/lib/$PYVER/site-packages"/pip-*.dist-info && \
+    rm -rf "/usr/lib/$PYVER/site-packages/pip" "/usr/lib/$PYVER/site-packages"/pip-*.dist-info && \
     # NOTE: do NOT remove setuptools/pkg_resources from system Python — supervisord depends on it
     # setuptools in venv is safe to remove (inspekt doesn't use it at runtime)
-    rm -rf /opt/inspekt/.venv/lib/python3.12/site-packages/setuptools /opt/inspekt/.venv/lib/python3.12/site-packages/setuptools-*.dist-info && \
+    rm -rf "/opt/inspekt/.venv/lib/$PYVER/site-packages/setuptools" "/opt/inspekt/.venv/lib/$PYVER/site-packages"/setuptools-*.dist-info && \
     # mkcert — certs are already generated, binary no longer needed
     rm -f /usr/local/bin/mkcert && \
     # noVNC test suite, docs, and snap packaging — never served
     rm -rf /usr/share/novnc/tests /usr/share/novnc/docs /usr/share/novnc/snap && \
     # Python stdlib modules unused at runtime
-    rm -rf /usr/lib/python3.12/ensurepip && \
-    rm -rf /usr/lib/python3.12/lib2to3 && \
-    rm -rf /usr/lib/python3.12/pydoc_data && \
-    rm -rf /usr/lib/python3.12/turtledemo && \
-    rm -f /usr/lib/python3.12/turtle.py && \
+    rm -rf "/usr/lib/$PYVER/ensurepip" && \
+    rm -rf "/usr/lib/$PYVER/lib2to3" && \
+    rm -rf "/usr/lib/$PYVER/pydoc_data" && \
+    rm -rf "/usr/lib/$PYVER/turtledemo" && \
+    rm -f "/usr/lib/$PYVER/turtle.py" && \
     # Test suites shipped inside pip packages
-    rm -rf /opt/inspekt/.venv/lib/python3.12/site-packages/tornado/test && \
-    rm -rf /opt/inspekt/.venv/lib/python3.12/site-packages/jsonschema/tests && \
-    rm -rf /opt/inspekt/.venv/lib/python3.12/site-packages/referencing/tests && \
-    rm -rf /opt/inspekt/.venv/lib/python3.12/site-packages/jsonschema_specifications/tests && \
-    rm -rf /opt/inspekt/.venv/lib/python3.12/site-packages/mitmproxy/test && \
+    rm -rf "/opt/inspekt/.venv/lib/$PYVER/site-packages/tornado/test" && \
+    rm -rf "/opt/inspekt/.venv/lib/$PYVER/site-packages/jsonschema/tests" && \
+    rm -rf "/opt/inspekt/.venv/lib/$PYVER/site-packages/referencing/tests" && \
+    rm -rf "/opt/inspekt/.venv/lib/$PYVER/site-packages/jsonschema_specifications/tests" && \
+    rm -rf "/opt/inspekt/.venv/lib/$PYVER/site-packages/mitmproxy/test" && \
     # Compiled Python bytecode — regenerated on first import, negligible startup cost
     find /opt/inspekt/.venv -name '*.pyc' -delete && \
     find /opt/inspekt/.venv -type d -name '__pycache__' -empty -delete && \

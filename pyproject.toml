@@ -26,7 +26,7 @@ classifiers = [
 ]
 
 dependencies = [
-    "click @ git+https://github.com/pallets/click.git@main",  # Using main branch until 8.3.2 is released (fixes flag_value regression #3084)
+    "click>=8.3.2,<9",  # 8.3.2 fixes flag_value regression #3084
     "requests>=2.31.0",
     "aiohttp>=3.9.0",
     "pydantic>=2.5.0",
