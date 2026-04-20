@@ -32,6 +32,17 @@ class TerminalSession:
         # Create PTY
         self.master_fd, self.slave_fd = pty.openpty()
 
+        # grantpt(3)-equivalent. Python's pty.openpty() leaves the slave owned
+        # by root:tty with mode 620, so the restricted 'inspekt' user can write
+        # to its own controlling terminal but cannot read it — which breaks any
+        # TUI that reopens /dev/tty (fzf, less, htop). Chown the slave to the
+        # target user so the child can read and write it.
+        import pwd
+        pw = pwd.getpwnam('inspekt')
+        slave_path = os.ttyname(self.slave_fd)
+        os.chown(slave_path, pw.pw_uid, pw.pw_gid)
+        os.chmod(slave_path, 0o620)
+
         # Set initial terminal size
         self._set_size(cols, rows)
 
@@ -46,6 +57,11 @@ class TerminalSession:
             os.dup2(self.slave_fd, 1)
             os.dup2(self.slave_fd, 2)
             os.close(self.slave_fd)
+            # Make the pty our controlling terminal. Without TIOCSCTTY,
+            # `open("/dev/tty")` fails with ENXIO — which breaks fzf, less,
+            # and anything else that reopens its controlling tty. `setsid()`
+            # above left us without a controlling tty; this re-establishes it.
+            fcntl.ioctl(0, termios.TIOCSCTTY, 0)
 
             # Set environment
             env = os.environ.copy()
