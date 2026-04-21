@@ -276,6 +276,7 @@ body.split-mode .terminal-overlay[data-terminal-scheme="light"] {
     padding: var(--space-4);
     padding-top: var(--space-3);
     overflow: hidden;
+    position: relative;  /* anchor for the custom overlay scrollbar */
 
     & .xterm {
         height: 100%;
@@ -283,10 +284,44 @@ body.split-mode .terminal-overlay[data-terminal-scheme="light"] {
     }
 }
 
-/* Make xterm.js viewport transparent for blur effect */
+/* Make xterm.js renderer transparent so the blurred overlay panel shows
+   through. Targets every bg-bearing class the renderer adds across xterm
+   5.x/6.x so a future internal rename doesn't re-introduce a colour strip. */
+.terminal-container .xterm,
 .terminal-container .xterm-viewport,
-.terminal-container .xterm-screen {
+.terminal-container .xterm-screen,
+.terminal-container .xterm-scrollable-element,
+.terminal-container .xterm-rows {
     background: transparent !important;
+}
+
+/* Hide xterm's own scrollbars (native browser + xterm 6's VS-Code-style
+   scrollable-element). We render our own overlay scrollbar below. */
+.terminal-container .xterm-viewport {
+    scrollbar-width: none;  /* Firefox */
+    -ms-overflow-style: none;  /* legacy Edge */
+}
+.terminal-container .xterm-viewport::-webkit-scrollbar {
+    display: none;  /* WebKit / Blink */
+    width: 0;
+    height: 0;
+}
+.terminal-container .xterm-scrollable-element > .scrollbar {
+    display: none !important;
+}
+
+/* Custom overlay scrollbar lives inside .terminal-container — reuses the
+   .virtual-scrollbar component from scrollbar.css, just re-anchored. */
+.terminal-container > .virtual-scrollbar.vertical {
+    right: var(--space-2);
+    top: var(--space-2);
+    bottom: var(--space-2);
+}
+.terminal-container > .virtual-scrollbar-hover-zone {
+    right: 0;
+    top: 0;
+    bottom: 0;
+    width: 24px;
 }
 
 /* ── Panel tabs (Terminal | Editor) ── */

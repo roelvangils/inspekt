@@ -461,7 +461,15 @@
             </div>
         </div>
         <div class="panel-body">
-            <div class="terminal-container" id="terminalContainer"></div>
+            <div class="terminal-container" id="terminalContainer">
+                <!-- Custom overlay scrollbar (native xterm scrollbars are hidden via CSS) -->
+                <div class="virtual-scrollbar-hover-zone" id="termScrollbarHoverZone"></div>
+                <div class="virtual-scrollbar vertical" id="termScrollbar">
+                    <div class="scrollbar-track" id="termScrollbarTrack">
+                        <div class="scrollbar-thumb" id="termScrollbarThumb"></div>
+                    </div>
+                </div>
+            </div>
             <div class="editor-container" id="editorContainer" style="display:none">
                 <div class="file-browser-sidebar" id="fileBrowserSidebar" style="display:none">
                     <div class="file-browser-header">

@@ -214,11 +214,20 @@ function initSplitDragHandle() {
 
 const LIGHT_TERMINAL_THEMES = new Set(['tomorrow', 'github', 'catppuccin-latte', 'solarized-light']);
 
+/** Build the xterm-facing copy of a theme: strip the background so the
+ *  canvas renderer paints nothing and the blurred overlay panel shows
+ *  through uniformly across both the canvas area and the container padding.
+ *  The original theme keeps its background — editor.js needs it to build
+ *  the matching CodeMirror theme. */
+function xtermThemeFor(theme) {
+    return { ...theme, background: 'rgba(0, 0, 0, 0)' };
+}
+
 function applyTerminalTheme(themeName) {
     if (!terminal) return;
     const theme = TERMINAL_THEMES[themeName];
     if (theme) {
-        terminal.options.theme = theme;
+        terminal.options.theme = xtermThemeFor(theme);
         localStorage.setItem('terminalTheme', themeName);
         // Tag overlay so CSS can match the theme's light/dark scheme
         const overlay = document.querySelector('.terminal-overlay');
@@ -236,6 +245,132 @@ function adjustTerminalFontSize(delta) {
     terminal.options.fontSize = next;
     localStorage.setItem('terminalFontSize', next);
     if (fitAddon) fitAddon.fit();
+}
+
+// ─── Custom overlay scrollbar for the terminal ────────────────────────
+// Parallel to scrollbar.js (which drives the VNC viewport). The xterm
+// version reads state directly from the Terminal API instead of polling
+// the control server.
+function _initTerminalScrollbar() {
+    const scrollbar = document.getElementById('termScrollbar');
+    const track = document.getElementById('termScrollbarTrack');
+    const thumb = document.getElementById('termScrollbarThumb');
+    const hoverZone = document.getElementById('termScrollbarHoverZone');
+    if (!scrollbar || !track || !thumb || !hoverZone || !terminal) return;
+
+    let isDragging = false;
+    let dragStartY = 0;
+    let dragStartViewportY = 0;
+    let hideTimer = null;
+    const hideDelay = 1500;
+
+    // Buffer metrics at the moment a read is needed. Recomputed on every
+    // update so font-size / resize changes don't need special handling.
+    function metrics() {
+        const buf = terminal.buffer.active;
+        const rows = terminal.rows;
+        const total = buf.length;
+        const viewportY = buf.viewportY;
+        // Scroll is only meaningful when there's scrollback beyond the visible rows.
+        const hasScroll = total > rows;
+        const maxScroll = Math.max(0, total - rows);
+        return { rows, total, viewportY, hasScroll, maxScroll };
+    }
+
+    function updateThumb() {
+        const m = metrics();
+        if (!m.hasScroll) {
+            scrollbar.classList.remove('visible');
+            return;
+        }
+        const trackHeight = track.offsetHeight;
+        const visibleRatio = m.rows / m.total;
+        const thumbHeight = Math.max(30, Math.round(trackHeight * visibleRatio));
+        const maxThumbTop = trackHeight - thumbHeight;
+        const topRatio = m.maxScroll > 0 ? m.viewportY / m.maxScroll : 0;
+        thumb.style.height = thumbHeight + 'px';
+        thumb.style.top = Math.round(topRatio * maxThumbTop) + 'px';
+    }
+
+    function show() {
+        if (!metrics().hasScroll) return;
+        scrollbar.classList.add('visible');
+        scheduleHide();
+    }
+    function scheduleHide() {
+        clearTimeout(hideTimer);
+        hideTimer = setTimeout(() => {
+            if (!isDragging) scrollbar.classList.remove('visible');
+        }, hideDelay);
+    }
+
+    // xterm fires onScroll whenever the viewport moves — either the user
+    // scrolled, or new output pushed the viewport down. Either way we
+    // reposition the thumb and briefly surface the scrollbar.
+    terminal.onScroll(() => {
+        updateThumb();
+        show();
+    });
+
+    // Thumb drag
+    function onDragStart(e) {
+        e.preventDefault();
+        const m = metrics();
+        if (!m.hasScroll) return;
+        isDragging = true;
+        scrollbar.classList.add('dragging');
+        thumb.classList.add('dragging');
+        dragStartY = e.clientY;
+        dragStartViewportY = m.viewportY;
+        thumb.setPointerCapture(e.pointerId);
+        thumb.addEventListener('pointermove', onDragMove);
+        thumb.addEventListener('pointerup', onDragEnd);
+    }
+    function onDragMove(e) {
+        if (!isDragging) return;
+        const m = metrics();
+        const trackHeight = track.offsetHeight;
+        const thumbHeight = thumb.offsetHeight;
+        const maxThumbTop = trackHeight - thumbHeight;
+        if (maxThumbTop <= 0 || m.maxScroll <= 0) return;
+        const deltaPx = e.clientY - dragStartY;
+        const deltaLines = Math.round((deltaPx / maxThumbTop) * m.maxScroll);
+        const targetLine = Math.max(0, Math.min(m.maxScroll, dragStartViewportY + deltaLines));
+        terminal.scrollToLine(targetLine);
+    }
+    function onDragEnd(e) {
+        isDragging = false;
+        scrollbar.classList.remove('dragging');
+        thumb.classList.remove('dragging');
+        try { thumb.releasePointerCapture(e.pointerId); } catch {}
+        thumb.removeEventListener('pointermove', onDragMove);
+        thumb.removeEventListener('pointerup', onDragEnd);
+        scheduleHide();
+        terminal.focus();
+    }
+    thumb.addEventListener('pointerdown', onDragStart);
+
+    // Track click: jump so the click point becomes the new thumb center.
+    track.addEventListener('click', (e) => {
+        if (e.target === thumb) return;
+        const m = metrics();
+        if (!m.hasScroll) return;
+        const trackRect = track.getBoundingClientRect();
+        const clickRatio = (e.clientY - trackRect.top) / trackRect.height;
+        const targetLine = Math.round(clickRatio * m.maxScroll);
+        terminal.scrollToLine(Math.max(0, Math.min(m.maxScroll, targetLine)));
+        show();
+    });
+
+    // Surface on hover along the right edge and when the user wheels.
+    hoverZone.addEventListener('mouseenter', show);
+    hoverZone.addEventListener('mouseleave', scheduleHide);
+    scrollbar.addEventListener('mouseenter', () => clearTimeout(hideTimer));
+    scrollbar.addEventListener('mouseleave', () => { if (!isDragging) scheduleHide(); });
+
+    // Initial paint — handles the case where the terminal opens already
+    // mid-buffer (e.g. cached session replay).
+    updateThumb();
 }
 
 let terminalInitialized = false; // Ensure we only connect ONCE
@@ -258,7 +393,7 @@ function connectTerminal() {
             cursorBlink: true,
             fontSize: parseInt(localStorage.getItem('terminalFontSize')) || 14,
             fontFamily: "'JetBrains Mono NF', 'JetBrains Mono', Menlo, Monaco, monospace",
-            theme: TERMINAL_THEMES[savedTheme] || TERMINAL_THEMES['tokyo-night'],
+            theme: xtermThemeFor(TERMINAL_THEMES[savedTheme] || TERMINAL_THEMES['tokyo-night']),
             lineHeight: 1.2,
             letterSpacing: 0
         });
@@ -419,6 +554,11 @@ function connectTerminal() {
         terminal.open(container);
         console.log('[Terminal] Terminal opened');
         fitAddon.fit();
+
+        // Drive the custom overlay scrollbar (native xterm scrollbars are
+        // hidden via CSS). Same visual/behaviour as the VNC viewport
+        // scrollbar — reuses the .virtual-scrollbar component.
+        _initTerminalScrollbar();
 
         // Auto-focus terminal on hover so users can type immediately
         container.addEventListener('mouseenter', () => {
