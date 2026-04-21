@@ -1,8 +1,8 @@
 # xterm.js vendored files
 
 **xterm**: 6.0.0
-**xterm-addon-fit**: 0.10.0
-**xterm-addon-web-links**: 0.11.0
+**xterm-addon-fit**: 0.11.0
+**xterm-addon-web-links**: 0.12.0
 **License**: MIT
 **Source**: https://github.com/xtermjs/xterm.js
 
@@ -16,8 +16,15 @@ are deprecated.
 |------|---------|---------|
 | `xterm.css` | @xterm/xterm | 6.0.0 |
 | `xterm.min.js` | @xterm/xterm | 6.0.0 |
-| `xterm-addon-fit.min.js` | @xterm/addon-fit | 0.10.0 |
-| `xterm-addon-web-links.min.js` | @xterm/addon-web-links | 0.11.0 |
+| `xterm-addon-fit.min.js` | @xterm/addon-fit | 0.11.0 |
+| `xterm-addon-web-links.min.js` | @xterm/addon-web-links | 0.12.0 |
+
+**Addon compatibility gotcha:** addon-fit 0.10.0 and addon-web-links 0.11.0
+are for **xterm 5.x** (their peerDep is `^5.0.0`) even though they were
+published alongside xterm 6.0.0. The xterm-6-compatible stable versions are
+addon-fit 0.11.0 and addon-web-links 0.12.0 (no peerDep declared). Using
+the 5.x-peer versions with xterm 6 crashes inside `FitAddon.fit()` with
+`TypeError: undefined is not an object (evaluating 'e.viewport.scrollBarWidth')`.
 
 The UMD bundles still expose the same globals the control panel uses
 (`window.Terminal`, `FitAddon.FitAddon`, `WebLinksAddon.WebLinksAddon`),
@@ -35,8 +42,8 @@ Set the desired versions, then run:
 
 ```bash
 XTERM=6.0.0
-FIT=0.10.0
-WEBLINKS=0.11.0
+FIT=0.11.0
+WEBLINKS=0.12.0
 
 curl -sL "https://cdn.jsdelivr.net/npm/@xterm/xterm@${XTERM}/css/xterm.css" \
   -o vm/vendor/xterm.css
