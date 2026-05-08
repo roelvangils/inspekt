@@ -836,6 +836,11 @@ pub fn run() {
                 "devtools" => {
                     tauri::async_runtime::spawn(api_get("/devtools/toggle"));
                 }
+                "reload_window" => {
+                    if let Some(window) = app.get_webview_window("vm") {
+                        let _ = window.eval("location.reload()");
+                    }
+                }
                 "element_inspector" | "terminal" | "split_view" | "tab_overview" | "page_info" => {
                     emit_to_vm(app, id);
                 }

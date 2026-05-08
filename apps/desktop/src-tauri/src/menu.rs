@@ -117,6 +117,9 @@ pub fn create_menu(app: &AppHandle) -> Result<Menu<Wry>, tauri::Error> {
             &CheckMenuItemBuilder::with_id("element_inspector", "Element Inspector")
                 .accelerator("CmdOrCtrl+Alt+C")
                 .build(app)?,
+            &MenuItemBuilder::with_id("reload_window", "Reload Window")
+                .accelerator("CmdOrCtrl+Alt+R")
+                .build(app)?,
             &PredefinedMenuItem::separator(app)?,
             &CheckMenuItemBuilder::with_id("terminal", "Terminal")
                 .accelerator("CmdOrCtrl+\\")
