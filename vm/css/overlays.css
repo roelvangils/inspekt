@@ -108,13 +108,16 @@
     border-radius: 10px;
     font-size: var(--text-base);
     box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
-    transition: transform var(--duration-slow) cubic-bezier(0.4, 0, 0.2, 1);
+    transition:
+        transform var(--duration-slow) cubic-bezier(0.4, 0, 0.2, 1),
+        opacity var(--duration-slow) cubic-bezier(0.4, 0, 0.2, 1);
     z-index: var(--z-toast);
     pointer-events: none;
+    opacity: 0;
     background: var(--bg-bar);
     color: var(--text-bright);
 
-    &.show { pointer-events: auto; }
+    &.show { pointer-events: auto; opacity: 1; }
 
     /* Type variants */
     &.success { background: var(--success); color: white; }
@@ -124,37 +127,38 @@
     &.success .toast-action,
     &.error .toast-action { border-color: rgba(255, 255, 255, 0.3); }
 
-    /* Position variants — hidden transform slides the toast in from the
-       nearest edge. Centred variants preserve the -50% X offset on both
-       hidden and shown state. */
+    /* Position variants — hidden transform slides the toast fully past the
+       nearest edge (bottom of toast clears the viewport edge by --space-3),
+       so nothing peeks while idle. Centred variants preserve the -50% X
+       offset on both hidden and shown state. */
     &.pos-top-center {
         top: var(--space-5); left: 50%;
-        transform: translateX(-50%) translateY(-120%);
+        transform: translateX(-50%) translateY(calc(-100% - var(--space-5) - var(--space-3)));
         &.show { transform: translateX(-50%) translateY(0); }
     }
     &.pos-bottom-center {
         bottom: var(--space-5); left: 50%;
-        transform: translateX(-50%) translateY(120%);
+        transform: translateX(-50%) translateY(calc(100% + var(--space-5) + var(--space-3)));
         &.show { transform: translateX(-50%) translateY(0); }
     }
     &.pos-top-left {
         top: var(--space-5); left: var(--space-5);
-        transform: translateY(-120%);
+        transform: translateY(calc(-100% - var(--space-5) - var(--space-3)));
         &.show { transform: translateY(0); }
     }
     &.pos-top-right {
         top: var(--space-5); right: var(--space-5);
-        transform: translateY(-120%);
+        transform: translateY(calc(-100% - var(--space-5) - var(--space-3)));
         &.show { transform: translateY(0); }
     }
     &.pos-bottom-left {
         bottom: var(--space-5); left: var(--space-5);
-        transform: translateY(120%);
+        transform: translateY(calc(100% + var(--space-5) + var(--space-3)));
         &.show { transform: translateY(0); }
     }
     &.pos-bottom-right {
         bottom: var(--space-5); right: var(--space-5);
-        transform: translateY(120%);
+        transform: translateY(calc(100% + var(--space-5) + var(--space-3)));
         &.show { transform: translateY(0); }
     }
 }

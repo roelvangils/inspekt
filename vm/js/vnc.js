@@ -509,6 +509,18 @@ function showToast(message, optionsOrType = '', duration) {
     // Clear any pending dismiss timer
     clearTimeout(toast._dismissTimer);
 
+    // Promote errors to assertive (interrupting) live region; everything
+    // else stays polite. Set BEFORE innerHTML mutation so the announcement
+    // fires with the correct urgency.
+    const isError = opts.type === 'error';
+    toast.setAttribute('role', isError ? 'alert' : 'status');
+    toast.setAttribute('aria-live', isError ? 'assertive' : 'polite');
+
+    // Lift inert BEFORE mutating innerHTML so the live-region update is
+    // visible to assistive tech (changes inside an inert subtree are
+    // excluded from the accessibility tree).
+    toast.inert = false;
+
     // Build toast content
     let html = `<span class="toast-message">${_esc(message)}</span>`;
 
@@ -544,16 +556,59 @@ function showToast(message, optionsOrType = '', duration) {
         }, { once: true });
     }
 
-    // Auto-dismiss (0 = stay until manual dismiss)
+    // Auto-dismiss (0 = stay until manual dismiss). Tracks an absolute
+    // deadline so hover/focus pause can compute remaining time on resume.
+    toast._remaining = null;
     if (opts.duration > 0) {
+        toast._dismissAt = Date.now() + opts.duration;
         toast._dismissTimer = setTimeout(_dismissToast, opts.duration);
+        // If the user is already hovering/focused when the toast appears,
+        // pause immediately so they don't lose time they couldn't see.
+        if (toast._hovered || toast._focused) _pauseToastTimer();
+    } else {
+        toast._dismissAt = null;
+        toast._dismissTimer = null;
     }
+    _ensureToastHoverHandlers();
+}
+
+// Attach pause-on-hover-or-focus listeners exactly once. Resumes only when
+// both mouse and focus have left the toast.
+function _ensureToastHoverHandlers() {
+    const toast = document.getElementById('toast');
+    if (toast._hoverHandlersAttached) return;
+    toast._hoverHandlersAttached = true;
+    toast.addEventListener('mouseenter', () => { toast._hovered = true; _pauseToastTimer(); });
+    toast.addEventListener('mouseleave', () => { toast._hovered = false; _maybeResumeToastTimer(); });
+    toast.addEventListener('focusin',    () => { toast._focused = true; _pauseToastTimer(); });
+    toast.addEventListener('focusout',   () => { toast._focused = false; _maybeResumeToastTimer(); });
+}
+
+function _pauseToastTimer() {
+    const toast = document.getElementById('toast');
+    if (toast._dismissTimer == null || toast._dismissAt == null) return;
+    clearTimeout(toast._dismissTimer);
+    toast._dismissTimer = null;
+    toast._remaining = Math.max(0, toast._dismissAt - Date.now());
+}
+
+function _maybeResumeToastTimer() {
+    const toast = document.getElementById('toast');
+    if (toast._hovered || toast._focused) return;
+    if (toast._remaining == null || toast._remaining <= 0) return;
+    toast._dismissAt = Date.now() + toast._remaining;
+    toast._dismissTimer = setTimeout(_dismissToast, toast._remaining);
+    toast._remaining = null;
 }
 
 function _dismissToast() {
     const toast = document.getElementById('toast');
     toast.classList.remove('show');
     clearTimeout(toast._dismissTimer);
+    toast._dismissTimer = null;
+    toast._dismissAt = null;
+    toast._remaining = null;
+    toast.inert = true;
 }
 
 // Toggle dropdown menu
