@@ -28,7 +28,7 @@ def _focus_browser_if_requested(ctx):
     pass
 
 
-def _send_text(text, selector, delay_ms, clear=True):
+def _send_text(text, selector, delay_ms, clear=True, skill=None):
     """Helper function to send text to browser."""
     executor = BridgeExecutor()
     executor.ensure_server_running()
@@ -62,6 +62,7 @@ def _send_text(text, selector, delay_ms, clear=True):
     # Get typing configuration
     typing_config = get_typing_config()
     typo_rate = typing_config['human-like-typo-rate']
+    resolved_skill = skill if skill is not None else typing_config['human-like-skill']
 
     # Replace placeholders with properly escaped values
     # Use JSON encoding for proper JavaScript string escaping
@@ -69,6 +70,7 @@ def _send_text(text, selector, delay_ms, clear=True):
     code = code.replace("DELAY_PLACEHOLDER", str(delay_ms))
     code = code.replace("CLEAR_PLACEHOLDER", "true" if clear else "false")
     code = code.replace("TYPO_RATE_PLACEHOLDER", str(typo_rate))
+    code = code.replace("SKILL_PLACEHOLDER", str(resolved_skill))
 
     # Calculate timeout based on text length and delay
     # For human mode (-1), estimate ~300ms per character (including pauses)
@@ -111,9 +113,10 @@ def _send_text(text, selector, delay_ms, clear=True):
 @click.command()
 @click.argument("text")
 @click.option("--selector", "-s", help="CSS selector to focus before typing")
-@click.option("--speed", type=int, help="Typing speed in characters per second (default: fastest, 0: human-like)")
+@click.option("--speed", type=int, help="Characters per second (default: fastest; 0: human-like with realistic rhythm, pauses, and typos)")
 @click.option("--clear/--no-clear", default=True, help="Clear existing text before typing (default: true)")
-def type_text(text, selector, speed, clear):
+@click.option("--skill", type=float, help="Human-mode typist skill, 0.0 (beginner, ~340 cpm) to 1.0 (expert, ~500 cpm). Only with --speed 0.")
+def type_text(text, selector, speed, clear, skill):
     """
     Type text character by character into the browser.
 
@@ -123,12 +126,27 @@ def type_text(text, selector, speed, clear):
     By default, clears any existing text and types as fast as possible.
     Use --speed to control typing rate and --no-clear to append instead.
 
+    Human-like mode (`--speed 0`) simulates a real typist: log-normal
+    keystroke timing with autocorrelated rhythm, digraph/trigram motor
+    chunks (e.g. "the", "ing"), word-onset planning pauses, burst-and-
+    micro-pause cadence, fatigue, shift-key delays, and occasional typos
+    that are sometimes caught immediately, sometimes only after a few
+    more keys. Tune with `--skill` or the `typing.human-like-skill`
+    config key (0.0–1.0, default 0.7); tune error rate with
+    `typing.human-like-typo-rate` (default 0.05).
+
     Examples:
         # Type at maximum speed (clears existing text):
         inspekt type "Hello World"
 
-        # Type with human-like random delays (~50 WPM):
+        # Human-like typing at default skill (~7–8 cps, ~430 cpm):
         inspekt type "Hello, how are you?" --speed 0
+
+        # Beginner typist (slower, more errors):
+        inspekt type "login failed again" --speed 0 --skill 0.3
+
+        # Expert typist (fast, clean rhythm):
+        inspekt type "the quick brown fox" --speed 0 --skill 0.95
 
         # Type at 10 characters per second:
         inspekt type "test@example.com" --speed 10
@@ -148,7 +166,7 @@ def type_text(text, selector, speed, clear):
     else:
         delay_ms = 0  # Fastest (no delay)
 
-    _send_text(text, selector, delay_ms, clear)
+    _send_text(text, selector, delay_ms, clear, skill=skill)
 
 
 @click.command()

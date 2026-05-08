@@ -96,6 +96,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
     },
     "typing": {
         "human-like-typo-rate": 0.05,
+        "human-like-skill": 0.7,
     },
     "paths": {
         "recordings": ".",  # Current directory
@@ -679,13 +680,21 @@ def get_typing_config() -> dict[str, Any]:
     typo_rate = typing_config.get("human-like-typo-rate", 0.05)
     try:
         typo_rate = float(typo_rate)
-        # Clamp between 0 and 1
         typo_rate = max(0.0, min(1.0, typo_rate))
     except (ValueError, TypeError):
         typo_rate = 0.05
 
+    # Validate skill: must be between 0 and 1 (0 = beginner, 1 = expert)
+    skill = typing_config.get("human-like-skill", 0.7)
+    try:
+        skill = float(skill)
+        skill = max(0.0, min(1.0, skill))
+    except (ValueError, TypeError):
+        skill = 0.7
+
     return {
         "human-like-typo-rate": typo_rate,
+        "human-like-skill": skill,
     }
 
 
