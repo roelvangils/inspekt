@@ -15,6 +15,8 @@ A powerful CLI tool for browser automation, debugging, and interactive developme
 
 Comprehensive guides, API reference, tutorials, and examples. Beautiful Material theme with search, dark mode, and interactive examples.
 
+> **🛠️ Hacking on Inspekt?** Clone the repo and run `bun run dev` — it brings up the full stack (CLI, browser extension, Browser VM, desktop app) under [overmind](https://github.com/DarthSim/overmind). See **[CONTRIBUTING.md](CONTRIBUTING.md)** for setup, the [`docs/development/`](docs/development/) folder for per-surface guides, and [`docs/architecture.html`](docs/architecture.html) for a visual map of how the pieces wire together.
+
 ---
 
 ## ✨ Features
@@ -1144,7 +1146,7 @@ This design ensures:
 - ✅ Easy extensibility (add new commands/services)
 - ✅ Maintainable codebase (avg 362 lines per module)
 
-See [ARCHITECTURE.md](ARCHITECTURE.md) for details.
+See [docs/development/architecture.md](docs/development/architecture.md) for details, or open [`docs/architecture.html`](docs/architecture.html) in a browser for a visual map.
 
 ## 🛠 Development
 
@@ -1185,11 +1187,12 @@ control-panel + VM, Tauri + VM) wire together, open
 
 ### Documentation
 
-- [ARCHITECTURE.md](ARCHITECTURE.md) - System architecture and design
-- [SECURITY.md](SECURITY.md) - Security model and best practices
-- [PROTOCOL.md](PROTOCOL.md) - WebSocket protocol specification
-- [CONTRIBUTING.md](CONTRIBUTING.md) - Development guide
-- [REFACTOR_PLAN.md](REFACTOR_PLAN.md) - Refactoring history
+- [docs/development/architecture.md](docs/development/architecture.md) — System architecture and design
+- [docs/architecture.html](docs/architecture.html) — Visual map of CLI / VM / desktop / extension wiring
+- [SECURITY.md](SECURITY.md) — Security model and best practices
+- [docs/api/protocol.md](docs/api/protocol.md) — WebSocket protocol specification
+- [CONTRIBUTING.md](CONTRIBUTING.md) — Development guide
+- [archive/REFACTOR_PLAN.md](archive/REFACTOR_PLAN.md) — Historical refactor notes
 
 ## 🐛 Troubleshooting
 
@@ -1250,11 +1253,11 @@ Special thanks to:
 
 Contributions are welcome! Please feel free to submit issues, feature requests, or pull requests.
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for development guidelines and [ARCHITECTURE.md](ARCHITECTURE.md) for system design details.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development guidelines and [docs/development/architecture.md](docs/development/architecture.md) for system design details.
 
 ## 📖 More Resources
 
-- **[EXAMPLES.md](EXAMPLES.md)** - 50+ real-world use cases and workflows
+- **[docs/guide/examples.md](docs/guide/examples.md)** — 50+ real-world use cases and workflows
 - **GitHub Issues** - Bug reports and feature requests
 - **Wiki** - Additional documentation and guides
 

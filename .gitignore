@@ -1,4 +1,11 @@
-# Python
+# =====================================================================
+# Inspekt root .gitignore — single source of truth for all subtrees.
+# Keep paths anchored (/foo) when a rule should apply only at the
+# repo root. Children (apps/, extensions/, vm/) inherit from here;
+# child-level .gitignore files have been folded back into this one.
+# =====================================================================
+
+# --- Python -----------------------------------------------------------
 __pycache__/
 *.py[cod]
 *$py.class
@@ -23,76 +30,81 @@ share/python-wheels/
 *.egg
 MANIFEST
 
-# Virtual environments
+# --- Virtual environments ---------------------------------------------
 venv/
 env/
 ENV/
 env.bak/
 venv.bak/
 
-# IDEs
+# --- Node.js ----------------------------------------------------------
+node_modules/
+package-lock.json
+
+# --- Rust / Tauri build artifacts -------------------------------------
+target/
+apps/*/dist/
+apps/*/src-tauri/WixTools/
+vm/dist/
+
+# --- Browser extension build artifacts --------------------------------
+extensions/firefox/web-ext-artifacts/
+
+# --- Tests / coverage -------------------------------------------------
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+coverage.xml
+
+# --- IDEs / editors ---------------------------------------------------
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
+
+# --- OS metadata ------------------------------------------------------
 .DS_Store
+Thumbs.db
 
-# Testing
-.pytest_cache/
-.coverage
-htmlcov/
-.tox/
-
-# Project specific
-*.log
+# --- Environment / secrets --------------------------------------------
 .env
-coverage.xml
-nohup.out
+.env.local
+.env.*.local
 
-# Cache databases
+# --- Logs / runtime sockets -------------------------------------------
+*.log
+nohup.out
+.cache/
+.overmind.sock
+
+# --- Cache databases --------------------------------------------------
 action_cache.db
 data.db
+tts_cache.db
 
-# Documentation
+# --- Documentation generators -----------------------------------------
 site/
-
 # Generated man-page intermediates (committed copies live in inspekt/man/)
 build/man/
 
-# Node.js
-node_modules/
-package-lock.json
-
-# Rust / Tauri build artifacts
-target/
-apps/*/dist/
-vm/dist/
-
-# Recordings and replays (generated test files)
+# --- Inspekt runtime artifacts ----------------------------------------
 recording_*.yaml
-sensoa.yaml
-vdab.yaml
-zelfhulp.yaml
+/recording_*/
+inspekt_*.yaml
+inspekt/inspekt_*.yaml
+test*.yaml
+test-*.html
 
-# Screenshots and test outputs
+# --- Image output (allowlist real assets) -----------------------------
 *.png
 !extensions/chrome/icons/*.png
 !extensions/firefox/icons/*.png
 !docs/**/*.png
 !apps/**/*.png
 
-# Temporary/backup files
-*.bak
-*.tmp
-*.temp
-
-# Test sites and artifacts
-test-site/
-test-*.html
-mcp-test/
-
-# Downloaded HTML files
+# --- HTML output (allowlist real source files) ------------------------
 *.html
 !vm/*.html
 !vm/pages/*.html
@@ -100,60 +112,27 @@ mcp-test/
 !docs/**/*.html
 !apps/**/*.html
 
-# Marketing materials (separate repo?)
-marketing/
-
-# Inspekt scan output (YAML dumps from inspekt runs)
-inspekt_*.yaml
-inspekt/inspekt_*.yaml
-
-# Broken pip artifacts
-=*
-
-# Cache directories
-.cache/
-
-# Claude Code project config (machine-specific)
-.claude/projects/
-
-# TTS cache
-tts_cache.db
-
-# Test/scratch files
-test*.yaml
-kaka.yaml
-
-# Media files
-*.webm
-*.zip
-
-# Handoff prompts (temporary)
-*_HANDOFF.md
-
-# Misc
+# --- Other media ------------------------------------------------------
 *.pdf
 !logos/**/*.pdf
+*.webm
+*.mp4
+*.zip
 
-# User-specific config files
+# --- Temporary / backup files -----------------------------------------
+*.bak
+*.tmp
+*.temp
+*_HANDOFF.md
+
+# --- Broken pip install artifacts (e.g. `=1.0.0` typos) --------------
+=*
+
+# --- Claude Code machine-specific state -------------------------------
+.claude/projects/
+
+# --- User-specific config at repo root --------------------------------
 /config.json
 /sound_choices.json
-
-# Recording frame directories
-/recording_*/
-
-# Report asset directories
-/report_assets/
-/report-final_assets/
-
-# TTS audio cache
-/tts_audio/
-
-# Test data directories
-/test_assets/
-/test-pdfs/
-
-# Home directory artifact (from typo)
+# Home directory artifact (from `~/` typo)
 /~/
-
-# Video files
-*.mp4
