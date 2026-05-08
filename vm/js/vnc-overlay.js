@@ -113,23 +113,47 @@ let _inspectTrackingActive = false;
 let _lastInspectMeta = {};  // { siblingIndex, siblingCount }
 const _tabInspectState = {};  // { tabId: { wasTracking: bool } }
 
+// Transform a rect from the inner VM browser's CSS px (via getBoundingClientRect
+// inside Chromium) into host CSS px relative to #vncContainer (the overlay's
+// positioning ancestor). Accounts for canvas offset (letterboxing / centering)
+// and noVNC scaleViewport scaling.
+function _vmRectToOverlayRect(rect) {
+    const container = document.getElementById('vncContainer');
+    const canvas = container && container.querySelector('canvas');
+    if (!canvas || !container) return rect;
+    const cr = canvas.getBoundingClientRect();
+    const vr = container.getBoundingClientRect();
+    const scaleX = canvas.width  ? cr.width  / canvas.width  : 1;
+    const scaleY = canvas.height ? cr.height / canvas.height : 1;
+    return {
+        left:   rect.left   * scaleX + (cr.left - vr.left),
+        top:    rect.top    * scaleY + (cr.top  - vr.top),
+        width:  rect.width  * scaleX,
+        height: rect.height * scaleY,
+    };
+}
+
 function _positionInspectOverlay(rect, selector, meta) {
     // Update sibling metadata if provided
     if (meta && meta.siblingIndex) {
         _lastInspectMeta = { siblingIndex: meta.siblingIndex, siblingCount: meta.siblingCount };
     }
+    // Convert the VM-side rect to overlay/container coordinates. The original
+    // `rect` is still used for the size shown in the tooltip — users want the
+    // element's true page size, not its scaled on-screen size.
+    const r = _vmRectToOverlayRect(rect);
     const isNew = !vncOverlay.isVisible('inspect-highlight');
 
     if (isNew) {
         // First show: create with entering class, then remove to trigger fade-in
-        vncOverlay.show('inspect-highlight', rect, { className: 'vnc-overlay-highlight entering' });
+        vncOverlay.show('inspect-highlight', r, { className: 'vnc-overlay-highlight entering' });
         requestAnimationFrame(() => {
             const entry = vncOverlay._overlays['inspect-highlight'];
             if (entry) entry.element.classList.remove('entering');
         });
     } else {
         // Subsequent updates: just move — CSS transition handles the animation
-        vncOverlay.update('inspect-highlight', rect);
+        vncOverlay.update('inspect-highlight', r);
     }
 
     // Tooltip: position + content (with optional sibling index)
@@ -138,8 +162,8 @@ function _positionInspectOverlay(rect, selector, meta) {
         tooltipText += ` (${_lastInspectMeta.siblingIndex}/${_lastInspectMeta.siblingCount})`;
     }
     tooltipText += ' \u2022 ' + Math.round(rect.width) + '\u00d7' + Math.round(rect.height);
-    const tooltipTop = rect.top >= 28 ? rect.top - 28 : rect.top + rect.height + 4;
-    const tooltipLeft = Math.max(0, rect.left);
+    const tooltipTop = r.top >= 28 ? r.top - 28 : r.top + r.height + 4;
+    const tooltipLeft = Math.max(0, r.left);
     const tooltipRect = { left: tooltipLeft, top: tooltipTop };
 
     if (isNew) {
