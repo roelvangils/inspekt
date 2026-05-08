@@ -7,9 +7,6 @@ src-tauri/target/
 
 # Tauri generated files
 src-tauri/WixTools/
-src-tauri/icons/*.png
-src-tauri/icons/*.ico
-src-tauri/icons/*.icns
 
 # Logs
 *.log

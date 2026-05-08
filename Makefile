@@ -148,7 +148,14 @@ dev-desktop:
 	cd apps/desktop && bun run tauri dev
 
 dev-all: ensure-docker
-	@command -v overmind >/dev/null 2>&1 || { echo "Install overmind: brew install overmind"; exit 1; }
+	@command -v overmind >/dev/null 2>&1 || { \
+		if command -v brew >/dev/null 2>&1; then \
+			echo "  • overmind not found — installing via Homebrew…"; \
+			brew install overmind; \
+		else \
+			echo "Install overmind: brew install overmind  (or https://github.com/DarthSim/overmind)"; exit 1; \
+		fi; \
+	}
 	@command -v bun >/dev/null 2>&1 || { echo "Install bun: https://bun.sh"; exit 1; }
 	@$(MAKE) --no-print-directory vm-start
 	@# Stop any lingering background bridge/API daemon so the Procfile's
@@ -167,7 +174,8 @@ dev-all: ensure-docker
 		done; \
 	fi
 	@#    cli=blue  extension=green  vm=yellow  desktop=magenta
-	OVERMIND_COLORS=4,2,3,5 overmind start -f Procfile.dev
+	@# Leading `-` swallows overmind's non-zero SIGINT exit so Ctrl+C doesn't print "make: *** Error 130"
+	-OVERMIND_COLORS=4,2,3,5 OVERMIND_CAN_DIE=desktop overmind start -f Procfile.dev
 
 sync-extension:
 	@if [ -z "$(VM_CONTAINER)" ]; then echo "Error: No VM container running"; exit 1; fi

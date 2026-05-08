@@ -1,4 +1,8 @@
 {
+  "workspaces": [
+    "apps/desktop",
+    "apps/pdf-viewer"
+  ],
   "dependencies": {
     "material-icons": "^1.13.14",
     "qrcode-generator": "^2.0.4"

@@ -62,7 +62,6 @@ build/man/
 
 # Node.js
 node_modules/
-bun.lock
 package-lock.json
 
 # Rust / Tauri build artifacts
@@ -81,6 +80,7 @@ zelfhulp.yaml
 !extensions/chrome/icons/*.png
 !extensions/firefox/icons/*.png
 !docs/**/*.png
+!apps/**/*.png
 
 # Temporary/backup files
 *.bak
