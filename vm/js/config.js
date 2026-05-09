@@ -189,6 +189,8 @@ var terminalPosition = localStorage.getItem('terminalPosition') || 'right';
 var terminalMode = localStorage.getItem('terminalMode') || 'floating';
 var splitRatio = parseFloat(localStorage.getItem('splitRatio')) || 0.5;
 var splitFlipped = localStorage.getItem('splitFlipped') === 'true';
+var splitOrientation = localStorage.getItem('splitOrientation') === 'vertical' ? 'vertical' : 'horizontal';
+var splitMaximized = null; // transient: null | 'canvas' | 'terminal'
 var isDraggingSplitHandle = false;
 
 // VNC connection state

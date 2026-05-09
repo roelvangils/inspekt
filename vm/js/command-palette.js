@@ -38,6 +38,9 @@ const UI_COMMANDS = [
     { id: 'ui:terminal',      title: 'Toggle Terminal',          section: 'Terminal',       keywords: 'shell console cli',         handler: () => toggleTerminal(),                                                     content: 'Open terminal overlay' },
     { id: 'ui:split-view',    title: 'Toggle Split View',        section: 'Terminal',       keywords: 'split side by side layout', handler: () => toggleSplitMode(),                                                    content: 'Side-by-side terminal and browser' },
     { id: 'ui:flip-split',    title: 'Flip Split Layout',        section: 'Terminal',       keywords: 'swap flip position',        handler: () => { if (terminalMode !== 'split') enterSplitMode(); flipSplitLayout(); }, content: 'Swap terminal and browser positions' },
+    { id: 'ui:toggle-orientation', title: 'Toggle Split Orientation', section: 'Terminal',  keywords: 'horizontal vertical stacked rotate orientation', handler: () => { if (terminalMode !== 'split') enterSplitMode(); toggleSplitOrientation(); }, content: 'Switch between side-by-side and stacked' },
+    { id: 'ui:max-canvas',    title: 'Maximize Canvas Pane',     section: 'Terminal',       keywords: 'fullscreen focus collapse browser', handler: () => { if (terminalMode !== 'split') enterSplitMode(); toggleMaximizePane('canvas'); }, content: 'Collapse terminal, fill with browser' },
+    { id: 'ui:max-terminal',  title: 'Maximize Terminal Pane',   section: 'Terminal',       keywords: 'fullscreen focus collapse shell',   handler: () => { if (terminalMode !== 'split') enterSplitMode(); toggleMaximizePane('terminal'); }, content: 'Collapse browser, fill with terminal' },
     { id: 'ui:move-terminal', title: 'Move Terminal Left/Right', section: 'Terminal',       keywords: 'move position left right',  handler: () => toggleTerminalPosition(),                                             content: 'Move terminal to opposite side' },
     // View
     { id: 'ui:devtools',      title: 'Toggle DevTools',          section: 'View',           keywords: 'developer tools debug',     handler: () => toggleDevTools(),                                                     content: 'Chrome DevTools' },
@@ -186,6 +189,22 @@ function buildCommandPaletteData(registryData) {
             handler: cmd.handler,
             content,
         });
+    }
+
+    // === Device-width entries (built from DEVICE_SNAPS in split-mode.js) ===
+    // Generated lazily so script-load order doesn't matter — by the time
+    // this runs, both files have executed.
+    if (typeof DEVICE_SNAPS !== 'undefined' && typeof setCanvasToDeviceWidth === 'function') {
+        for (const d of DEVICE_SNAPS) {
+            items.push({
+                id: `ui:device-${d.label.toLowerCase().replace(/\s+/g, '-')}`,
+                title: `Set Canvas to ${d.label} · ${d.width} px`,
+                section: 'Canvas Width',
+                keywords: `device width viewport responsive ${d.label.toLowerCase()} ${d.width}`,
+                handler: () => setCanvasToDeviceWidth(d.width),
+                content: `Resize canvas pane to ${d.width} px`,
+            });
+        }
     }
 
     // === Inspekt Commands (from registry API) ===

@@ -41,6 +41,11 @@
     <link rel="stylesheet" href="/css/vision-sim.css">
     <link rel="stylesheet" href="/css/motor-sim.css">
     <link rel="stylesheet" href="/css/voice-overlay.css">
+    <link rel="stylesheet" href="/css/overlay-bus.css">
+    <!-- Shared popover styles — same modular CSS run_a11y.js inlines in-page
+         in non-VM mode. Imported by index.css via @import url("../axe-popover/...") so
+         the directory layout under /scripts/ must mirror inspekt/scripts/. -->
+    <link rel="stylesheet" href="/scripts/unified-popover/index.css">
     <!-- APP_CSS_END -->
     <script src="/vendor/sortable.min.js"></script>
     <!-- QR code generator (kazuhikoarase/qrcode-generator v2.0.4, MIT) -->
@@ -71,6 +76,18 @@
     <script src="/js/vnc-context-menu.js" defer></script>
     <script src="/js/context-menu.js" defer></script>
     <script src="/js/vnc-overlay.js" defer></script>
+    <!-- Shared popover modules — define window.__inspektPopoverCore__ and
+         window.__inspektPopoverContent__. Same files run_a11y.js relies on
+         in-page; the host-side bus consumer reuses them so VM and non-VM
+         renderings are pixel-identical. Must load before overlay-bus.js. -->
+    <script src="/scripts/shared-popover/popover-core.js" defer></script>
+    <script src="/scripts/shared-popover/popover-content.js" defer></script>
+    <!-- Shared overlay-bus renderer factory — defines
+         window.__inspektCreateOverlayRenderers__ and is also loaded
+         in-page in non-VM mode. Single source of truth for kind→renderer
+         logic; must load before overlay-bus.js. -->
+    <script src="/scripts/overlay-bus-renderers.js" defer></script>
+    <script src="/js/overlay-bus.js" defer></script>
     <script src="/js/audio.js" defer></script>
     <script src="/js/zoom.js" defer></script>
     <script src="/js/scrollbar.js" defer></script>
@@ -313,7 +330,10 @@
     <div class="split-content-row" id="splitContentRow">
         <!-- VNC Container -->
         <div class="vnc-container" id="vncContainer">
-            <div class="resize-dimensions" id="resizeDimensions"></div>
+            <div class="resize-readout" id="resizeReadout">
+                <div class="resize-dimensions" id="resizeDimensions"></div>
+                <div class="snap-chip" id="snapChip" aria-hidden="true"></div>
+            </div>
             <!-- SR Focus Indicator (positioned over VNC canvas) -->
             <div id="srFocusIndicator" class="sr-focus-indicator" style="display: none;">
                 <span class="sr-focus-label" id="srFocusLabel"></span>
@@ -339,9 +359,16 @@
 
         <!-- Split mode drag handle (hidden in floating mode) -->
         <div class="split-drag-handle" id="splitDragHandle" style="display:none">
-            <button class="split-flip-btn" onclick="flipSplitLayout()" title="Swap canvas and terminal positions">
-                <svg viewBox="0 0 24 24" width="14" height="14"><path d="M6.99 11L3 15l3.99 4v-3H14v-2H6.99v-3zM21 9l-3.99-4v3H10v2h7.01v3L21 9z" fill="currentColor"/></svg>
-            </button>
+            <div class="split-handle-controls" popover="manual" id="splitHandleControls">
+                <div class="split-handle-inner">
+                    <button class="split-flip-btn" onclick="flipSplitLayout()" title="Swap canvas and terminal positions">
+                        <svg viewBox="0 0 24 24" width="14" height="14"><path d="M6.99 11L3 15l3.99 4v-3H14v-2H6.99v-3zM21 9l-3.99-4v3H10v2h7.01v3L21 9z" fill="currentColor"/></svg>
+                    </button>
+                    <button class="split-orient-btn" onclick="toggleSplitOrientation()" title="Toggle layout direction (horizontal ↔ vertical)">
+                        <svg viewBox="0 0 24 24" width="14" height="14"><rect x="4" y="4" width="6" height="16" rx="1" fill="currentColor"/><rect x="14" y="4" width="6" height="16" rx="1" fill="currentColor"/></svg>
+                    </button>
+                </div>
+            </div>
         </div>
 
     <!-- Click-to-focus overlay (appears when terminal closes) -->

@@ -2,6 +2,18 @@
 // Split Mode
 // =============================================
 
+// Common viewport widths for Shift-drag magnetic snap. Module-scoped so
+// command-palette.js (concatenated into the same global script) can build
+// "Set Canvas to <Device>" entries from the same source of truth.
+var DEVICE_SNAPS = [
+    { width: 375,  label: 'Mobile' },
+    { width: 768,  label: 'Tablet' },
+    { width: 1024, label: 'iPad Pro' },
+    { width: 1280, label: 'Laptop' },
+    { width: 1440, label: 'Desktop' },
+    { width: 1920, label: 'Wide' },
+];
+
 function toggleSplitMode() {
     // Don't enter split if window too narrow
     if (terminalMode === 'floating' && window.innerWidth < 700) return;
@@ -35,12 +47,31 @@ function enterSplitMode() {
     if (splitFlipped) {
         document.body.classList.add('split-flipped');
     }
+    document.body.classList.toggle('split-vertical', splitOrientation === 'vertical');
+
+    // Reset any maximize state from a previous session
+    splitMaximized = null;
+    document.body.classList.remove('split-maximized-canvas', 'split-maximized-terminal');
 
     // Show drag handle
     handle.style.display = '';
 
-    // Set VNC width from ratio
-    document.body.style.setProperty('--split-vnc-width', (splitRatio * 100) + '%');
+    // Set pane size from ratio (drives width in horizontal, height in vertical)
+    document.body.style.setProperty('--split-vnc-size', (splitRatio * 100) + '%');
+
+    // Prefer the last-used device width over the raw ratio when applicable —
+    // device widths survive window resizes more meaningfully. Only relevant
+    // in horizontal split (the property is a width). offsetWidth here forces
+    // a layout, so we read accurate dimensions after the body class change.
+    const savedDeviceWidth = parseInt(localStorage.getItem('splitDeviceWidth') || '0', 10);
+    if (savedDeviceWidth > 0 && splitOrientation === 'horizontal') {
+        const contentRow = document.getElementById('splitContentRow');
+        const totalSize = contentRow ? (contentRow.offsetWidth - 5) : 0;
+        if (totalSize > 0 && totalSize > savedDeviceWidth + 300) {
+            splitRatio = savedDeviceWidth / totalSize;
+            document.body.style.setProperty('--split-vnc-size', (splitRatio * 100) + '%');
+        }
+    }
 
     // Mark terminal as open
     isTerminalOpen = true;
@@ -69,7 +100,16 @@ function exitSplitMode() {
     const handle = document.getElementById('splitDragHandle');
 
     // Remove split classes
-    document.body.classList.remove('split-mode', 'split-flipped', 'split-dragging');
+    document.body.classList.remove(
+        'split-mode', 'split-flipped', 'split-dragging',
+        'split-vertical', 'split-maximized-canvas', 'split-maximized-terminal'
+    );
+    splitMaximized = null;
+
+    // Retract the floating controls if they happened to be open.
+    const controls = handle.querySelector('.split-handle-controls');
+    try { if (controls && controls.matches(':popover-open')) controls.hidePopover(); }
+    catch {}
 
     // Hide drag handle
     handle.style.display = 'none';
@@ -101,18 +141,103 @@ function flipSplitLayout() {
     localStorage.setItem('splitFlipped', splitFlipped);
 
     // Invert ratio so the divider bar stays in place visually —
-    // VNC gets the width the terminal previously had, and vice versa.
+    // VNC gets the size the terminal previously had, and vice versa.
     splitRatio = 1 - splitRatio;
-    document.body.style.setProperty('--split-vnc-width', (splitRatio * 100) + '%');
+    document.body.style.setProperty('--split-vnc-size', (splitRatio * 100) + '%');
     localStorage.setItem('splitRatio', splitRatio);
 
-    // Refit after layout change (VNC ResizeObserver fires automatically)
+    _refitAfterLayout();
+}
+
+function toggleSplitOrientation() {
+    if (terminalMode !== 'split') return;
+    splitOrientation = splitOrientation === 'horizontal' ? 'vertical' : 'horizontal';
+    document.body.classList.toggle('split-vertical', splitOrientation === 'vertical');
+    localStorage.setItem('splitOrientation', splitOrientation);
+
+    // Clear any maximize state when toggling orientation — the saved ratio
+    // takes over again.
+    if (splitMaximized) {
+        splitMaximized = null;
+        document.body.classList.remove('split-maximized-canvas', 'split-maximized-terminal');
+    }
+
+    _refitAfterLayout();
+}
+
+function toggleMaximizePane(which) {
+    if (terminalMode !== 'split') return;
+    _setMaximizedPane(splitMaximized === which ? null : which);
+    _refitAfterLayout();
+}
+
+// Internal: update maximize state without triggering a refit (caller decides).
+// Used by both toggleMaximizePane and the drag snap-to-edge path.
+function _setMaximizedPane(which) {
+    splitMaximized = which;
+    document.body.classList.toggle('split-maximized-canvas',   which === 'canvas');
+    document.body.classList.toggle('split-maximized-terminal', which === 'terminal');
+}
+
+// Set the canvas pane to a specific pixel width — used by the per-device
+// command-palette entries. Enters split mode and forces horizontal orientation
+// when needed (device widths only make sense for the horizontal split).
+function setCanvasToDeviceWidth(px) {
+    if (terminalMode !== 'split') enterSplitMode();
+    if (splitOrientation === 'vertical') toggleSplitOrientation();
+
+    const contentRow = document.getElementById('splitContentRow');
+    if (!contentRow) return;
+    const totalSize = contentRow.offsetWidth - 5;
+    if (totalSize <= 0 || totalSize < px + 300) {
+        if (typeof showToast === 'function') {
+            showToast(`Window too narrow for a ${px} px canvas`, 'error');
+        }
+        return;
+    }
+
+    if (splitMaximized) _setMaximizedPane(null);
+    splitRatio = px / totalSize;
+    document.body.style.setProperty('--split-vnc-size', (splitRatio * 100) + '%');
+    localStorage.setItem('splitRatio', splitRatio);
+    localStorage.setItem('splitDeviceWidth', px);
+    _refitAfterLayout();
+}
+
+// Shared refit hook used after any layout change. VNC ResizeObserver fires
+// automatically; we only need to nudge xterm.
+function _refitAfterLayout() {
     requestAnimationFrame(() => {
         if (fitAddon) {
             fitAddon.fit();
             sendTerminalSize();
         }
     });
+}
+
+// Persist current split state to localStorage. Called from every code path
+// that ends a divider gesture (drag mouseup, dblclick reset, wheel tune) so
+// `splitDeviceWidth` always reflects the canvas's actual final width — no
+// stale device-width restoration on next reload.
+function _savePersistedSplitState() {
+    if (splitMaximized) return; // maximize state is intentionally not persisted
+    localStorage.setItem('splitRatio', splitRatio);
+
+    // Device-width persistence only meaningful in horizontal split.
+    if (splitOrientation !== 'horizontal') {
+        localStorage.removeItem('splitDeviceWidth');
+        return;
+    }
+    const contentRow = document.getElementById('splitContentRow');
+    if (!contentRow) return;
+    const totalSize = contentRow.offsetWidth - 5;
+    const canvasPx = splitRatio * totalSize;
+    const matched = DEVICE_SNAPS.find(s => Math.abs(canvasPx - s.width) < 5);
+    if (matched) {
+        localStorage.setItem('splitDeviceWidth', matched.width);
+    } else {
+        localStorage.removeItem('splitDeviceWidth');
+    }
 }
 
 function updateSplitButton() {
@@ -133,6 +258,28 @@ function initSplitDragHandle() {
     const SNAP_POINTS = [0.25, 1/3, 0.5, 2/3, 0.75];
     const SNAP_THRESHOLD = 0.02; // ~15px at typical widths
 
+    // Shift-drag chip (DEVICE_SNAPS lives at module scope). The chip is shown
+    // for the full duration of Shift-held and identifies the nearest device
+    // target; the actual snap fires on either mouse release or Shift release.
+    const snapChip = document.getElementById('snapChip');
+
+    function _showSnapChip(target) {
+        if (!snapChip) return;
+        snapChip.textContent = `${target.label} · ${target.width} px`;
+        snapChip.classList.add('visible', 'engaged');
+    }
+    function _hideSnapChip() {
+        if (!snapChip) return;
+        snapChip.classList.remove('visible', 'engaged');
+    }
+
+    // Floating buttons + show-on-hover state. Declared up here so every
+    // listener below can reference them.
+    const controls = handle.querySelector('.split-handle-controls');
+    let _showTimer = null;
+    const SHOW_DELAY_MS = 120;
+    const ANCHOR_OFFSET_PX = 15; // gap between cursor and the first button
+
     // Prevent flip button clicks from triggering drag
     const flipBtn = handle.querySelector('.split-flip-btn');
     if (flipBtn) {
@@ -148,40 +295,117 @@ function initSplitDragHandle() {
         handle.classList.add('dragging');
         document.body.classList.add('split-dragging');
 
+        // Hide the floating buttons the instant a drag begins — they're
+        // distracting overlays on top of the user's intended action.
+        clearTimeout(_showTimer);
+        try { if (controls && controls.matches(':popover-open')) controls.hidePopover(); }
+        catch {}
+
+        const isVertical = splitOrientation === 'vertical';
         const contentRow = document.getElementById('splitContentRow');
-        const totalWidth = contentRow.offsetWidth - 5; // minus handle width
-        const startX = e.clientX;
-        const startRatio = splitRatio;
+        const totalSize = (isVertical ? contentRow.offsetHeight : contentRow.offsetWidth) - 5; // minus handle thickness
+        // `let` because the shift-snap commit reassigns these so the drag
+        // can continue smoothly from the snapped position.
+        let startCoord = isVertical ? e.clientY : e.clientX;
+        let startRatio = splitRatio;
+        let lastClientX = e.clientX;
+        let lastClientY = e.clientY;
+
+        // Past this many pixels from either edge, we treat the drag as a
+        // gesture-based maximize of the adjacent pane.
+        const EDGE_SNAP_PX = 30;
+        const edgeRatio = EDGE_SNAP_PX / totalSize;
+
+        // Tracks the device target nearest the cursor whenever Shift is held.
+        // The actual snap fires on either mouse release or Shift release —
+        // whichever comes first — so the user gets a clear committed result
+        // (with toast) instead of a janky mid-drag jump.
+        let shiftSnapTarget = null;
+
+        function commitShiftSnap() {
+            if (!shiftSnapTarget || splitMaximized) return false;
+            const target = shiftSnapTarget;
+            splitRatio = target.width / totalSize;
+            document.body.style.setProperty('--split-vnc-size', (splitRatio * 100) + '%');
+            localStorage.setItem('splitRatio', splitRatio);
+            localStorage.setItem('splitDeviceWidth', target.width);
+            if (typeof showToast === 'function') {
+                showToast(`Snapped to ${target.label} · ${target.width} px`, 'success');
+            }
+            _hideSnapChip();
+            shiftSnapTarget = null;
+            // Reset the drag origin so further mouse movement is relative
+            // to the snapped position rather than jumping back to the cursor.
+            startCoord = isVertical ? lastClientY : lastClientX;
+            startRatio = splitRatio;
+            _refitAfterLayout();
+            return true;
+        }
+
+        function onShiftKeyUp(e) {
+            if (e.key === 'Shift') commitShiftSnap();
+        }
 
         function onMouseMove(e) {
-            const deltaX = e.clientX - startX;
+            lastClientX = e.clientX;
+            lastClientY = e.clientY;
+
+            const delta = (isVertical ? e.clientY : e.clientX) - startCoord;
             let newRatio = splitFlipped
-                ? startRatio - (deltaX / totalWidth)
-                : startRatio + (deltaX / totalWidth);
+                ? startRatio - (delta / totalSize)
+                : startRatio + (delta / totalSize);
+
+            // Edge → maximize. The CSS var is overridden by the maximize body
+            // class, so we don't write splitRatio while in the snap zone.
+            if (newRatio < edgeRatio) { _setMaximizedPane('terminal'); return; }
+            if (newRatio > 1 - edgeRatio) { _setMaximizedPane('canvas'); return; }
+            if (splitMaximized) _setMaximizedPane(null);
 
             // Clamp: minimum 300px for each side
-            const minRatio = 300 / totalWidth;
-            const maxRatio = 1 - (300 / totalWidth);
+            const minRatio = 300 / totalSize;
+            const maxRatio = 1 - (300 / totalSize);
             newRatio = Math.max(minRatio, Math.min(maxRatio, newRatio));
 
-            // Snap to common ratios
-            for (const snap of SNAP_POINTS) {
-                if (Math.abs(newRatio - snap) < SNAP_THRESHOLD) {
-                    newRatio = snap;
-                    break;
+            // Shift held in horizontal split → identify nearest device target
+            // and keep the chip permanently visible. No magnetic pull mid-drag
+            // — the snap commits on release of either Shift or the mouse.
+            if (e.shiftKey && !isVertical) {
+                const canvasPx = newRatio * totalSize;
+                let nearest = DEVICE_SNAPS[0];
+                let nearestDiff = Infinity;
+                for (const s of DEVICE_SNAPS) {
+                    const d = Math.abs(canvasPx - s.width);
+                    if (d < nearestDiff) { nearestDiff = d; nearest = s; }
+                }
+                shiftSnapTarget = nearest;
+                _showSnapChip(nearest);
+            } else {
+                shiftSnapTarget = null;
+                _hideSnapChip();
+                for (const snap of SNAP_POINTS) {
+                    if (Math.abs(newRatio - snap) < SNAP_THRESHOLD) {
+                        newRatio = snap;
+                        break;
+                    }
                 }
             }
 
             splitRatio = newRatio;
-            document.body.style.setProperty('--split-vnc-width', (splitRatio * 100) + '%');
+            document.body.style.setProperty('--split-vnc-size', (splitRatio * 100) + '%');
         }
 
         function onMouseUp() {
+            // Commit any pending shift snap (fires toast). If shift was
+            // already released earlier the keyup handler did this.
+            commitShiftSnap();
+
             isDraggingSplitHandle = false;
             handle.classList.remove('dragging');
             document.body.classList.remove('split-dragging');
             document.removeEventListener('mousemove', onMouseMove);
             document.removeEventListener('mouseup', onMouseUp);
+            document.removeEventListener('keyup', onShiftKeyUp);
+            _hideSnapChip();
 
             // Refit both panels
             if (fitAddon) {
@@ -190,26 +414,104 @@ function initSplitDragHandle() {
             }
             // VNC ResizeObserver fires automatically
 
-            localStorage.setItem('splitRatio', splitRatio);
+            // Persist final state — derives splitDeviceWidth from the actual
+            // canvas width, so a shift-committed snap the user then drifted
+            // away from won't survive on reload.
+            _savePersistedSplitState();
+
+            // If the cursor is no longer over the handle, retract the controls.
+            if (!handle.matches(':hover')) {
+                const c = handle.querySelector('.split-handle-controls');
+                try { if (c && c.matches(':popover-open')) c.hidePopover(); }
+                catch {}
+            }
         }
 
         document.addEventListener('mousemove', onMouseMove);
         document.addEventListener('mouseup', onMouseUp);
+        document.addEventListener('keyup', onShiftKeyUp);
     });
+
+    // Reveal the controls via the Popover API — promotes them to the
+    // browser's top layer, escaping every stacking context (badges,
+    // overlays, modals) without z-index. Anchored just below the cursor's
+    // entry point so the user has minimal travel to either button. A small
+    // enter delay prevents flicker when the cursor merely transits the
+    // divider on its way between panes.
+    function _positionControls(e) {
+        if (!controls) return;
+        const rect = handle.getBoundingClientRect();
+        if (splitOrientation === 'vertical') {
+            // Horizontal divider: anchor LEFT of buttons at cursor X,
+            // vertically centered on the divider.
+            const x = Math.max(rect.left, Math.min(rect.right, e.clientX)) + ANCHOR_OFFSET_PX;
+            const y = rect.top + rect.height / 2;
+            controls.style.left = `${x}px`;
+            controls.style.top = `${y}px`;
+            controls.style.transform = 'translateY(-50%)';
+        } else {
+            // Vertical divider: anchor TOP of buttons at cursor Y,
+            // horizontally centered on the divider.
+            const x = rect.left + rect.width / 2;
+            const y = Math.max(rect.top, Math.min(rect.bottom, e.clientY)) + ANCHOR_OFFSET_PX;
+            controls.style.left = `${x}px`;
+            controls.style.top = `${y}px`;
+            controls.style.transform = 'translateX(-50%)';
+        }
+    }
+
+    handle.addEventListener('mouseenter', (e) => {
+        _positionControls(e);
+        clearTimeout(_showTimer);
+        _showTimer = setTimeout(() => {
+            try { if (!controls.matches(':popover-open')) controls.showPopover(); }
+            catch {}
+        }, SHOW_DELAY_MS);
+    });
+
+    handle.addEventListener('mouseleave', () => {
+        clearTimeout(_showTimer);
+        // Stay visible while a drag is in progress — the cursor can leave
+        // the strip momentarily but the user's intent is still on the divider.
+        if (isDraggingSplitHandle) return;
+        try { if (controls && controls.matches(':popover-open')) controls.hidePopover(); }
+        catch {}
+    });
+
+    // Scroll wheel on the divider fine-tunes the split ratio in 2% steps.
+    // Handy for nudging without dragging. Disabled while maximized so the
+    // user doesn't accidentally exit maximize via scroll.
+    let _wheelSaveTimer = null;
+    handle.addEventListener('wheel', (e) => {
+        if (terminalMode !== 'split' || splitMaximized) return;
+        e.preventDefault();
+        const step = 0.02;
+        const direction = e.deltaY > 0 ? 1 : -1;
+        let next = splitFlipped
+            ? splitRatio - direction * step
+            : splitRatio + direction * step;
+        next = Math.max(0.1, Math.min(0.9, next));
+        splitRatio = next;
+        document.body.style.setProperty('--split-vnc-size', (splitRatio * 100) + '%');
+        _refitAfterLayout();
+        clearTimeout(_wheelSaveTimer);
+        _wheelSaveTimer = setTimeout(_savePersistedSplitState, 200);
+    }, { passive: false });
 
     // Double-click to reset to 50/50
-    handle.addEventListener('dblclick', (e) => {
+    handle.addEventListener('dblclick', () => {
         splitRatio = 0.5;
-        document.body.style.setProperty('--split-vnc-width', '50%');
-        localStorage.setItem('splitRatio', 0.5);
-
-        requestAnimationFrame(() => {
-            if (fitAddon) {
-                fitAddon.fit();
-                sendTerminalSize();
-            }
-        });
+        document.body.style.setProperty('--split-vnc-size', '50%');
+        _refitAfterLayout();
+        _savePersistedSplitState();
     });
+
+    // The orientation button sits next to the swap button. Block its
+    // mousedown from initiating a drag, same as the swap button.
+    const orientBtn = handle.querySelector('.split-orient-btn');
+    if (orientBtn) {
+        orientBtn.addEventListener('mousedown', (e) => e.stopPropagation());
+    }
 }
 
 const LIGHT_TERMINAL_THEMES = new Set(['tomorrow', 'github', 'catppuccin-latte', 'solarized-light']);

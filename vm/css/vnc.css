@@ -87,15 +87,24 @@
 /* In split mode, native container takes VNC container's flex slot */
 body.split-mode .native-container.active {
     display: block;
-    width: var(--split-vnc-width, 50%);
+    width: var(--split-vnc-size, 50%);
     flex-shrink: 0;
 }
 
-.resize-dimensions {
+/* Flex wrapper that anchors the live dimensions readout (and its
+   Shift-drag snap-target chip) at the top-left of the canvas. */
+.resize-readout {
     position: absolute;
     top: var(--space-3);
     left: var(--space-3);
     z-index: var(--z-terminal);
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    pointer-events: none;
+}
+
+.resize-dimensions {
     padding: 6px var(--space-3);
     border-radius: var(--radius-md);
     background: rgba(0, 0, 0, 0.7);
@@ -103,11 +112,40 @@ body.split-mode .native-container.active {
     font-family: var(--font-mono);
     font-size: var(--text-base);
     letter-spacing: 0.5px;
-    pointer-events: none;
     opacity: 0;
     transition: opacity var(--duration-fast) ease-out;
 
     &.visible { opacity: 1; }
+}
+
+/* Shift-drag snap chip — shows nearest device-width target while the user
+   drags with Shift held. Brightens to accent when within the snap range. */
+.snap-chip {
+    padding: 6px var(--space-3);
+    border-radius: var(--radius-md);
+    background: rgba(0, 0, 0, 0.55);
+    color: rgba(255, 255, 255, 0.7);
+    font-family: var(--font-mono);
+    font-size: var(--text-base);
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+    opacity: 0;
+    transition:
+        opacity var(--duration-fast) ease-out,
+        background var(--duration-fast) ease,
+        color var(--duration-fast) ease,
+        transform var(--duration-fast) cubic-bezier(0.2, 0.8, 0.2, 1);
+    transform: translateX(-4px);
+
+    &.visible {
+        opacity: 1;
+        transform: translateX(0);
+    }
+
+    &.engaged {
+        background: var(--accent);
+        color: #fff;
+    }
 }
 
 /* ── VNC Overlay System (host-side highlights) ── */
