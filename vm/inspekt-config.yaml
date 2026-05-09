@@ -71,6 +71,45 @@ browser:
   # container restart.
   strip-csp: true
 
+  # ----- Chromium managed policies -----
+  # These are enforced at browser startup and cannot be overridden from
+  # chrome://settings. Defaults are tuned for a testing/audit VM. Edit a
+  # value here to override; restart the browser to apply
+  # (Cmd+K → "Restart Browser").
+  policies:
+    # Show Chrome's "Translate this page?" infobar. Off in testing —
+    # pages should appear in their native language.
+    translate-enabled: false
+
+    # Browser sign-in mode. Options: false (disabled), optional, forced.
+    browser-signin: false
+
+    # Allow Chrome sync (bookmarks, history, passwords) with a Google
+    # account. Off — the VM is disposable.
+    sync-disabled: true
+
+    # Saved passwords and autofill. Off — testing browsers shouldn't
+    # store credentials or personal data.
+    password-manager-enabled: false
+    autofill-address-enabled: false
+    autofill-credit-card-enabled: false
+
+    # Ambient prompts.
+    default-browser-setting-enabled: false   # "Set Chrome as default" infobar
+    promotional-tabs-enabled: false          # "What's New" / Discover promo
+    metrics-reporting-enabled: false         # Crash + usage stats to Google
+    search-suggest-enabled: false            # Leaks typed text to suggest API
+    safe-browsing-protection-level: 0        # 0=off, 1=standard, 2=enhanced
+
+  # Escape hatch — raw Chromium policy names mapped to values, merged on
+  # top of `policies` above. Use exact CamelCase names from
+  # https://chromeenterprise.google/policies/.
+  # Example:
+  #   policies-extra:
+  #     URLBlocklist: ["chrome://flags", "chrome://settings"]
+  #     ExtensionInstallBlocklist: ["*"]
+  policies-extra: {}
+
 # --------------------------------------------------
 # Commands
 # --------------------------------------------------

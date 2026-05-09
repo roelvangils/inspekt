@@ -65,6 +65,15 @@ CHROME_ARGS=(
     --no-first-run
     --no-default-browser-check
     --disable-default-apps
+    # EU/Belgium DMA: skip the "choose your search engine" screen on first run
+    --disable-search-engine-choice-screen
+    # Skip "Restore pages?" bubble after a crash — would block the kiosk
+    --disable-session-crashed-bubble
+    # Disable built-in component extensions (Hangouts, Cloud Print stubs)
+    # that make background network calls
+    --disable-component-extensions-with-background-pages
+    # Disable all chrome://flags experiments — keeps every VM identical
+    --no-experiments
 
     # Allow automatic/multiple downloads without prompting
     --safebrowsing-disable-download-protection
@@ -101,6 +110,12 @@ CHROME_ARGS=(
     # Automation
     --remote-debugging-port=9222
     --autoplay-policy=no-user-gesture-required
+    # Suppress the "Chrome is being debugged by extension" infobar
+    # (we attach to CDP on 9222 from extensions / scripts)
+    --silent-debugger-extension-api
+    # Deterministic colour output regardless of host display profile —
+    # makes screenshot comparisons reproducible across machines
+    --force-color-profile=srgb
 
     # HTTP proxy (mitmproxy running locally for traffic interception)
     --proxy-server=http://127.0.0.1:8080
@@ -115,7 +130,12 @@ CHROME_ARGS=(
     # - InterestGroupStorage/BrowsingTopics: Disable Privacy Sandbox ad tracking
     # - PrivacySandboxSettings4: Disable Privacy Sandbox settings UI
     # - ChromeWhatsNewUI: Disable "What's new" promotional popup
-    --disable-features=Translate,TranslateUI,MediaRouter,GlobalMediaControls,DialMediaRouteProvider,NetworkServiceInProcess,OutOfBlinkCors,Presentation,CastMediaRouteProvider,CastStreamingMediaRouteProvider,RemotePlayback,AudioServiceOutOfProcess,AutofillServerCommunication,OptimizationGuideModelDownloading,OptimizationHints,InterestGroupStorage,BrowsingTopics,PrivacySandboxSettings4,ChromeWhatsNewUI,CalculateNativeWinOcclusion
+    # - OptimizationGuideOnDeviceModel: Disable on-device AI model downloads
+    # - LensOverlay/LensStandalone: Disable Google Lens overlay features
+    # - ReadAnything: Disable Reading Mode side panel
+    # - SidePanelPinning: Disable side-panel pin controls
+    # - DesktopPWAsLinkCapturing: Disable "Open in app?" PWA dialogs
+    --disable-features=Translate,TranslateUI,MediaRouter,GlobalMediaControls,DialMediaRouteProvider,NetworkServiceInProcess,OutOfBlinkCors,Presentation,CastMediaRouteProvider,CastStreamingMediaRouteProvider,RemotePlayback,AudioServiceOutOfProcess,AutofillServerCommunication,OptimizationGuideModelDownloading,OptimizationHints,OptimizationGuideOnDeviceModel,InterestGroupStorage,BrowsingTopics,PrivacySandboxSettings4,ChromeWhatsNewUI,CalculateNativeWinOcclusion,LensOverlay,LensStandalone,ReadAnything,SidePanelPinning,DesktopPWAsLinkCapturing
 
     # Extension
     --load-extension=/opt/inspekt/extensions/chrome
@@ -217,6 +237,67 @@ if [ -f "$CONFIG_FILE" ]; then
         HOME_URL="$HOMEPAGE"
     fi
 fi
+
+# ---------------------------------------------------------------
+# Chromium managed policies → /etc/chromium/policies/managed/inspekt.json
+# Built from sensible defaults + browser.policies / browser.policies-extra
+# in inspekt-config.yaml. Policies are read once at chromium startup, so
+# this runs every time the wrapper launches.
+# ---------------------------------------------------------------
+POLICY_DIR=/etc/chromium/policies/managed
+mkdir -p "$POLICY_DIR"
+/opt/inspekt/.venv/bin/python3 - "$CONFIG_FILE" "$POLICY_DIR/inspekt.json" <<'PYPOL'
+import json, sys
+from pathlib import Path
+
+cfg_path, out_path = sys.argv[1], sys.argv[2]
+
+# kebab-case (YAML) → (CamelCase policy name, default, optional coercer)
+KNOWN = {
+    "translate-enabled":              ("TranslateEnabled",              False, None),
+    "sync-disabled":                  ("SyncDisabled",                  True,  None),
+    "password-manager-enabled":       ("PasswordManagerEnabled",        False, None),
+    "autofill-address-enabled":       ("AutofillAddressEnabled",        False, None),
+    "autofill-credit-card-enabled":   ("AutofillCreditCardEnabled",     False, None),
+    "default-browser-setting-enabled":("DefaultBrowserSettingEnabled",  False, None),
+    "promotional-tabs-enabled":       ("PromotionalTabsEnabled",        False, None),
+    "metrics-reporting-enabled":      ("MetricsReportingEnabled",       False, None),
+    "search-suggest-enabled":         ("SearchSuggestEnabled",          False, None),
+    "safe-browsing-protection-level": ("SafeBrowsingProtectionLevel",   0,     int),
+    # BrowserSignin: 0=disabled, 1=optional, 2=forced. Accept either int or
+    # the strings false/optional/forced for the user-facing key.
+    "browser-signin": (
+        "BrowserSignin", 0,
+        lambda v: (
+            v if isinstance(v, int) and not isinstance(v, bool)
+            else {"false": 0, "optional": 1, "forced": 2, False: 0, True: 1}.get(
+                v.lower() if isinstance(v, str) else v, 0
+            )
+        ),
+    ),
+}
+
+out = {pol_name: default for (pol_name, default, _) in KNOWN.values()}
+
+try:
+    import yaml  # PyYAML, already installed via mitmproxy venv
+    cfg = yaml.safe_load(Path(cfg_path).read_text()) or {}
+    browser = cfg.get("browser") or {}
+    user = browser.get("policies") or {}
+    for kebab, (pol_name, _default, coerce) in KNOWN.items():
+        if kebab in user:
+            v = user[kebab]
+            out[pol_name] = coerce(v) if coerce else v
+    for raw_name, raw_val in (browser.get("policies-extra") or {}).items():
+        out[raw_name] = raw_val
+except FileNotFoundError:
+    pass  # No config file — defaults apply
+except Exception as e:
+    sys.stderr.write(f"[inspekt-chromium] policy generation warning: {e}\n")
+
+Path(out_path).write_text(json.dumps(out, indent=2))
+PYPOL
+echo "[inspekt-chromium] Wrote managed policies → $POLICY_DIR/inspekt.json"
 
 # Launch Chromium with the configured arguments
 exec /usr/bin/chromium "${CHROME_ARGS[@]}" "${HOME_URL:-http://inspekt/status}"
