@@ -1,6 +1,7 @@
 .PHONY: help dev install clean test test-unit test-integration test-e2e lint format typecheck pre-commit all \
        vm-start vm-stop vm-restart vm-rebuild vm-status vm-logs vm-shell vm-services vm-health \
-       vm-restart-control vm-restart-terminal vm-restart-chromium vm-restart-proxy \
+       vm-restart-control vm-restart-terminal vm-restart-chromium vm-restart-proxy vm-restart-overlay-bus \
+       vm-fix-mounts \
        vm-bundle ensure-docker \
        build-man install-man clean-man \
        dev-cli dev-extension dev-vm dev-desktop dev-all sync-extension \
@@ -56,7 +57,8 @@ help:
 	@echo ""
 	@echo "VM internals (rarely invoked directly):"
 	@echo "  make vm-start / vm-stop / vm-restart / vm-rebuild / vm-status / vm-logs / vm-shell"
-	@echo "  make vm-restart-{control,terminal,chromium,proxy}"
+	@echo "  make vm-restart-{control,terminal,chromium,proxy,overlay-bus}"
+	@echo "  make vm-fix-mounts        Re-establish bind mounts (recovery)"
 	@echo "  make vm-services / vm-health / vm-bundle"
 	@echo ""
 	@echo "Man pages (requires pandoc):"
@@ -295,6 +297,23 @@ vm-restart-chromium:
 vm-restart-proxy:
 	@if [ -z "$(VM_CONTAINER)" ]; then echo "Error: No VM container running"; exit 1; fi
 	docker exec $(VM_CONTAINER) supervisorctl restart mitmproxy
+
+vm-restart-overlay-bus:
+	@if [ -z "$(VM_CONTAINER)" ]; then echo "Error: No VM container running"; exit 1; fi
+	docker exec $(VM_CONTAINER) supervisorctl restart overlay-bus
+
+# Recovery shortcut: re-establish bind mounts after the kernel single-file
+# mount inode goes stale. Should be unnecessary now that all hot-reloaded
+# files use directory mounts (see vm/entrypoint.sh dev symlinks block),
+# but kept as an escape hatch for anyone hitting an edge case.
+vm-fix-mounts:
+	@if [ -z "$(VM_CONTAINER)" ]; then echo "Error: No VM container running"; exit 1; fi
+	@echo "  • Restarting container to refresh bind mounts…"
+	@docker restart $(VM_CONTAINER) > /dev/null
+	@echo "  • Waiting for services…"
+	@sleep 5
+	@docker exec $(VM_CONTAINER) supervisorctl status 2>&1 | grep -E "(RUNNING|ERROR)" | sed 's/^/    /'
+	@echo "  [ok] mounts re-established"
 
 # List all supervised services and their status
 vm-services:

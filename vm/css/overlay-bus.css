@@ -1,0 +1,230 @@
+/* =============================================
+ * Overlay Bus — host-side styles for bus-rendered overlays.
+ *
+ * Each overlay element carries `bus-overlay` plus a kind-specific class.
+ * The base overlay primitive (`vncOverlay.show`) handles position:absolute
+ * and rect application; visual styling is the renderer's job.
+ *
+ * - 'highlight' reuses `.vnc-overlay-highlight` from vnc.css.
+ * - 'tooltip'   reuses `.vnc-overlay-tooltip`   from vnc.css.
+ * - 'a11y-badge' reuses `.inspekt-badge` and `.inspekt-axe-popover` styles
+ *    from /scripts/{axe,unified}-popover/ — same modular CSS run_a11y.js
+ *    inlines in-page in non-VM mode. Linked from control-panel.html.
+ *
+ * The generic 'badge' / 'unknown' classes below are for hypothetical
+ * non-a11y consumers (recorder outlines, plugin highlights, …).
+ * ============================================= */
+
+.bus-overlay {
+    pointer-events: none;
+}
+
+.bus-overlay-unknown {
+    outline: 2px dashed magenta;
+    background: transparent;
+}
+
+/* ── Generic badge primitive ── */
+/* Used for non-a11y badges (e.g. plugin highlights). a11y badges go
+   through the 'a11y-badge' renderer instead and reuse `.inspekt-badge`. */
+
+.bus-overlay-badge {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-size: 13px;
+    font-weight: bold;
+    color: white;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+    border: 2px solid white;
+    user-select: none;
+    line-height: 1;
+    overflow: hidden;
+    z-index: 1;
+}
+
+.bus-overlay-badge--critical { background: #dc2626; }
+.bus-overlay-badge--serious  { background: #ea580c; }
+.bus-overlay-badge--moderate { background: #2563eb; }
+.bus-overlay-badge--minor    { background: #6b7280; }
+
+/* ── Anchor host badges to the overlay container ──
+ * The shared `.inspekt-badge` styles use `position: absolute !important`
+ * and `all: initial` (designed for in-page injection where the host page
+ * has its own styles). In our overlay container they work fine — `all:
+ * initial` only resets the badge element itself, not its container. The
+ * inline style we set in the renderer (left/top + anchor-name) overrides
+ * the cascade and pins the badge correctly.
+ *
+ * The popover uses CSS anchor positioning (`position-anchor: --badge-N`
+ * + `position-area: block-end span-inline-end`) which works in modern
+ * Chromium without the polyfill. */
+
+#vncOverlayContainer .inspekt-badge,
+#vncOverlayContainer [popover].inspekt-axe-popover {
+    /* Stack above the canvas + any other overlay */
+    z-index: 1000;
+}
+
+/* Popovers are interactive — re-enable pointer events. */
+#vncOverlayContainer [popover].inspekt-axe-popover {
+    pointer-events: auto;
+}
+#vncOverlayContainer .inspekt-badge {
+    pointer-events: auto;
+}
+
+/* ── Scroll-suppress: hide overlays during fast scrolls ───────────────────
+ *
+ * VM-mode overlays move via DOM at 16 ms while the noVNC pixel stream
+ * lags ~50–150 ms behind. During fast scroll the gap is visible as
+ * overlays "racing" the canvas. The producer sends overlay.suppress on
+ * scroll-start, overlay.unsuppress after a 150 ms settling window;
+ * those messages toggle .bus-scrolling on this container, fading
+ * overlays to opacity 0 for the duration.
+ *
+ * Detached popovers are exempt — they sit in position:fixed, scrolling
+ * doesn't move them, no discrepancy to hide.
+ *
+ * Universal selector targets every direct child regardless of kind
+ * (badges, popovers, highlights, tooltips, custom kinds). Transition
+ * applies unconditionally so both fade-out and fade-in animate. */
+#vncOverlayContainer > * {
+    transition: opacity 180ms ease;
+}
+#vncOverlayContainer.bus-scrolling > *:not(.inspekt-axe-popover--detached) {
+    opacity: 0;
+}
+
+/* ── Outline kind ───────────────────────────────────────────── */
+.bus-overlay-outline {
+    /* color + border style come from the renderer's inline `style` so
+       theming per-emission stays simple. */
+    border-radius: 2px;
+}
+.bus-overlay-outline__label {
+    position: absolute;
+    top: -22px;
+    left: -2px;
+    padding: 2px 8px;
+    background: var(--accent, #2563eb);
+    color: white;
+    font: 10px/1.4 -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    font-weight: 600;
+    border-radius: 3px;
+    white-space: nowrap;
+    pointer-events: none;
+}
+
+/* ── Panel kind ─────────────────────────────────────────────── */
+.bus-overlay-panel {
+    background: var(--bg-bar, rgba(31, 31, 41, 0.96));
+    color: var(--text-bright, #fff);
+    border: 1px solid var(--divider, rgba(255, 255, 255, 0.12));
+    border-radius: 10px;
+    box-shadow: 0 18px 60px rgba(0, 0, 0, 0.45), 0 6px 18px rgba(0, 0, 0, 0.25);
+    backdrop-filter: blur(18px) saturate(180%);
+    -webkit-backdrop-filter: blur(18px) saturate(180%);
+    font: 13px/1.5 -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    overflow: auto;
+    z-index: 10;
+}
+.bus-overlay-panel__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    background: rgba(0, 0, 0, 0.25);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    position: sticky;
+    top: 0;
+    z-index: 1;
+}
+.bus-overlay-panel__title {
+    font-weight: 600;
+    font-size: 13px;
+}
+.bus-overlay-panel__close {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    border: none;
+    background: rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.85);
+    font-size: 18px;
+    line-height: 1;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+.bus-overlay-panel__close:hover {
+    background: rgba(239, 68, 68, 0.3);
+    color: #fff;
+}
+.bus-overlay-panel__body {
+    padding: 12px 14px;
+}
+
+/* ── Pointer kind ───────────────────────────────────────────── */
+/* Click pulse: ring expands and fades out. */
+.bus-overlay-pointer {
+    position: absolute;
+    border-radius: 50%;
+    border: 2px solid var(--accent, #2563eb);
+    box-sizing: border-box;
+    pointer-events: none;
+}
+.bus-overlay-pointer--click {
+    animation: bus-overlay-pointer-click 600ms ease-out forwards;
+}
+.bus-overlay-pointer--pulse {
+    animation: bus-overlay-pointer-pulse 1.2s ease-in-out infinite;
+}
+.bus-overlay-pointer--cursor {
+    background: var(--accent, #2563eb);
+    opacity: 0.6;
+}
+@keyframes bus-overlay-pointer-click {
+    0%   { transform: scale(0.4); opacity: 0.9; }
+    100% { transform: scale(1.6); opacity: 0;   }
+}
+@keyframes bus-overlay-pointer-pulse {
+    0%, 100% { transform: scale(0.95); opacity: 0.5; }
+    50%      { transform: scale(1.15); opacity: 1;   }
+}
+
+/* ── Region kind (spotlight) ────────────────────────────────── */
+.bus-overlay-region {
+    position: absolute;
+    pointer-events: none;
+    /* The dim is implemented via inline `box-shadow` from the renderer
+       so the outer area gets darkened without a separate full-cover
+       element. */
+}
+.bus-overlay-region__label {
+    position: absolute;
+    bottom: -32px;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 4px 12px;
+    background: var(--bg-bar, rgba(31, 31, 41, 0.96));
+    color: white;
+    border-radius: 4px;
+    font: 12px/1.4 -apple-system, system-ui, sans-serif;
+    font-weight: 500;
+    white-space: nowrap;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+/* ── Backdrop kind ──────────────────────────────────────────── */
+.bus-overlay-backdrop {
+    position: absolute;
+    /* color + opacity from renderer inline style; this just locks z-index
+       and basic positioning. */
+}

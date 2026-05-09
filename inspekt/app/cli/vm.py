@@ -23,7 +23,7 @@ CONTAINER_NAME = "inspekt-browser-vm"
 # Ports used by the VM (all must be free before starting)
 NOVNC_PORT = 6080
 CONTROL_PORT = 8888
-VM_PORTS = [6080, 6081, 8767, 8768, 8889, 9222]  # All ports the VM uses
+VM_PORTS = [6080, 6081, 8767, 8768, 8889, 8890, 9222]  # All ports the VM uses
 
 # Path to vm directory
 def get_vm_dir() -> Path:
@@ -346,18 +346,40 @@ def _start_container(dev_mode: bool = False, vm_dir: Path = None) -> bool:
         # Set dev mode flag so control panel can show [DEV] indicator
         cmd.extend(["-e", "INSPEKT_DEV_MODE=1"])
 
-        # Mount control panel, fonts, and servers for UI/server development
+        # Dev-mode mounts.
+        #
+        # ⚠️  All hot-reloaded files use DIRECTORY mounts, never single-file
+        # mounts. Single-file bind mounts cache the source inode at mount
+        # time; when an editor / linter atomic-replaces the file (write tmp
+        # → rename over original), the inode changes and the container
+        # sees an empty path. Recovery requires `docker restart` to
+        # re-resolve the mount. Directory mounts re-resolve dentries at
+        # access time, so atomic rewrites Just Work.
+        #
+        # The image's COPYed /opt/*-server.py + /usr/share/novnc/control.html
+        # files are SHADOWED by symlinks created in entrypoint.sh's dev-mode
+        # block, which point into these directory mounts. See
+        # vm/entrypoint.sh `--- DEV-MODE LIVE-RELOAD SYMLINKS ---`.
         cmd.extend([
-            "-v", f"{vm_dir}/control-panel.html:/usr/share/novnc/control.html:ro",
+            # Whole vm/ tree — covers control-panel.html, vendor/, servers/.
+            # Existing per-subdir mounts below (vm/css, vm/js, vm/fonts,
+            # vm/icons) keep their dedicated paths because supervisord +
+            # noVNC reference them directly; this parent mount is only
+            # used for the symlink targets.
+            "-v", f"{vm_dir}:/host/vm-source:ro",
+            # The other dir mounts that already worked fine — keep them.
             "-v", f"{vm_dir}/css:/usr/share/novnc/css:ro",
             "-v", f"{vm_dir}/js:/usr/share/novnc/js:ro",
-            "-v", f"{vm_dir}/vendor/sortable.min.js:/usr/share/novnc/vendor/sortable.min.js:ro",
-            "-v", f"{vm_dir}/vendor/qrcode.min.js:/usr/share/novnc/vendor/qrcode.min.js:ro",
             "-v", f"{vm_dir}/fonts:/usr/share/novnc/fonts:ro",
             "-v", f"{vm_dir}/icons:/usr/share/novnc/icons:ro",
-            "-v", f"{vm_dir}/servers/control-server.py:/opt/control-server.py:ro",
-            "-v", f"{vm_dir}/servers/terminal-server.py:/opt/terminal-server.py:ro",
-            "-v", f"{vm_dir}/servers/audio-server.py:/opt/audio-server.py:ro",
+            # Shared popover modules — already directory mounts, fine.
+            "-v", f"{project_root}/inspekt/scripts/shared-popover:/usr/share/novnc/scripts/shared-popover:ro",
+            "-v", f"{project_root}/inspekt/scripts/axe-popover:/usr/share/novnc/scripts/axe-popover:ro",
+            "-v", f"{project_root}/inspekt/scripts/unified-popover:/usr/share/novnc/scripts/unified-popover:ro",
+            # inspekt-config.yaml — read once at startup then copied to the
+            # inspekt user's home (see entrypoint.sh). Even if the bind
+            # mount desyncs later, the copy already happened. Low risk
+            # leaving as a single-file mount.
             "-v", f"{vm_dir}/inspekt-config.yaml:/root/.config/inspekt.yaml:ro",
         ])
 
@@ -372,12 +394,15 @@ def _start_container(dev_mode: bool = False, vm_dir: Path = None) -> bool:
         if extensions_src.exists():
             cmd.extend(["-v", f"{extensions_src}:/opt/inspekt/extensions:ro"])
 
-        click.echo("    Volume mounts:")
-        click.echo("    • control-panel.html → /usr/share/novnc/control.html")
-        click.echo("    • fonts/ → /usr/share/novnc/fonts/")
-        click.echo("    • control-server.py → /opt/control-server.py")
-        click.echo("    • terminal-server.py → /opt/terminal-server.py")
-        click.echo("    • inspekt-config.yaml → /root/.config/inspekt.yaml")
+        click.echo("    Volume mounts (directory mounts only — single-file mounts");
+        click.echo("    desync on atomic-rewrite; entrypoint.sh symlinks the targets):")
+        click.echo("    • vm/ → /host/vm-source/  (source tree, symlinked into expected paths)")
+        click.echo("    • vm/css → /usr/share/novnc/css/")
+        click.echo("    • vm/js → /usr/share/novnc/js/")
+        click.echo("    • vm/fonts → /usr/share/novnc/fonts/")
+        click.echo("    • inspekt/scripts/{shared,axe,unified}-popover → /usr/share/novnc/scripts/...")
+        click.echo("    • inspekt-config.yaml → /root/.config/inspekt.yaml  (read-once, low risk)")
+        click.echo("    • inspekt-vm-data → /root/.config/inspekt/  (persistent)")
         click.echo("    • inspekt-vm-data → /root/.config/inspekt/ (persistent)")
         if inspekt_src.exists():
             click.echo("    • inspekt/ → /opt/inspekt/inspekt/")

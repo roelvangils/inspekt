@@ -123,6 +123,7 @@ iptables -A OUTPUT -m owner --uid-owner $INSPEKT_UID -o lo -p tcp --dport 8080 -
 iptables -A OUTPUT -m owner --uid-owner $INSPEKT_UID -o lo -p tcp --dport 8767 -j ACCEPT  # bridge WebSocket
 iptables -A OUTPUT -m owner --uid-owner $INSPEKT_UID -o lo -p tcp --dport 8768 -j ACCEPT  # bridge HTTP
 iptables -A OUTPUT -m owner --uid-owner $INSPEKT_UID -o lo -p tcp --dport 8888 -j ACCEPT  # control server
+iptables -A OUTPUT -m owner --uid-owner $INSPEKT_UID -o lo -p tcp --dport 8890 -j ACCEPT  # overlay bus
 
 # Drop everything else (CDP on 9222, internet, other ports)
 iptables -A OUTPUT -m owner --uid-owner $INSPEKT_UID -j DROP
@@ -192,6 +193,54 @@ if [ -d "$CHROMIUM_PROFILE/Default" ]; then
         "$CHROMIUM_PROFILE/ShaderCache" \
         2>/dev/null || true
     echo "Chromium caches cleared"
+fi
+
+# --- DEV-MODE LIVE-RELOAD SYMLINKS ---
+# When started in dev mode (INSPEKT_DEV_MODE=1, set by `inspekt vm start`
+# from a source repo), the host's working tree is bind-mounted under
+# /host/vm-source and /opt/inspekt/extensions. Replace the image's baked
+# production files with symlinks into those directory mounts so source
+# edits are visible immediately — without the bind-mount-desync that
+# single-file mounts hit on Linux when editors atomic-replace files.
+if [ "${INSPEKT_DEV_MODE}" = "1" ]; then
+    echo "Dev mode: linking baked files to bind-mounted source tree"
+
+    # Server scripts (supervisord runs these by absolute path)
+    if [ -d /host/vm-source/servers ]; then
+        for s in control-server terminal-server audio-server overlay-bus-server; do
+            if [ -f "/host/vm-source/servers/${s}.py" ]; then
+                ln -sf "/host/vm-source/servers/${s}.py" "/opt/${s}.py"
+            fi
+        done
+    fi
+
+    # Chromium wrapper — supervisord launches /opt/inspekt-chromium.sh.
+    # Symlinking lets us iterate on flags / policies with just a chromium
+    # restart, no rebuild.
+    if [ -f /host/vm-source/scripts/inspekt-chromium.sh ]; then
+        ln -sf /host/vm-source/scripts/inspekt-chromium.sh /opt/inspekt-chromium.sh
+    fi
+
+    # noVNC control panel
+    if [ -f /host/vm-source/control-panel.html ]; then
+        ln -sf /host/vm-source/control-panel.html /usr/share/novnc/control.html
+    fi
+
+    # Frequently-edited vendor JS
+    for v in sortable.min.js qrcode.min.js; do
+        if [ -f "/host/vm-source/vendor/${v}" ]; then
+            ln -sf "/host/vm-source/vendor/${v}" "/usr/share/novnc/vendor/${v}"
+        fi
+    done
+
+    # Overlay-bus renderer factory — source-of-truth lives in the chrome
+    # extension. The extensions tree is mounted at /opt/inspekt/extensions
+    # by `inspekt vm start`. Only link if that mount is in place.
+    if [ -f /opt/inspekt/extensions/chrome/overlay-bus-renderers.js ]; then
+        mkdir -p /usr/share/novnc/scripts
+        ln -sf /opt/inspekt/extensions/chrome/overlay-bus-renderers.js \
+               /usr/share/novnc/scripts/overlay-bus-renderers.js
+    fi
 fi
 
 # Start supervisor (manages all processes)

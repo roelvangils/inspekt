@@ -593,39 +593,138 @@
             };
         }
 
-        // Inject CSS
-        await injectUnifiedCSS(devCss);
-
-        // Create badges and popovers
+        // VM-mode bus path: emit overlay data instead of injecting DOM badges/popovers.
+        // Detect by both API and ready flag — the ready flag is mirrored from the
+        // isolated content script after the producer WS connects.
+        const useOverlayBus = !!(window.InspektOverlayBus && window.__INSPEKT_OVERLAY_BUS_READY__);
         let badgeCount = 0;
-        unifiedViolations.forEach((violation, idx) => {
-            const badgeNumber = idx + 1;
 
-            // Create badge
-            const badge = createUnifiedBadge(violation, badgeNumber);
-            if (!badge) return;
+        if (useOverlayBus) {
+            const bus = window.InspektOverlayBus;
+            // Drop any leftover unified-axe overlays from a prior run.
+            bus.clearAll('a11y:');
+            // Shadow-DOM-aware target resolver. axe's `node.target` is a flat
+            // string[] for normal elements but a nested string[][] (one selector
+            // list per shadow boundary) for elements inside shadow roots. A
+            // flat join(' > ') corrupts the nested form, so we walk shadow roots
+            // ourselves and hand the live element to the bus.
+            const resolveAxeTarget = (target, fallbackElement) => {
+                if (typeof target === 'string') return { selector: target };
+                if (!Array.isArray(target) || target.length === 0) {
+                    return fallbackElement ? { element: fallbackElement } : { selector: null };
+                }
+                const isNested = target.some(part => Array.isArray(part));
+                if (!isNested) return { selector: target.join(' > ') };
+                try {
+                    let el = document.querySelector(target[0].join(' > '));
+                    if (!el) {
+                        console.warn('[Inspekt A11Y] resolveAxeTarget: shadow host not found, falling back to element', target);
+                        return fallbackElement ? { element: fallbackElement } : { selector: null };
+                    }
+                    for (let i = 1; i < target.length; i++) {
+                        if (!el.shadowRoot) {
+                            console.warn('[Inspekt A11Y] resolveAxeTarget: shadow root inaccessible at depth', i, target);
+                            return fallbackElement ? { element: fallbackElement } : { selector: null };
+                        }
+                        el = el.shadowRoot.querySelector(target[i].join(' > '));
+                        if (!el) {
+                            console.warn('[Inspekt A11Y] resolveAxeTarget: piercing query miss at depth', i, target);
+                            return fallbackElement ? { element: fallbackElement } : { selector: null };
+                        }
+                    }
+                    return { element: el };
+                } catch (e) {
+                    console.warn('[Inspekt A11Y] resolveAxeTarget: shadow walk error', target, e);
+                    return fallbackElement ? { element: fallbackElement } : { selector: null };
+                }
+            };
+            unifiedViolations.forEach((violation, idx) => {
+                const element = violation.element;
+                if (!element || element.nodeType !== 1) return;
+                const badgeNumber = idx + 1;
+                const rect = element.getBoundingClientRect();
 
-            // Create popover using shared popover content module
-            const popover = popoverContent.createUnifiedPopover(violation, badgeNumber, engines, popoverCore);
+                // Selector / element resolution for live tracking. axe targets
+                // can be nested arrays (shadow DOM) — resolveAxeTarget handles
+                // both shapes.
+                const axeTarget = (violation.sources && violation.sources.axe && violation.sources.axe[0])
+                    ? violation.sources.axe[0].target : null;
+                const tracked = (axeTarget != null)
+                    ? resolveAxeTarget(axeTarget, element)
+                    : (element.id ? { selector: '#' + element.id } : { element });
 
-            document.body.appendChild(badge);
-            document.body.appendChild(popover);
+                // Build a transport-safe view of the unified violation: same
+                // shape popoverCore.addViolation + popoverContent.createUnifiedPopover
+                // expect, minus the live DOM ref (which can't cross the bus).
+                // The host-side consumer uses this to call those same shared
+                // modules and renders the exact same popover UI as non-VM mode.
+                const violationView = {
+                    index: violation.index,
+                    badgeId: violation.badgeId,
+                    popoverId: violation.popoverId,
+                    sources: violation.sources,
+                    highestImpact: violation.highestImpact,
+                    isRecommendation: !!violation.isRecommendation,
+                    engineCounts: violation.engineCounts,
+                    hasEngine: violation.hasEngine,
+                    totalCount: violation.totalCount,
+                    hasAxe: violation.hasAxe,
+                    hasIbm: violation.hasIbm,
+                    axeCount: violation.axeCount,
+                    ibmCount: violation.ibmCount,
+                };
+                const payload = {
+                    badgeNumber,
+                    engines,
+                    violation: violationView,
+                };
+                const opts = {
+                    interactive: !!interactiveBadges,
+                    track: true,
+                    events: interactiveBadges ? ['click'] : [],
+                    ...tracked,
+                };
+                // 'a11y-badge' is an a11y-aware kind: the consumer renders the
+                // badge AND pre-creates the matching popover element (hidden,
+                // popover="auto") so popoverCore navigation just calls
+                // showPopover()/hidePopover() like in the in-page path.
+                bus.set('a11y:badge:' + badgeNumber, 'a11y-badge', rect, payload, opts);
 
-            // Add to popover state
-            popoverCore.addViolation(violation);
+                // Keep the in-page popoverCore in sync too — the in-page CLI
+                // result still references this violation list for verbose
+                // output. Host-side popoverCore is populated by the consumer.
+                popoverCore.addViolation(violation);
+                badgeCount++;
+            });
+            console.log(`[Inspekt A11Y] Emitted ${badgeCount} unified badges via overlay bus`);
+        } else {
+            // Inject CSS — only needed for the DOM path.
+            await injectUnifiedCSS(devCss);
 
-            // Bind badge click
-            if (interactiveBadges) {
-                badge.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    popoverCore.navigateToViolation(idx);
-                });
-            }
+            unifiedViolations.forEach((violation, idx) => {
+                const badgeNumber = idx + 1;
 
-            badgeCount++;
-        });
+                const badge = createUnifiedBadge(violation, badgeNumber);
+                if (!badge) return;
 
-        console.log(`[Inspekt A11Y] Created ${badgeCount} unified badges`);
+                const popover = popoverContent.createUnifiedPopover(violation, badgeNumber, engines, popoverCore);
+
+                document.body.appendChild(badge);
+                document.body.appendChild(popover);
+
+                popoverCore.addViolation(violation);
+
+                if (interactiveBadges) {
+                    badge.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        popoverCore.navigateToViolation(idx);
+                    });
+                }
+                badgeCount++;
+            });
+
+            console.log(`[Inspekt A11Y] Created ${badgeCount} unified badges`);
+        }
 
         // Calculate per-engine badge breakdown
         const perEngineBadges = {};

@@ -9,6 +9,7 @@ services:
       - "8888:8888"   # Control server (navigation, tabs, CDP proxy)
       - "7835:7835"   # bore tunnel server
       - "8889:8889"   # Terminal WebSocket server
+      - "8890:8890"   # Overlay bus WebSocket server
     environment:
       - VNC_RESOLUTION=1280x720
       - VNC_PASSWORD=

@@ -220,68 +220,6 @@
     }
 
     // ============================================================
-    // DIRECTION CALCULATION
-    // ============================================================
-
-    /**
-     * Calculate direction from current badge to target badge
-     * @param {HTMLElement} currentBadge - Current badge element
-     * @param {HTMLElement} targetBadge - Target badge element
-     * @returns {string} Direction string
-     */
-    function calculateDirection(currentBadge, targetBadge) {
-        const currentRect = currentBadge.getBoundingClientRect();
-        const targetRect = targetBadge.getBoundingClientRect();
-
-        const currentX = currentRect.left + currentRect.width / 2;
-        const currentY = currentRect.top + currentRect.height / 2;
-        const targetX = targetRect.left + targetRect.width / 2;
-        const targetY = targetRect.top + targetRect.height / 2;
-
-        const deltaX = targetX - currentX;
-        const deltaY = targetY - currentY;
-
-        const absDeltaX = Math.abs(deltaX);
-        const absDeltaY = Math.abs(deltaY);
-
-        // Pure horizontal
-        if (absDeltaX > absDeltaY * 2) {
-            return deltaX > 0 ? 'right' : 'left';
-        }
-
-        // Pure vertical
-        if (absDeltaY > absDeltaX * 2) {
-            return deltaY > 0 ? 'down' : 'up';
-        }
-
-        // Diagonal
-        if (deltaY < 0) {
-            return deltaX > 0 ? 'up-right' : 'up-left';
-        } else {
-            return deltaX > 0 ? 'down-right' : 'down-left';
-        }
-    }
-
-    /**
-     * Get opposite direction for entry animation
-     * @param {string} exitDirection - Exit direction
-     * @returns {string} Opposite direction for entry
-     */
-    function getOppositeDirection(exitDirection) {
-        const opposites = {
-            'up': 'down',
-            'down': 'up',
-            'left': 'right',
-            'right': 'left',
-            'up-left': 'down-right',
-            'up-right': 'down-left',
-            'down-left': 'up-right',
-            'down-right': 'up-left'
-        };
-        return opposites[exitDirection] || 'down';
-    }
-
-    // ============================================================
     // NAVIGATION
     // ============================================================
 
@@ -290,10 +228,14 @@
      * @param {HTMLElement} popover - The popover element
      */
     function updateNavigationControls(popover) {
-        const prevBtn = popover.querySelector('.inspekt-nav__prev');
-        const nextBtn = popover.querySelector('.inspekt-nav__next');
-        const counter = popover.querySelector('.inspekt-nav__counter');
-        const skipInput = popover.querySelector('.inspekt-nav__skip-input');
+        // The popover's actual class names use the `inspekt-axe-nav__*`
+        // prefix (see popover-content.js:147+). The original `inspekt-nav__*`
+        // selectors here matched nothing — counter stayed at the hardcoded
+        // "1/1" forever and prev/next buttons were never enabled/disabled.
+        const prevBtn = popover.querySelector('.inspekt-axe-nav__prev');
+        const nextBtn = popover.querySelector('.inspekt-axe-nav__next');
+        const counter = popover.querySelector('.inspekt-axe-nav__counter');
+        const skipInput = popover.querySelector('.inspekt-axe-nav__skip-input');
 
         const total = popoverState.violations.length;
         const current = popoverState.currentIndex + 1; // 1-based for display
@@ -320,10 +262,24 @@
     }
 
     /**
-     * Navigate to a violation by index
+     * Navigate to a violation by index. Slides the popover from its
+     * previous anchored position to the new one; content swap is
+     * instant. NO fade, NO scale, NO cross-fade — the only thing that
+     * animates is the popover's position.
+     *
+     * Implementation: pure FLIP. Capture the current popover's on-screen
+     * rect, hide it, show the next one (which appears at its natural
+     * anchored position), then animate the new popover's transform from
+     * the OLD position back to (0, 0) over 200 ms. Browser interpolates
+     * the translate; no other property changes.
+     *
+     * Skipped in detached mode (popover stays where the user dragged it
+     * — no movement to animate) and on initial open (no previous popover
+     * to slide from).
+     *
      * @param {number} targetIndex - Index to navigate to
      */
-    async function navigateToViolation(targetIndex) {
+    function navigateToViolation(targetIndex) {
         if (targetIndex < 0 || targetIndex >= popoverState.violations.length) return;
 
         const targetViolation = popoverState.violations[targetIndex];
@@ -334,124 +290,47 @@
             b.classList.remove('inspekt-badge--active')
         );
         const activeBadge = document.getElementById(targetViolation.badgeId);
-        if (activeBadge) {
-            activeBadge.classList.add('inspekt-badge--active');
-        }
+        if (activeBadge) activeBadge.classList.add('inspekt-badge--active');
+
+        const targetPopover = document.getElementById(targetViolation.popoverId);
+        if (!targetPopover) return;
 
         const currentIndex = popoverState.currentIndex;
-        const targetPopover = document.getElementById(targetViolation.popoverId);
 
-        // If no current popover or detached mode, navigate instantly
-        if (currentIndex < 0 || popoverState.detachedState.isDetached) {
-            if (currentIndex >= 0) {
-                const currentViolation = popoverState.violations[currentIndex];
-                if (currentViolation) {
-                    const currentPopover = document.getElementById(currentViolation.popoverId);
-                    if (currentPopover) {
-                        currentPopover.hidePopover();
-                    }
+        // Capture the previous popover's screen rect BEFORE we hide it —
+        // this is the FLIP "from" position. Skipped for initial open (no
+        // current popover) and for detached mode (no movement needed).
+        let fromRect = null;
+        if (currentIndex >= 0 && !popoverState.detachedState.isDetached) {
+            const cv = popoverState.violations[currentIndex];
+            if (cv && cv.popoverId !== targetViolation.popoverId) {
+                const cp = document.getElementById(cv.popoverId);
+                if (cp && cp.matches(':popover-open')) {
+                    fromRect = cp.getBoundingClientRect();
+                    cp.hidePopover();
                 }
             }
-
-            popoverState.currentIndex = targetIndex;
-            if (targetPopover) {
-                targetPopover.showPopover();
-                updateNavigationControls(targetPopover);
-            }
-            return;
         }
 
-        // Directional transition
-        const currentViolation = popoverState.violations[currentIndex];
-        if (!currentViolation) return;
-
-        const currentPopover = document.getElementById(currentViolation.popoverId);
-        if (!currentPopover) return;
-
-        const currentBadge = document.getElementById(currentViolation.badgeId);
-        const targetBadge = document.getElementById(targetViolation.badgeId);
-
-        if (!currentBadge || !targetBadge) {
-            // Fallback to instant
-            currentPopover.hidePopover();
-            popoverState.currentIndex = targetIndex;
-            if (targetPopover) {
-                targetPopover.showPopover();
-                updateNavigationControls(targetPopover);
-            }
-            return;
-        }
-
-        const direction = calculateDirection(currentBadge, targetBadge);
-        const oppositeDirection = getOppositeDirection(direction);
-
-        // Apply exit animation
-        currentPopover.classList.add(`exit-${direction}`);
-
-        // Wait for exit animation
-        await new Promise(resolve => {
-            let resolved = false;
-            const timeoutId = setTimeout(() => {
-                if (!resolved) {
-                    resolved = true;
-                    currentPopover.removeEventListener('animationend', onAnimationEnd);
-                    resolve();
-                }
-            }, 200);
-
-            const onAnimationEnd = (e) => {
-                if (e.target !== currentPopover) return;
-                if (!e.animationName.startsWith('popoverExit')) return;
-
-                if (!resolved) {
-                    resolved = true;
-                    clearTimeout(timeoutId);
-                    currentPopover.removeEventListener('animationend', onAnimationEnd);
-                    resolve();
-                }
-            };
-            currentPopover.addEventListener('animationend', onAnimationEnd);
-        });
-
-        // Hide current and clean up
-        currentPopover.hidePopover();
-        currentPopover.classList.remove(`exit-${direction}`);
-
-        // Update current index
         popoverState.currentIndex = targetIndex;
+        targetPopover.showPopover();
+        updateNavigationControls(targetPopover);
 
-        // Show target with entry animation
-        if (targetPopover) {
-            targetPopover.classList.add(`enter-from-${oppositeDirection}`);
-
-            requestAnimationFrame(() => {
-                requestAnimationFrame(() => {
-                    targetPopover.showPopover();
-                    updateNavigationControls(targetPopover);
-
-                    let entryResolved = false;
-                    const entryTimeoutId = setTimeout(() => {
-                        if (!entryResolved) {
-                            entryResolved = true;
-                            targetPopover.removeEventListener('animationend', onEntryAnimationEnd);
-                            targetPopover.classList.remove(`enter-from-${oppositeDirection}`);
-                        }
-                    }, 200);
-
-                    const onEntryAnimationEnd = (e) => {
-                        if (e.target !== targetPopover) return;
-                        if (!e.animationName.startsWith('popoverEnterFrom')) return;
-
-                        if (!entryResolved) {
-                            entryResolved = true;
-                            clearTimeout(entryTimeoutId);
-                            targetPopover.removeEventListener('animationend', onEntryAnimationEnd);
-                            targetPopover.classList.remove(`enter-from-${oppositeDirection}`);
-                        }
-                    };
-                    targetPopover.addEventListener('animationend', onEntryAnimationEnd);
-                });
-            });
+        if (fromRect) {
+            const toRect = targetPopover.getBoundingClientRect();
+            const dx = fromRect.left - toRect.left;
+            const dy = fromRect.top  - toRect.top;
+            // Skip animation if the delta is sub-pixel — same anchor or
+            // visually identical position.
+            if (Math.abs(dx) > 1 || Math.abs(dy) > 1) {
+                targetPopover.animate(
+                    [
+                        { transform: `translate(${dx}px, ${dy}px)` },
+                        { transform: 'translate(0, 0)' },
+                    ],
+                    { duration: 200, easing: 'cubic-bezier(0.4, 0, 0.2, 1)', fill: 'none' }
+                );
+            }
         }
     }
 
@@ -464,17 +343,17 @@
      * @param {HTMLElement} popover - The popover element
      */
     function toggleDetach(popover) {
-        const detachButton = popover.querySelector('.inspekt-nav__detach');
+        const detachButton = popover.querySelector('.inspekt-axe-nav__detach');
         const isDetached = popoverState.detachedState.isDetached;
 
         if (isDetached) {
             // Reattach
             popoverState.detachedState.isDetached = false;
-            popover.classList.remove('inspekt-popover--detached');
+            popover.classList.remove('inspekt-axe-popover--detached');
             popover.style.left = '';
             popover.style.top = '';
             if (detachButton) {
-                detachButton.classList.remove('inspekt-nav__detach--active');
+                detachButton.classList.remove('inspekt-axe-nav__detach--active');
                 detachButton.setAttribute('aria-pressed', 'false');
                 detachButton.title = 'Detach popover (drag freely on page)';
             }
@@ -486,11 +365,11 @@
             popoverState.detachedState.x = rect.left;
             popoverState.detachedState.y = rect.top;
             popoverState.detachedState.isDragging = false;
-            popover.classList.add('inspekt-popover--detached');
+            popover.classList.add('inspekt-axe-popover--detached');
             popover.style.left = rect.left + 'px';
             popover.style.top = rect.top + 'px';
             if (detachButton) {
-                detachButton.classList.add('inspekt-nav__detach--active');
+                detachButton.classList.add('inspekt-axe-nav__detach--active');
                 detachButton.setAttribute('aria-pressed', 'true');
                 detachButton.title = 'Reattach popover to badge';
             }
@@ -504,7 +383,7 @@
      */
     function enableDragging(popover) {
         const popoverId = popover.id;
-        const nav = popover.querySelector('.inspekt-nav');
+        const nav = popover.querySelector('.inspekt-axe-nav');
         if (!nav) return;
 
         const onMouseDown = (e) => {
@@ -513,7 +392,7 @@
             popoverState.detachedState.isDragging = true;
             popoverState.detachedState.offsetX = e.clientX - parseFloat(popover.style.left);
             popoverState.detachedState.offsetY = e.clientY - parseFloat(popover.style.top);
-            popover.classList.add('inspekt-popover--dragging');
+            popover.classList.add('inspekt-axe-popover--dragging');
             e.preventDefault();
         };
 
@@ -530,7 +409,7 @@
             if (!popoverState.detachedState.isDetached) return;
 
             popoverState.detachedState.isDragging = false;
-            popover.classList.remove('inspekt-popover--dragging');
+            popover.classList.remove('inspekt-axe-popover--dragging');
         };
 
         const onTouchStart = (e) => {
@@ -540,7 +419,7 @@
             popoverState.detachedState.isDragging = true;
             popoverState.detachedState.offsetX = touch.clientX - parseFloat(popover.style.left);
             popoverState.detachedState.offsetY = touch.clientY - parseFloat(popover.style.top);
-            popover.classList.add('inspekt-popover--dragging');
+            popover.classList.add('inspekt-axe-popover--dragging');
             e.preventDefault();
         };
 
@@ -559,7 +438,7 @@
             if (!popoverState.detachedState.isDetached) return;
 
             popoverState.detachedState.isDragging = false;
-            popover.classList.remove('inspekt-popover--dragging');
+            popover.classList.remove('inspekt-axe-popover--dragging');
         };
 
         // Store listeners for cleanup
@@ -586,7 +465,7 @@
      */
     function disableDragging(popover) {
         const popoverId = popover.id;
-        const nav = popover.querySelector('.inspekt-nav');
+        const nav = popover.querySelector('.inspekt-axe-nav');
 
         if (nav && nav._dragListeners) {
             nav.removeEventListener('mousedown', nav._dragListeners.mousedown);
@@ -622,12 +501,12 @@
 
         // Restore detached state if enabled
         if (popoverState.detachedState.isDetached) {
-            const detachButton = popover.querySelector('.inspekt-nav__detach');
-            popover.classList.add('inspekt-popover--detached');
+            const detachButton = popover.querySelector('.inspekt-axe-nav__detach');
+            popover.classList.add('inspekt-axe-popover--detached');
             popover.style.left = popoverState.detachedState.x + 'px';
             popover.style.top = popoverState.detachedState.y + 'px';
             if (detachButton) {
-                detachButton.classList.add('inspekt-nav__detach--active');
+                detachButton.classList.add('inspekt-axe-nav__detach--active');
                 detachButton.setAttribute('aria-pressed', 'true');
                 detachButton.title = 'Reattach popover to badge';
             }
@@ -748,10 +627,6 @@
         enableDragging,
         disableDragging,
         handlePopoverOpen,
-
-        // Direction calculation
-        calculateDirection,
-        getOppositeDirection,
 
         // Reset
         reset

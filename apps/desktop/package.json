@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "clean-cache": "rm -rf ~/Library/WebKit/be.fronteers.inspekt-browser-vm ~/Library/Caches/be.fronteers.inspekt-browser-vm 2>/dev/null || true",
-    "dev": "bun run clean-cache && vite",
+    "dev": "bun run clean-cache && NODE_OPTIONS=--disable-warning=DEP0205 vite",
     "dev:bundle": "tauri build --debug --bundles app",
     "dev:app": "bash scripts/dev-app-bundle.sh",
     "build": "vite build",
@@ -15,17 +15,17 @@
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^6.2.4",
-    "@tailwindcss/vite": "^4.2.2",
-    "@tauri-apps/cli": "^2.10.1",
+    "@tailwindcss/vite": "^4.3.0",
+    "@tauri-apps/cli": "^2.11.1",
     "@tsconfig/svelte": "^5.0.8",
-    "svelte": "^5.55.4",
-    "svelte-check": "^4.4.6",
-    "tailwindcss": "^4.2.2",
+    "svelte": "^5.55.5",
+    "svelte-check": "^4.4.8",
+    "tailwindcss": "^4.3.0",
     "typescript": "^5.9.3",
-    "vite": "^7.3.2"
+    "vite": "^7.3.3"
   },
   "dependencies": {
-    "@tauri-apps/api": "^2.10.1",
+    "@tauri-apps/api": "^2.11.0",
     "@tauri-apps/plugin-shell": "^2.3.5",
     "@tauri-apps/plugin-notification": "^2.3.3",
     "@tauri-apps/plugin-os": "^2.3.2"

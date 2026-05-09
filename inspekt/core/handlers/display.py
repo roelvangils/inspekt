@@ -33,6 +33,9 @@ logger = logging.getLogger(__name__)
 # VM control server port (matches vm/control-server.py)
 VM_CONTROL_PORT = 8888
 
+# VM overlay-bus WebSocket port (matches vm/servers/overlay-bus-server.py)
+VM_OVERLAY_BUS_PORT = 8890
+
 
 def _is_vm() -> bool:
     """Check if running inside the Inspekt VM."""

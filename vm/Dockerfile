@@ -16,12 +16,23 @@
 FROM oven/bun:1-alpine AS bundle
 WORKDIR /work
 COPY package.json ./
+# Workspace package.jsons need to be present for `bun install` to satisfy
+# the workspaces declaration. Tauri apps don't ship inside the VM image —
+# we only need their package.jsons to keep bun's resolver happy.
+COPY apps/desktop/package.json    ./apps/desktop/package.json
+COPY apps/pdf-viewer/package.json ./apps/pdf-viewer/package.json
 # Install both prod + dev deps — esbuild (used by bundle-vm.mjs) is a devDep.
 RUN bun install
 COPY scripts/bundle-vm.mjs ./scripts/
 COPY vm/control-panel.html ./vm/
 COPY vm/css ./vm/css
 COPY vm/js ./vm/js
+# Source-of-truth files for assets that get served from the noVNC paths but
+# are checked in elsewhere (so the bundler can resolve them via remap).
+COPY inspekt/scripts/shared-popover  ./inspekt/scripts/shared-popover
+COPY inspekt/scripts/axe-popover     ./inspekt/scripts/axe-popover
+COPY inspekt/scripts/unified-popover ./inspekt/scripts/unified-popover
+COPY extensions/chrome/overlay-bus-renderers.js ./extensions/chrome/overlay-bus-renderers.js
 RUN bun scripts/bundle-vm.mjs
 
 # ── Stage 2: the VM image ───────────────────────────────────
@@ -440,12 +451,24 @@ COPY vm/vendor/xterm.min.js /usr/share/novnc/vendor/xterm.min.js
 COPY vm/vendor/xterm-addon-fit.min.js /usr/share/novnc/vendor/xterm-addon-fit.min.js
 COPY vm/vendor/xterm-addon-web-links.min.js /usr/share/novnc/vendor/xterm-addon-web-links.min.js
 COPY vm/js /usr/share/novnc/js
+# Shared popover modules + CSS — same files run_a11y.js loads in-page
+# in non-VM mode. We serve them from the control panel so the host-side
+# bus consumer can render the exact same popover element + styling.
+COPY inspekt/scripts/shared-popover /usr/share/novnc/scripts/shared-popover
+COPY inspekt/scripts/axe-popover    /usr/share/novnc/scripts/axe-popover
+COPY inspekt/scripts/unified-popover /usr/share/novnc/scripts/unified-popover
+# Shared overlay-bus renderer factory — single source of truth (lives in
+# extensions/chrome/ since the extension also loads it as a content
+# script in non-VM mode). Served from /scripts/ so it sits outside the
+# vm/js dev bind-mount.
+COPY extensions/chrome/overlay-bus-renderers.js /usr/share/novnc/scripts/overlay-bus-renderers.js
 COPY vm/scripts/inspekt-chromium.sh /opt/inspekt-chromium.sh
 COPY vm/scripts/devtools-manager.sh /opt/devtools-manager.sh
 COPY vm/config/xorg.conf /etc/X11/xorg.conf
 COPY vm/scripts/resize-display.sh /opt/resize-display.sh
 COPY vm/scripts/download.sh /usr/local/bin/download
 COPY vm/servers/audio-server.py /opt/audio-server.py
+COPY vm/servers/overlay-bus-server.py /opt/overlay-bus-server.py
 COPY vm/config/pulse-config.pa /etc/pulse/default.pa
 COPY vm/proxy-scripts /opt/proxy-scripts
 COPY vm/pages /opt/pages

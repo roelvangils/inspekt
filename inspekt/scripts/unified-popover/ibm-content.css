@@ -200,15 +200,35 @@
   filter: grayscale(50%);
 }
 
-/* Active badge (currently viewing) */
+/* Active badge (currently viewing) — pulse via box-shadow rings, NOT
+   transform: scale. Scaling moves the badge, and since the badge is the
+   position-anchor source for the popover (CSS anchor positioning), the
+   popover would shift along with the badge. box-shadow expands outside
+   the badge's box without affecting its layout rect, so the anchor stays
+   put. We keep a static glow ring (4px) and animate a SECOND ring outward
+   from there for the visible pulse effect. !important on both is needed
+   because the base `.inspekt-badge` rule has `box-shadow: ... !important`
+   on the drop shadow, and we want our active rings to layer on top. */
 .inspekt-badge--active {
-  animation: badgePulse 1.5s ease-in-out infinite;
-  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.3), 0 2px 4px rgba(0, 0, 0, 0.4) !important;
+  box-shadow:
+    0 0 0 4px rgba(37, 99, 235, 0.4),
+    0 2px 4px rgba(0, 0, 0, 0.4) !important;
+  animation: badgePulse 1.5s ease-in-out infinite !important;
 }
 
 @keyframes badgePulse {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.1); }
+  0% {
+    box-shadow:
+      0 0 0 4px rgba(37, 99, 235, 0.4),
+      0 0 0 4px rgba(37, 99, 235, 0.4),
+      0 2px 4px rgba(0, 0, 0, 0.4);
+  }
+  100% {
+    box-shadow:
+      0 0 0 4px rgba(37, 99, 235, 0.4),
+      0 0 0 14px rgba(37, 99, 235, 0.0),
+      0 2px 4px rgba(0, 0, 0, 0.4);
+  }
 }
 
 /* Interactive badge (clickable) */

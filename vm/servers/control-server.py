@@ -2200,7 +2200,9 @@ class ControlHandler(BaseHTTPRequestHandler):
     else if (el.className && typeof el.className === 'string' && el.className.trim())
         selector += '.' + el.className.trim().split(/\\s+/).slice(0,2).join('.');
     const r = el.getBoundingClientRect();
-    return {{ ok: true, selector: selector, rect: {{ left: r.left, top: r.top, width: r.width, height: r.height }} }};
+    const rect = {{ left: r.left, top: r.top, width: r.width, height: r.height }};
+    window.InspektOverlayBus?._emitInspect?.(rect, selector, 0, 0, false);
+    return {{ ok: true, selector: selector, rect: rect }};
 }})()
 '''
             try:
@@ -2303,7 +2305,12 @@ class ControlHandler(BaseHTTPRequestHandler):
     else if (el.className && typeof el.className === 'string' && el.className.trim())
         selector += '.' + el.className.trim().split(/\\s+/).slice(0,2).join('.');
     const r = el.getBoundingClientRect();
-    return {{ ok: true, tag: tag, selector: selector, rect: {{ left: r.left, top: r.top, width: r.width, height: r.height }} }};
+    const rect = {{ left: r.left, top: r.top, width: r.width, height: r.height }};
+    const siblings = Array.from(el.parentElement?.children || []);
+    const siblingIndex = siblings.indexOf(el) + 1;
+    const siblingCount = siblings.length;
+    window.InspektOverlayBus?._emitInspect?.(rect, selector, siblingIndex, siblingCount, true);
+    return {{ ok: true, tag: tag, selector: selector, rect: rect }};
 }})()
 '''
             try:
@@ -2360,6 +2367,30 @@ class ControlHandler(BaseHTTPRequestHandler):
                     self.send_json({'ok': False})
             except Exception:
                 self.send_json({'ok': False})
+
+        elif path == '/inspect/clear':
+            # Clear all bus-rendered inspect overlays. Called when the host
+            # exits inspect mode so the producer drops its observers and the
+            # consumer dismisses the highlight + tooltip.
+            query = parse_qs(urlparse(self.path).query)
+            tab = get_requested_tab(query)
+            if not tab or not tab.get('webSocketDebuggerUrl'):
+                self.send_json({'ok': True, 'noTab': True})
+                return
+            js_code = '''
+(() => {
+    if (window.InspektOverlayBus) window.InspektOverlayBus.clearAll('inspect:');
+    return { ok: true };
+})()
+'''
+            try:
+                ws_url = tab['webSocketDebuggerUrl']
+                send_cdp_command(ws_url, 'Runtime.evaluate', {
+                    'expression': js_code, 'returnByValue': True
+                })
+                self.send_json({'ok': True})
+            except Exception as e:
+                self.send_json({'ok': False, 'error': str(e)})
 
         elif path == '/inspect/navigate':
             # Navigate the DOM relative to the current inspected element.
@@ -2442,12 +2473,16 @@ class ControlHandler(BaseHTTPRequestHandler):
         selector += '.' + target.className.trim().split(/\\s+/).slice(0,2).join('.');
     const r = target.getBoundingClientRect();
     const siblings = Array.from(target.parentElement?.children || []);
+    const rect = {{ left: r.left, top: r.top, width: r.width, height: r.height }};
+    const siblingIndex = siblings.indexOf(target) + 1;
+    const siblingCount = siblings.length;
+    window.InspektOverlayBus?._emitInspect?.(rect, selector, siblingIndex, siblingCount, true);
     return {{
         ok: true,
         selector: selector,
-        rect: {{ left: r.left, top: r.top, width: r.width, height: r.height }},
-        siblingIndex: siblings.indexOf(target) + 1,
-        siblingCount: siblings.length,
+        rect: rect,
+        siblingIndex: siblingIndex,
+        siblingCount: siblingCount,
         ...navInfo
     }};
 }})()

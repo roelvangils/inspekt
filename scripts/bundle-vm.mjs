@@ -35,10 +35,25 @@ function extractPaths(html, startMarker, endMarker, attrPattern) {
   return [...block[1].matchAll(attrPattern)].map((m) => m[1]);
 }
 
+// Some control-panel.html assets live outside vm/ — the shared popover
+// modules + overlay-bus renderer factory are sources of truth checked in
+// elsewhere and served from the same noVNC paths in the image. Map them
+// back to their real on-disk locations for bundling.
+function remapToSource(p) {
+  // /scripts/{shared,axe,unified}-popover/* → inspekt/scripts/...
+  const popover = p.match(/^\/scripts\/((?:shared|axe|unified)-popover\/.*)$/);
+  if (popover) return resolve(projectRoot, "inspekt", "scripts", popover[1]);
+  // /scripts/overlay-bus-renderers.js → extensions/chrome/overlay-bus-renderers.js
+  if (p === "/scripts/overlay-bus-renderers.js") {
+    return resolve(projectRoot, "extensions", "chrome", "overlay-bus-renderers.js");
+  }
+  return resolve(vmDir, p.replace(/^\//, ""));
+}
+
 function concat(paths) {
   return paths
     .map((p) => {
-      const filePath = resolve(vmDir, p.replace(/^\//, ""));
+      const filePath = remapToSource(p);
       try {
         return readFileSync(filePath, "utf8");
       } catch {

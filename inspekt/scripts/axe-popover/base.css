@@ -49,11 +49,10 @@
   padding: 0;
   overflow: hidden;
   overscroll-behavior: contain;
-  transition: opacity var(--transition-base), box-shadow var(--transition-base);
-
-  &:popover-open {
-    animation: popoverFadeIn var(--animation-duration) ease-out;
-  }
+  /* No transition / no opacity animation — popovers should appear and
+     disappear instantly. The only animation in the system is the FLIP
+     slide on attached-mode navigation (driven by JS in popover-core.js's
+     navigateToViolation). */
 }
 
 /* Position Fallbacks */
@@ -69,14 +68,16 @@
   position-area: block-start span-inline-start;
 }
 
-/* Detached State */
+/* Detached State — drag-mode positioning. No colour change to the border
+   (that visual flag was distracting); just the layout switch from anchor
+   positioning to free `position: fixed` and a slightly heavier shadow
+   to read as "lifted off the page". */
 [popover].inspekt-axe-popover--detached {
   position: fixed;
   position-anchor: unset;
   position-area: unset;
   position-try-fallbacks: unset;
   inset: unset;
-  border-color: var(--green);
   box-shadow: 0 25px 70px rgba(0, 0, 0, 0.15), 0 10px 25px rgba(0, 0, 0, 0.1);
 }
 

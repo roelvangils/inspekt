@@ -158,6 +158,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message.type === 'INJECT_MAIN_WORLD_VARS') {
         // Inject version variables into MAIN world
         injectMainWorldVars(sender.tab.id)
+            .then(() => injectOverlayBusMain(sender.tab.id))
             .then(() => sendResponse({ ok: true }))
             .catch(error => sendResponse({ ok: false, error: String(error) }));
         return true; // Keep channel open for async response
@@ -885,6 +886,34 @@ async function injectMainWorldVars(tabId) {
     } catch (error) {
         console.error('[Inspekt] Failed to inject variables:', error);
         throw error;
+    }
+}
+
+/**
+ * Inject the Overlay Bus MAIN-world stub (window.InspektOverlayBus).
+ *
+ * The isolated-world counterpart (overlay-bus.js content script) holds the
+ * WebSocket and observers; this stub is the MAIN-world API surface that
+ * feature scripts (run_axe.js, inspect, recorder, …) call to emit overlay
+ * data. Bridge is window.postMessage with INSPEKT_OVERLAY_* envelopes.
+ *
+ * Injected via files: rather than func: so the script is parsed once per
+ * tab and gets standard CSP/source-map treatment. The path is mapped via
+ * web_accessible_resources is unnecessary — chrome.scripting.executeScript
+ * with files: works for extension-bundled files regardless of WAR.
+ */
+async function injectOverlayBusMain(tabId) {
+    try {
+        await chrome.scripting.executeScript({
+            target: { tabId: tabId },
+            world: 'MAIN',
+            files: ['overlay-bus-main.js'],
+        });
+    } catch (error) {
+        // Non-fatal — outside VM mode the bus producer never connects so
+        // feature scripts fall through to the in-page DOM path. Log only at
+        // debug level.
+        console.debug('[Inspekt] overlay-bus-main injection skipped:', error?.message || error);
     }
 }
 

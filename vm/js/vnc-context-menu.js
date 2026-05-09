@@ -735,8 +735,14 @@ function _setupCanvasEventInterceptors() {
             _handleHoverLock(vm.x, vm.y);
             return;
         }
-        // Normal left click: dismiss overlays
+        // Normal left click: dismiss overlays — but NOT when the click landed
+        // on a bus-rendered interactive overlay (axe badge, popover, …). Those
+        // own their own click semantics and dismissing them would race the
+        // round-trip that opens their popover.
         if (e.button === 0) {
+            if (e.target && e.target.closest && e.target.closest('.bus-overlay')) {
+                return;
+            }
             if (_isMenuOpen()) dismissContextMenu();
             if (_inspectTrackingActive && activeTabId) {
                 _tabInspectState[activeTabId] = { wasTracking: false };
@@ -770,6 +776,9 @@ function _setupCanvasEventInterceptors() {
             return;
         }
         if (e.button === 0) {
+            if (e.target && e.target.closest && e.target.closest('.bus-overlay')) {
+                return;
+            }
             if (_isMenuOpen()) dismissContextMenu();
             if (_inspectTrackingActive && activeTabId) {
                 _tabInspectState[activeTabId] = { wasTracking: false };

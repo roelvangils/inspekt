@@ -850,6 +850,43 @@
                         </div>
                     `;
                 }
+
+                // CSS selector — engines that expose it (axe.target, eac/sia
+                // sometimes have a path). Shows users which DOM element this
+                // finding is anchored to.
+                const selectorText = (() => {
+                    if (engineId === 'axe' && Array.isArray(issue.target)) {
+                        return issue.target.flat(Infinity).join(' ');
+                    }
+                    if (issue.path) return issue.path;
+                    return null;
+                })();
+                if (selectorText) {
+                    content += `
+                        <div class="inspekt-axe-popover__section">
+                            <span class="inspekt-axe-popover__section-label">CSS Selector</span>
+                            <div class="inspekt-axe-popover__selector">${escapeHtml(selectorText)}</div>
+                        </div>
+                    `;
+                }
+
+                // Offending HTML snippet — collapsible so it doesn't dominate
+                // the popover when violations have large markup. Open by
+                // default for axe (where it's usually short and informative).
+                const htmlSnippet = issue.html || issue.snippet || null;
+                if (htmlSnippet) {
+                    const openAttr = engineId === 'axe' ? 'open' : '';
+                    content += `
+                        <div class="inspekt-axe-popover__section">
+                            <details class="inspekt-axe-popover__details" ${openAttr}>
+                                <summary>HTML Snippet</summary>
+                                <div class="inspekt-axe-popover__details-content">
+                                    <pre class="inspekt-axe-popover__code">${escapeHtml(htmlSnippet)}</pre>
+                                </div>
+                            </details>
+                        </div>
+                    `;
+                }
             });
 
             content += `</div></div>`;
@@ -924,6 +961,10 @@
      * Bind all event handlers for unified popover
      */
     function bindUnifiedPopoverEvents(popover, popoverCore) {
+        // Document-level Arrow nav listener — installed once total, on
+        // the first popover that comes through this function. Idempotent.
+        _installDocLevelKeyHandler(popoverCore);
+
         const prevBtn = popover.querySelector('.inspekt-axe-nav__prev');
         const nextBtn = popover.querySelector('.inspekt-axe-nav__next');
         const closeBtn = popover.querySelector('.inspekt-axe-nav__close');
@@ -992,25 +1033,66 @@
             }
         });
 
-        // Keyboard navigation
+        // Per-popover Escape handler (popover-scoped — it only matters
+        // when this specific popover is open and has focus).
         popover.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') {
                 popover.hidePopover();
                 e.stopPropagation();
-            } else if (e.key === 'ArrowLeft' && !e.target.matches('textarea')) {
-                const prevIndex = popoverCore.getPreviousViolationIndex();
-                if (prevIndex >= 0) {
-                    popoverCore.navigateToViolation(prevIndex);
-                    e.preventDefault();
-                }
-            } else if (e.key === 'ArrowRight' && !e.target.matches('textarea')) {
-                const nextIndex = popoverCore.getNextViolationIndex();
-                if (nextIndex >= 0) {
-                    popoverCore.navigateToViolation(nextIndex);
-                    e.preventDefault();
-                }
             }
         });
+    }
+
+    // ============================================================
+    // Document-level keyboard navigation
+    // ============================================================
+    // Arrow-key navigation between violations needs to work regardless
+    // of where focus is, because the View Transitions API moves focus
+    // away from the popover during the morph (captured elements get
+    // visibility:hidden) and we can't rely on focus landing back on the
+    // new popover before the user presses another key. Worse, in VM
+    // mode the noVNC canvas tends to grab focus, which forwards
+    // ArrowLeft/Right to the inspected page where they trigger
+    // horizontal scroll / browser behaviour.
+    //
+    // Strategy: register ONE keydown listener on the document at
+    // capture phase. It fires regardless of focus, gates on "is any
+    // unified popover open", and short-circuits when the user is
+    // typing in an input/textarea. Self-installs on first popover
+    // creation; idempotent.
+    let _docKeyListenerInstalled = false;
+    function _installDocLevelKeyHandler(popoverCore) {
+        if (_docKeyListenerInstalled) return;
+        _docKeyListenerInstalled = true;
+        document.addEventListener('keydown', (e) => {
+            if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+            // Only trigger when a unified popover is currently open.
+            const open = document.querySelector('[popover].inspekt-axe-popover:popover-open');
+            if (!open) return;
+            // Bail ONLY when focus is on a form control INSIDE the open
+            // popover (e.g. the legacy markdown-export textarea — user is
+            // legitimately typing). Form controls OUTSIDE the popover
+            // (noVNC keeps a hidden <textarea> for input capture; xterm
+            // wraps a textarea; the URL bar is an <input>) should NOT
+            // block our handler — those just happen to have focus, the
+            // user's intent is to navigate the popover.
+            if (open.contains(e.target)) {
+                const tag = e.target?.tagName;
+                if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+                if (e.target?.isContentEditable) return;
+            }
+            // Stop here so noVNC's canvas listener doesn't see the keydown
+            // and forward ArrowLeft/Right to the inspected page.
+            e.preventDefault();
+            e.stopPropagation();
+            if (e.key === 'ArrowLeft') {
+                const prevIndex = popoverCore.getPreviousViolationIndex();
+                if (prevIndex >= 0) popoverCore.navigateToViolation(prevIndex);
+            } else {
+                const nextIndex = popoverCore.getNextViolationIndex();
+                if (nextIndex >= 0) popoverCore.navigateToViolation(nextIndex);
+            }
+        }, true /* capture: catch the key before noVNC's listener on the canvas */);
     }
 
     // Export to global scope

@@ -468,7 +468,9 @@ cli.add_lazy_command("focused", "inspection", "focused")
 cli.add_lazy_command("screenshot", "inspection", "screenshot")
 
 # Accessibility commands (from accessibility.py)
-cli.add_lazy_command("axe", "accessibility", "axe")
+# `axe` was deprecated and removed in favour of `a11y -e axe`. `ibm` (the
+# deprecated wrapper for `a11y -e eac`) is still registered below — remove
+# in a follow-up if it's similarly bit-rotted.
 cli.add_lazy_command("ibm", "accessibility", "ibm")
 cli.add_lazy_command("a11y", "accessibility", "a11y")
 cli.add_lazy_command("a11y-reset", "accessibility", "a11y_reset")

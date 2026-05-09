@@ -75,6 +75,33 @@ const vncOverlay = {
         if (rect.height != null) el.style.height = rect.height + 'px';
     },
 
+    // Update text or HTML content of an existing overlay in place.
+    // `text` and `html` are mutually exclusive; `html` is caller-trusted.
+    // Returns the element (or null).
+    setContent(id, { text, html } = {}) {
+        const entry = this._overlays[id];
+        if (!entry) return null;
+        const el = entry.element;
+        if (text !== undefined) el.textContent = text;
+        else if (html !== undefined) el.innerHTML = html;
+        return el;
+    },
+
+    // Merge inline style properties onto an existing overlay's element.style.
+    setStyle(id, styleObj) {
+        const entry = this._overlays[id];
+        if (!entry || !styleObj) return null;
+        Object.assign(entry.element.style, styleObj);
+        return entry.element;
+    },
+
+    // Escape hatch for callers that need to wire DOM event listeners on an
+    // overlay element. Returns null if the overlay isn't currently visible.
+    getElement(id) {
+        const entry = this._overlays[id];
+        return entry ? entry.element : null;
+    },
+
     dismiss(id, animate = true) {
         const entry = this._overlays[id];
         if (!entry) return;
@@ -134,6 +161,15 @@ function _vmRectToOverlayRect(rect) {
 }
 
 function _positionInspectOverlay(rect, selector, meta) {
+    // Bus path takes over when the producer is connected — control-server
+    // emits highlight + tooltip via the bus and tracks them with observers.
+    // Skip host-side rendering to avoid duplicate overlays.
+    if (window.overlayBus && window.overlayBus.connected) {
+        if (meta && meta.siblingIndex) {
+            _lastInspectMeta = { siblingIndex: meta.siblingIndex, siblingCount: meta.siblingCount };
+        }
+        return;
+    }
     // Update sibling metadata if provided
     if (meta && meta.siblingIndex) {
         _lastInspectMeta = { siblingIndex: meta.siblingIndex, siblingCount: meta.siblingCount };
@@ -231,12 +267,20 @@ function showInspectOverlay(rect, selector) {
     _lastInspectMeta = {};  // Reset sibling info for fresh inspection
     if (!rect || !rect.width || !rect.height) return;
 
-    // Show initial position immediately
+    // Show initial position immediately. Bus mode takes over inside
+    // _positionInspectOverlay; this still runs to update _lastInspectMeta.
     _positionInspectOverlay(rect, selector);
 
-    // Start polling to track scroll, resize, and font size changes.
-    // Uses chained setTimeout (not setInterval) to prevent request pile-up.
     _inspectTrackingActive = true;
+
+    // When the overlay bus is connected the producer attaches its own
+    // ResizeObserver/IntersectionObserver via track:true, so the legacy
+    // 200 ms /inspect/get-rect polling is unnecessary. Skip it.
+    if (window.overlayBus && window.overlayBus.connected) {
+        return;
+    }
+
+    // Polling fallback (non-bus path): chained setTimeout prevents pile-up.
     _inspectTrackingInterval = setTimeout(_pollInspectRect, 200);
 }
 

@@ -84,6 +84,11 @@ function _cleanupAllInspectState() {
     vncOverlay.dismiss('inspect-highlight', true);
     vncOverlay.dismiss('inspect-tooltip', true);
     vncOverlay.dismiss('inspect-info-panel', true);
+    // When using the bus, also tell the producer to drop its tracked
+    // inspect overlays so it stops firing observer callbacks. Fire-and-forget.
+    if (window.overlayBus && window.overlayBus.connected) {
+        fetch(`http://${VNC_HOST}:${CONTROL_PORT}/inspect/clear`).catch(() => {});
+    }
     // Reset button state
     updateInspectButton();
 }

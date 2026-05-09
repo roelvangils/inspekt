@@ -130,6 +130,7 @@ test-*.html
 
 # --- Claude Code machine-specific state -------------------------------
 .claude/projects/
+.claude/scheduled_tasks.lock
 
 # --- User-specific config at repo root --------------------------------
 /config.json

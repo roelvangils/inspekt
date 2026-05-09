@@ -40,6 +40,6 @@
     "@siteimprove/alfa-rules": "^0.108.2",
     "@siteimprove/alfa-web": "^0.108.2",
     "esbuild": "^0.28.0",
-    "jsdom": "^29.0.2"
+    "jsdom": "^29.1.1"
   }
 }
