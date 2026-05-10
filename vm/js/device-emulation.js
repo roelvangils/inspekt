@@ -19,6 +19,11 @@
 // Module-scope `var` (consistent with config.js / split-mode.js).
 var activeDeviceProfileId = null;
 var deviceOrientation = 'portrait';
+// Remembered profile for the "Toggle Last Device Emulation" palette
+// command. Survives `clearDeviceEmulation` so a single command can flip
+// emulation on/off with the most recent profile. Persisted to localStorage
+// so it's available after a control-panel reload.
+var lastDeviceProfileId = null;
 
 // Wheel events are intentionally NOT intercepted: they pass through to noVNC
 // so they scroll the emulated page (the natural expectation). To reach
@@ -34,6 +39,16 @@ var deviceOrientation = 'portrait';
     }
     const orient = localStorage.getItem('deviceOrientation');
     if (orient === 'landscape') deviceOrientation = 'landscape';
+    const last = localStorage.getItem('lastDeviceProfile');
+    if (last && last !== 'null' && last !== '') {
+        lastDeviceProfileId = last;
+    } else if (activeDeviceProfileId) {
+        // First run after the upgrade: seed `last` from the active profile
+        // and persist immediately so the value survives a reload even if
+        // the user clears emulation before triggering setDeviceProfile.
+        lastDeviceProfileId = activeDeviceProfileId;
+        localStorage.setItem('lastDeviceProfile', activeDeviceProfileId);
+    }
 })();
 
 // Rotation is a pure width/height swap — dpr/mobile/UA stay the same — so a
@@ -85,8 +100,10 @@ async function setDeviceProfile(id) {
             return;
         }
         activeDeviceProfileId = profile.id;
+        lastDeviceProfileId = profile.id;
         localStorage.setItem('deviceProfile', profile.id);
         localStorage.setItem('deviceOrientation', deviceOrientation);
+        localStorage.setItem('lastDeviceProfile', profile.id);
         renderDeviceBadge();
         _startDeviceVisuals();
         if (typeof showToast === 'function') {
@@ -121,6 +138,23 @@ async function rotateDevice() {
     if (!activeDeviceProfileId) return;
     deviceOrientation = deviceOrientation === 'portrait' ? 'landscape' : 'portrait';
     await setDeviceProfile(activeDeviceProfileId);
+}
+
+// Power-user accelerator: a single palette command that flips emulation
+// on/off with whatever profile was used most recently. Lets users A/B
+// between "real" and "mobile" without going through the full picker.
+async function toggleLastDeviceEmulation() {
+    if (activeDeviceProfileId) {
+        await clearDeviceEmulation();
+        return;
+    }
+    if (lastDeviceProfileId) {
+        await setDeviceProfile(lastDeviceProfileId);
+        return;
+    }
+    if (typeof showToast === 'function') {
+        showToast('No previous device — pick one from the palette first', 'dark');
+    }
 }
 
 // Called once on init: align the control panel with whatever the server
@@ -309,26 +343,24 @@ function _drawDeviceBackdrop() {
 }
 
 // Tiered badge visibility based on pane width.
-//   pane >= deviceW + 64  → full badge (icon + label + meta + rotate + close)
-//   pane >= 280           → compact (drop meta)
-//   pane >= 140           → compact-tight (drop meta + rotate)
-//   pane < 140            → hidden entirely
-// Decoupled from the `hidden` attribute (which renderDeviceBadge owns to
-// signal "is emulation active?") via dedicated classes.
+//   pane >= 320  → full badge (icon + label + meta + rotate + close)
+//   pane >= 80   → compact (drop meta — keep label so the user still sees
+//                  which device is active)
+//   pane <  80   → hide entirely (extreme edge case; absurd pane width)
+// Thresholds intentionally use absolute pixel values rather than scaling
+// with deviceW: at any reasonable working pane size the user gets the full
+// badge. Decoupled from the `hidden` attribute (which renderDeviceBadge owns
+// to signal "is emulation active?") via dedicated classes.
 function _updateDeviceBadgeFit() {
     const badge = document.getElementById('deviceBadge');
     const container = document.getElementById('vncContainer');
     if (!badge || !container) return;
     const paneW = container.clientWidth;
-    const dims = _getDeviceFrameDims();
-    const fullThreshold = dims ? dims.dW + 64 : 360;
 
-    badge.classList.remove('compact', 'compact-tight', 'device-badge--hidden');
-    if (paneW < 140) {
+    badge.classList.remove('compact', 'device-badge--hidden');
+    if (paneW < 80) {
         badge.classList.add('device-badge--hidden');
-    } else if (paneW < 280) {
-        badge.classList.add('compact-tight');
-    } else if (paneW < fullThreshold) {
+    } else if (paneW < 320) {
         badge.classList.add('compact');
     }
 }
@@ -391,10 +423,11 @@ function _stopDeviceVisuals() {
     _resetDeviceFrame();
     const backdrop = document.getElementById('deviceBackdrop');
     if (backdrop) backdrop.hidden = true;
-    // Clear tiered-fit classes so the next activation starts clean.
+    // Clear tiered-fit + orientation classes so the next activation starts
+    // clean.
     const badge = document.getElementById('deviceBadge');
     if (badge) {
-        badge.classList.remove('compact', 'compact-tight', 'device-badge--hidden');
+        badge.classList.remove('compact', 'device-badge--hidden', 'device-badge--landscape');
     }
 }
 
@@ -420,10 +453,20 @@ function renderDeviceBadge() {
     const { width: w, height: h } = _orientedDims(profile, deviceOrientation);
     const labelEl = badge.querySelector('.device-badge-label');
     const metaEl = badge.querySelector('.device-badge-meta');
+    const iconEl = badge.querySelector('.device-badge-icon');
     if (labelEl) labelEl.textContent = profile.label;
     if (metaEl) {
         metaEl.textContent = `${w} × ${h} · ${formatDpr(profile.dpr)}`;
     }
+    // Tooltip on the icon repeats the full info so users still discover the
+    // device when the badge collapses to its compact form (no meta visible).
+    if (iconEl) {
+        const o = deviceOrientation === 'landscape' ? ' · landscape' : '';
+        iconEl.title = `Emulating ${profile.label} — ${w} × ${h} · ${formatDpr(profile.dpr)}${o}`;
+    }
+    // Rotate the icon glyph -90° in landscape so orientation is readable
+    // at-a-glance even from the badge alone.
+    badge.classList.toggle('device-badge--landscape', deviceOrientation === 'landscape');
     badge.hidden = false;
     document.body.classList.add('device-emulating');
 }

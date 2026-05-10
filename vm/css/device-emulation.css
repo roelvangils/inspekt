@@ -91,10 +91,6 @@ body.device-emulating #vncContainer canvas.device-frame-entering {
 .device-badge.compact .device-badge-meta {
     display: none;
 }
-.device-badge.compact-tight .device-badge-meta,
-.device-badge.compact-tight .device-badge-rotate {
-    display: none;
-}
 
 .device-badge-label,
 .device-badge-meta {
@@ -104,6 +100,15 @@ body.device-emulating #vncContainer canvas.device-frame-entering {
 .device-badge-icon {
     font-size: 14px;
     line-height: 1;
+    /* Smooth orientation flip — see .device-badge--landscape rule below. */
+    transition: transform var(--duration-fast) ease;
+    transform-origin: center;
+}
+
+/* In landscape, lay the phone glyph on its side so the orientation reads at
+   a glance even when the meta dimensions are hidden by the compact tier. */
+.device-badge--landscape .device-badge-icon {
+    transform: rotate(-90deg);
 }
 
 .device-badge-label {

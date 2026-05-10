@@ -232,6 +232,14 @@ function buildCommandPaletteData(registryData) {
             content: 'Swap width and height',
         });
         items.push({
+            id: 'ui:emulate-toggle-last',
+            title: 'Toggle Last Device Emulation',
+            section: 'Device Emulation',
+            keywords: 'toggle last recent emulation on off',
+            handler: () => toggleLastDeviceEmulation(),
+            content: 'Flip emulation on/off with the most recent profile',
+        });
+        items.push({
             id: 'ui:emulate-clear',
             title: 'Clear Device Emulation',
             section: 'Device Emulation',
