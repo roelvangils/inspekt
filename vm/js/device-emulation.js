@@ -237,12 +237,15 @@ function _getNoVNCElements() {
     return { container, canvas };
 }
 
-// 16px floor on the centering offsets. Gives the floating-card shadow room
-// to render on all sides, prevents the device viewport from kissing the
-// badge, and (critically) keeps the device anchored when the pane is smaller
-// than the device — the rest overflows and gets clipped by the container's
-// existing overflow:hidden, instead of visually rescaling on every drag tick.
+// Centering-offset floors. Asymmetric on purpose: the top floor has to
+// clear the .resize-readout / device-badge that lives at top-left of the
+// pane (badge bottom is around y=42), so we need ~56px of vertical
+// breathing room before the device viewport starts. Horizontal and bottom
+// floors stay tight because nothing else competes for space there. When
+// the pane is large enough, (paneH-dH)/2 wins and the device ends up
+// genuinely centered — the floors only kick in for tight panes.
 const DEVICE_FRAME_MIN_PAD = 16;
+const DEVICE_FRAME_TOP_PAD = 56;
 
 function _applyDeviceFrame() {
     const els = _getNoVNCElements();
@@ -263,7 +266,7 @@ function _applyDeviceFrame() {
     const dW = dims.dW;
     const dH = dims.dH;
     const offsetX = Math.max(DEVICE_FRAME_MIN_PAD, (paneW - dW) / 2);
-    const offsetY = Math.max(DEVICE_FRAME_MIN_PAD, (paneH - dH) / 2);
+    const offsetY = Math.max(DEVICE_FRAME_TOP_PAD, (paneH - dH) / 2);
 
     // Native canvas pixel dims = X display size (kept in sync with pane via
     // the auto-resize ResizeObserver in vnc.js).
