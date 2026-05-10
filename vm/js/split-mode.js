@@ -499,9 +499,11 @@ function initSplitDragHandle() {
     }, { passive: false });
 
     // Double-click: by default resets to 50/50. While device emulation is
-    // active in horizontal split, snap the canvas pane to exactly the
-    // emulated device width instead — closes the left/right backdrop strip
-    // so the device fits the pane edge-to-edge.
+    // active in horizontal split, snap the canvas pane to the emulated
+    // device width plus a 20px breathing margin on each side — gives the
+    // device a small backdrop frame so it sits clearly centered without the
+    // floating-card shadow getting clipped against the pane edge.
+    const DEVICE_SNAP_BREATHING_PX = 20;
     handle.addEventListener('dblclick', () => {
         if (
             splitOrientation === 'horizontal' &&
@@ -512,11 +514,12 @@ function initSplitDragHandle() {
             if (profile) {
                 const landscape = deviceOrientation === 'landscape';
                 const dW = landscape ? profile.height : profile.width;
+                const targetW = dW + DEVICE_SNAP_BREATHING_PX * 2;
                 const contentRow = document.getElementById('splitContentRow');
                 const totalSize = contentRow ? contentRow.offsetWidth - 5 : 0;
                 // Mirror setCanvasToDeviceWidth's 300 px terminal floor.
-                if (totalSize > 0 && totalSize - dW >= 300) {
-                    splitRatio = dW / totalSize;
+                if (totalSize > 0 && totalSize - targetW >= 300) {
+                    splitRatio = targetW / totalSize;
                     document.body.style.setProperty('--split-vnc-size', (splitRatio * 100) + '%');
                     _refitAfterLayout();
                     _savePersistedSplitState();

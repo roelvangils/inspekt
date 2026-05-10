@@ -20,6 +20,11 @@
 var activeDeviceProfileId = null;
 var deviceOrientation = 'portrait';
 
+// Wheel events are intentionally NOT intercepted: they pass through to noVNC
+// so they scroll the emulated page (the natural expectation). To reach
+// clipped edges when the device overflows the pane, drag the gutter wider or
+// double-click it to snap to a fitting width.
+
 (function loadDevicePersistence() {
     const id = localStorage.getItem('deviceProfile');
     // localStorage returns null for missing keys, but a previous version may
@@ -31,14 +36,22 @@ var deviceOrientation = 'portrait';
     if (orient === 'landscape') deviceOrientation = 'landscape';
 })();
 
-function _resolveDeviceMetrics(profile, orientation) {
-    // Rotation is a width/height swap. dpr/mobile/UA are unaffected.
+// Rotation is a pure width/height swap — dpr/mobile/UA stay the same — so a
+// tiny shared helper avoids the same ternary appearing in 3 places.
+function _orientedDims(profile, orientation) {
     const landscape = orientation === 'landscape';
+    return {
+        width:  landscape ? profile.height : profile.width,
+        height: landscape ? profile.width  : profile.height,
+    };
+}
+
+function _resolveDeviceMetrics(profile, orientation) {
+    const { width, height } = _orientedDims(profile, orientation);
     return {
         profile_id: profile.id,
         label: profile.label,
-        width: landscape ? profile.height : profile.width,
-        height: landscape ? profile.width : profile.height,
+        width, height,
         dpr: profile.dpr,
         mobile: !!profile.mobile,
         user_agent: profile.userAgent || null,
@@ -173,23 +186,13 @@ const DEVICE_BACKDROP_INTERVAL_MS = 200;  // 5 fps — plenty for a blurred bg
 let _deviceFrameRO = null;
 let _deviceBackdropTimer = null;
 let _prevScaleViewport = null;             // remember to restore on clear
-// Wheel-pan offset: how far the user has panned the device viewport within
-// the pane. Positive panX = device shifted left so its right side is visible
-// (only meaningful when the device overflows the pane). Reset on profile
-// change. Driven by the wheel listener attached in _startDeviceVisuals.
-let _devicePanX = 0;
-let _devicePanY = 0;
-let _deviceWheelHandler = null;
 
 function _getDeviceFrameDims() {
     if (!activeDeviceProfileId) return null;
     const profile = getDeviceProfile(activeDeviceProfileId);
     if (!profile) return null;
-    const landscape = deviceOrientation === 'landscape';
-    return {
-        dW: landscape ? profile.height : profile.width,
-        dH: landscape ? profile.width : profile.height,
-    };
+    const { width, height } = _orientedDims(profile, deviceOrientation);
+    return { dW: width, dH: height };
 }
 
 function _getNoVNCElements() {
@@ -225,23 +228,8 @@ function _applyDeviceFrame() {
     // and CSS size remain equal so clientX → canvas pixel is 1:1).
     const dW = dims.dW;
     const dH = dims.dH;
-    const baseOffsetX = Math.max(DEVICE_FRAME_MIN_PAD, (paneW - dW) / 2);
-    const baseOffsetY = Math.max(DEVICE_FRAME_MIN_PAD, (paneH - dH) / 2);
-
-    // When the pane is smaller than the device, the user can wheel-pan to
-    // reveal the off-screen edges. Clamp the pan into [0, overflow] so they
-    // can't pan into empty space. When there's no overflow on an axis, pan
-    // collapses to 0 — drag-resizing the pane wider clears any stale pan.
-    const overflowX = Math.max(0, dW + DEVICE_FRAME_MIN_PAD * 2 - paneW);
-    const overflowY = Math.max(0, dH + DEVICE_FRAME_MIN_PAD * 2 - paneH);
-    _devicePanX = Math.max(0, Math.min(overflowX, _devicePanX));
-    _devicePanY = Math.max(0, Math.min(overflowY, _devicePanY));
-    const offsetX = baseOffsetX - _devicePanX;
-    const offsetY = baseOffsetY - _devicePanY;
-
-    // Surface "the device is bigger than the pane" affordance — `grab`
-    // cursor over the pane when wheel-pan is meaningful.
-    els.container.style.cursor = (overflowX > 0 || overflowY > 0) ? 'grab' : '';
+    const offsetX = Math.max(DEVICE_FRAME_MIN_PAD, (paneW - dW) / 2);
+    const offsetY = Math.max(DEVICE_FRAME_MIN_PAD, (paneH - dH) / 2);
 
     // Native canvas pixel dims = X display size (kept in sync with pane via
     // the auto-resize ResizeObserver in vnc.js).
@@ -346,11 +334,6 @@ function _updateDeviceBadgeFit() {
 }
 
 function _startDeviceVisuals() {
-    // Reset pan offsets — switching profiles shouldn't carry pan from a
-    // previous device that may have had different overflow.
-    _devicePanX = 0;
-    _devicePanY = 0;
-
     _applyDeviceFrame();
     _updateDeviceBadgeFit();
 
@@ -383,32 +366,6 @@ function _startDeviceVisuals() {
         }
     }
 
-    // Wheel-pan: when the device overflows the pane, consume wheel events
-    // here so they pan the canvas instead of being forwarded to noVNC as
-    // page scroll. When there's no overflow, the listener no-ops and lets
-    // the wheel reach noVNC normally.
-    if (!_deviceWheelHandler) {
-        const container = document.getElementById('vncContainer');
-        if (container) {
-            _deviceWheelHandler = (e) => {
-                if (!activeDeviceProfileId) return;
-                const dims = _getDeviceFrameDims();
-                if (!dims) return;
-                const overflowX = Math.max(0, dims.dW + DEVICE_FRAME_MIN_PAD * 2 - container.clientWidth);
-                const overflowY = Math.max(0, dims.dH + DEVICE_FRAME_MIN_PAD * 2 - container.clientHeight);
-                if (overflowX === 0 && overflowY === 0) return;  // no overflow — let noVNC have it
-                e.preventDefault();
-                e.stopPropagation();
-                if (overflowX > 0) _devicePanX = Math.max(0, Math.min(overflowX, _devicePanX + e.deltaX));
-                if (overflowY > 0) _devicePanY = Math.max(0, Math.min(overflowY, _devicePanY + e.deltaY));
-                _applyDeviceFrame();
-            };
-            // Capture phase + non-passive so we can preventDefault before
-            // noVNC's own wheel handler sees it.
-            container.addEventListener('wheel', _deviceWheelHandler, { capture: true, passive: false });
-        }
-    }
-
     if (_deviceBackdropTimer) clearInterval(_deviceBackdropTimer);
     _deviceBackdropTimer = setInterval(() => {
         // Idempotent: re-apply framing each tick so we recover if noVNC
@@ -431,16 +388,7 @@ function _stopDeviceVisuals() {
         _deviceFrameRO.disconnect();
         _deviceFrameRO = null;
     }
-    if (_deviceWheelHandler) {
-        const container = document.getElementById('vncContainer');
-        if (container) container.removeEventListener('wheel', _deviceWheelHandler, { capture: true });
-        _deviceWheelHandler = null;
-    }
-    _devicePanX = 0;
-    _devicePanY = 0;
     _resetDeviceFrame();
-    const container = document.getElementById('vncContainer');
-    if (container) container.style.cursor = '';
     const backdrop = document.getElementById('deviceBackdrop');
     if (backdrop) backdrop.hidden = true;
     // Clear tiered-fit classes so the next activation starts clean.
@@ -469,9 +417,7 @@ function renderDeviceBadge() {
         document.body.classList.remove('device-emulating');
         return;
     }
-    const landscape = deviceOrientation === 'landscape';
-    const w = landscape ? profile.height : profile.width;
-    const h = landscape ? profile.width : profile.height;
+    const { width: w, height: h } = _orientedDims(profile, deviceOrientation);
     const labelEl = badge.querySelector('.device-badge-label');
     const metaEl = badge.querySelector('.device-badge-meta');
     if (labelEl) labelEl.textContent = profile.label;
