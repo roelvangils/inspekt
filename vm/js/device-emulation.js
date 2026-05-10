@@ -237,16 +237,6 @@ function _getNoVNCElements() {
     return { container, canvas };
 }
 
-// Centering-offset floors. Asymmetric on purpose: the top floor has to
-// clear the .resize-readout / device-badge that lives at top-left of the
-// pane (badge bottom is around y=42), so we need ~56px of vertical
-// breathing room before the device viewport starts. Horizontal and bottom
-// floors stay tight because nothing else competes for space there. When
-// the pane is large enough, (paneH-dH)/2 wins and the device ends up
-// genuinely centered — the floors only kick in for tight panes.
-const DEVICE_FRAME_MIN_PAD = 16;
-const DEVICE_FRAME_TOP_PAD = 56;
-
 function _applyDeviceFrame() {
     const els = _getNoVNCElements();
     if (!els || !els.canvas) return;
@@ -258,15 +248,26 @@ function _applyDeviceFrame() {
     if (paneW < 50 || paneH < 50) return;
 
     // Locked scale = 1: device renders at native CSS pixels regardless of
-    // pane size. Pane > device → centered with backdrop. Pane < device →
-    // device overflows and is clipped by .vnc-container's overflow:hidden.
-    // Mirrors Chrome DevTools' device toolbar behaviour and keeps
-    // _clientToVm's mapping in vnc.js trivially correct (canvas pixel size
-    // and CSS size remain equal so clientX → canvas pixel is 1:1).
+    // pane size, true-centered on both axes.
+    //
+    //   pane > device → centered with backdrop on both sides.
+    //   pane < device → offsetX/Y go negative; equal-clipping on both
+    //     sides (the pane's overflow:hidden does the work). This is what
+    //     keeps the device visually centered even in tight panes — a
+    //     PAD floor here would anchor it to the top-left and look weird.
+    //
+    // The badge at top-left can overlap the device top when pane is tight,
+    // but its 0.85 background + 1px hairline border + backdrop-filter:blur
+    // give it enough contrast to read cleanly against the drop-shadow halo.
+    //
+    // Chrome DevTools' device toolbar behaves the same way:
+    // getBoundingClientRect stays accurate so noVNC's mouse-coord mapping
+    // in vnc.js's _clientToVm just keeps working (canvas pixel size and
+    // CSS size remain equal → clientX → canvas pixel is 1:1).
     const dW = dims.dW;
     const dH = dims.dH;
-    const offsetX = Math.max(DEVICE_FRAME_MIN_PAD, (paneW - dW) / 2);
-    const offsetY = Math.max(DEVICE_FRAME_TOP_PAD, (paneH - dH) / 2);
+    const offsetX = (paneW - dW) / 2;
+    const offsetY = (paneH - dH) / 2;
 
     // Native canvas pixel dims = X display size (kept in sync with pane via
     // the auto-resize ResizeObserver in vnc.js).
