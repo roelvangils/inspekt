@@ -261,7 +261,7 @@ const SRCaptionManager = {
         panel.style.minHeight = floating.minHeight + 'px';
 
         // Max width = 80% of canvas
-        const canvas = document.querySelector('#vncContainer canvas');
+        const canvas = document.querySelector('#vncContainer canvas:not(.device-backdrop)');
         if (canvas) {
             panel.style.maxWidth = Math.round(canvas.offsetWidth * 0.8) + 'px';
         }
@@ -509,7 +509,7 @@ let _srMouseHandler = null;
 let _srMouseDebounce = null;
 
 function startSRMouseTracking() {
-    const canvas = document.querySelector('#vncContainer canvas');
+    const canvas = document.querySelector('#vncContainer canvas:not(.device-backdrop)');
     if (!canvas) return;
 
     _srMouseHandler = function(e) {
@@ -548,7 +548,7 @@ function startSRMouseTracking() {
 
 function stopSRMouseTracking() {
     if (_srMouseHandler) {
-        const canvas = document.querySelector('#vncContainer canvas');
+        const canvas = document.querySelector('#vncContainer canvas:not(.device-backdrop)');
         if (canvas) canvas.removeEventListener('mousemove', _srMouseHandler);
         _srMouseHandler = null;
     }

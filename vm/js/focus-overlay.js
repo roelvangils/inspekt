@@ -70,7 +70,11 @@ function hideFocusOverlay() {
     function attach() {
         if (!rfb || !rfb._keyboard) { setTimeout(attach, 500); return; }
 
-        const canvas = document.querySelector('#vncContainer canvas');
+        // Exclude the device-emulation backdrop canvas — it's a sibling but
+        // not the one noVNC owns. Without :not, this selector returns the
+        // backdrop (it's first in DOM order) and the Cmd+K / Shift+Tab patch
+        // gets attached to the wrong element.
+        const canvas = document.querySelector('#vncContainer canvas:not(.device-backdrop)');
         if (!canvas) { setTimeout(attach, 500); return; }
 
         // Track Shift state from canvas events (these always propagate)

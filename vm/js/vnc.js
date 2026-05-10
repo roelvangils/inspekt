@@ -9,9 +9,12 @@ let _isConnecting = false;  // Prevents overlapping connectVNC calls
 let _lastConnectTime = 0;   // Timestamp of last successful connect
 const _RFB_MAX_RECONNECT_DELAY = 5000;
 
-// Convert parent-document client coordinates to VM pixel coordinates
+// Convert parent-document client coordinates to VM pixel coordinates.
+// NOTE the `:not(.device-backdrop)` — device-emulation.js adds its own
+// blurred-snapshot <canvas> as a child of #vncContainer; we must always
+// resolve to noVNC's canvas, not that backdrop.
 function _clientToVm(clientX, clientY) {
-    const canvas = document.querySelector('#vncContainer canvas');
+    const canvas = document.querySelector('#vncContainer canvas:not(.device-backdrop)');
     if (!canvas) return { x: clientX, y: clientY };
     const rect = canvas.getBoundingClientRect();
     const resolution = currentResolution || { width: rect.width, height: rect.height };
