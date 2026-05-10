@@ -498,8 +498,32 @@ function initSplitDragHandle() {
         _wheelSaveTimer = setTimeout(_savePersistedSplitState, 200);
     }, { passive: false });
 
-    // Double-click to reset to 50/50
+    // Double-click: by default resets to 50/50. While device emulation is
+    // active in horizontal split, snap the canvas pane to exactly the
+    // emulated device width instead — closes the left/right backdrop strip
+    // so the device fits the pane edge-to-edge.
     handle.addEventListener('dblclick', () => {
+        if (
+            splitOrientation === 'horizontal' &&
+            typeof activeDeviceProfileId !== 'undefined' && activeDeviceProfileId &&
+            typeof getDeviceProfile === 'function'
+        ) {
+            const profile = getDeviceProfile(activeDeviceProfileId);
+            if (profile) {
+                const landscape = deviceOrientation === 'landscape';
+                const dW = landscape ? profile.height : profile.width;
+                const contentRow = document.getElementById('splitContentRow');
+                const totalSize = contentRow ? contentRow.offsetWidth - 5 : 0;
+                // Mirror setCanvasToDeviceWidth's 300 px terminal floor.
+                if (totalSize > 0 && totalSize - dW >= 300) {
+                    splitRatio = dW / totalSize;
+                    document.body.style.setProperty('--split-vnc-size', (splitRatio * 100) + '%');
+                    _refitAfterLayout();
+                    _savePersistedSplitState();
+                    return;
+                }
+            }
+        }
         splitRatio = 0.5;
         document.body.style.setProperty('--split-vnc-size', '50%');
         _refitAfterLayout();

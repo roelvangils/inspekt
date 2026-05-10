@@ -207,6 +207,40 @@ function buildCommandPaletteData(registryData) {
         }
     }
 
+    // === Device emulation entries (DevTools-style, decoupled from canvas) ===
+    // Built from DEVICE_PROFILES in device-profiles.js. These apply a profile
+    // via CDP — page reflows to the device viewport without resizing the pane.
+    if (typeof DEVICE_PROFILES !== 'undefined' && typeof setDeviceProfile === 'function') {
+        for (const p of DEVICE_PROFILES) {
+            const dprText = `${formatDpr(p.dpr)} DPR`;
+            const touchText = p.mobile ? ' · touch' : '';
+            items.push({
+                id: `ui:emulate-${p.id}`,
+                title: `Emulate Device · ${p.label}`,
+                section: 'Device Emulation',
+                keywords: `emulate device viewport ${p.label.toLowerCase()} ${p.category} ${p.width} mobile responsive`,
+                handler: () => setDeviceProfile(p.id),
+                content: `${p.width} × ${p.height} · ${dprText}${touchText}`,
+            });
+        }
+        items.push({
+            id: 'ui:emulate-rotate',
+            title: 'Rotate Emulated Device',
+            section: 'Device Emulation',
+            keywords: 'rotate orientation portrait landscape',
+            handler: () => rotateDevice(),
+            content: 'Swap width and height',
+        });
+        items.push({
+            id: 'ui:emulate-clear',
+            title: 'Clear Device Emulation',
+            section: 'Device Emulation',
+            keywords: 'clear remove disable reset emulation device',
+            handler: () => clearDeviceEmulation(),
+            content: 'Stop emulating, return to canvas-driven viewport',
+        });
+    }
+
     // === Inspekt Commands (from registry API) ===
     if (registryData && registryData.categories) {
         for (const [category, commands] of Object.entries(registryData.categories)) {

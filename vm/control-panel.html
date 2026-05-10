@@ -38,6 +38,7 @@
     <link rel="stylesheet" href="/css/modals.css">
     <link rel="stylesheet" href="/css/scrollbar.css">
     <link rel="stylesheet" href="/css/toolbar.css">
+    <link rel="stylesheet" href="/css/device-emulation.css">
     <link rel="stylesheet" href="/css/vision-sim.css">
     <link rel="stylesheet" href="/css/motor-sim.css">
     <link rel="stylesheet" href="/css/voice-overlay.css">
@@ -57,6 +58,8 @@
     <script src="/js/tabs.js" defer></script>
     <script src="/js/terminal.js" defer></script>
     <script src="/js/split-mode.js" defer></script>
+    <script src="/js/device-profiles.js" defer></script>
+    <script src="/js/device-emulation.js" defer></script>
     <script src="/js/vnc.js" defer></script>
     <script src="/js/editor.js" defer></script>
     <script src="/js/navigation.js" defer></script>
@@ -330,9 +333,23 @@
     <div class="split-content-row" id="splitContentRow">
         <!-- VNC Container -->
         <div class="vnc-container" id="vncContainer">
+            <!-- Blurred snapshot of the emulated device area, periodically
+                 redrawn while a device profile is active. -->
+            <canvas class="device-backdrop" id="deviceBackdrop" hidden></canvas>
             <div class="resize-readout" id="resizeReadout">
                 <div class="resize-dimensions" id="resizeDimensions"></div>
                 <div class="snap-chip" id="snapChip" aria-hidden="true"></div>
+                <div class="device-badge" id="deviceBadge" hidden>
+                    <span class="device-badge-icon" aria-hidden="true">📱</span>
+                    <span class="device-badge-label"></span>
+                    <span class="device-badge-meta"></span>
+                    <button class="device-badge-rotate" type="button"
+                            title="Rotate (portrait ↔ landscape)"
+                            aria-label="Rotate device">⟳</button>
+                    <button class="device-badge-close" type="button"
+                            title="Clear emulation"
+                            aria-label="Clear device emulation">×</button>
+                </div>
             </div>
             <!-- SR Focus Indicator (positioned over VNC canvas) -->
             <div id="srFocusIndicator" class="sr-focus-indicator" style="display: none;">

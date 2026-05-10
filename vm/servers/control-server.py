@@ -637,6 +637,137 @@ def _reapply_domain_overrides(domain, changed_features):
         _push_emulation_to_tab(tab, _effective_features_for_tab(target_id, domain))
 
 
+# --- Device emulation state --------------------------------------------------
+# DevTools-style device-toolbar emulation. Distinct from media-query emulation
+# above: this controls window.innerWidth, navigator.userAgent, and touch event
+# emission via Emulation.setDeviceMetricsOverride / setUserAgentOverride /
+# setTouchEmulationEnabled, decoupled from the X display dimensions.
+#
+# A single profile is global (applied to every open page target) — that mirrors
+# the Chrome DevTools UX where "device toolbar" is per-window, not per-tab.
+# `None` means no profile is active.
+current_device_emulation = None
+_last_device_emul_target_ids = set()
+_last_device_emul_target_domains = {}
+
+
+def _push_device_emulation_to_tab(tab, emul, reload=False):
+    """Apply a device emulation payload to a single tab via CDP.
+
+    Sends setDeviceMetricsOverride + setUserAgentOverride + the two touch
+    commands. When `reload=True`, also issues Page.reload so that touch
+    feature detection (`ontouchstart in window`) re-runs against the new
+    runtime state — without a reload the override is invisible to feature
+    sniffing on already-loaded pages, matching Chrome DevTools' behavior.
+
+    Failures are logged and swallowed; the per-poll reconciler will retry on
+    the next /tabs request.
+    """
+    ws_url = tab.get('webSocketDebuggerUrl')
+    if not ws_url:
+        return False
+    try:
+        send_cdp_command(ws_url, 'Emulation.setDeviceMetricsOverride', {
+            'width': int(emul['width']),
+            'height': int(emul['height']),
+            'deviceScaleFactor': float(emul['dpr']),
+            'mobile': bool(emul['mobile']),
+            'screenWidth': int(emul['width']),
+            'screenHeight': int(emul['height']),
+        })
+        ua = emul.get('user_agent') or ''
+        # Always send setUserAgentOverride so a profile change resets a
+        # previously-spoofed UA when switching to a generic profile (which has
+        # no user_agent of its own).
+        ua_params = {'userAgent': ua}
+        if ua:
+            ua_params['acceptLanguage'] = 'en-US,en;q=0.9'
+        send_cdp_command(ws_url, 'Emulation.setUserAgentOverride', ua_params)
+        send_cdp_command(ws_url, 'Emulation.setTouchEmulationEnabled', {
+            'enabled': bool(emul['mobile']),
+            'maxTouchPoints': 5 if emul['mobile'] else 0,
+        })
+        send_cdp_command(ws_url, 'Emulation.setEmitTouchEventsForMouse', {
+            'enabled': bool(emul['mobile']),
+            'configuration': 'mobile' if emul['mobile'] else 'desktop',
+        })
+        if reload:
+            try:
+                send_cdp_command(ws_url, 'Page.reload', {})
+            except Exception as re:
+                # Reload is best-effort — the page is already emulated, just
+                # without re-evaluated feature detection.
+                print(f"[device-emul] reload after apply failed: {re}")
+        return True
+    except Exception as e:
+        print(f"[device-emul] push to {tab.get('id')} failed: {e}")
+        return False
+
+
+def _clear_device_emulation_for_tab(tab, reload=False):
+    """Clear all device-emulation overrides on a single tab."""
+    ws_url = tab.get('webSocketDebuggerUrl')
+    if not ws_url:
+        return False
+    try:
+        send_cdp_command(ws_url, 'Emulation.clearDeviceMetricsOverride', {})
+        send_cdp_command(ws_url, 'Emulation.setUserAgentOverride', {'userAgent': ''})
+        send_cdp_command(ws_url, 'Emulation.setTouchEmulationEnabled', {'enabled': False})
+        send_cdp_command(ws_url, 'Emulation.setEmitTouchEventsForMouse', {'enabled': False})
+        if reload:
+            try:
+                send_cdp_command(ws_url, 'Page.reload', {})
+            except Exception as re:
+                print(f"[device-emul] reload after clear failed: {re}")
+        return True
+    except Exception as e:
+        print(f"[device-emul] clear on {tab.get('id')} failed: {e}")
+        return False
+
+
+def _apply_device_emulation_to_all_tabs(reload=False):
+    """Push current_device_emulation to every open page target."""
+    if not current_device_emulation:
+        return
+    for tab in get_page_tabs():
+        _push_device_emulation_to_tab(tab, current_device_emulation, reload=reload)
+
+
+def _clear_device_emulation_from_all_tabs(reload=False):
+    for tab in get_page_tabs():
+        _clear_device_emulation_for_tab(tab, reload=reload)
+
+
+def _reconcile_device_emulation(page_tabs):
+    """Re-apply current_device_emulation to newly-seen or newly-navigated tabs.
+
+    CDP overrides are per-target and can be dropped on cross-origin navigation
+    in some Chromium versions; piggybacking on the /tabs poll catches both new
+    tabs and domain changes within ~1s.
+    """
+    global _last_device_emul_target_ids, _last_device_emul_target_domains
+
+    live_ids = set()
+    for tab in page_tabs:
+        target_id = tab.get('id')
+        if not target_id:
+            continue
+        live_ids.add(target_id)
+        if not current_device_emulation:
+            continue
+        domain = _extract_domain(tab.get('url', ''))
+        prev_domain = _last_device_emul_target_domains.get(target_id)
+        first_seen = target_id not in _last_device_emul_target_ids
+        if first_seen or domain != prev_domain:
+            _push_device_emulation_to_tab(tab, current_device_emulation)
+            _last_device_emul_target_domains[target_id] = domain
+
+    # Drop tracking for vanished tabs.
+    for gone_id in _last_device_emul_target_ids - live_ids:
+        _last_device_emul_target_domains.pop(gone_id, None)
+    _last_device_emul_target_ids = live_ids
+
+
 def get_tab_theme_color(tab):
     """Extract theme color from a tab via CDP Runtime.evaluate.
 
@@ -1810,6 +1941,11 @@ class ControlHandler(BaseHTTPRequestHandler):
                     _reconcile_tab_emulation(tabs)
                 except Exception as rec_err:
                     print(f"[emulate] Reconcile failed: {rec_err}")
+                # Same poll re-applies device emulation to new/navigated tabs.
+                try:
+                    _reconcile_device_emulation(tabs)
+                except Exception as rec_err:
+                    print(f"[device-emul] Reconcile failed: {rec_err}")
                 # Return simplified tab info
                 tab_list = [{
                     'id': t.get('id'),
@@ -1820,6 +1956,16 @@ class ControlHandler(BaseHTTPRequestHandler):
                 self.send_json({'ok': True, 'tabs': tab_list})
             except Exception as e:
                 self.send_json({'ok': False, 'error': str(e)}, 500)
+
+        elif path == '/device':
+            # GET /device — current device-emulation profile (or null).
+            # Used by the control panel on init to restore an active profile
+            # after a control-server restart, and to keep the badge in sync.
+            self.send_json({
+                'ok': True,
+                'active': current_device_emulation is not None,
+                'emulation': current_device_emulation,
+            })
 
         elif path.startswith('/emulate/'):
             # GET /emulate/<targetId> — return overrides at each scope plus
@@ -3720,6 +3866,7 @@ class ControlHandler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         global auto_scan_enabled, terminal_hidden, clipboard_data, upload_state
+        global current_device_emulation, _last_device_emul_target_ids, _last_device_emul_target_domains
         path = urlparse(self.path).path
 
         if path == '/api/internal/log':
@@ -4027,6 +4174,71 @@ class ControlHandler(BaseHTTPRequestHandler):
                         changed.append(name)
                 _reapply_overrides_to_all_tabs(changed)
                 self.send_json({'ok': True, 'host_prefs': host_prefs, 'changed': changed})
+            except Exception as e:
+                self.send_json({'ok': False, 'error': str(e)}, 500)
+
+        elif path == '/device':
+            # POST /device — apply a device-emulation profile to all open tabs.
+            # Body: {profile_id, label, width, height, dpr, mobile, user_agent?, orientation?}
+            # The control panel is the source of truth for the profile catalog;
+            # the server just applies whatever metrics it's handed.
+            try:
+                content_length = int(self.headers.get('Content-Length', 0))
+                body = self.rfile.read(content_length).decode('utf-8') if content_length else '{}'
+                data = json.loads(body) if body else {}
+                if not isinstance(data, dict):
+                    self.send_json({'ok': False, 'error': 'Body must be a JSON object'}, 400)
+                    return
+                try:
+                    width = int(data['width'])
+                    height = int(data['height'])
+                    dpr = float(data['dpr'])
+                    mobile = bool(data['mobile'])
+                except (KeyError, TypeError, ValueError):
+                    self.send_json({'ok': False,
+                        'error': 'width, height, dpr, mobile required'}, 400)
+                    return
+                if width < 50 or height < 50 or width > 4000 or height > 4000:
+                    self.send_json({'ok': False,
+                        'error': 'width/height out of range (50–4000)'}, 400)
+                    return
+                emul = {
+                    'profile_id': data.get('profile_id'),
+                    'label': data.get('label'),
+                    'width': width,
+                    'height': height,
+                    'dpr': dpr,
+                    'mobile': mobile,
+                    'user_agent': data.get('user_agent') or None,
+                    'orientation': data.get('orientation') or 'portrait',
+                }
+                current_device_emulation = emul
+                # Apply to every live tab and snapshot what we've stamped, so
+                # the next /tabs reconciler pass treats them as already-applied
+                # for this profile (and only re-applies on cross-origin nav).
+                live_tabs = get_page_tabs()
+                for tab in live_tabs:
+                    _push_device_emulation_to_tab(tab, emul, reload=True)
+                _last_device_emul_target_ids = {
+                    t.get('id') for t in live_tabs if t.get('id')
+                }
+                _last_device_emul_target_domains = {
+                    t.get('id'): _extract_domain(t.get('url', ''))
+                    for t in live_tabs if t.get('id')
+                }
+                self.send_json({'ok': True, 'active': True, 'emulation': emul})
+            except Exception as e:
+                self.send_json({'ok': False, 'error': str(e)}, 500)
+
+        elif path == '/device/clear':
+            # POST /device/clear — disable device emulation on every tab and
+            # forget the active profile.
+            try:
+                _clear_device_emulation_from_all_tabs(reload=True)
+                current_device_emulation = None
+                _last_device_emul_target_ids = set()
+                _last_device_emul_target_domains = {}
+                self.send_json({'ok': True, 'active': False, 'emulation': None})
             except Exception as e:
                 self.send_json({'ok': False, 'error': str(e)}, 500)
 
