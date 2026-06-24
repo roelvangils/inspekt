@@ -1,6 +1,6 @@
 {
-  "version": "4.11.0",
-  "installed_at": "2025-11-22T22:30:00Z",
-  "source": "https://cdn.jsdelivr.net/npm/axe-core@4.11.0/axe.min.js",
-  "checksum": "sha256:e9e5863c33a874f09bc01acd9234b7e3c871479f5eef8802fa582544465e6d01"
+  "version": "4.11.4",
+  "installed_at": "2026-06-01T12:15:04.572711Z",
+  "source": "https://cdn.jsdelivr.net/npm/axe-core@4.11.4/axe.min.js",
+  "checksum": "sha256:fb83a4378d978ecb7d2dae48a3a3778a84c971ac692f3afd45d714fba89c0f0d"
 }

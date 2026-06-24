@@ -1,6 +1,6 @@
 {
-  "version": "4.0.16",
-  "installed_at": "2026-03-27T14:03:32.383116Z",
-  "source": "https://unpkg.com/accessibility-checker-engine@4.0.16/ace.js",
-  "checksum": "sha256:d4b2d8a2df882011db9a919d939c340f9aaa59bf8ee666f5201c701619a4229e"
+  "version": "4.0.24",
+  "installed_at": "2026-06-01T12:23:56.009871Z",
+  "source": "https://unpkg.com/accessibility-checker-engine@4.0.24/ace.js",
+  "checksum": "sha256:aee95cdee69782a4096ee4f96aa953a1fbb7eeb6fd8b54828caa46e06e3dbf2f"
 }
