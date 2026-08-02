@@ -53,67 +53,70 @@ Before you begin, ensure you have the following:
 
 You can install Inspekt from source (recommended for development) or via pip (when available).
 
-=== "From Source (Recommended)"
+=== "Installer Script (Recommended)"
 
-    Clone the repository and install in development mode:
+    One command sets up everything on a fresh Mac — Python, uv, and optionally the Browser VM:
 
     ```bash
-    # Clone the repository
-    git clone https://github.com/roelvangils/inspekt.git
-    cd inspekt
-
-    # Install in development mode
-    pip install -e .
+    curl -fsSL https://raw.githubusercontent.com/roelvangils/inspekt/main/install.sh | bash
     ```
 
-    This installs the `inspekt` command and all dependencies. The `-e` flag means "editable" - changes to the source code will be reflected immediately.
-
-=== "Install Dependencies Manually"
-
-    If you prefer to manage dependencies yourself:
+    Or from a clone:
 
     ```bash
-    # Clone the repository
     git clone https://github.com/roelvangils/inspekt.git
     cd inspekt
-
-    # Install dependencies
-    pip install -r requirements.txt
+    ./install.sh --cli-only   # fast path, no Docker needed
     ```
 
-=== "For Development"
+=== "From Source with uv"
 
-    If you plan to contribute or run tests:
+    If you already have [uv](https://github.com/astral-sh/uv) installed:
 
     ```bash
     # Clone the repository
     git clone https://github.com/roelvangils/inspekt.git
     cd inspekt
 
-    # Install with dev dependencies
+    # Create a virtual environment and install in editable mode
+    uv venv --python 3.13
+    uv pip install -e ".[dev]"
+    source .venv/bin/activate
+    ```
+
+    The `-e` flag means "editable" — changes to the source code are reflected immediately. The `[dev]` extra includes testing tools (pytest, playwright), linters (ruff), and type checkers (mypy).
+
+=== "With pip"
+
+    Inside a virtual environment of your choice (bare `pip` on Homebrew Python will fail with a PEP 668 "externally managed" error):
+
+    ```bash
+    git clone https://github.com/roelvangils/inspekt.git
+    cd inspekt
+
+    python3 -m venv .venv
+    source .venv/bin/activate
     pip install -e ".[dev]"
     ```
-
-    This includes testing tools (pytest, playwright), linters (ruff), and type checkers (mypy).
 
 ### Verify the Installation
 
 After installation, verify the `inspekt` command is available:
 
 ```bash
-inspekt--version
+inspekt --version
 ```
 
 You should see output like:
 
 ```
-Inspekt v2.0.0
+inspekt, version 1.0.0
 ```
 
 Run the help command to see available commands:
 
 ```bash
-inspekt--help
+inspekt --help
 ```
 
 !!! success "Installation Complete"
@@ -302,7 +305,7 @@ First, install a userscript manager extension in your browser:
 Display the userscript code using the CLI:
 
 ```bash
-inspektuserscript
+inspekt userscript
 ```
 
 This will output the complete userscript code to your terminal. The userscript is located at `/Users/roelvangils/inspekt_bridge/userscript_ws.js` in the repository.
@@ -314,7 +317,7 @@ Now create a new userscript in your userscript manager:
 1. **Click the userscript manager icon** in your browser toolbar
 2. **Create a new script** (usually a "+" or "New Script" button)
 3. **Delete any default content** in the editor
-4. **Paste the userscript code** from the `inspektuserscript` command
+4. **Paste the userscript code** from the `inspekt userscript` command
 5. **Save the script** (usually ++ctrl+s++ or ++cmd+s++)
 
 The userscript will automatically enable itself.
@@ -322,12 +325,12 @@ The userscript will automatically enable itself.
 !!! tip "Quick Copy"
     To copy the userscript to your clipboard (macOS):
     ```bash
-    inspektuserscript | pbcopy
+    inspekt userscript | pbcopy
     ```
 
     Or save it to a file:
     ```bash
-    inspektuserscript > my-userscript.js
+    inspekt userscript > my-userscript.js
     ```
 
 #### 2.4b Verify Userscript is Active
@@ -356,19 +359,19 @@ You can start the server in foreground or background mode:
     **Recommended for normal use:**
 
     ```bash
-    inspektserver start --daemon
+    inspekt start --daemon
     ```
 
     The server runs in the background. You can close your terminal and it will keep running.
 
     Check server status:
     ```bash
-    inspektserver status
+    inspekt status
     ```
 
     Stop the server:
     ```bash
-    inspektserver stop
+    inspekt stop
     ```
 
 === "Foreground Mode"
@@ -376,7 +379,7 @@ You can start the server in foreground or background mode:
     **Useful for debugging:**
 
     ```bash
-    inspektserver start
+    inspekt start
     ```
 
     The server runs in the foreground with live log output. Press ++ctrl+c++ to stop.
@@ -404,7 +407,7 @@ The server uses two ports:
 Check the server status:
 
 ```bash
-inspektserver status
+inspekt status
 ```
 
 Expected output when running:
@@ -519,18 +522,18 @@ inspektrepl
 
 1. **Start the server**:
    ```bash
-   inspektserver start --daemon
+   inspekt start --daemon
    ```
 
 2. **Check if server is running**:
    ```bash
-   inspektserver status
+   inspekt status
    ```
 
 3. **Restart the server**:
    ```bash
-   inspektserver stop
-   inspektserver start --daemon
+   inspekt stop
+   inspekt start --daemon
    ```
 
 4. **Check for port conflicts**:
@@ -562,12 +565,12 @@ inspektrepl
 4. **Restart everything**:
    ```bash
    # Stop server
-   inspektserver stop
+   inspekt stop
 
    # Restart browser (to reload userscript)
 
    # Start server
-   inspektserver start --daemon
+   inspekt start --daemon
    ```
 
 5. **Check WebSocket connection manually**
@@ -604,7 +607,7 @@ inspektrepl
 
 1. **Verify server is running**:
    ```bash
-   inspektserver status
+   inspekt status
    ```
 
 2. **Check firewall settings**:
@@ -648,7 +651,7 @@ To uninstall Inspekt:
 ### 1. Stop the Server
 
 ```bash
-inspektserver stop
+inspekt stop
 ```
 
 ### 2. Uninstall the Package

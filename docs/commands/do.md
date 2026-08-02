@@ -675,7 +675,7 @@ If cached action is outdated:
 
 If command is slow:
 1. Check if `mods` is responding (AI fallback)
-2. Verify server is running (`inspekt server status`)
+2. Verify server is running (`inspekt status`)
 3. Check network connection
 4. Consider disabling cache temporarily
 

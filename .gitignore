@@ -124,6 +124,8 @@ test-*.html
 *.tmp
 *.temp
 *_HANDOFF.md
+# Engine updaters write restore points next to the vendored libs
+inspekt/scripts/vendor/*.backup.js
 
 # --- Broken pip install artifacts (e.g. `=1.0.0` typos) --------------
 =*

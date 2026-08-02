@@ -34,32 +34,35 @@ Comprehensive guides, API reference, tutorials, and examples. Beautiful Material
 - **Smart Help** - Enhanced help system shows all available flags for each command
 - **Fast & Reliable** - WebSocket-based architecture for instant responses
 
-## 🆕 What's New in v2.0
+## 🏗️ Architecture Highlights
 
 - **Modular Architecture** - Clean hexagonal design with 4 layers
-- **Comprehensive Testing** - 244 tests with 97%+ coverage on core services
+- **Comprehensive Testing** - 1000+ tests with strong coverage on core services
 - **Enhanced Performance** - Eliminated blocking I/O for faster responses
 - **Better Documentation** - Complete architecture and security docs
 - **Type Safety** - Full type hints with Pydantic validation
 - **CI/CD Pipeline** - Automated testing on Python 3.11-3.13
-- **Zero Breaking Changes** - Full backward compatibility with v1.x
 
 ## 📦 Installation
 
 ### 1. Install the CLI tool
 
-**Requirements:** Python 3.11+
+**Requirements:** macOS (the installer handles everything else, including Python)
 
 ```bash
-# Clone the repository
+# One-command install (interactive: CLI only, Browser VM, or both)
+curl -fsSL https://raw.githubusercontent.com/roelvangils/inspekt/main/install.sh | bash
+```
+
+Or from a clone:
+
+```bash
 git clone https://github.com/roelvangils/inspekt.git
 cd inspekt
 
-# Install in development mode
-pip install -e .
-
-# Or install dependencies manually
-pip install -r requirements.txt
+./install.sh --cli-only   # fast path, no Docker
+# or, if you already have uv:
+make dev                  # creates .venv and installs with dev extras
 ```
 
 ### 2. Choose Your Browser Integration
@@ -103,7 +106,7 @@ Inspekt works with either a browser extension (recommended) or a userscript. Cho
 
 To view the userscript:
 ```bash
-inspektuserscript
+inspekt userscript
 ```
 
 > **Recommendation:** Use the browser extension for the best experience, especially if you work with sites that have Content Security Policy restrictions.
@@ -111,14 +114,14 @@ inspektuserscript
 ### 3. Start the bridge server
 
 ```bash
-# Start in foreground
-inspektserver start
+# Start (daemonizes bridge + API by default)
+inspekt start
 
-# Or start in background (daemon mode)
-inspektserver start --daemon
+# Or keep it in the foreground
+inspekt start --foreground
 
 # Check server status
-inspektserver status
+inspekt status
 ```
 
 ## 🚀 Quick Start
@@ -942,10 +945,10 @@ inspektexec inspekt/scripts/highlight_selector.js
 
 ## 📚 Command Reference
 
-Run `inspekt--help` to see all commands with their available flags and options:
+Run `inspekt --help` to see all commands with their available flags and options:
 
 ```bash
-inspekt--help
+inspekt --help
 ```
 
 The enhanced help system shows:
@@ -1200,7 +1203,7 @@ control-panel + VM, Tauri + VM) wire together, open
 
 Start the server:
 ```bash
-inspektserver start
+inspekt start
 ```
 
 ### "No response from browser"
@@ -1223,14 +1226,14 @@ inspekteval "slow_operation()" --timeout 30
 
 ```bash
 # Restart the server
-inspektserver stop
-inspektserver start
+inspekt stop
+inspekt start
 
 # Check server status
-inspektserver status
+inspekt status
 
 # View server logs
-inspektserver start  # (foreground mode to see logs)
+inspekt start  # (foreground mode to see logs)
 ```
 
 

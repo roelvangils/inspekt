@@ -519,7 +519,7 @@ Triggered when:
 
 **HTTP Request Failed**:
 - CLI: `ConnectionError: Failed to submit code`
-- Check if server is running: `inspekt server status`
+- Check if server is running: `inspekt status`
 
 ---
 

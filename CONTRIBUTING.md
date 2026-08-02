@@ -35,11 +35,11 @@ Thank you for your interest in contributing to Inspekt! This guide will help you
 git clone https://github.com/roelvangils/inspekt.git
 cd inspekt
 
-# Install in development mode
-pip install -e .
+# Bootstrap everything (creates .venv, installs dev extras)
+./install.sh --cli-only
 
 # Verify installation
-inspekt --version
+.venv/bin/inspekt --version
 ```
 
 ---
@@ -55,39 +55,23 @@ inspekt --version
 curl -LsSf https://astral.sh/uv/install.sh | sh
 
 # Create virtual environment and install dependencies
-uv venv
+uv venv --python 3.13
 source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 uv pip install -e ".[dev]"
 
-# Install pre-commit hooks (post-refactor)
+# Install pre-commit hooks
 pre-commit install
 ```
 
 ### Option 2: Using pip + venv
 
 ```bash
-# Create virtual environment
+# Create virtual environment (bare pip on Homebrew Python fails with PEP 668)
 python3 -m venv .venv
 source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 
-# Install dependencies
-pip install -e .
-
-# For development (after Phase 0 refactor)
+# Install with dev dependencies
 pip install -e ".[dev]"
-```
-
-### Option 3: Using poetry
-
-```bash
-# Install poetry (if not already installed)
-curl -sSL https://install.python-poetry.org | python3 -
-
-# Install dependencies
-poetry install
-
-# Activate shell
-poetry shell
 ```
 
 ---
@@ -100,7 +84,7 @@ In one terminal:
 
 ```bash
 # Start the WebSocket server
-inspekt server start
+inspekt start
 ```
 
 Expected output:
@@ -306,7 +290,7 @@ For scripts in `inspekt/scripts/`:
 No tests exist yet. Manual testing only.
 
 **Manual Test Checklist**:
-1. Start server: `inspekt server start`
+1. Start server: `inspekt start`
 2. Install userscript in browser
 3. Open test page (e.g., https://example.com)
 4. Run 10 commands:
@@ -753,7 +737,7 @@ No need to restart server for CLI changes (server is separate process).
 
 ```bash
 # Server side
-inspekt server start  # Already verbose by default
+inspekt start  # Already verbose by default
 
 # Browser side
 # Edit userscript_ws.js, set:
@@ -764,7 +748,7 @@ const VERBOSE = true;
 
 ```bash
 # Is server running?
-inspekt server status
+inspekt status
 
 # Health check
 curl http://127.0.0.1:8765/health

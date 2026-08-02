@@ -643,7 +643,7 @@ def start(bridge_only, api_only, foreground, api_port, bridge_port, host, docs, 
         from inspekt.config import is_dev_mode
         if is_dev_mode():
             from inspekt.app.cli.table import print_hint
-            print_hint("Dev mode: If you changed shared extension code, run `make sync-extensions`")
+            print_hint("Dev mode: If you changed shared extension code, run `make sync-extension`")
     else:
         click.echo(f"\n{error('Failed to start one or more servers')}", err=True)
         sys.exit(1)

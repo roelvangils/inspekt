@@ -11,7 +11,7 @@ requires-python = ">=3.11"
 license = "MIT"
 license-files = ["LICENSE"]
 authors = [
-    {name = "Roel van Gils", email = "roel@example.com"}
+    {name = "Roel van Gils", email = "roelvangils@gmail.com"}
 ]
 keywords = ["browser", "automation", "javascript", "cli", "development-tools", "inspection", "accessibility"]
 classifiers = [

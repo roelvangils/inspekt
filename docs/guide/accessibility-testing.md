@@ -474,7 +474,7 @@ jobs:
 
       - name: Start servers
         run: |
-          inspekt server start
+          inspekt start
           npm run dev &
           sleep 5
 

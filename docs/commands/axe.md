@@ -591,7 +591,7 @@ Run in CI pipeline:
 # .github/workflows/accessibility.yml
 - name: Run accessibility audit
   run: |
-    inspekt server start
+    inspekt start
     ./accessibility-test.sh
 ```
 

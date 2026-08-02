@@ -14,7 +14,7 @@ The DevTools Panel codebase is being refactored from monolithic files to a modul
 - Extracted component modules (highlighter, picker)
 - Created clean modular `panel.js` entry point (~170 lines)
 - Updated `panel.html` to support ES6 modules (`type="module"`)
-- Backed up original panel.js as `panel.js.backup`
+- The original monolithic panel.js was kept as `panel.js.backup` during the refactor (since removed)
 
 ### 📁 New File Structure
 
@@ -22,7 +22,6 @@ The DevTools Panel codebase is being refactored from monolithic files to a modul
 extensions/chrome/
 ├── panel.html                     # ✅ Updated to use <script type="module">
 ├── panel.js                       # ✅ NEW: Clean modular entry point (~170 lines)
-├── panel.js.backup                # ✅ Original monolithic file (backup)
 │
 ├── modules/                       # ✅ Core functionality modules
 │   ├── connection-manager.js      # ✅ WebSocket status monitoring (~100 lines)

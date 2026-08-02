@@ -934,7 +934,7 @@ Start the bridge server.
 
 **Syntax:**
 ```bash
-inspekt server start [OPTIONS]
+inspekt start [OPTIONS]
 ```
 
 **Options:**
@@ -946,13 +946,13 @@ inspekt server start [OPTIONS]
 
 ```bash
 # Start in foreground
-inspekt server start
+inspekt start
 
 # Start on custom port
-inspekt server start --port 9000
+inspekt start --port 9000
 
 # Start as background daemon
-inspekt server start --daemon
+inspekt start --daemon
 ```
 
 **Return Value:**
@@ -983,13 +983,13 @@ Check bridge server status.
 
 **Syntax:**
 ```bash
-inspekt server status
+inspekt status
 ```
 
 **Examples:**
 
 ```bash
-inspekt server status
+inspekt status
 ```
 
 **Return Value:**
@@ -1018,13 +1018,13 @@ Stop the bridge server.
 
 **Syntax:**
 ```bash
-inspekt server stop
+inspekt stop
 ```
 
 **Examples:**
 
 ```bash
-inspekt server stop
+inspekt stop
 ```
 
 **Return Value:**

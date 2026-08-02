@@ -177,7 +177,7 @@ inspekt exec script.js               # Explicit
 inspekt extract-links                # Explicit
 
 # No automatic execution on server start
-inspekt server start  # Only starts server, no code execution
+inspekt start  # Only starts server, no code execution
 ```
 
 **Properties**:
@@ -317,10 +317,10 @@ Update when new versions are released for security fixes.
 
 ```bash
 # Stop when done
-inspekt server stop
+inspekt stop
 
 # Check status
-inspekt server status
+inspekt status
 ```
 
 If server isn't running, attack surface is eliminated.
@@ -519,7 +519,7 @@ We follow responsible disclosure:
 
 ```bash
 # Server generates token on start
-inspekt server start
+inspekt start
 # Server token: abc123xyz
 
 # CLI uses token

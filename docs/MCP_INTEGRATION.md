@@ -115,13 +115,13 @@ Commands:
 The MCP server requires the bridge server to communicate with the browser:
 
 ```bash
-inspekt server start --daemon
+inspekt start --daemon
 ```
 
 Verify the bridge server is running:
 
 ```bash
-inspekt server status
+inspekt status
 ```
 
 ### Step 4: Test MCP Server
@@ -388,8 +388,8 @@ Claude will:
 **Symptoms:** Tools fail with "Bridge server is not running"
 
 **Solutions:**
-1. Start the bridge server: `inspekt server start --daemon`
-2. Verify it's running: `inspekt server status`
+1. Start the bridge server: `inspekt start --daemon`
+2. Verify it's running: `inspekt status`
 3. Check the port is correct (default: 8765)
 
 ### Browser Not Connected

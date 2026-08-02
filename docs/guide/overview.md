@@ -51,7 +51,7 @@ The server acts as a message broker:
 
 Start the server with:
 ```bash
-inspekt server start --daemon
+inspekt start --daemon
 ```
 
 ### 3. Browser Userscript (In Your Browser)
@@ -328,7 +328,7 @@ Ready to try Inspekt? Check out these guides:
 ## Next Steps
 
 1. Install Inspekt and the userscript (see [Installation guide](../getting-started/installation.md))
-2. Start the server: `inspekt server start --daemon`
+2. Start the server: `inspekt start --daemon`
 3. Try basic commands: `inspekt eval "document.title"`
 4. Explore the guides above
 5. Check out the [API Reference](../api/commands.md) for complete documentation

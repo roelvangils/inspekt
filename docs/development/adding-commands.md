@@ -184,7 +184,7 @@ def my_command(my_arg, my_option, debug):
 
     # 1. Check if server is alive
     if not client.is_alive():
-        click.echo("Error: Bridge server is not running. Start it with: inspekt server start", err=True)
+        click.echo("Error: Bridge server is not running. Start it with: inspekt start", err=True)
         sys.exit(1)
 
     # 2. Check for external dependencies (if needed)
@@ -366,7 +366,7 @@ inspekt my-command "test input" --debug
 
 ```bash
 # Test with real input (may require server + browser)
-inspekt server start --daemon
+inspekt start --daemon
 # Open browser with userscript active
 inspekt my-command "real input"
 ```
@@ -378,7 +378,7 @@ inspekt my-command "real input"
 Test error cases:
 ```bash
 # Server not running
-inspekt server stop
+inspekt stop
 inspekt my-command "test"  # Should show clear error
 
 # Invalid input
@@ -587,7 +587,7 @@ inspekt analyze "test" --debug
 inspekt analyze "test"
 
 # 10. Test error handling
-inspekt server stop
+inspekt stop
 inspekt analyze "test"  # Should show server error
 ```
 

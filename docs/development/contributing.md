@@ -81,7 +81,7 @@ python -c "import inspekt; print(inspekt.__version__)"
 In one terminal:
 
 ```bash
-inspekt server start
+inspekt start
 ```
 
 Expected output:
@@ -643,7 +643,7 @@ inspekt my-command test-arg
 **Server side**:
 
 ```bash
-inspekt server start  # Already verbose
+inspekt start  # Already verbose
 ```
 
 **Browser side** - Edit `userscript_ws.js`:
@@ -656,7 +656,7 @@ const VERBOSE = true;  // Set to true
 
 ```bash
 # Is server running?
-inspekt server status
+inspekt status
 
 # Health check
 curl http://127.0.0.1:8765/health

@@ -794,7 +794,7 @@ Try these exercises to build your skills:
 | Page description | `inspektdescribe` |
 | Keyboard control | `inspektcontrol` |
 | Watch events | `inspektwatch input` |
-| Server status | `inspekt server status` |
+| Server status | `inspekt status` |
 | Enable completion | `inspekt completion install` |
 | Get help | `inspekt --help` |
 

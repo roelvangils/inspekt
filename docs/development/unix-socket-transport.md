@@ -386,7 +386,7 @@ class UnixSocketTransport(Transport):
         if not self._socket_path.exists():
             raise ConnectionError(
                 f"Socket not found: {self._socket_path}. "
-                "Is the inspekt server running? Try: inspekt server start"
+                "Is the inspekt server running? Try: inspekt start"
             )
 
         try:
@@ -482,7 +482,7 @@ class SyncUnixSocketTransport(SyncTransport):
         if not self._socket_path.exists():
             raise ConnectionError(
                 f"Socket not found: {self._socket_path}. "
-                "Is the inspekt server running? Try: inspekt server start"
+                "Is the inspekt server running? Try: inspekt start"
             )
 
         try:
@@ -627,7 +627,7 @@ class TCPTransport(Transport):
         except OSError as e:
             raise ConnectionError(
                 f"Failed to connect to {self._host}:{self._port}: {e}. "
-                "Is the inspekt server running? Try: inspekt server start"
+                "Is the inspekt server running? Try: inspekt start"
             )
 
     async def disconnect(self) -> None:
@@ -1434,7 +1434,7 @@ After implementation, these commands demonstrate the new functionality:
 
 ```bash
 # Start server (creates socket automatically)
-inspekt server start
+inspekt start
 
 # Check socket path
 inspekt config get transport.socket_path
@@ -1446,7 +1446,7 @@ INSPEKT_TRANSPORT=tcp inspekt eval "document.title"
 INSPEKT_TRANSPORT=http inspekt eval "document.title"
 
 # Check server status (shows socket info)
-inspekt server status
+inspekt status
 ```
 
 ---

@@ -121,10 +121,10 @@ Sometimes the issue isn't CSP:
 
 ```bash
 # Check if server is running
-inspekt server status
+inspekt status
 
 # Restart if needed
-inspekt server restart
+inspekt restart
 ```
 
 ### ✅ Check Browser Console

@@ -390,7 +390,7 @@ jobs:
 
       - name: Start Inspekt server
         run: |
-          inspekt server start --daemon
+          inspekt start --daemon
           sleep 2
 
       - name: Run browser tests
@@ -420,7 +420,7 @@ test:
   image: python:3.11
   before_script:
     - pip install -e .
-    - inspekt server start --daemon
+    - inspekt start --daemon
   script:
     - inspekt open "file://$CI_PROJECT_DIR/tests/test-page.html" --wait
     - inspekt eval "runTests()" --format json > results.json
@@ -438,8 +438,8 @@ test:
 echo "Running browser tests…"
 
 # Start server if not running
-if ! inspekt server status &>/dev/null; then
-  inspekt server start --daemon
+if ! inspekt status &>/dev/null; then
+  inspekt start --daemon
   sleep 2
   cleanup=true
 fi

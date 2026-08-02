@@ -464,7 +464,7 @@ inspekt info --extended
 
 ```bash
 # Use CLI to start servers
-inspekt server start
+inspekt start
 uvicorn inspekt.app.api.server:app --host 127.0.0.1 --port 8767 &
 
 # Use API for the heavy lifting
@@ -498,7 +498,7 @@ If you need better CLI performance:
 
 3. **Keep bridge server running**:
    ```bash
-   inspekt server start --daemon  # Only start once
+   inspekt start --daemon  # Only start once
    ```
 
 ### For API Users

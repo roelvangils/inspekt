@@ -368,7 +368,7 @@ cd /Users/roelvangils/inspekt_bridge
 
 ### Commands not executing
 
-1. Make sure bridge server is running: `inspekt server status`
+1. Make sure bridge server is running: `inspekt status`
 2. Start servers if needed: `inspekt api start -d`
 3. Test CLI directly: `inspekt info`
 

@@ -703,8 +703,8 @@ curl http://localhost:8000/api/extraction/info
 ```json
 {
   "ok": false,
-  "error": "Bridge server is not running. Start it with: inspekt server start",
-  "detail": "Is the bridge server running? Start it with: inspekt server start"
+  "error": "Bridge server is not running. Start it with: inspekt start",
+  "detail": "Is the bridge server running? Start it with: inspekt start"
 }
 ```
 
@@ -988,7 +988,7 @@ The API server sends commands to the bridge server, which sends them to the brow
 
 **A**: Yes! The API is completely independent. You just need:
 
-1. Bridge server running (`inspekt server start`)
+1. Bridge server running (`inspekt start`)
 2. Browser with extension/userscript
 3. API server running (`uvicorn …`)
 
