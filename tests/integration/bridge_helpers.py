@@ -42,8 +42,7 @@ class FakeExtension:
     - command messages     -> {"type": "response", "requestId": ..., "response": ...}
     """
 
-    def __init__(self, client, auto_reply=True, result_value="fake-result",
-                 command_response=None):
+    def __init__(self, client, auto_reply=True, result_value="fake-result", command_response=None):
         self._client = client
         self.auto_reply = auto_reply
         self.result_value = result_value
@@ -77,22 +76,26 @@ class FakeExtension:
             if msg_type == "execute":
                 self.received_codes.append(data.get("code"))
                 if self.auto_reply:
-                    await self._ws.send_json({
-                        "type": "result",
-                        "request_id": data["request_id"],
-                        "ok": True,
-                        "result": self.result_value,
-                        "url": "https://example.test/page",
-                        "title": "Fake Page",
-                    })
+                    await self._ws.send_json(
+                        {
+                            "type": "result",
+                            "request_id": data["request_id"],
+                            "ok": True,
+                            "result": self.result_value,
+                            "url": "https://example.test/page",
+                            "title": "Fake Page",
+                        }
+                    )
             elif msg_type == "pong":
                 pass
             elif "requestId" in data and self.auto_reply:
-                await self._ws.send_json({
-                    "type": "response",
-                    "requestId": data["requestId"],
-                    "response": self.command_response,
-                })
+                await self._ws.send_json(
+                    {
+                        "type": "response",
+                        "requestId": data["requestId"],
+                        "response": self.command_response,
+                    }
+                )
 
     async def close(self):
         if self._reader_task:

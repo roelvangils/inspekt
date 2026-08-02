@@ -20,6 +20,7 @@ def get_terminal_width() -> int:
     """Get the current terminal width, defaulting to 80 if unavailable."""
     try:
         import shutil
+
         return shutil.get_terminal_size().columns
     except Exception:
         return 80
@@ -63,13 +64,15 @@ def strip_icon_font_chars(text: str) -> str:
     for char in text:
         code = ord(char)
         # Skip if in any PUA range
-        if (0xE000 <= code <= 0xF8FF or      # BMP PUA
-            0xF0000 <= code <= 0xFFFFD or    # Supplementary PUA-A
-            0x100000 <= code <= 0x10FFFD):   # Supplementary PUA-B
+        if (
+            0xE000 <= code <= 0xF8FF  # BMP PUA
+            or 0xF0000 <= code <= 0xFFFFD  # Supplementary PUA-A
+            or 0x100000 <= code <= 0x10FFFD
+        ):  # Supplementary PUA-B
             continue
         result.append(char)
 
-    return ''.join(result)
+    return "".join(result)
 
 
 def sanitize_display_name(text: str, max_length: int = 25) -> str:
@@ -95,7 +98,7 @@ def unescape_css_selector(selector: str) -> str:
 
     # Pattern matches backslash followed by any character
     # CSS escape: \X where X is any character (including space)
-    return re.sub(r'\\(.)', r'\1', selector)
+    return re.sub(r"\\(.)", r"\1", selector)
 
 
 def format_selector_display(selector: str, max_length: int = 35) -> str:
@@ -131,8 +134,8 @@ def style_secondary_key(key: str) -> str:
 def truncate_to_width(text: str, max_width: int, suffix: str = "…") -> str:
     """Truncate text to fit within max_width, accounting for ANSI escape codes."""
     # Remove ANSI escape codes to get actual visible length
-    ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
-    visible_text = ansi_escape.sub('', text)
+    ansi_escape = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
+    visible_text = ansi_escape.sub("", text)
 
     if len(visible_text) <= max_width:
         return text
@@ -145,7 +148,7 @@ def truncate_to_width(text: str, max_width: int, suffix: str = "…") -> str:
 
     while i < len(text) and visible_count < max_width - len(suffix):
         # Check if we're at an ANSI escape sequence
-        match = re.match(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])', text[i:])
+        match = re.match(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])", text[i:])
         if match:
             # Skip the escape sequence entirely
             i += len(match.group())
@@ -212,7 +215,9 @@ def get_recordings_dir() -> Path:
     return recordings_dir
 
 
-def format_step_header(use_color: bool = True, indent: bool = False, show_milliseconds: bool = True) -> str:
+def format_step_header(
+    use_color: bool = True, indent: bool = False, show_milliseconds: bool = True
+) -> str:
     """Format the header row for step display.
 
     Args:
@@ -369,6 +374,7 @@ def format_step_for_display(
         icon_color = "bright_black" if dimmed_icon else "yellow"
         if is_native:
             from inspekt.app.cli.icons import get_platform_icon
+
             platform_icon = get_platform_icon() or ""
             # Platform icon (yellow normally, dark gray when dimmed)
             action_str_native = action.ljust(10) + click.style(platform_icon, fg=icon_color)
@@ -406,10 +412,18 @@ def format_step_for_display(
     elif action in ("click", "rightclick", "activate"):
         name = accessible_name or sanitize_display_name(target.get("text", "") if target else "")
         sel_display = format_selector_display(selector)
-        tag_display = click.style(f" ({tag})", fg="bright_black") if tag and use_color else (f" ({tag})" if tag else "")
+        tag_display = (
+            click.style(f" ({tag})", fg="bright_black")
+            if tag and use_color
+            else (f" ({tag})" if tag else "")
+        )
         # Use bright_green for activate to distinguish from mouse click
         name_color = "bright_green" if action == "activate" else "green"
-        name_display = click.style(f'"{name}"', fg=name_color) if name and use_color else (f'"{name}"' if name else "")
+        name_display = (
+            click.style(f'"{name}"', fg=name_color)
+            if name and use_color
+            else (f'"{name}"' if name else "")
+        )
         if name:
             # When we have an accessible name, skip the selector (it's redundant)
             result = f"{prefix}   {name_display}{tag_display}"
@@ -422,13 +436,21 @@ def format_step_for_display(
         sel_display = format_selector_display(selector)
         # Get input type if available
         input_type = target.get("attributes", {}).get("type", "") if target else ""
-        type_display = click.style(f" [{input_type}]", fg="bright_black") if input_type and input_type != "text" and use_color else (f" [{input_type}]" if input_type and input_type != "text" else "")
+        type_display = (
+            click.style(f" [{input_type}]", fg="bright_black")
+            if input_type and input_type != "text" and use_color
+            else (f" [{input_type}]" if input_type and input_type != "text" else "")
+        )
         if step.get("sensitive"):
             pwd_display = click.style("(password)", fg="red") if use_color else "(password)"
             result = f"{prefix}   {sel_display} {pwd_display}"
         else:
             char_count = len(value)
-            chars_display = click.style(f"({char_count} chars)", fg="yellow") if use_color else f"({char_count} chars)"
+            chars_display = (
+                click.style(f"({char_count} chars)", fg="yellow")
+                if use_color
+                else f"({char_count} chars)"
+            )
             result = f"{prefix}   {sel_display} {chars_display}{type_display}"
         return truncate_to_width(result, term_width)
 
@@ -467,14 +489,18 @@ def format_step_for_display(
                     "month": "Native Month Picker",
                     "week": "Native Week Picker",
                     "number": "Native Number Spinner",
-                    "color": "Native Color Picker"
+                    "color": "Native Color Picker",
                 }
                 display_name = native_control_names.get(input_type, accessible_name)
             else:
                 display_name = accessible_name
 
             if display_name:
-                name_display = click.style(f"({display_name})", fg="bright_black") if use_color else f"({display_name})"
+                name_display = (
+                    click.style(f"({display_name})", fg="bright_black")
+                    if use_color
+                    else f"({display_name})"
+                )
                 result = f"{prefix}   {key_display} {name_display}"
             else:
                 result = f"{prefix}   {key_display}"
@@ -485,8 +511,16 @@ def format_step_for_display(
     elif action == "hover":
         name = accessible_name or sanitize_display_name(target.get("text", "") if target else "")
         sel_display = format_selector_display(selector)
-        tag_display = click.style(f" ({tag})", fg="bright_black") if tag and use_color else (f" ({tag})" if tag else "")
-        name_display = click.style(f'"{name}"', fg="white") if name and use_color else (f'"{name}"' if name else "")
+        tag_display = (
+            click.style(f" ({tag})", fg="bright_black")
+            if tag and use_color
+            else (f" ({tag})" if tag else "")
+        )
+        name_display = (
+            click.style(f'"{name}"', fg="white")
+            if name and use_color
+            else (f'"{name}"' if name else "")
+        )
         if name:
             # When we have an accessible name, skip the selector (it's redundant)
             result = f"{prefix}   {name_display}{tag_display}"
@@ -500,8 +534,16 @@ def format_step_for_display(
         sel_display = format_selector_display(selector)
         value = step.get("value", "")
         # Show value if available (for radio buttons especially)
-        value_display = click.style(f'"{value}"', fg="green") if value and use_color else (f'"{value}"' if value else "")
-        name_display = click.style(f'"{name}"', fg="green") if name and use_color else (f'"{name}"' if name else "")
+        value_display = (
+            click.style(f'"{value}"', fg="green")
+            if value and use_color
+            else (f'"{value}"' if value else "")
+        )
+        name_display = (
+            click.style(f'"{name}"', fg="green")
+            if name and use_color
+            else (f'"{name}"' if name else "")
+        )
         # Prefer value over name for radio buttons
         display = value_display if value else name_display
         if display:
@@ -515,7 +557,11 @@ def format_step_for_display(
         # Checkbox unchecked
         name = accessible_name or sanitize_display_name(target.get("text", "") if target else "")
         sel_display = format_selector_display(selector)
-        name_display = click.style(f'"{name}"', fg="red") if name and use_color else (f'"{name}"' if name else "")
+        name_display = (
+            click.style(f'"{name}"', fg="red")
+            if name and use_color
+            else (f'"{name}"' if name else "")
+        )
         if name:
             # When we have an accessible name, skip the selector (it's redundant)
             result = f"{prefix}   {name_display}"
@@ -529,8 +575,16 @@ def format_step_for_display(
         sel_display = format_selector_display(selector)
         value = step.get("value", "")
         # Show value for radio buttons (more meaningful than label)
-        value_display = click.style(f'"{value}"', fg="green") if value and use_color else (f'"{value}"' if value else "")
-        name_display = click.style(f'"{name}"', fg="green") if name and use_color else (f'"{name}"' if name else "")
+        value_display = (
+            click.style(f'"{value}"', fg="green")
+            if value and use_color
+            else (f'"{value}"' if value else "")
+        )
+        name_display = (
+            click.style(f'"{name}"', fg="green")
+            if name and use_color
+            else (f'"{name}"' if name else "")
+        )
         # Prefer value over name for radio buttons
         display = value_display if value else name_display
         if display:
@@ -548,7 +602,9 @@ def format_step_for_display(
         # Prefer showing option text over raw value
         display_text = option_text or value
         if display_text:
-            text_display = click.style(f'"{display_text}"', fg="cyan") if use_color else f'"{display_text}"'
+            text_display = (
+                click.style(f'"{display_text}"', fg="cyan") if use_color else f'"{display_text}"'
+            )
             result = f"{prefix}   {sel_display} {text_display}"
         else:
             result = f"{prefix}   {sel_display}"
@@ -600,7 +656,9 @@ def format_step_for_display(
                 result = f"{prefix}   {arrow_display} {state_styled}"
         else:
             if accessible_name:
-                result = f'{prefix}   {arrow} "{truncate_text(accessible_name, 30)}" ({state_display})'
+                result = (
+                    f'{prefix}   {arrow} "{truncate_text(accessible_name, 30)}" ({state_display})'
+                )
             else:
                 result = f"{prefix}   {arrow} ({state_display})"
         return truncate_to_width(result, term_width)
@@ -630,7 +688,9 @@ def format_step_for_display(
             state_styled = click.style(f"({state_display})", fg="bright_black")
             result = f"{prefix}   {symbol_display} {sel_display} {state_styled}"
         else:
-            result = f"{prefix}   {symbol} {format_selector_display(selector, 30)} ({state_display})"
+            result = (
+                f"{prefix}   {symbol} {format_selector_display(selector, 30)} ({state_display})"
+            )
         return truncate_to_width(result, term_width)
 
     elif action == "jsdialog":
@@ -796,7 +856,9 @@ def format_skipped_step_for_display(
     elif action in ("click", "rightclick", "activate", "hover", "check", "uncheck"):
         name = accessible_name or sanitize_display_name(target.get("text", "") if target else "")
         tag_suffix = f" ({tag})" if tag else ""
-        details = f'"{name}"{tag_suffix}' if name else step.get("target", {}).get("selector", "")[:35]
+        details = (
+            f'"{name}"{tag_suffix}' if name else step.get("target", {}).get("selector", "")[:35]
+        )
     elif action == "type":
         char_count = len(step.get("value", ""))
         details = f"({char_count} chars)"
@@ -904,7 +966,9 @@ def format_paused_step_for_display(
     elif action in ("click", "rightclick", "activate", "hover", "check", "uncheck"):
         name = accessible_name or sanitize_display_name(target.get("text", "") if target else "")
         tag_suffix = f" ({tag})" if tag else ""
-        details = f'"{name}"{tag_suffix}' if name else step.get("target", {}).get("selector", "")[:35]
+        details = (
+            f'"{name}"{tag_suffix}' if name else step.get("target", {}).get("selector", "")[:35]
+        )
     elif action == "type":
         char_count = len(step.get("value", ""))
         details = f"({char_count} chars)"
@@ -965,7 +1029,9 @@ def format_system_message(
 
     # Format time: either actual elapsed or placeholder
     if elapsed_ms is not None:
-        time_str = format_elapsed(elapsed_ms, show_milliseconds=show_milliseconds, use_color=use_color)
+        time_str = format_elapsed(
+            elapsed_ms, show_milliseconds=show_milliseconds, use_color=use_color
+        )
     else:
         # Placeholder: --:-- or --:--.--- depending on milliseconds setting
         time_str = "--:--.---" if show_milliseconds else "--:--"
@@ -973,7 +1039,9 @@ def format_system_message(
             # Style the .--- part in dark gray to match format_elapsed styling
             time_str = "--:--" + click.style(".---", fg="bright_black")
 
-    prefix = click.style(f"----   {time_str}", fg="bright_black") if use_color else f"----   {time_str}"
+    prefix = (
+        click.style(f"----   {time_str}", fg="bright_black") if use_color else f"----   {time_str}"
+    )
     msg = click.style(message, fg="bright_black", italic=True) if use_color else message
 
     # Get icon if specified

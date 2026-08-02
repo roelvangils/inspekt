@@ -62,15 +62,11 @@ async def extract_links(params: ExtractLinksParams) -> ExtractLinksResponse:
 
             # Filter by type if requested
             if params.filter_type and params.filter_type != "all":
-                links_data = [
-                    link for link in links_data if link.get("type") == params.filter_type
-                ]
+                links_data = [link for link in links_data if link.get("type") == params.filter_type]
 
             # Filter anchors if not included
             if not params.include_anchors:
-                links_data = [
-                    link for link in links_data if link.get("type") != "anchor"
-                ]
+                links_data = [link for link in links_data if link.get("type") != "anchor"]
 
             # Convert to Pydantic models
             links = [
@@ -125,9 +121,7 @@ async def extract_outline(params: EmptyParams) -> ExtractOutlineResponse:
         if result.get("ok"):
             result_data = result.get("result", {})
             # The script returns {"headings": [...]}
-            outline_data = (
-                result_data.get("headings", []) if isinstance(result_data, dict) else []
-            )
+            outline_data = result_data.get("headings", []) if isinstance(result_data, dict) else []
 
             # Convert to Pydantic models
             outline = [

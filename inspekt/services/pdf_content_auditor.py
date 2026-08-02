@@ -60,18 +60,18 @@ def _is_garbage_text(text: str) -> bool:
         return True
 
     # Very short fragments (1-3 chars) are suspicious unless common words
-    if len(text) <= 3 and text.lower() not in {'see', 'go', 'to', 'url', 'www', 'pdf', 'faq'}:
+    if len(text) <= 3 and text.lower() not in {"see", "go", "to", "url", "www", "pdf", "faq"}:
         return True
 
     # Too many newlines for the text length suggests fragmented extraction
     # (text from multiple unrelated areas falling within the link rectangle)
     if text:
-        newline_ratio = text.count('\n') / len(text)
+        newline_ratio = text.count("\n") / len(text)
         if newline_ratio > 0.2:  # More than 20% newlines
             return True
 
     # Random URL-like fragments (partial protocol strings)
-    garbage_fragments = {'://', '//', ':/w', '://w', 'http', 'https', 'www', 'mailto', 'ftp'}
+    garbage_fragments = {"://", "//", ":/w", "://w", "http", "https", "www", "mailto", "ftp"}
     if text.strip() in garbage_fragments:
         return True
 
@@ -82,8 +82,8 @@ def _is_garbage_text(text: str) -> bool:
 
     # Check for fragmented multi-line text (multiple short words/fragments)
     # e.g., "HAB\n$285\noutr" - multiple fragments separated by newlines
-    if '\n' in text:
-        lines = [line.strip() for line in text.split('\n') if line.strip()]
+    if "\n" in text:
+        lines = [line.strip() for line in text.split("\n") if line.strip()]
         if len(lines) >= 2:
             # If most lines are very short (< 5 chars), it's likely fragmented
             short_lines = sum(1 for line in lines if len(line) < 5)
@@ -116,7 +116,7 @@ def _clean_toc_text(text: str) -> str:
     # e.g., "3\nBorealis Exterior" -> "Borealis Exterior"
     # e.g., "12\tChapter Name" -> "Chapter Name"
     # Only match when there's a clear separator (tab, newline, or 2+ spaces)
-    cleaned = re.sub(r'^\d+(?:[\t\n]|\s{2,})\s*', '', text)
+    cleaned = re.sub(r"^\d+(?:[\t\n]|\s{2,})\s*", "", text)
 
     return cleaned.strip()
 
@@ -545,7 +545,7 @@ class ListAudit:
 
 # Annotation types that should be checked for accessibility
 ACCESSIBLE_ANNOTATION_TYPES = {
-    0: "Text",           # Sticky notes
+    0: "Text",  # Sticky notes
     2: "FreeText",
     8: "Highlight",
     9: "Underline",
@@ -710,11 +710,13 @@ class PDFContentAuditor:
     def __enter__(self) -> PDFContentAuditor:
         """Open PDF files."""
         import pikepdf
+
         self._pdf = pikepdf.open(self.pdf_path)
 
         # Try to open with PyMuPDF for additional extraction
         try:
             import fitz
+
             self._fitz_doc = fitz.open(self.pdf_path)
         except ImportError:
             logger.debug("PyMuPDF not available for content extraction")
@@ -746,12 +748,9 @@ class PDFContentAuditor:
             result.images = self._audit_images()
             result.total_images = len(result.images)
             result.images_without_alt = sum(
-                1 for img in result.images
-                if not img.has_alt_text and not img.is_decorative
+                1 for img in result.images if not img.has_alt_text and not img.is_decorative
             )
-            result.images_decorative = sum(
-                1 for img in result.images if img.is_decorative
-            )
+            result.images_decorative = sum(1 for img in result.images if img.is_decorative)
         except Exception as e:
             logger.warning(f"Error auditing images: {e}")
             result.extraction_errors.append(f"Images: {e}")
@@ -760,12 +759,8 @@ class PDFContentAuditor:
             # Audit tables
             result.tables = self._audit_tables()
             result.total_tables = len(result.tables)
-            result.tables_without_headers = sum(
-                1 for tbl in result.tables if not tbl.has_headers
-            )
-            result.tables_layout = sum(
-                1 for tbl in result.tables if tbl.is_layout_table
-            )
+            result.tables_without_headers = sum(1 for tbl in result.tables if not tbl.has_headers)
+            result.tables_layout = sum(1 for tbl in result.tables if tbl.is_layout_table)
         except Exception as e:
             logger.warning(f"Error auditing tables: {e}")
             result.extraction_errors.append(f"Tables: {e}")
@@ -775,8 +770,7 @@ class PDFContentAuditor:
             result.forms = self._audit_forms()
             result.total_form_fields = len(result.forms)
             result.fields_without_labels = sum(
-                1 for f in result.forms
-                if not f.has_tooltip and not f.has_label
+                1 for f in result.forms if not f.has_tooltip and not f.has_label
             )
         except Exception as e:
             logger.warning(f"Error auditing forms: {e}")
@@ -790,8 +784,7 @@ class PDFContentAuditor:
                 1 for link in result.links if not link.is_descriptive
             )
             result.links_missing_text = sum(
-                1 for link in result.links
-                if not link.link_text and not link.alt_text
+                1 for link in result.links if not link.link_text and not link.alt_text
             )
         except Exception as e:
             logger.warning(f"Error auditing links: {e}")
@@ -801,9 +794,7 @@ class PDFContentAuditor:
             # Audit lists (L/LI/Lbl/LBody structure)
             result.lists = self._audit_lists()
             result.total_lists = len(result.lists)
-            result.lists_with_issues = sum(
-                1 for lst in result.lists if lst.status != "pass"
-            )
+            result.lists_with_issues = sum(1 for lst in result.lists if lst.status != "pass")
         except Exception as e:
             logger.warning(f"Error auditing lists: {e}")
             result.extraction_errors.append(f"Lists: {e}")
@@ -813,8 +804,7 @@ class PDFContentAuditor:
             result.annotations = self._audit_annotations()
             result.total_annotations = len(result.annotations)
             result.annotations_without_description = sum(
-                1 for ann in result.annotations
-                if ann.status in ("fail", "warn")
+                1 for ann in result.annotations if ann.status in ("fail", "warn")
             )
         except Exception as e:
             logger.warning(f"Error auditing annotations: {e}")
@@ -825,8 +815,7 @@ class PDFContentAuditor:
             result.vector_graphics = self._audit_vector_graphics()
             result.total_vector_graphics = len(result.vector_graphics)
             result.vector_graphics_without_alt = sum(
-                1 for vg in result.vector_graphics
-                if not vg.has_alt_text and not vg.is_decorative
+                1 for vg in result.vector_graphics if not vg.has_alt_text and not vg.is_decorative
             )
             result.vector_graphics_decorative = sum(
                 1 for vg in result.vector_graphics if vg.is_decorative
@@ -1091,8 +1080,7 @@ class PDFContentAuditor:
         from inspekt.services.image_classifier import ImageCategory, generate_alt_text_suggestion
 
         images_needing_alt = [
-            img for img in images
-            if not img.has_alt_text and not img.is_decorative
+            img for img in images if not img.has_alt_text and not img.is_decorative
         ]
 
         for idx, img in enumerate(images_needing_alt):
@@ -1107,7 +1095,11 @@ class PDFContentAuditor:
 
                 # Determine category
                 try:
-                    category = ImageCategory(img.image_category) if img.image_category else ImageCategory.UNKNOWN
+                    category = (
+                        ImageCategory(img.image_category)
+                        if img.image_category
+                        else ImageCategory.UNKNOWN
+                    )
                 except ValueError:
                     category = ImageCategory.UNKNOWN
 
@@ -1145,7 +1137,9 @@ class PDFContentAuditor:
             total_pages = len(self._fitz_doc)
             pages_to_audit = min(total_pages, MAX_AUDIT_PAGES)
             if pages_to_audit < total_pages:
-                logger.info(f"Content audit limited to first {pages_to_audit} of {total_pages} pages")
+                logger.info(
+                    f"Content audit limited to first {pages_to_audit} of {total_pages} pages"
+                )
 
             for page_num in range(pages_to_audit):
                 page = self._fitz_doc[page_num]
@@ -1191,20 +1185,22 @@ class PDFContentAuditor:
                     if not has_alt and not is_decorative:
                         issues.append("Missing alternative text")
 
-                    images.append(ImageAudit(
-                        page=page_num,
-                        index=img_idx,
-                        bbox=bbox,
-                        width=width,
-                        height=height,
-                        has_alt_text=has_alt,
-                        alt_text=alt_text,
-                        is_decorative=is_decorative,
-                        image_type=ext.upper() if ext else None,
-                        bits_per_component=bpc,
-                        color_space=str(color_space) if color_space else None,
-                        issues=issues,
-                    ))
+                    images.append(
+                        ImageAudit(
+                            page=page_num,
+                            index=img_idx,
+                            bbox=bbox,
+                            width=width,
+                            height=height,
+                            has_alt_text=has_alt,
+                            alt_text=alt_text,
+                            is_decorative=is_decorative,
+                            image_type=ext.upper() if ext else None,
+                            bits_per_component=bpc,
+                            color_space=str(color_space) if color_space else None,
+                            issues=issues,
+                        )
+                    )
 
         return images
 
@@ -1622,18 +1618,20 @@ class PDFContentAuditor:
                     elif not is_descriptive:
                         issues.append(f"Non-descriptive link text: '{link_text}'")
 
-                    links.append(LinkAudit(
-                        page=page_num,
-                        index=link_idx,
-                        bbox=bbox,
-                        link_text=link_text,
-                        destination=dest,
-                        destination_type=dest_type,
-                        is_internal=is_internal,
-                        is_descriptive=is_descriptive,
-                        alt_text=alt_text,
-                        issues=issues,
-                    ))
+                    links.append(
+                        LinkAudit(
+                            page=page_num,
+                            index=link_idx,
+                            bbox=bbox,
+                            link_text=link_text,
+                            destination=dest,
+                            destination_type=dest_type,
+                            is_internal=is_internal,
+                            is_descriptive=is_descriptive,
+                            alt_text=alt_text,
+                            issues=issues,
+                        )
+                    )
 
         return links
 
@@ -1745,7 +1743,9 @@ class PDFContentAuditor:
                         # Check for nested lists in LBody (this is correct)
                         if "/K" in child:
                             lbody_k = child["/K"]
-                            lbody_children = lbody_k if isinstance(lbody_k, pikepdf.Array) else [lbody_k]
+                            lbody_children = (
+                                lbody_k if isinstance(lbody_k, pikepdf.Array) else [lbody_k]
+                            )
                             for lbody_child in lbody_children:
                                 if isinstance(lbody_child, pikepdf.Dictionary):
                                     lbody_tag = str(lbody_child.get("/S", "")).lstrip("/")
@@ -1790,7 +1790,9 @@ class PDFContentAuditor:
                         has_proper_structure = False
                     else:
                         # Non-LI child under L
-                        issues.append(f"Invalid child '{child_tag}' directly under L (should be LI)")
+                        issues.append(
+                            f"Invalid child '{child_tag}' directly under L (should be LI)"
+                        )
                         has_proper_structure = False
 
         analyze_children(list_element)
@@ -1874,19 +1876,21 @@ class PDFContentAuditor:
                         if not accessible_desc:
                             issues.append(f"{type_name} annotation has no explanation note")
 
-                    annotations.append(AnnotationAudit(
-                        page=page_num,
-                        index=ann_idx,
-                        annotation_type=type_name,
-                        type_code=annot_type,
-                        bbox=bbox,
-                        has_contents=has_contents,
-                        contents=contents,
-                        has_title=has_title,
-                        title=title,
-                        subject=subject,
-                        issues=issues,
-                    ))
+                    annotations.append(
+                        AnnotationAudit(
+                            page=page_num,
+                            index=ann_idx,
+                            annotation_type=type_name,
+                            type_code=annot_type,
+                            bbox=bbox,
+                            has_contents=has_contents,
+                            contents=contents,
+                            has_title=has_title,
+                            title=title,
+                            subject=subject,
+                            issues=issues,
+                        )
+                    )
                     ann_idx += 1
 
         return annotations
@@ -1952,19 +1956,21 @@ class PDFContentAuditor:
                 if not is_decorative and not has_alt_text:
                     issues.append("Vector graphic without alternative text")
 
-                vectors.append(VectorGraphicAudit(
-                    page=page_num,
-                    index=idx,
-                    bbox=bbox,
-                    width=width,
-                    height=height,
-                    has_alt_text=has_alt_text,
-                    alt_text=alt_text,
-                    is_decorative=is_decorative,
-                    path_count=cluster["path_count"],
-                    fill_colors=cluster["color_count"],
-                    issues=issues,
-                ))
+                vectors.append(
+                    VectorGraphicAudit(
+                        page=page_num,
+                        index=idx,
+                        bbox=bbox,
+                        width=width,
+                        height=height,
+                        has_alt_text=has_alt_text,
+                        alt_text=alt_text,
+                        is_decorative=is_decorative,
+                        path_count=cluster["path_count"],
+                        fill_colors=cluster["color_count"],
+                        issues=issues,
+                    )
+                )
 
         return vectors
 
@@ -1999,15 +2005,15 @@ class PDFContentAuditor:
                     continue
 
                 if isinstance(stream, bytes):
-                    stream = stream.decode('latin-1', errors='replace')
+                    stream = stream.decode("latin-1", errors="replace")
 
                 # Find artifact sections: /Artifact BMC ... EMC
-                artifact_pattern = r'/Artifact[^\n]*BMC(.*?)EMC'
+                artifact_pattern = r"/Artifact[^\n]*BMC(.*?)EMC"
                 matches = re.findall(artifact_pattern, stream, re.DOTALL)
 
                 for match in matches:
                     # Find rectangle operations (x y w h re)
-                    rect_pattern = r'([\d.]+)\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)\s+re'
+                    rect_pattern = r"([\d.]+)\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)\s+re"
                     rects = re.findall(rect_pattern, match)
                     for r in rects:
                         x, y, w, h = float(r[0]), float(r[1]), float(r[2]), float(r[3])
@@ -2015,8 +2021,8 @@ class PDFContentAuditor:
                         artifact_regions.append((x, y, x + w, y + h))
 
                     # Also detect Form XObjects (images/logos) via transformation matrix
-                    if '/Fm' in match and 'Do' in match:
-                        cm_pattern = r'([\d.-]+)\s+([\d.-]+)\s+([\d.-]+)\s+([\d.-]+)\s+([\d.-]+)\s+([\d.-]+)\s+cm'
+                    if "/Fm" in match and "Do" in match:
+                        cm_pattern = r"([\d.-]+)\s+([\d.-]+)\s+([\d.-]+)\s+([\d.-]+)\s+([\d.-]+)\s+([\d.-]+)\s+cm"
                         cm_match = re.search(cm_pattern, match)
                         if cm_match:
                             a, _b, _c, d, e, f = [float(x) for x in cm_match.groups()]
@@ -2052,8 +2058,12 @@ class PDFContentAuditor:
 
         for ax0, ay0, ax1, ay1 in artifact_regions:
             # Check for overlap with tolerance
-            if not (x1 < ax0 - tolerance or ax1 < x0 - tolerance or
-                    y1 < ay0 - tolerance or ay1 < y0 - tolerance):
+            if not (
+                x1 < ax0 - tolerance
+                or ax1 < x0 - tolerance
+                or y1 < ay0 - tolerance
+                or ay1 < y0 - tolerance
+            ):
                 return True
 
         return False
@@ -2098,10 +2108,10 @@ class PDFContentAuditor:
                     continue
 
                 if isinstance(stream, bytes):
-                    stream = stream.decode('latin-1', errors='replace')
+                    stream = stream.decode("latin-1", errors="replace")
 
                 # Find Figure sections with MCID: /Figure <</MCID N>> BDC ... EMC
-                figure_mcid_pattern = r'/Figure\s*<<\s*/MCID\s*(\d+)\s*>>\s*BDC(.*?)EMC'
+                figure_mcid_pattern = r"/Figure\s*<<\s*/MCID\s*(\d+)\s*>>\s*BDC(.*?)EMC"
                 matches = re.findall(figure_mcid_pattern, stream, re.DOTALL)
 
                 for mcid_str, content in matches:
@@ -2109,7 +2119,7 @@ class PDFContentAuditor:
                     alt_text = mcid_to_alt.get(mcid)
 
                     # Find rectangle operations (x y w h re)
-                    rect_pattern = r'([\d.]+)\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)\s+re'
+                    rect_pattern = r"([\d.]+)\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)\s+re"
                     rects = re.findall(rect_pattern, content)
                     for r in rects:
                         x, y, w, h = float(r[0]), float(r[1]), float(r[2]), float(r[3])
@@ -2117,8 +2127,8 @@ class PDFContentAuditor:
                         figure_regions.append((bbox, alt_text))
 
                     # Also detect Form XObjects via transformation matrix
-                    if 'Do' in content:
-                        cm_pattern = r'([\d.-]+)\s+([\d.-]+)\s+([\d.-]+)\s+([\d.-]+)\s+([\d.-]+)\s+([\d.-]+)\s+cm'
+                    if "Do" in content:
+                        cm_pattern = r"([\d.-]+)\s+([\d.-]+)\s+([\d.-]+)\s+([\d.-]+)\s+([\d.-]+)\s+([\d.-]+)\s+cm"
                         cm_match = re.search(cm_pattern, content)
                         if cm_match:
                             a, _b, _c, d, e, f = [float(x) for x in cm_match.groups()]
@@ -2128,11 +2138,11 @@ class PDFContentAuditor:
                             figure_regions.append((bbox, alt_text))
 
                 # Also handle simple /Figure BMC without MCID (less common)
-                simple_figure_pattern = r'/Figure\s+BMC(.*?)EMC'
+                simple_figure_pattern = r"/Figure\s+BMC(.*?)EMC"
                 simple_matches = re.findall(simple_figure_pattern, stream, re.DOTALL)
                 for content in simple_matches:
                     # These don't have MCIDs, so no alt text lookup possible
-                    rect_pattern = r'([\d.]+)\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)\s+re'
+                    rect_pattern = r"([\d.]+)\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)\s+re"
                     rects = re.findall(rect_pattern, content)
                     for r in rects:
                         x, y, w, h = float(r[0]), float(r[1]), float(r[2]), float(r[3])
@@ -2248,8 +2258,12 @@ class PDFContentAuditor:
 
         for (fx0, fy0, fx1, fy1), alt_text in figure_regions:
             # Check for overlap with tolerance
-            if not (x1 < fx0 - tolerance or fx1 < x0 - tolerance or
-                    y1 < fy0 - tolerance or fy1 < y0 - tolerance):
+            if not (
+                x1 < fx0 - tolerance
+                or fx1 < x0 - tolerance
+                or y1 < fy0 - tolerance
+                or fy1 < y0 - tolerance
+            ):
                 return alt_text
 
         return None
@@ -2287,10 +2301,12 @@ class PDFContentAuditor:
                 # Check aspect ratio (roughly square-ish, allow up to 2.5:1)
                 aspect = min(w, h) / max(w, h) if max(w, h) > 0 else 0
                 if aspect > 0.4:
-                    candidates.append({
-                        "rect": rect,
-                        "fill": d.get("fill"),
-                    })
+                    candidates.append(
+                        {
+                            "rect": rect,
+                            "fill": d.get("fill"),
+                        }
+                    )
 
         if not candidates:
             return []
@@ -2332,11 +2348,13 @@ class PDFContentAuditor:
             final_w = cluster_rect.width
             final_h = cluster_rect.height
             if 10 < final_w < 150 and 10 < final_h < 150:
-                clusters.append({
-                    "bbox": tuple(cluster_rect),
-                    "path_count": path_count,
-                    "color_count": len(cluster_colors),
-                })
+                clusters.append(
+                    {
+                        "bbox": tuple(cluster_rect),
+                        "path_count": path_count,
+                        "color_count": len(cluster_colors),
+                    }
+                )
 
         return clusters
 
@@ -2522,9 +2540,15 @@ def get_content_audit_summary(result: ContentAuditResult) -> str:
     # Vector Graphics
     if result.total_vector_graphics > 0:
         lines.append(f"\nVector Graphics: {result.total_vector_graphics}")
-        vector_with_alt = result.total_vector_graphics - result.vector_graphics_without_alt - result.vector_graphics_decorative
+        vector_with_alt = (
+            result.total_vector_graphics
+            - result.vector_graphics_without_alt
+            - result.vector_graphics_decorative
+        )
         if result.vector_graphics_decorative > 0:
-            lines.append(f"  ✓ {result.vector_graphics_decorative} decorative (excluded from accessibility tree)")
+            lines.append(
+                f"  ✓ {result.vector_graphics_decorative} decorative (excluded from accessibility tree)"
+            )
         if vector_with_alt > 0:
             lines.append(f"  ✓ {vector_with_alt} with alt text")
         if result.vector_graphics_without_alt > 0:

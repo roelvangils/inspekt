@@ -96,6 +96,7 @@ def get_inspekt_version() -> str:
     """Get the current inspekt version from pyproject.toml."""
     try:
         from importlib.metadata import version
+
         return version("inspekt")
     except Exception:
         return "unknown"
@@ -104,6 +105,7 @@ def get_inspekt_version() -> str:
 def get_username() -> str:
     """Get the current username (cross-platform)."""
     import getpass
+
     try:
         return getpass.getuser()
     except Exception:
@@ -149,6 +151,7 @@ def get_os_info() -> str:
 def get_hostname() -> str:
     """Get the machine hostname."""
     import socket
+
     try:
         return socket.gethostname()
     except Exception:
@@ -168,16 +171,17 @@ def get_timezone() -> str:
 
         # Try to get the IANA timezone name
         local_tz = datetime.now().astimezone().tzinfo
-        if hasattr(local_tz, 'key'):
+        if hasattr(local_tz, "key"):
             return local_tz.key
 
         # Fallback to UTC offset format
-        offset = datetime.now().astimezone().strftime('%z')
+        offset = datetime.now().astimezone().strftime("%z")
         return f"UTC{offset[:3]}:{offset[3:]}"
     except Exception:
         try:
             # Alternative: use time module
             import time
+
             return time.tzname[time.daylight] if time.daylight else time.tzname[0]
         except Exception:
             return "unknown"
@@ -436,6 +440,7 @@ def add_jpeg_metadata(file_path: Path, metadata: dict[str, str]) -> None:
     except Exception as e:
         # JPEG EXIF writing can be finicky, log warning but don't fail
         import click
+
         click.echo(f"Warning: Could not add metadata to JPEG: {e}", err=True)
 
 
@@ -453,7 +458,9 @@ def add_metadata(file_path: Path, metadata: dict[str, str]) -> None:
         ImportError: If Pillow is not installed
     """
     if not is_pillow_installed():
-        raise ImportError("Pillow is required for metadata embedding. Install with: pip install Pillow")
+        raise ImportError(
+            "Pillow is required for metadata embedding. Install with: pip install Pillow"
+        )
 
     file_path = Path(file_path)
     suffix = file_path.suffix.lower()

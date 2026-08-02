@@ -91,16 +91,34 @@ def count_css_properties_in_string(css_content: str) -> int:
 
 # Shorthand properties that Lightning CSS can create from longhands
 SHORTHAND_PROPERTIES = {
-    "margin", "padding",
-    "border", "border-width", "border-style", "border-color", "border-radius",
-    "border-top", "border-right", "border-bottom", "border-left",
-    "background", "background-position",
-    "flex", "flex-flow",
-    "gap", "grid-gap",
-    "inset", "outline", "overflow",
-    "transition", "animation",
-    "font", "list-style", "text-decoration",
-    "place-content", "place-items", "place-self",
+    "margin",
+    "padding",
+    "border",
+    "border-width",
+    "border-style",
+    "border-color",
+    "border-radius",
+    "border-top",
+    "border-right",
+    "border-bottom",
+    "border-left",
+    "background",
+    "background-position",
+    "flex",
+    "flex-flow",
+    "gap",
+    "grid-gap",
+    "inset",
+    "outline",
+    "overflow",
+    "transition",
+    "animation",
+    "font",
+    "list-style",
+    "text-decoration",
+    "place-content",
+    "place-items",
+    "place-self",
 }
 
 
@@ -115,6 +133,7 @@ def count_shorthands_in_css(css_content: str) -> int:
         Number of shorthand properties found
     """
     import re
+
     count = 0
     for line in css_content.split("\n"):
         stripped = line.strip()
@@ -131,9 +150,9 @@ def count_shorthands_in_css(css_content: str) -> int:
 
 
 # Rendering limits for large snippets
-RENDER_LIMIT_DESCENDANTS = 1000        # Max descendant nodes for HTML
-RENDER_LIMIT_CSS_PROPERTIES = 50000    # Max initial CSS properties (before treeshaking)
-RENDER_LIMIT_CHARACTERS = 10000        # Max characters for any snippet
+RENDER_LIMIT_DESCENDANTS = 1000  # Max descendant nodes for HTML
+RENDER_LIMIT_CSS_PROPERTIES = 50000  # Max initial CSS properties (before treeshaking)
+RENDER_LIMIT_CHARACTERS = 10000  # Max characters for any snippet
 
 
 def _check_render_limits(
@@ -165,7 +184,9 @@ def _check_render_limits(
 
     # Check CSS property limit (CSS only)
     if css_property_count is not None and css_property_count > RENDER_LIMIT_CSS_PROPERTIES:
-        exceeded.append(f"{css_property_count:,} CSS properties (limit: {RENDER_LIMIT_CSS_PROPERTIES:,})")
+        exceeded.append(
+            f"{css_property_count:,} CSS properties (limit: {RENDER_LIMIT_CSS_PROPERTIES:,})"
+        )
 
     if not exceeded:
         return None
@@ -267,7 +288,9 @@ def generate_inspected_filename(
     Returns:
         Generated filename
     """
-    return generate_element_filename(domain, selector, extension, source_type="inspected", timestamp=timestamp)
+    return generate_element_filename(
+        domain, selector, extension, source_type="inspected", timestamp=timestamp
+    )
 
 
 @click.command()
@@ -402,17 +425,21 @@ def display_element_info(response, source_type="inspected", output_json=False):
     """
     if response.get("error"):
         if output_json:
-            click.echo(json.dumps({"error": response['error'], "hint": response.get("hint")}, indent=2))
+            click.echo(
+                json.dumps({"error": response["error"], "hint": response.get("hint")}, indent=2)
+            )
         else:
             click.echo(f"Error: {response['error']}", err=True)
             if response.get("hint"):
                 from inspekt.app.cli.table import print_hint
-                print_hint(response['hint'])
+
+                print_hint(response["hint"])
         sys.exit(1)
 
     # JSON output
     if output_json:
         from inspekt.app.cli.table import print_json
+
         print_json(response, summary=f"{source_type} element")
         return
 
@@ -421,6 +448,7 @@ def display_element_info(response, source_type="inspected", output_json=False):
 
     # VM terminal: offer a "Data ready to copy" toast
     from inspekt.app.cli.table import emit_copyable_data
+
     a11y = response.get("accessibility", {}) or {}
     dim = response.get("dimensions", {}) or {}
     rows = [
@@ -468,10 +496,7 @@ def _display_element_details(response):
     # Selection source
     selection_source = response.get("selectionSource", "unknown")
     if selection_source != "unknown":
-        source_labels = {
-            "panel": "Inspekt panel picker",
-            "devtools": "Chrome DevTools inspector"
-        }
+        source_labels = {"panel": "Inspekt panel picker", "devtools": "Chrome DevTools inspector"}
         source_label = source_labels.get(selection_source, selection_source)
         click.echo(f"\nSelected via: {click.style(source_label, fg='cyan')}")
 
@@ -519,9 +544,7 @@ def _display_element_details(response):
     name_source = a11y.get("accessibleNameSource", "none")
     if accessible_name:
         # Truncate if too long
-        display_name = (
-            accessible_name if len(accessible_name) <= 50 else accessible_name[:50] + "…"
-        )
+        display_name = accessible_name if len(accessible_name) <= 50 else accessible_name[:50] + "…"
         click.echo(f'  Accessible Name: "{display_name}"')
         click.echo(f"  Name computed from: {name_source}")
     else:
@@ -547,11 +570,7 @@ def _display_element_details(response):
 
     # Semantic info
     semantic = response.get("semantic", {})
-    if (
-        semantic.get("isInteractive")
-        or semantic.get("isFormElement")
-        or semantic.get("isLandmark")
-    ):
+    if semantic.get("isInteractive") or semantic.get("isFormElement") or semantic.get("isLandmark"):
         click.echo("\nSemantic:")
         if semantic.get("isInteractive"):
             click.echo("  Interactive element")
@@ -619,6 +638,8 @@ def inspected(ctx, output_json):
     if ctx.invoked_subcommand is None:
         response = get_inspected_data()
         display_inspected_info(response, output_json=output_json)
+
+
 def _display_text_markdown_metadata(response):
     """Display metadata summary for text and markdown commands."""
     from inspekt.app.cli.output import pluralize
@@ -647,7 +668,7 @@ def _display_text_markdown_metadata(response):
         ["Metric", "Value"],
         alignments=["left", "left"],
         title="Element metadata",
-        icon="\ue736"  # HTML icon (for consistency with HTML command)
+        icon="\ue736",  # HTML icon (for consistency with HTML command)
     )
     table.set_data(stats_rows)
     table.print_header(skip_column_headers=True)
@@ -663,7 +684,9 @@ def _display_text_markdown_metadata(response):
 
 
 @inspected.command()
-@click.option("--raw", is_flag=True, help="Output raw content without formatting (auto-enabled when piped)")
+@click.option(
+    "--raw", is_flag=True, help="Output raw content without formatting (auto-enabled when piped)"
+)
 @click.option("--copy", is_flag=True, help="Copy output to clipboard")
 @click.option("--json", "-j", "output_json", is_flag=True, help="Output as JSON")
 def text(raw, copy, output_json):
@@ -683,11 +706,13 @@ def text(raw, copy, output_json):
 
     if response.get("error"):
         if output_json:
-            click.echo(json.dumps({"error": response['error'], "hint": response.get("hint")}, indent=2))
+            click.echo(
+                json.dumps({"error": response["error"], "hint": response.get("hint")}, indent=2)
+            )
         elif not raw:
             click.echo(f"Error: {response['error']}", err=True)
             if response.get("hint"):
-                print_hint(response['hint'])
+                print_hint(response["hint"])
         sys.exit(1)
 
     # Get text content - prefer fullTextContent (full text) over textContent (truncated)
@@ -706,9 +731,10 @@ def text(raw, copy, output_json):
             "text": text_content,
             "length": len(text_content),
             "tag": response.get("tag"),
-            "selector": response.get("selector")
+            "selector": response.get("selector"),
         }
         from inspekt.app.cli.table import print_json
+
         print_json(output, summary=f"inspected text ({len(text_content)} chars)")
         return
 
@@ -738,7 +764,9 @@ def text(raw, copy, output_json):
 
 
 @inspected.command()
-@click.option("--raw", is_flag=True, help="Output raw content without formatting (auto-enabled when piped)")
+@click.option(
+    "--raw", is_flag=True, help="Output raw content without formatting (auto-enabled when piped)"
+)
 @click.option("--copy", is_flag=True, help="Copy output to clipboard")
 @click.option("--json", "-j", "output_json", is_flag=True, help="Output as JSON")
 def markdown(raw, copy, output_json):
@@ -759,11 +787,13 @@ def markdown(raw, copy, output_json):
 
     if response.get("error"):
         if output_json:
-            click.echo(json.dumps({"error": response['error'], "hint": response.get("hint")}, indent=2))
+            click.echo(
+                json.dumps({"error": response["error"], "hint": response.get("hint")}, indent=2)
+            )
         elif not raw:
             click.echo(f"Error: {response['error']}", err=True)
             if response.get("hint"):
-                print_hint(response['hint'])
+                print_hint(response["hint"])
         sys.exit(1)
 
     # Get HTML content and convert to markdown
@@ -786,9 +816,10 @@ def markdown(raw, copy, output_json):
             "markdown": markdown_content,
             "length": len(markdown_content),
             "tag": response.get("tag"),
-            "selector": response.get("selector")
+            "selector": response.get("selector"),
         }
         from inspekt.app.cli.table import print_json
+
         print_json(output, summary=f"inspected markdown ({len(markdown_content)} chars)")
         return
 
@@ -884,8 +915,28 @@ def markdown(raw, copy, output_json):
     help="Round CSS pixel values to nearest whole pixel (when using --include-css). Enabled by default.",
 )
 @html_output_options
-def html(file_path, open_after, reveal_after, include_css, bundled, all_properties, include_defaults, optimize_css,
-         remove_comments, oklch, alphabetize, rounding, raw, copy, output_json, pretty, compact, colors, theme, indent):
+def html(
+    file_path,
+    open_after,
+    reveal_after,
+    include_css,
+    bundled,
+    all_properties,
+    include_defaults,
+    optimize_css,
+    remove_comments,
+    oklch,
+    alphabetize,
+    rounding,
+    raw,
+    copy,
+    output_json,
+    pretty,
+    compact,
+    colors,
+    theme,
+    indent,
+):
     """
     Get the HTML of the inspected element.
 
@@ -932,12 +983,15 @@ def html(file_path, open_after, reveal_after, include_css, bundled, all_properti
 
     if response.get("error"):
         if output_json:
-            click.echo(json.dumps({"error": response['error'], "hint": response.get("hint")}, indent=2))
+            click.echo(
+                json.dumps({"error": response["error"], "hint": response.get("hint")}, indent=2)
+            )
         elif not raw:
             click.echo(f"Error: {response['error']}", err=True)
             if response.get("hint"):
                 from inspekt.app.cli.table import print_hint
-                print_hint(response['hint'])
+
+                print_hint(response["hint"])
         sys.exit(1)
 
     # Load config defaults
@@ -962,16 +1016,18 @@ def html(file_path, open_after, reveal_after, include_css, bundled, all_properti
     # Note: process_html always removes empty comments regardless of other flags
     if pretty or compact or remove_comments:
         from inspekt.services.html_processor import process_html
+
         html_content = process_html(
             html_content,
             format=pretty,
             compact=compact,
             remove_comments=remove_comments,
-            indent=indent
+            indent=indent,
         )
     else:
         # Still strip empty comments even without other processing
         from inspekt.services.html_processor import strip_empty_comments
+
         html_content = strip_empty_comments(html_content)
 
     # File output mode
@@ -1008,8 +1064,7 @@ def html(file_path, open_after, reveal_after, include_css, bundled, all_properti
             }
 
             script = loader.load_with_substitution_sync(
-                "get_computed_css.js",
-                {"OPTIONS_PLACEHOLDER": js_options}
+                "get_computed_css.js", {"OPTIONS_PLACEHOLDER": js_options}
             )
 
             try:
@@ -1027,6 +1082,7 @@ def html(file_path, open_after, reveal_after, include_css, bundled, all_properti
                             collect_computed_props,
                             collect_rounded_props,
                         )
+
                         rounded_props = collect_rounded_props(root) if rounding else None
                         computed_props = collect_computed_props(root) if not rounding else None
 
@@ -1036,6 +1092,7 @@ def html(file_path, open_after, reveal_after, include_css, bundled, all_properti
                             from inspekt.services.css_optimizer import (
                                 optimize_css as do_optimize_css,
                             )
+
                             css_content = do_optimize_css(
                                 css_content,
                                 convert_to_oklch=oklch,
@@ -1117,12 +1174,14 @@ def html(file_path, open_after, reveal_after, include_css, bundled, all_properti
     # Copy to clipboard (before syntax highlighting, we want raw content)
     if copy:
         from inspekt.app.cli.output import OutputHandler
+
         OutputHandler.copy_to_clipboard(html_content)
         sys.exit(0)
 
     # JSON mode - return un-highlighted HTML with metadata
     if output_json:
         from inspekt.app.cli.output import JsonOutput
+
         (
             JsonOutput()
             .with_content("html", response.get("htmlContent", ""))
@@ -1172,7 +1231,7 @@ def html(file_path, open_after, reveal_after, include_css, bundled, all_properti
         ["Metric", "Value"],
         alignments=["left", "left"],
         title="HTML from inspected element",
-        icon="\ue736"  # HTML icon
+        icon="\ue736",  # HTML icon
     )
     table.set_data(stats_rows)
     table.print_header(skip_column_headers=True)
@@ -1198,6 +1257,7 @@ def html(file_path, open_after, reveal_after, include_css, bundled, all_properti
     if limit_warning:
         # Show warning instead of rendered content
         from inspekt.app.cli.table import print_warning
+
         print_warning(limit_warning)
     else:
         # Apply syntax highlighting for formatted display
@@ -1205,10 +1265,11 @@ def html(file_path, open_after, reveal_after, include_css, bundled, all_properti
             html_content = apply_syntax_highlighting(html_content, theme=theme)
 
         # Remove empty lines for cleaner output
-        clean_html = '\n'.join(line for line in html_content.split('\n') if line.strip())
+        clean_html = "\n".join(line for line in html_content.split("\n") if line.strip())
 
         # Display HTML content in styled code block
         from inspekt.app.cli.output import print_code_block
+
         print_code_block(clean_html)
 
     # Show TIPS
@@ -1216,7 +1277,13 @@ def html(file_path, open_after, reveal_after, include_css, bundled, all_properti
     if not pretty:
         tips.append(("`--pretty`", "Format HTML with indentation", None))
     if not compact:
-        tips.append(("`--compact`", "Strip classes, data-* attrs, styles; truncate long text (for documentation only)", None))
+        tips.append(
+            (
+                "`--compact`",
+                "Strip classes, data-* attrs, styles; truncate long text (for documentation only)",
+                None,
+            )
+        )
     if not remove_comments:
         tips.append(("`--no-comments`", "Remove HTML comments", None))
     if colors:
@@ -1248,7 +1315,9 @@ def html(file_path, open_after, reveal_after, include_css, bundled, all_properti
     is_flag=True,
     help="Reveal file in file explorer after saving (requires --file)",
 )
-@click.option("--raw", is_flag=True, help="Output raw content without formatting (auto-enabled when piped)")
+@click.option(
+    "--raw", is_flag=True, help="Output raw content without formatting (auto-enabled when piped)"
+)
 @click.option("--copy", is_flag=True, help="Copy output to clipboard")
 @click.option("--json", "-j", "output_json", is_flag=True, help="Output as JSON")
 @click.option(
@@ -1306,7 +1375,25 @@ def html(file_path, open_after, reveal_after, include_css, bundled, all_properti
     is_flag=True,
     help="Show original authored CSS values (e.g., clamp(), var(), rem) instead of browser-computed values.",
 )
-def css(file_path, open_after, reveal_after, raw, copy, output_json, all_properties, include_defaults, optimize, oklch, alphabetize, rounding, heuristic_comments, two_columns, three_columns, compact, authored):
+def css(
+    file_path,
+    open_after,
+    reveal_after,
+    raw,
+    copy,
+    output_json,
+    all_properties,
+    include_defaults,
+    optimize,
+    oklch,
+    alphabetize,
+    rounding,
+    heuristic_comments,
+    two_columns,
+    three_columns,
+    compact,
+    authored,
+):
     """
     Extract computed CSS styles as nested CSS.
 
@@ -1362,7 +1449,7 @@ def css(file_path, open_after, reveal_after, raw, copy, output_json, all_propert
     # Load and execute the script
     script = loader.load_with_substitution_sync(
         "get_computed_css.js",
-        {"OPTIONS_PLACEHOLDER": js_options, "SOURCE_TYPE_PLACEHOLDER": "inspected"}
+        {"OPTIONS_PLACEHOLDER": js_options, "SOURCE_TYPE_PLACEHOLDER": "inspected"},
     )
 
     try:
@@ -1392,7 +1479,10 @@ def css(file_path, open_after, reveal_after, raw, copy, output_json, all_propert
         if authored:
             authored_script = loader.load_with_substitution_sync(
                 "get_authored_css_cdp.js",
-                {"SOURCE_TYPE_PLACEHOLDER": "inspected", "ELEMENT_COUNT_PLACEHOLDER": element_count}
+                {
+                    "SOURCE_TYPE_PLACEHOLDER": "inspected",
+                    "ELEMENT_COUNT_PLACEHOLDER": element_count,
+                },
             )
             try:
                 authored_result = executor.execute(authored_script, timeout=30.0)
@@ -1400,13 +1490,18 @@ def css(file_path, open_after, reveal_after, raw, copy, output_json, all_propert
                     authored_response = authored_result.get("result", {})
                     if authored_response.get("ok"):
                         from inspekt.services.css_authored_merger import merge_authored_css
+
                         authored_map = authored_response.get("elements", {})
                         root = merge_authored_css(root, authored_map)
                         from inspekt.services.css_generator import collect_authored_props
+
                         authored_count = len(collect_authored_props(root))
             except Exception:
                 from inspekt.app.cli.table import print_warning
-                print_warning("Could not retrieve authored CSS values. Showing computed values only.")
+
+                print_warning(
+                    "Could not retrieve authored CSS values. Showing computed values only."
+                )
 
         # Generate nested CSS
         css_content = generate_nested_css(root)
@@ -1414,6 +1509,7 @@ def css(file_path, open_after, reveal_after, raw, copy, output_json, all_propert
 
         # Collect rounded/computed props for comment insertion after optimization
         from inspekt.services.css_generator import collect_computed_props, collect_rounded_props
+
         rounded_props = collect_rounded_props(root) if rounding else None
         computed_props = collect_computed_props(root) if not rounding else None
 
@@ -1422,13 +1518,17 @@ def css(file_path, open_after, reveal_after, raw, copy, output_json, all_propert
 
         # Optionally optimize CSS and/or convert colors to oklch
         # Color names are always added when optimizing for convenience
-        optimized = optimize or oklch or alphabetize or heuristic_comments or two_columns or three_columns
+        optimized = (
+            optimize or oklch or alphabetize or heuristic_comments or two_columns or three_columns
+        )
         if optimized:
             from inspekt.services.css_optimizer import optimize_css
+
             # Collect cross-reference values (authored → computed) when authored mode is active
             cross_ref = None
             if authored and authored_count > 0:
                 from inspekt.services.css_generator import collect_cross_ref_values
+
                 cross_ref = collect_cross_ref_values(root)
             css_content = optimize_css(
                 css_content,
@@ -1453,6 +1553,7 @@ def css(file_path, open_after, reveal_after, raw, copy, output_json, all_propert
         # Apply compact mode if requested
         if compact:
             from inspekt.services.html_processor import compact_css as compact_css_content
+
             css_content = compact_css_content(css_content, strip_comments=False)
 
         from inspekt.app.cli.output import JsonOutput, OutputHandler, pluralize
@@ -1487,7 +1588,10 @@ def css(file_path, open_after, reveal_after, raw, copy, output_json, all_propert
             elem_word = pluralize(element_count, "element")
             prop_word = pluralize(property_count, "property", "properties")
             OutputHandler.copy_to_clipboard(css_content, quiet=True)
-            click.echo(f"Copied CSS to clipboard ({property_count} {prop_word} from {element_count} {elem_word})", err=True)
+            click.echo(
+                f"Copied CSS to clipboard ({property_count} {prop_word} from {element_count} {elem_word})",
+                err=True,
+            )
             sys.exit(0)
 
         # JSON mode - return CSS with metadata (no full tree)
@@ -1520,18 +1624,26 @@ def css(file_path, open_after, reveal_after, raw, copy, output_json, all_propert
             total_word = pluralize(total_considered, "property", "properties")
             stats_rows.append(["Scanned", f"{total_considered} {total_word}"])
         if stripped_as_default > 0:
-            default_word = pluralize(stripped_as_default, "browser default property", "browser default properties")
+            default_word = pluralize(
+                stripped_as_default, "browser default property", "browser default properties"
+            )
             stats_rows.append(["Removed", f"{stripped_as_default} {default_word}"])
         if stripped_as_inherited > 0:
-            inherited_word = pluralize(stripped_as_inherited, "inherited duplicate", "inherited duplicates")
+            inherited_word = pluralize(
+                stripped_as_inherited, "inherited duplicate", "inherited duplicates"
+            )
             stats_rows.append(["Removed", f"{stripped_as_inherited} {inherited_word}"])
         if authored and authored_count > 0:
             authored_word = pluralize(authored_count, "property", "properties")
-            stats_rows.append(["Authored", f"{authored_count} {authored_word} resolved from source stylesheets"])
+            stats_rows.append(
+                ["Authored", f"{authored_count} {authored_word} resolved from source stylesheets"]
+            )
         if optimized and merged_count > 0:
             merged_word = pluralize(merged_count, "property", "properties")
             shorthand_word = pluralize(shorthand_count, "shorthand", "shorthands")
-            stats_rows.append(["Merged", f"{merged_count} {merged_word} into {shorthand_count} {shorthand_word}"])
+            stats_rows.append(
+                ["Merged", f"{merged_count} {merged_word} into {shorthand_count} {shorthand_word}"]
+            )
         prop_word = pluralize(property_count, "effective property", "effective properties")
         stats_rows.append(["Kept", f"{property_count} {prop_word}"])
 
@@ -1542,7 +1654,7 @@ def css(file_path, open_after, reveal_after, raw, copy, output_json, all_propert
             ["Metric", "Value"],
             alignments=["left", "left"],
             title=f"{css_title} from {element_count} {elem_word}",
-            icon="\ue749"  # CSS icon
+            icon="\ue749",  # CSS icon
         )
         table.set_data(stats_rows)
         table.print_header(skip_column_headers=True)
@@ -1562,6 +1674,7 @@ def css(file_path, open_after, reveal_after, raw, copy, output_json, all_propert
         if limit_warning:
             # Show warning instead of rendered content
             from inspekt.app.cli.table import print_warning
+
             print_warning(limit_warning)
         else:
             # Apply CSS syntax highlighting and display in styled code block
@@ -1573,7 +1686,9 @@ def css(file_path, open_after, reveal_after, raw, copy, output_json, all_propert
                     from pygments.formatters import Terminal256Formatter
                     from pygments.lexers import CssLexer
 
-                    highlighted = highlight(css_content, CssLexer(), Terminal256Formatter(style="monokai"))
+                    highlighted = highlight(
+                        css_content, CssLexer(), Terminal256Formatter(style="monokai")
+                    )
                     print_code_block(highlighted.rstrip())
                 except ImportError:
                     print_code_block(css_content)
@@ -1586,18 +1701,43 @@ def css(file_path, open_after, reveal_after, raw, copy, output_json, all_propert
             tips.append(("`--oklch`", "Display colors in OKLCH (perceptual) format", None))
         if not heuristic_comments:
             from inspekt.services.css_property_comments import get_random_tip_example
+
             prop, value, comment = get_random_tip_example()
-            tips.append(("`--heuristic-comments`", "Add helpful comments", f"`{prop}: {value}` → /* {comment} */"))
+            tips.append(
+                (
+                    "`--heuristic-comments`",
+                    "Add helpful comments",
+                    f"`{prop}: {value}` → /* {comment} */",
+                )
+            )
         if not all_properties:
-            tips.append(("`--all-properties`", "Include the complete computed style (~300 properties)", None))
+            tips.append(
+                (
+                    "`--all-properties`",
+                    "Include the complete computed style (~300 properties)",
+                    None,
+                )
+            )
         if optimized:
             tips.append(("`--no-optimize`", "Output raw data (no shorthand merging)", None))
         if not two_columns and not three_columns:
             tips.append(("`--two-columns`", "Align properties and values in columns", None))
         if not compact:
-            tips.append(("`--compact`", "Shorten data URIs, URLs, and long text (breaks CSS; for documentation only)", None))
+            tips.append(
+                (
+                    "`--compact`",
+                    "Shorten data URIs, URLs, and long text (breaks CSS; for documentation only)",
+                    None,
+                )
+            )
         if not authored:
-            tips.append(("`--authored`", "Show original authored values (clamp(), var(), rem) via Chrome DevTools Protocol", None))
+            tips.append(
+                (
+                    "`--authored`",
+                    "Show original authored values (clamp(), var(), rem) via Chrome DevTools Protocol",
+                    None,
+                )
+            )
 
         if tips:
             click.echo()
@@ -1613,7 +1753,11 @@ def css(file_path, open_after, reveal_after, raw, copy, output_json, all_propert
     "--language", "--lang", type=str, default=None, help="Language for AI output (overrides config)"
 )
 @click.option("--json", "-j", "output_json", is_flag=True, help="Output as JSON")
-@click.option("--debug", is_flag=True, help="Show detailed debug output (prompts, API calls, image processing)")
+@click.option(
+    "--debug",
+    is_flag=True,
+    help="Show detailed debug output (prompts, API calls, image processing)",
+)
 def inspected_describe(language, output_json, debug):
     """
     Generate an AI-powered accessibility description of the inspected element.
@@ -1647,12 +1791,16 @@ def inspected_describe(language, output_json, debug):
 
     if output_json:
         from inspekt.app.cli.table import print_json
-        print_json({
-            "description": result.description,
-            "element_type": result.element_type,
-            "accessible_name": result.accessible_name,
-            "source": result.source,
-        }, summary="inspected element description")
+
+        print_json(
+            {
+                "description": result.description,
+                "element_type": result.element_type,
+                "accessible_name": result.accessible_name,
+                "source": result.source,
+            },
+            summary="inspected element description",
+        )
     else:
         if result.description.startswith("Error:"):
             click.echo(result.description, err=True)
@@ -1669,7 +1817,11 @@ def inspected_describe(language, output_json, debug):
     "--language", "--lang", type=str, default=None, help="Language for AI output (overrides config)"
 )
 @click.option("--json", "-j", "output_json", is_flag=True, help="Output as JSON")
-@click.option("--debug", is_flag=True, help="Show detailed debug output (prompts, API calls, image processing)")
+@click.option(
+    "--debug",
+    is_flag=True,
+    help="Show detailed debug output (prompts, API calls, image processing)",
+)
 def inspected_ask(question, language, output_json, debug):
     """
     Ask a question about the inspected element using AI.
@@ -1697,12 +1849,16 @@ def inspected_ask(question, language, output_json, debug):
 
     if output_json:
         from inspekt.app.cli.table import print_json
-        print_json({
-            "question": question,
-            "answer": result.answer,
-            "element_type": result.element_type,
-            "source": result.source,
-        }, summary="inspected element answer")
+
+        print_json(
+            {
+                "question": question,
+                "answer": result.answer,
+                "element_type": result.element_type,
+                "source": result.source,
+            },
+            summary="inspected element answer",
+        )
     else:
         if result.answer.startswith("Error:"):
             click.echo(result.answer, err=True)
@@ -1768,7 +1924,9 @@ def focused(ctx, output_json):
 
 
 @focused.command()
-@click.option("--raw", is_flag=True, help="Output raw content without formatting (auto-enabled when piped)")
+@click.option(
+    "--raw", is_flag=True, help="Output raw content without formatting (auto-enabled when piped)"
+)
 @click.option("--copy", is_flag=True, help="Copy output to clipboard")
 @click.option("--json", "-j", "output_json", is_flag=True, help="Output as JSON")
 def text(raw, copy, output_json):  # noqa: F811 -- separate click command (focused group) reusing the name
@@ -1788,11 +1946,13 @@ def text(raw, copy, output_json):  # noqa: F811 -- separate click command (focus
 
     if response.get("error"):
         if output_json:
-            click.echo(json.dumps({"error": response['error'], "hint": response.get("hint")}, indent=2))
+            click.echo(
+                json.dumps({"error": response["error"], "hint": response.get("hint")}, indent=2)
+            )
         elif not auto_raw:
             click.echo(f"Error: {response['error']}", err=True)
             if response.get("hint"):
-                print_hint(response['hint'])
+                print_hint(response["hint"])
         sys.exit(1)
 
     # Get text content - prefer fullTextContent (full text) over textContent (truncated)
@@ -1811,9 +1971,10 @@ def text(raw, copy, output_json):  # noqa: F811 -- separate click command (focus
             "text": text_content,
             "length": len(text_content),
             "tag": response.get("tag"),
-            "selector": response.get("selector")
+            "selector": response.get("selector"),
         }
         from inspekt.app.cli.table import print_json
+
         print_json(output, summary=f"focused text ({len(text_content)} chars)")
         return
 
@@ -1843,7 +2004,9 @@ def text(raw, copy, output_json):  # noqa: F811 -- separate click command (focus
 
 
 @focused.command()
-@click.option("--raw", is_flag=True, help="Output raw content without formatting (auto-enabled when piped)")
+@click.option(
+    "--raw", is_flag=True, help="Output raw content without formatting (auto-enabled when piped)"
+)
 @click.option("--copy", is_flag=True, help="Copy output to clipboard")
 @click.option("--json", "-j", "output_json", is_flag=True, help="Output as JSON")
 def markdown(raw, copy, output_json):  # noqa: F811 -- separate click command (focused group) reusing the name
@@ -1864,11 +2027,13 @@ def markdown(raw, copy, output_json):  # noqa: F811 -- separate click command (f
 
     if response.get("error"):
         if output_json:
-            click.echo(json.dumps({"error": response['error'], "hint": response.get("hint")}, indent=2))
+            click.echo(
+                json.dumps({"error": response["error"], "hint": response.get("hint")}, indent=2)
+            )
         elif not auto_raw:
             click.echo(f"Error: {response['error']}", err=True)
             if response.get("hint"):
-                print_hint(response['hint'])
+                print_hint(response["hint"])
         sys.exit(1)
 
     # Get HTML content and convert to markdown
@@ -1891,9 +2056,10 @@ def markdown(raw, copy, output_json):  # noqa: F811 -- separate click command (f
             "markdown": markdown_content,
             "length": len(markdown_content),
             "tag": response.get("tag"),
-            "selector": response.get("selector")
+            "selector": response.get("selector"),
         }
         from inspekt.app.cli.table import print_json
+
         print_json(output, summary=f"focused markdown ({len(markdown_content)} chars)")
         return
 
@@ -1989,8 +2155,28 @@ def markdown(raw, copy, output_json):  # noqa: F811 -- separate click command (f
     help="Round CSS pixel values to nearest whole pixel (when using --include-css). Enabled by default.",
 )
 @html_output_options
-def html(file_path, open_after, reveal_after, include_css, bundled, all_properties, include_defaults, optimize_css,  # noqa: F811 -- separate click command (focused group) reusing the name
-         remove_comments, oklch, alphabetize, rounding, raw, copy, output_json, pretty, compact, colors, theme, indent):
+def html(  # noqa: F811 -- separate click command (focused group) reusing the name
+    file_path,
+    open_after,
+    reveal_after,
+    include_css,
+    bundled,
+    all_properties,
+    include_defaults,
+    optimize_css,
+    remove_comments,
+    oklch,
+    alphabetize,
+    rounding,
+    raw,
+    copy,
+    output_json,
+    pretty,
+    compact,
+    colors,
+    theme,
+    indent,
+):
     """
     Get the HTML of the focused element.
 
@@ -2037,12 +2223,15 @@ def html(file_path, open_after, reveal_after, include_css, bundled, all_properti
 
     if response.get("error"):
         if output_json:
-            click.echo(json.dumps({"error": response['error'], "hint": response.get("hint")}, indent=2))
+            click.echo(
+                json.dumps({"error": response["error"], "hint": response.get("hint")}, indent=2)
+            )
         elif not auto_raw:
             click.echo(f"Error: {response['error']}", err=True)
             if response.get("hint"):
                 from inspekt.app.cli.table import print_hint
-                print_hint(response['hint'])
+
+                print_hint(response["hint"])
         sys.exit(1)
 
     # Load config defaults
@@ -2066,15 +2255,17 @@ def html(file_path, open_after, reveal_after, include_css, bundled, all_properti
     # Process HTML (always strip empty comments, optionally do more)
     if pretty or compact or remove_comments:
         from inspekt.services.html_processor import process_html
+
         html_content = process_html(
             html_content,
             format=pretty,
             compact=compact,
             remove_comments=remove_comments,
-            indent=indent
+            indent=indent,
         )
     else:
         from inspekt.services.html_processor import strip_empty_comments
+
         html_content = strip_empty_comments(html_content)
 
     # File output mode
@@ -2090,7 +2281,9 @@ def html(file_path, open_after, reveal_after, include_css, bundled, all_properti
 
         # Determine HTML filename
         if file_path == "auto":
-            html_filename = generate_element_filename(domain, selector, "html", source_type="focused", timestamp=timestamp)
+            html_filename = generate_element_filename(
+                domain, selector, "html", source_type="focused", timestamp=timestamp
+            )
         else:
             html_filename = file_path if file_path.endswith(".html") else f"{file_path}.html"
 
@@ -2111,7 +2304,7 @@ def html(file_path, open_after, reveal_after, include_css, bundled, all_properti
 
             script = loader.load_with_substitution_sync(
                 "get_computed_css.js",
-                {"OPTIONS_PLACEHOLDER": js_options, "SOURCE_TYPE_PLACEHOLDER": "focused"}
+                {"OPTIONS_PLACEHOLDER": js_options, "SOURCE_TYPE_PLACEHOLDER": "focused"},
             )
 
             try:
@@ -2128,6 +2321,7 @@ def html(file_path, open_after, reveal_after, include_css, bundled, all_properti
                             collect_computed_props,
                             collect_rounded_props,
                         )
+
                         rounded_props = collect_rounded_props(root) if rounding else None
                         computed_props = collect_computed_props(root) if not rounding else None
 
@@ -2135,6 +2329,7 @@ def html(file_path, open_after, reveal_after, include_css, bundled, all_properti
                             from inspekt.services.css_optimizer import (
                                 optimize_css as do_optimize_css,
                             )
+
                             css_content = do_optimize_css(
                                 css_content,
                                 convert_to_oklch=oklch,
@@ -2211,12 +2406,14 @@ def html(file_path, open_after, reveal_after, include_css, bundled, all_properti
     # Copy to clipboard (before syntax highlighting, we want raw content)
     if copy:
         from inspekt.app.cli.output import OutputHandler
+
         OutputHandler.copy_to_clipboard(html_content)
         sys.exit(0)
 
     # JSON mode - return un-highlighted HTML with metadata
     if output_json:
         from inspekt.app.cli.output import JsonOutput
+
         (
             JsonOutput()
             .with_content("html", response.get("htmlContent", ""))
@@ -2266,7 +2463,7 @@ def html(file_path, open_after, reveal_after, include_css, bundled, all_properti
         ["Metric", "Value"],
         alignments=["left", "left"],
         title="HTML from focused element",
-        icon="\ue736"
+        icon="\ue736",
     )
     table.set_data(stats_rows)
     table.print_header(skip_column_headers=True)
@@ -2292,6 +2489,7 @@ def html(file_path, open_after, reveal_after, include_css, bundled, all_properti
     if limit_warning:
         # Show warning instead of rendered content
         from inspekt.app.cli.table import print_warning
+
         print_warning(limit_warning)
     else:
         # Apply syntax highlighting for formatted display
@@ -2299,10 +2497,11 @@ def html(file_path, open_after, reveal_after, include_css, bundled, all_properti
             html_content = apply_syntax_highlighting(html_content, theme=theme)
 
         # Remove empty lines for cleaner output
-        clean_html = '\n'.join(line for line in html_content.split('\n') if line.strip())
+        clean_html = "\n".join(line for line in html_content.split("\n") if line.strip())
 
         # Display HTML content in styled code block
         from inspekt.app.cli.output import print_code_block
+
         print_code_block(clean_html)
 
     # Show TIPS
@@ -2310,7 +2509,13 @@ def html(file_path, open_after, reveal_after, include_css, bundled, all_properti
     if not pretty:
         tips.append(("`--pretty`", "Format HTML with indentation", None))
     if not compact:
-        tips.append(("`--compact`", "Strip classes, data-* attrs, styles; truncate long text (for documentation only)", None))
+        tips.append(
+            (
+                "`--compact`",
+                "Strip classes, data-* attrs, styles; truncate long text (for documentation only)",
+                None,
+            )
+        )
     if not remove_comments:
         tips.append(("`--no-comments`", "Remove HTML comments", None))
     if colors:
@@ -2342,7 +2547,9 @@ def html(file_path, open_after, reveal_after, include_css, bundled, all_properti
     is_flag=True,
     help="Reveal file in file explorer after saving (requires --file)",
 )
-@click.option("--raw", is_flag=True, help="Output raw CSS without formatting (auto-enabled when piped)")
+@click.option(
+    "--raw", is_flag=True, help="Output raw CSS without formatting (auto-enabled when piped)"
+)
 @click.option("--copy", is_flag=True, help="Copy output to clipboard")
 @click.option("--json", "-j", "output_json", is_flag=True, help="Output as JSON")
 @click.option(
@@ -2400,7 +2607,25 @@ def html(file_path, open_after, reveal_after, include_css, bundled, all_properti
     is_flag=True,
     help="Show original authored CSS values (e.g., clamp(), var(), rem) instead of browser-computed values.",
 )
-def css(file_path, open_after, reveal_after, raw, copy, output_json, all_properties, include_defaults, optimize, oklch, alphabetize, rounding, heuristic_comments, two_columns, three_columns, compact, authored):  # noqa: F811 -- separate click command (focused group) reusing the name
+def css(  # noqa: F811 -- separate click command (focused group) reusing the name
+    file_path,
+    open_after,
+    reveal_after,
+    raw,
+    copy,
+    output_json,
+    all_properties,
+    include_defaults,
+    optimize,
+    oklch,
+    alphabetize,
+    rounding,
+    heuristic_comments,
+    two_columns,
+    three_columns,
+    compact,
+    authored,
+):
     """
     Extract computed CSS styles as nested CSS from the focused element.
 
@@ -2429,7 +2654,7 @@ def css(file_path, open_after, reveal_after, raw, copy, output_json, all_propert
 
     script = loader.load_with_substitution_sync(
         "get_computed_css.js",
-        {"OPTIONS_PLACEHOLDER": js_options, "SOURCE_TYPE_PLACEHOLDER": "focused"}
+        {"OPTIONS_PLACEHOLDER": js_options, "SOURCE_TYPE_PLACEHOLDER": "focused"},
     )
 
     try:
@@ -2458,7 +2683,7 @@ def css(file_path, open_after, reveal_after, raw, copy, output_json, all_propert
         if authored:
             authored_script = loader.load_with_substitution_sync(
                 "get_authored_css_cdp.js",
-                {"SOURCE_TYPE_PLACEHOLDER": "focused", "ELEMENT_COUNT_PLACEHOLDER": element_count}
+                {"SOURCE_TYPE_PLACEHOLDER": "focused", "ELEMENT_COUNT_PLACEHOLDER": element_count},
             )
             try:
                 authored_result = executor.execute(authored_script, timeout=30.0)
@@ -2466,30 +2691,40 @@ def css(file_path, open_after, reveal_after, raw, copy, output_json, all_propert
                     authored_response = authored_result.get("result", {})
                     if authored_response.get("ok"):
                         from inspekt.services.css_authored_merger import merge_authored_css
+
                         authored_map = authored_response.get("elements", {})
                         root = merge_authored_css(root, authored_map)
                         from inspekt.services.css_generator import collect_authored_props
+
                         authored_count = len(collect_authored_props(root))
             except Exception:
                 from inspekt.app.cli.table import print_warning
-                print_warning("Could not retrieve authored CSS values. Showing computed values only.")
+
+                print_warning(
+                    "Could not retrieve authored CSS values. Showing computed values only."
+                )
 
         css_content = generate_nested_css(root)
         property_count = count_properties(root)
 
         from inspekt.services.css_generator import collect_computed_props, collect_rounded_props
+
         rounded_props = collect_rounded_props(root) if rounding else None
         computed_props = collect_computed_props(root) if not rounding else None
 
         original_property_count = property_count
 
-        optimized = optimize or oklch or alphabetize or heuristic_comments or two_columns or three_columns
+        optimized = (
+            optimize or oklch or alphabetize or heuristic_comments or two_columns or three_columns
+        )
         if optimized:
             from inspekt.services.css_optimizer import optimize_css
+
             # Collect cross-reference values (authored → computed) when authored mode is active
             cross_ref = None
             if authored and authored_count > 0:
                 from inspekt.services.css_generator import collect_cross_ref_values
+
                 cross_ref = collect_cross_ref_values(root)
             css_content = optimize_css(
                 css_content,
@@ -2512,6 +2747,7 @@ def css(file_path, open_after, reveal_after, raw, copy, output_json, all_propert
 
         if compact:
             from inspekt.services.html_processor import compact_css as compact_css_content
+
             css_content = compact_css_content(css_content, strip_comments=False)
 
         from inspekt.app.cli.output import JsonOutput, OutputHandler, pluralize
@@ -2521,7 +2757,9 @@ def css(file_path, open_after, reveal_after, raw, copy, output_json, all_propert
             domain = response.get("pageDomain", "localhost")
 
             if file_path == "auto":
-                output_file = generate_element_filename(domain, selector, "css", source_type="focused")
+                output_file = generate_element_filename(
+                    domain, selector, "css", source_type="focused"
+                )
             else:
                 output_file = file_path if file_path.endswith(".css") else f"{file_path}.css"
 
@@ -2542,7 +2780,10 @@ def css(file_path, open_after, reveal_after, raw, copy, output_json, all_propert
             elem_word = pluralize(element_count, "element")
             prop_word = pluralize(property_count, "property", "properties")
             OutputHandler.copy_to_clipboard(css_content, quiet=True)
-            click.echo(f"Copied CSS to clipboard ({property_count} {prop_word} from {element_count} {elem_word})", err=True)
+            click.echo(
+                f"Copied CSS to clipboard ({property_count} {prop_word} from {element_count} {elem_word})",
+                err=True,
+            )
             sys.exit(0)
 
         if output_json:
@@ -2571,18 +2812,26 @@ def css(file_path, open_after, reveal_after, raw, copy, output_json, all_propert
             total_word = pluralize(total_considered, "property", "properties")
             stats_rows.append(["Scanned", f"{total_considered} {total_word}"])
         if stripped_as_default > 0:
-            default_word = pluralize(stripped_as_default, "browser default property", "browser default properties")
+            default_word = pluralize(
+                stripped_as_default, "browser default property", "browser default properties"
+            )
             stats_rows.append(["Removed", f"{stripped_as_default} {default_word}"])
         if stripped_as_inherited > 0:
-            inherited_word = pluralize(stripped_as_inherited, "inherited duplicate", "inherited duplicates")
+            inherited_word = pluralize(
+                stripped_as_inherited, "inherited duplicate", "inherited duplicates"
+            )
             stats_rows.append(["Removed", f"{stripped_as_inherited} {inherited_word}"])
         if authored and authored_count > 0:
             authored_word = pluralize(authored_count, "property", "properties")
-            stats_rows.append(["Authored", f"{authored_count} {authored_word} resolved from source stylesheets"])
+            stats_rows.append(
+                ["Authored", f"{authored_count} {authored_word} resolved from source stylesheets"]
+            )
         if optimized and merged_count > 0:
             merged_word = pluralize(merged_count, "property", "properties")
             shorthand_word = pluralize(shorthand_count, "shorthand", "shorthands")
-            stats_rows.append(["Merged", f"{merged_count} {merged_word} into {shorthand_count} {shorthand_word}"])
+            stats_rows.append(
+                ["Merged", f"{merged_count} {merged_word} into {shorthand_count} {shorthand_word}"]
+            )
         prop_word = pluralize(property_count, "effective property", "effective properties")
         stats_rows.append(["Kept", f"{property_count} {prop_word}"])
 
@@ -2592,7 +2841,7 @@ def css(file_path, open_after, reveal_after, raw, copy, output_json, all_propert
             ["Metric", "Value"],
             alignments=["left", "left"],
             title=f"{css_title} from {element_count} {elem_word}",
-            icon="\ue749"
+            icon="\ue749",
         )
         table.set_data(stats_rows)
         table.print_header(skip_column_headers=True)
@@ -2612,6 +2861,7 @@ def css(file_path, open_after, reveal_after, raw, copy, output_json, all_propert
         if limit_warning:
             # Show warning instead of rendered content
             from inspekt.app.cli.table import print_warning
+
             print_warning(limit_warning)
         else:
             # Apply CSS syntax highlighting and display in styled code block
@@ -2623,7 +2873,9 @@ def css(file_path, open_after, reveal_after, raw, copy, output_json, all_propert
                     from pygments.formatters import Terminal256Formatter
                     from pygments.lexers import CssLexer
 
-                    highlighted = highlight(css_content, CssLexer(), Terminal256Formatter(style="monokai"))
+                    highlighted = highlight(
+                        css_content, CssLexer(), Terminal256Formatter(style="monokai")
+                    )
                     print_code_block(highlighted.rstrip())
                 except ImportError:
                     print_code_block(css_content)
@@ -2635,18 +2887,43 @@ def css(file_path, open_after, reveal_after, raw, copy, output_json, all_propert
             tips.append(("`--oklch`", "Display colors in OKLCH (perceptual) format", None))
         if not heuristic_comments:
             from inspekt.services.css_property_comments import get_random_tip_example
+
             prop, value, comment = get_random_tip_example()
-            tips.append(("`--heuristic-comments`", "Add helpful comments", f"`{prop}: {value}` → /* {comment} */"))
+            tips.append(
+                (
+                    "`--heuristic-comments`",
+                    "Add helpful comments",
+                    f"`{prop}: {value}` → /* {comment} */",
+                )
+            )
         if not all_properties:
-            tips.append(("`--all-properties`", "Include the complete computed style (~300 properties)", None))
+            tips.append(
+                (
+                    "`--all-properties`",
+                    "Include the complete computed style (~300 properties)",
+                    None,
+                )
+            )
         if optimized:
             tips.append(("`--no-optimize`", "Output raw data (no shorthand merging)", None))
         if not two_columns and not three_columns:
             tips.append(("`--two-columns`", "Align properties and values in columns", None))
         if not compact:
-            tips.append(("`--compact`", "Shorten data URIs, URLs, and long text (breaks CSS; for documentation only)", None))
+            tips.append(
+                (
+                    "`--compact`",
+                    "Shorten data URIs, URLs, and long text (breaks CSS; for documentation only)",
+                    None,
+                )
+            )
         if not authored:
-            tips.append(("`--authored`", "Show original authored values (clamp(), var(), rem) via Chrome DevTools Protocol", None))
+            tips.append(
+                (
+                    "`--authored`",
+                    "Show original authored values (clamp(), var(), rem) via Chrome DevTools Protocol",
+                    None,
+                )
+            )
 
         if tips:
             click.echo()
@@ -2672,31 +2949,149 @@ def screenshot_element_options(func):
     """
     # Define options in reverse order (decorators are applied bottom-to-top)
     options = [
-        click.option("--compare", is_flag=True, default=False, help="Create comparison grid showing normal state alongside forced state(s)"),
-        click.option("--state", "-S", "states", multiple=True, type=click.Choice(["hover", "focus", "focus-visible", "focus-within", "active", "target"], case_sensitive=False), help="Force CSS pseudo-state(s) on element (repeatable: -S hover -S focus)"),
-        click.option("--keep-selection", is_flag=True, default=False, help="Don't clear text selection before capture"),
-        click.option("--keep-zoom", is_flag=True, default=False, help="Don't reset zoom to 100% before capture"),
-        click.option("--redact-selectors", default=None, help="Additional CSS selectors to redact (comma-separated)"),
-        click.option("--redact-style", type=click.Choice(["blur", "bar"], case_sensitive=False), default="bar", help="Redaction style: bar (████ blocks, default) or blur"),
-        click.option("--redact/--no-redact", default=True, help="Redact sensitive data before capture (enabled by default for security)"),
-        click.option("--metadata/--no-metadata", default=True, help="Embed metadata (URL, timestamp, viewport) in image file (default: enabled)"),
-        click.option("--json", "-j", "json_output", is_flag=True, help="Output result as JSON (for scripting)"),
+        click.option(
+            "--compare",
+            is_flag=True,
+            default=False,
+            help="Create comparison grid showing normal state alongside forced state(s)",
+        ),
+        click.option(
+            "--state",
+            "-S",
+            "states",
+            multiple=True,
+            type=click.Choice(
+                ["hover", "focus", "focus-visible", "focus-within", "active", "target"],
+                case_sensitive=False,
+            ),
+            help="Force CSS pseudo-state(s) on element (repeatable: -S hover -S focus)",
+        ),
+        click.option(
+            "--keep-selection",
+            is_flag=True,
+            default=False,
+            help="Don't clear text selection before capture",
+        ),
+        click.option(
+            "--keep-zoom",
+            is_flag=True,
+            default=False,
+            help="Don't reset zoom to 100% before capture",
+        ),
+        click.option(
+            "--redact-selectors",
+            default=None,
+            help="Additional CSS selectors to redact (comma-separated)",
+        ),
+        click.option(
+            "--redact-style",
+            type=click.Choice(["blur", "bar"], case_sensitive=False),
+            default="bar",
+            help="Redaction style: bar (████ blocks, default) or blur",
+        ),
+        click.option(
+            "--redact/--no-redact",
+            default=True,
+            help="Redact sensitive data before capture (enabled by default for security)",
+        ),
+        click.option(
+            "--metadata/--no-metadata",
+            default=True,
+            help="Embed metadata (URL, timestamp, viewport) in image file (default: enabled)",
+        ),
+        click.option(
+            "--json",
+            "-j",
+            "json_output",
+            is_flag=True,
+            help="Output result as JSON (for scripting)",
+        ),
         click.option("--quiet", "-q", is_flag=True, help="Suppress output except errors"),
-        click.option("--force", "-f", is_flag=True, help="Overwrite existing file without confirmation"),
-        click.option("--clipboard", is_flag=True, help="Copy to clipboard instead of saving to file"),
-        click.option("--reveal", "reveal_after", is_flag=True, help="Reveal screenshot in file explorer after saving"),
-        click.option("--open", "open_after", is_flag=True, help="Open screenshot in default application after saving"),
-        click.option("--hide-outline/--keep-outline", default=True, help="Hide element outline during capture (default: yes)"),
-        click.option("--scroll-into-view/--no-scroll", default=True, help="Scroll element into view before capture (default: yes)"),
-        click.option("--quality", type=click.FloatRange(0.0, 1.0), default=None, help="Quality for lossy formats (0.0-1.0, default: from config)"),
-        click.option("--format", type=click.Choice(["png", "jpg", "webp"], case_sensitive=False), default=None, help="Output format (default: from config)"),
-        click.option("--max-width", type=int, default=None, help="Resize output to fit within max width (maintains aspect ratio)"),
-        click.option("--scale", "--dpr", type=click.IntRange(1, 4), default=None, help="Scale/DPR factor 1-4 (1=standard, 2=retina). Alias: --dpr (default: from config)"),
-        click.option("--enable-compression", is_flag=True, default=False, help="Force lossless compression even for files larger than 5 MB"),
-        click.option("--disable-compression", is_flag=True, default=False, help="Skip lossless PNG compression entirely"),
-        click.option("--margin-color", "-c", default=None, help="Margin color: 'auto' (sample first pixel), hex code like '#fff', or color name (default: from config)"),
-        click.option("--margin", "-m", type=int, default=None, help="Margin in pixels around screenshot (default: from config)"),
-        click.option("--output", "-o", type=click.Path(), default=None, help="Output file path (default: auto-generated)"),
+        click.option(
+            "--force", "-f", is_flag=True, help="Overwrite existing file without confirmation"
+        ),
+        click.option(
+            "--clipboard", is_flag=True, help="Copy to clipboard instead of saving to file"
+        ),
+        click.option(
+            "--reveal",
+            "reveal_after",
+            is_flag=True,
+            help="Reveal screenshot in file explorer after saving",
+        ),
+        click.option(
+            "--open",
+            "open_after",
+            is_flag=True,
+            help="Open screenshot in default application after saving",
+        ),
+        click.option(
+            "--hide-outline/--keep-outline",
+            default=True,
+            help="Hide element outline during capture (default: yes)",
+        ),
+        click.option(
+            "--scroll-into-view/--no-scroll",
+            default=True,
+            help="Scroll element into view before capture (default: yes)",
+        ),
+        click.option(
+            "--quality",
+            type=click.FloatRange(0.0, 1.0),
+            default=None,
+            help="Quality for lossy formats (0.0-1.0, default: from config)",
+        ),
+        click.option(
+            "--format",
+            type=click.Choice(["png", "jpg", "webp"], case_sensitive=False),
+            default=None,
+            help="Output format (default: from config)",
+        ),
+        click.option(
+            "--max-width",
+            type=int,
+            default=None,
+            help="Resize output to fit within max width (maintains aspect ratio)",
+        ),
+        click.option(
+            "--scale",
+            "--dpr",
+            type=click.IntRange(1, 4),
+            default=None,
+            help="Scale/DPR factor 1-4 (1=standard, 2=retina). Alias: --dpr (default: from config)",
+        ),
+        click.option(
+            "--enable-compression",
+            is_flag=True,
+            default=False,
+            help="Force lossless compression even for files larger than 5 MB",
+        ),
+        click.option(
+            "--disable-compression",
+            is_flag=True,
+            default=False,
+            help="Skip lossless PNG compression entirely",
+        ),
+        click.option(
+            "--margin-color",
+            "-c",
+            default=None,
+            help="Margin color: 'auto' (sample first pixel), hex code like '#fff', or color name (default: from config)",
+        ),
+        click.option(
+            "--margin",
+            "-m",
+            type=int,
+            default=None,
+            help="Margin in pixels around screenshot (default: from config)",
+        ),
+        click.option(
+            "--output",
+            "-o",
+            type=click.Path(),
+            default=None,
+            help="Output file path (default: auto-generated)",
+        ),
     ]
     for option in options:
         func = option(func)
@@ -2711,7 +3106,34 @@ def screenshot_element_options(func):
     help="CSS selector of element (default: use currently inspected element)",
 )
 @screenshot_element_options
-def screenshot_node(selector, output, margin, margin_color, disable_compression, enable_compression, scale, max_width, format, quality, scroll_into_view, hide_outline, open_after, reveal_after, clipboard, force, quiet, json_output, metadata, redact, redact_style, redact_selectors, keep_zoom, keep_selection, states, compare):
+def screenshot_node(
+    selector,
+    output,
+    margin,
+    margin_color,
+    disable_compression,
+    enable_compression,
+    scale,
+    max_width,
+    format,
+    quality,
+    scroll_into_view,
+    hide_outline,
+    open_after,
+    reveal_after,
+    clipboard,
+    force,
+    quiet,
+    json_output,
+    metadata,
+    redact,
+    redact_style,
+    redact_selectors,
+    keep_zoom,
+    keep_selection,
+    states,
+    compare,
+):
     """
     Capture a screenshot of a specific element (node).
 
@@ -2800,7 +3222,10 @@ def screenshot_node(selector, output, margin, margin_color, disable_compression,
             from inspekt.services.screenshot_utils import decode_data_url
 
             if not is_pillow_installed():
-                click.echo("Error: Comparison screenshots require Pillow. Install with: pip install Pillow", err=True)
+                click.echo(
+                    "Error: Comparison screenshots require Pillow. Install with: pip install Pillow",
+                    err=True,
+                )
                 sys.exit(1)
 
             # Load pseudo-state screenshot script
@@ -2813,12 +3238,14 @@ def screenshot_node(selector, output, margin, margin_color, disable_compression,
             # Build list of states: always include 'normal' first
             # If no states specified with --compare, just show normal
             if states:
-                state_list = ['normal'] + [s.lower() for s in states]
+                state_list = ["normal"] + [s.lower() for s in states]
             else:
-                state_list = ['normal']
+                state_list = ["normal"]
 
             if not quiet and not json_output:
-                click.echo(icons.camera(f"Capturing {len(state_list)} states: {', '.join(state_list)}"))
+                click.echo(
+                    icons.camera(f"Capturing {len(state_list)} states: {', '.join(state_list)}")
+                )
 
             # Check for inspected element first
             if not selector:
@@ -2830,9 +3257,19 @@ def screenshot_node(selector, output, margin, margin_color, disable_compression,
                 check_result = executor.execute(check_code, timeout=5.0)
                 if not check_result.get("ok") or not check_result.get("result"):
                     if json_output:
-                        click.echo(json.dumps({"ok": False, "error": "No element is currently inspected. Use --selector or inspect an element first."}))
+                        click.echo(
+                            json.dumps(
+                                {
+                                    "ok": False,
+                                    "error": "No element is currently inspected. Use --selector or inspect an element first.",
+                                }
+                            )
+                        )
                     else:
-                        click.echo("Error: No element is currently inspected. Use --selector or inspect an element first.", err=True)
+                        click.echo(
+                            "Error: No element is currently inspected. Use --selector or inspect an element first.",
+                            err=True,
+                        )
                     sys.exit(1)
 
             # Capture screenshots for each state
@@ -2843,7 +3280,7 @@ def screenshot_node(selector, output, margin, margin_color, disable_compression,
 
             for state in state_list:
                 if not quiet and not json_output:
-                    if state == 'normal':
+                    if state == "normal":
                         click.echo(icons.info("Capturing normal state…"))
                     else:
                         click.echo(icons.info(f"Forcing :{state} state…"))
@@ -2869,7 +3306,9 @@ def screenshot_node(selector, output, margin, margin_color, disable_compression,
                 result = executor.execute(code, timeout=30.0)
 
                 if not result.get("ok"):
-                    click.echo(f"Error executing script for {state} state: {result.get('error')}", err=True)
+                    click.echo(
+                        f"Error executing script for {state} state: {result.get('error')}", err=True
+                    )
                     sys.exit(1)
 
                 response = result.get("result", {})
@@ -2883,7 +3322,7 @@ def screenshot_node(selector, output, margin, margin_color, disable_compression,
                     total_rules_injected += response.get("rulesInjected", 0)
 
                 # Get tag name from first capture
-                if state == 'normal':
+                if state == "normal":
                     tag_name = response.get("tagName", "element")
 
                 # Decode and store screenshot
@@ -2897,9 +3336,15 @@ def screenshot_node(selector, output, margin, margin_color, disable_compression,
             # Show CSS injection note with rules count
             if used_fallback and not quiet and not json_output:
                 if total_rules_injected > 0:
-                    click.echo(click.style("\ue749  ", fg="blue") + f"Applied {total_rules_injected} CSS rules via injection (DevTools is open)")
+                    click.echo(
+                        click.style("\ue749  ", fg="blue")
+                        + f"Applied {total_rules_injected} CSS rules via injection (DevTools is open)"
+                    )
                 else:
-                    click.echo(click.style("\uf071  ", fg="yellow") + "No CSS rules found for pseudo-state (element may not have :focus/:hover styles)")
+                    click.echo(
+                        click.style("\uf071  ", fg="yellow")
+                        + "No CSS rules found for pseudo-state (element may not have :focus/:hover styles)"
+                    )
 
             # Compose grid
             if not quiet and not json_output:
@@ -2916,6 +3361,7 @@ def screenshot_node(selector, output, margin, margin_color, disable_compression,
                 import io
 
                 from PIL import Image
+
                 with Image.open(io.BytesIO(final_image)) as img:
                     grid_width, grid_height = img.size
             except Exception:
@@ -2991,9 +3437,19 @@ def screenshot_node(selector, output, margin, margin_color, disable_compression,
                 check_result = executor.execute(check_code, timeout=5.0)
                 if not check_result.get("ok") or not check_result.get("result"):
                     if json_output:
-                        click.echo(json.dumps({"ok": False, "error": "No element is currently inspected. Use --selector flag or inspect an element first."}))
+                        click.echo(
+                            json.dumps(
+                                {
+                                    "ok": False,
+                                    "error": "No element is currently inspected. Use --selector flag or inspect an element first.",
+                                }
+                            )
+                        )
                     else:
-                        click.echo("Error: No element is currently inspected. Use --selector flag or inspect an element first.", err=True)
+                        click.echo(
+                            "Error: No element is currently inspected. Use --selector flag or inspect an element first.",
+                            err=True,
+                        )
                     sys.exit(1)
 
             # Apply redaction if requested (before capture)
@@ -3018,7 +3474,9 @@ def screenshot_node(selector, output, margin, margin_color, disable_compression,
                         custom = [s.strip() for s in redact_selectors.split(",") if s.strip()]
                         redact_options["selectors"] = custom
 
-                    redact_code = redact_script.replace("OPTIONS_PLACEHOLDER", json.dumps(redact_options))
+                    redact_code = redact_script.replace(
+                        "OPTIONS_PLACEHOLDER", json.dumps(redact_options)
+                    )
                     redact_result = executor.execute(redact_code, timeout=30.0)
 
                     if redact_result.get("ok"):
@@ -3031,18 +3489,31 @@ def screenshot_node(selector, output, margin, margin_color, disable_compression,
                             if not quiet and not json_output:
                                 messages = []
                                 if redacted_count > 0:
-                                    style_desc = {"blur": "blur", "bar": "bar", "pixelate": "pixelate"}.get(redact_style.lower(), "blur")
-                                    messages.append(f"{redacted_count} element(s) with {style_desc}")
+                                    style_desc = {
+                                        "blur": "blur",
+                                        "bar": "bar",
+                                        "pixelate": "pixelate",
+                                    }.get(redact_style.lower(), "blur")
+                                    messages.append(
+                                        f"{redacted_count} element(s) with {style_desc}"
+                                    )
                                 if masked_emails_count > 0:
                                     messages.append(f"{masked_emails_count} email(s) masked")
                                 if messages:
-                                    click.echo(click.style("\uedaa  ", fg="blue") + f"Redacting: {', '.join(messages)}…")
+                                    click.echo(
+                                        click.style("\uedaa  ", fg="blue")
+                                        + f"Redacting: {', '.join(messages)}…"
+                                    )
                                 else:
-                                    click.echo(icons.shield_check("No sensitive elements found to redact"))
+                                    click.echo(
+                                        icons.shield_check("No sensitive elements found to redact")
+                                    )
 
                 except FileNotFoundError:
                     if not quiet and not json_output:
-                        click.echo("Warning: Redaction script not found, skipping redaction", err=True)
+                        click.echo(
+                            "Warning: Redaction script not found, skipping redaction", err=True
+                        )
                 except Exception as e:
                     if not quiet and not json_output:
                         click.echo(f"Warning: Redaction failed: {e}", err=True)
@@ -3187,7 +3658,10 @@ def screenshot_node(selector, output, margin, margin_color, disable_compression,
                     # Note: CDP is unavailable because DevTools is open (required for inspected element)
                     # CSS injection is the expected method for this use case
                     if rules_count > 0:
-                        click.echo(click.style("\ue749  ", fg="blue") + f"Applied {rules_count} CSS rules for :{forced_state} state")
+                        click.echo(
+                            click.style("\ue749  ", fg="blue")
+                            + f"Applied {rules_count} CSS rules for :{forced_state} state"
+                        )
 
             # Execute the screenshot capture
             result = executor.execute(code, timeout=60.0)
@@ -3220,7 +3694,9 @@ def screenshot_node(selector, output, margin, margin_color, disable_compression,
             if redact_script and redacted_count > 0:
                 try:
                     restore_options = {"action": "restore"}
-                    restore_code = redact_script.replace("OPTIONS_PLACEHOLDER", json.dumps(restore_options))
+                    restore_code = redact_script.replace(
+                        "OPTIONS_PLACEHOLDER", json.dumps(restore_options)
+                    )
                     executor.execute(restore_code, timeout=10.0)
                 except Exception:
                     pass  # Silently ignore restore failures - screenshot already captured
@@ -3236,7 +3712,11 @@ def screenshot_node(selector, output, margin, margin_color, disable_compression,
 
             # Get element tag name for display
             tag_name = response.get("tagName", "element").lower()
-            scroll_dir = response.get("scrollDirection", "down") if response.get("scrolledIntoView") else None
+            scroll_dir = (
+                response.get("scrollDirection", "down")
+                if response.get("scrolledIntoView")
+                else None
+            )
 
             # Display action log in logical order (unless quiet or json mode)
             if not quiet and not json_output:
@@ -3246,22 +3726,32 @@ def screenshot_node(selector, output, margin, margin_color, disable_compression,
                     zoom_percent = int(original_zoom * 100)
                     # Use zoom-out icon if original > 1.0 (we're reducing), zoom-in icon if < 1.0 (we're increasing)
                     zoom_icon = "\uf532" if original_zoom > 1.0 else "\uf531"
-                    click.echo(click.style(f"{zoom_icon}  ", fg="blue") + f"Resetting zoom level from {zoom_percent}% to 100%…")
+                    click.echo(
+                        click.style(f"{zoom_icon}  ", fg="blue")
+                        + f"Resetting zoom level from {zoom_percent}% to 100%…"
+                    )
 
                 # 2. Selection cleared (if text was selected)
                 if response.get("selectionCleared"):
-                    click.echo(click.style("\U000F09A9  ", fg="blue") + "Clearing text selection…")
+                    click.echo(click.style("\U000f09a9  ", fg="blue") + "Clearing text selection…")
 
                 # 3. Scroll action (if element was scrolled into view)
                 if scroll_dir:
-                    click.echo(icons.scroll_action(scroll_dir, f"Scrolling <{tag_name}> into view…"))
+                    click.echo(
+                        icons.scroll_action(scroll_dir, f"Scrolling <{tag_name}> into view…")
+                    )
 
                 # 4. Capture action
                 state_suffix = f" with :{forced_state} state" if forced_state else ""
                 if selector:
-                    click.echo(click.style("\ueada  ", fg="blue") + f"Capturing element{state_suffix}: {selector}")
+                    click.echo(
+                        click.style("\ueada  ", fg="blue")
+                        + f"Capturing element{state_suffix}: {selector}"
+                    )
                 else:
-                    click.echo(icons.camera(f"Capturing currently inspected element{state_suffix}…"))
+                    click.echo(
+                        icons.camera(f"Capturing currently inspected element{state_suffix}…")
+                    )
 
                 # 5. Restore feedback (zoom level and/or text selection)
                 zoom_restored = response.get("zoomWasReset")
@@ -3275,7 +3765,12 @@ def screenshot_node(selector, output, margin, margin_color, disable_compression,
 
                 # 6. Restore scroll position (if we scrolled) - use opposite direction
                 if scroll_dir:
-                    opposite_dir = {"up": "down", "down": "up", "left": "right", "right": "left"}.get(scroll_dir, "up")
+                    opposite_dir = {
+                        "up": "down",
+                        "down": "up",
+                        "left": "right",
+                        "right": "left",
+                    }.get(scroll_dir, "up")
                     click.echo(icons.scroll_action(opposite_dir, "Restoring scroll position…"))
 
                 # 6. CDP fallback info (if used)
@@ -3285,18 +3780,22 @@ def screenshot_node(selector, output, margin, margin_color, disable_compression,
                     height = dims.get("height", 0)
                     vw = dims.get("viewportWidth", 0)
                     vh = dims.get("viewportHeight", 0)
-                    click.echo(icons.info(
-                        f"Element ({width}×{height}) exceeds viewport ({vw}×{vh}). "
-                        "Used full-page capture method and cropped image"
-                    ))
+                    click.echo(
+                        icons.info(
+                            f"Element ({width}×{height}) exceeds viewport ({vw}×{vh}). "
+                            "Used full-page capture method and cropped image"
+                        )
+                    )
 
                 # 7. Large dimension warning
                 dims = response.get("elementDimensions", {})
                 if dims.get("width", 0) > 10000 or dims.get("height", 0) > 10000:
-                    click.echo(icons.info(
-                        f"Large element captured: {dims.get('width')}×{dims.get('height')}. "
-                        "Chrome has a maximum dimension limit of 16384"
-                    ))
+                    click.echo(
+                        icons.info(
+                            f"Large element captured: {dims.get('width')}×{dims.get('height')}. "
+                            "Chrome has a maximum dimension limit of 16384"
+                        )
+                    )
 
             # Decode image data
             from inspekt.services.screenshot_utils import decode_data_url
@@ -3317,7 +3816,9 @@ def screenshot_node(selector, output, margin, margin_color, disable_compression,
 
             if copy_image_to_clipboard(image_data, format=format):
                 click.echo(
-                    clipboard_icon(f"Copied to clipboard ({response.get('width')}×{response.get('height')}px, {format_filesize(len(image_data))})")
+                    clipboard_icon(
+                        f"Copied to clipboard ({response.get('width')}×{response.get('height')}px, {format_filesize(len(image_data))})"
+                    )
                 )
             else:
                 click.echo("Failed to copy to clipboard", err=True)
@@ -3361,7 +3862,9 @@ def screenshot_node(selector, output, margin, margin_color, disable_compression,
             if output_path.exists() and not force:
                 if json_output:
                     # In JSON mode, just error out
-                    click.echo(json.dumps({"ok": False, "error": f"File already exists: {output_path}"}))
+                    click.echo(
+                        json.dumps({"ok": False, "error": f"File already exists: {output_path}"})
+                    )
                     sys.exit(1)
                 click.echo(f"File already exists: {output_path}", err=True)
                 if not click.confirm("Overwrite?"):
@@ -3388,7 +3891,11 @@ def screenshot_node(selector, output, margin, margin_color, disable_compression,
             try:
                 # Show "Received from Chrome" message
                 if not quiet and not json_output:
-                    click.echo(icons.chrome_received(f"Received from Chrome: {final_width}×{final_height} ({format_filesize(original_file_size)})"))
+                    click.echo(
+                        icons.chrome_received(
+                            f"Received from Chrome: {final_width}×{final_height} ({format_filesize(original_file_size)})"
+                        )
+                    )
 
                 # Resize if max_width specified and image is wider
                 if max_width and final_width and final_width > max_width:
@@ -3404,7 +3911,9 @@ def screenshot_node(selector, output, margin, margin_color, disable_compression,
                         with Image.open(tmp_path) as img:
                             ratio = max_width / img.width
                             new_height = int(img.height * ratio)
-                            resized_img = img.resize((max_width, new_height), Image.Resampling.LANCZOS)
+                            resized_img = img.resize(
+                                (max_width, new_height), Image.Resampling.LANCZOS
+                            )
 
                             save_kwargs = {}
                             if format == "png":
@@ -3418,11 +3927,18 @@ def screenshot_node(selector, output, margin, margin_color, disable_compression,
                             resized = True
 
                             if not quiet and not json_output:
-                                click.echo(icons.info(f"Resized: {response.get('width')}x{response.get('height')}px → {max_width}x{new_height}px"))
+                                click.echo(
+                                    icons.info(
+                                        f"Resized: {response.get('width')}x{response.get('height')}px → {max_width}x{new_height}px"
+                                    )
+                                )
 
                     except ImportError:
                         if not quiet and not json_output:
-                            click.echo("Note: --max-width requires Pillow. Install with: pip install Pillow", err=True)
+                            click.echo(
+                                "Note: --max-width requires Pillow. Install with: pip install Pillow",
+                                err=True,
+                            )
 
                 # Embed metadata (before optimization)
                 if metadata and format in ("png", "jpg", "jpeg"):
@@ -3483,10 +3999,12 @@ def screenshot_node(selector, output, margin, margin_color, disable_compression,
                     if compression == "auto" and file_size > SIZE_5MB:
                         # Skip compression for very large files
                         if not quiet and not json_output:
-                            click.echo(icons.optimizing(
-                                "Skipping lossless compression for files larger than 5 MB "
-                                "(force with --enable-compression)…"
-                            ))
+                            click.echo(
+                                icons.optimizing(
+                                    "Skipping lossless compression for files larger than 5 MB "
+                                    "(force with --enable-compression)…"
+                                )
+                            )
                         compression_skipped = True
                     else:
                         # Determine appropriate message based on file size
@@ -3517,14 +4035,22 @@ def screenshot_node(selector, output, margin, margin_color, disable_compression,
                 if not quiet and not json_output:
                     filename_display = output_path.name
                     if auto_generated:
-                        click.echo(icons.save(f"Screenshot saved: {filename_display} (filename auto-generated)"))
+                        click.echo(
+                            icons.save(
+                                f"Screenshot saved: {filename_display} (filename auto-generated)"
+                            )
+                        )
                     else:
                         click.echo(icons.save(f"Screenshot saved: {filename_display}"))
 
                     # Show optimization summary (indented)
                     if compression_applied and original_file_size > 0:
                         reduction = ((original_file_size - final_size) / original_file_size) * 100
-                        click.echo(icons.optimized_summary(f"Optimized: {format_filesize(original_file_size)} → {format_filesize(final_size)} ({reduction:.1f}% decrease)"))
+                        click.echo(
+                            icons.optimized_summary(
+                                f"Optimized: {format_filesize(original_file_size)} → {format_filesize(final_size)} ({reduction:.1f}% decrease)"
+                            )
+                        )
 
                     # Display source URL (indented)
                     url = response.get("url", "")
@@ -3568,11 +4094,13 @@ def screenshot_node(selector, output, margin, margin_color, disable_compression,
             # Open in default application if requested
             if open_after:
                 from inspekt.app.cli.output import OutputHandler
+
                 OutputHandler.open_file(output_path)
 
             # Reveal in file explorer if requested
             if reveal_after:
                 from inspekt.app.cli.output import OutputHandler
+
                 OutputHandler.reveal_file(output_path)
 
             # Display contextual hints (unless quiet or json mode)
@@ -3583,18 +4111,26 @@ def screenshot_node(selector, output, margin, margin_color, disable_compression,
                 zoom_reset = response.get("zoomWasReset")
                 selection_cleared = response.get("selectionCleared")
                 if zoom_reset and selection_cleared:
-                    print_hint("Use `--keep-zoom` and `--keep-selection` to skip resetting zoom/selection.")
+                    print_hint(
+                        "Use `--keep-zoom` and `--keep-selection` to skip resetting zoom/selection."
+                    )
                 elif zoom_reset:
                     print_hint("Use `--keep-zoom` to capture at the current zoom level.")
                 elif selection_cleared:
-                    print_hint("Use `--keep-selection` to keep text selection visible in screenshot.")
+                    print_hint(
+                        "Use `--keep-selection` to keep text selection visible in screenshot."
+                    )
 
                 # Hint about larger browser window if CDP fallback or scroll was needed
                 if response.get("usedCDPFallback") or response.get("scrolledIntoView"):
-                    print_hint("Making the browser window larger may improve results for large elements.")
+                    print_hint(
+                        "Making the browser window larger may improve results for large elements."
+                    )
 
                 # General customization hint
-                print_hint("For redacting, quality, format, and scaling options, run `inspekt inspected screenshot --help`.")
+                print_hint(
+                    "For redacting, quality, format, and scaling options, run `inspekt inspected screenshot --help`."
+                )
 
     except (ConnectionError, TimeoutError, RuntimeError) as e:
         click.echo(f"Error: {e}", err=True)
@@ -3634,7 +4170,7 @@ def screenshot_focused(ctx, **kwargs):
         inspekt screenshot node       - Capture any element by selector
     """
     # Invoke screenshot_node with selector='focused' and forward all other options
-    ctx.invoke(screenshot_node, selector='focused', **kwargs)
+    ctx.invoke(screenshot_node, selector="focused", **kwargs)
 
 
 @focused.command("describe")
@@ -3642,7 +4178,11 @@ def screenshot_focused(ctx, **kwargs):
     "--language", "--lang", type=str, default=None, help="Language for AI output (overrides config)"
 )
 @click.option("--json", "-j", "output_json", is_flag=True, help="Output as JSON")
-@click.option("--debug", is_flag=True, help="Show detailed debug output (prompts, API calls, image processing)")
+@click.option(
+    "--debug",
+    is_flag=True,
+    help="Show detailed debug output (prompts, API calls, image processing)",
+)
 def focused_describe(language, output_json, debug):
     """
     Generate an AI-powered accessibility description of the focused element.
@@ -3676,12 +4216,16 @@ def focused_describe(language, output_json, debug):
 
     if output_json:
         from inspekt.app.cli.table import print_json
-        print_json({
-            "description": result.description,
-            "element_type": result.element_type,
-            "accessible_name": result.accessible_name,
-            "source": result.source,
-        }, summary="focused element description")
+
+        print_json(
+            {
+                "description": result.description,
+                "element_type": result.element_type,
+                "accessible_name": result.accessible_name,
+                "source": result.source,
+            },
+            summary="focused element description",
+        )
     else:
         if result.description.startswith("Error:"):
             click.echo(result.description, err=True)
@@ -3698,7 +4242,11 @@ def focused_describe(language, output_json, debug):
     "--language", "--lang", type=str, default=None, help="Language for AI output (overrides config)"
 )
 @click.option("--json", "-j", "output_json", is_flag=True, help="Output as JSON")
-@click.option("--debug", is_flag=True, help="Show detailed debug output (prompts, API calls, image processing)")
+@click.option(
+    "--debug",
+    is_flag=True,
+    help="Show detailed debug output (prompts, API calls, image processing)",
+)
 def focused_ask(question, language, output_json, debug):
     """
     Ask a question about the focused element using AI.
@@ -3727,12 +4275,16 @@ def focused_ask(question, language, output_json, debug):
 
     if output_json:
         from inspekt.app.cli.table import print_json
-        print_json({
-            "question": question,
-            "answer": result.answer,
-            "element_type": result.element_type,
-            "source": result.source,
-        }, summary="focused element answer")
+
+        print_json(
+            {
+                "question": question,
+                "answer": result.answer,
+                "element_type": result.element_type,
+                "source": result.source,
+            },
+            summary="focused element answer",
+        )
     else:
         if result.answer.startswith("Error:"):
             click.echo(result.answer, err=True)
@@ -3744,7 +4296,13 @@ def focused_ask(question, language, output_json, debug):
 
 
 @screenshot.command(name="viewport")
-@click.option("--output", "-o", type=click.Path(), default=None, help="Output file path (required unless --clipboard)")
+@click.option(
+    "--output",
+    "-o",
+    type=click.Path(),
+    default=None,
+    help="Output file path (required unless --clipboard)",
+)
 @click.option(
     "--margin",
     "-m",
@@ -3857,7 +4415,28 @@ def focused_ask(question, language, output_json, debug):
     default=None,
     help="Additional CSS selectors to redact (comma-separated)",
 )
-def screenshot_viewport(output, margin, margin_color, disable_compression, enable_compression, scale, format, quality, open_after, reveal_after, clipboard, metadata, keep_zoom, keep_selection, quiet, json_output, force, redact, redact_style, redact_selectors):
+def screenshot_viewport(
+    output,
+    margin,
+    margin_color,
+    disable_compression,
+    enable_compression,
+    scale,
+    format,
+    quality,
+    open_after,
+    reveal_after,
+    clipboard,
+    metadata,
+    keep_zoom,
+    keep_selection,
+    quiet,
+    json_output,
+    force,
+    redact,
+    redact_style,
+    redact_selectors,
+):
     """
     Capture a screenshot of the visible viewport.
 
@@ -3905,7 +4484,9 @@ def screenshot_viewport(output, margin, margin_color, disable_compression, enabl
         compression = "auto"
 
     # Validate options (allow auto-generated filename)
-    validate_screenshot_options(clipboard, open_after, reveal_after, json_output, output, allow_auto_filename=True)
+    validate_screenshot_options(
+        clipboard, open_after, reveal_after, json_output, output, allow_auto_filename=True
+    )
 
     # Note if both --open and --reveal are used
     if open_after and reveal_after and not quiet and not json_output:
@@ -3942,7 +4523,6 @@ def screenshot_viewport(output, margin, margin_color, disable_compression, enabl
     redact_script = None
 
     try:
-
         # Apply redaction before capture
         if redact:
             try:
@@ -3957,7 +4537,9 @@ def screenshot_viewport(output, margin, margin_color, disable_compression, enabl
                     custom = [s.strip() for s in redact_selectors.split(",") if s.strip()]
                     redact_options["selectors"] = custom
 
-                redact_code = redact_script.replace("OPTIONS_PLACEHOLDER", json.dumps(redact_options))
+                redact_code = redact_script.replace(
+                    "OPTIONS_PLACEHOLDER", json.dumps(redact_options)
+                )
                 redact_result = executor.execute(redact_code, timeout=30.0)
 
                 if redact_result.get("ok"):
@@ -3971,12 +4553,17 @@ def screenshot_viewport(output, margin, margin_color, disable_compression, enabl
                         if not quiet and not json_output:
                             messages = []
                             if redacted_count > 0:
-                                style_desc = {"blur": "blur", "bar": "bar"}.get(redact_style.lower(), "bar")
+                                style_desc = {"blur": "blur", "bar": "bar"}.get(
+                                    redact_style.lower(), "bar"
+                                )
                                 messages.append(f"{redacted_count} element(s) with {style_desc}")
                             if masked_emails_count > 0:
                                 messages.append(f"{masked_emails_count} email(s) masked")
                             if messages:
-                                click.echo(click.style("\uedaa  ", fg="blue") + f"Redacting: {', '.join(messages)}…")
+                                click.echo(
+                                    click.style("\uedaa  ", fg="blue")
+                                    + f"Redacting: {', '.join(messages)}…"
+                                )
 
             except FileNotFoundError:
                 if not quiet and not json_output:
@@ -3991,7 +4578,9 @@ def screenshot_viewport(output, margin, margin_color, disable_compression, enabl
         if redact and redact_script and redacted_count > 0:
             try:
                 restore_options = {"action": "restore"}
-                restore_code = redact_script.replace("OPTIONS_PLACEHOLDER", json.dumps(restore_options))
+                restore_code = redact_script.replace(
+                    "OPTIONS_PLACEHOLDER", json.dumps(restore_options)
+                )
                 executor.execute(restore_code, timeout=10.0)
             except Exception:
                 pass  # Silently ignore restore failures - screenshot already captured
@@ -4037,16 +4626,22 @@ def screenshot_viewport(output, margin, margin_color, disable_compression, enabl
 
             if copy_image_to_clipboard(image_data, format=format):
                 if json_output:
-                    click.echo(json.dumps({
-                        "ok": True,
-                        "clipboard": True,
-                        "width": response.get("width"),
-                        "height": response.get("height"),
-                        "size_bytes": len(image_data),
-                        "url": response.get("url"),
-                    }))
+                    click.echo(
+                        json.dumps(
+                            {
+                                "ok": True,
+                                "clipboard": True,
+                                "width": response.get("width"),
+                                "height": response.get("height"),
+                                "size_bytes": len(image_data),
+                                "url": response.get("url"),
+                            }
+                        )
+                    )
                 elif not quiet:
-                    click.echo(clipboard_icon(f"Copied to clipboard ({format_filesize(len(image_data))})"))
+                    click.echo(
+                        clipboard_icon(f"Copied to clipboard ({format_filesize(len(image_data))})")
+                    )
             else:
                 if json_output:
                     click.echo(json.dumps({"ok": False, "error": "Failed to copy to clipboard"}))
@@ -4065,7 +4660,9 @@ def screenshot_viewport(output, margin, margin_color, disable_compression, enabl
             # Check if file exists and handle overwrite
             if output_path.exists() and not force:
                 if json_output:
-                    click.echo(json.dumps({"ok": False, "error": f"File already exists: {output_path}"}))
+                    click.echo(
+                        json.dumps({"ok": False, "error": f"File already exists: {output_path}"})
+                    )
                     sys.exit(1)
                 click.echo(f"File already exists: {output_path}", err=True)
                 if not click.confirm("Overwrite?"):
@@ -4157,11 +4754,13 @@ def screenshot_viewport(output, margin, margin_color, disable_compression, enabl
             # Open in default application if requested
             if open_after:
                 from inspekt.app.cli.output import OutputHandler
+
                 OutputHandler.open_file(output_path)
 
             # Reveal in file explorer if requested
             if reveal_after:
                 from inspekt.app.cli.output import OutputHandler
+
                 OutputHandler.reveal_file(output_path)
 
     except (ConnectionError, TimeoutError, RuntimeError) as e:
@@ -4173,7 +4772,13 @@ def screenshot_viewport(output, margin, margin_color, disable_compression, enabl
 
 
 @screenshot.command(name="page")
-@click.option("--output", "-o", type=click.Path(), default=None, help="Output file path (required unless --clipboard)")
+@click.option(
+    "--output",
+    "-o",
+    type=click.Path(),
+    default=None,
+    help="Output file path (required unless --clipboard)",
+)
 @click.option(
     "--margin",
     "-m",
@@ -4292,7 +4897,29 @@ def screenshot_viewport(output, margin, margin_color, disable_compression, enabl
     default=None,
     help="Additional CSS selectors to redact (comma-separated)",
 )
-def screenshot_page(output, margin, margin_color, disable_compression, enable_compression, scale, format, quality, max_height, open_after, reveal_after, clipboard, metadata, keep_zoom, keep_selection, quiet, json_output, force, redact, redact_style, redact_selectors):
+def screenshot_page(
+    output,
+    margin,
+    margin_color,
+    disable_compression,
+    enable_compression,
+    scale,
+    format,
+    quality,
+    max_height,
+    open_after,
+    reveal_after,
+    clipboard,
+    metadata,
+    keep_zoom,
+    keep_selection,
+    quiet,
+    json_output,
+    force,
+    redact,
+    redact_style,
+    redact_selectors,
+):
     """
     Capture a screenshot of the entire page (full height).
 
@@ -4345,7 +4972,9 @@ def screenshot_page(output, margin, margin_color, disable_compression, enable_co
         compression = "auto"
 
     # Validate options (allow auto-generated filename)
-    validate_screenshot_options(clipboard, open_after, reveal_after, json_output, output, allow_auto_filename=True)
+    validate_screenshot_options(
+        clipboard, open_after, reveal_after, json_output, output, allow_auto_filename=True
+    )
 
     # Note if both --open and --reveal are used
     if open_after and reveal_after and not quiet and not json_output:
@@ -4383,7 +5012,6 @@ def screenshot_page(output, margin, margin_color, disable_compression, enable_co
     redact_script = None
 
     try:
-
         # Apply redaction before capture
         if redact:
             try:
@@ -4398,7 +5026,9 @@ def screenshot_page(output, margin, margin_color, disable_compression, enable_co
                     custom = [s.strip() for s in redact_selectors.split(",") if s.strip()]
                     redact_options["selectors"] = custom
 
-                redact_code = redact_script.replace("OPTIONS_PLACEHOLDER", json.dumps(redact_options))
+                redact_code = redact_script.replace(
+                    "OPTIONS_PLACEHOLDER", json.dumps(redact_options)
+                )
                 redact_result = executor.execute(redact_code, timeout=30.0)
 
                 if redact_result.get("ok"):
@@ -4412,12 +5042,17 @@ def screenshot_page(output, margin, margin_color, disable_compression, enable_co
                         if not quiet and not json_output:
                             messages = []
                             if redacted_count > 0:
-                                style_desc = {"blur": "blur", "bar": "bar"}.get(redact_style.lower(), "bar")
+                                style_desc = {"blur": "blur", "bar": "bar"}.get(
+                                    redact_style.lower(), "bar"
+                                )
                                 messages.append(f"{redacted_count} element(s) with {style_desc}")
                             if masked_emails_count > 0:
                                 messages.append(f"{masked_emails_count} email(s) masked")
                             if messages:
-                                click.echo(click.style("\uedaa  ", fg="blue") + f"Redacting: {', '.join(messages)}…")
+                                click.echo(
+                                    click.style("\uedaa  ", fg="blue")
+                                    + f"Redacting: {', '.join(messages)}…"
+                                )
 
             except FileNotFoundError:
                 if not quiet and not json_output:
@@ -4432,7 +5067,9 @@ def screenshot_page(output, margin, margin_color, disable_compression, enable_co
         if redact and redact_script and redacted_count > 0:
             try:
                 restore_options = {"action": "restore"}
-                restore_code = redact_script.replace("OPTIONS_PLACEHOLDER", json.dumps(restore_options))
+                restore_code = redact_script.replace(
+                    "OPTIONS_PLACEHOLDER", json.dumps(restore_options)
+                )
                 executor.execute(restore_code, timeout=10.0)
             except Exception:
                 pass  # Silently ignore restore failures - screenshot already captured
@@ -4485,17 +5122,23 @@ def screenshot_page(output, margin, margin_color, disable_compression, enable_co
 
             if copy_image_to_clipboard(image_data, format=format):
                 if json_output:
-                    click.echo(json.dumps({
-                        "ok": True,
-                        "clipboard": True,
-                        "width": response.get("width"),
-                        "height": response.get("height"),
-                        "size_bytes": len(image_data),
-                        "url": response.get("url"),
-                        "truncated": response.get("truncated", False),
-                    }))
+                    click.echo(
+                        json.dumps(
+                            {
+                                "ok": True,
+                                "clipboard": True,
+                                "width": response.get("width"),
+                                "height": response.get("height"),
+                                "size_bytes": len(image_data),
+                                "url": response.get("url"),
+                                "truncated": response.get("truncated", False),
+                            }
+                        )
+                    )
                 elif not quiet:
-                    click.echo(clipboard_icon(f"Copied to clipboard ({format_filesize(len(image_data))})"))
+                    click.echo(
+                        clipboard_icon(f"Copied to clipboard ({format_filesize(len(image_data))})")
+                    )
             else:
                 if json_output:
                     click.echo(json.dumps({"ok": False, "error": "Failed to copy to clipboard"}))
@@ -4514,7 +5157,9 @@ def screenshot_page(output, margin, margin_color, disable_compression, enable_co
             # Check if file exists and handle overwrite
             if output_path.exists() and not force:
                 if json_output:
-                    click.echo(json.dumps({"ok": False, "error": f"File already exists: {output_path}"}))
+                    click.echo(
+                        json.dumps({"ok": False, "error": f"File already exists: {output_path}"})
+                    )
                     sys.exit(1)
                 click.echo(f"File already exists: {output_path}", err=True)
                 if not click.confirm("Overwrite?"):
@@ -4607,11 +5252,13 @@ def screenshot_page(output, margin, margin_color, disable_compression, enable_co
             # Open in default application if requested
             if open_after:
                 from inspekt.app.cli.output import OutputHandler
+
                 OutputHandler.open_file(output_path)
 
             # Reveal in file explorer if requested
             if reveal_after:
                 from inspekt.app.cli.output import OutputHandler
+
                 OutputHandler.reveal_file(output_path)
 
     except (ConnectionError, TimeoutError, RuntimeError) as e:
@@ -4623,7 +5270,13 @@ def screenshot_page(output, margin, margin_color, disable_compression, enable_co
 
 
 @screenshot.command(name="selection")
-@click.option("--output", "-o", type=click.Path(), default=None, help="Output file path (auto-generated if not specified)")
+@click.option(
+    "--output",
+    "-o",
+    type=click.Path(),
+    default=None,
+    help="Output file path (auto-generated if not specified)",
+)
 @click.option(
     "--margin",
     "-m",
@@ -4840,7 +5493,9 @@ def screenshot_selection(
         # Start selection mode
         if not quiet and not json_output:
             click.echo(crosshair_icon("Starting selection mode…"))
-            click.echo("  Drag to select a region. Press Enter or click to confirm, Escape to cancel.")
+            click.echo(
+                "  Drag to select a region. Press Enter or click to confirm, Escape to cancel."
+            )
 
         start_result = executor.execute(start_code, timeout=10.0)
         if not start_result.get("ok"):
@@ -4918,7 +5573,11 @@ def screenshot_selection(
 
         if not quiet and not json_output:
             if snapped:
-                click.echo(snap_icon(f"Snapped to {element_count} element{'s' if element_count != 1 else ''}"))
+                click.echo(
+                    snap_icon(
+                        f"Snapped to {element_count} element{'s' if element_count != 1 else ''}"
+                    )
+                )
             elif element_count > 0:
                 click.echo(info_icon("Selection not snapped (expansion exceeded tolerance)"))
 
@@ -4942,7 +5601,9 @@ def screenshot_selection(
 
         # Use selection mode with clip
         screenshot_code = screenshot_script.replace("'MODE_PLACEHOLDER'", json.dumps("selection"))
-        screenshot_code = screenshot_code.replace("OPTIONS_PLACEHOLDER", json.dumps(screenshot_options))
+        screenshot_code = screenshot_code.replace(
+            "OPTIONS_PLACEHOLDER", json.dumps(screenshot_options)
+        )
 
         # Execute screenshot capture
         screenshot_result = executor.execute(screenshot_code, timeout=60.0)
@@ -4978,20 +5639,28 @@ def screenshot_selection(
         # Handle clipboard output
         if clipboard:
             from inspekt.services.screenshot_utils import copy_image_to_clipboard
+
             success = copy_image_to_clipboard(image_data, format)
             if success:
                 if json_output:
-                    click.echo(json.dumps({
-                        "ok": True,
-                        "clipboard": True,
-                        "width": response.get("width"),
-                        "height": response.get("height"),
-                        "snapped": snapped,
-                        "element_count": element_count,
-                    }))
+                    click.echo(
+                        json.dumps(
+                            {
+                                "ok": True,
+                                "clipboard": True,
+                                "width": response.get("width"),
+                                "height": response.get("height"),
+                                "snapped": snapped,
+                                "element_count": element_count,
+                            }
+                        )
+                    )
                 elif not quiet:
                     from inspekt.services.formatting_utils import format_filesize
-                    click.echo(clipboard_icon(f"Copied to clipboard ({format_filesize(len(image_data))})"))
+
+                    click.echo(
+                        clipboard_icon(f"Copied to clipboard ({format_filesize(len(image_data))})")
+                    )
             else:
                 if json_output:
                     click.echo(json.dumps({"ok": False, "error": "Failed to copy to clipboard"}))
@@ -5010,7 +5679,9 @@ def screenshot_selection(
             # Check if file exists and handle overwrite
             if output_path.exists() and not force:
                 if json_output:
-                    click.echo(json.dumps({"ok": False, "error": f"File already exists: {output_path}"}))
+                    click.echo(
+                        json.dumps({"ok": False, "error": f"File already exists: {output_path}"})
+                    )
                     sys.exit(1)
                 click.echo(f"File already exists: {output_path}", err=True)
                 if not click.confirm("Overwrite?"):
@@ -5095,11 +5766,13 @@ def screenshot_selection(
             # Open in default application if requested
             if open_after:
                 from inspekt.app.cli.output import OutputHandler
+
                 OutputHandler.open_file(output_path)
 
             # Reveal in file explorer if requested
             if reveal_after:
                 from inspekt.app.cli.output import OutputHandler
+
                 OutputHandler.reveal_file(output_path)
 
     except (ConnectionError, TimeoutError, RuntimeError) as e:

@@ -25,9 +25,7 @@ router = APIRouter()
 class ActivateTabRequest(BaseModel):
     """Request model for activating a browser tab."""
 
-    browser_name: str = Field(
-        ..., description="Browser name (Safari, Chrome, Brave, Edge)"
-    )
+    browser_name: str = Field(..., description="Browser name (Safari, Chrome, Brave, Edge)")
     url: str = Field(..., description="URL of the tab to activate (uses 'contains' matching)")
 
 

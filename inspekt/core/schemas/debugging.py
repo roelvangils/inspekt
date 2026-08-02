@@ -27,9 +27,7 @@ class ConsoleEntry(BaseModel):
     """A single console log entry."""
 
     level: str = Field(..., description="Log level: error, warn, log, info, or debug")
-    timestamp: str = Field(
-        ..., description="Timestamp when the message was logged (ISO 8601)"
-    )
+    timestamp: str = Field(..., description="Timestamp when the message was logged (ISO 8601)")
     message: str = Field(..., description="The logged message content")
 
 
@@ -37,13 +35,9 @@ class GetConsoleLogsResponse(BaseModel):
     """Response from get_console_logs command."""
 
     success: bool = Field(..., description="Whether the operation succeeded")
-    entries: list[ConsoleEntry] = Field(
-        default=[], description="List of console log entries"
-    )
+    entries: list[ConsoleEntry] = Field(default=[], description="List of console log entries")
     count: int = Field(default=0, description="Number of entries returned")
-    hooked: bool = Field(
-        default=False, description="Whether console hooks are active on the page"
-    )
+    hooked: bool = Field(default=False, description="Whether console hooks are active on the page")
     message: str | None = Field(default=None, description="Success or error message")
 
 

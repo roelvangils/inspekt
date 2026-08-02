@@ -24,6 +24,7 @@ from inspekt.services import http_client
 # Try to import protego for RFC 9309 compliance
 try:
     from protego import Protego
+
     HAS_PROTEGO = True
 except ImportError:
     HAS_PROTEGO = False
@@ -34,7 +35,9 @@ except ImportError:
 @click.command()
 @click.option("--json", "-j", "output_json", is_flag=True, help="Output as JSON")
 @click.option("--validate", is_flag=True, help="Show detailed validation errors and warnings")
-@click.option("--url", "override_url", type=str, help="Specify URL to inspect (overrides current page)")
+@click.option(
+    "--url", "override_url", type=str, help="Specify URL to inspect (overrides current page)"
+)
 def robots(output_json, validate, override_url):
     """
     Fetch and parse robots.txt for the current page.
@@ -89,7 +92,7 @@ def robots(output_json, validate, override_url):
         "status": robots_data.get("status"),
         "exists": robots_data.get("exists"),
         "metadata": robots_data.get("metadata", {}),
-        **parsed_data
+        **parsed_data,
     }
 
     # Add validation if requested or in JSON mode
@@ -120,7 +123,7 @@ def _fetch_robots_txt(robots_url: str) -> dict[str, Any]:
             robots_url,
             timeout=5,
             headers={"User-Agent": "Inspekt-CLI-RobotsTxt-Checker"},
-            allow_redirects=True
+            allow_redirects=True,
         )
 
         # Check if robots.txt is too large (RFC 9309: should be < 500KB)
@@ -130,20 +133,20 @@ def _fetch_robots_txt(robots_url: str) -> dict[str, Any]:
                 "url": robots_url,
                 "status": 413,
                 "exists": False,
-                "error": f"robots.txt too large: {int(content_length) / 1024:.1f}KB (max 500KB per RFC 9309)"
+                "error": f"robots.txt too large: {int(content_length) / 1024:.1f}KB (max 500KB per RFC 9309)",
             }
 
         if response.status_code == 200:
             # Calculate actual size
             content = response.text
-            size_bytes = len(content.encode('utf-8'))
+            size_bytes = len(content.encode("utf-8"))
 
             # Extract metadata
             metadata = {
                 "size": size_bytes,
                 "lines": len(content.splitlines()),
                 "encoding": response.encoding or "utf-8",
-                "contentType": response.headers.get("Content-Type", "unknown")
+                "contentType": response.headers.get("Content-Type", "unknown"),
             }
 
             # Optional metadata
@@ -162,14 +165,14 @@ def _fetch_robots_txt(robots_url: str) -> dict[str, Any]:
                 "status": 200,
                 "exists": True,
                 "content": content,
-                "metadata": metadata
+                "metadata": metadata,
             }
         else:
             return {
                 "url": robots_url,
                 "status": response.status_code,
                 "exists": False,
-                "error": f"HTTP {response.status_code}"
+                "error": f"HTTP {response.status_code}",
             }
 
     except requests.Timeout:
@@ -177,22 +180,17 @@ def _fetch_robots_txt(robots_url: str) -> dict[str, Any]:
             "url": robots_url,
             "status": 0,
             "exists": False,
-            "error": "Request timeout after 5 seconds"
+            "error": "Request timeout after 5 seconds",
         }
     except requests.ConnectionError as e:
         return {
             "url": robots_url,
             "status": 0,
             "exists": False,
-            "error": f"Connection error: {e!s}"
+            "error": f"Connection error: {e!s}",
         }
     except requests.RequestException as e:
-        return {
-            "url": robots_url,
-            "status": 0,
-            "exists": False,
-            "error": f"Request failed: {e!s}"
-        }
+        return {"url": robots_url, "status": 0, "exists": False, "error": f"Request failed: {e!s}"}
 
 
 def _parse_robots_txt(content: str, robots_url: str) -> dict[str, Any]:
@@ -227,80 +225,78 @@ def _parse_with_protego(content: str, robots_url: str) -> dict[str, Any]:
     for line_num, line in enumerate(lines, 1):
         stripped = line.strip()
 
-        if not stripped or stripped.startswith('#'):
+        if not stripped or stripped.startswith("#"):
             continue
 
-        if ':' in stripped:
-            directive, _, value = stripped.partition(':')
+        if ":" in stripped:
+            directive, _, value = stripped.partition(":")
             directive = directive.strip().lower()
             value = value.strip()
 
-            if directive == 'user-agent':
+            if directive == "user-agent":
                 # Start new group if we have rules
                 if current_agents and current_rules:
-                    groups.append({
-                        "userAgents": current_agents,
-                        "rules": current_rules,
-                        **({"crawlDelay": current_crawl_delay} if current_crawl_delay else {}),
-                        **({"requestRate": current_request_rate} if current_request_rate else {})
-                    })
+                    groups.append(
+                        {
+                            "userAgents": current_agents,
+                            "rules": current_rules,
+                            **({"crawlDelay": current_crawl_delay} if current_crawl_delay else {}),
+                            **(
+                                {"requestRate": current_request_rate}
+                                if current_request_rate
+                                else {}
+                            ),
+                        }
+                    )
                     current_rules = []
                     current_crawl_delay = None
                     current_request_rate = None
 
                 current_agents.append(value)
 
-            elif directive in ('allow', 'disallow'):
-                current_rules.append({
-                    "directive": directive.capitalize(),
-                    "path": value,
-                    "line": line_num
-                })
+            elif directive in ("allow", "disallow"):
+                current_rules.append(
+                    {"directive": directive.capitalize(), "path": value, "line": line_num}
+                )
 
-            elif directive == 'crawl-delay':
+            elif directive == "crawl-delay":
                 try:
                     current_crawl_delay = float(value)
                 except ValueError:
                     pass
 
-            elif directive == 'request-rate':
+            elif directive == "request-rate":
                 current_request_rate = value
 
     # Add last group
     if current_agents and current_rules:
-        groups.append({
-            "userAgents": current_agents,
-            "rules": current_rules,
-            **({"crawlDelay": current_crawl_delay} if current_crawl_delay else {}),
-            **({"requestRate": current_request_rate} if current_request_rate else {})
-        })
+        groups.append(
+            {
+                "userAgents": current_agents,
+                "rules": current_rules,
+                **({"crawlDelay": current_crawl_delay} if current_crawl_delay else {}),
+                **({"requestRate": current_request_rate} if current_request_rate else {}),
+            }
+        )
 
     # Extract sitemaps
     sitemaps = []
     for line in lines:
-        if line.strip().lower().startswith('sitemap:'):
-            _, _, sitemap_url = line.partition(':')
+        if line.strip().lower().startswith("sitemap:"):
+            _, _, sitemap_url = line.partition(":")
             sitemaps.append(sitemap_url.strip())
 
     # Extract comments
     comments = []
     for line_num, line in enumerate(lines, 1):
-        if '#' in line:
+        if "#" in line:
             # Handle inline comments
-            comment_start = line.index('#')
+            comment_start = line.index("#")
             comment_text = line[comment_start:].strip()
             if comment_text:
-                comments.append({
-                    "line": line_num,
-                    "text": comment_text
-                })
+                comments.append({"line": line_num, "text": comment_text})
 
-    return {
-        "groups": groups,
-        "sitemaps": sitemaps,
-        "comments": comments,
-        "raw": content
-    }
+    return {"groups": groups, "sitemaps": sitemaps, "comments": comments, "raw": content}
 
 
 def _parse_with_urllib(content: str, robots_url: str) -> dict[str, Any]:
@@ -322,52 +318,36 @@ def _parse_with_urllib(content: str, robots_url: str) -> dict[str, Any]:
         if not stripped:
             continue
 
-        if stripped.startswith('#'):
-            comments.append({
-                "line": line_num,
-                "text": stripped
-            })
+        if stripped.startswith("#"):
+            comments.append({"line": line_num, "text": stripped})
             continue
 
-        if ':' in stripped:
-            directive, _, value = stripped.partition(':')
+        if ":" in stripped:
+            directive, _, value = stripped.partition(":")
             directive = directive.strip().lower()
             value = value.strip()
 
-            if directive == 'user-agent':
+            if directive == "user-agent":
                 # Start new group if we have rules
                 if current_agents and current_rules:
-                    groups.append({
-                        "userAgents": current_agents,
-                        "rules": current_rules
-                    })
+                    groups.append({"userAgents": current_agents, "rules": current_rules})
                     current_rules = []
 
                 current_agents.append(value)
 
-            elif directive in ('allow', 'disallow'):
-                current_rules.append({
-                    "directive": directive.capitalize(),
-                    "path": value,
-                    "line": line_num
-                })
+            elif directive in ("allow", "disallow"):
+                current_rules.append(
+                    {"directive": directive.capitalize(), "path": value, "line": line_num}
+                )
 
-            elif directive == 'sitemap':
+            elif directive == "sitemap":
                 sitemaps.append(value)
 
     # Add last group
     if current_agents and current_rules:
-        groups.append({
-            "userAgents": current_agents,
-            "rules": current_rules
-        })
+        groups.append({"userAgents": current_agents, "rules": current_rules})
 
-    return {
-        "groups": groups,
-        "sitemaps": sitemaps,
-        "comments": comments,
-        "raw": content
-    }
+    return {"groups": groups, "sitemaps": sitemaps, "comments": comments, "raw": content}
 
 
 def _validate_robots_txt(content: str, parsed_data: dict[str, Any]) -> dict[str, Any]:
@@ -387,19 +367,21 @@ def _validate_robots_txt(content: str, parsed_data: dict[str, Any]) -> dict[str,
     lines = content.splitlines()
 
     # Check for non-standard directives
-    non_standard = ['crawl-delay', 'request-rate', 'visit-time', 'host']
+    non_standard = ["crawl-delay", "request-rate", "visit-time", "host"]
     for line_num, line in enumerate(lines, 1):
         stripped = line.strip().lower()
-        if ':' in stripped:
-            directive = stripped.split(':', 1)[0].strip()
+        if ":" in stripped:
+            directive = stripped.split(":", 1)[0].strip()
             if directive in non_standard:
-                warnings.append(f"Non-standard directive '{directive}' at line {line_num} (may not be supported by all crawlers)")
+                warnings.append(
+                    f"Non-standard directive '{directive}' at line {line_num} (may not be supported by all crawlers)"
+                )
 
     # Check for invalid user-agent tokens
-    user_agent_pattern = re.compile(r'^[a-zA-Z0-9_-]+$|^\*$')
+    user_agent_pattern = re.compile(r"^[a-zA-Z0-9_-]+$|^\*$")
     for group in parsed_data.get("groups", []):
         for agent in group.get("userAgents", []):
-            if agent != '*' and not user_agent_pattern.match(agent):
+            if agent != "*" and not user_agent_pattern.match(agent):
                 warnings.append(f"User-agent '{agent}' contains non-standard characters")
 
     # Check for empty groups
@@ -409,12 +391,11 @@ def _validate_robots_txt(content: str, parsed_data: dict[str, Any]) -> dict[str,
 
     # Warn if using urllib instead of protego
     if not HAS_PROTEGO:
-        warnings.append("Using urllib.robotparser instead of protego (install with: pip install protego for full RFC 9309 compliance)")
+        warnings.append(
+            "Using urllib.robotparser instead of protego (install with: pip install protego for full RFC 9309 compliance)"
+        )
 
-    return {
-        "errors": errors,
-        "warnings": warnings
-    }
+    return {"errors": errors, "warnings": warnings}
 
 
 def _display_robots_txt(data: dict[str, Any], show_validation: bool = False):
@@ -512,7 +493,9 @@ def _display_robots_txt(data: dict[str, Any], show_validation: bool = False):
         # Single column table for sitemaps with auto-width and title bar
         sitemap_rows = [[sitemap] for sitemap in sitemaps]
         sitemap_icon = get_icon("Sitemaps")
-        sitemap_table = Table(["URL"], alignments=["left"], title=f"Sitemaps ({len(sitemaps)})", icon=sitemap_icon)
+        sitemap_table = Table(
+            ["URL"], alignments=["left"], title=f"Sitemaps ({len(sitemaps)})", icon=sitemap_icon
+        )
         sitemap_table.set_data(sitemap_rows)
         sitemap_table.print_header()
 
@@ -543,7 +526,12 @@ def _display_robots_txt(data: dict[str, Any], show_validation: bool = False):
 
             # Create validation table with auto-width and title bar
             val_icon = get_icon("Validation")
-            val_table = Table(["", "Type", "Message"], alignments=["left", "left", "left"], title=f"Validation ({total_issues} issues)", icon=val_icon)
+            val_table = Table(
+                ["", "Type", "Message"],
+                alignments=["left", "left", "left"],
+                title=f"Validation ({total_issues} issues)",
+                icon=val_icon,
+            )
             val_table.set_data(val_rows)
             val_table.print_header()
 
@@ -552,5 +540,9 @@ def _display_robots_txt(data: dict[str, Any], show_validation: bool = False):
 
             val_table.print_footer()
         else:
-            click.echo(click.style(f"{format_status_icon('pass')} Validation: No errors or warnings", fg="green"))
+            click.echo(
+                click.style(
+                    f"{format_status_icon('pass')} Validation: No errors or warnings", fg="green"
+                )
+            )
         click.echo()

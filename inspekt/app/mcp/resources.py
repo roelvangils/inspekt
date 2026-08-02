@@ -167,9 +167,7 @@ class ResourceProvider:
     async def _get_page_title(self) -> str:
         """Get current page title."""
         try:
-            result = await asyncio.to_thread(
-                self.executor.execute, "document.title", 5.0
-            )
+            result = await asyncio.to_thread(self.executor.execute, "document.title", 5.0)
             if result.get("ok"):
                 return result.get("result", "")
             else:
@@ -208,14 +206,14 @@ class ResourceProvider:
                 };
             })()
             """
-            result = await asyncio.to_thread(
-                self.executor.execute, code, 10.0
-            )
+            result = await asyncio.to_thread(self.executor.execute, code, 10.0)
             if result.get("ok"):
                 # Return as formatted JSON
                 return json.dumps(result.get("result", {}), indent=2)
             else:
-                raise RuntimeError(f"Failed to get metadata: {result.get('error', 'Unknown error')}")
+                raise RuntimeError(
+                    f"Failed to get metadata: {result.get('error', 'Unknown error')}"
+                )
         except Exception as e:
             logger.error(f"Error getting page metadata: {e}")
             raise RuntimeError(f"Failed to read page metadata: {e}")
@@ -241,13 +239,13 @@ class ResourceProvider:
                 };
             })()
             """
-            result = await asyncio.to_thread(
-                self.executor.execute, code, 10.0
-            )
+            result = await asyncio.to_thread(self.executor.execute, code, 10.0)
             if result.get("ok"):
                 return json.dumps(result.get("result", {}), indent=2)
             else:
-                raise RuntimeError(f"Failed to get browser info: {result.get('error', 'Unknown error')}")
+                raise RuntimeError(
+                    f"Failed to get browser info: {result.get('error', 'Unknown error')}"
+                )
         except Exception as e:
             logger.error(f"Error getting browser info: {e}")
             raise RuntimeError(f"Failed to read browser info: {e}")
@@ -256,20 +254,13 @@ class ResourceProvider:
         """Get connection status and health information as JSON."""
         try:
             # Get bridge server status (run in thread since it's synchronous)
-            bridge_connected = await asyncio.to_thread(
-                self.executor.is_server_running
-            )
+            bridge_connected = await asyncio.to_thread(self.executor.is_server_running)
 
-            status = {
-                "bridge_connected": bridge_connected,
-                "timestamp": datetime.now().isoformat()
-            }
+            status = {"bridge_connected": bridge_connected, "timestamp": datetime.now().isoformat()}
 
             # Try to get additional server health info
             try:
-                server_status = await asyncio.to_thread(
-                    self.executor.client.get_status
-                )
+                server_status = await asyncio.to_thread(self.executor.client.get_status)
                 if server_status:
                     status["server_info"] = server_status
             except Exception:
@@ -279,8 +270,11 @@ class ResourceProvider:
         except Exception as e:
             logger.error(f"Error getting connection status: {e}")
             # Even if there's an error, return what we know
-            return json.dumps({
-                "bridge_connected": False,
-                "error": str(e),
-                "timestamp": datetime.now().isoformat()
-            }, indent=2)
+            return json.dumps(
+                {
+                    "bridge_connected": False,
+                    "error": str(e),
+                    "timestamp": datetime.now().isoformat(),
+                },
+                indent=2,
+            )

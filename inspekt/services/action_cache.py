@@ -83,13 +83,59 @@ class ActionCache:
         """Return default English filler words as fallback."""
         return {
             "en": {
-                "go", "open", "click", "navigate", "visit", "access",
-                "show", "display", "view", "see", "find", "get",
-                "take", "bring", "load", "press",
-                "the", "a", "an", "to", "on", "at", "in", "of", "for", "with", "from", "by",
-                "my", "me", "i", "want", "need",
-                "page", "button", "link", "image", "icon", "field", "form", "input", "menu", "tab", "section", "area",
-                "please", "now", "then", "next", "first", "also", "just", "only",
+                "go",
+                "open",
+                "click",
+                "navigate",
+                "visit",
+                "access",
+                "show",
+                "display",
+                "view",
+                "see",
+                "find",
+                "get",
+                "take",
+                "bring",
+                "load",
+                "press",
+                "the",
+                "a",
+                "an",
+                "to",
+                "on",
+                "at",
+                "in",
+                "of",
+                "for",
+                "with",
+                "from",
+                "by",
+                "my",
+                "me",
+                "i",
+                "want",
+                "need",
+                "page",
+                "button",
+                "link",
+                "image",
+                "icon",
+                "field",
+                "form",
+                "input",
+                "menu",
+                "tab",
+                "section",
+                "area",
+                "please",
+                "now",
+                "then",
+                "next",
+                "first",
+                "also",
+                "just",
+                "only",
             }
         }
 
@@ -162,6 +208,7 @@ class ActionCache:
 
         # Remove punctuation
         import string
+
         action = action.translate(str.maketrans("", "", string.punctuation))
 
         # Determine which languages to use for filtering
@@ -232,7 +279,9 @@ class ActionCache:
                 landmark_similarity = 1.0
 
             # Weighted average
-            similarity = (count_similarity * 0.4 + heading_similarity * 0.3 + landmark_similarity * 0.3)
+            similarity = (
+                count_similarity * 0.4 + heading_similarity * 0.3 + landmark_similarity * 0.3
+            )
             return similarity
         except Exception:
             return 0.0

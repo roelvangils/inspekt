@@ -40,9 +40,13 @@ def _generate_element_css(
     indent = " " * (depth * indent_size)
     selector = element.get("selector", element.get("tag", "unknown"))
     styles = element.get("styles", {})
-    rounded_props = set(element.get("roundedProps", []))   # Properties that were rounded
-    computed_props = set(element.get("computedProps", []))  # Properties with decimal pixels (when not rounding)
-    authored_props = set(element.get("authoredProps", []))  # Properties with original authored values
+    rounded_props = set(element.get("roundedProps", []))  # Properties that were rounded
+    computed_props = set(
+        element.get("computedProps", [])
+    )  # Properties with decimal pixels (when not rounding)
+    authored_props = set(
+        element.get("authoredProps", [])
+    )  # Properties with original authored values
     children = element.get("children", [])
 
     # Skip elements with no styles and no children with styles

@@ -68,10 +68,25 @@ def _format_file_size(size_bytes: int) -> str:
 
 
 _PLACEHOLDER_NAMES = {
-    "placeholder", "untitled", "image", "img", "photo", "picture",
-    "banner", "graphic", "thumbnail", "icon",
+    "placeholder",
+    "untitled",
+    "image",
+    "img",
+    "photo",
+    "picture",
+    "banner",
+    "graphic",
+    "thumbnail",
+    "icon",
 }
-_REDUNDANT_PREFIXES = ("image of", "picture of", "photo of", "graphic of", "image showing", "photo showing")
+_REDUNDANT_PREFIXES = (
+    "image of",
+    "picture of",
+    "photo of",
+    "graphic of",
+    "image showing",
+    "photo showing",
+)
 _CLICK_WORDS_RE = re.compile(r"\b(?:click|tap|press)\b", re.IGNORECASE)
 _URL_RE = re.compile(r"https?://|\bwww\.", re.IGNORECASE)
 _DIMENSIONS_RE = re.compile(r"\b\d+\s*[x×]\s*\d+\b|\b\d+\s*px\b", re.IGNORECASE)
@@ -153,7 +168,9 @@ def _compute_acc_hints(img: GalleryImage) -> list[str]:
 
     # H15 — linked logo.
     if img.is_linked and _LOGO_RE.search(stripped):
-        hints.append("Logo inside a link — ensure the name describes where the link goes, not just the logo.")
+        hints.append(
+            "Logo inside a link — ensure the name describes where the link goes, not just the logo."
+        )
 
     # H16 — URL in the accessible name.
     if _URL_RE.search(stripped):
@@ -246,11 +263,17 @@ def generate_gallery_html(
             svg_data_attr = f'\n                    data-svg-source="{svg_b64}"'
 
         # Build badge row — format is always present; source/link/hints conditional.
-        badges = [f'<span class="gallery-badge badge-format">{_escape_html(file_ext.upper())}</span>']
+        badges = [
+            f'<span class="gallery-badge badge-format">{_escape_html(file_ext.upper())}</span>'
+        ]
         if img.source_type == "css-background":
-            badges.append('<span class="gallery-badge badge-source" title="CSS background image">BG</span>')
+            badges.append(
+                '<span class="gallery-badge badge-source" title="CSS background image">BG</span>'
+            )
         elif img.original_url.startswith("data:"):
-            badges.append('<span class="gallery-badge badge-source" title="Originally a data URI">64</span>')
+            badges.append(
+                '<span class="gallery-badge badge-source" title="Originally a data URI">64</span>'
+            )
         if img.is_linked:
             badges.append(
                 '<span class="gallery-badge badge-link" title="Wrapped in a link">↗</span>'
@@ -262,24 +285,31 @@ def generate_gallery_html(
                 f'<span class="gallery-badge badge-hints" '
                 f'aria-label="{len(hints)} accessibility hint{"s" if len(hints) != 1 else ""}" '
                 f'title="{len(hints)} accessibility hint{"s" if len(hints) != 1 else ""}">'
-                f'⚠ {len(hints)}</span>'
+                f"⚠ {len(hints)}</span>"
             )
         badges_html = "\n                    ".join(badges)
 
         # Accessible-name line. Empty name gets a warning pill so it's visible.
         if img.accessible_name:
-            acc_name_display = img.accessible_name[:120] + "…" if len(img.accessible_name) > 120 else img.accessible_name
+            acc_name_display = (
+                img.accessible_name[:120] + "…"
+                if len(img.accessible_name) > 120
+                else img.accessible_name
+            )
             acc_name_html = f'<span class="acc-name">{_escape_html(acc_name_display)}</span>'
         else:
             acc_name_html = '<span class="no-name">— no accessible name —</span>'
-        name_source_html = f'<span class="name-source">{_escape_html(img.accessible_name_source)}</span>'
+        name_source_html = (
+            f'<span class="name-source">{_escape_html(img.accessible_name_source)}</span>'
+        )
 
         # Hints encoded for the lightbox as JSON (lightbox JS parses and renders).
         import json as _json_mod
+
         hints_json = _json_mod.dumps(hints) if hints else "[]"
 
         cards_html.append(f"""
-        <article class="gallery-card" data-index="{i}" data-ext="{file_ext}" data-width="{img.width}" data-height="{img.height}" data-source-type="{_escape_html(img.source_type)}" data-has-hints="{'1' if hints else '0'}">
+        <article class="gallery-card" data-index="{i}" data-ext="{file_ext}" data-width="{img.width}" data-height="{img.height}" data-source-type="{_escape_html(img.source_type)}" data-has-hints="{"1" if hints else "0"}">
             <button type="button" class="gallery-thumbnail"
                     aria-label="View {_escape_html(img.filename)} in lightbox"
                     data-full-src="{_escape_html(full_src)}"
@@ -297,7 +327,7 @@ def generate_gallery_html(
                     {badges_html}
                 </div>
                 <img src="{_escape_html(thumb_src)}"
-                     alt="{_escape_html(img.alt) or 'Image ' + str(i + 1)}"
+                     alt="{_escape_html(img.alt) or "Image " + str(i + 1)}"
                      loading="lazy"
                      decoding="async">
             </button>
@@ -307,7 +337,7 @@ def generate_gallery_html(
                     <span class="dimensions">{dimensions}</span>
                     <span class="size">{file_size_str}</span>
                 </div>
-                <div class="accessible-name" title="{_escape_html(img.accessible_name) or 'no accessible name'}">
+                <div class="accessible-name" title="{_escape_html(img.accessible_name) or "no accessible name"}">
                     {acc_name_html}
                     {name_source_html}
                 </div>
@@ -1328,14 +1358,18 @@ def generate_gallery_html(
                 {file_type_options_html}
             </select>
         </div>
-        {'''<div class="filter-group">
+        {
+        '''<div class="filter-group">
             <label for="filter-source">Source</label>
             <select id="filter-source">
                 <option value="">All sources</option>
                 <option value="img">&lt;img&gt; elements</option>
                 <option value="css-background">CSS backgrounds</option>
             </select>
-        </div>''' if any_bg else ''}
+        </div>'''
+        if any_bg
+        else ""
+    }
         <div class="filter-group">
             <label for="filter-min-width">Min. width</label>
             <input type="number" id="filter-min-width" min="0" placeholder="px">
@@ -1354,12 +1388,16 @@ def generate_gallery_html(
                 Merge identical images
             </label>
         </div>
-        {'''<div class="filter-group filter-group-checkbox">
+        {
+        '''<div class="filter-group filter-group-checkbox">
             <label for="filter-only-issues">
                 <input type="checkbox" id="filter-only-issues">
                 Only with a11y issues
             </label>
-        </div>''' if any_hints else ''}
+        </div>'''
+        if any_hints
+        else ""
+    }
         <div class="filter-results" aria-live="polite">
             Showing <strong id="visible-count">{len(images)}</strong> of {len(images)} images
         </div>

@@ -49,7 +49,11 @@ def merge_authored_css(
         for prop in list(styles.keys()):
             if prop in element_authored:
                 authored_entry = element_authored[prop]
-                authored_value = authored_entry.get("value") if isinstance(authored_entry, dict) else authored_entry
+                authored_value = (
+                    authored_entry.get("value")
+                    if isinstance(authored_entry, dict)
+                    else authored_entry
+                )
 
                 if authored_value and authored_value != styles[prop]:
                     computed_values[prop] = styles[prop]  # Save original computed value

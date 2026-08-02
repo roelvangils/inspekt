@@ -80,9 +80,7 @@ class AskResponse(BaseModel):
 class DoParams(BaseModel):
     """Parameters for do command."""
 
-    instruction: str = Field(
-        description="Natural language instruction for what action to perform"
-    )
+    instruction: str = Field(description="Natural language instruction for what action to perform")
 
 
 class DoResponse(BaseModel):
@@ -130,9 +128,13 @@ class ElementDescribeParams(BaseModel):
 class ElementDescribeResponse(BaseModel):
     """Response from element_describe command."""
 
-    description: str = Field(description="AI-generated accessibility-focused description of the element")
+    description: str = Field(
+        description="AI-generated accessibility-focused description of the element"
+    )
     element_type: str = Field(description="HTML tag name of the element")
-    accessible_name: str | None = Field(default=None, description="Computed accessible name of the element")
+    accessible_name: str | None = Field(
+        default=None, description="Computed accessible name of the element"
+    )
     source: str = Field(description="Source type used (inspected, focused, or selection)")
 
 

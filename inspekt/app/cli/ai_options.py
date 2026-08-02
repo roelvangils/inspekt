@@ -75,9 +75,7 @@ def get_ai_context(
     manager = get_provider_manager()
 
     # Resolve provider and model
-    resolved_provider, resolved_model = manager.resolve_provider(
-        provider=provider, command=command
-    )
+    resolved_provider, resolved_model = manager.resolve_provider(provider=provider, command=command)
 
     # Model override from CLI takes precedence
     if model:

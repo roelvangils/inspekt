@@ -65,9 +65,7 @@ class ThothProvider(AIProvider):
 
     def _get_endpoint(self) -> str:
         """Get the Thoth API endpoint."""
-        return self._config.get(
-            "endpoint", "https://thoth.elevenways.be/v1/chat/completions"
-        )
+        return self._config.get("endpoint", "https://thoth.elevenways.be/v1/chat/completions")
 
     def get_default_text_model(self) -> str:
         return self._config.get("text-model", "gpt-4o-mini")

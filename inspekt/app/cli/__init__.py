@@ -25,30 +25,45 @@ def _no_tips_callback(ctx, param, value):
     """
     if value:
         import os
-        os.environ['INSPEKT_NO_TIPS'] = '1'
+
+        os.environ["INSPEKT_NO_TIPS"] = "1"
 
 
 @click.group(cls=CustomGroup)
 @click.version_option(version=__version__)
-@click.option('--verbose', '-v', is_flag=True, help='Enable verbose output (timing, requests, state changes)')
-@click.option('--no-tips', is_flag=True, is_eager=True, expose_value=False,
-              callback=_no_tips_callback, help='Suppress tips and hints in output')
-@click.option('--instance', '-i', 'instance_id', default=None, metavar='ID',
-              help='Target specific browser instance by ID, alias, or index (e.g., "b7x2", "homepage", "0")')
+@click.option(
+    "--verbose", "-v", is_flag=True, help="Enable verbose output (timing, requests, state changes)"
+)
+@click.option(
+    "--no-tips",
+    is_flag=True,
+    is_eager=True,
+    expose_value=False,
+    callback=_no_tips_callback,
+    help="Suppress tips and hints in output",
+)
+@click.option(
+    "--instance",
+    "-i",
+    "instance_id",
+    default=None,
+    metavar="ID",
+    help='Target specific browser instance by ID, alias, or index (e.g., "b7x2", "homepage", "0")',
+)
 @click.pass_context
 def cli(ctx, verbose, instance_id):
     """Inspekt - Browser automation and inspection from the command line."""
     import os
 
     ctx.ensure_object(dict)
-    ctx.obj['verbose'] = verbose
-    ctx.obj['instance_id'] = instance_id
+    ctx.obj["verbose"] = verbose
+    ctx.obj["instance_id"] = instance_id
 
     if verbose:
-        os.environ['INSPEKT_VERBOSE'] = '1'
+        os.environ["INSPEKT_VERBOSE"] = "1"
 
     if instance_id:
-        os.environ['INSPEKT_INSTANCE'] = instance_id
+        os.environ["INSPEKT_INSTANCE"] = instance_id
 
 
 @cli.group()
@@ -69,6 +84,7 @@ def completion():
 def _get_completion_script(shell: str) -> str:
     """Generate the completion script for a shell."""
     from click.shell_completion import get_completion_class
+
     completion_class = get_completion_class(shell)
     completer = completion_class(cli, {}, "inspekt", "_INSPEKT_COMPLETE")
     return completer.source()
@@ -78,6 +94,7 @@ def _detect_shell() -> str | None:
     """Detect the current shell from environment."""
     import os
     from pathlib import Path
+
     shell_path = os.environ.get("SHELL", "")
     shell_name = Path(shell_path).name if shell_path else ""
 
@@ -93,6 +110,7 @@ def _detect_shell() -> str | None:
 def _get_rc_file(shell: str):
     """Get the config file path for a shell."""
     from pathlib import Path
+
     if shell == "zsh":
         return Path.home() / ".zshrc"
     elif shell == "fish":
@@ -145,8 +163,12 @@ def completion_fish():
 
 
 @completion.command("install")
-@click.option("--shell", "-s", type=click.Choice(["bash", "zsh", "fish"]),
-              help="Shell to install for (auto-detected if not specified)")
+@click.option(
+    "--shell",
+    "-s",
+    type=click.Choice(["bash", "zsh", "fish"]),
+    help="Shell to install for (auto-detected if not specified)",
+)
 @click.option("--force", "-f", is_flag=True, help="Reinstall even if already installed")
 def completion_install(shell: str | None, force: bool):
     """Install shell completion automatically.
@@ -201,8 +223,12 @@ def completion_install(shell: str | None, force: bool):
 
 
 @completion.command("uninstall")
-@click.option("--shell", "-s", type=click.Choice(["bash", "zsh", "fish"]),
-              help="Shell to uninstall from (auto-detected if not specified)")
+@click.option(
+    "--shell",
+    "-s",
+    type=click.Choice(["bash", "zsh", "fish"]),
+    help="Shell to uninstall from (auto-detected if not specified)",
+)
 def completion_uninstall(shell: str | None):
     """Remove shell completion from config file.
 
@@ -274,7 +300,9 @@ def completion_status():
     if installed:
         status_text = f"{format_status_icon('pass')} " + click.style("Installed", fg="green")
     else:
-        status_text = f"{format_status_icon('warning')} " + click.style("Not installed", fg="yellow")
+        status_text = f"{format_status_icon('warning')} " + click.style(
+            "Not installed", fg="yellow"
+        )
 
     data = [
         ["Shell", shell],
@@ -293,7 +321,7 @@ def completion_status():
 
 
 @cli.command()
-@click.option('--install-completion', is_flag=True, help='Automatically install shell completion')
+@click.option("--install-completion", is_flag=True, help="Automatically install shell completion")
 def setup(install_completion: bool):
     """Interactive setup wizard for new users.
 
@@ -314,7 +342,9 @@ def setup(install_completion: bool):
     click.echo()
 
     # === System Info Table ===
-    info_table = Table(["Property", "Value"], title="Inspekt Setup", icon=get_indicator("info_circle"))
+    info_table = Table(
+        ["Property", "Value"], title="Inspekt Setup", icon=get_indicator("info_circle")
+    )
     info_data = [
         ["Version", __version__],
         ["Shell", shell],
@@ -329,12 +359,16 @@ def setup(install_completion: bool):
     click.echo()
 
     # === Shell Completion Table ===
-    completion_table = Table(["Setting", "Status"], title="Shell Completion", icon=get_indicator("terminal"))
+    completion_table = Table(
+        ["Setting", "Status"], title="Shell Completion", icon=get_indicator("terminal")
+    )
 
     if already_installed:
         status_text = f"{format_status_icon('pass')} " + click.style("Installed", fg="green")
     else:
-        status_text = f"{format_status_icon('warning')} " + click.style("Not installed", fg="yellow")
+        status_text = f"{format_status_icon('warning')} " + click.style(
+            "Not installed", fg="yellow"
+        )
 
     completion_data = [
         ["Tab completion", status_text],
@@ -351,11 +385,11 @@ def setup(install_completion: bool):
             # Auto-install completion using shared logic
             script = _get_completion_script(shell)
 
-            if shell == 'fish':
+            if shell == "fish":
                 rc_file.parent.mkdir(parents=True, exist_ok=True)
                 rc_file.write_text(script)
             else:
-                with open(rc_file, 'a') as f:
+                with open(rc_file, "a") as f:
                     f.write(f"\n# inspekt shell completion\n{script}\n")
 
             click.echo()
@@ -385,7 +419,10 @@ def setup(install_completion: bool):
 
     click.echo()
     from inspekt.app.cli.table import print_hint
-    print_hint("Mistype a command? Inspekt suggests corrections! Try `inspekt screenshit` → Did you mean 'screenshot'?")
+
+    print_hint(
+        "Mistype a command? Inspekt suggests corrections! Try `inspekt screenshit` → Did you mean 'screenshot'?"
+    )
 
 
 @cli.command()
@@ -583,17 +620,19 @@ cli.add_lazy_command("suggest", "suggest", "suggest")
 
 import os as _os  # noqa: E402 -- deliberate: keeps the VM-restricted block self-contained at the end of module assembly
 
-if _os.environ.get('INSPEKT_RESTRICTED') == '1':
+if _os.environ.get("INSPEKT_RESTRICTED") == "1":
     _RESTRICTED_COMMANDS = {
-        'eval', 'exec', 'repl',    # Arbitrary JS execution
-        'plugin',                    # Persistent JS plugins
-        'yolo',                      # Bypass all security restrictions
-        'domain',                    # CSP/domain bypass
-        'vm',                        # Docker management (nonsensical inside VM)
-        'do',                        # Natural language browser actions
-        'mcp',                       # MCP server management
-        'autostart',                 # macOS LaunchAgent (nonsensical inside VM)
-        'tunnel',                    # Tunneling from inside VM is nonsensical
+        "eval",
+        "exec",
+        "repl",  # Arbitrary JS execution
+        "plugin",  # Persistent JS plugins
+        "yolo",  # Bypass all security restrictions
+        "domain",  # CSP/domain bypass
+        "vm",  # Docker management (nonsensical inside VM)
+        "do",  # Natural language browser actions
+        "mcp",  # MCP server management
+        "autostart",  # macOS LaunchAgent (nonsensical inside VM)
+        "tunnel",  # Tunneling from inside VM is nonsensical
     }
     for _cmd in _RESTRICTED_COMMANDS:
         cli._lazy_commands.pop(_cmd, None)
@@ -602,6 +641,7 @@ if _os.environ.get('INSPEKT_RESTRICTED') == '1':
 # ============================================================================
 # Export main CLI
 # ============================================================================
+
 
 def main():
     """Entry point for the CLI."""

@@ -30,7 +30,7 @@ def split_sentences(text: str) -> list[str]:
     # The pattern captures the punctuation so we can keep it
     # Handles: "Hello. World" -> ["Hello.", "World"]
     # Also handles: "Hello!  World" and "Hello?\nWorld"
-    pattern = r'(?<=[.!?])\s+'
+    pattern = r"(?<=[.!?])\s+"
 
     sentences = re.split(pattern, text.strip())
 
@@ -68,7 +68,7 @@ def chunk_text_for_tts(
         if sentence_length > max_chars:
             # First, flush the current chunk if any
             if current_chunk:
-                chunks.append(' '.join(current_chunk))
+                chunks.append(" ".join(current_chunk))
                 current_chunk = []
                 current_length = 0
 
@@ -82,7 +82,7 @@ def chunk_text_for_tts(
         if current_length + space_needed + sentence_length > max_chars:
             # Flush current chunk and start a new one
             if current_chunk:
-                chunks.append(' '.join(current_chunk))
+                chunks.append(" ".join(current_chunk))
             current_chunk = [sentence]
             current_length = sentence_length
         else:
@@ -92,7 +92,7 @@ def chunk_text_for_tts(
 
     # Don't forget the last chunk
     if current_chunk:
-        chunks.append(' '.join(current_chunk))
+        chunks.append(" ".join(current_chunk))
 
     return chunks
 
@@ -113,7 +113,7 @@ def _split_long_sentence(sentence: str, max_chars: int) -> list[str]:
     """
     # Try to split at clause boundaries first
     # Pattern matches comma, semicolon, or dash followed by space
-    clause_pattern = r'(?<=[,;—–-])\s+'
+    clause_pattern = r"(?<=[,;—–-])\s+"
     clauses = re.split(clause_pattern, sentence)
 
     chunks: list[str] = []
@@ -124,7 +124,7 @@ def _split_long_sentence(sentence: str, max_chars: int) -> list[str]:
         if len(clause) > max_chars:
             # Even the clause is too long, split by words
             if current_chunk:
-                chunks.append(' '.join(current_chunk))
+                chunks.append(" ".join(current_chunk))
                 current_chunk = []
                 current_length = 0
 
@@ -136,7 +136,7 @@ def _split_long_sentence(sentence: str, max_chars: int) -> list[str]:
                 space = 1 if word_chunk else 0
                 if word_length + space + len(word) > max_chars:
                     if word_chunk:
-                        chunks.append(' '.join(word_chunk))
+                        chunks.append(" ".join(word_chunk))
                     word_chunk = [word]
                     word_length = len(word)
                 else:
@@ -144,12 +144,12 @@ def _split_long_sentence(sentence: str, max_chars: int) -> list[str]:
                     word_length += space + len(word)
 
             if word_chunk:
-                chunks.append(' '.join(word_chunk))
+                chunks.append(" ".join(word_chunk))
         else:
             space = 1 if current_chunk else 0
             if current_length + space + len(clause) > max_chars:
                 if current_chunk:
-                    chunks.append(' '.join(current_chunk))
+                    chunks.append(" ".join(current_chunk))
                 current_chunk = [clause]
                 current_length = len(clause)
             else:
@@ -157,7 +157,7 @@ def _split_long_sentence(sentence: str, max_chars: int) -> list[str]:
                 current_length += space + len(clause)
 
     if current_chunk:
-        chunks.append(' '.join(current_chunk))
+        chunks.append(" ".join(current_chunk))
 
     return chunks
 
@@ -196,12 +196,12 @@ def truncate_at_sentence_boundary(
     if not result and sentences:
         # Find the last word boundary before max_chars
         truncated = text[:max_chars]
-        last_space = truncated.rfind(' ')
+        last_space = truncated.rfind(" ")
         if last_space > max_chars // 2:  # Only use if we keep at least half
-            return truncated[:last_space] + '…'
-        return truncated + '…'
+            return truncated[:last_space] + "…"
+        return truncated + "…"
 
-    return ' '.join(result)
+    return " ".join(result)
 
 
 def estimate_chunk_count(

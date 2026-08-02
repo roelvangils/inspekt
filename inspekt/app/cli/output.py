@@ -25,6 +25,7 @@ if TYPE_CHECKING:
 @dataclass
 class OutputResult:
     """Result from an output operation."""
+
     path: Path | None = None
     content: str = ""
     size: int = 0
@@ -73,6 +74,7 @@ class OutputHandler:
             ANSI escape sequence string with clickable link
         """
         from inspekt.app.cli.util import make_file_link
+
         return make_file_link(path.resolve(), display_text or str(path))
 
     @staticmethod
@@ -111,6 +113,7 @@ class OutputHandler:
             True if successful, False otherwise
         """
         from inspekt.app.cli.util import open_or_download
+
         return open_or_download(path)
 
     @staticmethod
@@ -128,6 +131,7 @@ class OutputHandler:
             True if successful, False otherwise
         """
         from inspekt.app.cli.util import reveal_or_download
+
         return reveal_or_download(path)
 
     @staticmethod
@@ -162,6 +166,7 @@ class OutputHandler:
             True if successful, False otherwise
         """
         from inspekt.app.cli.util import copy_image_to_clipboard
+
         return copy_image_to_clipboard(image_data, format=format)
 
     @staticmethod
@@ -354,6 +359,7 @@ class JsonOutput:
         """
         if indent == 2:
             from inspekt.app.cli.table import print_json
+
             print_json(self._data, summary=summary)
         else:
             click.echo(json.dumps(self._data, indent=indent))
@@ -439,7 +445,7 @@ def _strip_background_colors(content: str) -> str:
         if not codes_str:
             return match.group(0)
 
-        codes = codes_str.split(';')
+        codes = codes_str.split(";")
         filtered_codes = []
         i = 0
 
@@ -447,19 +453,19 @@ def _strip_background_colors(content: str) -> str:
             code = codes[i]
 
             # Skip background color codes
-            if code == '48':
+            if code == "48":
                 # 48;5;N (256-color) or 48;2;R;G;B (24-bit)
-                if i + 1 < len(codes) and codes[i + 1] == '5':
+                if i + 1 < len(codes) and codes[i + 1] == "5":
                     i += 3  # Skip 48;5;N
                     continue
-                elif i + 1 < len(codes) and codes[i + 1] == '2':
+                elif i + 1 < len(codes) and codes[i + 1] == "2":
                     i += 5  # Skip 48;2;R;G;B
                     continue
-            elif code in ('40', '41', '42', '43', '44', '45', '46', '47', '49'):
+            elif code in ("40", "41", "42", "43", "44", "45", "46", "47", "49"):
                 # Standard background colors 40-47, default 49
                 i += 1
                 continue
-            elif code in ('100', '101', '102', '103', '104', '105', '106', '107'):
+            elif code in ("100", "101", "102", "103", "104", "105", "106", "107"):
                 # Bright background colors 100-107
                 i += 1
                 continue
@@ -468,12 +474,12 @@ def _strip_background_colors(content: str) -> str:
             i += 1
 
         if not filtered_codes:
-            return ''  # All codes were background-related
+            return ""  # All codes were background-related
 
-        return f'\033[{";".join(filtered_codes)}m'
+        return f"\033[{';'.join(filtered_codes)}m"
 
     # Match ANSI escape sequences: \033[ followed by codes, ending with m
-    ansi_pattern = re.compile(r'\x1b\[([0-9;]*)m')
+    ansi_pattern = re.compile(r"\x1b\[([0-9;]*)m")
     return ansi_pattern.sub(process_escape_sequence, content)
 
 
@@ -513,16 +519,16 @@ def _wrap_ansi_line_fast(line: str, max_width: int, ansi_pattern: re.Pattern) ->
 
     while i < len(line):
         # Check for ANSI escape sequence
-        if line[i] == '\x1b' and i + 1 < len(line) and line[i + 1] == '[':
+        if line[i] == "\x1b" and i + 1 < len(line) and line[i + 1] == "[":
             # Find end of ANSI sequence
             j = i + 2
-            while j < len(line) and line[j] != 'm':
+            while j < len(line) and line[j] != "m":
                 j += 1
             if j < len(line):
                 code = line[i : j + 1]
                 current_segment.append(code)
                 # Track active codes for continuation
-                if code == '\033[0m' or code == '\033[m':
+                if code == "\033[0m" or code == "\033[m":
                     active_codes = []
                 else:
                     active_codes.append(code)
@@ -535,7 +541,7 @@ def _wrap_ansi_line_fast(line: str, max_width: int, ansi_pattern: re.Pattern) ->
 
         # Check if we need to wrap
         if visible_count >= max_width:
-            wrapped_lines.append(''.join(current_segment))
+            wrapped_lines.append("".join(current_segment))
             # Start new segment with active codes
             current_segment = list(active_codes)
             visible_count = 0
@@ -544,7 +550,7 @@ def _wrap_ansi_line_fast(line: str, max_width: int, ansi_pattern: re.Pattern) ->
 
     # Add remaining content
     if current_segment:
-        wrapped_lines.append(''.join(current_segment))
+        wrapped_lines.append("".join(current_segment))
 
     return wrapped_lines if wrapped_lines else [line]
 
@@ -582,7 +588,7 @@ def _wrap_ansi_line(
 
     # Use pre-computed plain text if provided, otherwise compute it
     if plain_text is None:
-        plain_text = ansi_pattern.sub('', line)
+        plain_text = ansi_pattern.sub("", line)
 
     # If it fits, no wrapping needed
     if len(plain_text) <= max_width:
@@ -613,12 +619,12 @@ def _wrap_ansi_line(
         """Find best break point, preferring spaces outside quotes."""
         # First try: find space outside quotes
         for i in range(end - 1, start, -1):
-            if plain_text[i] == ' ' and not quote_state[i]:
+            if plain_text[i] == " " and not quote_state[i]:
                 return i + 1
 
         # Second try: any space (even inside quotes)
         for i in range(end - 1, start, -1):
-            if plain_text[i] == ' ':
+            if plain_text[i] == " ":
                 return i + 1
 
         # No space found - hard break
@@ -652,12 +658,12 @@ def _wrap_ansi_line(
 
         # Prepend active ANSI codes for continuation lines
         if wrapped_lines:
-            segment = ''.join(active_codes) + segment
+            segment = "".join(active_codes) + segment
 
         # Track ANSI codes for next line
         for match in ansi_pattern.finditer(segment):
             code = match.group()
-            if code == '\033[0m' or code == '\033[m':
+            if code == "\033[0m" or code == "\033[m":
                 active_codes = []
             else:
                 active_codes.append(code)
@@ -668,7 +674,9 @@ def _wrap_ansi_line(
     return wrapped_lines if wrapped_lines else [line]
 
 
-def print_code_block(content: str, syntax_highlighted: bool = False, raw_content: str | None = None) -> None:
+def print_code_block(
+    content: str, syntax_highlighted: bool = False, raw_content: str | None = None
+) -> None:
     """
     Print content in a styled code block with dark background.
 
@@ -699,7 +707,7 @@ def print_code_block(content: str, syntax_highlighted: bool = False, raw_content
     reset = "\033[0m"
 
     # Regex pattern for ALL ANSI escape sequences (for length calculation)
-    ansi_pattern = re.compile(r'\x1b\[[0-9;]*m')
+    ansi_pattern = re.compile(r"\x1b\[[0-9;]*m")
 
     # Strip background colors from content (preserves foreground colors)
     content = _strip_background_colors(content)
@@ -711,9 +719,9 @@ def print_code_block(content: str, syntax_highlighted: bool = False, raw_content
     click.echo(f"{bg_dark}{' ' * term_width}{reset}")
 
     # Process each line of content
-    for line in content.split('\n'):
+    for line in content.split("\n"):
         # Calculate visible length (strip ANSI codes for length calculation)
-        visible_text = ansi_pattern.sub('', line)
+        visible_text = ansi_pattern.sub("", line)
         visible_len = len(visible_text)
 
         # Check if line needs wrapping
@@ -722,7 +730,7 @@ def print_code_block(content: str, syntax_highlighted: bool = False, raw_content
             wrapped = _wrap_ansi_line(line, content_width, ansi_pattern, visible_text)
             for wrapped_line in wrapped:
                 # Calculate visible length of wrapped segment
-                wrapped_visible = ansi_pattern.sub('', wrapped_line)
+                wrapped_visible = ansi_pattern.sub("", wrapped_line)
                 wrapped_len = len(wrapped_visible)
                 right_padding = max(0, term_width - 2 - wrapped_len - 2)
                 styled_line = f"{bg_dark}  {wrapped_line}{' ' * (right_padding + 2)}{reset}"
@@ -738,8 +746,10 @@ def print_code_block(content: str, syntax_highlighted: bool = False, raw_content
 
     # In VM mode, signal the control panel to show a copy button
     import os
+
     if os.environ.get("INSPEKT_ISOLATED") == "1":
         from inspekt.app.cli.util import _vm_copyable_signal
+
         # Use provided raw content, or strip ANSI codes from displayed content
-        copyable_text = raw_content if raw_content is not None else ansi_pattern.sub('', content)
+        copyable_text = raw_content if raw_content is not None else ansi_pattern.sub("", content)
         _vm_copyable_signal(copyable_text)

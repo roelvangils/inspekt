@@ -183,17 +183,19 @@ def _generate_score_data(result: PDFFullResult) -> AccessibilityScoreData:
 
     category_scores = []
     for cat, cs in score.category_scores.items():
-        category_scores.append(CategoryScoreData(
-            category=cat.value,
-            score=cs.score,
-            weight=cs.weight,
-            weighted_score=cs.weighted_score,
-            issues_count=cs.issues_count,
-            critical_count=cs.critical_count,
-            serious_count=cs.serious_count,
-            moderate_count=cs.moderate_count,
-            minor_count=cs.minor_count,
-        ))
+        category_scores.append(
+            CategoryScoreData(
+                category=cat.value,
+                score=cs.score,
+                weight=cs.weight,
+                weighted_score=cs.weighted_score,
+                issues_count=cs.issues_count,
+                critical_count=cs.critical_count,
+                serious_count=cs.serious_count,
+                moderate_count=cs.moderate_count,
+                minor_count=cs.minor_count,
+            )
+        )
 
     return AccessibilityScoreData(
         score=score.score,
@@ -237,17 +239,19 @@ def _generate_basic_checks(result: PDFFullResult) -> BasicChecksData:
         if check.wcag_sc:
             wcag_criteria.append(check.wcag_sc)
 
-        checks.append(CheckResultData(
-            check_id=check.check_id,
-            name=check.name,
-            description=check.message,  # PDFCheckResult uses 'message' not 'description'
-            status=check.status,
-            severity=check.severity,
-            category=getattr(check, "category", None),
-            message=check.message,
-            wcag_criteria=wcag_criteria,
-            remediation=None,  # Not available in PDFCheckResult
-        ))
+        checks.append(
+            CheckResultData(
+                check_id=check.check_id,
+                name=check.name,
+                description=check.message,  # PDFCheckResult uses 'message' not 'description'
+                status=check.status,
+                severity=check.severity,
+                category=getattr(check, "category", None),
+                message=check.message,
+                wcag_criteria=wcag_criteria,
+                remediation=None,  # Not available in PDFCheckResult
+            )
+        )
 
     return BasicChecksData(
         is_tagged=is_tagged,
@@ -484,24 +488,26 @@ def _generate_text_layer_analysis(pdf_path: Path, config: dict) -> TextLayerAnal
         else:
             missing_excerpts = []
 
-        page_comparisons.append(PageTextComparisonData(
-            page=pc.page_num + 1,  # 1-indexed for display
-            pdf_text=pc.pdf_text,
-            ocr_text=pc.ocr_text,
-            similarity=pc.similarity,
-            pdf_char_count=pc.pdf_char_count,
-            ocr_char_count=pc.ocr_char_count,
-            has_significant_discrepancy=pc.has_significant_discrepancy,
-            is_image_only=pc.is_image_only,
-            thumbnail_base64=pc.thumbnail_base64,
-            lightbox_base64=pc.lightbox_base64,
-            pdf_page_url=f"{pdf_file_url_base}#page={pc.page_num + 1}",
-            status=status,
-            accessible_percentage=accessible_percentage,
-            missing_char_count=missing_char_count,
-            missing_excerpts=missing_excerpts,
-            recommendation=recommendation,
-        ))
+        page_comparisons.append(
+            PageTextComparisonData(
+                page=pc.page_num + 1,  # 1-indexed for display
+                pdf_text=pc.pdf_text,
+                ocr_text=pc.ocr_text,
+                similarity=pc.similarity,
+                pdf_char_count=pc.pdf_char_count,
+                ocr_char_count=pc.ocr_char_count,
+                has_significant_discrepancy=pc.has_significant_discrepancy,
+                is_image_only=pc.is_image_only,
+                thumbnail_base64=pc.thumbnail_base64,
+                lightbox_base64=pc.lightbox_base64,
+                pdf_page_url=f"{pdf_file_url_base}#page={pc.page_num + 1}",
+                status=status,
+                accessible_percentage=accessible_percentage,
+                missing_char_count=missing_char_count,
+                missing_excerpts=missing_excerpts,
+                recommendation=recommendation,
+            )
+        )
 
     return TextLayerAnalysisData(
         ocr_available=True,
@@ -544,7 +550,9 @@ def _generate_structure_tree(pdf_path: Path) -> StructureTreeData:
             list_count=stats.list_count,
             form_count=stats.form_count,
             root=root_node,
-            validation_errors=result.validation_errors if hasattr(result, 'validation_errors') else [],
+            validation_errors=result.validation_errors
+            if hasattr(result, "validation_errors")
+            else [],
         )
 
     except Exception as e:
@@ -595,9 +603,13 @@ def _generate_remediation_roadmap(
                 title=task.title,
                 description=task.description,
                 # Convert enums to string values for JSON serialization
-                priority=task.priority.value if hasattr(task.priority, 'value') else str(task.priority),
+                priority=task.priority.value
+                if hasattr(task.priority, "value")
+                else str(task.priority),
                 category=task.category,
-                estimated_effort=task.effort.value if hasattr(task.effort, 'value') else str(task.effort),
+                estimated_effort=task.effort.value
+                if hasattr(task.effort, "value")
+                else str(task.effort),
                 affected_pages=task.affected_pages,
                 pages_summary=task.pages_summary,
                 wcag_criteria=task.wcag_criteria,
@@ -785,17 +797,19 @@ def _generate_contrast_analysis(pdf_path: Path, config: dict) -> ContrastAnalysi
         issues = []
         for page_result in result.pages:
             for issue in page_result.issues:
-                issues.append(ContrastIssueData(
-                    page=issue.display_page,
-                    foreground_color=issue.fg_hex,
-                    background_color=issue.bg_hex,
-                    contrast_ratio=round(issue.contrast_ratio, 2),
-                    required_ratio=issue.required_ratio,
-                    level=issue.wcag_level,
-                    text_sample=issue.text_sample[:50] if issue.text_sample else None,
-                    bbox=issue.bbox,
-                    screenshot_base64=issue.screenshot_b64,
-                ))
+                issues.append(
+                    ContrastIssueData(
+                        page=issue.display_page,
+                        foreground_color=issue.fg_hex,
+                        background_color=issue.bg_hex,
+                        contrast_ratio=round(issue.contrast_ratio, 2),
+                        required_ratio=issue.required_ratio,
+                        level=issue.wcag_level,
+                        text_sample=issue.text_sample[:50] if issue.text_sample else None,
+                        bbox=issue.bbox,
+                        screenshot_base64=issue.screenshot_b64,
+                    )
+                )
 
         return ContrastAnalysisData(
             ran_analysis=True,
@@ -896,13 +910,15 @@ def _generate_issue_screenshots(
                 img.save(buffer, format="PNG", optimize=True)
                 image_b64 = base64.b64encode(buffer.getvalue()).decode("ascii")
 
-                screenshots.append(IssueScreenshotData(
-                    violation_index=idx,
-                    rule_id=violation.rule_id,
-                    page=page_num,
-                    screenshot_base64=image_b64,
-                    bbox=tuple(bbox) if bbox else None,
-                ))
+                screenshots.append(
+                    IssueScreenshotData(
+                        violation_index=idx,
+                        rule_id=violation.rule_id,
+                        page=page_num,
+                        screenshot_base64=image_b64,
+                        bbox=tuple(bbox) if bbox else None,
+                    )
+                )
 
             except Exception as e:
                 logger.debug(f"Failed to capture screenshot for violation {idx}: {e}")

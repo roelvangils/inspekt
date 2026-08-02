@@ -238,11 +238,14 @@ def probe_video(video_path: Path | str) -> dict | None:
         result = subprocess.run(
             [
                 str(ffprobe_path),
-                "-v", "quiet",
-                "-print_format", "json",
+                "-v",
+                "quiet",
+                "-print_format",
+                "json",
                 "-show_format",
                 "-show_streams",
-                "-select_streams", "v:0",  # First video stream only
+                "-select_streams",
+                "v:0",  # First video stream only
                 str(video_path),
             ],
             capture_output=True,
@@ -254,6 +257,7 @@ def probe_video(video_path: Path | str) -> dict | None:
             return None
 
         import json
+
         data = json.loads(result.stdout)
 
         # Extract video stream info
@@ -280,15 +284,18 @@ def probe_video(video_path: Path | str) -> dict | None:
             "fps": round(fps, 2),
         }
 
-    except (subprocess.TimeoutExpired, subprocess.SubprocessError, OSError, ValueError, json.JSONDecodeError):
+    except (
+        subprocess.TimeoutExpired,
+        subprocess.SubprocessError,
+        OSError,
+        ValueError,
+        json.JSONDecodeError,
+    ):
         return None
 
 
 def merge_audio_video(
-    video_path: Path | str,
-    audio_path: Path | str,
-    output_path: Path | str,
-    timeout: int = 300
+    video_path: Path | str, audio_path: Path | str, output_path: Path | str, timeout: int = 300
 ) -> dict:
     """
     Merge an audio track with a video file using FFmpeg.
@@ -334,39 +341,35 @@ def merge_audio_video(
     cmd = [
         str(ffmpeg_path),
         "-y",
-        "-i", str(video_path),
-        "-i", str(audio_path),
-        "-c:v", "copy",
-        "-c:a", "aac",
-        "-b:a", "128k",
+        "-i",
+        str(video_path),
+        "-i",
+        str(audio_path),
+        "-c:v",
+        "copy",
+        "-c:a",
+        "aac",
+        "-b:a",
+        "128k",
         "-shortest",
-        "-map", "0:v:0",
-        "-map", "1:a:0",
-        str(output_path)
+        "-map",
+        "0:v:0",
+        "-map",
+        "1:a:0",
+        str(output_path),
     ]
 
     try:
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            timeout=timeout
-        )
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
 
         if result.returncode == 0 and output_path.exists():
-            return {
-                "ok": True,
-                "output_path": str(output_path)
-            }
+            return {"ok": True, "output_path": str(output_path)}
         else:
             error_msg = result.stderr.strip() if result.stderr else "Unknown error"
             # Truncate long error messages
             if len(error_msg) > 500:
                 error_msg = error_msg[:500] + "…"
-            return {
-                "ok": False,
-                "error": f"FFmpeg failed: {error_msg}"
-            }
+            return {"ok": False, "error": f"FFmpeg failed: {error_msg}"}
 
     except subprocess.TimeoutExpired:
         return {"ok": False, "error": f"FFmpeg timed out after {timeout}s"}

@@ -30,36 +30,41 @@ def accessible_pdf(pdf_fixtures_dir) -> Path:
 
     with pikepdf.new() as pdf:
         # Add a page with text content
-        page = pikepdf.Page(pikepdf.Dictionary({
-            "/Type": pikepdf.Name("/Page"),
-            "/MediaBox": [0, 0, 612, 792],
-            "/Contents": pdf.make_stream(b"BT /F1 12 Tf 100 700 Td (Hello World) Tj ET"),
-            "/Resources": pikepdf.Dictionary({
-                "/Font": pikepdf.Dictionary({
-                    "/F1": pikepdf.Dictionary({
-                        "/Type": pikepdf.Name("/Font"),
-                        "/Subtype": pikepdf.Name("/Type1"),
-                        "/BaseFont": pikepdf.Name("/Helvetica"),
-                    })
-                })
-            })
-        }))
+        page = pikepdf.Page(
+            pikepdf.Dictionary(
+                {
+                    "/Type": pikepdf.Name("/Page"),
+                    "/MediaBox": [0, 0, 612, 792],
+                    "/Contents": pdf.make_stream(b"BT /F1 12 Tf 100 700 Td (Hello World) Tj ET"),
+                    "/Resources": pikepdf.Dictionary(
+                        {
+                            "/Font": pikepdf.Dictionary(
+                                {
+                                    "/F1": pikepdf.Dictionary(
+                                        {
+                                            "/Type": pikepdf.Name("/Font"),
+                                            "/Subtype": pikepdf.Name("/Type1"),
+                                            "/BaseFont": pikepdf.Name("/Helvetica"),
+                                        }
+                                    )
+                                }
+                            )
+                        }
+                    ),
+                }
+            )
+        )
         pdf.pages.append(page)
 
         # Make it tagged
-        pdf.Root["/MarkInfo"] = pikepdf.Dictionary({
-            "/Marked": True
-        })
-        pdf.Root["/StructTreeRoot"] = pikepdf.Dictionary({
-            "/Type": pikepdf.Name("/StructTreeRoot"),
-            "/K": pikepdf.Array([])
-        })
+        pdf.Root["/MarkInfo"] = pikepdf.Dictionary({"/Marked": True})
+        pdf.Root["/StructTreeRoot"] = pikepdf.Dictionary(
+            {"/Type": pikepdf.Name("/StructTreeRoot"), "/K": pikepdf.Array([])}
+        )
 
         # Set title with DisplayDocTitle
         pdf.docinfo["/Title"] = "Accessible Test Document"
-        pdf.Root["/ViewerPreferences"] = pikepdf.Dictionary({
-            "/DisplayDocTitle": True
-        })
+        pdf.Root["/ViewerPreferences"] = pikepdf.Dictionary({"/DisplayDocTitle": True})
 
         # Set language
         pdf.Root["/Lang"] = "en-US"
@@ -78,29 +83,37 @@ def untagged_pdf(pdf_fixtures_dir) -> Path:
 
     with pikepdf.new() as pdf:
         # Add a page with text content
-        page = pikepdf.Page(pikepdf.Dictionary({
-            "/Type": pikepdf.Name("/Page"),
-            "/MediaBox": [0, 0, 612, 792],
-            "/Contents": pdf.make_stream(b"BT /F1 12 Tf 100 700 Td (Hello World) Tj ET"),
-            "/Resources": pikepdf.Dictionary({
-                "/Font": pikepdf.Dictionary({
-                    "/F1": pikepdf.Dictionary({
-                        "/Type": pikepdf.Name("/Font"),
-                        "/Subtype": pikepdf.Name("/Type1"),
-                        "/BaseFont": pikepdf.Name("/Helvetica"),
-                    })
-                })
-            })
-        }))
+        page = pikepdf.Page(
+            pikepdf.Dictionary(
+                {
+                    "/Type": pikepdf.Name("/Page"),
+                    "/MediaBox": [0, 0, 612, 792],
+                    "/Contents": pdf.make_stream(b"BT /F1 12 Tf 100 700 Td (Hello World) Tj ET"),
+                    "/Resources": pikepdf.Dictionary(
+                        {
+                            "/Font": pikepdf.Dictionary(
+                                {
+                                    "/F1": pikepdf.Dictionary(
+                                        {
+                                            "/Type": pikepdf.Name("/Font"),
+                                            "/Subtype": pikepdf.Name("/Type1"),
+                                            "/BaseFont": pikepdf.Name("/Helvetica"),
+                                        }
+                                    )
+                                }
+                            )
+                        }
+                    ),
+                }
+            )
+        )
         pdf.pages.append(page)
 
         # No MarkInfo or StructTreeRoot - untagged
 
         # Set other properties
         pdf.docinfo["/Title"] = "Untagged Test Document"
-        pdf.Root["/ViewerPreferences"] = pikepdf.Dictionary({
-            "/DisplayDocTitle": True
-        })
+        pdf.Root["/ViewerPreferences"] = pikepdf.Dictionary({"/DisplayDocTitle": True})
         pdf.Root["/Lang"] = "en-US"
 
         pdf.save(pdf_path)
@@ -117,28 +130,39 @@ def no_title_pdf(pdf_fixtures_dir) -> Path:
 
     with pikepdf.new() as pdf:
         # Add a page
-        page = pikepdf.Page(pikepdf.Dictionary({
-            "/Type": pikepdf.Name("/Page"),
-            "/MediaBox": [0, 0, 612, 792],
-            "/Contents": pdf.make_stream(b"BT /F1 12 Tf 100 700 Td (No Title Document) Tj ET"),
-            "/Resources": pikepdf.Dictionary({
-                "/Font": pikepdf.Dictionary({
-                    "/F1": pikepdf.Dictionary({
-                        "/Type": pikepdf.Name("/Font"),
-                        "/Subtype": pikepdf.Name("/Type1"),
-                        "/BaseFont": pikepdf.Name("/Helvetica"),
-                    })
-                })
-            })
-        }))
+        page = pikepdf.Page(
+            pikepdf.Dictionary(
+                {
+                    "/Type": pikepdf.Name("/Page"),
+                    "/MediaBox": [0, 0, 612, 792],
+                    "/Contents": pdf.make_stream(
+                        b"BT /F1 12 Tf 100 700 Td (No Title Document) Tj ET"
+                    ),
+                    "/Resources": pikepdf.Dictionary(
+                        {
+                            "/Font": pikepdf.Dictionary(
+                                {
+                                    "/F1": pikepdf.Dictionary(
+                                        {
+                                            "/Type": pikepdf.Name("/Font"),
+                                            "/Subtype": pikepdf.Name("/Type1"),
+                                            "/BaseFont": pikepdf.Name("/Helvetica"),
+                                        }
+                                    )
+                                }
+                            )
+                        }
+                    ),
+                }
+            )
+        )
         pdf.pages.append(page)
 
         # Make it tagged
         pdf.Root["/MarkInfo"] = pikepdf.Dictionary({"/Marked": True})
-        pdf.Root["/StructTreeRoot"] = pikepdf.Dictionary({
-            "/Type": pikepdf.Name("/StructTreeRoot"),
-            "/K": pikepdf.Array([])
-        })
+        pdf.Root["/StructTreeRoot"] = pikepdf.Dictionary(
+            {"/Type": pikepdf.Name("/StructTreeRoot"), "/K": pikepdf.Array([])}
+        )
 
         # No title - docinfo is empty
         pdf.Root["/Lang"] = "en-US"
@@ -157,28 +181,39 @@ def no_language_pdf(pdf_fixtures_dir) -> Path:
 
     with pikepdf.new() as pdf:
         # Add a page
-        page = pikepdf.Page(pikepdf.Dictionary({
-            "/Type": pikepdf.Name("/Page"),
-            "/MediaBox": [0, 0, 612, 792],
-            "/Contents": pdf.make_stream(b"BT /F1 12 Tf 100 700 Td (No Language Document) Tj ET"),
-            "/Resources": pikepdf.Dictionary({
-                "/Font": pikepdf.Dictionary({
-                    "/F1": pikepdf.Dictionary({
-                        "/Type": pikepdf.Name("/Font"),
-                        "/Subtype": pikepdf.Name("/Type1"),
-                        "/BaseFont": pikepdf.Name("/Helvetica"),
-                    })
-                })
-            })
-        }))
+        page = pikepdf.Page(
+            pikepdf.Dictionary(
+                {
+                    "/Type": pikepdf.Name("/Page"),
+                    "/MediaBox": [0, 0, 612, 792],
+                    "/Contents": pdf.make_stream(
+                        b"BT /F1 12 Tf 100 700 Td (No Language Document) Tj ET"
+                    ),
+                    "/Resources": pikepdf.Dictionary(
+                        {
+                            "/Font": pikepdf.Dictionary(
+                                {
+                                    "/F1": pikepdf.Dictionary(
+                                        {
+                                            "/Type": pikepdf.Name("/Font"),
+                                            "/Subtype": pikepdf.Name("/Type1"),
+                                            "/BaseFont": pikepdf.Name("/Helvetica"),
+                                        }
+                                    )
+                                }
+                            )
+                        }
+                    ),
+                }
+            )
+        )
         pdf.pages.append(page)
 
         # Make it tagged
         pdf.Root["/MarkInfo"] = pikepdf.Dictionary({"/Marked": True})
-        pdf.Root["/StructTreeRoot"] = pikepdf.Dictionary({
-            "/Type": pikepdf.Name("/StructTreeRoot"),
-            "/K": pikepdf.Array([])
-        })
+        pdf.Root["/StructTreeRoot"] = pikepdf.Dictionary(
+            {"/Type": pikepdf.Name("/StructTreeRoot"), "/K": pikepdf.Array([])}
+        )
 
         # Set title
         pdf.docinfo["/Title"] = "No Language Test"
@@ -200,28 +235,39 @@ def invalid_language_pdf(pdf_fixtures_dir) -> Path:
 
     with pikepdf.new() as pdf:
         # Add a page
-        page = pikepdf.Page(pikepdf.Dictionary({
-            "/Type": pikepdf.Name("/Page"),
-            "/MediaBox": [0, 0, 612, 792],
-            "/Contents": pdf.make_stream(b"BT /F1 12 Tf 100 700 Td (Invalid Language) Tj ET"),
-            "/Resources": pikepdf.Dictionary({
-                "/Font": pikepdf.Dictionary({
-                    "/F1": pikepdf.Dictionary({
-                        "/Type": pikepdf.Name("/Font"),
-                        "/Subtype": pikepdf.Name("/Type1"),
-                        "/BaseFont": pikepdf.Name("/Helvetica"),
-                    })
-                })
-            })
-        }))
+        page = pikepdf.Page(
+            pikepdf.Dictionary(
+                {
+                    "/Type": pikepdf.Name("/Page"),
+                    "/MediaBox": [0, 0, 612, 792],
+                    "/Contents": pdf.make_stream(
+                        b"BT /F1 12 Tf 100 700 Td (Invalid Language) Tj ET"
+                    ),
+                    "/Resources": pikepdf.Dictionary(
+                        {
+                            "/Font": pikepdf.Dictionary(
+                                {
+                                    "/F1": pikepdf.Dictionary(
+                                        {
+                                            "/Type": pikepdf.Name("/Font"),
+                                            "/Subtype": pikepdf.Name("/Type1"),
+                                            "/BaseFont": pikepdf.Name("/Helvetica"),
+                                        }
+                                    )
+                                }
+                            )
+                        }
+                    ),
+                }
+            )
+        )
         pdf.pages.append(page)
 
         # Make it tagged
         pdf.Root["/MarkInfo"] = pikepdf.Dictionary({"/Marked": True})
-        pdf.Root["/StructTreeRoot"] = pikepdf.Dictionary({
-            "/Type": pikepdf.Name("/StructTreeRoot"),
-            "/K": pikepdf.Array([])
-        })
+        pdf.Root["/StructTreeRoot"] = pikepdf.Dictionary(
+            {"/Type": pikepdf.Name("/StructTreeRoot"), "/K": pikepdf.Array([])}
+        )
 
         # Set title
         pdf.docinfo["/Title"] = "Invalid Language Test"
@@ -244,28 +290,37 @@ def with_forms_pdf(pdf_fixtures_dir) -> Path:
 
     with pikepdf.new() as pdf:
         # Add a page
-        page = pikepdf.Page(pikepdf.Dictionary({
-            "/Type": pikepdf.Name("/Page"),
-            "/MediaBox": [0, 0, 612, 792],
-            "/Contents": pdf.make_stream(b"BT /F1 12 Tf 100 700 Td (Form Document) Tj ET"),
-            "/Resources": pikepdf.Dictionary({
-                "/Font": pikepdf.Dictionary({
-                    "/F1": pikepdf.Dictionary({
-                        "/Type": pikepdf.Name("/Font"),
-                        "/Subtype": pikepdf.Name("/Type1"),
-                        "/BaseFont": pikepdf.Name("/Helvetica"),
-                    })
-                })
-            })
-        }))
+        page = pikepdf.Page(
+            pikepdf.Dictionary(
+                {
+                    "/Type": pikepdf.Name("/Page"),
+                    "/MediaBox": [0, 0, 612, 792],
+                    "/Contents": pdf.make_stream(b"BT /F1 12 Tf 100 700 Td (Form Document) Tj ET"),
+                    "/Resources": pikepdf.Dictionary(
+                        {
+                            "/Font": pikepdf.Dictionary(
+                                {
+                                    "/F1": pikepdf.Dictionary(
+                                        {
+                                            "/Type": pikepdf.Name("/Font"),
+                                            "/Subtype": pikepdf.Name("/Type1"),
+                                            "/BaseFont": pikepdf.Name("/Helvetica"),
+                                        }
+                                    )
+                                }
+                            )
+                        }
+                    ),
+                }
+            )
+        )
         pdf.pages.append(page)
 
         # Make it tagged
         pdf.Root["/MarkInfo"] = pikepdf.Dictionary({"/Marked": True})
-        pdf.Root["/StructTreeRoot"] = pikepdf.Dictionary({
-            "/Type": pikepdf.Name("/StructTreeRoot"),
-            "/K": pikepdf.Array([])
-        })
+        pdf.Root["/StructTreeRoot"] = pikepdf.Dictionary(
+            {"/Type": pikepdf.Name("/StructTreeRoot"), "/K": pikepdf.Array([])}
+        )
 
         # Set title and language
         pdf.docinfo["/Title"] = "Form Test Document"
@@ -273,17 +328,21 @@ def with_forms_pdf(pdf_fixtures_dir) -> Path:
         pdf.Root["/Lang"] = "en-US"
 
         # Add AcroForm with fields
-        text_field = pikepdf.Dictionary({
-            "/Type": pikepdf.Name("/Annot"),
-            "/Subtype": pikepdf.Name("/Widget"),
-            "/FT": pikepdf.Name("/Tx"),
-            "/T": "name_field",
-            "/Rect": [100, 600, 300, 620],
-        })
+        text_field = pikepdf.Dictionary(
+            {
+                "/Type": pikepdf.Name("/Annot"),
+                "/Subtype": pikepdf.Name("/Widget"),
+                "/FT": pikepdf.Name("/Tx"),
+                "/T": "name_field",
+                "/Rect": [100, 600, 300, 620],
+            }
+        )
 
-        pdf.Root["/AcroForm"] = pikepdf.Dictionary({
-            "/Fields": pikepdf.Array([text_field]),
-        })
+        pdf.Root["/AcroForm"] = pikepdf.Dictionary(
+            {
+                "/Fields": pikepdf.Array([text_field]),
+            }
+        )
 
         pdf.save(pdf_path)
 
@@ -299,28 +358,39 @@ def with_xmp_pdf(pdf_fixtures_dir) -> Path:
 
     with pikepdf.new() as pdf:
         # Add a page
-        page = pikepdf.Page(pikepdf.Dictionary({
-            "/Type": pikepdf.Name("/Page"),
-            "/MediaBox": [0, 0, 612, 792],
-            "/Contents": pdf.make_stream(b"BT /F1 12 Tf 100 700 Td (XMP Metadata Document) Tj ET"),
-            "/Resources": pikepdf.Dictionary({
-                "/Font": pikepdf.Dictionary({
-                    "/F1": pikepdf.Dictionary({
-                        "/Type": pikepdf.Name("/Font"),
-                        "/Subtype": pikepdf.Name("/Type1"),
-                        "/BaseFont": pikepdf.Name("/Helvetica"),
-                    })
-                })
-            })
-        }))
+        page = pikepdf.Page(
+            pikepdf.Dictionary(
+                {
+                    "/Type": pikepdf.Name("/Page"),
+                    "/MediaBox": [0, 0, 612, 792],
+                    "/Contents": pdf.make_stream(
+                        b"BT /F1 12 Tf 100 700 Td (XMP Metadata Document) Tj ET"
+                    ),
+                    "/Resources": pikepdf.Dictionary(
+                        {
+                            "/Font": pikepdf.Dictionary(
+                                {
+                                    "/F1": pikepdf.Dictionary(
+                                        {
+                                            "/Type": pikepdf.Name("/Font"),
+                                            "/Subtype": pikepdf.Name("/Type1"),
+                                            "/BaseFont": pikepdf.Name("/Helvetica"),
+                                        }
+                                    )
+                                }
+                            )
+                        }
+                    ),
+                }
+            )
+        )
         pdf.pages.append(page)
 
         # Make it tagged
         pdf.Root["/MarkInfo"] = pikepdf.Dictionary({"/Marked": True})
-        pdf.Root["/StructTreeRoot"] = pikepdf.Dictionary({
-            "/Type": pikepdf.Name("/StructTreeRoot"),
-            "/K": pikepdf.Array([])
-        })
+        pdf.Root["/StructTreeRoot"] = pikepdf.Dictionary(
+            {"/Type": pikepdf.Name("/StructTreeRoot"), "/K": pikepdf.Array([])}
+        )
 
         # Set title and language
         pdf.docinfo["/Title"] = "XMP Test Document"
@@ -328,7 +398,7 @@ def with_xmp_pdf(pdf_fixtures_dir) -> Path:
         pdf.Root["/Lang"] = "en-US"
 
         # Add XMP metadata
-        xmp_content = b'''<?xpacket begin="" id="W5M0MpCehiHzreSzNTczkc9d"?>
+        xmp_content = b"""<?xpacket begin="" id="W5M0MpCehiHzreSzNTczkc9d"?>
 <x:xmpmeta xmlns:x="adobe:ns:meta/">
   <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
     <rdf:Description rdf:about=""
@@ -340,7 +410,7 @@ def with_xmp_pdf(pdf_fixtures_dir) -> Path:
     </rdf:Description>
   </rdf:RDF>
 </x:xmpmeta>
-<?xpacket end="w"?>'''
+<?xpacket end="w"?>"""
 
         xmp_stream = pdf.make_stream(xmp_content)
         xmp_stream["/Type"] = pikepdf.Name("/Metadata")
@@ -362,28 +432,39 @@ def long_no_bookmarks_pdf(pdf_fixtures_dir) -> Path:
     with pikepdf.new() as pdf:
         # Add 25 pages
         for i in range(25):
-            page = pikepdf.Page(pikepdf.Dictionary({
-                "/Type": pikepdf.Name("/Page"),
-                "/MediaBox": [0, 0, 612, 792],
-                "/Contents": pdf.make_stream(f"BT /F1 12 Tf 100 700 Td (Page {i + 1}) Tj ET".encode()),
-                "/Resources": pikepdf.Dictionary({
-                    "/Font": pikepdf.Dictionary({
-                        "/F1": pikepdf.Dictionary({
-                            "/Type": pikepdf.Name("/Font"),
-                            "/Subtype": pikepdf.Name("/Type1"),
-                            "/BaseFont": pikepdf.Name("/Helvetica"),
-                        })
-                    })
-                })
-            }))
+            page = pikepdf.Page(
+                pikepdf.Dictionary(
+                    {
+                        "/Type": pikepdf.Name("/Page"),
+                        "/MediaBox": [0, 0, 612, 792],
+                        "/Contents": pdf.make_stream(
+                            f"BT /F1 12 Tf 100 700 Td (Page {i + 1}) Tj ET".encode()
+                        ),
+                        "/Resources": pikepdf.Dictionary(
+                            {
+                                "/Font": pikepdf.Dictionary(
+                                    {
+                                        "/F1": pikepdf.Dictionary(
+                                            {
+                                                "/Type": pikepdf.Name("/Font"),
+                                                "/Subtype": pikepdf.Name("/Type1"),
+                                                "/BaseFont": pikepdf.Name("/Helvetica"),
+                                            }
+                                        )
+                                    }
+                                )
+                            }
+                        ),
+                    }
+                )
+            )
             pdf.pages.append(page)
 
         # Make it tagged
         pdf.Root["/MarkInfo"] = pikepdf.Dictionary({"/Marked": True})
-        pdf.Root["/StructTreeRoot"] = pikepdf.Dictionary({
-            "/Type": pikepdf.Name("/StructTreeRoot"),
-            "/K": pikepdf.Array([])
-        })
+        pdf.Root["/StructTreeRoot"] = pikepdf.Dictionary(
+            {"/Type": pikepdf.Name("/StructTreeRoot"), "/K": pikepdf.Array([])}
+        )
 
         # Set title and language
         pdf.docinfo["/Title"] = "Long Document Without Bookmarks"

@@ -81,7 +81,7 @@ def _speak_text(text: str, voice_name: str, audio_output: str | None = None) -> 
     # Detached mode buffers audio to temp file so playback survives process termination
     detached = os.environ.get("INSPEKT_TTS_DETACHED") == "1"
 
-    speak_icon = get_icon("speak") or "\U0001F50A"  # Speaker icon
+    speak_icon = get_icon("speak") or "\U0001f50a"  # Speaker icon
 
     # Check if content exceeds ElevenLabs limit
     if len(text) > ELEVENLABS_CHAR_LIMIT:
@@ -90,11 +90,15 @@ def _speak_text(text: str, voice_name: str, audio_output: str | None = None) -> 
 
         click.echo()
         click.secho(f"Content is {len(text):,} characters", fg="yellow", err=True)
-        click.echo(f"ElevenLabs has a {ELEVENLABS_CHAR_LIMIT:,} character limit per request.", err=True)
+        click.echo(
+            f"ElevenLabs has a {ELEVENLABS_CHAR_LIMIT:,} character limit per request.", err=True
+        )
         click.echo(err=True)
         click.echo("Options:", err=True)
         click.echo("  1. Truncate at sentence boundary (one API request)", err=True)
-        click.echo(f"  2. Split into {chunk_count} chunks (multiple requests, play sequentially)", err=True)
+        click.echo(
+            f"  2. Split into {chunk_count} chunks (multiple requests, play sequentially)", err=True
+        )
         click.echo("  3. Cancel", err=True)
         click.echo(err=True)
 
@@ -145,7 +149,9 @@ def _speak_text(text: str, voice_name: str, audio_output: str | None = None) -> 
                 text,
                 voice_name=voice_name,
                 detached=detached,
-                on_error=lambda msg: click.echo(click.style(f"TTS error: {msg}", fg="red"), err=True),
+                on_error=lambda msg: click.echo(
+                    click.style(f"TTS error: {msg}", fg="red"), err=True
+                ),
             )
         except TTSError as e:
             click.echo(click.style(f"TTS error: {e}", fg="red"), err=True)
@@ -176,7 +182,7 @@ def _process_tts_chunks(
 
     from inspekt.services.tts_service import TTSError, generate_audio, play_audio_bytes, speak_text
 
-    speak_icon = get_icon("speak") or "\U0001F50A"
+    speak_icon = get_icon("speak") or "\U0001f50a"
     all_audio_bytes: list[bytes] = []
 
     click.echo()
@@ -197,7 +203,7 @@ def _process_tts_chunks(
         if all_audio_bytes:
             output_path = Path(audio_output)
             output_path.parent.mkdir(parents=True, exist_ok=True)
-            combined = b''.join(all_audio_bytes)
+            combined = b"".join(all_audio_bytes)
             output_path.write_bytes(combined)
             click.echo(success_icon(f"Saved: {output_path}"), err=True)
         return
@@ -209,8 +215,8 @@ def _process_tts_chunks(
         prefetch_future: Future | None = None
 
         for i, chunk in enumerate(chunks, 1):
-            is_first_chunk = (i == 1)
-            is_last_chunk = (i == len(chunks))
+            is_first_chunk = i == 1
+            is_last_chunk = i == len(chunks)
             next_chunk = chunks[i] if not is_last_chunk else None
 
             click.echo(f"  Chunk {i}/{len(chunks)} ({len(chunk):,} chars)", err=True)
@@ -231,7 +237,9 @@ def _process_tts_chunks(
                         voice_name=voice_name,
                         detached=detached,
                         on_start=start_prefetch,
-                        on_error=lambda msg: click.echo(click.style(f"    TTS error: {msg}", fg="red"), err=True),
+                        on_error=lambda msg: click.echo(
+                            click.style(f"    TTS error: {msg}", fg="red"), err=True
+                        ),
                     )
                 except TTSError as e:
                     click.secho(f"    ✗ {e}", fg="red", err=True)
@@ -245,7 +253,9 @@ def _process_tts_chunks(
 
                         # Start prefetching next chunk before playing current
                         if next_chunk:
-                            prefetch_future = executor.submit(generate_audio, next_chunk, voice_name)
+                            prefetch_future = executor.submit(
+                                generate_audio, next_chunk, voice_name
+                            )
 
                         # Play the prefetched audio
                         play_audio_bytes(audio_bytes)
@@ -287,7 +297,13 @@ def extract():
 @url_scheme(
     "article",
     param_map={"output_json": "json", "no_frontmatter": "no_frontmatter"},
-    defaults={"engine": None, "no_images": False, "flatten": False, "no_frontmatter": False, "speak": None},
+    defaults={
+        "engine": None,
+        "no_images": False,
+        "flatten": False,
+        "no_frontmatter": False,
+        "speak": None,
+    },
     exclude_params=["cache_images", "output", "force_refresh", "output_json", "verbose"],
 )
 @click.option(
@@ -505,7 +521,9 @@ def article(
             # Show progress
             if page_title_for_display:
                 click.echo(
-                    analyze_icon(f'Extracting article from "{page_title_for_display}" ({engine_name})…'),
+                    analyze_icon(
+                        f'Extracting article from "{page_title_for_display}" ({engine_name})…'
+                    ),
                     err=True,
                 )
             else:
@@ -576,18 +594,18 @@ return ({extraction_script})
             # Per-image progress only in verbose mode
             progress_callback = None
             if verbose and not output_json:
+
                 def on_progress(url: str, success: bool, current: int, total: int):
                     status = click.style("✓", fg="green") if success else click.style("✗", fg="red")
                     display_url = _truncate(url, 70)
                     click.echo(f"  {status} [{current}/{total}] {display_url}", err=True)
+
                 progress_callback = on_progress
 
             cached_paths = image_cache.download_batch(unique_urls, on_progress=progress_callback)
 
             # Replace URLs in markdown with local paths
-            url_mapping = {
-                url: str(path) for url, path in cached_paths.items() if path is not None
-            }
+            url_mapping = {url: str(path) for url, path in cached_paths.items() if path is not None}
             markdown_body = replace_image_urls(markdown_body, url_mapping)
 
             # Count successes
@@ -699,13 +717,14 @@ return ({extraction_script})
                 )
 
         from inspekt.app.cli.table import print_json
+
         print_json(json_output, summary="extracted article")
 
     elif output:
         output_path = Path(output)
 
         # Smart output detection by extension
-        audio_extensions = {'.mp3', '.wav', '.m4a', '.aac'}
+        audio_extensions = {".mp3", ".wav", ".m4a", ".aac"}
         is_audio_output = output_path.suffix.lower() in audio_extensions
 
         if is_audio_output:
@@ -715,12 +734,13 @@ return ({extraction_script})
 
             # Prepare text for TTS
             from inspekt.services.markdown_converter import flatten_inline_markdown
+
             tts_text = flatten_inline_markdown(full_markdown)
             # Remove frontmatter for TTS
             if tts_text.startswith("---\n"):
                 end_idx = tts_text.find("\n---\n", 4)
                 if end_idx > 0:
-                    tts_text = tts_text[end_idx + 5:].strip()
+                    tts_text = tts_text[end_idx + 5 :].strip()
 
             _speak_text(tts_text, voice, audio_output=str(output_path))
         else:
@@ -733,12 +753,13 @@ return ({extraction_script})
             # Also speak if --speak was provided
             if speak:
                 from inspekt.services.markdown_converter import flatten_inline_markdown
+
                 tts_text = flatten_inline_markdown(full_markdown)
                 # Remove frontmatter for TTS
                 if tts_text.startswith("---\n"):
                     end_idx = tts_text.find("\n---\n", 4)
                     if end_idx > 0:
-                        tts_text = tts_text[end_idx + 5:].strip()
+                        tts_text = tts_text[end_idx + 5 :].strip()
                 _speak_text(tts_text, speak)
 
     else:
@@ -749,12 +770,13 @@ return ({extraction_script})
         if speak:
             # For TTS, strip markdown formatting and use plain text
             from inspekt.services.markdown_converter import flatten_inline_markdown
+
             tts_text = flatten_inline_markdown(full_markdown)
             # Remove frontmatter for TTS
             if tts_text.startswith("---\n"):
                 end_idx = tts_text.find("\n---\n", 4)
                 if end_idx > 0:
-                    tts_text = tts_text[end_idx + 5:].strip()
+                    tts_text = tts_text[end_idx + 5 :].strip()
             _speak_text(tts_text, speak)
 
 
@@ -995,7 +1017,11 @@ def images(
         height = img.get("naturalHeight") or img.get("displayedHeight") or 0
 
         # Skip if dimensions are unknown and filters are set
-        if (min_width > 0 or max_width or min_height > 0 or max_height) and width == 0 and height == 0:
+        if (
+            (min_width > 0 or max_width or min_height > 0 or max_height)
+            and width == 0
+            and height == 0
+        ):
             return True  # Include unknowns, let download determine size
 
         if min_width > 0 and width < min_width:
@@ -1010,10 +1036,7 @@ def images(
 
     # Blob URIs can't be dereferenced server-side — browser-only scheme. Skip.
     # Data URIs are decoded inline in download_image() below.
-    external_images = [
-        img for img in filtered_images
-        if not img.get("isBlobUri")
-    ]
+    external_images = [img for img in filtered_images if not img.get("isBlobUri")]
 
     if not external_images:
         click.echo("No downloadable images after filtering.", err=True)
@@ -1073,9 +1096,15 @@ def images(
         is_data_uri = bool(img.get("isDataUri"))
 
         _MIME_TO_EXT = {
-            "image/png": ".png", "image/jpeg": ".jpg", "image/jpg": ".jpg",
-            "image/gif": ".gif", "image/webp": ".webp", "image/svg+xml": ".svg",
-            "image/avif": ".avif", "image/bmp": ".bmp", "image/x-icon": ".ico",
+            "image/png": ".png",
+            "image/jpeg": ".jpg",
+            "image/jpg": ".jpg",
+            "image/gif": ".gif",
+            "image/webp": ".webp",
+            "image/svg+xml": ".svg",
+            "image/avif": ".avif",
+            "image/bmp": ".bmp",
+            "image/x-icon": ".ico",
         }
 
         data_uri_bytes = None
@@ -1084,6 +1113,7 @@ def images(
             # the correct mime-derived extension. The same bytes feed the main
             # processing path further down.
             from inspekt.services.html_image_optimizer import parse_data_uri
+
             parsed = parse_data_uri(url)
             if not parsed:
                 return {"success": False, "error": "Malformed data URI", "img": img}
@@ -1128,7 +1158,7 @@ def images(
                     if potential_thumb.exists():
                         thumb_path = potential_thumb
 
-                cached_url = (url[:60] + "…" if is_data_uri and len(url) > 60 else url)
+                cached_url = url[:60] + "…" if is_data_uri and len(url) > 60 else url
                 return {
                     "success": True,
                     "cached": True,
@@ -1179,7 +1209,12 @@ def images(
             content_hash = hashlib.md5(image_bytes).hexdigest()
             with seen_hashes_lock:
                 if content_hash in seen_hashes:
-                    return {"success": False, "error": "Duplicate", "img": img, "is_duplicate": True}
+                    return {
+                        "success": False,
+                        "error": "Duplicate",
+                        "img": img,
+                        "is_duplicate": True,
+                    }
                 seen_hashes.add(content_hash)
 
             # Get actual dimensions from image
@@ -1218,13 +1253,17 @@ def images(
                     if target_width and orig_w > target_width:
                         ratio = target_width / orig_w
                         new_h = int(orig_h * ratio)
-                        pil_image = pil_image.resize((target_width, new_h), Image.Resampling.LANCZOS)
+                        pil_image = pil_image.resize(
+                            (target_width, new_h), Image.Resampling.LANCZOS
+                        )
                         was_resized = True
                         actual_width, actual_height = target_width, new_h
                     elif target_height and orig_h > target_height:
                         ratio = target_height / orig_h
                         new_w = int(orig_w * ratio)
-                        pil_image = pil_image.resize((new_w, target_height), Image.Resampling.LANCZOS)
+                        pil_image = pil_image.resize(
+                            (new_w, target_height), Image.Resampling.LANCZOS
+                        )
                         was_resized = True
                         actual_width, actual_height = new_w, target_height
 
@@ -1239,7 +1278,11 @@ def images(
             # Optimize if requested
             was_optimized = False
             if optimize:
-                mime_type = "image/jpeg" if extension.lower() in (".jpg", ".jpeg") else f"image/{extension[1:]}"
+                mime_type = (
+                    "image/jpeg"
+                    if extension.lower() in (".jpg", ".jpeg")
+                    else f"image/{extension[1:]}"
+                )
                 try:
                     optimized_bytes, new_mime = optimize_image_bytes(
                         image_bytes,
@@ -1363,7 +1406,9 @@ def images(
                 elif result.get("is_duplicate"):
                     status = click.style("≡", fg="yellow")
                     filename = result["img"].get("filename") or "image"
-                    click.echo(f"  {status} [{i}/{total}] {filename} (duplicate, skipped)", err=True)
+                    click.echo(
+                        f"  {status} [{i}/{total}] {filename} (duplicate, skipped)", err=True
+                    )
                 else:
                     status = click.style("✗", fg="red")
                     error = result.get("error", "Unknown error")[:50]
@@ -1427,6 +1472,7 @@ def images(
                             import warnings
 
                             from bs4 import BeautifulSoup, XMLParsedAsHTMLWarning
+
                             warnings.filterwarnings("ignore", category=XMLParsedAsHTMLWarning)
                             # Try xml parser (requires lxml), fall back to html.parser
                             try:
@@ -1471,7 +1517,8 @@ def images(
             # HEAD-probe cached images to determine which originals are still
             # publicly reachable; downloaded ones already know from their GET.
             unknown_idx = [
-                i for i, r in enumerate(successful)
+                i
+                for i, r in enumerate(successful)
                 if r.get("publicly_reachable") is None and r.get("original_url")
             ]
 
@@ -1507,15 +1554,15 @@ def images(
             # Inline thumbnails as data URIs and set full_src override per image.
             import base64
             import mimetypes
+
             for gimg, r in zip(gallery_images, successful, strict=False):
                 thumb_path = r.get("thumb_path")
                 if thumb_path and thumb_path.exists():
                     thumb_bytes = thumb_path.read_bytes()
                     thumb_mime = mimetypes.guess_type(thumb_path.name)[0] or "image/webp"
-                    gimg.thumbnail_data_uri = (
-                        f"data:{thumb_mime};base64,"
-                        + base64.b64encode(thumb_bytes).decode("ascii")
-                    )
+                    gimg.thumbnail_data_uri = f"data:{thumb_mime};base64," + base64.b64encode(
+                        thumb_bytes
+                    ).decode("ascii")
                 if r.get("publicly_reachable") and r.get("original_url"):
                     gimg.full_src_override = r["original_url"]
 
@@ -1614,12 +1661,14 @@ def images(
                 json_output["gallery_url"] = f"http://inspekt/images/{domain}/"
 
         from inspekt.app.cli.table import print_json
+
         count = json_output.get("downloaded", len(json_output.get("images", [])))
         print_json(json_output, summary=f"{count} images")
 
     # Open directory if requested
     if open_dir:
         from inspekt.app.cli.util import reveal_or_download
+
         reveal_or_download(output_path)
 
 

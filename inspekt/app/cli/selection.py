@@ -13,7 +13,12 @@ from inspekt.services.script_loader import ScriptLoader
 def html_output_options(fn):
     """Shared Click options for HTML/CSS output formatting."""
     fn = click.option("--indent", type=int, default=2, help="Indentation width")(fn)
-    fn = click.option("--theme", type=click.Choice(["monokai", "github-dark", "dracula", "vim", "one-dark"]), default=None, help="Syntax highlighting theme")(fn)
+    fn = click.option(
+        "--theme",
+        type=click.Choice(["monokai", "github-dark", "dracula", "vim", "one-dark"]),
+        default=None,
+        help="Syntax highlighting theme",
+    )(fn)
     fn = click.option("--colors/--no-colors", default=True, help="Enable ANSI colors in output")(fn)
     fn = click.option("--compact", is_flag=True, help="Compact single-line output")(fn)
     fn = click.option("--pretty", is_flag=True, help="Pretty-print output")(fn)
@@ -99,7 +104,7 @@ def apply_syntax_highlighting(html_content, theme=None):
             try:
                 # Validate theme exists
                 style = get_style_by_name(theme)
-                formatter_kwargs['style'] = style
+                formatter_kwargs["style"] = style
             except Exception:
                 # Invalid theme, use default
                 click.echo(f"Warning: Unknown theme '{theme}', using default", err=True)
@@ -118,7 +123,9 @@ def apply_syntax_highlighting(html_content, theme=None):
         return html_content
 
 
-def display_selection(response, content_type="text", show_tip=True, pretty=None, compact=None, colors=None, theme=None):
+def display_selection(
+    response, content_type="text", show_tip=True, pretty=None, compact=None, colors=None, theme=None
+):
     """Display selection in formatted output."""
     from inspekt.config import get_html_selection_config
 
@@ -134,6 +141,7 @@ def display_selection(response, content_type="text", show_tip=True, pretty=None,
 
         # Apply pretty, compact, and syntax highlighting for HTML display
         from inspekt.services.html_processor import process_html
+
         config = get_html_selection_config()
 
         # Use provided flags or fall back to config/defaults
@@ -165,7 +173,7 @@ def display_selection(response, content_type="text", show_tip=True, pretty=None,
         reset = "\033[0m"
         separator = f"{dark_gray}{'—' * 80}{reset}"
         # Remove empty lines
-        content = '\n'.join(line for line in content.split('\n') if line.strip())
+        content = "\n".join(line for line in content.split("\n") if line.strip())
         click.echo(f"{display_name} ({len(response.get('html', ''))} characters):\n")
         click.echo(separator)
         click.echo(content)
@@ -190,7 +198,7 @@ def display_selection(response, content_type="text", show_tip=True, pretty=None,
     container = response.get("container", {})
     if container.get("tag"):
         click.echo("Container:")
-        tag = container['tag']
+        tag = container["tag"]
         click.echo(f"  Tag: <{tag}>")
         if container.get("id"):
             click.echo(f"  ID: {container['id']}")
@@ -201,9 +209,20 @@ def display_selection(response, content_type="text", show_tip=True, pretty=None,
     # Show tips
     if show_tip:
         from inspekt.app.cli.table import _style_with_inline_code
+
         click.echo("Tips:")
-        click.echo(_style_with_inline_code(f"  • Use `inspekt selection {content_type} --raw` for raw {content_type.upper()} output", base_fg="white"))
-        click.echo(_style_with_inline_code(f"  • Type `inspekt selection {content_type} --help` for advanced options", base_fg="white"))
+        click.echo(
+            _style_with_inline_code(
+                f"  • Use `inspekt selection {content_type} --raw` for raw {content_type.upper()} output",
+                base_fg="white",
+            )
+        )
+        click.echo(
+            _style_with_inline_code(
+                f"  • Type `inspekt selection {content_type} --help` for advanced options",
+                base_fg="white",
+            )
+        )
 
 
 @click.group(invoke_without_command=True)
@@ -216,13 +235,12 @@ def selection(ctx, output_json):
         response = get_selection_data()
 
         if response is None:
-            click.echo(json.dumps({
-                "hasSelection": False,
-                "text": "",
-                "html": "",
-                "markdown": "",
-                "length": 0
-            }, indent=2))
+            click.echo(
+                json.dumps(
+                    {"hasSelection": False, "text": "", "html": "", "markdown": "", "length": 0},
+                    indent=2,
+                )
+            )
             sys.exit(0)
 
         # Generate markdown from HTML
@@ -238,9 +256,10 @@ def selection(ctx, output_json):
             "markdown": markdown_content,
             "length": response.get("length", 0),
             "position": response.get("position", {}),
-            "container": response.get("container", {})
+            "container": response.get("container", {}),
         }
         from inspekt.app.cli.table import print_json
+
         print_json(output, summary=f"selection ({output['length']} chars)")
         sys.exit(0)
     elif ctx.invoked_subcommand is None:
@@ -262,6 +281,7 @@ def text(raw, output_json):
         elif not raw:
             click.echo("No text selected")
             from inspekt.app.cli.table import print_hint
+
             print_hint("Select some text in the browser first, then run `inspekt selection text`.")
         sys.exit(0)
 
@@ -269,12 +289,9 @@ def text(raw, output_json):
 
     # JSON mode: output only text data
     if output_json:
-        output = {
-            "hasSelection": True,
-            "text": text_content,
-            "length": response.get("length", 0)
-        }
+        output = {"hasSelection": True, "text": text_content, "length": response.get("length", 0)}
         from inspekt.app.cli.table import print_json
+
         print_json(output, summary=f"selected text ({output['length']} chars)")
         return
 
@@ -290,10 +307,20 @@ def text(raw, output_json):
 @selection.command()
 @click.option("--raw", is_flag=True, help="Output only the raw HTML without formatting")
 @click.option("--json", "-j", "output_json", is_flag=True, help="Output as JSON")
-@click.option("--pretty/--no-pretty", default=None, help="Format HTML using prettier (default: from config)")
-@click.option("--compact/--no-compact", default=None, help="Remove classes and truncate long text (default: from config)")
-@click.option("--colors/--no-colors", default=None, help="Apply syntax highlighting (default: from config)")
-@click.option("--theme", default=None, help="Syntax highlighting theme (e.g., monokai, vim, github-dark)")
+@click.option(
+    "--pretty/--no-pretty", default=None, help="Format HTML using prettier (default: from config)"
+)
+@click.option(
+    "--compact/--no-compact",
+    default=None,
+    help="Remove classes and truncate long text (default: from config)",
+)
+@click.option(
+    "--colors/--no-colors", default=None, help="Apply syntax highlighting (default: from config)"
+)
+@click.option(
+    "--theme", default=None, help="Syntax highlighting theme (e.g., monokai, vim, github-dark)"
+)
 def html(raw, output_json, pretty, compact, colors, theme):
     """Get selected HTML."""
     from inspekt.config import get_html_selection_config
@@ -319,6 +346,7 @@ def html(raw, output_json, pretty, compact, colors, theme):
         elif not raw:
             click.echo("No text selected")
             from inspekt.app.cli.table import print_hint
+
             print_hint("Select some text in the browser first, then run `inspekt selection html`.")
         sys.exit(0)
 
@@ -327,6 +355,7 @@ def html(raw, output_json, pretty, compact, colors, theme):
     # Process HTML if pretty or compact flags are set
     if pretty or compact:
         from inspekt.services.html_processor import process_html
+
         html_content = process_html(html_content, prettier=pretty, compact=compact)
 
     # Apply syntax highlighting if requested (before JSON/raw output)
@@ -336,12 +365,9 @@ def html(raw, output_json, pretty, compact, colors, theme):
 
     # JSON mode: output only html data
     if output_json:
-        output = {
-            "hasSelection": True,
-            "html": html_content,
-            "length": response.get("length", 0)
-        }
+        output = {"hasSelection": True, "html": html_content, "length": response.get("length", 0)}
         from inspekt.app.cli.table import print_json
+
         print_json(output, summary=f"selected HTML ({output['length']} chars)")
         return
 
@@ -351,7 +377,9 @@ def html(raw, output_json, pretty, compact, colors, theme):
         return
 
     # Formatted display - pass flags to display function
-    display_selection(response, content_type="html", pretty=pretty, compact=compact, colors=colors, theme=theme)
+    display_selection(
+        response, content_type="html", pretty=pretty, compact=compact, colors=colors, theme=theme
+    )
 
 
 @selection.command()
@@ -367,7 +395,10 @@ def markdown(raw, output_json):
         elif not raw:
             click.echo("No text selected")
             from inspekt.app.cli.table import print_hint
-            print_hint("Select some text in the browser first, then run `inspekt selection markdown`.")
+
+            print_hint(
+                "Select some text in the browser first, then run `inspekt selection markdown`."
+            )
         sys.exit(0)
 
     html_content = response.get("html", "")
@@ -379,9 +410,10 @@ def markdown(raw, output_json):
         output = {
             "hasSelection": True,
             "markdown": markdown_content,
-            "length": response.get("length", 0)
+            "length": response.get("length", 0),
         }
         from inspekt.app.cli.table import print_json
+
         print_json(output, summary=f"selected markdown ({output['length']} chars)")
         return
 
@@ -404,7 +436,10 @@ def selected(raw, output_json):
 
     Please use 'inspekt selection text' instead.
     """
-    click.echo("Warning: 'inspekt selected' is deprecated. Use 'inspekt selection text' instead.\n", err=True)
+    click.echo(
+        "Warning: 'inspekt selected' is deprecated. Use 'inspekt selection text' instead.\n",
+        err=True,
+    )
 
     response = get_selection_data()
 
@@ -414,6 +449,7 @@ def selected(raw, output_json):
         elif not raw:
             click.echo("No text selected")
             from inspekt.app.cli.table import print_hint
+
             print_hint("Select some text in the browser first, then run `inspekt selection text`.")
         sys.exit(0)
 
@@ -421,12 +457,9 @@ def selected(raw, output_json):
 
     # JSON mode: output only text data (for backward compatibility)
     if output_json:
-        output = {
-            "hasSelection": True,
-            "text": text_content,
-            "length": response.get("length", 0)
-        }
+        output = {"hasSelection": True, "text": text_content, "length": response.get("length", 0)}
         from inspekt.app.cli.table import print_json
+
         print_json(output, summary=f"selected text ({output['length']} chars)")
         return
 

@@ -39,7 +39,9 @@ def _add_deprecation_headers(response: Response):
     response.headers["Deprecation"] = "true"
     response.headers["Sunset"] = "Wed, 01 Jan 2026 00:00:00 GMT"
     response.headers["Link"] = '</api/storage>; rel="alternate"'
-    response.headers["Warning"] = '299 - "This API endpoint is deprecated. Use /api/storage instead."'
+    response.headers["Warning"] = (
+        '299 - "This API endpoint is deprecated. Use /api/storage instead."'
+    )
 
 
 # Request Models
@@ -55,7 +57,9 @@ class SetCookieRequest(BaseModel):
     path: str = Field("/", description="Cookie path")
     domain: str | None = Field(None, description="Cookie domain")
     secure: bool = Field(False, description="Secure flag (HTTPS only)")
-    same_site: Literal["Strict", "Lax", "None"] | None = Field(None, description="SameSite attribute")
+    same_site: Literal["Strict", "Lax", "None"] | None = Field(
+        None, description="SameSite attribute"
+    )
 
 
 # Response Models

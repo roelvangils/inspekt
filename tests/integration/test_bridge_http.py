@@ -73,9 +73,7 @@ class TestRun:
 
     async def test_run_unknown_instance_returns_404(self, client):
         async with FakeExtension(client):
-            resp = await client.post(
-                "/run", json={"code": "1", "instance": "doesnotexist"}
-            )
+            resp = await client.post("/run", json={"code": "1", "instance": "doesnotexist"})
             assert resp.status == 404
             data = await resp.json()
             assert data["error"] == "instance_not_found"
@@ -129,9 +127,7 @@ class TestRoundTrip:
             assert run.status == 200
             request_id = (await run.json())["request_id"]
 
-            result = await client.get(
-                "/result", params={"request_id": request_id}
-            )
+            result = await client.get("/result", params={"request_id": request_id})
             data = await result.json()
             assert data["ok"] is True
             assert data["result"] == 42

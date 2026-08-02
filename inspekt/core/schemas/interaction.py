@@ -14,9 +14,7 @@ from pydantic import BaseModel, Field
 class ClickElementParams(BaseModel):
     """Parameters for click_element command."""
 
-    selector: str = Field(
-        ..., description="CSS selector or '$0' for DevTools-inspected element"
-    )
+    selector: str = Field(..., description="CSS selector or '$0' for DevTools-inspected element")
     click_type: Literal["single", "double", "right"] | None = Field(
         default="single", description="Type of click: single, double, or right-click"
     )
@@ -38,9 +36,7 @@ class TypeTextParams(BaseModel):
     typing_speed: Literal["instant", "fast", "normal", "slow"] | None = Field(
         default="normal", description="Typing speed simulation"
     )
-    submit: bool | None = Field(
-        default=False, description="Press Enter after typing (submit form)"
-    )
+    submit: bool | None = Field(default=False, description="Press Enter after typing (submit form)")
 
 
 class TypeTextResponse(BaseModel):

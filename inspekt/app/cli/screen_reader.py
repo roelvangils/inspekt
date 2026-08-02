@@ -67,15 +67,28 @@ def _enrichment_options(f):
     return f
 
 
-def _build_show_flags(show_description, show_focusable, show_tooltip, show_href,
-                      show_value, show_table_headers, show_secondary, show_bugs,
-                      show_all):
+def _build_show_flags(
+    show_description,
+    show_focusable,
+    show_tooltip,
+    show_href,
+    show_value,
+    show_table_headers,
+    show_secondary,
+    show_bugs,
+    show_all,
+):
     """Build a dict of which enrichment columns to display."""
     if show_all:
         return {
-            "description": True, "focusable": True, "tooltip": True,
-            "href": True, "value": True, "table_headers": True,
-            "secondary": True, "bugs": True,
+            "description": True,
+            "focusable": True,
+            "tooltip": True,
+            "href": True,
+            "value": True,
+            "table_headers": True,
+            "secondary": True,
+            "bugs": True,
         }
     return {
         "description": show_description,
@@ -158,10 +171,23 @@ def sr(ctx):
 )
 @_enrichment_options
 @click.pass_context
-def walk(ctx, screen_reader, verbosity, max_elements, output_format, json_flag,
-         show_description, show_focusable, show_tooltip, show_href,
-         show_value, show_table_headers, show_secondary, show_bugs,
-         show_all):
+def walk(
+    ctx,
+    screen_reader,
+    verbosity,
+    max_elements,
+    output_format,
+    json_flag,
+    show_description,
+    show_focusable,
+    show_tooltip,
+    show_href,
+    show_value,
+    show_table_headers,
+    show_secondary,
+    show_bugs,
+    show_all,
+):
     """Walk through the page showing screen reader announcements.
 
     Linearizes the page into reading order and shows what each screen
@@ -193,8 +219,14 @@ def walk(ctx, screen_reader, verbosity, max_elements, output_format, json_flag,
         sys.exit(1)
 
     show = _build_show_flags(
-        show_description, show_focusable, show_tooltip, show_href,
-        show_value, show_table_headers, show_secondary, show_bugs,
+        show_description,
+        show_focusable,
+        show_tooltip,
+        show_href,
+        show_value,
+        show_table_headers,
+        show_secondary,
+        show_bugs,
         show_all,
     )
 
@@ -203,6 +235,7 @@ def walk(ctx, screen_reader, verbosity, max_elements, output_format, json_flag,
 
     if output_format == "json":
         from inspekt.app.cli.table import print_json
+
         print_json(result.model_dump(), summary=f"sr walk ({screen_reader})")
         return
 
@@ -255,10 +288,23 @@ def walk(ctx, screen_reader, verbosity, max_elements, output_format, json_flag,
 )
 @_enrichment_options
 @click.pass_context
-def compare(ctx, verbosity, max_elements, output_format, json_flag, differences_only,
-            show_description, show_focusable, show_tooltip, show_href,
-            show_value, show_table_headers, show_secondary, show_bugs,
-         show_all):
+def compare(
+    ctx,
+    verbosity,
+    max_elements,
+    output_format,
+    json_flag,
+    differences_only,
+    show_description,
+    show_focusable,
+    show_tooltip,
+    show_href,
+    show_value,
+    show_table_headers,
+    show_secondary,
+    show_bugs,
+    show_all,
+):
     """Compare announcements across JAWS, NVDA, and VoiceOver.
 
     Shows a side-by-side comparison of how each screen reader would
@@ -289,8 +335,14 @@ def compare(ctx, verbosity, max_elements, output_format, json_flag, differences_
         sys.exit(1)
 
     show = _build_show_flags(
-        show_description, show_focusable, show_tooltip, show_href,
-        show_value, show_table_headers, show_secondary, show_bugs,
+        show_description,
+        show_focusable,
+        show_tooltip,
+        show_href,
+        show_value,
+        show_table_headers,
+        show_secondary,
+        show_bugs,
         show_all,
     )
 
@@ -299,6 +351,7 @@ def compare(ctx, verbosity, max_elements, output_format, json_flag, differences_
 
     if output_format == "json":
         from inspekt.app.cli.table import print_json
+
         print_json(result.model_dump(), summary="sr compare")
         return
 
@@ -382,10 +435,7 @@ def _emit_sr_walk_signal(result, screen_reader: str, differences_only: bool = Fa
 
     if screen_reader in ("jaws", "nvda", "voiceover"):
         headers = ["#", "Role", "Announcement"]
-        rows = [
-            [str(a.index), a.role, getattr(a, screen_reader, "") or ""]
-            for a in items
-        ]
+        rows = [[str(a.index), a.role, getattr(a, screen_reader, "") or ""] for a in items]
     else:
         headers = ["#", "Element", "JAWS", "NVDA", "VoiceOver"]
         rows = [
@@ -420,7 +470,9 @@ def _format_enrichment_suffix(a, show):
     parts = []
 
     if show.get("focusable") and a.is_focusable:
-        tab_info = f" (tabindex={a.tab_index})" if a.tab_index is not None and a.tab_index != 0 else ""
+        tab_info = (
+            f" (tabindex={a.tab_index})" if a.tab_index is not None and a.tab_index != 0 else ""
+        )
         parts.append(click.style(f"focusable{tab_info}", fg="green"))
 
     if show.get("description") and a.description:
@@ -460,16 +512,20 @@ def _format_enrichment_suffix(a, show):
             bug = get_bug_details(bug_id)
             if bug:
                 severity_colors = {
-                    "critical": "red", "serious": "red",
-                    "moderate": "yellow", "minor": "bright_black",
+                    "critical": "red",
+                    "serious": "red",
+                    "moderate": "yellow",
+                    "minor": "bright_black",
                 }
                 color = severity_colors.get(bug.get("severity", ""), "yellow")
                 desc = bug.get("description", "")
                 desc_short = desc[:80] + "…" if len(desc) > 80 else desc
-                parts.append(click.style(
-                    f"Bug [{bug.get('severity', '?')}]: {desc_short}",
-                    fg=color,
-                ))
+                parts.append(
+                    click.style(
+                        f"Bug [{bug.get('severity', '?')}]: {desc_short}",
+                        fg=color,
+                    )
+                )
 
     return "  ".join(parts) if parts else None
 
@@ -495,16 +551,11 @@ def _print_comparison(result, differences_only=False, show=None):
 
     items = result.announcements
     if differences_only:
-        items = [
-            a for a in items
-            if len({a.jaws, a.nvda, a.voiceover}) > 1
-        ]
+        items = [a for a in items if len({a.jaws, a.nvda, a.voiceover}) > 1]
 
     if not items:
         if differences_only:
-            click.echo(
-                f"  {get_indicator('pass')} All screen readers announce the same content."
-            )
+            click.echo(f"  {get_indicator('pass')} All screen readers announce the same content.")
         else:
             click.echo("  No elements found on the page.")
         click.echo()
@@ -539,15 +590,31 @@ def _print_comparison(result, differences_only=False, show=None):
             element_desc += f" {name_short}"
 
         if all_same and not differences_only:
-            display_rows.append(([
-                str(a.index), element_desc, jaws_text,
-                click.style("↑ same", dim=True),
-                click.style("↑ same", dim=True),
-            ], False))
+            display_rows.append(
+                (
+                    [
+                        str(a.index),
+                        element_desc,
+                        jaws_text,
+                        click.style("↑ same", dim=True),
+                        click.style("↑ same", dim=True),
+                    ],
+                    False,
+                )
+            )
         else:
-            display_rows.append(([
-                str(a.index), element_desc, jaws_text, nvda_text, vo_text,
-            ], False))
+            display_rows.append(
+                (
+                    [
+                        str(a.index),
+                        element_desc,
+                        jaws_text,
+                        nvda_text,
+                        vo_text,
+                    ],
+                    False,
+                )
+            )
 
         # Add enrichment detail row if applicable
         enrichment = _format_enrichment_suffix(a, show) if has_enrichment else None
@@ -643,9 +710,7 @@ def _print_announce(result):
 
     rows = []
     if result.role:
-        rows.append(
-            [click.style("Role", dim=True), click.style(result.role, fg="cyan")]
-        )
+        rows.append([click.style("Role", dim=True), click.style(result.role, fg="cyan")])
     if result.name:
         rows.append([click.style("Name", dim=True), result.name])
 
@@ -688,10 +753,7 @@ def _print_summary(result):
     if summary.lists:
         parts.append(f"{summary.lists} lists")
 
-    click.echo(
-        f"  {result.element_count} elements  |  "
-        + "  |  ".join(parts)
-    )
+    click.echo(f"  {result.element_count} elements  |  " + "  |  ".join(parts))
 
     if result.difference_count > 0:
         click.echo(

@@ -121,9 +121,22 @@ def _display_table(entries: list, show_domain: bool = False, summary: dict | Non
 
     # Print summary row with totals
     if show_domain:
-        summary_row = ["Total", f"{len(entries)} requests", "", format_size(total_size), format_time(total_time // len(entries) if entries else 0), ""]
+        summary_row = [
+            "Total",
+            f"{len(entries)} requests",
+            "",
+            format_size(total_size),
+            format_time(total_time // len(entries) if entries else 0),
+            "",
+        ]
     else:
-        summary_row = [f"{len(entries)} requests", "", format_size(total_size), format_time(total_time // len(entries) if entries else 0), ""]
+        summary_row = [
+            f"{len(entries)} requests",
+            "",
+            format_size(total_size),
+            format_time(total_time // len(entries) if entries else 0),
+            "",
+        ]
     table.print_summary(summary_row)
 
     table.print_footer()
@@ -160,14 +173,18 @@ def _display_summary(summary: dict):
         click.echo()
         slowest_icon = get_section_icon("slowest") or ""
         slowest_prefix = f"  {slowest_icon} " if slowest_icon else "  "
-        click.echo(f"{slowest_prefix}Slowest: {_truncate(slow['name'], 40)} ({format_time(slow['duration'])})")
+        click.echo(
+            f"{slowest_prefix}Slowest: {_truncate(slow['name'], 40)} ({format_time(slow['duration'])})"
+        )
 
     # Largest request
     if summary.get("largestRequest") and summary["largestRequest"]["size"] > 0:
         large = summary["largestRequest"]
         largest_icon = get_section_icon("largest") or ""
         largest_prefix = f"  {largest_icon} " if largest_icon else "  "
-        click.echo(f"{largest_prefix}Largest: {_truncate(large['name'], 40)} ({format_size(large['size'])})")
+        click.echo(
+            f"{largest_prefix}Largest: {_truncate(large['name'], 40)} ({format_size(large['size'])})"
+        )
 
 
 def _try_har_silently(executor: BridgeExecutor) -> dict | None:
@@ -183,7 +200,7 @@ def _try_har_silently(executor: BridgeExecutor) -> dict | None:
     try:
         response = requests.get(
             "http://127.0.0.1:8765/network/har",
-            timeout=5.0  # Short timeout for auto-detection
+            timeout=5.0,  # Short timeout for auto-detection
         )
         try:
             data = response.json()
@@ -201,8 +218,11 @@ def _try_har_silently(executor: BridgeExecutor) -> dict | None:
 def _show_devtools_hint():
     """Show a hint about opening DevTools for more information."""
     from inspekt.app.cli.table import print_hint
+
     click.echo()
-    print_hint("Open DevTools (`F12`) and refresh the page to see HTTP status codes, headers, and error details.")
+    print_hint(
+        "Open DevTools (`F12`) and refresh the page to see HTTP status codes, headers, and error details."
+    )
 
 
 def _emit_network_signal(
@@ -311,7 +331,9 @@ def _run_network_command(
         # Sort entries (HAR uses different field names)
         sort_keys = {
             "start": lambda e: e.get("startedDateTime", ""),
-            "time": lambda e: -(e.get("timing", {}).get("total", 0) if isinstance(e.get("timing"), dict) else 0),
+            "time": lambda e: (
+                -(e.get("timing", {}).get("total", 0) if isinstance(e.get("timing"), dict) else 0)
+            ),
             "size": lambda e: -e.get("transferSize", 0),
             "name": lambda e: e.get("name", "").lower(),
             "type": lambda e: e.get("type", ""),
@@ -335,11 +357,19 @@ def _run_network_command(
                 "summary": summary,
             }
             from inspekt.app.cli.table import print_json
+
             print_json(output, summary=f"{len(entries)} network requests")
         else:
             _display_har_table(entries, show_domain=show_domain, show_status=True)
             _display_har_summary(summary)
-            _emit_network_signal(entries, har_data, summary, source="devtools", show_domain=show_domain, has_status=True)
+            _emit_network_signal(
+                entries,
+                har_data,
+                summary,
+                source="devtools",
+                show_domain=show_domain,
+                has_status=True,
+            )
     else:
         # Fall back to Performance API (basic info)
         data = _get_network_data(executor, loader)
@@ -383,11 +413,19 @@ def _run_network_command(
                 "summary": summary,
             }
             from inspekt.app.cli.table import print_json
+
             print_json(output, summary=f"{len(entries)} network requests")
         else:
             _display_table(entries, show_domain=show_domain)
             _display_summary(summary)
-            _emit_network_signal(entries, data, summary, source="performance_api", show_domain=show_domain, has_status=False)
+            _emit_network_signal(
+                entries,
+                data,
+                summary,
+                source="performance_api",
+                show_domain=show_domain,
+                has_status=False,
+            )
             # Show hint about DevTools
             _show_devtools_hint()
 
@@ -612,10 +650,7 @@ def _get_har_data(executor: BridgeExecutor) -> dict:
     import requests
 
     try:
-        response = requests.get(
-            "http://127.0.0.1:8765/network/har",
-            timeout=20.0
-        )
+        response = requests.get("http://127.0.0.1:8765/network/har", timeout=20.0)
         try:
             return response.json()
         except json.JSONDecodeError as e:
@@ -624,23 +659,14 @@ def _get_har_data(executor: BridgeExecutor) -> dict:
             return {
                 "ok": False,
                 "error": f"Invalid JSON response: {e}",
-                "hint": f"Response preview: {text!r}"
+                "hint": f"Response preview: {text!r}",
             }
     except requests.exceptions.ConnectionError:
-        return {
-            "ok": False,
-            "error": "Bridge server not running. Start it with: `inspekt start`"
-        }
+        return {"ok": False, "error": "Bridge server not running. Start it with: `inspekt start`"}
     except requests.exceptions.Timeout:
-        return {
-            "ok": False,
-            "error": "Request timed out. Is DevTools open?"
-        }
+        return {"ok": False, "error": "Request timed out. Is DevTools open?"}
     except Exception as e:
-        return {
-            "ok": False,
-            "error": str(e)
-        }
+        return {"ok": False, "error": str(e)}
 
 
 def _display_har_table(entries: list, show_domain: bool = False, show_status: bool = True):
@@ -739,13 +765,37 @@ def _display_har_table(entries: list, show_domain: bool = False, show_status: bo
     # Print summary row with totals
     avg_time = total_time // len(entries) if entries else 0
     if show_domain and show_status:
-        summary_row = ["Total", f"{len(entries)} requests", "", "", format_size(total_size), format_time(avg_time)]
+        summary_row = [
+            "Total",
+            f"{len(entries)} requests",
+            "",
+            "",
+            format_size(total_size),
+            format_time(avg_time),
+        ]
     elif show_domain:
-        summary_row = ["Total", f"{len(entries)} requests", "", format_size(total_size), format_time(avg_time)]
+        summary_row = [
+            "Total",
+            f"{len(entries)} requests",
+            "",
+            format_size(total_size),
+            format_time(avg_time),
+        ]
     elif show_status:
-        summary_row = [f"{len(entries)} requests", "", "", format_size(total_size), format_time(avg_time)]
+        summary_row = [
+            f"{len(entries)} requests",
+            "",
+            "",
+            format_size(total_size),
+            format_time(avg_time),
+        ]
     else:
-        summary_row = [f"{len(entries)} requests", "", format_size(total_size), format_time(avg_time)]
+        summary_row = [
+            f"{len(entries)} requests",
+            "",
+            format_size(total_size),
+            format_time(avg_time),
+        ]
     table.print_summary(summary_row)
 
     table.print_footer()
@@ -803,16 +853,20 @@ def _display_har_summary(summary: dict):
         click.echo()
         slowest_icon = get_section_icon("slowest") or ""
         slowest_prefix = f"  {slowest_icon} " if slowest_icon else "  "
-        status_str = f" ({slowest.get('status', '')})" if slowest.get('status') else ""
-        click.echo(f"{slowest_prefix}Slowest: {_truncate(slowest.get('name', ''), 35)}{status_str} ({format_time(slowest.get('duration', 0))})")
+        status_str = f" ({slowest.get('status', '')})" if slowest.get("status") else ""
+        click.echo(
+            f"{slowest_prefix}Slowest: {_truncate(slowest.get('name', ''), 35)}{status_str} ({format_time(slowest.get('duration', 0))})"
+        )
 
     # Largest request
     largest = summary.get("largestRequest")
     if largest and largest.get("size", 0) > 0:
         largest_icon = get_section_icon("largest") or ""
         largest_prefix = f"  {largest_icon} " if largest_icon else "  "
-        status_str = f" ({largest.get('status', '')})" if largest.get('status') else ""
-        click.echo(f"{largest_prefix}Largest: {_truncate(largest.get('name', ''), 35)}{status_str} ({format_size(largest.get('size', 0))})")
+        status_str = f" ({largest.get('status', '')})" if largest.get("status") else ""
+        click.echo(
+            f"{largest_prefix}Largest: {_truncate(largest.get('name', ''), 35)}{status_str} ({format_size(largest.get('size', 0))})"
+        )
 
 
 @network.command(name="har")
@@ -835,8 +889,12 @@ def _display_har_summary(summary: dict):
     default=None,
     help="Filter by resource type",
 )
-@click.option("--raw", "raw_har", is_flag=True, help="Output raw HAR format (for import into other tools)")
-def network_har(output_json, sort_by, show_domain, only_external, only_errors, limit, resource_type, raw_har):
+@click.option(
+    "--raw", "raw_har", is_flag=True, help="Output raw HAR format (for import into other tools)"
+)
+def network_har(
+    output_json, sort_by, show_domain, only_external, only_errors, limit, resource_type, raw_har
+):
     """
     Get full network data from DevTools (HAR format).
 
@@ -870,6 +928,7 @@ def network_har(output_json, sort_by, show_domain, only_external, only_errors, l
         click.echo(click.style(f"Error: {error}", fg="red"), err=True)
         if hint:
             from inspekt.app.cli.table import print_hint
+
             print_hint(hint)
         sys.exit(1)
 
@@ -877,6 +936,7 @@ def network_har(output_json, sort_by, show_domain, only_external, only_errors, l
     if raw_har:
         raw_data = data.get("rawHAR", data)
         from inspekt.app.cli.table import print_json
+
         print_json(raw_data, summary="raw HAR")
         return
 
@@ -905,7 +965,9 @@ def network_har(output_json, sort_by, show_domain, only_external, only_errors, l
     # Sort entries
     sort_keys = {
         "start": lambda e: e.get("startedDateTime", ""),
-        "time": lambda e: -(e.get("timing", {}).get("total", 0) if isinstance(e.get("timing"), dict) else 0),
+        "time": lambda e: (
+            -(e.get("timing", {}).get("total", 0) if isinstance(e.get("timing"), dict) else 0)
+        ),
         "size": lambda e: -e.get("transferSize", 0),
         "name": lambda e: e.get("name", "").lower(),
         "type": lambda e: e.get("type", ""),
@@ -934,6 +996,7 @@ def network_har(output_json, sort_by, show_domain, only_external, only_errors, l
             "summary": summary,
         }
         from inspekt.app.cli.table import print_json
+
         print_json(output, summary=f"{len(entries)} HAR entries")
     else:
         click.echo(click.style("HAR Data (DevTools)", bold=True, fg="green"))

@@ -47,9 +47,7 @@ class RemoveHiddenElementRequest(BaseModel):
     selector: str = Field(..., description="CSS selector")
 
     model_config = {
-        "json_schema_extra": {
-            "example": {"domain": "github.com", "selector": ".js-cookie-banner"}
-        }
+        "json_schema_extra": {"example": {"domain": "github.com", "selector": ".js-cookie-banner"}}
     }
 
 
@@ -179,9 +177,7 @@ def remove_hidden_element(request: RemoveHiddenElementRequest):
     """
     try:
         service = get_persistence_service()
-        result = service.remove_hidden_element(
-            domain=request.domain, selector=request.selector
-        )
+        result = service.remove_hidden_element(domain=request.domain, selector=request.selector)
         return HiddenElementResponse(**result)
 
     except Exception as e:
@@ -189,9 +185,7 @@ def remove_hidden_element(request: RemoveHiddenElementRequest):
 
 
 @router.delete("/hidden/all", response_model=UnhideAllResponse)
-def remove_all_hidden_elements(
-    domain: str = Query(..., description="Domain to clear")
-):
+def remove_all_hidden_elements(domain: str = Query(..., description="Domain to clear")):
     """
     Remove all hidden elements for a domain (unhide all).
 

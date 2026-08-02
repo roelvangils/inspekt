@@ -55,18 +55,26 @@ def _verify_video(video_path: Path) -> str | None:
     try:
         result = subprocess.run(
             [
-                "ffprobe", "-v", "quiet", "-print_format", "json",
-                "-show_format", "-show_streams", str(video_path)
+                "ffprobe",
+                "-v",
+                "quiet",
+                "-print_format",
+                "json",
+                "-show_format",
+                "-show_streams",
+                str(video_path),
             ],
             capture_output=True,
             text=True,
-            timeout=10
+            timeout=10,
         )
         if result.returncode != 0:
             return None
 
         probe = json.loads(result.stdout)
-        video_stream = next((s for s in probe.get("streams", []) if s.get("codec_type") == "video"), None)
+        video_stream = next(
+            (s for s in probe.get("streams", []) if s.get("codec_type") == "video"), None
+        )
         if not video_stream:
             return None
 
@@ -102,8 +110,7 @@ def check_csp_bypass_enabled() -> bool:
     """Check if global CSP bypass is enabled in the browser extension."""
     try:
         response = requests.get(
-            f"http://{BRIDGE_HTTP_HOST}:{BRIDGE_HTTP_PORT}/csp/global",
-            timeout=2.0
+            f"http://{BRIDGE_HTTP_HOST}:{BRIDGE_HTTP_PORT}/csp/global", timeout=2.0
         )
         if response.status_code == 200:
             data = response.json()
@@ -182,19 +189,19 @@ def _execute_native_keypress(step) -> dict:
     modifiers = step.modifiers or []
     if isinstance(modifiers, dict):
         # Dict format: {'shift': True, 'ctrl': False}
-        ctrl = modifiers.get('ctrl', False)
-        alt = modifiers.get('alt', False)
-        shift = modifiers.get('shift', False)
-        meta = modifiers.get('meta', False)
+        ctrl = modifiers.get("ctrl", False)
+        alt = modifiers.get("alt", False)
+        shift = modifiers.get("shift", False)
+        meta = modifiers.get("meta", False)
     else:
         # List format: ['shift', 'ctrl']
-        ctrl = 'ctrl' in modifiers
-        alt = 'alt' in modifiers
-        shift = 'shift' in modifiers
-        meta = 'meta' in modifiers
+        ctrl = "ctrl" in modifiers
+        alt = "alt" in modifiers
+        shift = "shift" in modifiers
+        meta = "meta" in modifiers
 
     spec = KeySpec(
-        type='key',
+        type="key",
         key=step.key,
         code=step.key,  # Will be mapped by keycode_map
         ctrl=ctrl,
@@ -206,10 +213,10 @@ def _execute_native_keypress(step) -> dict:
     results = send_native_key_sequence([spec], delay_config=None)
 
     if results and results[0].ok:
-        return {'ok': True, 'native': True, 'method': 'applescript'}
+        return {"ok": True, "native": True, "method": "applescript"}
     else:
-        error_msg = results[0].error if results else 'Unknown error'
-        return {'ok': False, 'error': error_msg}
+        error_msg = results[0].error if results else "Unknown error"
+        return {"ok": False, "error": error_msg}
 
 
 def _execute_native_type(step, typing_speed: str) -> dict:
@@ -227,18 +234,16 @@ def _execute_native_type(step, typing_speed: str) -> dict:
 
     text = step.value or ""
     if not text:
-        return {'ok': True, 'native': True, 'method': 'applescript'}
+        return {"ok": True, "native": True, "method": "applescript"}
 
     result = send_native_text(
-        text=text,
-        typing_speed=typing_speed,
-        char_by_char=(typing_speed != 'instant')
+        text=text, typing_speed=typing_speed, char_by_char=(typing_speed != "instant")
     )
 
     if result.ok:
-        return {'ok': True, 'native': True, 'method': 'applescript', 'chars': len(text)}
+        return {"ok": True, "native": True, "method": "applescript", "chars": len(text)}
     else:
-        return {'ok': False, 'error': result.error}
+        return {"ok": False, "error": result.error}
 
 
 def _execute_native_activate(step) -> dict:
@@ -258,18 +263,18 @@ def _execute_native_activate(step) -> dict:
 
     # Activate typically uses Enter, but could be Space for buttons
     # Check if step has a hint about which key was used
-    key = 'Enter'  # Default to Enter
-    if hasattr(step, 'key') and step.key:
+    key = "Enter"  # Default to Enter
+    if hasattr(step, "key") and step.key:
         key = step.key
 
-    spec = KeySpec(type='key', key=key, code=key)
+    spec = KeySpec(type="key", key=key, code=key)
     results = send_native_key_sequence([spec], delay_config=None)
 
     if results and results[0].ok:
-        return {'ok': True, 'native': True, 'method': 'applescript'}
+        return {"ok": True, "native": True, "method": "applescript"}
     else:
-        error_msg = results[0].error if results else 'Unknown error'
-        return {'ok': False, 'error': error_msg}
+        error_msg = results[0].error if results else "Unknown error"
+        return {"ok": False, "error": error_msg}
 
 
 def _get_modifiers_from_step(step) -> dict:
@@ -283,10 +288,10 @@ def _get_modifiers_from_step(step) -> dict:
         dict with ctrl, alt, shift, meta booleans
     """
     return {
-        'ctrl': getattr(step, 'ctrl', False) or False,
-        'alt': getattr(step, 'alt', False) or False,
-        'shift': getattr(step, 'shift', False) or False,
-        'meta': getattr(step, 'meta', False) or False,
+        "ctrl": getattr(step, "ctrl", False) or False,
+        "alt": getattr(step, "alt", False) or False,
+        "shift": getattr(step, "shift", False) or False,
+        "meta": getattr(step, "meta", False) or False,
     }
 
 
@@ -308,7 +313,9 @@ def _print_retry_failure_message():
     click.echo()
 
 
-def _handle_missed_native_key(step, client, typing_speed: str, attempt: int = 1, step_num: int = 0, total_steps: int = 0) -> dict:
+def _handle_missed_native_key(
+    step, client, typing_speed: str, attempt: int = 1, step_num: int = 0, total_steps: int = 0
+) -> dict:
     """
     Handle case where native keyboard event didn't reach the browser.
 
@@ -332,6 +339,7 @@ def _handle_missed_native_key(step, client, typing_speed: str, attempt: int = 1,
 
     # Show failure status
     from inspekt.app.cli.formatting import format_status, style_secondary_key
+
     click.echo(format_status("FAIL"))
     click.echo()
 
@@ -356,6 +364,7 @@ def _handle_missed_native_key(step, client, typing_speed: str, attempt: int = 1,
     if sys.stdin.isatty():
         try:
             import termios
+
             # Try to get terminal settings - this will fail if not a real terminal
             termios.tcgetattr(sys.stdin.fileno())
             can_get_input = True
@@ -364,7 +373,10 @@ def _handle_missed_native_key(step, client, typing_speed: str, attempt: int = 1,
 
     if not can_get_input:
         # Non-interactive mode - abort immediately
-        return {'ok': False, 'error': 'Native key not received (non-interactive mode, cannot retry)'}
+        return {
+            "ok": False,
+            "error": "Native key not received (non-interactive mode, cannot retry)",
+        }
 
     while True:
         try:
@@ -372,18 +384,21 @@ def _handle_missed_native_key(step, client, typing_speed: str, attempt: int = 1,
         except KeyboardInterrupt:
             # Ctrl+C pressed - abort gracefully
             click.echo()
-            return {'ok': False, 'error': 'Aborted by user (Ctrl+C)'}
+            return {"ok": False, "error": "Aborted by user (Ctrl+C)"}
         except Exception:
             # If getchar fails, abort
-            return {'ok': False, 'error': 'Native key not received (input error)'}
+            return {"ok": False, "error": "Native key not received (input error)"}
 
-        if user_input in ('\r', '\n'):
+        if user_input in ("\r", "\n"):
             # Retry - restore browser focus first using AppleScript
             # Build progress message with re-run icon
             rerun_icon = "\ueb2c"  # nf-cod-debug_restart
             if step_num > 0 and total_steps > 0:
                 remaining = total_steps - step_num
-                click.echo(f"{rerun_icon} Re-running step {step_num} of {total_steps} ({remaining} steps remaining)… ", nl=False)
+                click.echo(
+                    f"{rerun_icon} Re-running step {step_num} of {total_steps} ({remaining} steps remaining)… ",
+                    nl=False,
+                )
             else:
                 click.echo(f"{rerun_icon} Retrying… ", nl=False)
 
@@ -408,34 +423,42 @@ def _handle_missed_native_key(step, client, typing_speed: str, attempt: int = 1,
                         time.sleep(0.1)
 
                     # Re-try with appropriate detection based on key type
-                    key = step.key.lower() if hasattr(step, 'key') and step.key else ''
-                    is_tab = key == 'tab'
+                    key = step.key.lower() if hasattr(step, "key") and step.key else ""
+                    is_tab = key == "tab"
 
                     if is_tab:
-                        result = _try_native_tab_with_focus_detection(step, client, typing_speed, attempt + 1)
-                        error_type = 'focus_not_changed'
+                        result = _try_native_tab_with_focus_detection(
+                            step, client, typing_speed, attempt + 1
+                        )
+                        error_type = "focus_not_changed"
                     else:
                         result = _try_native_keypress_with_detection(step, client, attempt + 1)
-                        error_type = 'key_not_received'
+                        error_type = "key_not_received"
                 finally:
                     # Always cancel the alarm and restore handler
                     signal.alarm(0)
                     signal.signal(signal.SIGALRM, old_handler)
 
-                if not result.get('ok') and result.get('error') == error_type:
+                if not result.get("ok") and result.get("error") == error_type:
                     if attempt >= MAX_RETRIES:
                         click.echo(format_status("FAIL"))
                         click.echo()
                         _print_retry_failure_message()
-                        return {'ok': False, 'error': f'Native key not received after {MAX_RETRIES} attempts', 'status_printed': True}
+                        return {
+                            "ok": False,
+                            "error": f"Native key not received after {MAX_RETRIES} attempts",
+                            "status_printed": True,
+                        }
                     # Recursively handle next retry (will print its own FAIL status)
-                    return _handle_missed_native_key(step, client, typing_speed, attempt + 1, step_num, total_steps)
+                    return _handle_missed_native_key(
+                        step, client, typing_speed, attempt + 1, step_num, total_steps
+                    )
 
                 # Success! Print the check mark on same line, then blank line before next step
                 click.echo(format_status("OK"))
                 click.echo()
                 # Flag to tell main loop not to print status again
-                result['status_printed'] = True
+                result["status_printed"] = True
                 return result
 
             except (TimeoutError, Exception) as e:
@@ -445,13 +468,17 @@ def _handle_missed_native_key(step, client, typing_speed: str, attempt: int = 1,
                 if attempt >= MAX_RETRIES:
                     click.echo()
                     _print_retry_failure_message()
-                    return {'ok': False, 'error': f'Retry failed: {e}', 'status_printed': True}
+                    return {"ok": False, "error": f"Retry failed: {e}", "status_printed": True}
 
                 # Try again
                 click.echo()
-                click.secho(f"  Connection issue, will retry ({attempt}/{MAX_RETRIES})…", fg="bright_black")
+                click.secho(
+                    f"  Connection issue, will retry ({attempt}/{MAX_RETRIES})…", fg="bright_black"
+                )
                 click.echo()
-                return _handle_missed_native_key(step, client, typing_speed, attempt + 1, step_num, total_steps)
+                return _handle_missed_native_key(
+                    step, client, typing_speed, attempt + 1, step_num, total_steps
+                )
 
         # Ignore other keys, keep waiting for Enter
 
@@ -503,17 +530,17 @@ def _try_native_tab_with_focus_detection(step, client, typing_speed: str, attemp
 
     try:
         before_result = client.execute(before_script, timeout=2.0)
-        if not before_result.get('ok'):
+        if not before_result.get("ok"):
             # Can't communicate with browser - likely closed or crashed
-            return {'ok': False, 'error': 'focus_not_changed', 'reason': 'browser_not_responding'}
+            return {"ok": False, "error": "focus_not_changed", "reason": "browser_not_responding"}
 
-        before_focus = before_result.get('result', {})
-        before_uid = before_focus.get('uid', 'none')
+        before_focus = before_result.get("result", {})
+        before_uid = before_focus.get("uid", "none")
 
         # Send the native Tab key
         native_result = _execute_native_keypress(step)
 
-        if not native_result.get('ok'):
+        if not native_result.get("ok"):
             return native_result
 
         # Small delay for focus to change
@@ -521,12 +548,12 @@ def _try_native_tab_with_focus_detection(step, client, typing_speed: str, attemp
 
         # Check if focus changed
         after_result = client.execute(before_script, timeout=2.0)
-        if not after_result.get('ok'):
+        if not after_result.get("ok"):
             # Can't communicate with browser after Tab - likely closed or crashed
-            return {'ok': False, 'error': 'focus_not_changed', 'reason': 'browser_not_responding'}
+            return {"ok": False, "error": "focus_not_changed", "reason": "browser_not_responding"}
 
-        after_focus = after_result.get('result', {})
-        after_uid = after_focus.get('uid', 'none')
+        after_focus = after_result.get("result", {})
+        after_uid = after_focus.get("uid", "none")
 
         # Focus should have changed (different element)
         focus_changed = before_uid != after_uid
@@ -552,17 +579,17 @@ def _try_native_tab_with_focus_detection(step, client, typing_speed: str, attemp
                 })()
                 """
                 check_result = client.execute(check_script, timeout=2.0)
-                focus_info = check_result.get('result', {}) if check_result.get('ok') else {}
+                focus_info = check_result.get("result", {}) if check_result.get("ok") else {}
 
                 # If not the last focusable element, this is suspicious
-                if not focus_info.get('isLast', False):
-                    return {'ok': False, 'error': 'focus_not_changed'}
+                if not focus_info.get("isLast", False):
+                    return {"ok": False, "error": "focus_not_changed"}
 
         return native_result
 
     except Exception:
         # If detection fails (timeout, connection error), browser likely not responding
-        return {'ok': False, 'error': 'focus_not_changed', 'reason': 'browser_not_responding'}
+        return {"ok": False, "error": "focus_not_changed", "reason": "browser_not_responding"}
 
 
 def _try_native_keypress_with_detection(step, client, attempt: int = 1) -> dict:
@@ -601,16 +628,16 @@ def _try_native_keypress_with_detection(step, client, attempt: int = 1) -> dict:
 
     try:
         expect_result = client.execute(expect_script, timeout=2.0)
-        if not expect_result.get('ok') or not expect_result.get('result', {}).get('ok'):
+        if not expect_result.get("ok") or not expect_result.get("result", {}).get("ok"):
             # KeyWatcher not available, fall back to sending without detection
             return _execute_native_keypress(step)
 
-        expected_time = expect_result.get('result', {}).get('timestamp', 0)
+        expected_time = expect_result.get("result", {}).get("timestamp", 0)
 
         # Send the native key
         native_result = _execute_native_keypress(step)
 
-        if not native_result.get('ok'):
+        if not native_result.get("ok"):
             # AppleScript failed, clear watcher and return error
             client.execute("window.__INSPEKT_VISUAL__?.keyWatcher?.clear()", timeout=1.0)
             return native_result
@@ -634,8 +661,8 @@ def _try_native_keypress_with_detection(step, client, attempt: int = 1) -> dict:
         }})()
         """
         check_result = client.execute(check_script, timeout=2.0)
-        debug_info = check_result.get('result', {})
-        key_received = check_result.get('ok') and debug_info.get('received', False)
+        debug_info = check_result.get("result", {})
+        key_received = check_result.get("ok") and debug_info.get("received", False)
 
         # Debug output
         if not key_received:
@@ -643,7 +670,7 @@ def _try_native_keypress_with_detection(step, client, attempt: int = 1) -> dict:
 
         if not key_received:
             # Event didn't arrive
-            return {'ok': False, 'error': 'key_not_received'}
+            return {"ok": False, "error": "key_not_received"}
 
         return native_result
 
@@ -652,7 +679,9 @@ def _try_native_keypress_with_detection(step, client, attempt: int = 1) -> dict:
         return _execute_native_keypress(step)
 
 
-def _execute_native_keyboard_action(step, typing_speed: str, client=None, step_num: int = 0, total_steps: int = 0) -> dict | None:
+def _execute_native_keyboard_action(
+    step, typing_speed: str, client=None, step_num: int = 0, total_steps: int = 0
+) -> dict | None:
     """
     Execute a keyboard action natively via AppleScript if applicable.
 
@@ -677,26 +706,33 @@ def _execute_native_keyboard_action(step, typing_speed: str, client=None, step_n
     if client:
         _ensure_page_focus(client)
 
-    if step.action == 'keypress':
+    if step.action == "keypress":
         # For Tab/Shift+Tab, use focus-change detection instead of keydown detection
         # (Tab keydown events don't reliably reach document-level listeners)
-        key = step.key.lower() if step.key else ''
-        is_tab = key == 'tab'
+        key = step.key.lower() if step.key else ""
+        is_tab = key == "tab"
 
         if is_tab and client:
             result = _try_native_tab_with_focus_detection(step, client, typing_speed)
-            if not result.get('ok') and result.get('error') == 'focus_not_changed':
+            if not result.get("ok") and result.get("error") == "focus_not_changed":
                 # Focus didn't change - offer retry
-                return _handle_missed_native_key(step, client, typing_speed, attempt=1, step_num=step_num, total_steps=total_steps)
+                return _handle_missed_native_key(
+                    step,
+                    client,
+                    typing_speed,
+                    attempt=1,
+                    step_num=step_num,
+                    total_steps=total_steps,
+                )
             return result
         else:
             # For non-Tab keys, just execute without detection for now
             # TODO: Could add keydown detection for Enter, Space, etc.
             return _execute_native_keypress(step)
-    elif step.action == 'type':
+    elif step.action == "type":
         # Type actions don't use detection (too slow for character-by-character)
         return _execute_native_type(step, typing_speed)
-    elif step.action == 'activate':
+    elif step.action == "activate":
         # TODO: Key detection temporarily disabled (same as keypress above)
         return _execute_native_activate(step)
     else:
@@ -792,7 +828,9 @@ class ReplayResult:
     def add_success(self, step_index: int, step: dict):
         self.passed_steps += 1
 
-    def add_failure(self, step_index: int, step: dict, error: str, assertion_failures: list[str] | None = None):
+    def add_failure(
+        self, step_index: int, step: dict, error: str, assertion_failures: list[str] | None = None
+    ):
         self.failed_steps += 1
         failure = {
             "step": step_index + 1,
@@ -912,11 +950,16 @@ def wait_for_reconnection(
                     # Get current domain for the message
                     try:
                         from urllib.parse import urlparse
+
                         url_result = client.execute("window.location.href", timeout=1.0)
                         if url_result.get("ok"):
                             url = url_result.get("result", "")
                             domain = urlparse(url).netloc or url
-                            click.echo(format_system_message(f"Playback resumed on {domain}", icon="resume"))
+                            click.echo(
+                                format_system_message(
+                                    f"Playback resumed on {domain}", icon="resume"
+                                )
+                            )
                         else:
                             click.echo(format_system_message("Playback resumed", icon="resume"))
                     except Exception:
@@ -932,7 +975,9 @@ def wait_for_reconnection(
     return False
 
 
-def _interruptible_wait(seconds: float, action_name: str, elapsed_ms: int = 0, show_milliseconds: bool = True) -> bool:
+def _interruptible_wait(
+    seconds: float, action_name: str, elapsed_ms: int = 0, show_milliseconds: bool = True
+) -> bool:
     """
     Wait with live countdown, skippable by Enter.
 
@@ -975,7 +1020,9 @@ def _interruptible_wait(seconds: float, action_name: str, elapsed_ms: int = 0, s
         millis = current_elapsed % 1000
         if show_milliseconds:
             # Style milliseconds in dark gray to match step output
-            elapsed_str = click.style(f"{mins:02d}:{secs:02d}", fg="bright_black") + click.style(f".{millis:03d}", fg="bright_black")
+            elapsed_str = click.style(f"{mins:02d}:{secs:02d}", fg="bright_black") + click.style(
+                f".{millis:03d}", fg="bright_black"
+            )
         else:
             elapsed_str = click.style(f"{mins:02d}:{secs:02d}", fg="bright_black")
 
@@ -1149,7 +1196,9 @@ def wait_for_visual_script_ready(
     return {"success": False, "injected": False, "elapsed_ms": elapsed_ms, "timed_out": True}
 
 
-def send_text_with_typing(client: BridgeClient, text: str, selector: str, clear: bool = True) -> dict:
+def send_text_with_typing(
+    client: BridgeClient, text: str, selector: str, clear: bool = True
+) -> dict:
     """Send text using human-like typing simulation.
 
     Uses the same approach as 'inspekt type --speed 0' for realistic typing.
@@ -1195,7 +1244,7 @@ def send_text_with_typing(client: BridgeClient, text: str, selector: str, clear:
 
     # Get typing configuration
     typing_config = get_typing_config()
-    typo_rate = typing_config.get('human-like-typo-rate', 0)
+    typo_rate = typing_config.get("human-like-typo-rate", 0)
 
     # Human-like typing speed (delay_ms = -1 triggers human mode in send_keys.js)
     delay_ms = -1
@@ -1393,7 +1442,11 @@ def check_inspekt_expectations(command: str, expect: dict, cmd_result: dict) -> 
     # For console commands, check if output is empty
     if "console" in command and expect.get("empty"):
         # Check if there are any log entries (non-empty, non-header output)
-        lines = [line for line in stdout.strip().split("\n") if line.strip() and not line.startswith("Console")]
+        lines = [
+            line
+            for line in stdout.strip().split("\n")
+            if line.strip() and not line.startswith("Console")
+        ]
         if lines:
             failures.append(f"Expected no console messages, but found: {len(lines)} message(s)")
 
@@ -1633,7 +1686,13 @@ def run_download_shell_command(command: str, file_path: Path) -> dict:
 
 
 @click.command()
-@click.argument("recording_file", type=click.Path(exists=True), required=False, default=None, shell_complete=complete_recording_files)
+@click.argument(
+    "recording_file",
+    type=click.Path(exists=True),
+    required=False,
+    default=None,
+    shell_complete=complete_recording_files,
+)
 @click.option(
     "--speed",
     type=float,
@@ -1971,6 +2030,7 @@ def replay(
     # Determine whether to show milliseconds in timestamps
     # CLI flag takes precedence over config setting
     from inspekt.config import load_config
+
     config_data = load_config()
     show_milliseconds = not no_milliseconds and config_data.get("show-milliseconds", True)
 
@@ -1979,7 +2039,10 @@ def replay(
     if recording_file is None:
         recent = find_most_recent_recording()
         if recent is None:
-            click.echo("Error: No recording file specified and no .yaml files found in current directory.", err=True)
+            click.echo(
+                "Error: No recording file specified and no .yaml files found in current directory.",
+                err=True,
+            )
             sys.exit(1)
         recording_file = str(recent)
         auto_selected = True
@@ -1994,6 +2057,7 @@ def replay(
             sys.exit(1)
 
         from inspekt.services.applescript_utils import check_accessibility_permissions
+
         if not check_accessibility_permissions():
             print_error("Accessibility permissions required for --native mode")
             print_hint("Grant permission in System Settings > Privacy & Security > Accessibility")
@@ -2055,7 +2119,9 @@ def replay(
 
         # Warn if --fps is used with compact mode (where it's ignored)
         if video_fps is not None and video_mode == "compact":
-            print_hint("`--fps` only applies to `--smooth` mode. Using compact mode (1 frame per action).")
+            print_hint(
+                "`--fps` only applies to `--smooth` mode. Using compact mode (1 frame per action)."
+            )
 
         video_recording_enabled = True
 
@@ -2147,8 +2213,12 @@ def replay(
     should_validate = replay_config.get("validate", True) and not skip_validation
 
     # Skip-ahead settings (CLI overrides config)
-    skip_ahead_enabled = skip_ahead if skip_ahead is not None else replay_config.get("skip-ahead", True)
-    skip_threshold_sec = skip_threshold if skip_threshold is not None else replay_config.get("skip-threshold", 5)
+    skip_ahead_enabled = (
+        skip_ahead if skip_ahead is not None else replay_config.get("skip-ahead", True)
+    )
+    skip_threshold_sec = (
+        skip_threshold if skip_threshold is not None else replay_config.get("skip-threshold", 5)
+    )
 
     if should_validate:
         from inspekt.app.cli.validation import display_validation_results, validate_recording_file
@@ -2207,8 +2277,8 @@ def replay(
     last_modified = file_mtime.strftime("%B %d, %Y at %H:%M")
 
     # Only show Last Modified if different from Recorded (compare at minute level)
-    show_last_modified = (
-        created_at_local.strftime("%Y-%m-%d %H:%M") != file_mtime.strftime("%Y-%m-%d %H:%M")
+    show_last_modified = created_at_local.strftime("%Y-%m-%d %H:%M") != file_mtime.strftime(
+        "%Y-%m-%d %H:%M"
     )
 
     # Build title with optional (last modified) suffix
@@ -2216,29 +2286,35 @@ def replay(
     title = f"{recording_path.name}{title_suffix}"
 
     # Support both v1.0 (viewport in metadata) and v1.1 (viewport in state)
-    viewport = recording.state.viewport if recording.state else getattr(recording.metadata, 'viewport', None)
+    viewport = (
+        recording.state.viewport
+        if recording.state
+        else getattr(recording.metadata, "viewport", None)
+    )
     viewport_str = f"{viewport.width}×{viewport.height}" if viewport else "unknown"
 
     # Count special step types for intelligent steps display
-    keyboard_actions = ('keypress', 'type', 'activate')
+    keyboard_actions = ("keypress", "type", "activate")
     native_count = 0
     skipped_count = 0
     merged_count = 0
 
     for i, s in enumerate(steps_to_run):
         # Count native steps
-        step_native = getattr(s, 'native', None)
-        if (step_native is True and s.action in keyboard_actions) or (step_native is None and native and s.action in keyboard_actions):
+        step_native = getattr(s, "native", None)
+        if (step_native is True and s.action in keyboard_actions) or (
+            step_native is None and native and s.action in keyboard_actions
+        ):
             native_count += 1
 
         # Count skipped steps
-        if getattr(s, 'skip', False):
+        if getattr(s, "skip", False):
             skipped_count += 1
 
         # Count merged scroll steps (scroll that will be merged with previous)
-        if s.action == 'scroll' and i > 0:
+        if s.action == "scroll" and i > 0:
             prev = steps_to_run[i - 1]
-            if prev.action == 'scroll':
+            if prev.action == "scroll":
                 merged_count += 1
 
     # Build steps string
@@ -2269,11 +2345,13 @@ def replay(
     ]
     if show_last_modified:
         rows.append(["Last Modified", last_modified])
-    rows.extend([
-        ["URL", recording.metadata.starting_url],
-        ["Viewport", viewport_str],
-        ["Steps", steps_str],
-    ])
+    rows.extend(
+        [
+            ["URL", recording.metadata.starting_url],
+            ["Viewport", viewport_str],
+            ["Steps", steps_str],
+        ]
+    )
 
     table = Table(["Key", "Value"], title=title, icon="󰨛")
     table.set_data(rows)
@@ -2283,7 +2361,9 @@ def replay(
     table.print_row(["Recorded", recorded_date])
     if show_last_modified:
         table.print_row(["Last Modified", last_modified])
-    table.print_row(["URL", click.style(recording.metadata.starting_url, fg="blue", underline=True)])
+    table.print_row(
+        ["URL", click.style(recording.metadata.starting_url, fg="blue", underline=True)]
+    )
     table.print_row(["Viewport", viewport_str])
     table.print_row(["Steps", steps_str])
     table.print_footer()
@@ -2315,12 +2395,20 @@ def replay(
         client = BridgeClient()
 
         if not client.is_alive():
-            click.echo(_style_with_inline_code("Error: Bridge server is not running. Start it with `inspekt start`.", base_fg="red"), err=True)
+            click.echo(
+                _style_with_inline_code(
+                    "Error: Bridge server is not running. Start it with `inspekt start`.",
+                    base_fg="red",
+                ),
+                err=True,
+            )
             sys.exit(1)
 
         # Check CSP bypass status and warn if disabled
         if not check_csp_bypass_enabled():
-            click.secho("⚠ CSP bypass is disabled (or no web page is loaded)", fg="yellow", bold=True)
+            click.secho(
+                "⚠ CSP bypass is disabled (or no web page is loaded)", fg="yellow", bold=True
+            )
             click.secho("  Some sites may not work correctly during replay.", fg="bright_black")
             click.secho("  Enable it with: `inspekt domain csp --enable`.", fg="bright_black")
             click.echo()
@@ -2445,7 +2533,10 @@ def replay(
         # Handle mode mismatches between recording and replay
         if recorded_window_mode and current_window_mode:
             if recorded_window_mode != current_window_mode:
-                if recorded_window_mode in ("fullscreen", "kiosk") and current_window_mode == "normal":
+                if (
+                    recorded_window_mode in ("fullscreen", "kiosk")
+                    and current_window_mode == "normal"
+                ):
                     # Recording was in fullscreen, replay is in normal mode
                     click.echo()
                     click.secho(
@@ -2454,14 +2545,20 @@ def replay(
                         fg="blue",
                     )
                     click.echo("   Viewport dimensions may differ. Use --match-viewport to resize.")
-                elif current_window_mode in ("fullscreen", "kiosk") and recorded_window_mode == "normal":
+                elif (
+                    current_window_mode in ("fullscreen", "kiosk")
+                    and recorded_window_mode == "normal"
+                ):
                     # Recording was normal, replay is in fullscreen
                     click.echo()
                     click.secho(
                         f"⚠ Recording was made in normal window mode, but replay is in {current_window_mode} mode",
                         fg="yellow",
                     )
-                    click.secho(f"  Exit {current_window_mode} mode (press F11 or Esc) if viewport dimensions need to match.", fg="bright_black")
+                    click.secho(
+                        f"  Exit {current_window_mode} mode (press F11 or Esc) if viewport dimensions need to match.",
+                        fg="bright_black",
+                    )
 
         # Check for viewport/zoom mismatch and show warning
         # Only check WIDTH - height can vary due to debug banner
@@ -2474,7 +2571,11 @@ def replay(
             zoom_mismatch = abs(current_zoom - recorded_zoom) > 0.05  # 5% tolerance
 
         # Show warning if there's a mismatch and no matching flags were provided
-        if (viewport_width_mismatch or zoom_mismatch) and not match_viewport and not match_zoom_level:
+        if (
+            (viewport_width_mismatch or zoom_mismatch)
+            and not match_viewport
+            and not match_zoom_level
+        ):
             click.echo()
             click.secho(
                 "⚠ Your browser's current viewport width or zoom level differs from the",
@@ -2539,9 +2640,15 @@ def replay(
                 f"⚠ Browser is in {current_window_mode} mode. Cannot resize viewport.",
                 fg="yellow",
             )
-            click.secho(f"  Recorded viewport: {recorded_viewport.width}×{recorded_viewport.height}", fg="bright_black")
+            click.secho(
+                f"  Recorded viewport: {recorded_viewport.width}×{recorded_viewport.height}",
+                fg="bright_black",
+            )
             click.secho(f"  Current viewport: {current_width}×{current_height}", fg="bright_black")
-            click.secho(f"  Exit {current_window_mode} mode (press F11 or Esc) to enable viewport matching.", fg="bright_black")
+            click.secho(
+                f"  Exit {current_window_mode} mode (press F11 or Esc) to enable viewport matching.",
+                fg="bright_black",
+            )
             click.echo()
             # Disable viewport matching for this run
             match_viewport = False
@@ -2551,7 +2658,9 @@ def replay(
             target_height = recorded_viewport.height
 
             if verbose:
-                click.echo(format_system_message(f"Resizing viewport to {target_width}×{target_height}…"))
+                click.echo(
+                    format_system_message(f"Resizing viewport to {target_width}×{target_height}…")
+                )
 
             # Import config functions for caching
             from inspekt.config import get_viewport_offsets, save_viewport_offsets
@@ -2577,6 +2686,7 @@ def replay(
                 if sys.platform == "darwin":
                     try:
                         from inspekt.services.applescript_utils import resize_browser_window
+
                         return resize_browser_window(width, height)
                     except Exception:
                         pass
@@ -2618,7 +2728,11 @@ def replay(
                     resize_success = True
                 elif actual_w is not None:
                     if verbose:
-                        click.echo(format_system_message(f"Cached offsets outdated (got {actual_w}×{actual_h}), calibrating…"))
+                        click.echo(
+                            format_system_message(
+                                f"Cached offsets outdated (got {actual_w}×{actual_h}), calibrating…"
+                            )
+                        )
                     cached_offsets = None  # Fall through to calibration
 
             # Calibration loop if cached offsets didn't work
@@ -2632,7 +2746,7 @@ def replay(
                     adjusted_h = target_height - adjustment_h
 
                     attempt_resize(adjusted_w, adjusted_h)
-                    time.sleep(0.3 * (1.1 ** attempt))  # Exponential backoff
+                    time.sleep(0.3 * (1.1**attempt))  # Exponential backoff
 
                     actual_w, actual_h = get_actual_viewport()
                     if actual_w is None:
@@ -2655,7 +2769,9 @@ def replay(
                         offset_h = -adjustment_h
                         save_viewport_offsets(offset_w, offset_h)
                         if verbose:
-                            click.echo(format_system_message(f"Viewport set to {actual_w}×{actual_h}"))
+                            click.echo(
+                                format_system_message(f"Viewport set to {actual_w}×{actual_h}")
+                            )
                         resize_success = True
                         break
 
@@ -2708,7 +2824,9 @@ def replay(
             target_height = viewport.height
 
             if verbose:
-                click.echo(format_system_message(f"Restoring viewport to {target_width}x{target_height}…"))
+                click.echo(
+                    format_system_message(f"Restoring viewport to {target_width}x{target_height}…")
+                )
 
             # Try to resize the browser window
             resize_code = f"""
@@ -2754,7 +2872,9 @@ def replay(
                     )
                     print_hint("Manually resize your browser window for best results.")
                 elif verbose:
-                    click.echo(format_system_message(f"Viewport set to {current_width}x{current_height}"))
+                    click.echo(
+                        format_system_message(f"Viewport set to {current_width}x{current_height}")
+                    )
 
         # Navigate to starting URL and hard reload for clean state
         starting_url = recording.metadata.starting_url
@@ -2840,6 +2960,7 @@ def replay(
             # Verify checksum if requested
             if verify_checksum and recording.state.checksum:
                 import hashlib
+
                 if verbose:
                     click.echo(format_system_message("Verifying DOM checksum…"))
 
@@ -2864,7 +2985,9 @@ def replay(
                             print_hint("Use `--no-strict-checksum` to continue anyway.")
                             sys.exit(1)
                         else:
-                            print_warning("DOM checksum mismatch - page structure differs from recording")
+                            print_warning(
+                                "DOM checksum mismatch - page structure differs from recording"
+                            )
                     elif verbose:
                         click.echo(format_system_message("✓ DOM checksum matches"))
 
@@ -2905,7 +3028,9 @@ def replay(
                     result = client.execute(restore_code, timeout=5.0)
                     if verbose:
                         if result.get("ok"):
-                            click.echo(format_system_message(f"✓ Restored {len(cookies_list)} cookies"))
+                            click.echo(
+                                format_system_message(f"✓ Restored {len(cookies_list)} cookies")
+                            )
                         else:
                             print_warning("Failed to restore cookies")
                 except Exception as e:
@@ -2929,7 +3054,9 @@ def replay(
                         result = client.execute(restore_code, timeout=3.0)
                         if verbose and result.get("ok"):
                             count = result.get("result", {}).get("restored", 0)
-                            click.echo(format_system_message(f"✓ Restored {count} localStorage keys"))
+                            click.echo(
+                                format_system_message(f"✓ Restored {count} localStorage keys")
+                            )
                     except Exception as e:
                         print_warning(f"`localStorage` restoration failed: {e}")
 
@@ -2948,16 +3075,24 @@ def replay(
                         result = client.execute(restore_code, timeout=3.0)
                         if verbose and result.get("ok"):
                             count = result.get("result", {}).get("restored", 0)
-                            click.echo(format_system_message(f"✓ Restored {count} sessionStorage keys"))
+                            click.echo(
+                                format_system_message(f"✓ Restored {count} sessionStorage keys")
+                            )
                     except Exception as e:
                         print_warning(f"`sessionStorage` restoration failed: {e}")
 
             # Restore scroll position if state has scroll data
-            if recording.state.scroll and (recording.state.scroll.x > 0 or recording.state.scroll.y > 0):
+            if recording.state.scroll and (
+                recording.state.scroll.x > 0 or recording.state.scroll.y > 0
+            ):
                 scroll_x = recording.state.scroll.x
                 scroll_y = recording.state.scroll.y
                 if verbose:
-                    click.echo(format_system_message(f"Restoring scroll position to ({scroll_x}, {scroll_y})…"))
+                    click.echo(
+                        format_system_message(
+                            f"Restoring scroll position to ({scroll_x}, {scroll_y})…"
+                        )
+                    )
 
                 scroll_code = f"window.scrollTo({scroll_x}, {scroll_y})"
                 client.execute(scroll_code, timeout=2.0)
@@ -3011,14 +3146,24 @@ def replay(
                 if replay_mode_result.get("ok"):
                     replay_mode_enabled = True
                     if verbose:
-                        click.echo(format_system_message("replay mode enabled (auto-inject on navigation)"))
+                        click.echo(
+                            format_system_message("replay mode enabled (auto-inject on navigation)")
+                        )
                 else:
                     # Fallback: inject script directly (extension might not support replay mode)
                     if verbose:
-                        click.echo(format_system_message("replay mode not available, using direct injection"))
+                        click.echo(
+                            format_system_message(
+                                "replay mode not available, using direct injection"
+                            )
+                        )
                     inject_result = client.execute(visual_script, timeout=10.0)
                     if not inject_result.get("ok"):
-                        click.secho(f"⚠ Could not inject visual script: {inject_result.get('error')}", fg="yellow", err=True)
+                        click.secho(
+                            f"⚠ Could not inject visual script: {inject_result.get('error')}",
+                            fg="yellow",
+                            err=True,
+                        )
                     elif verbose:
                         click.echo(format_system_message("visual feedback script injected"))
 
@@ -3055,15 +3200,26 @@ def replay(
                         )
                         input()
                         # Resume audio context after user interaction
-                        client.execute("window.__INSPEKT_VISUAL__.audio.ctx && window.__INSPEKT_VISUAL__.audio.ctx.resume()", timeout=5.0)
-                        client.execute("window.__INSPEKT_VISUAL__.audio.playStartPlayback()", timeout=5.0)
+                        client.execute(
+                            "window.__INSPEKT_VISUAL__.audio.ctx && window.__INSPEKT_VISUAL__.audio.ctx.resume()",
+                            timeout=5.0,
+                        )
+                        client.execute(
+                            "window.__INSPEKT_VISUAL__.audio.playStartPlayback()", timeout=5.0
+                        )
                         time.sleep(0.5)  # Wait for start sound to complete
                 else:
-                    click.secho("⚠ Visual script injected but __INSPEKT_VISUAL__ not created", fg="yellow", err=True)
+                    click.secho(
+                        "⚠ Visual script injected but __INSPEKT_VISUAL__ not created",
+                        fg="yellow",
+                        err=True,
+                    )
                     if verbose:
                         click.echo(format_system_message(f"verify result: {verify_result}"))
             except FileNotFoundError:
-                click.secho(f"⚠ Visual script not found: {visual_script_path}", fg="yellow", err=True)
+                click.secho(
+                    f"⚠ Visual script not found: {visual_script_path}", fg="yellow", err=True
+                )
 
     # Print interactive mode message and step header (unless in progress bar mode)
     if not progress:
@@ -3078,9 +3234,9 @@ def replay(
         # Show warning for native mode (before header)
         # Count native actions (considering per-step overrides)
         native_action_count = 0
-        keyboard_actions = ('keypress', 'type', 'activate')
+        keyboard_actions = ("keypress", "type", "activate")
         for s in steps_to_run:
-            step_native = getattr(s, 'native', None)
+            step_native = getattr(s, "native", None)
             if step_native is True and s.action in keyboard_actions:
                 # Explicitly marked as native
                 native_action_count += 1
@@ -3154,10 +3310,7 @@ def replay(
 
         # Start download monitoring
         download_session_id = f"replay-{int(time.time() * 1000)}"
-        download_config = json.dumps({
-            "action": "start",
-            "sessionId": download_session_id
-        })
+        download_config = json.dumps({"action": "start", "sessionId": download_session_id})
         download_script = download_script_template.replace(
             "DOWNLOAD_CONFIG_PLACEHOLDER", download_config
         )
@@ -3165,9 +3318,17 @@ def replay(
         if start_result.get("ok"):
             download_monitoring_active = True
             if verbose:
-                click.echo(format_system_message(f"download monitoring started, files will be saved to: {replay_downloads_dir}"))
+                click.echo(
+                    format_system_message(
+                        f"download monitoring started, files will be saved to: {replay_downloads_dir}"
+                    )
+                )
         else:
-            click.secho(f"⚠ Could not start download monitoring: {start_result.get('error')}", fg="yellow", err=True)
+            click.secho(
+                f"⚠ Could not start download monitoring: {start_result.get('error')}",
+                fg="yellow",
+                err=True,
+            )
 
     # Measure viewport height BEFORE any debugger attachment
     # This is needed to detect the automation banner height for video cropping
@@ -3197,7 +3358,9 @@ def replay(
             dialog_result = js_step.result
             # Include duration for replay timing (default 1500ms if not recorded)
             dialog_duration = js_step.duration or 1500
-            queue.append({"type": dialog_type, "result": dialog_result, "duration": dialog_duration})
+            queue.append(
+                {"type": dialog_type, "result": dialog_result, "duration": dialog_duration}
+            )
         return queue
 
     def build_cdp_enable_code(queue: list) -> str:
@@ -3283,22 +3446,40 @@ def replay(
                     cdp_dialog_interception_enabled = True
                     if verbose:
                         if queue:
-                            click.echo(format_system_message(f"CDP dialog interception enabled ({len(queue)} dialog(s) queued)"))
+                            click.echo(
+                                format_system_message(
+                                    f"CDP dialog interception enabled ({len(queue)} dialog(s) queued)"
+                                )
+                            )
                         else:
-                            click.echo(format_system_message("CDP dialog interception enabled (no dialogs in recording)"))
+                            click.echo(
+                                format_system_message(
+                                    "CDP dialog interception enabled (no dialogs in recording)"
+                                )
+                            )
                 else:
                     # CDP failed (e.g., DevTools open) - JS fallback is enabled via visual script
                     if verbose:
                         error_msg = inner_result.get("error", "Unknown error")
-                        click.echo(format_system_message(f"CDP dialog interception unavailable: {error_msg} (using JS fallback)"))
+                        click.echo(
+                            format_system_message(
+                                f"CDP dialog interception unavailable: {error_msg} (using JS fallback)"
+                            )
+                        )
             else:
                 # Communication failure - JS fallback is enabled via visual script
                 if verbose:
-                    click.echo(format_system_message(f"CDP dialog interception failed: {intercept_result.get('error')} (using JS fallback)"))
+                    click.echo(
+                        format_system_message(
+                            f"CDP dialog interception failed: {intercept_result.get('error')} (using JS fallback)"
+                        )
+                    )
         except Exception as e:
             # Setup exception - JS fallback is enabled via visual script
             if verbose:
-                click.echo(format_system_message(f"CDP dialog interception error: {e} (using JS fallback)"))
+                click.echo(
+                    format_system_message(f"CDP dialog interception error: {e} (using JS fallback)")
+                )
 
     # Start video recording if enabled (BEFORE first step to capture all frames)
     if video_recording_enabled and not dry_run and client:
@@ -3341,52 +3522,71 @@ def replay(
             try:
                 sc_result = client.execute(smooth_start_js, timeout=15.0)
                 if sc_result.get("ok") and sc_result.get("result", {}).get("ok"):
-                    click.echo(format_system_message(
-                        f"Recording smooth video at {actual_fps} fps…",
-                        icon="video",
-                        elapsed_ms=video_start_elapsed
-                    ))
+                    click.echo(
+                        format_system_message(
+                            f"Recording smooth video at {actual_fps} fps…",
+                            icon="video",
+                            elapsed_ms=video_start_elapsed,
+                        )
+                    )
                     # Smooth capture is now active in browser (tabCapture + MediaRecorder)
                 else:
-                    error_msg = sc_result.get("result", {}).get("error", sc_result.get("error", "Unknown error"))
+                    error_msg = sc_result.get("result", {}).get(
+                        "error", sc_result.get("error", "Unknown error")
+                    )
                     print_warning(f"Could not start smooth video recording: {error_msg}")
                     print_warning("Falling back to compact mode (1 frame per action)")
                     video_mode = "compact"
-                    click.echo(format_system_message(
-                        "Recording compact video (1 frame per action)…",
-                        icon="video",
-                        elapsed_ms=video_start_elapsed
-                    ))
+                    click.echo(
+                        format_system_message(
+                            "Recording compact video (1 frame per action)…",
+                            icon="video",
+                            elapsed_ms=video_start_elapsed,
+                        )
+                    )
             except Exception as e:
                 print_warning(f"Smooth video recording error: {e}")
                 print_warning("Falling back to compact mode (1 frame per action)")
                 video_mode = "compact"
-                click.echo(format_system_message(
-                    "Recording compact video (1 frame per action)…",
-                    icon="video",
-                    elapsed_ms=video_start_elapsed
-                ))
+                click.echo(
+                    format_system_message(
+                        "Recording compact video (1 frame per action)…",
+                        icon="video",
+                        elapsed_ms=video_start_elapsed,
+                    )
+                )
         else:
             # Compact mode - 1 frame per action
-            click.echo(format_system_message(
-                "Recording compact video (1 frame per action)…",
-                icon="video",
-                elapsed_ms=video_start_elapsed
-            ))
+            click.echo(
+                format_system_message(
+                    "Recording compact video (1 frame per action)…",
+                    icon="video",
+                    elapsed_ms=video_start_elapsed,
+                )
+            )
 
         # Start audio cue recording if --include-effects is enabled
         if include_effects:
             try:
                 # Start audio recording in JavaScript (captures timestamps when sounds play)
-                client.execute("window.__INSPEKT_REPLAY_VISUAL__.audio.startRecordingForVideo()", timeout=2.0)
+                client.execute(
+                    "window.__INSPEKT_REPLAY_VISUAL__.audio.startRecordingForVideo()", timeout=2.0
+                )
                 # Also notify bridge server to start collecting cues
                 import requests
+
                 requests.post("http://127.0.0.1:8765/audio/start", timeout=2.0)
                 if verbose:
-                    click.echo(format_system_message("Recording audio cues for video…", icon="audio"))
+                    click.echo(
+                        format_system_message("Recording audio cues for video…", icon="audio")
+                    )
             except Exception as e:
                 if verbose:
-                    click.echo(format_system_message(f"Could not start audio cue recording: {e}", icon="warning"))
+                    click.echo(
+                        format_system_message(
+                            f"Could not start audio cue recording: {e}", icon="warning"
+                        )
+                    )
 
     # Terminal echo suppressor - prevents escape sequences from appearing when user
     # accidentally types in the terminal instead of the browser during replay
@@ -3431,7 +3631,9 @@ def replay(
         # Check if Ctrl+C was pressed in browser (non-interactive mode)
         if not dry_run and client and (visual or lock):
             try:
-                stop_check = client.execute("window.__INSPEKT_VISUAL__.isStopRequested()", timeout=1.0)
+                stop_check = client.execute(
+                    "window.__INSPEKT_VISUAL__.isStopRequested()", timeout=1.0
+                )
                 if stop_check.get("ok") and stop_check.get("result"):
                     click.echo()
                     click.secho("Replay stopped by user (Ctrl+C in browser).", fg="yellow")
@@ -3453,11 +3655,15 @@ def replay(
                 delay_sec = min(delay_sec, 30.0)
                 if delay_sec > 0.05:  # Only sleep if delay is meaningful (>50ms)
                     # For long delays, offer skip-ahead option (if enabled and interactive)
-                    if (skip_ahead_enabled and
-                        delay_sec > skip_threshold_sec and
-                        not progress and
-                        sys.stdin.isatty()):
-                        _interruptible_wait(delay_sec, step.action or "action", step_timestamp, show_milliseconds)
+                    if (
+                        skip_ahead_enabled
+                        and delay_sec > skip_threshold_sec
+                        and not progress
+                        and sys.stdin.isatty()
+                    ):
+                        _interruptible_wait(
+                            delay_sec, step.action or "action", step_timestamp, show_milliseconds
+                        )
                     else:
                         time.sleep(delay_sec)
         page_load_wait_ms = 0  # Reset after applying
@@ -3467,18 +3673,26 @@ def replay(
         if step.action in skip_actions:
             if not progress:
                 # Determine if this would be a native action (for icon display)
-                would_be_native = native and step.action in ('keypress', 'type', 'activate')
+                would_be_native = native and step.action in ("keypress", "type", "activate")
                 summary = format_step_for_display(
-                    step_dict, actual_index + 1, step_timestamp,
-                    reserve_suffix_width=12, native_mode=native,
-                    is_native=would_be_native, dimmed_icon=True,
-                    show_milliseconds=show_milliseconds
+                    step_dict,
+                    actual_index + 1,
+                    step_timestamp,
+                    reserve_suffix_width=12,
+                    native_mode=native,
+                    is_native=would_be_native,
+                    dimmed_icon=True,
+                    show_milliseconds=show_milliseconds,
                 )
                 click.echo(summary, nl=False)
                 click.echo(format_status("SKIP"))
             result.add_skip(actual_index, step_dict, f"Skipped by --skip {step.action}")
             if verbose and not progress:
-                click.echo(format_system_message(f"skipped: {step.action} in skip list", show_milliseconds=show_milliseconds))
+                click.echo(
+                    format_system_message(
+                        f"skipped: {step.action} in skip list", show_milliseconds=show_milliseconds
+                    )
+                )
             previous_step = step
             continue
 
@@ -3488,15 +3702,26 @@ def replay(
             if not progress:
                 # Navigate is not a native action, so is_native=False
                 summary = format_step_for_display(
-                    step_dict, actual_index + 1, step_timestamp,
-                    reserve_suffix_width=12, native_mode=native, dimmed_icon=True,
-                    show_milliseconds=show_milliseconds
+                    step_dict,
+                    actual_index + 1,
+                    step_timestamp,
+                    reserve_suffix_width=12,
+                    native_mode=native,
+                    dimmed_icon=True,
+                    show_milliseconds=show_milliseconds,
                 )
                 click.echo(summary, nl=False)
                 click.echo(format_status("MERGED"))
-            result.add_success(actual_index, step_dict)  # Count as success since navigation happened
+            result.add_success(
+                actual_index, step_dict
+            )  # Count as success since navigation happened
             if verbose and not progress:
-                click.echo(format_system_message("navigation already occurred from previous click", show_milliseconds=show_milliseconds))
+                click.echo(
+                    format_system_message(
+                        "navigation already occurred from previous click",
+                        show_milliseconds=show_milliseconds,
+                    )
+                )
             last_step_navigated = False  # Reset the flag
             previous_step = step
             continue
@@ -3506,7 +3731,18 @@ def replay(
 
         # Display step (skip in progress mode)
         # Pass native_mode=True when in --native mode to show JS icon for non-native steps
-        summary = format_step_for_display(step_dict, actual_index + 1, step_timestamp, reserve_suffix_width=5, native_mode=native, show_milliseconds=show_milliseconds) if not progress else ""
+        summary = (
+            format_step_for_display(
+                step_dict,
+                actual_index + 1,
+                step_timestamp,
+                reserve_suffix_width=5,
+                native_mode=native,
+                show_milliseconds=show_milliseconds,
+            )
+            if not progress
+            else ""
+        )
 
         if dry_run:
             click.echo(summary)
@@ -3529,7 +3765,9 @@ def replay(
 
         if step_mode == "skip":
             # Unconditional skip - mode: skip takes precedence over skip_if
-            skipped_summary = format_skipped_step_for_display(step_dict, actual_index + 1, step_timestamp, show_milliseconds=show_milliseconds)
+            skipped_summary = format_skipped_step_for_display(
+                step_dict, actual_index + 1, step_timestamp, show_milliseconds=show_milliseconds
+            )
             if not progress:
                 click.echo(skipped_summary)
             result.add_skip(actual_index, step_dict, "mode: skip")
@@ -3540,7 +3778,9 @@ def replay(
             # Pause mode - wait for user to press Enter (but not in interactive mode)
             # Show the paused step indicator
             if not progress:
-                paused_summary = format_paused_step_for_display(step_dict, actual_index + 1, step_timestamp, show_milliseconds=show_milliseconds)
+                paused_summary = format_paused_step_for_display(
+                    step_dict, actual_index + 1, step_timestamp, show_milliseconds=show_milliseconds
+                )
                 click.echo(paused_summary)
 
             # Display pause prompt and wait for Enter
@@ -3567,7 +3807,11 @@ def replay(
                 if not progress:
                     click.echo(summary, nl=False)
                     click.echo(format_status("SKIP"))
-                result.add_skip(actual_index, step_dict, f"skip_if: {skip_result.get('reason', 'condition met')}")
+                result.add_skip(
+                    actual_index,
+                    step_dict,
+                    f"skip_if: {skip_result.get('reason', 'condition met')}",
+                )
                 if verbose and not progress:
                     click.echo(format_system_message(f"skipped: {skip_result.get('reason', '')}"))
                 previous_step = step
@@ -3579,7 +3823,9 @@ def replay(
             timeout_ms = step.wait_for.timeout or 5000  # Default 5 seconds
 
             if verbose and not progress:
-                click.echo(format_system_message(f"waiting for condition (timeout: {timeout_ms}ms)…"))
+                click.echo(
+                    format_system_message(f"waiting for condition (timeout: {timeout_ms}ms)…")
+                )
 
             wait_result = wait_for_condition(
                 client,
@@ -3625,14 +3871,20 @@ def replay(
             interactive_code = script_template.replace("STEP_DATA_PLACEHOLDER", interactive_json)
 
             try:
-                interactive_result = client.execute(interactive_code, timeout=300.0)  # Long timeout for user input
+                interactive_result = client.execute(
+                    interactive_code, timeout=300.0
+                )  # Long timeout for user input
 
                 if verbose:
                     result_data = interactive_result.get("result", {})
                     choice = result_data.get("choice", "unknown")
                     warning = result_data.get("warning")
                     if warning:
-                        click.echo(format_system_message(f"Interactive: choice={choice}, warning={warning}"))
+                        click.echo(
+                            format_system_message(
+                                f"Interactive: choice={choice}, warning={warning}"
+                            )
+                        )
                     else:
                         click.echo(format_system_message(f"Interactive: choice={choice}"))
 
@@ -3644,7 +3896,9 @@ def replay(
                         # User pressed Space - skip this step
                         click.echo(summary, nl=False)
                         click.echo(format_status("SKIP"))
-                        result.add_skip(actual_index, step_dict, "Skipped by user (interactive mode)")
+                        result.add_skip(
+                            actual_index, step_dict, "Skipped by user (interactive mode)"
+                        )
                         if verbose:
                             click.echo(format_system_message("skipped by user"))
                         previous_step = step
@@ -3660,7 +3914,11 @@ def replay(
                     # choice == "next" - continue to execute the step
                 else:
                     if verbose:
-                        click.echo(format_system_message(f"Interactive prompt failed: {interactive_result.get('error')}"))
+                        click.echo(
+                            format_system_message(
+                                f"Interactive prompt failed: {interactive_result.get('error')}"
+                            )
+                        )
             except Exception as e:
                 if verbose:
                     click.echo(format_system_message(f"Interactive prompt error: {e}"))
@@ -3670,18 +3928,18 @@ def replay(
 
         # Check if this will be a native action (before printing summary)
         # Per-step native override takes precedence over global --native flag
-        step_native = getattr(step, 'native', None)
+        step_native = getattr(step, "native", None)
         if step_native is not None:
-            is_native_action = step_native and step.action in ('keypress', 'type', 'activate')
+            is_native_action = step_native and step.action in ("keypress", "type", "activate")
         else:
-            is_native_action = native and step.action in ('keypress', 'type', 'activate')
+            is_native_action = native and step.action in ("keypress", "type", "activate")
 
         # Check for redundant actions that will be merged (before printing step)
         # In native mode, actions like 'activate' following keypress Enter/Space are redundant
         # because the real keyboard event already triggered the DOM action
         is_merged_action = False
         if is_native_action:
-            redundant_actions = {'activate', 'check', 'uncheck', 'radio', 'toggle', 'select'}
+            redundant_actions = {"activate", "check", "uncheck", "radio", "toggle", "select"}
             timestamp_tolerance_ms = 100
             step_ts = step.timestamp or 0
             prev_ts = (previous_step.timestamp or 0) if previous_step else 0
@@ -3690,8 +3948,8 @@ def replay(
             is_merged_action = (
                 step.action in redundant_actions
                 and previous_step
-                and previous_step.action == 'keypress'
-                and previous_step.key in ('Enter', 'Space', 'enter', 'space')
+                and previous_step.action == "keypress"
+                and previous_step.key in ("Enter", "Space", "enter", "space")
                 and timestamps_match
             )
 
@@ -3704,11 +3962,11 @@ def replay(
             step_ts = step.timestamp or 0
 
             # Keys that directly cause scrolling (the scroll is redundant)
-            scroll_keys = {'pageup', 'pagedown', 'home', 'end', 'arrowup', 'arrowdown'}
+            scroll_keys = {"pageup", "pagedown", "home", "end", "arrowup", "arrowdown"}
             # Keys that move focus and may trigger scrollIntoView
-            focus_keys = {'tab'}
+            focus_keys = {"tab"}
             # Space scrolls when not on interactive elements
-            space_key = {'space', ' '}
+            space_key = {"space", " "}
 
             # Look at recent steps (up to 5 back) to find a keypress or anchor click
             # that might have triggered this scroll
@@ -3737,15 +3995,17 @@ def replay(
                         target = recent_step.target
                         # Space on buttons/links activates them, not scroll
                         # But on other elements (body, div, etc.) it scrolls
-                        if not target or target.tag not in ('button', 'a', 'input', 'select'):
+                        if not target or target.tag not in ("button", "a", "input", "select"):
                             is_side_effect_scroll = True
                             break
 
                 # Case 4: Click on anchor link followed by scroll
-                if (recent_step.action == "click" and
-                    recent_step.target and
-                    recent_step.target.tag == "a" and
-                    time_delta <= 300):
+                if (
+                    recent_step.action == "click"
+                    and recent_step.target
+                    and recent_step.target.tag == "a"
+                    and time_delta <= 300
+                ):
                     is_side_effect_scroll = True
                     break
 
@@ -3754,30 +4014,48 @@ def replay(
             if is_side_effect_scroll:
                 # Side-effect scroll: show dimmed icon (with platform icon in native mode)
                 summary = format_step_for_display(
-                    step_dict, actual_index + 1, step_timestamp,
-                    reserve_suffix_width=12, native_mode=native, dimmed_icon=True,
-                    show_milliseconds=show_milliseconds
+                    step_dict,
+                    actual_index + 1,
+                    step_timestamp,
+                    reserve_suffix_width=12,
+                    native_mode=native,
+                    dimmed_icon=True,
+                    show_milliseconds=show_milliseconds,
                 )
             elif is_merged_action:
                 # Merged action: show dimmed platform icon
                 summary = format_step_for_display(
-                    step_dict, actual_index + 1, step_timestamp,
-                    reserve_suffix_width=12, is_native=True, native_mode=True, dimmed_icon=True,
-                    show_milliseconds=show_milliseconds
+                    step_dict,
+                    actual_index + 1,
+                    step_timestamp,
+                    reserve_suffix_width=12,
+                    is_native=True,
+                    native_mode=True,
+                    dimmed_icon=True,
+                    show_milliseconds=show_milliseconds,
                 )
             elif is_native_action:
                 # Normal native action: show yellow platform icon
                 summary = format_step_for_display(
-                    step_dict, actual_index + 1, step_timestamp,
-                    reserve_suffix_width=5, is_native=True, native_mode=True,
-                    show_milliseconds=show_milliseconds
+                    step_dict,
+                    actual_index + 1,
+                    step_timestamp,
+                    reserve_suffix_width=5,
+                    is_native=True,
+                    native_mode=True,
+                    show_milliseconds=show_milliseconds,
                 )
             click.echo(summary, nl=False)
 
         # Handle merged actions early (before audio and execution)
         if is_merged_action:
             if verbose and not progress:
-                click.echo(format_system_message(f"merged {step.action} (keypress already triggered)", show_milliseconds=show_milliseconds))
+                click.echo(
+                    format_system_message(
+                        f"merged {step.action} (keypress already triggered)",
+                        show_milliseconds=show_milliseconds,
+                    )
+                )
             if not progress:
                 click.echo(format_status("MERGED"))
             result.add_success(actual_index, step_dict)
@@ -3802,34 +4080,43 @@ def replay(
         # but native mode skips JS execution, so we need to play it explicitly)
         if is_native_action and use_browser_audio:
             try:
-                client.execute(f"window.__INSPEKT_VISUAL__?.audio?.playForAction('{step.action}')", timeout=2.0)
+                client.execute(
+                    f"window.__INSPEKT_VISUAL__?.audio?.playForAction('{step.action}')", timeout=2.0
+                )
             except Exception:
                 pass  # Audio is optional, don't fail the step
 
         # Handle keyboard actions natively if --native mode is enabled
         # This intercepts keypress, type, and activate actions before JavaScript execution
         if is_native_action:
-
-            native_result = _execute_native_keyboard_action(step, typing_speed, client=client, step_num=actual_index + 1, total_steps=len(steps_to_run))
+            native_result = _execute_native_keyboard_action(
+                step,
+                typing_speed,
+                client=client,
+                step_num=actual_index + 1,
+                total_steps=len(steps_to_run),
+            )
             if native_result is not None:
-                if native_result.get('ok'):
+                if native_result.get("ok"):
                     # Platform icon is now shown next to the command name, not in status
                     # Skip if status was already printed (e.g., after native retry)
-                    if not progress and not native_result.get('status_printed'):
+                    if not progress and not native_result.get("status_printed"):
                         click.echo(format_status("OK"))
                     result.add_success(actual_index, step_dict)
                     if verbose and not progress:
-                        method = native_result.get('method', 'applescript')
-                        if step.action == 'type':
-                            chars = native_result.get('chars', 0)
-                            click.echo(format_system_message(f"native {method}: typed {chars} chars"))
+                        method = native_result.get("method", "applescript")
+                        if step.action == "type":
+                            chars = native_result.get("chars", 0)
+                            click.echo(
+                                format_system_message(f"native {method}: typed {chars} chars")
+                            )
                         else:
                             click.echo(format_system_message(f"native {method}: {step.action}"))
                 else:
                     # Skip if status was already printed (e.g., after native retry failure)
-                    if not progress and not native_result.get('status_printed'):
+                    if not progress and not native_result.get("status_printed"):
                         click.echo(format_status("FAIL"))
-                    error_msg = native_result.get('error', 'Native keyboard action failed')
+                    error_msg = native_result.get("error", "Native keyboard action failed")
                     result.add_failure(actual_index, step_dict, error_msg)
                     if cli_audio:
                         cli_audio.play_failure()
@@ -3846,12 +4133,16 @@ def replay(
             if cmd_result.get("ok"):
                 # Check expectations
                 expect_dict = step.expect.model_dump(exclude_none=True) if step.expect else {}
-                assertion_failures = check_inspekt_expectations(step.command, expect_dict, cmd_result)
+                assertion_failures = check_inspekt_expectations(
+                    step.command, expect_dict, cmd_result
+                )
 
                 if assertion_failures:
                     if not progress:
                         click.echo(format_status("FAIL"))
-                    result.add_failure(actual_index, step_dict, "Assertion failed", assertion_failures)
+                    result.add_failure(
+                        actual_index, step_dict, "Assertion failed", assertion_failures
+                    )
                     if cli_audio:
                         cli_audio.play_failure()
                     if verbose and not progress:
@@ -3864,16 +4155,24 @@ def replay(
             else:
                 if not progress:
                     click.echo(format_status("FAIL"))
-                result.add_failure(actual_index, step_dict, cmd_result.get("error", "Command failed"))
+                result.add_failure(
+                    actual_index, step_dict, cmd_result.get("error", "Command failed")
+                )
                 if cli_audio:
                     cli_audio.play_failure()
                 if verbose and not progress:
-                    click.echo(format_system_message(f"Error: {cmd_result.get('error', 'Unknown')}"))
+                    click.echo(
+                        format_system_message(f"Error: {cmd_result.get('error', 'Unknown')}")
+                    )
 
         # Handle download steps - these are markers for downloads triggered by previous actions
         # Downloads happen as side effects of clicks/keypresses, so we don't need to wait
         elif step.action == "download" and step.download:
-            download_info = step.download.model_dump() if hasattr(step.download, "model_dump") else step.download
+            download_info = (
+                step.download.model_dump()
+                if hasattr(step.download, "model_dump")
+                else step.download
+            )
             downloaded_file_path = None
 
             # Get expectations
@@ -3889,7 +4188,9 @@ def replay(
             if assertion_failures:
                 if not progress:
                     click.echo(format_status("FAIL"))
-                result.add_failure(actual_index, step_dict, "Download assertion failed", assertion_failures)
+                result.add_failure(
+                    actual_index, step_dict, "Download assertion failed", assertion_failures
+                )
                 if cli_audio:
                     cli_audio.play_failure()
                 if verbose and not progress:
@@ -3936,11 +4237,15 @@ def replay(
                 else:
                     if not progress:
                         click.echo(format_status("FAIL"))
-                    result.add_failure(actual_index, step_dict, type_result.get("error", "Typing failed"))
+                    result.add_failure(
+                        actual_index, step_dict, type_result.get("error", "Typing failed")
+                    )
                     if cli_audio:
                         cli_audio.play_failure()
                     if verbose and not progress:
-                        click.echo(format_system_message(f"Error: {type_result.get('error', 'Unknown')}"))
+                        click.echo(
+                            format_system_message(f"Error: {type_result.get('error', 'Unknown')}")
+                        )
 
         else:
             # Execute via JavaScript (for click, hover, keypress, navigate)
@@ -3961,7 +4266,9 @@ def replay(
             # Navigation causes the page to unload before response can be sent
             is_click_action = step.action in ("click", "activate")
             is_navigate_action = step.action == "navigate"
-            is_enter_keypress = step.action == "keypress" and step.key and step.key.lower() == "enter"
+            is_enter_keypress = (
+                step.action == "keypress" and step.key and step.key.lower() == "enter"
+            )
             target = step.target
             action_timeout = 30.0
             might_navigate = False
@@ -3988,13 +4295,17 @@ def replay(
                 accessible_name = target.accessible_name or ""
 
                 might_navigate = (
-                    tag.lower() == "a" or
-                    "href" in selector.lower() or
-                    " > a" in selector or
-                    selector.endswith(" a") or
-                    "button" in tag.lower() or
+                    tag.lower() == "a"
+                    or "href" in selector.lower()
+                    or " > a" in selector
+                    or selector.endswith(" a")
+                    or "button" in tag.lower()
+                    or
                     # Common navigation patterns
-                    any(x in accessible_name.lower() for x in ["read more", "meer lezen", "lees meer", "open", "go to", "view"])
+                    any(
+                        x in accessible_name.lower()
+                        for x in ["read more", "meer lezen", "lees meer", "open", "go to", "view"]
+                    )
                 )
 
                 if might_navigate:
@@ -4009,9 +4320,18 @@ def replay(
                     if might_navigate and "timeout" in str(nav_exc).lower():
                         # Navigation causes page unload before response can be sent
                         # Treat timeout as successful navigation
-                        exec_result = {"ok": True, "result": {"ok": True, "navigated": is_navigate_action, "mayNavigate": not is_navigate_action}}
+                        exec_result = {
+                            "ok": True,
+                            "result": {
+                                "ok": True,
+                                "navigated": is_navigate_action,
+                                "mayNavigate": not is_navigate_action,
+                            },
+                        }
                         if verbose:
-                            click.echo(format_system_message("Response lost (navigation in progress)"))
+                            click.echo(
+                                format_system_message("Response lost (navigation in progress)")
+                            )
                     else:
                         # Re-raise other exceptions
                         raise
@@ -4035,12 +4355,17 @@ def replay(
 
                         if assertion_failures or response.get("assertionsFailed"):
                             # Action succeeded but assertion failed
-                            result.add_failure(actual_index, step_dict, "Assertion failed", assertion_failures)
+                            result.add_failure(
+                                actual_index, step_dict, "Assertion failed", assertion_failures
+                            )
                             if cli_audio:
                                 cli_audio.play_failure()
                             # Show assertion message with failure indicator
                             if step.expect:
-                                assertion_msg = step.expect.message or _generate_assertion_description(step.expect)
+                                assertion_msg = (
+                                    step.expect.message
+                                    or _generate_assertion_description(step.expect)
+                                )
                                 if assertion_msg:
                                     click.echo(format_assertion_result(assertion_msg, passed=False))
                             if verbose:
@@ -4051,13 +4376,18 @@ def replay(
                             # Show assertion message if present (always, not just verbose)
                             # But only if assertions were actually evaluated (not skipped)
                             if step.expect and not skip_tests:
-                                assertion_msg = step.expect.message or _generate_assertion_description(step.expect)
+                                assertion_msg = (
+                                    step.expect.message
+                                    or _generate_assertion_description(step.expect)
+                                )
                                 if assertion_msg:
                                     click.echo(format_assertion_result(assertion_msg, passed=True))
 
                             # Show focus fallback note if CSS injection didn't work (Tab navigation)
                             if response.get("focusNote") and not progress:
-                                click.echo(format_system_message(response.get("focusNote"), icon="info"))
+                                click.echo(
+                                    format_system_message(response.get("focusNote"), icon="info")
+                                )
 
                             if verbose and response.get("usedSelector"):
                                 used = response["usedSelector"]
@@ -4075,7 +4405,11 @@ def replay(
                                 if navigated:
                                     click.echo(format_system_message("Waiting for page to load…"))
                                 elif may_navigate:
-                                    click.echo(format_system_message("Link clicked, checking for navigation…"))
+                                    click.echo(
+                                        format_system_message(
+                                            "Link clicked, checking for navigation…"
+                                        )
+                                    )
 
                             # Wait for the page to be fully loaded (document.readyState === 'complete')
                             # Use shorter timeout for mayNavigate since it might not actually navigate
@@ -4097,7 +4431,7 @@ def replay(
                                 # Continue anyway - next step execution will fail if truly problematic
 
                             # Re-inject visual script after navigation (it's lost on page change)
-                            if (visual or audio or lock):
+                            if visual or audio or lock:
                                 visual_ready = wait_for_visual_script_ready(
                                     client,
                                     visual_script,
@@ -4110,45 +4444,68 @@ def replay(
                                     # Re-enable input lock
                                     if lock:
                                         try:
-                                            client.execute("window.__INSPEKT_VISUAL__.inputLock.enable()", timeout=5.0)
+                                            client.execute(
+                                                "window.__INSPEKT_VISUAL__.inputLock.enable()",
+                                                timeout=5.0,
+                                            )
                                         except Exception:
                                             pass
                                     # Re-initialize audio context after page navigation (browser audio only)
                                     if use_browser_audio:
                                         try:
-                                            client.execute("window.__INSPEKT_VISUAL__.audio.init()", timeout=5.0)
+                                            client.execute(
+                                                "window.__INSPEKT_VISUAL__.audio.init()",
+                                                timeout=5.0,
+                                            )
                                             if navigated:
                                                 # Play navigate sound to indicate page transition
-                                                client.execute("window.__INSPEKT_VISUAL__.audio.playNavigate()", timeout=5.0)
+                                                client.execute(
+                                                    "window.__INSPEKT_VISUAL__.audio.playNavigate()",
+                                                    timeout=5.0,
+                                                )
                                         except Exception:
                                             pass
                                     # Re-initialize key watcher for native mode (lost on navigation)
                                     if native:
                                         try:
-                                            client.execute("window.__INSPEKT_VISUAL__.keyWatcher.init()", timeout=2.0)
+                                            client.execute(
+                                                "window.__INSPEKT_VISUAL__.keyWatcher.init()",
+                                                timeout=2.0,
+                                            )
                                         except Exception:
                                             pass
                                     # Note: CDP dialog interception persists across navigations
                                     # (it's attached at the browser level via chrome.debugger)
                                 elif verbose:
-                                    click.echo(format_system_message("visual script not ready after navigation"))
+                                    click.echo(
+                                        format_system_message(
+                                            "visual script not ready after navigation"
+                                        )
+                                    )
 
                             # Re-inject download monitoring after navigation (it's lost on page change)
                             if download_monitoring_active and download_session_id:
-                                download_config = json.dumps({
-                                    "action": "start",
-                                    "sessionId": download_session_id
-                                })
+                                download_config = json.dumps(
+                                    {"action": "start", "sessionId": download_session_id}
+                                )
                                 download_script = download_script_template.replace(
                                     "DOWNLOAD_CONFIG_PLACEHOLDER", download_config
                                 )
                                 reinject_result = client.execute(download_script, timeout=5.0)
                                 if reinject_result.get("ok"):
                                     if verbose:
-                                        click.echo(format_system_message("download monitoring re-injected after navigation"))
+                                        click.echo(
+                                            format_system_message(
+                                                "download monitoring re-injected after navigation"
+                                            )
+                                        )
                                 else:
                                     if verbose:
-                                        click.echo(format_system_message(f"could not re-inject download monitoring: {reinject_result.get('error')}"))
+                                        click.echo(
+                                            format_system_message(
+                                                f"could not re-inject download monitoring: {reinject_result.get('error')}"
+                                            )
+                                        )
 
                             # Mark that this step caused navigation
                             # Next navigate step can be skipped since navigation already happened
@@ -4193,9 +4550,11 @@ def replay(
             # Check if this step was the most recent failure
             if result.failures and result.failures[-1]["step"] == actual_index + 1:
                 click.echo()
-                click.secho("    Paused on failure. Press Enter to continue, 'q' to quit…", fg="yellow")
+                click.secho(
+                    "    Paused on failure. Press Enter to continue, 'q' to quit…", fg="yellow"
+                )
                 user_input = click.getchar()
-                if user_input.lower() == 'q':
+                if user_input.lower() == "q":
                     click.echo("\n    Replay aborted by user.")
                     break
 
@@ -4216,7 +4575,9 @@ def replay(
             if frame_data:
                 video_frames.append(frame_data)
                 if verbose:
-                    click.echo(format_system_message(f"captured video frame at {frame_timestamp:.2f}s"))
+                    click.echo(
+                        format_system_message(f"captured video frame at {frame_timestamp:.2f}s")
+                    )
 
         # Additional fixed delay between steps (on top of real-time timing)
         # Only applies if --step-delay is explicitly set to a non-zero value
@@ -4245,7 +4606,11 @@ def replay(
             stop_result = client.execute(stop_script, timeout=5.0)
             if verbose and stop_result.get("ok"):
                 stats = stop_result.get("result", {}).get("stats", {})
-                click.echo(format_system_message(f"download monitoring stopped (captured: {stats.get('completed', 0)})"))
+                click.echo(
+                    format_system_message(
+                        f"download monitoring stopped (captured: {stats.get('completed', 0)})"
+                    )
+                )
         except Exception as e:
             if verbose:
                 click.echo(format_system_message(f"could not stop download monitoring: {e}"))
@@ -4260,7 +4625,11 @@ def replay(
             if video_mode == "smooth":
                 # Stop smooth capture via JavaScript postMessage
                 stop_elapsed = int((datetime.now() - result.start_time).total_seconds() * 1000)
-                click.echo(format_system_message("Stopping video capture…", icon="video", elapsed_ms=stop_elapsed))
+                click.echo(
+                    format_system_message(
+                        "Stopping video capture…", icon="video", elapsed_ms=stop_elapsed
+                    )
+                )
 
                 # Send stop message via JS postMessage
                 smooth_stop_js = """
@@ -4296,7 +4665,9 @@ def replay(
                 try:
                     stop_result = client.execute(smooth_stop_js, timeout=15.0)
                     if verbose:
-                        click.echo(format_system_message(f"Stop result: {stop_result.get('result', {})}"))
+                        click.echo(
+                            format_system_message(f"Stop result: {stop_result.get('result', {})}")
+                        )
                 except Exception as e:
                     if verbose:
                         click.echo(format_system_message(f"Stop message warning: {e}"))
@@ -4312,17 +4683,19 @@ def replay(
 
                 try:
                     video_response = requests.get(
-                        f"http://127.0.0.1:{get_bridge_port()}/video/get",
-                        timeout=30.0
+                        f"http://127.0.0.1:{get_bridge_port()}/video/get", timeout=30.0
                     )
                     if video_response.status_code == 200:
                         video_data = video_response.json()
                         if video_data.get("ok") and video_data.get("data"):
                             # Decode base64 video data
                             import base64
+
                             video_bytes = base64.b64decode(video_data["data"])
 
-                            save_elapsed = int((datetime.now() - result.start_time).total_seconds() * 1000)
+                            save_elapsed = int(
+                                (datetime.now() - result.start_time).total_seconds() * 1000
+                            )
 
                             # Save the video (WebM format from MediaRecorder)
                             # Always use ffmpeg to crop to viewport dimensions (removes black bars)
@@ -4345,11 +4718,11 @@ def replay(
                                     target_w = 0
                                     target_h = 0
 
-                                click.echo(format_system_message(
-                                    "Processing video…",
-                                    icon="video",
-                                    elapsed_ms=save_elapsed
-                                ))
+                                click.echo(
+                                    format_system_message(
+                                        "Processing video…", icon="video", elapsed_ms=save_elapsed
+                                    )
+                                )
 
                                 # Build ffmpeg command with viewport cropping
                                 if target_w > 0 and target_h > 0:
@@ -4364,13 +4737,35 @@ def replay(
                                     ffmpeg_cmd = ["ffmpeg", "-y", "-i", tmp_path]
                                     if vf_filter:
                                         ffmpeg_cmd.extend(["-vf", vf_filter])
-                                    ffmpeg_cmd.extend(["-c:v", "libvpx-vp9", "-crf", "30", "-b:v", "0", str(resolved_video_path)])
+                                    ffmpeg_cmd.extend(
+                                        [
+                                            "-c:v",
+                                            "libvpx-vp9",
+                                            "-crf",
+                                            "30",
+                                            "-b:v",
+                                            "0",
+                                            str(resolved_video_path),
+                                        ]
+                                    )
                                 else:
                                     # Convert to MP4 with cropping
                                     ffmpeg_cmd = ["ffmpeg", "-y", "-i", tmp_path]
                                     if vf_filter:
                                         ffmpeg_cmd.extend(["-vf", vf_filter])
-                                    ffmpeg_cmd.extend(["-c:v", "libx264", "-preset", "fast", "-crf", "23", "-pix_fmt", "yuv420p", str(resolved_video_path)])
+                                    ffmpeg_cmd.extend(
+                                        [
+                                            "-c:v",
+                                            "libx264",
+                                            "-preset",
+                                            "fast",
+                                            "-crf",
+                                            "23",
+                                            "-pix_fmt",
+                                            "yuv420p",
+                                            str(resolved_video_path),
+                                        ]
+                                    )
 
                                 subprocess.run(ffmpeg_cmd, check=True, capture_output=True)
                                 video_saved_path = resolved_video_path
@@ -4383,28 +4778,38 @@ def replay(
 
                                 # Create clickable filename
                                 file_uri = video_saved_path.as_uri()
-                                clickable_name = f"\033]8;;{file_uri}\033\\{video_saved_path.name}\033]8;;\033\\"
+                                clickable_name = (
+                                    f"\033]8;;{file_uri}\033\\{video_saved_path.name}\033]8;;\033\\"
+                                )
 
-                                saved_elapsed = int((datetime.now() - result.start_time).total_seconds() * 1000)
-                                click.echo(format_system_message(
-                                    f"Video saved: {clickable_name} ({file_size_str})",
-                                    icon="video",
-                                    elapsed_ms=saved_elapsed,
-                                    truncate=False
-                                ))
+                                saved_elapsed = int(
+                                    (datetime.now() - result.start_time).total_seconds() * 1000
+                                )
+                                click.echo(
+                                    format_system_message(
+                                        f"Video saved: {clickable_name} ({file_size_str})",
+                                        icon="video",
+                                        elapsed_ms=saved_elapsed,
+                                        truncate=False,
+                                    )
+                                )
 
                                 # Verify video
                                 verify_result = _verify_video(video_saved_path)
                                 if verify_result:
-                                    click.echo(format_system_message(
-                                        f"Video verified: {verify_result}",
-                                        icon="video",
-                                        elapsed_ms=saved_elapsed
-                                    ))
+                                    click.echo(
+                                        format_system_message(
+                                            f"Video verified: {verify_result}",
+                                            icon="video",
+                                            elapsed_ms=saved_elapsed,
+                                        )
+                                    )
                         else:
                             print_warning("No video data captured")
                     else:
-                        print_warning(f"Failed to retrieve video: HTTP {video_response.status_code}")
+                        print_warning(
+                            f"Failed to retrieve video: HTTP {video_response.status_code}"
+                        )
 
                 except requests.RequestException as e:
                     print_warning(f"Failed to retrieve video: {e}")
@@ -4432,8 +4837,16 @@ def replay(
                     real_fps = actual_fps
                     actual_duration = len(frames) / actual_fps
 
-                encode_start_elapsed = int((datetime.now() - result.start_time).total_seconds() * 1000)
-                click.echo(format_system_message(f"Encoding {len(frames)} frames to video…", icon="video", elapsed_ms=encode_start_elapsed))
+                encode_start_elapsed = int(
+                    (datetime.now() - result.start_time).total_seconds() * 1000
+                )
+                click.echo(
+                    format_system_message(
+                        f"Encoding {len(frames)} frames to video…",
+                        icon="video",
+                        elapsed_ms=encode_start_elapsed,
+                    )
+                )
 
                 # Encode to video
                 from inspekt.services.video_encoder import encode_replay_video
@@ -4464,16 +4877,33 @@ def replay(
                     file_size_str = format_filesize(file_size)
 
                     # Show encoding done message
-                    encode_done_elapsed = int((datetime.now() - result.start_time).total_seconds() * 1000)
-                    click.echo(format_system_message(f"Encoding done (took {encode_duration:.1f}s)", icon="video", elapsed_ms=encode_done_elapsed))
+                    encode_done_elapsed = int(
+                        (datetime.now() - result.start_time).total_seconds() * 1000
+                    )
+                    click.echo(
+                        format_system_message(
+                            f"Encoding done (took {encode_duration:.1f}s)",
+                            icon="video",
+                            elapsed_ms=encode_done_elapsed,
+                        )
+                    )
 
                     # Create clickable filename using OSC 8
                     file_uri = resolved_video_path.as_uri()
-                    clickable_name = f"\033]8;;{file_uri}\033\\{resolved_video_path.name}\033]8;;\033\\"
+                    clickable_name = (
+                        f"\033]8;;{file_uri}\033\\{resolved_video_path.name}\033]8;;\033\\"
+                    )
 
                     # Show video saved message
                     saved_elapsed = int((datetime.now() - result.start_time).total_seconds() * 1000)
-                    click.echo(format_system_message(f"Video saved: {clickable_name} ({file_size_str})", icon="video", elapsed_ms=saved_elapsed, truncate=False))
+                    click.echo(
+                        format_system_message(
+                            f"Video saved: {clickable_name} ({file_size_str})",
+                            icon="video",
+                            elapsed_ms=saved_elapsed,
+                            truncate=False,
+                        )
+                    )
 
                     # Merge audio effects if --include-effects was used
                     if include_effects:
@@ -4483,40 +4913,59 @@ def replay(
                             import requests
 
                             # Stop audio recording in JavaScript
-                            client.execute("window.__INSPEKT_REPLAY_VISUAL__.audio.stopRecordingForVideo()", timeout=2.0)
+                            client.execute(
+                                "window.__INSPEKT_REPLAY_VISUAL__.audio.stopRecordingForVideo()",
+                                timeout=2.0,
+                            )
 
                             # Get audio cues from bridge server
-                            cues_response = requests.get("http://127.0.0.1:8765/audio/cues", timeout=5.0)
+                            cues_response = requests.get(
+                                "http://127.0.0.1:8765/audio/cues", timeout=5.0
+                            )
                             cues_data = cues_response.json()
                             cues = cues_data.get("cues", [])
 
                             if cues:
                                 # Generate audio track
-                                audio_start_elapsed = int((datetime.now() - result.start_time).total_seconds() * 1000)
-                                click.echo(format_system_message(f"Generating audio track ({len(cues)} effects)…", icon="audio", elapsed_ms=audio_start_elapsed))
+                                audio_start_elapsed = int(
+                                    (datetime.now() - result.start_time).total_seconds() * 1000
+                                )
+                                click.echo(
+                                    format_system_message(
+                                        f"Generating audio track ({len(cues)} effects)…",
+                                        icon="audio",
+                                        elapsed_ms=audio_start_elapsed,
+                                    )
+                                )
 
                                 # Get video duration from probe
                                 temp_video_info = probe_video(resolved_video_path)
-                                video_duration_ms = int((temp_video_info.get("duration", 0) if temp_video_info else 0) * 1000)
+                                video_duration_ms = int(
+                                    (temp_video_info.get("duration", 0) if temp_video_info else 0)
+                                    * 1000
+                                )
 
                                 if video_duration_ms > 0:
                                     # Generate audio track using CLIAudio
-                                    audio_bytes = cli_audio.generate_audio_track(cues, video_duration_ms)
+                                    audio_bytes = cli_audio.generate_audio_track(
+                                        cues, video_duration_ms
+                                    )
 
                                     # Save to temp file
-                                    with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as temp_audio:
+                                    with tempfile.NamedTemporaryFile(
+                                        suffix=".wav", delete=False
+                                    ) as temp_audio:
                                         temp_audio.write(audio_bytes)
                                         temp_audio_path = temp_audio.name
 
                                     # Merge audio with video
                                     temp_video_path = str(resolved_video_path) + ".temp.mp4"
                                     import shutil
+
                                     shutil.move(str(resolved_video_path), temp_video_path)
 
                                     merge_result = merge_audio_video(
-                                        temp_video_path,
-                                        temp_audio_path,
-                                        str(resolved_video_path)
+                                        temp_video_path, temp_audio_path, str(resolved_video_path)
                                     )
 
                                     # Cleanup temp files
@@ -4527,20 +4976,38 @@ def replay(
                                         pass
 
                                     if merge_result.get("ok"):
-                                        audio_done_elapsed = int((datetime.now() - result.start_time).total_seconds() * 1000)
-                                        click.echo(format_system_message(f"Added {len(cues)} audio effects to video", icon="audio", elapsed_ms=audio_done_elapsed))
+                                        audio_done_elapsed = int(
+                                            (datetime.now() - result.start_time).total_seconds()
+                                            * 1000
+                                        )
+                                        click.echo(
+                                            format_system_message(
+                                                f"Added {len(cues)} audio effects to video",
+                                                icon="audio",
+                                                elapsed_ms=audio_done_elapsed,
+                                            )
+                                        )
 
                                         # Update file size display
                                         new_file_size = resolved_video_path.stat().st_size
                                         file_size_str = format_filesize(new_file_size)
                                     else:
                                         if verbose:
-                                            click.echo(format_system_message(f"Could not merge audio: {merge_result.get('error')}", icon="warning"))
+                                            click.echo(
+                                                format_system_message(
+                                                    f"Could not merge audio: {merge_result.get('error')}",
+                                                    icon="warning",
+                                                )
+                                            )
                             elif verbose:
-                                click.echo(format_system_message("No audio effects recorded", icon="info"))
+                                click.echo(
+                                    format_system_message("No audio effects recorded", icon="info")
+                                )
                         except Exception as e:
                             if verbose:
-                                click.echo(format_system_message(f"Audio merge error: {e}", icon="warning"))
+                                click.echo(
+                                    format_system_message(f"Audio merge error: {e}", icon="warning")
+                                )
 
                     # Probe video file for sanity check
                     video_info = probe_video(resolved_video_path)
@@ -4572,8 +5039,16 @@ def replay(
 
                         if info_parts:
                             info_str = " · ".join(info_parts)
-                            probe_elapsed = int((datetime.now() - result.start_time).total_seconds() * 1000)
-                            click.echo(format_system_message(f"Video verified: {info_str}", icon="video", elapsed_ms=probe_elapsed))
+                            probe_elapsed = int(
+                                (datetime.now() - result.start_time).total_seconds() * 1000
+                            )
+                            click.echo(
+                                format_system_message(
+                                    f"Video verified: {info_str}",
+                                    icon="video",
+                                    elapsed_ms=probe_elapsed,
+                                )
+                            )
 
                     # Open video file if --open flag was set
                     if open_after:
@@ -4647,26 +5122,46 @@ def replay(
         # User cancelled the replay - show partial results
         duration = format_duration(result.duration_ms)
         completed = result.passed_steps + result.failed_steps + result.skipped_steps
-        click.secho(f"Replay cancelled after {completed} of {result.total_steps} steps", fg="yellow", bold=True)
-        click.echo(f"  Passed: {result.passed_steps} | Failed: {result.failed_steps} | Skipped: {result.skipped_steps}")
+        click.secho(
+            f"Replay cancelled after {completed} of {result.total_steps} steps",
+            fg="yellow",
+            bold=True,
+        )
+        click.echo(
+            f"  Passed: {result.passed_steps} | Failed: {result.failed_steps} | Skipped: {result.skipped_steps}"
+        )
         click.echo(f"  Duration: {duration}")
         sys.exit(130)  # Exit code 130 = cancelled by user (like Ctrl+C)
 
     duration = format_duration(result.duration_ms)
 
     if result.all_passed:
-        click.secho(success(f"All {result.passed_steps} steps completed in {duration}"), fg="green", bold=True)
+        click.secho(
+            success(f"All {result.passed_steps} steps completed in {duration}"),
+            fg="green",
+            bold=True,
+        )
         # Show tips about replay modes (only if not already using them)
         if not interactive or not native:
             click.echo()
             if not interactive:
                 print_hint("Use `--interactive` to step through manually.")
             if not native:
-                print_hint("Use `--native` to simulate OS-level key events instead of synthetic ones.")
-                click.secho("   Works well for accessibility testing. Use with caution.", fg="bright_black")
+                print_hint(
+                    "Use `--native` to simulate OS-level key events instead of synthetic ones."
+                )
+                click.secho(
+                    "   Works well for accessibility testing. Use with caution.", fg="bright_black"
+                )
     else:
-        click.secho(error(f"{result.failed_steps} of {result.total_steps} steps failed"), fg="red", bold=True)
-        click.echo(f"  Passed: {result.passed_steps} | Failed: {result.failed_steps} | Skipped: {result.skipped_steps}")
+        click.secho(
+            error(f"{result.failed_steps} of {result.total_steps} steps failed"),
+            fg="red",
+            bold=True,
+        )
+        click.echo(
+            f"  Passed: {result.passed_steps} | Failed: {result.failed_steps} | Skipped: {result.skipped_steps}"
+        )
         click.echo(f"  Duration: {duration}")
 
         # Show failures
@@ -4696,13 +5191,22 @@ def replay(
             click.echo("  • Content Security Policy (CSP) is blocking the connection")
             click.echo()
             click.echo("Troubleshooting:")
-            click.echo(_style_with_inline_code("  • Open browser console (`F12`) and check for Inspekt messages", base_fg="white"))
+            click.echo(
+                _style_with_inline_code(
+                    "  • Open browser console (`F12`) and check for Inspekt messages",
+                    base_fg="white",
+                )
+            )
             click.echo("  • Look for CSP warnings in red/orange")
-            click.echo(_style_with_inline_code("  • Verify connection: `inspekt status`", base_fg="white"))
+            click.echo(
+                _style_with_inline_code("  • Verify connection: `inspekt status`", base_fg="white")
+            )
             click.echo("  • Try refreshing the page or restarting the browser")
 
         # Show tip for slow pages
         click.echo()
-        print_hint("If pages load slowly, try `--slow` or `--very-slow` for more reliable playback.")
+        print_hint(
+            "If pages load slowly, try `--slow` or `--very-slow` for more reliable playback."
+        )
 
         sys.exit(1)

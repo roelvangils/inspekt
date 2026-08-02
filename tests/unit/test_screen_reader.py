@@ -45,8 +45,12 @@ class TestDataFiles:
         assert (DATA_DIR / "known-bugs.json").exists()
 
     def test_all_data_files_are_valid_json(self):
-        for filename in ["announcements.json", "keyboard-commands.json",
-                         "verbosity-levels.json", "known-bugs.json"]:
+        for filename in [
+            "announcements.json",
+            "keyboard-commands.json",
+            "verbosity-levels.json",
+            "known-bugs.json",
+        ]:
             path = DATA_DIR / filename
             with open(path) as f:
                 data = json.load(f)
@@ -70,11 +74,33 @@ class TestAnnouncementsData:
 
     def test_common_roles_present(self, announcements):
         required_roles = [
-            "button", "link", "heading", "checkbox", "radio", "textbox",
-            "combobox", "list", "listitem", "img", "table", "cell",
-            "navigation", "main", "banner", "contentinfo", "search",
-            "dialog", "alert", "tab", "tablist", "tabpanel",
-            "separator", "slider", "switch", "progressbar", "menu",
+            "button",
+            "link",
+            "heading",
+            "checkbox",
+            "radio",
+            "textbox",
+            "combobox",
+            "list",
+            "listitem",
+            "img",
+            "table",
+            "cell",
+            "navigation",
+            "main",
+            "banner",
+            "contentinfo",
+            "search",
+            "dialog",
+            "alert",
+            "tab",
+            "tablist",
+            "tabpanel",
+            "separator",
+            "slider",
+            "switch",
+            "progressbar",
+            "menu",
         ]
         for role in required_roles:
             assert role in announcements, f"Missing role: {role}"
@@ -128,8 +154,9 @@ class TestAnnouncementsData:
         landmarks = ["banner", "main", "navigation", "contentinfo", "complementary", "search"]
         for landmark in landmarks:
             for sr in ["jaws", "nvda"]:
-                assert "exit" in announcements[landmark][sr], \
+                assert "exit" in announcements[landmark][sr], (
                     f"Landmark '{landmark}'.{sr} missing 'exit' template"
+                )
 
     def test_global_states_present(self, announcements):
         assert "_global_states" in announcements
@@ -243,20 +270,21 @@ class TestKnownBugsData:
         for bug in bugs_data["bugs"]:
             has_role = "role" in bug
             has_property = "property" in bug
-            assert has_role or has_property, \
-                f"Bug '{bug['id']}' needs either 'role' or 'property'"
+            assert has_role or has_property, f"Bug '{bug['id']}' needs either 'role' or 'property'"
 
     def test_valid_severity_values(self, bugs_data):
         valid = {"critical", "serious", "moderate", "minor"}
         for bug in bugs_data["bugs"]:
-            assert bug["severity"] in valid, \
+            assert bug["severity"] in valid, (
                 f"Bug '{bug['id']}' has invalid severity: {bug['severity']}"
+            )
 
     def test_valid_screen_reader_values(self, bugs_data):
         valid = {"jaws", "nvda", "voiceover", "orca", "narrator", "talkback"}
         for bug in bugs_data["bugs"]:
-            assert bug["screen_reader"] in valid, \
+            assert bug["screen_reader"] in valid, (
                 f"Bug '{bug['id']}' has invalid SR: {bug['screen_reader']}"
+            )
 
     def test_unique_bug_ids(self, bugs_data):
         ids = [bug["id"] for bug in bugs_data["bugs"]]
@@ -299,9 +327,7 @@ class TestSRElementAnnouncement:
     """Test SRElementAnnouncement schema."""
 
     def test_minimal_valid(self):
-        a = SRElementAnnouncement(
-            index=0, selector="h1", tag="h1", role="heading", name="Title"
-        )
+        a = SRElementAnnouncement(index=0, selector="h1", tag="h1", role="heading", name="Title")
         assert a.index == 0
         assert a.is_focusable is False
         assert a.known_bugs == []
@@ -355,8 +381,11 @@ class TestSRWalkResponse:
             element_count=3,
             announcements=[
                 SRElementAnnouncement(
-                    index=0, selector="h1", tag="h1",
-                    role="heading", name="Welcome",
+                    index=0,
+                    selector="h1",
+                    tag="h1",
+                    role="heading",
+                    name="Welcome",
                     jaws="Heading level 1, Welcome",
                 ),
             ],
@@ -393,6 +422,7 @@ class TestHandlerDataLoading:
 
     def test_load_announcements(self):
         from inspekt.core.handlers.screen_reader import _get_announcements
+
         data = _get_announcements()
         assert "heading" in data
         assert "link" in data
@@ -400,6 +430,7 @@ class TestHandlerDataLoading:
 
     def test_load_verbosity(self):
         from inspekt.core.handlers.screen_reader import _get_verbosity
+
         data = _get_verbosity()
         assert "high" in data
         assert "medium" in data
@@ -407,12 +438,14 @@ class TestHandlerDataLoading:
 
     def test_load_known_bugs(self):
         from inspekt.core.handlers.screen_reader import _get_known_bugs
+
         data = _get_known_bugs()
         assert "bugs" in data
         assert len(data["bugs"]) > 0
 
     def test_get_bug_details(self):
         from inspekt.core.handlers.screen_reader import get_bug_details
+
         bug = get_bug_details("voiceover-alert-no-role")
         assert bug is not None
         assert bug["screen_reader"] == "voiceover"
@@ -420,11 +453,13 @@ class TestHandlerDataLoading:
 
     def test_get_bug_details_not_found(self):
         from inspekt.core.handlers.screen_reader import get_bug_details
+
         bug = get_bug_details("nonexistent-bug-id")
         assert bug is None
 
     def test_build_script_includes_all_data(self):
         from inspekt.core.handlers.screen_reader import _build_sr_script
+
         config = {"mode": "walk", "screenReader": "all", "verbosity": "high", "maxElements": 10}
         script = _build_sr_script(config)
 
@@ -436,9 +471,9 @@ class TestHandlerDataLoading:
 
         # Should contain actual data
         assert '"heading"' in script  # from announcements
-        assert '"high"' in script     # from verbosity
-        assert '"bugs"' in script     # from known bugs
-        assert '"walk"' in script     # from config
+        assert '"high"' in script  # from verbosity
+        assert '"bugs"' in script  # from known bugs
+        assert '"walk"' in script  # from config
 
     def test_build_script_is_valid_js(self):
         """The built script should be syntactically valid JavaScript."""
@@ -451,8 +486,14 @@ class TestHandlerDataLoading:
 
         # Use node to parse-check the script
         result = subprocess.run(
-            ["node", "-e", f"try {{ new Function({json.dumps(script)}); console.log('ok'); }} catch(e) {{ console.error(e.message); process.exit(1); }}"],
-            capture_output=True, text=True, timeout=10,
+            [
+                "node",
+                "-e",
+                f"try {{ new Function({json.dumps(script)}); console.log('ok'); }} catch(e) {{ console.error(e.message); process.exit(1); }}",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=10,
         )
         assert result.returncode == 0, f"JS syntax error: {result.stderr}"
 
@@ -464,11 +505,21 @@ class TestJSSimulatorSyntax:
     """Verify the JS simulator file is syntactically valid."""
 
     def test_simulator_file_exists(self):
-        path = Path(__file__).parent.parent.parent / "inspekt" / "scripts" / "screen_reader_simulator.js"
+        path = (
+            Path(__file__).parent.parent.parent
+            / "inspekt"
+            / "scripts"
+            / "screen_reader_simulator.js"
+        )
         assert path.exists()
 
     def test_simulator_has_required_placeholders(self):
-        path = Path(__file__).parent.parent.parent / "inspekt" / "scripts" / "screen_reader_simulator.js"
+        path = (
+            Path(__file__).parent.parent.parent
+            / "inspekt"
+            / "scripts"
+            / "screen_reader_simulator.js"
+        )
         content = path.read_text()
         assert "__SR_ANNOUNCEMENTS__" in content
         assert "__SR_VERBOSITY__" in content
@@ -476,19 +527,34 @@ class TestJSSimulatorSyntax:
         assert "__SR_CONFIG__" in content
 
     def test_simulator_has_key_classes(self):
-        path = Path(__file__).parent.parent.parent / "inspekt" / "scripts" / "screen_reader_simulator.js"
+        path = (
+            Path(__file__).parent.parent.parent
+            / "inspekt"
+            / "scripts"
+            / "screen_reader_simulator.js"
+        )
         content = path.read_text()
         assert "class AnnouncementEngine" in content
         assert "class VirtualCursor" in content
         assert "class LiveRegionMonitor" in content
 
     def test_simulator_has_walk_function(self):
-        path = Path(__file__).parent.parent.parent / "inspekt" / "scripts" / "screen_reader_simulator.js"
+        path = (
+            Path(__file__).parent.parent.parent
+            / "inspekt"
+            / "scripts"
+            / "screen_reader_simulator.js"
+        )
         content = path.read_text()
         assert "function walkPage" in content
 
     def test_simulator_has_interactive_api(self):
-        path = Path(__file__).parent.parent.parent / "inspekt" / "scripts" / "screen_reader_simulator.js"
+        path = (
+            Path(__file__).parent.parent.parent
+            / "inspekt"
+            / "scripts"
+            / "screen_reader_simulator.js"
+        )
         content = path.read_text()
         assert "function startSimulator" in content
         assert "function stopSimulator" in content
@@ -503,26 +569,32 @@ class TestCommandRegistration:
 
     def test_commands_importable(self):
         from inspekt.core.commands.screen_reader import SCREEN_READER_COMMANDS
+
         assert len(SCREEN_READER_COMMANDS) == 3  # sr group, sr_walk, sr_announce
 
     def test_sr_group_is_group(self):
         from inspekt.core.commands.screen_reader import sr
+
         assert sr.is_group is True
 
     def test_sr_walk_has_handler(self):
         from inspekt.core.commands.screen_reader import sr_walk
+
         assert sr_walk.handler is not None
         assert "screen_reader" in sr_walk.handler
 
     def test_sr_announce_has_handler(self):
         from inspekt.core.commands.screen_reader import sr_announce
+
         assert sr_announce.handler is not None
 
     def test_sr_walk_has_mcp_name(self):
         from inspekt.core.commands.screen_reader import sr_walk
+
         assert sr_walk.mcp_name == "screen_reader_walk"
 
     def test_sr_walk_category_is_accessibility(self):
         from inspekt.core.commands.base import Category
         from inspekt.core.commands.screen_reader import sr_walk
+
         assert sr_walk.category == Category.ACCESSIBILITY

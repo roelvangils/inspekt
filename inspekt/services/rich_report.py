@@ -82,7 +82,7 @@ def _format_accessibility_details(a11y: dict) -> str:
     # Role
     role = a11y.get("role", "")
     if role:
-        items.append(f'<dt>Role</dt><dd><code>{_escape_html(role)}</code></dd>')
+        items.append(f"<dt>Role</dt><dd><code>{_escape_html(role)}</code></dd>")
     else:
         items.append('<dt>Role</dt><dd class="empty">None (no explicit role)</dd>')
 
@@ -92,7 +92,7 @@ def _format_accessibility_details(a11y: dict) -> str:
     if name:
         items.append(f'<dt>Accessible Name</dt><dd>"{_escape_html(name)}"</dd>')
         if source:
-            items.append(f'<dt>Name Source</dt><dd><code>{_escape_html(source)}</code></dd>')
+            items.append(f"<dt>Name Source</dt><dd><code>{_escape_html(source)}</code></dd>")
     else:
         items.append('<dt>Accessible Name</dt><dd class="warning">Missing accessible name</dd>')
 
@@ -108,7 +108,7 @@ def _format_accessibility_details(a11y: dict) -> str:
         aria_attrs.append("aria-hidden=true")
 
     if aria_attrs:
-        items.append(f'<dt>ARIA Attributes</dt><dd><code>{", ".join(aria_attrs)}</code></dd>')
+        items.append(f"<dt>ARIA Attributes</dt><dd><code>{', '.join(aria_attrs)}</code></dd>")
     else:
         items.append('<dt>ARIA Attributes</dt><dd class="empty">None</dd>')
 
@@ -133,7 +133,9 @@ def _format_page_context(context: dict) -> str:
 
     url = context.get("url", "")
     if url:
-        items.append(f'<dt>URL</dt><dd><a href="{_escape_html(url)}" target="_blank" rel="noopener">{_escape_html(url)}</a></dd>')
+        items.append(
+            f'<dt>URL</dt><dd><a href="{_escape_html(url)}" target="_blank" rel="noopener">{_escape_html(url)}</a></dd>'
+        )
 
     title = context.get("title", "")
     if title:
@@ -177,7 +179,9 @@ def _format_element_tree(tree: list[dict], current_tag: str) -> str:
 
     # Add current element
     current_indent = "  " * len(tree)
-    lines.append(f'{current_indent}<strong>&lt;{_escape_html(current_tag)}&gt;</strong> <span class="tree-current">(inspected)</span>')
+    lines.append(
+        f'{current_indent}<strong>&lt;{_escape_html(current_tag)}&gt;</strong> <span class="tree-current">(inspected)</span>'
+    )
 
     return "\n".join(lines)
 
@@ -193,12 +197,12 @@ def _format_audit_section(audit_results: dict | None) -> str:
     if not engines_used:
         error = summary.get("error", "")
         if error:
-            return f'''
+            return f"""
             <section class="audit-section audit-error" aria-labelledby="audit-heading">
                 <h2 id="audit-heading">Accessibility Audit</h2>
                 <p class="audit-error-message">Unable to run accessibility audit: {_escape_html(error)}</p>
             </section>
-            '''
+            """
         return ""
 
     violations = audit_results.get("violations", [])
@@ -225,9 +229,11 @@ def _format_audit_section(audit_results: dict | None) -> str:
         passes_html = '<p class="audit-empty">No passing rules recorded</p>'
 
     # Engine badges
-    engine_badges = " ".join([f'<span class="badge badge-{e}">{e.upper()}</span>' for e in engines_used])
+    engine_badges = " ".join(
+        [f'<span class="badge badge-{e}">{e.upper()}</span>' for e in engines_used]
+    )
 
-    return f'''
+    return f"""
     <section class="audit-section" aria-labelledby="audit-heading">
         <h2 id="audit-heading">Accessibility Audit</h2>
 
@@ -270,7 +276,7 @@ def _format_audit_section(audit_results: dict | None) -> str:
             {passes_html}
         </div>
     </section>
-    '''
+    """
 
 
 def _format_issues_list(issues: list, issue_type: str) -> str:
@@ -288,7 +294,9 @@ def _format_issues_list(issues: list, issue_type: str) -> str:
         instances = issue.get("instances", [])
 
         # Engine badges
-        engine_badges = " ".join([f'<span class="badge badge-{e}">{e.upper()}</span>' for e in engines])
+        engine_badges = " ".join(
+            [f'<span class="badge badge-{e}">{e.upper()}</span>' for e in engines]
+        )
 
         # Impact badge
         impact_badge = f'<span class="badge badge-impact badge-{impact}">{impact}</span>'
@@ -300,7 +308,9 @@ def _format_issues_list(issues: list, issue_type: str) -> str:
             for sc in wcag[:2]:  # Limit to 2 SCs
                 if sc:
                     anchor = sc.replace(".", "")
-                    wcag_parts.append(f'<a href="https://www.w3.org/WAI/WCAG21/quickref/#{anchor}" class="wcag-link" target="_blank" rel="noopener">WCAG {_escape_html(sc)}</a>')
+                    wcag_parts.append(
+                        f'<a href="https://www.w3.org/WAI/WCAG21/quickref/#{anchor}" class="wcag-link" target="_blank" rel="noopener">WCAG {_escape_html(sc)}</a>'
+                    )
             wcag_links = " ".join(wcag_parts)
 
         # Instances
@@ -312,16 +322,16 @@ def _format_issues_list(issues: list, issue_type: str) -> str:
                 inst_msg = inst.get("message", "")
                 help_url = inst.get("help_url", "")
 
-                item = f'''
+                item = f"""
                 <li class="instance">
                     <code class="instance-html">{_escape_for_code_block(inst_html[:500])}</code>
                     <p class="instance-message">{_escape_html(inst_msg)}</p>
-                    {f'<a href="{_escape_html(help_url)}" class="help-link" target="_blank" rel="noopener">Learn more →</a>' if help_url else ''}
+                    {f'<a href="{_escape_html(help_url)}" class="help-link" target="_blank" rel="noopener">Learn more →</a>' if help_url else ""}
                 </li>
-                '''
+                """
                 instance_items.append(item)
 
-            instances_html = f'''
+            instances_html = f"""
             <div class="issue-instances">
                 <details>
                     <summary>{len(instances)} instance{"s" if len(instances) != 1 else ""}</summary>
@@ -330,9 +340,9 @@ def _format_issues_list(issues: list, issue_type: str) -> str:
                     </ul>
                 </details>
             </div>
-            '''
+            """
 
-        card = f'''
+        card = f"""
         <article class="issue-card impact-{impact}">
             <header class="issue-header">
                 <h3 class="issue-title">{_escape_html(description) or _escape_html(rule_id)}</h3>
@@ -344,7 +354,7 @@ def _format_issues_list(issues: list, issue_type: str) -> str:
             </header>
             {instances_html}
         </article>
-        '''
+        """
         cards.append(card)
 
     return "\n".join(cards)
@@ -359,15 +369,17 @@ def _format_passes_list(passes: list) -> str:
     for p in passes[:20]:  # Limit to 20 passes
         rule_id = p.get("rule_id", "unknown")
         engines = p.get("engines", [])
-        engine_badges = " ".join([f'<span class="badge badge-{e} badge-sm">{e.upper()}</span>' for e in engines])
+        engine_badges = " ".join(
+            [f'<span class="badge badge-{e} badge-sm">{e.upper()}</span>' for e in engines]
+        )
 
-        items.append(f'''
+        items.append(f"""
         <div class="pass-card">
             <span class="pass-icon" aria-hidden="true">✓</span>
             <span class="pass-rule">{_escape_html(rule_id)}</span>
             <span class="pass-engines">{engine_badges}</span>
         </div>
-        ''')
+        """)
 
     more_text = ""
     if len(passes) > 20:
@@ -376,18 +388,14 @@ def _format_passes_list(passes: list) -> str:
     return f'<div class="pass-grid">{"".join(items)}</div>{more_text}'
 
 
-def _format_qa_section(
-    question: str,
-    answer_html: str,
-    debug_data: dict | None = None
-) -> str:
+def _format_qa_section(question: str, answer_html: str, debug_data: dict | None = None) -> str:
     """Format the Q&A section, with debug tabs if debug_data is present."""
 
     question_escaped = _escape_html(question)
 
     if not debug_data:
         # Simple Q&A without tabs
-        return f'''
+        return f"""
             <section class="qa-section" aria-labelledby="qa-heading">
                 <h2 id="qa-heading" class="visually-hidden">Question and Analysis</h2>
                 <div class="question">
@@ -399,7 +407,7 @@ def _format_qa_section(
                     <div class="answer-content">{answer_html}</div>
                 </div>
             </section>
-'''
+"""
 
     # With debug tabs: Q&A | AI Prompt | cURL
     prompt_escaped = _escape_for_code_block(debug_data.get("prompt", ""))
@@ -415,7 +423,7 @@ def _format_qa_section(
     ]
     params_text = "\n".join(params_lines)
 
-    return f'''
+    return f"""
             <section class="qa-section" aria-labelledby="qa-heading">
                 <h2 id="qa-heading" class="visually-hidden">Question and Analysis</h2>
 
@@ -462,7 +470,7 @@ def _format_qa_section(
                     </div>
                 </div>
             </section>
-'''
+"""
 
 
 def generate_rich_report_html(data: RichReportData) -> str:

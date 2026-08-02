@@ -259,7 +259,9 @@ def get_cli_command_details(command_path: str) -> dict[str, Any] | None:
             # Get type name
             type_name = "TEXT"
             if param.type:
-                type_name = param.type.name.upper() if hasattr(param.type, "name") else str(param.type)
+                type_name = (
+                    param.type.name.upper() if hasattr(param.type, "name") else str(param.type)
+                )
 
             # Handle special types
             if param.is_flag:
@@ -267,9 +269,13 @@ def get_cli_command_details(command_path: str) -> dict[str, Any] | None:
             elif hasattr(param.type, "__class__"):
                 cls_name = param.type.__class__.__name__
                 if cls_name == "Path":
-                    if getattr(param.type, "file_okay", True) and not getattr(param.type, "dir_okay", True):
+                    if getattr(param.type, "file_okay", True) and not getattr(
+                        param.type, "dir_okay", True
+                    ):
                         type_name = "FILE"
-                    elif getattr(param.type, "dir_okay", True) and not getattr(param.type, "file_okay", True):
+                    elif getattr(param.type, "dir_okay", True) and not getattr(
+                        param.type, "file_okay", True
+                    ):
                         type_name = "DIRECTORY"
                     else:
                         type_name = "PATH"
@@ -292,15 +298,17 @@ def get_cli_command_details(command_path: str) -> dict[str, Any] | None:
                 # Convert non-serializable defaults to string representation
                 default = str(default)
 
-            options.append({
-                "name": long_name,
-                "short": short_name,
-                "type": type_name,
-                "required": param.required,
-                "default": default,
-                "is_flag": param.is_flag,
-                "help": param.help or "",
-            })
+            options.append(
+                {
+                    "name": long_name,
+                    "short": short_name,
+                    "type": type_name,
+                    "required": param.required,
+                    "default": default,
+                    "is_flag": param.is_flag,
+                    "help": param.help or "",
+                }
+            )
 
     # Extract examples from docstring
     examples = _extract_examples_from_help(full_help)

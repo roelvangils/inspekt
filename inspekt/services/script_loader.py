@@ -96,9 +96,7 @@ class ScriptLoader:
 
         return content
 
-    def substitute_placeholders(
-        self, script_content: str, placeholders: dict[str, Any]
-    ) -> str:
+    def substitute_placeholders(self, script_content: str, placeholders: dict[str, Any]) -> str:
         """Substitute placeholders in script with actual values.
 
         Args:

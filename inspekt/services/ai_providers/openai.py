@@ -50,8 +50,7 @@ class OpenAIProvider(AIProvider):
         """
         if not OPENAI_AVAILABLE:
             raise ImportError(
-                "The 'openai' package is not installed. "
-                "Install it with: pip install openai"
+                "The 'openai' package is not installed. Install it with: pip install openai"
             )
 
         self._config = config or {}
@@ -86,9 +85,7 @@ class OpenAIProvider(AIProvider):
         return self._provider_config.get("default-text-model", self.DEFAULT_TEXT_MODEL)
 
     def get_default_vision_model(self) -> str:
-        return self._provider_config.get(
-            "default-vision-model", self.DEFAULT_VISION_MODEL
-        )
+        return self._provider_config.get("default-vision-model", self.DEFAULT_VISION_MODEL)
 
     def supports_vision(self) -> bool:
         return True

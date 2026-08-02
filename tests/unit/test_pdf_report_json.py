@@ -387,37 +387,39 @@ class TestIntegrationWithExistingData:
 
     def test_v1_json_loads_correctly(self):
         """V1.0 JSON data should load and migrate correctly."""
-        v1_json = json.dumps({
-            "report_version": "1.0",
-            "generated_at": "2025-01-15T10:30:00",
-            "generator": "Inspekt PDF Checker",
-            "metadata": {
-                "file_name": "test.pdf",
-                "file_path": "/path/to/test.pdf",
-                "file_size": 123456,
-                "page_count": 10,
-                "title": "Test Document",
-                "author": "Test Author",
-                "language": "en",
-            },
-            "basic_checks": {
-                # Required fields for BasicChecksData
-                "is_tagged": True,
-                "has_title": True,
-                "has_language": True,
-                "has_bookmarks": True,
-                "is_linearized": False,
-                "checks": [
-                    {
-                        "check_id": "tagged",
-                        "name": "Tagged PDF",
-                        "description": "PDF has tags",
-                        "status": "pass",
-                        "severity": "critical",
-                    }
-                ],
-            },
-        })
+        v1_json = json.dumps(
+            {
+                "report_version": "1.0",
+                "generated_at": "2025-01-15T10:30:00",
+                "generator": "Inspekt PDF Checker",
+                "metadata": {
+                    "file_name": "test.pdf",
+                    "file_path": "/path/to/test.pdf",
+                    "file_size": 123456,
+                    "page_count": 10,
+                    "title": "Test Document",
+                    "author": "Test Author",
+                    "language": "en",
+                },
+                "basic_checks": {
+                    # Required fields for BasicChecksData
+                    "is_tagged": True,
+                    "has_title": True,
+                    "has_language": True,
+                    "has_bookmarks": True,
+                    "is_linearized": False,
+                    "checks": [
+                        {
+                            "check_id": "tagged",
+                            "name": "Tagged PDF",
+                            "description": "PDF has tags",
+                            "status": "pass",
+                            "severity": "critical",
+                        }
+                    ],
+                },
+            }
+        )
 
         report = PDFReportData.from_json(v1_json)
 
@@ -436,50 +438,52 @@ class TestIntegrationWithExistingData:
 
     def test_full_v2_json_loads_correctly(self):
         """Full v2.0 JSON with all sections should load correctly."""
-        v2_json = json.dumps({
-            "report_version": "1.0",
-            "schema_version": "2.0",
-            "generated_at": "2025-01-15T10:30:00",
-            "cover_image": {
-                "image_base64": "abc123",
-                "width": 800,
-                "height": 1200,
-            },
-            "contrast_analysis": {
-                "ran_analysis": True,
-                "pages_analyzed": 5,
-                "issues_found": 1,
-                "aa_failures": 1,
-                "aaa_failures": 0,
-                "issues": [
-                    {
-                        "page": 1,
-                        "foreground_color": "#333",
-                        "background_color": "#fff",
-                        "contrast_ratio": 3.5,
-                        "required_ratio": 4.5,
-                        "level": "AA",
-                    }
-                ],
-            },
-            "simple_checks": {
-                "ran_checks": True,
-                "total_checks": 11,
-                "passed": 9,
-                "failed": 2,
-                "checks": [],
-            },
-            "interactive_preview": {
-                "enabled": True,
-                "pages_rendered": 5,
-                "pages_with_overlays": [1, 2, 3, 4, 5],
-            },
-            "asset_manifest": {
-                "assets_directory": "report_assets",
-                "total_size": 0,
-                "assets": [],
-            },
-        })
+        v2_json = json.dumps(
+            {
+                "report_version": "1.0",
+                "schema_version": "2.0",
+                "generated_at": "2025-01-15T10:30:00",
+                "cover_image": {
+                    "image_base64": "abc123",
+                    "width": 800,
+                    "height": 1200,
+                },
+                "contrast_analysis": {
+                    "ran_analysis": True,
+                    "pages_analyzed": 5,
+                    "issues_found": 1,
+                    "aa_failures": 1,
+                    "aaa_failures": 0,
+                    "issues": [
+                        {
+                            "page": 1,
+                            "foreground_color": "#333",
+                            "background_color": "#fff",
+                            "contrast_ratio": 3.5,
+                            "required_ratio": 4.5,
+                            "level": "AA",
+                        }
+                    ],
+                },
+                "simple_checks": {
+                    "ran_checks": True,
+                    "total_checks": 11,
+                    "passed": 9,
+                    "failed": 2,
+                    "checks": [],
+                },
+                "interactive_preview": {
+                    "enabled": True,
+                    "pages_rendered": 5,
+                    "pages_with_overlays": [1, 2, 3, 4, 5],
+                },
+                "asset_manifest": {
+                    "assets_directory": "report_assets",
+                    "total_size": 0,
+                    "assets": [],
+                },
+            }
+        )
 
         report = PDFReportData.from_json(v2_json)
 

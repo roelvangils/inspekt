@@ -108,16 +108,16 @@ def delay_samples(samples: list[float], delay_seconds: float) -> list[float]:
 def samples_to_wav_bytes(samples: list[float]) -> bytes:
     """Convert float samples to WAV file bytes."""
     # Convert to 16-bit PCM
-    pcm_data = b''
+    pcm_data = b""
     for sample in samples:
         # Clamp to [-1, 1] and convert to 16-bit integer
         clamped = max(-1.0, min(1.0, sample))
         int_sample = int(clamped * 32767)
-        pcm_data += struct.pack('<h', int_sample)
+        pcm_data += struct.pack("<h", int_sample)
 
     # Create WAV file in memory
     buffer = io.BytesIO()
-    with wave.open(buffer, 'wb') as wav:
+    with wave.open(buffer, "wb") as wav:
         wav.setnchannels(1)  # Mono
         wav.setsampwidth(2)  # 16-bit
         wav.setframerate(SAMPLE_RATE)
@@ -137,13 +137,13 @@ def play_wav_bytes(wav_bytes: bytes, blocking: bool = False) -> bool:
 
     # Write to temp file and play
     try:
-        with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as f:
+        with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
             f.write(wav_bytes)
             temp_path = f.name
 
-        if system == 'Darwin':  # macOS
+        if system == "Darwin":  # macOS
             if blocking:
-                subprocess.run(['afplay', temp_path], check=True, capture_output=True)
+                subprocess.run(["afplay", temp_path], check=True, capture_output=True)
                 # Clean up after blocking play
                 try:
                     Path(temp_path).unlink()
@@ -153,17 +153,15 @@ def play_wav_bytes(wav_bytes: bytes, blocking: bool = False) -> bool:
                 # Play async - don't wait, don't capture output
                 # Temp file will be cleaned up by OS (in /tmp)
                 subprocess.Popen(
-                    ['afplay', temp_path],
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL
+                    ["afplay", temp_path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
                 )
-        elif system == 'Linux':
-            cmd = ['aplay', '-q', temp_path]
+        elif system == "Linux":
+            cmd = ["aplay", "-q", temp_path]
             if blocking:
                 try:
                     subprocess.run(cmd, check=True, capture_output=True)
                 except (subprocess.CalledProcessError, FileNotFoundError):
-                    subprocess.run(['paplay', temp_path], check=True, capture_output=True)
+                    subprocess.run(["paplay", temp_path], check=True, capture_output=True)
                 try:
                     Path(temp_path).unlink()
                 except Exception:
@@ -172,11 +170,13 @@ def play_wav_bytes(wav_bytes: bytes, blocking: bool = False) -> bool:
                 try:
                     subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                 except FileNotFoundError:
-                    subprocess.Popen(['paplay', temp_path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        elif system == 'Windows':
+                    subprocess.Popen(
+                        ["paplay", temp_path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+                    )
+        elif system == "Windows":
             # Windows doesn't have a good async option, use blocking
             ps_script = f'(New-Object Media.SoundPlayer "{temp_path}").PlaySync()'
-            subprocess.run(['powershell', '-Command', ps_script], check=True, capture_output=True)
+            subprocess.run(["powershell", "-Command", ps_script], check=True, capture_output=True)
             try:
                 Path(temp_path).unlink()
             except Exception:
@@ -203,16 +203,16 @@ class CLIAudio:
         self,
         frequency: float,
         duration: float,
-        wave_type: Literal['sine', 'triangle', 'square'] = 'sine',
+        wave_type: Literal["sine", "triangle", "square"] = "sine",
         volume: float | None = None,
-        delay: float = 0
+        delay: float = 0,
     ) -> list[float]:
         """Generate a single tone with envelope."""
-        vol = (volume if volume is not None else self.volume)
+        vol = volume if volume is not None else self.volume
 
-        if wave_type == 'sine':
+        if wave_type == "sine":
             samples = generate_sine_wave(frequency, duration, vol)
-        elif wave_type == 'triangle':
+        elif wave_type == "triangle":
             samples = generate_triangle_wave(frequency, duration, vol)
         else:
             samples = generate_square_wave(frequency, duration, vol)
@@ -236,33 +236,33 @@ class CLIAudio:
     def play_start_recording(self) -> bool:
         """Start recording - 3 ascending notes (major chord feel)."""
         # Choice 2: Ascending with acceleration
-        t1 = self._tone(300, 0.12, 'triangle', self.volume * 0.4)
-        t2 = self._tone(450, 0.1, 'triangle', self.volume * 0.44, delay=0.1)
-        t3 = self._tone(600, 0.15, 'sine', self.volume * 0.5, delay=0.18)
+        t1 = self._tone(300, 0.12, "triangle", self.volume * 0.4)
+        t2 = self._tone(450, 0.1, "triangle", self.volume * 0.44, delay=0.1)
+        t3 = self._tone(600, 0.15, "sine", self.volume * 0.5, delay=0.18)
         return self._play(mix_samples(t1, t2, t3))
 
     def play_stop_recording(self) -> bool:
         """Stop recording - 3 descending notes."""
         # Choice 4: Quick descending
-        t1 = self._tone(550, 0.1, 'triangle', self.volume * 0.45)
-        t2 = self._tone(400, 0.1, 'triangle', self.volume * 0.4, delay=0.08)
-        t3 = self._tone(300, 0.15, 'sine', self.volume * 0.35, delay=0.16)
+        t1 = self._tone(550, 0.1, "triangle", self.volume * 0.45)
+        t2 = self._tone(400, 0.1, "triangle", self.volume * 0.4, delay=0.08)
+        t3 = self._tone(300, 0.15, "sine", self.volume * 0.35, delay=0.16)
         return self._play(mix_samples(t1, t2, t3))
 
     def play_start_playback(self) -> bool:
         """Start playback - 3 ascending notes (different from recording)."""
         # Choice 2: Bright ascending
-        t1 = self._tone(350, 0.1, 'sine', self.volume * 0.35)
-        t2 = self._tone(525, 0.1, 'sine', self.volume * 0.4, delay=0.1)
-        t3 = self._tone(700, 0.15, 'triangle', self.volume * 0.45, delay=0.18)
+        t1 = self._tone(350, 0.1, "sine", self.volume * 0.35)
+        t2 = self._tone(525, 0.1, "sine", self.volume * 0.4, delay=0.1)
+        t3 = self._tone(700, 0.15, "triangle", self.volume * 0.45, delay=0.18)
         return self._play(mix_samples(t1, t2, t3))
 
     def play_stop_playback(self) -> bool:
         """Stop playback - 3 descending notes."""
         # Choice 5: Gentle fade
-        t1 = self._tone(600, 0.12, 'sine', self.volume * 0.4)
-        t2 = self._tone(450, 0.12, 'sine', self.volume * 0.35, delay=0.12)
-        t3 = self._tone(350, 0.18, 'sine', self.volume * 0.3, delay=0.24)
+        t1 = self._tone(600, 0.12, "sine", self.volume * 0.4)
+        t2 = self._tone(450, 0.12, "sine", self.volume * 0.35, delay=0.12)
+        t3 = self._tone(350, 0.18, "sine", self.volume * 0.3, delay=0.24)
         return self._play(mix_samples(t1, t2, t3))
 
     # ==========================================================================
@@ -288,34 +288,34 @@ class CLIAudio:
     def play_click(self) -> bool:
         """Mouse click - short tick sound."""
         # Choice 3: Tick
-        t1 = self._tone(1200, 0.015, 'square', self.volume * 0.2)
-        t2 = self._tone(300, 0.03, 'sine', self.volume * 0.25, delay=0.01)
+        t1 = self._tone(1200, 0.015, "square", self.volume * 0.2)
+        t2 = self._tone(300, 0.03, "sine", self.volume * 0.25, delay=0.01)
         return self._play(mix_samples(t1, t2))
 
     def play_rightclick(self) -> bool:
         """Right click - lower tick."""
         # Choice 5: Low thump
-        t1 = self._tone(150, 0.04, 'sine', self.volume * 0.35)
-        t2 = self._tone(100, 0.05, 'sine', self.volume * 0.25, delay=0.02)
+        t1 = self._tone(150, 0.04, "sine", self.volume * 0.35)
+        t2 = self._tone(100, 0.05, "sine", self.volume * 0.25, delay=0.02)
         return self._play(mix_samples(t1, t2))
 
     def play_activate(self) -> bool:
         """Enter/Space activation - confirmation ding."""
         # Choice 2: Soft ding
-        samples = self._tone(700, 0.12, 'sine', self.volume * 0.35)
+        samples = self._tone(700, 0.12, "sine", self.volume * 0.35)
         return self._play(samples)
 
     def play_type(self) -> bool:
         """Typing text - keyboard clack."""
         # Choice 4: Mechanical
-        t1 = self._tone(1400, 0.01, 'square', self.volume * 0.15)
-        t2 = self._tone(200, 0.04, 'sine', self.volume * 0.2, delay=0.008)
+        t1 = self._tone(1400, 0.01, "square", self.volume * 0.15)
+        t2 = self._tone(200, 0.04, "sine", self.volume * 0.2, delay=0.008)
         return self._play(mix_samples(t1, t2))
 
     def play_keypress(self) -> bool:
         """Keyboard shortcut - key sound."""
         # Choice 5: Soft tap
-        samples = self._tone(250, 0.05, 'sine', self.volume * 0.25)
+        samples = self._tone(250, 0.05, "sine", self.volume * 0.25)
         return self._play(samples)
 
     def play_hover(self) -> bool:
@@ -336,28 +336,28 @@ class CLIAudio:
     def play_check(self) -> bool:
         """Checkbox checked - ascending duo."""
         # Choice 1: Quick up
-        t1 = self._tone(500, 0.06, 'sine', self.volume * 0.3)
-        t2 = self._tone(700, 0.08, 'sine', self.volume * 0.35, delay=0.05)
+        t1 = self._tone(500, 0.06, "sine", self.volume * 0.3)
+        t2 = self._tone(700, 0.08, "sine", self.volume * 0.35, delay=0.05)
         return self._play(mix_samples(t1, t2))
 
     def play_uncheck(self) -> bool:
         """Checkbox unchecked - descending duo."""
         # Choice 1: Quick down
-        t1 = self._tone(700, 0.06, 'sine', self.volume * 0.3)
-        t2 = self._tone(500, 0.08, 'sine', self.volume * 0.35, delay=0.05)
+        t1 = self._tone(700, 0.06, "sine", self.volume * 0.3)
+        t2 = self._tone(500, 0.08, "sine", self.volume * 0.35, delay=0.05)
         return self._play(mix_samples(t1, t2))
 
     def play_radio(self) -> bool:
         """Radio button - selection ping."""
         # Choice 3: Pop
-        samples = self._tone(800, 0.08, 'triangle', self.volume * 0.35)
+        samples = self._tone(800, 0.08, "triangle", self.volume * 0.35)
         return self._play(samples)
 
     def play_select(self) -> bool:
         """Dropdown selection - selection blip."""
         # Choice 5: Subtle duo
-        t1 = self._tone(450, 0.05, 'sine', self.volume * 0.25)
-        t2 = self._tone(550, 0.06, 'sine', self.volume * 0.3, delay=0.04)
+        t1 = self._tone(450, 0.05, "sine", self.volume * 0.25)
+        t2 = self._tone(550, 0.06, "sine", self.volume * 0.3, delay=0.04)
         return self._play(mix_samples(t1, t2))
 
     def play_scroll(self) -> bool:
@@ -379,30 +379,30 @@ class CLIAudio:
     def play_plugin(self) -> bool:
         """Running plugin - bloop-bloop (identical double tone)."""
         # Choice 1: Bloop-bloop
-        t1 = self._tone(500, 0.1, 'sine', self.volume * 0.4)
-        t2 = self._tone(500, 0.1, 'sine', self.volume * 0.4, delay=0.15)
+        t1 = self._tone(500, 0.1, "sine", self.volume * 0.4)
+        t2 = self._tone(500, 0.1, "sine", self.volume * 0.4, delay=0.15)
         return self._play(mix_samples(t1, t2))
 
     def play_inspekt(self) -> bool:
         """Running inspekt command - bleep-bleep (identical double tone, higher)."""
         # Choice 3: Analysis beep-beep
-        t1 = self._tone(650, 0.1, 'triangle', self.volume * 0.35)
-        t2 = self._tone(650, 0.1, 'triangle', self.volume * 0.35, delay=0.14)
+        t1 = self._tone(650, 0.1, "triangle", self.volume * 0.35)
+        t2 = self._tone(650, 0.1, "triangle", self.volume * 0.35, delay=0.14)
         return self._play(mix_samples(t1, t2))
 
     def play_failure(self) -> bool:
         """Action failed - dissonant error buzz."""
         # Choice 1: Harsh buzz
-        t1 = self._tone(150, 0.15, 'square', self.volume * 0.25)
-        t2 = self._tone(155, 0.15, 'square', self.volume * 0.25)  # Slightly detuned for dissonance
-        t3 = self._tone(200, 0.1, 'triangle', self.volume * 0.2, delay=0.08)
+        t1 = self._tone(150, 0.15, "square", self.volume * 0.25)
+        t2 = self._tone(155, 0.15, "square", self.volume * 0.25)  # Slightly detuned for dissonance
+        t3 = self._tone(200, 0.1, "triangle", self.volume * 0.2, delay=0.08)
         return self._play(mix_samples(t1, t2, t3))
 
     def play_success(self) -> bool:
         """Success chime - pleasant ascending arpeggio."""
-        t1 = self._tone(523, 0.1, 'sine', self.volume * 0.3)  # C5
-        t2 = self._tone(659, 0.1, 'sine', self.volume * 0.35, delay=0.1)  # E5
-        t3 = self._tone(784, 0.15, 'sine', self.volume * 0.4, delay=0.2)  # G5
+        t1 = self._tone(523, 0.1, "sine", self.volume * 0.3)  # C5
+        t2 = self._tone(659, 0.1, "sine", self.volume * 0.35, delay=0.1)  # E5
+        t3 = self._tone(784, 0.15, "sine", self.volume * 0.4, delay=0.2)  # G5
         return self._play(mix_samples(t1, t2, t3))
 
     # ==========================================================================
@@ -412,26 +412,26 @@ class CLIAudio:
     def play_for_action(self, action: str) -> bool:
         """Play sound for a given action type."""
         action_map = {
-            'start_recording': self.play_start_recording,
-            'stop_recording': self.play_stop_recording,
-            'start_playback': self.play_start_playback,
-            'stop_playback': self.play_stop_playback,
-            'navigate': self.play_navigate,
-            'click': self.play_click,
-            'rightclick': self.play_rightclick,
-            'activate': self.play_activate,
-            'type': self.play_type,
-            'keypress': self.play_keypress,
-            'hover': self.play_hover,
-            'check': self.play_check,
-            'uncheck': self.play_uncheck,
-            'radio': self.play_radio,
-            'select': self.play_select,
-            'scroll': self.play_scroll,
-            'plugin': self.play_plugin,
-            'inspekt': self.play_inspekt,
-            'failure': self.play_failure,
-            'success': self.play_success,
+            "start_recording": self.play_start_recording,
+            "stop_recording": self.play_stop_recording,
+            "start_playback": self.play_start_playback,
+            "stop_playback": self.play_stop_playback,
+            "navigate": self.play_navigate,
+            "click": self.play_click,
+            "rightclick": self.play_rightclick,
+            "activate": self.play_activate,
+            "type": self.play_type,
+            "keypress": self.play_keypress,
+            "hover": self.play_hover,
+            "check": self.play_check,
+            "uncheck": self.play_uncheck,
+            "radio": self.play_radio,
+            "select": self.play_select,
+            "scroll": self.play_scroll,
+            "plugin": self.play_plugin,
+            "inspekt": self.play_inspekt,
+            "failure": self.play_failure,
+            "success": self.play_success,
         }
 
         player = action_map.get(action)
@@ -449,31 +449,31 @@ class CLIAudio:
         Used to generate audio tracks for video recordings.
         """
         # Map actions to sample generators (similar to play_for_action but returns samples)
-        if action == 'start_recording':
-            t1 = self._tone(300, 0.12, 'triangle', self.volume * 0.4)
-            t2 = self._tone(450, 0.1, 'triangle', self.volume * 0.44, delay=0.1)
-            t3 = self._tone(600, 0.15, 'sine', self.volume * 0.5, delay=0.18)
+        if action == "start_recording":
+            t1 = self._tone(300, 0.12, "triangle", self.volume * 0.4)
+            t2 = self._tone(450, 0.1, "triangle", self.volume * 0.44, delay=0.1)
+            t3 = self._tone(600, 0.15, "sine", self.volume * 0.5, delay=0.18)
             return mix_samples(t1, t2, t3)
 
-        elif action == 'stop_recording':
-            t1 = self._tone(550, 0.1, 'triangle', self.volume * 0.45)
-            t2 = self._tone(400, 0.1, 'triangle', self.volume * 0.4, delay=0.08)
-            t3 = self._tone(300, 0.15, 'sine', self.volume * 0.35, delay=0.16)
+        elif action == "stop_recording":
+            t1 = self._tone(550, 0.1, "triangle", self.volume * 0.45)
+            t2 = self._tone(400, 0.1, "triangle", self.volume * 0.4, delay=0.08)
+            t3 = self._tone(300, 0.15, "sine", self.volume * 0.35, delay=0.16)
             return mix_samples(t1, t2, t3)
 
-        elif action == 'start_playback':
-            t1 = self._tone(350, 0.1, 'sine', self.volume * 0.35)
-            t2 = self._tone(525, 0.1, 'sine', self.volume * 0.4, delay=0.1)
-            t3 = self._tone(700, 0.15, 'triangle', self.volume * 0.45, delay=0.18)
+        elif action == "start_playback":
+            t1 = self._tone(350, 0.1, "sine", self.volume * 0.35)
+            t2 = self._tone(525, 0.1, "sine", self.volume * 0.4, delay=0.1)
+            t3 = self._tone(700, 0.15, "triangle", self.volume * 0.45, delay=0.18)
             return mix_samples(t1, t2, t3)
 
-        elif action == 'stop_playback':
-            t1 = self._tone(600, 0.12, 'sine', self.volume * 0.4)
-            t2 = self._tone(450, 0.12, 'sine', self.volume * 0.35, delay=0.12)
-            t3 = self._tone(350, 0.18, 'sine', self.volume * 0.3, delay=0.24)
+        elif action == "stop_playback":
+            t1 = self._tone(600, 0.12, "sine", self.volume * 0.4)
+            t2 = self._tone(450, 0.12, "sine", self.volume * 0.35, delay=0.12)
+            t3 = self._tone(350, 0.18, "sine", self.volume * 0.3, delay=0.24)
             return mix_samples(t1, t2, t3)
 
-        elif action == 'navigate':
+        elif action == "navigate":
             samples = []
             duration = 0.08
             num_samples = int(SAMPLE_RATE * duration)
@@ -486,28 +486,28 @@ class CLIAudio:
                 samples.append(sample)
             return apply_envelope(samples, attack=0.005, decay=0.02)
 
-        elif action == 'click':
-            t1 = self._tone(1200, 0.015, 'square', self.volume * 0.2)
-            t2 = self._tone(300, 0.03, 'sine', self.volume * 0.25, delay=0.01)
+        elif action == "click":
+            t1 = self._tone(1200, 0.015, "square", self.volume * 0.2)
+            t2 = self._tone(300, 0.03, "sine", self.volume * 0.25, delay=0.01)
             return mix_samples(t1, t2)
 
-        elif action == 'rightclick':
-            t1 = self._tone(150, 0.04, 'sine', self.volume * 0.35)
-            t2 = self._tone(100, 0.05, 'sine', self.volume * 0.25, delay=0.02)
+        elif action == "rightclick":
+            t1 = self._tone(150, 0.04, "sine", self.volume * 0.35)
+            t2 = self._tone(100, 0.05, "sine", self.volume * 0.25, delay=0.02)
             return mix_samples(t1, t2)
 
-        elif action == 'activate':
-            return self._tone(700, 0.12, 'sine', self.volume * 0.35)
+        elif action == "activate":
+            return self._tone(700, 0.12, "sine", self.volume * 0.35)
 
-        elif action in ('type', 'set'):
-            t1 = self._tone(1400, 0.01, 'square', self.volume * 0.15)
-            t2 = self._tone(200, 0.04, 'sine', self.volume * 0.2, delay=0.008)
+        elif action in ("type", "set"):
+            t1 = self._tone(1400, 0.01, "square", self.volume * 0.15)
+            t2 = self._tone(200, 0.04, "sine", self.volume * 0.2, delay=0.008)
             return mix_samples(t1, t2)
 
-        elif action == 'keypress':
-            return self._tone(250, 0.05, 'sine', self.volume * 0.25)
+        elif action == "keypress":
+            return self._tone(250, 0.05, "sine", self.volume * 0.25)
 
-        elif action == 'hover':
+        elif action == "hover":
             samples = []
             duration = 0.1
             num_samples = int(SAMPLE_RATE * duration)
@@ -520,25 +520,25 @@ class CLIAudio:
                 samples.append(sample)
             return samples
 
-        elif action == 'check':
-            t1 = self._tone(500, 0.06, 'sine', self.volume * 0.3)
-            t2 = self._tone(700, 0.08, 'sine', self.volume * 0.35, delay=0.05)
+        elif action == "check":
+            t1 = self._tone(500, 0.06, "sine", self.volume * 0.3)
+            t2 = self._tone(700, 0.08, "sine", self.volume * 0.35, delay=0.05)
             return mix_samples(t1, t2)
 
-        elif action == 'uncheck':
-            t1 = self._tone(700, 0.06, 'sine', self.volume * 0.3)
-            t2 = self._tone(500, 0.08, 'sine', self.volume * 0.35, delay=0.05)
+        elif action == "uncheck":
+            t1 = self._tone(700, 0.06, "sine", self.volume * 0.3)
+            t2 = self._tone(500, 0.08, "sine", self.volume * 0.35, delay=0.05)
             return mix_samples(t1, t2)
 
-        elif action == 'radio':
-            return self._tone(800, 0.08, 'triangle', self.volume * 0.35)
+        elif action == "radio":
+            return self._tone(800, 0.08, "triangle", self.volume * 0.35)
 
-        elif action == 'select':
-            t1 = self._tone(450, 0.05, 'sine', self.volume * 0.25)
-            t2 = self._tone(550, 0.06, 'sine', self.volume * 0.3, delay=0.04)
+        elif action == "select":
+            t1 = self._tone(450, 0.05, "sine", self.volume * 0.25)
+            t2 = self._tone(550, 0.06, "sine", self.volume * 0.3, delay=0.04)
             return mix_samples(t1, t2)
 
-        elif action == 'scroll':
+        elif action == "scroll":
             samples = []
             duration = 0.08
             num_samples = int(SAMPLE_RATE * duration)
@@ -551,37 +551,37 @@ class CLIAudio:
                 samples.append(sample)
             return apply_envelope(samples, attack=0.01, decay=0.02)
 
-        elif action == 'plugin':
-            t1 = self._tone(500, 0.1, 'sine', self.volume * 0.4)
-            t2 = self._tone(500, 0.1, 'sine', self.volume * 0.4, delay=0.15)
+        elif action == "plugin":
+            t1 = self._tone(500, 0.1, "sine", self.volume * 0.4)
+            t2 = self._tone(500, 0.1, "sine", self.volume * 0.4, delay=0.15)
             return mix_samples(t1, t2)
 
-        elif action == 'inspekt':
-            t1 = self._tone(650, 0.1, 'triangle', self.volume * 0.35)
-            t2 = self._tone(650, 0.1, 'triangle', self.volume * 0.35, delay=0.14)
+        elif action == "inspekt":
+            t1 = self._tone(650, 0.1, "triangle", self.volume * 0.35)
+            t2 = self._tone(650, 0.1, "triangle", self.volume * 0.35, delay=0.14)
             return mix_samples(t1, t2)
 
-        elif action in ('failure', 'error'):
-            t1 = self._tone(150, 0.15, 'square', self.volume * 0.25)
-            t2 = self._tone(155, 0.15, 'square', self.volume * 0.25)
-            t3 = self._tone(200, 0.1, 'triangle', self.volume * 0.2, delay=0.08)
+        elif action in ("failure", "error"):
+            t1 = self._tone(150, 0.15, "square", self.volume * 0.25)
+            t2 = self._tone(155, 0.15, "square", self.volume * 0.25)
+            t3 = self._tone(200, 0.1, "triangle", self.volume * 0.2, delay=0.08)
             return mix_samples(t1, t2, t3)
 
-        elif action == 'success':
-            t1 = self._tone(523, 0.1, 'sine', self.volume * 0.3)
-            t2 = self._tone(659, 0.1, 'sine', self.volume * 0.35, delay=0.1)
-            t3 = self._tone(784, 0.15, 'sine', self.volume * 0.4, delay=0.2)
+        elif action == "success":
+            t1 = self._tone(523, 0.1, "sine", self.volume * 0.3)
+            t2 = self._tone(659, 0.1, "sine", self.volume * 0.35, delay=0.1)
+            t3 = self._tone(784, 0.15, "sine", self.volume * 0.4, delay=0.2)
             return mix_samples(t1, t2, t3)
 
-        elif action == 'pause':
-            t1 = self._tone(880, 0.15, 'sine', self.volume * 0.4)
-            t2 = self._tone(1047, 0.15, 'sine', self.volume * 0.4, delay=0.15)
+        elif action == "pause":
+            t1 = self._tone(880, 0.15, "sine", self.volume * 0.4)
+            t2 = self._tone(1047, 0.15, "sine", self.volume * 0.4, delay=0.15)
             return mix_samples(t1, t2)
 
         # Fallback actions use click sound
-        elif action in ('toggle', 'dialog', 'jsdialog', 'upload', 'download'):
-            t1 = self._tone(1200, 0.015, 'square', self.volume * 0.2)
-            t2 = self._tone(300, 0.03, 'sine', self.volume * 0.25, delay=0.01)
+        elif action in ("toggle", "dialog", "jsdialog", "upload", "download"):
+            t1 = self._tone(1200, 0.015, "square", self.volume * 0.2)
+            t2 = self._tone(300, 0.03, "sine", self.volume * 0.25, delay=0.01)
             return mix_samples(t1, t2)
 
         # Unknown action - return silence
@@ -603,8 +603,8 @@ class CLIAudio:
         # Generate each sound and place at timestamp
         all_tracks = []
         for cue in cues:
-            timestamp_ms = cue.get('timestamp_ms', 0)
-            action = cue.get('action', '')
+            timestamp_ms = cue.get("timestamp_ms", 0)
+            action = cue.get("action", "")
 
             # Get samples for this action
             samples = self._get_samples_for_action(action)

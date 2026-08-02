@@ -62,9 +62,7 @@ class SRElementAnnouncement(BaseModel):
     language: str = Field(default="en", description="Detected language")
     jaws: str | None = Field(default=None, description="JAWS announcement")
     nvda: str | None = Field(default=None, description="NVDA announcement")
-    voiceover: str | None = Field(
-        default=None, description="VoiceOver announcement"
-    )
+    voiceover: str | None = Field(default=None, description="VoiceOver announcement")
 
     # Secondary info
     description: str | None = Field(
@@ -74,41 +72,27 @@ class SRElementAnnouncement(BaseModel):
         default=None,
         description="title attribute (when not already used as accessible name)",
     )
-    is_focusable: bool = Field(
-        default=False, description="Whether element is keyboard-focusable"
-    )
-    tab_index: int | None = Field(
-        default=None, description="tabindex value (if explicitly set)"
-    )
+    is_focusable: bool = Field(default=False, description="Whether element is keyboard-focusable")
+    tab_index: int | None = Field(default=None, description="tabindex value (if explicitly set)")
 
     # Table context (only for table cells)
     table_column_header: str | None = Field(
         default=None, description="Associated column header text"
     )
-    table_row_header: str | None = Field(
-        default=None, description="Associated row header text"
-    )
+    table_row_header: str | None = Field(default=None, description="Associated row header text")
 
     # Form context
-    value: str | None = Field(
-        default=None, description="Current input value"
-    )
-    placeholder: str | None = Field(
-        default=None, description="Placeholder text"
-    )
+    value: str | None = Field(default=None, description="Current input value")
+    placeholder: str | None = Field(default=None, description="Placeholder text")
 
     # Link context
-    href: str | None = Field(
-        default=None, description="Link destination URL"
-    )
+    href: str | None = Field(default=None, description="Link destination URL")
 
     # Secondary announcements (the "after pause" text per SR)
     jaws_secondary: str | None = Field(
         default=None, description="What JAWS says after a pause (description/tooltip)"
     )
-    nvda_secondary: str | None = Field(
-        default=None, description="What NVDA says after a pause"
-    )
+    nvda_secondary: str | None = Field(default=None, description="What NVDA says after a pause")
     voiceover_secondary: str | None = Field(
         default=None, description="What VoiceOver says as help text"
     )
@@ -129,9 +113,7 @@ class SRDifference(BaseModel):
     name: str = Field(..., description="Accessible name")
     jaws: str | None = Field(default=None, description="JAWS announcement")
     nvda: str | None = Field(default=None, description="NVDA announcement")
-    voiceover: str | None = Field(
-        default=None, description="VoiceOver announcement"
-    )
+    voiceover: str | None = Field(default=None, description="VoiceOver announcement")
 
 
 class SRWalkResponse(BaseModel):
@@ -144,9 +126,7 @@ class SRWalkResponse(BaseModel):
     announcements: list[SRElementAnnouncement] = Field(
         default_factory=list, description="All element announcements"
     )
-    summary: SRWalkSummary | None = Field(
-        default=None, description="Summary statistics"
-    )
+    summary: SRWalkSummary | None = Field(default=None, description="Summary statistics")
     differences: list[SRDifference] = Field(
         default_factory=list, description="Elements where SRs differ"
     )
@@ -182,7 +162,5 @@ class SRAnnounceResponse(BaseModel):
     name: str | None = Field(default=None, description="Accessible name")
     jaws: str | None = Field(default=None, description="JAWS announcement")
     nvda: str | None = Field(default=None, description="NVDA announcement")
-    voiceover: str | None = Field(
-        default=None, description="VoiceOver announcement"
-    )
+    voiceover: str | None = Field(default=None, description="VoiceOver announcement")
     error: str | None = Field(default=None, description="Error message if failed")

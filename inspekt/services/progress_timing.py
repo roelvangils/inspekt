@@ -31,52 +31,52 @@ from inspekt.services.pdf_prescan import PDFPrescanResult
 TIMING_CONSTANTS = {
     # Core accessibility checks (tagged, title, language, protection, bookmarks, scanned, alt text)
     "core": {
-        "base": 500,        # Fixed overhead
-        "per_page": 5,      # Minimal per-page cost (structure inspection)
-        "per_image": 10,    # Alt text presence check
+        "base": 500,  # Fixed overhead
+        "per_page": 5,  # Minimal per-page cost (structure inspection)
+        "per_image": 10,  # Alt text presence check
     },
     # OCR text layer analysis
     "ocr": {
-        "base": 2000,       # Tesseract initialization
-        "per_page": 1500,   # OCR + comparison per page
+        "base": 2000,  # Tesseract initialization
+        "per_page": 1500,  # OCR + comparison per page
         "first_page_extra": 500,  # Model loading on first page
     },
     # Color contrast analysis
     "contrast": {
-        "base": 1000,       # Setup and rendering prep
-        "per_page": 500,    # Render + analyze per page
+        "base": 1000,  # Setup and rendering prep
+        "per_page": 500,  # Render + analyze per page
     },
     # Structure tree extraction
     "structure": {
-        "base": 500,        # Tree setup
-        "per_page": 50,     # Tag traversal per page
+        "base": 500,  # Tree setup
+        "per_page": 50,  # Tag traversal per page
     },
     # Content extraction (images, tables, forms, links)
     "content": {
-        "base": 1000,       # Setup
-        "per_page": 100,    # Page scan
-        "per_image": 50,    # Image metadata extraction
+        "base": 1000,  # Setup
+        "per_page": 100,  # Page scan
+        "per_image": 50,  # Image metadata extraction
     },
     # Image classification (local ML)
     "classify": {
-        "base": 1500,       # Model loading
-        "per_image": 300,   # Classification per image
-        "batch_size": 10,   # Images processed per batch
+        "base": 1500,  # Model loading
+        "per_image": 300,  # Classification per image
+        "batch_size": 10,  # Images processed per batch
     },
     # Preview generation (page renders, tag overlays, thumbnails)
     "preview": {
-        "base": 500,        # Setup
-        "per_page": 200,    # Render + overlay per page
+        "base": 500,  # Setup
+        "per_page": 200,  # Render + overlay per page
     },
     # Report building
     "build": {
-        "base": 500,        # Template prep
-        "per_page": 10,     # Data compilation
+        "base": 500,  # Template prep
+        "per_page": 10,  # Data compilation
     },
     # Report saving
     "save": {
-        "base": 200,        # File I/O
-        "per_page": 5,      # Asset writing
+        "base": 200,  # File I/O
+        "per_page": 5,  # Asset writing
     },
 }
 
@@ -194,13 +194,15 @@ def estimate_timing(
         SubstepTiming("scanned", "Detect scanned document", 100),
         SubstepTiming("alt_text", "Check figure alt text", core_consts["per_image"] * image_count),
     ]
-    steps.append(StepTiming(
-        step_id="core",
-        label="Run core accessibility checks",
-        estimated_ms=core_time,
-        will_run=True,
-        substeps=core_substeps,
-    ))
+    steps.append(
+        StepTiming(
+            step_id="core",
+            label="Run core accessibility checks",
+            estimated_ms=core_time,
+            will_run=True,
+            substeps=core_substeps,
+        )
+    )
 
     # ----- Step: Analyze document (OCR + Contrast) -----
     analyze_time = 0
@@ -214,34 +216,37 @@ def estimate_timing(
             + ocr_consts["per_page"] * max_ocr_pages
         )
         analyze_time += ocr_time
-        analyze_substeps.append(SubstepTiming(
-            "ocr",
-            f"Analyze text layer ({max_ocr_pages} pages)",
-            ocr_time,
-        ))
+        analyze_substeps.append(
+            SubstepTiming(
+                "ocr",
+                f"Analyze text layer ({max_ocr_pages} pages)",
+                ocr_time,
+            )
+        )
 
     if do_contrast:
         contrast_consts = TIMING_CONSTANTS["contrast"]
-        contrast_time = (
-            contrast_consts["base"]
-            + contrast_consts["per_page"] * max_contrast_pages
-        )
+        contrast_time = contrast_consts["base"] + contrast_consts["per_page"] * max_contrast_pages
         analyze_time += contrast_time
-        analyze_substeps.append(SubstepTiming(
-            "contrast",
-            f"Check color contrast ({max_contrast_pages} pages)",
-            contrast_time,
-        ))
+        analyze_substeps.append(
+            SubstepTiming(
+                "contrast",
+                f"Check color contrast ({max_contrast_pages} pages)",
+                contrast_time,
+            )
+        )
 
     # Only add analyze step if it has work to do
     if analyze_substeps:
-        steps.append(StepTiming(
-            step_id="analyze",
-            label="Analyze document",
-            estimated_ms=analyze_time,
-            will_run=True,
-            substeps=analyze_substeps,
-        ))
+        steps.append(
+            StepTiming(
+                step_id="analyze",
+                label="Analyze document",
+                estimated_ms=analyze_time,
+                will_run=True,
+                substeps=analyze_substeps,
+            )
+        )
 
     # ----- Step: Extract structure & content -----
     structure_consts = TIMING_CONSTANTS["structure"]
@@ -254,93 +259,99 @@ def estimate_timing(
         + content_consts["per_image"] * image_count
     )
     structure_substeps = [
-        SubstepTiming("tree", "Extract structure tree", structure_consts["base"] + structure_consts["per_page"] * page_count),
+        SubstepTiming(
+            "tree",
+            "Extract structure tree",
+            structure_consts["base"] + structure_consts["per_page"] * page_count,
+        ),
         SubstepTiming("headings", "Extract heading outline", 200),
         SubstepTiming("tables", "Audit tables", 300),
         SubstepTiming("forms", "Audit forms", 200 if prescan.has_forms else 50),
         SubstepTiming("links", "Extract links", 200),
         SubstepTiming("images", "Catalog images", content_consts["per_image"] * image_count),
     ]
-    steps.append(StepTiming(
-        step_id="structure",
-        label="Extract structure & content",
-        estimated_ms=structure_time,
-        will_run=True,
-        substeps=structure_substeps,
-    ))
+    steps.append(
+        StepTiming(
+            step_id="structure",
+            label="Extract structure & content",
+            estimated_ms=structure_time,
+            will_run=True,
+            substeps=structure_substeps,
+        )
+    )
 
     # ----- Step: Classify images (optional) -----
     if do_classify and image_count > 0:
         classify_consts = TIMING_CONSTANTS["classify"]
         images_to_classify = min(max_classify_images, image_count)
-        classify_time = (
-            classify_consts["base"]
-            + classify_consts["per_image"] * images_to_classify
+        classify_time = classify_consts["base"] + classify_consts["per_image"] * images_to_classify
+        steps.append(
+            StepTiming(
+                step_id="classify",
+                label="Classify images",
+                estimated_ms=classify_time,
+                will_run=True,
+                substeps=[
+                    SubstepTiming(
+                        "ml_classify",
+                        f"Classify {images_to_classify} images (local ML)",
+                        classify_time,
+                    ),
+                ],
+            )
         )
-        steps.append(StepTiming(
-            step_id="classify",
-            label="Classify images",
-            estimated_ms=classify_time,
-            will_run=True,
-            substeps=[
-                SubstepTiming(
-                    "ml_classify",
-                    f"Classify {images_to_classify} images (local ML)",
-                    classify_time,
-                ),
-            ],
-        ))
 
     # ----- Step: Generate preview (optional) -----
     if do_preview:
         preview_consts = TIMING_CONSTANTS["preview"]
-        preview_time = (
-            preview_consts["base"]
-            + preview_consts["per_page"] * max_preview_pages
+        preview_time = preview_consts["base"] + preview_consts["per_page"] * max_preview_pages
+        steps.append(
+            StepTiming(
+                step_id="preview",
+                label="Generate preview",
+                estimated_ms=preview_time,
+                will_run=True,
+                substeps=[
+                    SubstepTiming(
+                        "render",
+                        f"Render pages (1-{max_preview_pages})",
+                        preview_consts["per_page"] * max_preview_pages,
+                    ),
+                    SubstepTiming("overlay", "Create tag overlays", 300),
+                    SubstepTiming("thumbnails", "Generate thumbnails", 200),
+                ],
+            )
         )
-        steps.append(StepTiming(
-            step_id="preview",
-            label="Generate preview",
-            estimated_ms=preview_time,
-            will_run=True,
-            substeps=[
-                SubstepTiming("render", f"Render pages (1-{max_preview_pages})", preview_consts["per_page"] * max_preview_pages),
-                SubstepTiming("overlay", "Create tag overlays", 300),
-                SubstepTiming("thumbnails", "Generate thumbnails", 200),
-            ],
-        ))
 
     # ----- Step: Build report -----
     build_consts = TIMING_CONSTANTS["build"]
-    build_time = (
-        build_consts["base"]
-        + build_consts["per_page"] * page_count
+    build_time = build_consts["base"] + build_consts["per_page"] * page_count
+    steps.append(
+        StepTiming(
+            step_id="build",
+            label="Build report",
+            estimated_ms=build_time,
+            will_run=True,
+            substeps=[
+                SubstepTiming("compile", "Compile report data", build_time),
+            ],
+        )
     )
-    steps.append(StepTiming(
-        step_id="build",
-        label="Build report",
-        estimated_ms=build_time,
-        will_run=True,
-        substeps=[
-            SubstepTiming("compile", "Compile report data", build_time),
-        ],
-    ))
 
     # ----- Step: Save report -----
     save_consts = TIMING_CONSTANTS["save"]
-    save_time = (
-        save_consts["base"]
-        + save_consts["per_page"] * page_count
+    save_time = save_consts["base"] + save_consts["per_page"] * page_count
+    steps.append(
+        StepTiming(
+            step_id="save",
+            label="Save report",
+            estimated_ms=save_time,
+            will_run=True,
+            substeps=[
+                SubstepTiming("write", "Write report files", save_time),
+            ],
+        )
     )
-    steps.append(StepTiming(
-        step_id="save",
-        label="Save report",
-        estimated_ms=save_time,
-        will_run=True,
-        substeps=[
-            SubstepTiming("write", "Write report files", save_time),
-        ],
-    ))
 
     # Calculate total
     total_time = sum(s.estimated_ms for s in steps if s.will_run)

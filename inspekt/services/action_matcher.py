@@ -173,7 +173,10 @@ class ActionMatcher:
         return None
 
     def find_common_action_match(
-        self, action_normalized: str, actionable_elements: list[dict], languages: list[str] | None = None
+        self,
+        action_normalized: str,
+        actionable_elements: list[dict],
+        languages: list[str] | None = None,
     ) -> dict | None:
         """
         Find element using common action patterns.
@@ -204,12 +207,19 @@ class ActionMatcher:
                 for lang in languages:
                     if lang in patterns["texts"]:
                         for text in patterns["texts"][lang]:
-                            if text.lower() in action_normalized or action_normalized in text.lower():
-                                return self._find_by_pattern(patterns, actionable_elements, languages)
+                            if (
+                                text.lower() in action_normalized
+                                or action_normalized in text.lower()
+                            ):
+                                return self._find_by_pattern(
+                                    patterns, actionable_elements, languages
+                                )
 
         return None
 
-    def _find_by_pattern(self, patterns: dict, actionable_elements: list[dict], languages: list[str] | None = None) -> dict | None:
+    def _find_by_pattern(
+        self, patterns: dict, actionable_elements: list[dict], languages: list[str] | None = None
+    ) -> dict | None:
         """Find element matching a common action pattern. Supports multilingual text patterns."""
         if languages is None:
             languages = ["en", "nl", "fr", "de", "es"]
@@ -237,7 +247,10 @@ class ActionMatcher:
                     for lang in languages:
                         if lang in patterns["texts"]:
                             for text_pattern in patterns["texts"][lang]:
-                                if text_pattern.lower() in element_text or element_text in text_pattern.lower():
+                                if (
+                                    text_pattern.lower() in element_text
+                                    or element_text in text_pattern.lower()
+                                ):
                                     score = max(score, 0.9)
                                     break
                             if score >= 0.9:
@@ -310,11 +323,13 @@ class ActionMatcher:
                     score = len(action_normalized) / len(href_normalized)
 
             if match_type and score >= 0.4:
-                matches.append({
-                    "element": element,
-                    "score": score,
-                    "match_type": match_type,
-                })
+                matches.append(
+                    {
+                        "element": element,
+                        "score": score,
+                        "match_type": match_type,
+                    }
+                )
 
         matches.sort(key=lambda x: x["score"], reverse=True)
         matches = self._apply_prominence_bonus(matches)

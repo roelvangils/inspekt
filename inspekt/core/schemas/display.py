@@ -15,7 +15,25 @@ from pydantic import BaseModel, Field
 # ============================================================================
 
 # Predefined zoom steps (matching control-panel.html ZOOM_STEPS)
-ZOOM_STEPS = [0.25, 0.33, 0.5, 0.67, 0.75, 0.8, 0.9, 1.0, 1.1, 1.25, 1.5, 1.75, 2.0, 2.5, 3.0, 4.0, 5.0]
+ZOOM_STEPS = [
+    0.25,
+    0.33,
+    0.5,
+    0.67,
+    0.75,
+    0.8,
+    0.9,
+    1.0,
+    1.1,
+    1.25,
+    1.5,
+    1.75,
+    2.0,
+    2.5,
+    3.0,
+    4.0,
+    5.0,
+]
 
 # WCAG guidance for zoom levels
 ZOOM_WCAG_NOTES = {

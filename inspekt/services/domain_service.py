@@ -80,10 +80,13 @@ class DomainService:
         cursor = conn.cursor()
         try:
             expires_at = int(time.time()) + (duration_minutes * 60)
-            cursor.execute("""
+            cursor.execute(
+                """
                 INSERT OR REPLACE INTO yolo_mode (id, enabled, expires_at)
                 VALUES (1, 1, ?)
-            """, (expires_at,))
+            """,
+                (expires_at,),
+            )
             conn.commit()
             return {"ok": True, "expires_at": expires_at, "duration_minutes": duration_minutes}
         finally:
@@ -158,16 +161,14 @@ class DomainService:
                 "enabled": True,
                 "expires_at": expires_at,
                 "remaining_minutes": remaining_minutes,
-                "remaining_seconds": remaining_seconds
+                "remaining_seconds": remaining_seconds,
             }
         except Exception:
             return {"enabled": False}
         finally:
             conn.close()
 
-    def add_domain(
-        self, domain: str, permanent: bool = True
-    ) -> dict[str, Any]:
+    def add_domain(self, domain: str, permanent: bool = True) -> dict[str, Any]:
         """Add domain to allowed list (normalized to base domain)."""
         normalized = normalize_domain(domain)
         conn = sqlite3.connect(self.db_path)
@@ -251,6 +252,7 @@ class DomainService:
         """
         # Check isolated mode first - bypasses ALL domain checks (Docker VM)
         from inspekt.config import is_isolated_mode
+
         if is_isolated_mode():
             return True
 
@@ -337,10 +339,7 @@ class DomainService:
             dt = datetime.fromtimestamp(item["added_at"], tz=UTC)
             iso_timestamp = dt.isoformat().replace("+00:00", "Z")
 
-            domains[item["domain"]] = {
-                "addedAt": iso_timestamp,
-                "permanent": item["permanent"]
-            }
+            domains[item["domain"]] = {"addedAt": iso_timestamp, "permanent": item["permanent"]}
 
         return domains
 
@@ -359,9 +358,7 @@ class DomainService:
         finally:
             conn.close()
 
-    def import_domains(
-        self, domains: list[dict[str, Any]]
-    ) -> dict[str, Any]:
+    def import_domains(self, domains: list[dict[str, Any]]) -> dict[str, Any]:
         """
         Import domains from browser storage format.
 

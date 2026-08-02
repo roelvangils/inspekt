@@ -27,9 +27,7 @@ class TestControlNotification:
 
     def test_initialization_without_data(self):
         """Test initializing a ControlNotification without data parameter."""
-        notification = ControlNotification(
-            notification_type="refocus", message="Focus restored"
-        )
+        notification = ControlNotification(notification_type="refocus", message="Focus restored")
         assert notification.type == "refocus"
         assert notification.message == "Focus restored"
         assert notification.data == {}
@@ -125,9 +123,7 @@ class TestCheckNotifications:
         assert notifications[0].message == "Focus restored"
         assert notifications[1].type == "navigation"
         assert notifications[1].message == "Page loaded"
-        mock_get.assert_called_once_with(
-            "http://127.0.0.1:8765/notifications", timeout=0.5
-        )
+        mock_get.assert_called_once_with("http://127.0.0.1:8765/notifications", timeout=0.5)
 
     @patch("inspekt.services.control_manager.requests.get")
     def test_successful_response_with_ok_false(self, mock_get):
@@ -217,9 +213,7 @@ class TestCheckNotifications:
         manager = ControlManager()
         manager.check_notifications(timeout=2.0)
 
-        mock_get.assert_called_once_with(
-            "http://127.0.0.1:8765/notifications", timeout=2.0
-        )
+        mock_get.assert_called_once_with("http://127.0.0.1:8765/notifications", timeout=2.0)
 
     @patch("inspekt.services.control_manager.requests.get")
     def test_timeout_exception(self, mock_get):
@@ -296,9 +290,7 @@ class TestHandleRefocusNotification:
     @patch("inspekt.services.control_manager.subprocess.run")
     def test_handle_refocus_with_speak_timeout(self, mock_subprocess, mock_stderr):
         """Test handling refocus notification when speak command times out."""
-        mock_subprocess.side_effect = subprocess.TimeoutExpired(
-            cmd=["say", "test"], timeout=5
-        )
+        mock_subprocess.side_effect = subprocess.TimeoutExpired(cmd=["say", "test"], timeout=5)
         notification = ControlNotification("refocus", "Test message")
         manager = ControlManager()
 
@@ -345,9 +337,7 @@ class TestAnnounceAccessibleName:
         """Test announcing accessible name with role when announce_role is True."""
         manager = ControlManager()
 
-        manager.announce_accessible_name(
-            "Submit Button", role="button", announce_role=True
-        )
+        manager.announce_accessible_name("Submit Button", role="button", announce_role=True)
 
         mock_subprocess.assert_called_once_with(
             ["say", "button, Submit Button"],
@@ -361,9 +351,7 @@ class TestAnnounceAccessibleName:
         """Test announcing accessible name with role when announce_role is False."""
         manager = ControlManager()
 
-        manager.announce_accessible_name(
-            "Submit Button", role="button", announce_role=False
-        )
+        manager.announce_accessible_name("Submit Button", role="button", announce_role=False)
 
         mock_subprocess.assert_called_once_with(
             ["say", "Submit Button"],
@@ -421,9 +409,7 @@ class TestAnnounceAccessibleName:
     @patch("inspekt.services.control_manager.subprocess.run")
     def test_announce_with_timeout(self, mock_subprocess):
         """Test announcing when subprocess times out."""
-        mock_subprocess.side_effect = subprocess.TimeoutExpired(
-            cmd=["say", "test"], timeout=5
-        )
+        mock_subprocess.side_effect = subprocess.TimeoutExpired(cmd=["say", "test"], timeout=5)
         manager = ControlManager()
 
         # Should not raise exception
@@ -542,6 +528,7 @@ class TestSingletonPattern:
         """Test that get_control_manager returns a ControlManager instance."""
         # Reset the global variable first
         import inspekt.services.control_manager
+
         inspekt.services.control_manager._default_manager = None
 
         manager = get_control_manager()
@@ -554,6 +541,7 @@ class TestSingletonPattern:
         """Test that get_control_manager returns the same instance on multiple calls."""
         # Reset the global variable first
         import inspekt.services.control_manager
+
         inspekt.services.control_manager._default_manager = None
 
         manager1 = get_control_manager()
@@ -565,6 +553,7 @@ class TestSingletonPattern:
         """Test get_control_manager with custom host and port."""
         # Reset the global variable first
         import inspekt.services.control_manager
+
         inspekt.services.control_manager._default_manager = None
 
         manager = get_control_manager(host="localhost", port=9000)
@@ -576,6 +565,7 @@ class TestSingletonPattern:
         """Test that get_control_manager ignores parameters on subsequent calls."""
         # Reset the global variable first
         import inspekt.services.control_manager
+
         inspekt.services.control_manager._default_manager = None
 
         manager1 = get_control_manager(host="localhost", port=9000)

@@ -359,9 +359,7 @@ class PluginService:
         cursor = conn.cursor()
 
         try:
-            cursor.execute(
-                "SELECT * FROM plugins WHERE LOWER(name) = LOWER(?)", (name,)
-            )
+            cursor.execute("SELECT * FROM plugins WHERE LOWER(name) = LOWER(?)", (name,))
             row = cursor.fetchone()
 
             if not row:
@@ -594,7 +592,9 @@ class PluginService:
         finally:
             conn.close()
 
-    def set_autorun(self, plugin_id: str, enabled: bool, domains: str | None = None) -> dict[str, Any]:
+    def set_autorun(
+        self, plugin_id: str, enabled: bool, domains: str | None = None
+    ) -> dict[str, Any]:
         """Toggle autorun for a plugin."""
         plugin = self.get_plugin(plugin_id)
         if not plugin:
@@ -605,7 +605,12 @@ class PluginService:
         try:
             cursor.execute(
                 "UPDATE plugins SET autorun = ?, autorun_domains = ?, updated_at = ? WHERE id = ?",
-                (1 if enabled else 0, domains if enabled else plugin.get("autorun_domains"), int(time.time()), plugin_id),
+                (
+                    1 if enabled else 0,
+                    domains if enabled else plugin.get("autorun_domains"),
+                    int(time.time()),
+                    plugin_id,
+                ),
             )
             conn.commit()
             return {"ok": True, "autorun": enabled}
@@ -641,9 +646,7 @@ class PluginService:
         finally:
             conn.close()
 
-    def export_plugins(
-        self, plugin_ids: list[str] | None = None
-    ) -> dict[str, Any]:
+    def export_plugins(self, plugin_ids: list[str] | None = None) -> dict[str, Any]:
         """
         Export plugins to JSON format.
 
@@ -654,29 +657,29 @@ class PluginService:
             {"ok": True, "data": {...}} with exportable JSON data
         """
         if plugin_ids:
-            plugins = [
-                p for p in self.list_plugins() if p["id"] in plugin_ids
-            ]
+            plugins = [p for p in self.list_plugins() if p["id"] in plugin_ids]
         else:
             plugins = self.list_plugins()
 
         # Convert to export format (exclude internal fields)
         export_plugins = []
         for p in plugins:
-            export_plugins.append({
-                "id": p["id"],
-                "name": p["name"],
-                "description": p["description"],
-                "credits": p["credits"],
-                "code": p["code"],
-                "source_url": p["source_url"],
-                "category": p["category"],
-                "tags": p["tags"],
-                "returns_data": p["returns_data"],
-                "mcp_exposed": p["mcp_exposed"],
-                "unload_mode": p["unload_mode"],
-                "unload_code": p["unload_code"],
-            })
+            export_plugins.append(
+                {
+                    "id": p["id"],
+                    "name": p["name"],
+                    "description": p["description"],
+                    "credits": p["credits"],
+                    "code": p["code"],
+                    "source_url": p["source_url"],
+                    "category": p["category"],
+                    "tags": p["tags"],
+                    "returns_data": p["returns_data"],
+                    "mcp_exposed": p["mcp_exposed"],
+                    "unload_mode": p["unload_mode"],
+                    "unload_code": p["unload_code"],
+                }
+            )
 
         from datetime import datetime
 

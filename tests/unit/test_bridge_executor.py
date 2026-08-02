@@ -160,12 +160,8 @@ class TestCodeExecution:
 
         # Check retry messages
         assert mock_echo.call_count == 2
-        mock_echo.assert_any_call(
-            "Timeout on attempt 1/3, retrying in 0.5s…", err=True
-        )
-        mock_echo.assert_any_call(
-            "Timeout on attempt 2/3, retrying in 1.0s…", err=True
-        )
+        mock_echo.assert_any_call("Timeout on attempt 1/3, retrying in 0.5s…", err=True)
+        mock_echo.assert_any_call("Timeout on attempt 2/3, retrying in 1.0s…", err=True)
 
         # Check exponential backoff
         assert mock_sleep.call_count == 2
@@ -335,9 +331,7 @@ class TestScriptExecutionWithTemplates:
         result = executor.execute_with_script("test_script.js")
 
         assert result["ok"] is True
-        mock_loader.load_script_sync.assert_called_once_with(
-            "test_script.js", substitutions=None
-        )
+        mock_loader.load_script_sync.assert_called_once_with("test_script.js", substitutions=None)
         executor._client.execute.assert_called_once_with(
             "console.log('loaded script');", timeout=10.0, _fast_poll=False, instance=None
         )
@@ -369,17 +363,13 @@ class TestScriptExecutionWithTemplates:
     @patch("inspekt.services.script_loader.ScriptLoader")
     @patch("inspekt.services.bridge_executor.sys.exit")
     @patch("inspekt.services.bridge_executor.click.echo")
-    def test_execute_with_script_missing_script(
-        self, mock_echo, mock_exit, mock_loader_class
-    ):
+    def test_execute_with_script_missing_script(self, mock_echo, mock_exit, mock_loader_class):
         """Test execute_with_script() with missing script file."""
         # Make sys.exit raise SystemExit to stop execution
         mock_exit.side_effect = SystemExit(1)
 
         mock_loader = Mock()
-        mock_loader.load_script_sync.side_effect = FileNotFoundError(
-            "Script not found: missing.js"
-        )
+        mock_loader.load_script_sync.side_effect = FileNotFoundError("Script not found: missing.js")
         mock_loader_class.return_value = mock_loader
 
         executor = BridgeExecutor()
@@ -387,16 +377,12 @@ class TestScriptExecutionWithTemplates:
         with pytest.raises(SystemExit):
             executor.execute_with_script("missing.js")
 
-        mock_echo.assert_called_once_with(
-            "Error: Script not found: missing.js", err=True
-        )
+        mock_echo.assert_called_once_with("Error: Script not found: missing.js", err=True)
         mock_exit.assert_called_with(1)
 
     @patch("inspekt.services.script_loader.ScriptLoader")
     @patch("inspekt.services.bridge_executor.click.echo")
-    def test_execute_with_script_with_retry_on_timeout(
-        self, mock_echo, mock_loader_class
-    ):
+    def test_execute_with_script_with_retry_on_timeout(self, mock_echo, mock_loader_class):
         """Test execute_with_script() with retry_on_timeout parameter."""
         mock_loader = Mock()
         mock_loader.load_script_sync.return_value = "test code"
@@ -433,9 +419,7 @@ class TestResultChecking:
 
         executor.check_result_ok(result)
 
-        mock_echo.assert_called_once_with(
-            "Error: ReferenceError: foo is not defined", err=True
-        )
+        mock_echo.assert_called_once_with("Error: ReferenceError: foo is not defined", err=True)
         mock_exit.assert_called_once_with(1)
 
     @patch("inspekt.services.bridge_executor.click.echo")

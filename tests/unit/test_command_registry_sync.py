@@ -170,18 +170,14 @@ class TestCommandRegistrySync:
                 else:
                     group_names[cli_name] = cmd.id
             elif cli_name in names:
-                conflicts.append(
-                    f"{cli_name}: {names[cli_name]} vs {cmd.id}"
-                )
+                conflicts.append(f"{cli_name}: {names[cli_name]} vs {cmd.id}")
             else:
                 names[cli_name] = cmd.id
 
             # Check aliases
             for alias in cmd.cli_aliases:
                 if alias in names:
-                    conflicts.append(
-                        f"{alias}: {names[alias]} vs {cmd.id}"
-                    )
+                    conflicts.append(f"{alias}: {names[alias]} vs {cmd.id}")
                 else:
                     names[alias] = cmd.id
 
@@ -203,9 +199,7 @@ class TestCommandRegistrySync:
         duplicates = [id for id, count in ids.items() if count > 1]
 
         if duplicates:
-            pytest.fail(
-                f"Duplicate command IDs: {', '.join(duplicates)}"
-            )
+            pytest.fail(f"Duplicate command IDs: {', '.join(duplicates)}")
 
     def test_categories_are_valid(self):
         """All commands must have valid Category values."""
@@ -224,10 +218,7 @@ class TestCommandRegistrySync:
                 invalid.append(f"{cmd.id}: {cmd.category}")
 
         if invalid:
-            pytest.fail(
-                "Commands with invalid categories:\n"
-                + "\n".join(invalid)
-            )
+            pytest.fail("Commands with invalid categories:\n" + "\n".join(invalid))
 
     def test_registry_loads_without_errors(self):
         """The registry should load all commands without import errors."""
@@ -256,12 +247,8 @@ class TestCommandRegistrySync:
         grouped = registry.get_grouped_by_category()
 
         # Should have multiple categories
-        assert len(grouped) > 5, (
-            f"Expected at least 5 categories, got {len(grouped)}"
-        )
+        assert len(grouped) > 5, f"Expected at least 5 categories, got {len(grouped)}"
 
         # Each category should have commands
         for category, commands in grouped.items():
-            assert len(commands) > 0, (
-                f"Category {category} has no commands"
-            )
+            assert len(commands) > 0, f"Category {category} has no commands"

@@ -52,19 +52,21 @@ SPECIAL_KEYS: dict[str, tuple[str, str]] = {
 }
 
 # Modifier key names (lowercase)
-MODIFIER_KEYS = frozenset({
-    "ctrl",
-    "control",
-    "alt",
-    "option",  # macOS alt
-    "shift",
-    "meta",
-    "cmd",
-    "command",
-    "win",
-    "windows",
-    "super",
-})
+MODIFIER_KEYS = frozenset(
+    {
+        "ctrl",
+        "control",
+        "alt",
+        "option",  # macOS alt
+        "shift",
+        "meta",
+        "cmd",
+        "command",
+        "win",
+        "windows",
+        "super",
+    }
+)
 
 # Maximum wait duration in seconds
 MAX_WAIT_SECONDS = 60.0
@@ -190,9 +192,7 @@ def parse_key_spec(spec: str) -> KeySpec:
         else:
             # This is the actual key
             if key_part is not None:
-                raise ValueError(
-                    f"Multiple non-modifier keys in specification: '{spec}'"
-                )
+                raise ValueError(f"Multiple non-modifier keys in specification: '{spec}'")
             key_part = part
 
     if key_part is None:
@@ -266,9 +266,7 @@ def expand_repeats(spec: str) -> list[str]:
         if count < 1:
             raise ValueError(f"Repeat count must be at least 1, got {count}")
         if count > MAX_REPEAT_COUNT:
-            raise ValueError(
-                f"Repeat count {count} exceeds maximum of {MAX_REPEAT_COUNT}"
-            )
+            raise ValueError(f"Repeat count {count} exceeds maximum of {MAX_REPEAT_COUNT}")
 
         return [key_part] * count
 

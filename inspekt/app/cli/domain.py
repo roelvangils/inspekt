@@ -60,7 +60,9 @@ def domain_add(domain_name):
 
             # Show what was stored
             if result.get("original"):
-                click.echo(success(f"Domain added: {stored_domain} (normalized from {domain_name})"))
+                click.echo(
+                    success(f"Domain added: {stored_domain} (normalized from {domain_name})")
+                )
             else:
                 click.echo(success(f"Domain added: {stored_domain}"))
 
@@ -105,7 +107,9 @@ def domain_remove(domain_name):
             if result.get("deleted"):
                 # Show what was removed
                 if result.get("original"):
-                    click.echo(success(f"Domain removed: {stored_domain} (normalized from {domain_name})"))
+                    click.echo(
+                        success(f"Domain removed: {stored_domain} (normalized from {domain_name})")
+                    )
                 else:
                     click.echo(success(f"Domain removed: {stored_domain}"))
 
@@ -138,7 +142,6 @@ def domain_list(output_json):
         inspekt domain list --json       # JSON format
     """
     try:
-
         domain_service = get_domain_service()
 
         # Get all domains from SQLite
@@ -151,10 +154,7 @@ def domain_list(output_json):
             dt = datetime.fromtimestamp(item["added_at"], tz=UTC)
             iso_timestamp = dt.isoformat().replace("+00:00", "Z")
 
-            domains[item["domain"]] = {
-                "addedAt": iso_timestamp,
-                "permanent": item["permanent"]
-            }
+            domains[item["domain"]] = {"addedAt": iso_timestamp, "permanent": item["permanent"]}
 
         # Try to get bypass status (optional - don't fail if bridge not connected)
         bypass_status = None
@@ -162,7 +162,7 @@ def domain_list(output_json):
             bypass_response = requests.post(
                 f"http://{BRIDGE_HTTP_HOST}:{BRIDGE_HTTP_PORT}/domains/bypass",
                 json={"duration": -1},  # Special value to just get status
-                timeout=5.0
+                timeout=5.0,
             )
             if bypass_response.status_code == 200:
                 bypass_result = bypass_response.json()
@@ -174,12 +174,14 @@ def domain_list(output_json):
 
         if output_json:
             from inspekt.app.cli.table import print_json
+
             print_json(domains, summary=f"{len(domains)} domains")
         else:
             _display_domains(domains, bypass_status)
 
             # VM terminal: offer a "Data ready to copy" toast
             from inspekt.app.cli.table import emit_copyable_data
+
             rows = [
                 [d, str(info.get("addedAt", "")), "yes" if info.get("permanent") else "no"]
                 for d, info in domains.items()
@@ -223,7 +225,7 @@ def domain_csp(domain_name, enable, disable, status, list_all):
             response = requests.get(
                 f"http://{BRIDGE_HTTP_HOST}:{BRIDGE_HTTP_PORT}/csp/status",
                 params={"domain": "__list_all__"},
-                timeout=10.0
+                timeout=10.0,
             )
             # For now, just show a message since listing requires storage access
             click.echo("CSP bypass domains are stored in browser extension storage.")
@@ -245,7 +247,7 @@ def domain_csp(domain_name, enable, disable, status, list_all):
             response = requests.post(
                 f"http://{BRIDGE_HTTP_HOST}:{BRIDGE_HTTP_PORT}/csp/enable",
                 json={"domain": domain_name},
-                timeout=10.0
+                timeout=10.0,
             )
 
             if response.status_code == 200:
@@ -264,7 +266,7 @@ def domain_csp(domain_name, enable, disable, status, list_all):
             response = requests.post(
                 f"http://{BRIDGE_HTTP_HOST}:{BRIDGE_HTTP_PORT}/csp/disable",
                 json={"domain": domain_name},
-                timeout=10.0
+                timeout=10.0,
             )
 
             if response.status_code == 200:
@@ -284,7 +286,7 @@ def domain_csp(domain_name, enable, disable, status, list_all):
             response = requests.post(
                 f"http://{BRIDGE_HTTP_HOST}:{BRIDGE_HTTP_PORT}/csp/status",
                 json={"domain": domain_name},
-                timeout=10.0
+                timeout=10.0,
             )
 
             if response.status_code == 200:
@@ -293,7 +295,9 @@ def domain_csp(domain_name, enable, disable, status, list_all):
                     if result.get("enabled"):
                         click.echo(f"CSP bypass is ENABLED for {domain_name}")
                         if result.get("enabledAt"):
-                            click.echo(f"  Enabled at: {_format_human_datetime(result['enabledAt'])}")
+                            click.echo(
+                                f"  Enabled at: {_format_human_datetime(result['enabledAt'])}"
+                            )
                     else:
                         click.echo(f"CSP bypass is DISABLED for {domain_name}")
                 else:
@@ -333,7 +337,7 @@ def domain_bypass(duration):
         response = requests.post(
             f"http://{BRIDGE_HTTP_HOST}:{BRIDGE_HTTP_PORT}/domains/bypass",
             json={"duration": duration},
-            timeout=10.0
+            timeout=10.0,
         )
 
         if response.status_code == 200:
@@ -370,6 +374,7 @@ def domain_bypass(duration):
 # Helper Functions
 # ============================================================================
 
+
 def _sync_to_browser_confirmed(timeout: float = 10.0) -> tuple[bool, str]:
     """
     Sync domains to browser extension with confirmation.
@@ -389,7 +394,7 @@ def _sync_to_browser_confirmed(timeout: float = 10.0) -> tuple[bool, str]:
         response = requests.post(
             f"http://{BRIDGE_HTTP_HOST}:{BRIDGE_HTTP_PORT}/domains/sync",
             json={"domains": domains},
-            timeout=timeout
+            timeout=timeout,
         )
 
         if response.status_code == 200:
@@ -426,7 +431,7 @@ def _enable_browser_bypass(duration_minutes: int) -> bool:
         response = requests.post(
             f"http://{BRIDGE_HTTP_HOST}:{BRIDGE_HTTP_PORT}/domains/bypass",
             json={"duration": duration_minutes},
-            timeout=10.0
+            timeout=10.0,
         )
         if response.status_code == 200:
             data = response.json()
@@ -442,7 +447,7 @@ def _disable_browser_bypass() -> bool:
         response = requests.post(
             f"http://{BRIDGE_HTTP_HOST}:{BRIDGE_HTTP_PORT}/domains/bypass",
             json={"duration": 0},
-            timeout=10.0
+            timeout=10.0,
         )
         return response.status_code == 200
     except Exception:
@@ -455,7 +460,7 @@ def _reload_browser_page() -> bool:
         response = requests.post(
             f"http://{BRIDGE_HTTP_HOST}:{BRIDGE_HTTP_PORT}/execute",
             json={"code": "location.reload()"},
-            timeout=5.0
+            timeout=5.0,
         )
         if response.status_code == 200:
             click.echo("  Page reloaded")
@@ -489,7 +494,11 @@ def _display_domains(domains, bypass_status=None):
         remaining_minutes = bypass_status.get("remainingMinutes", 0)
         if remaining_minutes > 0:
             bypass_icon = get_indicator("bypass") or "⚡"
-            click.echo(click.style(f"{bypass_icon} Bypass active ({remaining_minutes} min remaining)", fg="yellow"))
+            click.echo(
+                click.style(
+                    f"{bypass_icon} Bypass active ({remaining_minutes} min remaining)", fg="yellow"
+                )
+            )
             click.echo()
 
     count = len(domains) if domains else 0
@@ -526,6 +535,7 @@ def _display_domains(domains, bypass_status=None):
 # ============================================================================
 # Top-level yolo command (registered separately in __init__.py)
 # ============================================================================
+
 
 @click.command()
 @click.option("--disable", "-d", is_flag=True, help="Disable yolo mode")
@@ -603,7 +613,7 @@ def _enable_csp_bypass_for_current_domain() -> bool:
         response = requests.post(
             f"http://{BRIDGE_HTTP_HOST}:{BRIDGE_HTTP_PORT}/execute",
             json={"code": "location.hostname"},
-            timeout=5.0
+            timeout=5.0,
         )
 
         if response.status_code != 200:
@@ -621,7 +631,7 @@ def _enable_csp_bypass_for_current_domain() -> bool:
         csp_response = requests.post(
             f"http://{BRIDGE_HTTP_HOST}:{BRIDGE_HTTP_PORT}/csp/enable",
             json={"domain": domain},
-            timeout=10.0
+            timeout=10.0,
         )
 
         if csp_response.status_code == 200:

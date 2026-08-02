@@ -39,14 +39,14 @@ def sanitize_filename(title: str, max_length: int = 100) -> str:
         title = "Untitled"
 
     # Remove invalid characters
-    cleaned = re.sub(r'[<>:"/\\|?*]', '', title)
+    cleaned = re.sub(r'[<>:"/\\|?*]', "", title)
     # Replace whitespace with underscores
-    cleaned = re.sub(r'\s+', '_', cleaned)
+    cleaned = re.sub(r"\s+", "_", cleaned)
     # Remove leading/trailing underscores
-    cleaned = cleaned.strip('_')
+    cleaned = cleaned.strip("_")
     # Limit length
     if len(cleaned) > max_length:
-        cleaned = cleaned[:max_length].rstrip('_')
+        cleaned = cleaned[:max_length].rstrip("_")
 
     return cleaned or "page"
 
@@ -54,13 +54,14 @@ def sanitize_filename(title: str, max_length: int = 100) -> str:
 def extract_domain_from_url(url: str) -> str | None:
     """Extract domain from URL."""
     from urllib.parse import urlparse
+
     try:
         parsed = urlparse(url)
         hostname = parsed.netloc or parsed.hostname
-        if hostname and ':' in hostname:
-            hostname = hostname.split(':')[0]
+        if hostname and ":" in hostname:
+            hostname = hostname.split(":")[0]
         # Remove www. prefix for cleaner folder names
-        if hostname and hostname.startswith('www.'):
+        if hostname and hostname.startswith("www."):
             hostname = hostname[4:]
         return hostname
     except Exception:
@@ -89,14 +90,14 @@ def generate_output_path(
         # User specified a filename
         path = Path(filename)
         if not path.suffix:
-            path = path.with_suffix('.html')
+            path = path.with_suffix(".html")
         if output_dir and not path.is_absolute():
             path = output_dir / path
         return path
 
     # Generate filename from title and date
     safe_title = sanitize_filename(title)
-    date_str = datetime.now().strftime('%Y%m%d_%H%M%S')
+    date_str = datetime.now().strftime("%Y%m%d_%H%M%S")
     generated_name = f"{safe_title}_{date_str}.html"
 
     if output_dir:
@@ -104,6 +105,7 @@ def generate_output_path(
 
     # Default: save to downloads directory from config, with domain subfolder
     from inspekt.config import get_paths_config
+
     paths = get_paths_config()
     downloads_dir = paths["downloads"]
 
@@ -117,79 +119,40 @@ def generate_output_path(
 
 @click.command()
 @click.option(
-    '--output', '-o',
+    "--output",
+    "-o",
     type=click.Path(),
-    help='Output file path (default: auto-generated from title)'
+    help="Output file path (default: auto-generated from title)",
 )
 @click.option(
-    '--dir', '-d',
-    'output_dir',
+    "--dir",
+    "-d",
+    "output_dir",
     type=click.Path(exists=True, file_okay=False, dir_okay=True),
-    help='Output directory (default: current directory)'
+    help="Output directory (default: current directory)",
 )
+@click.option("--no-images", is_flag=True, help="Skip embedding images (faster, smaller file)")
 @click.option(
-    '--no-images',
+    "--remote-images",
     is_flag=True,
-    help='Skip embedding images (faster, smaller file)'
+    help="Keep images as remote URLs instead of embedding (requires internet to view)",
 )
+@click.option("--no-styles", is_flag=True, help="Skip removing unused styles (keep all CSS)")
 @click.option(
-    '--remote-images',
-    is_flag=True,
-    help='Keep images as remote URLs instead of embedding (requires internet to view)'
+    "--include-scripts", is_flag=True, help="Include JavaScript in saved page (disabled by default)"
 )
+@click.option("--include-frames", is_flag=True, help="Include iframe content (disabled by default)")
+@click.option("--compress", is_flag=True, help="Compress HTML output (remove extra whitespace)")
+@click.option("--raw", is_flag=True, help="Save raw page without processing (useful for debugging)")
 @click.option(
-    '--no-styles',
+    "--optimize",
     is_flag=True,
-    help='Skip removing unused styles (keep all CSS)'
+    help="Optimize for smaller file size (removes unused styles/fonts, recommended for large pages)",
 )
-@click.option(
-    '--include-scripts',
-    is_flag=True,
-    help='Include JavaScript in saved page (disabled by default)'
-)
-@click.option(
-    '--include-frames',
-    is_flag=True,
-    help='Include iframe content (disabled by default)'
-)
-@click.option(
-    '--compress',
-    is_flag=True,
-    help='Compress HTML output (remove extra whitespace)'
-)
-@click.option(
-    '--raw',
-    is_flag=True,
-    help='Save raw page without processing (useful for debugging)'
-)
-@click.option(
-    '--optimize',
-    is_flag=True,
-    help='Optimize for smaller file size (removes unused styles/fonts, recommended for large pages)'
-)
-@click.option(
-    '--quiet', '-q',
-    is_flag=True,
-    help='Suppress progress output'
-)
-@click.option(
-    '--json',
-    'output_json',
-    is_flag=True,
-    help='Output result as JSON (for scripting)'
-)
-@click.option(
-    '--open',
-    'open_after',
-    is_flag=True,
-    help='Open saved file in default application'
-)
-@click.option(
-    '--reveal',
-    'reveal_after',
-    is_flag=True,
-    help='Reveal saved file in file explorer'
-)
+@click.option("--quiet", "-q", is_flag=True, help="Suppress progress output")
+@click.option("--json", "output_json", is_flag=True, help="Output result as JSON (for scripting)")
+@click.option("--open", "open_after", is_flag=True, help="Open saved file in default application")
+@click.option("--reveal", "reveal_after", is_flag=True, help="Reveal saved file in file explorer")
 def save(
     output: str | None,
     output_dir: str | None,
@@ -241,15 +204,16 @@ def save(
 
     if not client.is_alive():
         if output_json:
-            click.echo(json.dumps({
-                "ok": False,
-                "error": "Bridge server is not running"
-            }))
+            click.echo(json.dumps({"ok": False, "error": "Bridge server is not running"}))
         else:
             from inspekt.app.cli.table import _style_with_inline_code
+
             click.echo(
-                _style_with_inline_code("Error: Bridge server is not running. Start it with `inspekt start`.", base_fg="red"),
-                err=True
+                _style_with_inline_code(
+                    "Error: Bridge server is not running. Start it with `inspekt start`.",
+                    base_fg="red",
+                ),
+                err=True,
             )
         sys.exit(1)
 
@@ -265,22 +229,17 @@ def save(
             # Keep images as remote URLs (don't convert to base64)
             "saveOriginalURLs": remote_images,
             "networkTimeout": 0 if remote_images else 60000,
-
             # Style handling
             "removeUnusedStyles": not no_styles,
             "removeUnusedFonts": not no_styles,
-
             # Script handling
             "removeScripts": not include_scripts,
             "blockScripts": not include_scripts,
-
             # Frame handling
             "removeFrames": not include_frames,
-
             # Compression
             "compressHTML": compress,
             "compressCSS": compress,
-
             # Raw mode
             "saveRawPage": raw,
         }
@@ -298,11 +257,15 @@ def save(
             filepath = vendor_dir / filename
             if not filepath.exists():
                 if output_json:
-                    click.echo(json.dumps({"ok": False, "error": f"SingleFile library not found: {filepath}"}))
+                    click.echo(
+                        json.dumps(
+                            {"ok": False, "error": f"SingleFile library not found: {filepath}"}
+                        )
+                    )
                 else:
                     click.echo(f"Error: SingleFile library not found: {filepath}", err=True)
                 sys.exit(1)
-            with builtin_open(filepath, encoding='utf-8') as f:
+            with builtin_open(filepath, encoding="utf-8") as f:
                 singlefile_code_parts.append(f.read())
 
         singlefile_code = "\n".join(singlefile_code_parts)
@@ -351,32 +314,32 @@ def save(
 
         const defaultOptions = {{
             // Style handling - optimize flag enables aggressive cleanup
-            removeUnusedStyles: {'true' if optimize else 'false'},
-            removeUnusedFonts: {'true' if optimize else 'false'},
+            removeUnusedStyles: {"true" if optimize else "false"},
+            removeUnusedFonts: {"true" if optimize else "false"},
             removeImports: false,
-            removeAlternativeFonts: {'true' if optimize else 'false'},
-            removeAlternativeMedias: {'true' if optimize else 'false'},
-            compressCSS: {'true' if compress else 'false'},
+            removeAlternativeFonts: {"true" if optimize else "false"},
+            removeAlternativeMedias: {"true" if optimize else "false"},
+            compressCSS: {"true" if compress else "false"},
 
             // Element handling
-            removeHiddenElements: {'true' if optimize else 'false'},
+            removeHiddenElements: {"true" if optimize else "false"},
             removeFrames: false,
             removeScripts: true,
             removeAudioSrc: true,
             removeVideoSrc: false,
 
             // Image handling
-            removeAlternativeImages: {'true' if optimize else 'false'},
-            groupDuplicateImages: {'false' if remote_images else 'true'},
-            loadDeferredImages: {'false' if remote_images else 'true'},
-            loadDeferredImagesMaxIdleTime: {'0' if remote_images else '1500'},
+            removeAlternativeImages: {"true" if optimize else "false"},
+            groupDuplicateImages: {"false" if remote_images else "true"},
+            loadDeferredImages: {"false" if remote_images else "true"},
+            loadDeferredImagesMaxIdleTime: {"0" if remote_images else "1500"},
             loadDeferredImagesBlockCookies: false,
             loadDeferredImagesBlockStorage: false,
             loadDeferredImagesKeepZoomLevel: false,
 
             // Output settings
             saveRawPage: false,
-            compressHTML: {'true' if compress else 'false'},
+            compressHTML: {"true" if compress else "false"},
             insertCanonicalLink: true,
             insertMetaNoIndex: false,
             insertMetaCSP: true,
@@ -451,10 +414,7 @@ def save(
                 progress_bar.__exit__(None, None, None)
             error_msg = result.get("error", "Unknown error")
             if output_json:
-                click.echo(json.dumps({
-                    "ok": False,
-                    "error": error_msg
-                }))
+                click.echo(json.dumps({"ok": False, "error": error_msg}))
             else:
                 click.echo(f"Error: {error_msg}", err=True)
             sys.exit(1)
@@ -468,11 +428,11 @@ def save(
                 progress_bar.__exit__(None, None, None)
             error_msg = page_result.get("error", "Failed to capture page")
             if output_json:
-                click.echo(json.dumps({
-                    "ok": False,
-                    "error": error_msg,
-                    "stack": page_result.get("stack", "")
-                }))
+                click.echo(
+                    json.dumps(
+                        {"ok": False, "error": error_msg, "stack": page_result.get("stack", "")}
+                    )
+                )
             else:
                 click.echo(f"Error: {error_msg}", err=True)
                 if page_result.get("stack"):
@@ -490,10 +450,7 @@ def save(
                 progress_bar.update(20)
                 progress_bar.__exit__(None, None, None)
             if output_json:
-                click.echo(json.dumps({
-                    "ok": False,
-                    "error": "No content captured"
-                }))
+                click.echo(json.dumps({"ok": False, "error": "No content captured"}))
             else:
                 click.echo("Error: No content captured", err=True)
             sys.exit(1)
@@ -514,7 +471,7 @@ def save(
             progress_bar.update(15)  # 95% complete
 
         # Write the file
-        with builtin_open(output_path, 'w', encoding='utf-8') as f:
+        with builtin_open(output_path, "w", encoding="utf-8") as f:
             f.write(content)
 
         # Complete and close progress bar
@@ -523,19 +480,24 @@ def save(
             progress_bar.__exit__(None, None, None)
 
         # Calculate file size
-        file_size = len(content.encode('utf-8'))
+        file_size = len(content.encode("utf-8"))
         size_str = format_size(file_size)
 
         if output_json:
-            click.echo(json.dumps({
-                "ok": True,
-                "path": str(output_path.absolute()),
-                "title": title,
-                "url": url,
-                "size": file_size,
-                "sizeFormatted": size_str,
-                "stats": stats
-            }, indent=2))
+            click.echo(
+                json.dumps(
+                    {
+                        "ok": True,
+                        "path": str(output_path.absolute()),
+                        "title": title,
+                        "url": url,
+                        "size": file_size,
+                        "sizeFormatted": size_str,
+                        "stats": stats,
+                    },
+                    indent=2,
+                )
+            )
         else:
             if not quiet:
                 # Simple output format (tables don't work well with long URLs)
@@ -558,10 +520,7 @@ def save(
         if progress_bar:
             progress_bar.__exit__(None, None, None)
         if output_json:
-            click.echo(json.dumps({
-                "ok": False,
-                "error": str(e)
-            }))
+            click.echo(json.dumps({"ok": False, "error": str(e)}))
         else:
             click.echo(f"Error: {e}", err=True)
         sys.exit(1)
@@ -570,10 +529,7 @@ def save(
         if progress_bar:
             progress_bar.__exit__(None, None, None)
         if output_json:
-            click.echo(json.dumps({
-                "ok": False,
-                "error": str(e)
-            }))
+            click.echo(json.dumps({"ok": False, "error": str(e)}))
         else:
             click.echo(f"Error: {e}", err=True)
         sys.exit(1)

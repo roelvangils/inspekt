@@ -61,11 +61,11 @@ class SitemapEntry:
     title: str = ""
     # HTTP response metadata (populated during title fetch)
     http_status: int = 0
-    final_url: str = ""       # After redirects — differs from loc if redirected
-    canonical_url: str = ""   # From <link rel="canonical">
+    final_url: str = ""  # After redirects — differs from loc if redirected
+    canonical_url: str = ""  # From <link rel="canonical">
     content_length: int = 0
     etag: str = ""
-    lang: str = ""            # From <html lang="…">
+    lang: str = ""  # From <html lang="…">
 
 
 @dataclass
@@ -207,9 +207,7 @@ def discover_sitemap(origin: str) -> tuple[list[str], str]:
     return [], "not found"
 
 
-def fetch_sitemap(
-    url: str, flatten: bool = False, max_children: int = 10
-) -> SitemapResult:
+def fetch_sitemap(url: str, flatten: bool = False, max_children: int = 10) -> SitemapResult:
     """
     Fetch and parse a sitemap URL.
 
@@ -316,9 +314,7 @@ def fetch_sitemap(
             result.warnings.append(f"Skipped {skipped} <url> element(s) with no <loc>")
 
     else:
-        result.errors.append(
-            f"Invalid sitemap: expected <urlset> or <sitemapindex>, got <{tag}>"
-        )
+        result.errors.append(f"Invalid sitemap: expected <urlset> or <sitemapindex>, got <{tag}>")
 
     result.fetch_time = time.time() - start
     return result
@@ -377,9 +373,7 @@ def build_tree(entries: list[SitemapEntry], origin: str) -> TreeNode:
         for i, segment in enumerate(segments):
             if segment not in current.children:
                 partial_path = "/" + "/".join(segments[: i + 1])
-                current.children[segment] = TreeNode(
-                    name=segment, full_path=partial_path
-                )
+                current.children[segment] = TreeNode(name=segment, full_path=partial_path)
             current = current.children[segment]
 
         # Attach the entry to the deepest node
@@ -390,9 +384,7 @@ def build_tree(entries: list[SitemapEntry], origin: str) -> TreeNode:
     return root
 
 
-def find_node_by_path(
-    root: TreeNode, path: str
-) -> tuple[TreeNode | None, TreeNode | None]:
+def find_node_by_path(root: TreeNode, path: str) -> tuple[TreeNode | None, TreeNode | None]:
     """Find a node and its parent by URL path. Returns (node, parent).
 
     Args:
@@ -532,8 +524,7 @@ def _extract_title(text: str) -> str:
     title = html.unescape(title)
     # Strip ALL invisible/control Unicode characters that can corrupt terminal output
     title = "".join(
-        c for c in title
-        if unicodedata.category(c) not in ("Cf", "Cc") or c in ("\n", "\t")
+        c for c in title if unicodedata.category(c) not in ("Cf", "Cc") or c in ("\n", "\t")
     )
     title = title.strip()
     return title
@@ -602,8 +593,14 @@ def _fetch_single_title(url: str, timeout: float = 3.0) -> dict:
         canonical_url, content_length, etag, lang.
     """
     empty = {
-        "title": "", "date": "", "http_status": 0, "final_url": "",
-        "canonical_url": "", "content_length": 0, "etag": "", "lang": "",
+        "title": "",
+        "date": "",
+        "http_status": 0,
+        "final_url": "",
+        "canonical_url": "",
+        "content_length": 0,
+        "etag": "",
+        "lang": "",
     }
     try:
         response = http_client.get(
@@ -814,7 +811,9 @@ def fetch_titles(
     # Only retry entries that haven't been attempted (0) or had temporary server errors.
     # Network failures (-1) and depth-filter skips (-2) are not retried — use --refresh.
     _RETRYABLE = {0, 429, 500, 502, 503, 504}
-    to_fetch = [(i, e) for i, e in enumerate(entries) if not e.title and e.http_status in _RETRYABLE]
+    to_fetch = [
+        (i, e) for i, e in enumerate(entries) if not e.title and e.http_status in _RETRYABLE
+    ]
     if not to_fetch:
         return 0
 
@@ -872,10 +871,14 @@ def fetch_titles(
                 new_limit = max(concurrency_limit // 2, min_concurrency)
                 if new_limit < concurrency_limit:
                     concurrency_limit = new_limit
-                    logger.debug(f"Throttling: concurrency → {concurrency_limit} (failure rate: {failure_rate:.0%})")
+                    logger.debug(
+                        f"Throttling: concurrency → {concurrency_limit} (failure rate: {failure_rate:.0%})"
+                    )
             elif failure_rate < 0.1 and concurrency_limit < max_concurrent:
                 concurrency_limit = min(concurrency_limit + 2, max_concurrent)
-                logger.debug(f"Recovering: concurrency → {concurrency_limit} (failure rate: {failure_rate:.0%})")
+                logger.debug(
+                    f"Recovering: concurrency → {concurrency_limit} (failure rate: {failure_rate:.0%})"
+                )
 
     with ThreadPoolExecutor(max_workers=max_concurrent) as executor:
         futures = {}
@@ -929,32 +932,189 @@ def fetch_titles(
 
 # ISO 639-1 two-letter language codes
 LANG_CODES = {
-    "aa", "ab", "af", "ak", "am", "an", "ar", "as", "av", "ay", "az",
-    "ba", "be", "bg", "bh", "bi", "bm", "bn", "bo", "br", "bs",
-    "ca", "ce", "ch", "co", "cr", "cs", "cu", "cv", "cy",
-    "da", "de", "dv", "dz",
-    "ee", "el", "en", "eo", "es", "et", "eu",
-    "fa", "ff", "fi", "fj", "fo", "fr", "fy",
-    "ga", "gd", "gl", "gn", "gu", "gv",
-    "ha", "he", "hi", "ho", "hr", "ht", "hu", "hy", "hz",
-    "ia", "id", "ie", "ig", "ii", "ik", "io", "is", "it", "iu",
-    "ja", "jv",
-    "ka", "kg", "ki", "kj", "kk", "kl", "km", "kn", "ko", "kr", "ks", "ku", "kv", "kw", "ky",
-    "la", "lb", "lg", "li", "ln", "lo", "lt", "lu", "lv",
-    "mg", "mh", "mi", "mk", "ml", "mn", "mr", "ms", "mt", "my",
-    "na", "nb", "nd", "ne", "ng", "nl", "nn", "no", "nr", "nv", "ny",
-    "oc", "oj", "om", "or", "os",
-    "pa", "pi", "pl", "ps", "pt",
+    "aa",
+    "ab",
+    "af",
+    "ak",
+    "am",
+    "an",
+    "ar",
+    "as",
+    "av",
+    "ay",
+    "az",
+    "ba",
+    "be",
+    "bg",
+    "bh",
+    "bi",
+    "bm",
+    "bn",
+    "bo",
+    "br",
+    "bs",
+    "ca",
+    "ce",
+    "ch",
+    "co",
+    "cr",
+    "cs",
+    "cu",
+    "cv",
+    "cy",
+    "da",
+    "de",
+    "dv",
+    "dz",
+    "ee",
+    "el",
+    "en",
+    "eo",
+    "es",
+    "et",
+    "eu",
+    "fa",
+    "ff",
+    "fi",
+    "fj",
+    "fo",
+    "fr",
+    "fy",
+    "ga",
+    "gd",
+    "gl",
+    "gn",
+    "gu",
+    "gv",
+    "ha",
+    "he",
+    "hi",
+    "ho",
+    "hr",
+    "ht",
+    "hu",
+    "hy",
+    "hz",
+    "ia",
+    "id",
+    "ie",
+    "ig",
+    "ii",
+    "ik",
+    "io",
+    "is",
+    "it",
+    "iu",
+    "ja",
+    "jv",
+    "ka",
+    "kg",
+    "ki",
+    "kj",
+    "kk",
+    "kl",
+    "km",
+    "kn",
+    "ko",
+    "kr",
+    "ks",
+    "ku",
+    "kv",
+    "kw",
+    "ky",
+    "la",
+    "lb",
+    "lg",
+    "li",
+    "ln",
+    "lo",
+    "lt",
+    "lu",
+    "lv",
+    "mg",
+    "mh",
+    "mi",
+    "mk",
+    "ml",
+    "mn",
+    "mr",
+    "ms",
+    "mt",
+    "my",
+    "na",
+    "nb",
+    "nd",
+    "ne",
+    "ng",
+    "nl",
+    "nn",
+    "no",
+    "nr",
+    "nv",
+    "ny",
+    "oc",
+    "oj",
+    "om",
+    "or",
+    "os",
+    "pa",
+    "pi",
+    "pl",
+    "ps",
+    "pt",
     "qu",
-    "rm", "rn", "ro", "ru", "rw",
-    "sa", "sc", "sd", "se", "sg", "si", "sk", "sl", "sm", "sn", "so", "sq", "sr", "ss", "st", "su", "sv", "sw",
-    "ta", "te", "tg", "th", "ti", "tk", "tl", "tn", "to", "tr", "ts", "tt", "tw", "ty",
-    "ug", "uk", "ur", "uz",
-    "ve", "vi", "vo",
-    "wa", "wo",
+    "rm",
+    "rn",
+    "ro",
+    "ru",
+    "rw",
+    "sa",
+    "sc",
+    "sd",
+    "se",
+    "sg",
+    "si",
+    "sk",
+    "sl",
+    "sm",
+    "sn",
+    "so",
+    "sq",
+    "sr",
+    "ss",
+    "st",
+    "su",
+    "sv",
+    "sw",
+    "ta",
+    "te",
+    "tg",
+    "th",
+    "ti",
+    "tk",
+    "tl",
+    "tn",
+    "to",
+    "tr",
+    "ts",
+    "tt",
+    "tw",
+    "ty",
+    "ug",
+    "uk",
+    "ur",
+    "uz",
+    "ve",
+    "vi",
+    "vo",
+    "wa",
+    "wo",
     "xh",
-    "yi", "yo",
-    "za", "zh", "zu",
+    "yi",
+    "yo",
+    "za",
+    "zh",
+    "zu",
 }
 
 
@@ -989,17 +1149,21 @@ def detect_languages(entries: list[SitemapEntry]) -> set[str]:
 # Includes Unicode variants of the pipe character that some sites use
 # (e.g., iodigital.com uses U+23B8 LEFT VERTICAL BOX LINE instead of |).
 _TITLE_SEPARATORS = [
-    " | ", " - ", " — ", " · ", " :: ", " // ", " – ",
-    " ⎸ ",   # U+23B8 LEFT VERTICAL BOX LINE (used by e.g. iodigital.com)
-    " │ ",   # U+2502 BOX DRAWINGS LIGHT VERTICAL
+    " | ",
+    " - ",
+    " — ",
+    " · ",
+    " :: ",
+    " // ",
+    " – ",
+    " ⎸ ",  # U+23B8 LEFT VERTICAL BOX LINE (used by e.g. iodigital.com)
+    " │ ",  # U+2502 BOX DRAWINGS LIGHT VERTICAL
     " ｜ ",  # U+FF5C FULLWIDTH VERTICAL LINE
-    " l ",   # Lowercase L — seen in the wild as a mistyped pipe (iodigital.com/fr)
+    " l ",  # Lowercase L — seen in the wild as a mistyped pipe (iodigital.com/fr)
 ]
 
 
-def detect_site_name(
-    entries: list[SitemapEntry], threshold: float = 0.5
-) -> list[str]:
+def detect_site_name(entries: list[SitemapEntry], threshold: float = 0.5) -> list[str]:
     """
     Detect site name variants from page titles.
 
@@ -1080,10 +1244,10 @@ def _strip_dangling_separators(text: str) -> str:
         changed = False
         for s in _DANGLING_SEP_CHARS:
             if text.endswith(s):
-                text = text[:-len(s)].strip()
+                text = text[: -len(s)].strip()
                 changed = True
             if text.startswith(s):
-                text = text[len(s):].strip()
+                text = text[len(s) :].strip()
                 changed = True
     return text
 
@@ -1114,14 +1278,14 @@ def strip_site_name(title: str, site_name: str | list[str]) -> str:
             # Site name at the start: "Site Name | Page Title"
             prefix = f"{name}{sep}"
             if title_lower.startswith(prefix.lower()):
-                cleaned = _strip_dangling_separators(title[len(prefix):])
+                cleaned = _strip_dangling_separators(title[len(prefix) :])
                 if cleaned:
                     return cleaned
 
             # Site name at the end: "Page Title | Site Name"
             suffix = f"{sep}{name}"
             if title_lower.endswith(suffix.lower()):
-                cleaned = _strip_dangling_separators(title[:-len(suffix)])
+                cleaned = _strip_dangling_separators(title[: -len(suffix)])
                 if cleaned:
                     return cleaned
 
@@ -1165,7 +1329,7 @@ def _strip_repeated_tails(entries: list[SitemapEntry], min_count: int = 3) -> No
             continue
         for tail in frequent_tails:
             if entry.title.endswith(tail):
-                cleaned = _strip_dangling_separators(entry.title[:-len(tail)])
+                cleaned = _strip_dangling_separators(entry.title[: -len(tail)])
                 if cleaned:
                     entry.title = cleaned
                 break

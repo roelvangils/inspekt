@@ -81,14 +81,10 @@ class TestUnixSocket:
         assert response.data  # health payload present
 
     async def test_run_without_browser_over_socket(self, transport):
-        response = await transport.send(
-            Request(method="run", params={"code": "1 + 1"})
-        )
+        response = await transport.send(Request(method="run", params={"code": "1 + 1"}))
         payload = response.data or {}
         assert response.success is False or payload.get("ok") is False
 
     async def test_unknown_method_over_socket(self, transport):
-        response = await transport.send(
-            Request(method="definitely_not_a_method", params={})
-        )
+        response = await transport.send(Request(method="definitely_not_a_method", params={}))
         assert response.success is False or response.error

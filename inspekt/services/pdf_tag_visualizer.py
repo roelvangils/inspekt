@@ -29,54 +29,45 @@ TAG_COLORS = {
     "H4": "#65a30d",  # Lime-600
     "H5": "#16a34a",  # Green-600
     "H6": "#0d9488",  # Teal-600
-
     # Content (cool colors)
-    "P": "#0284c7",       # Sky-600 (blue)
-    "Span": "#7c3aed",    # Violet-600
-
+    "P": "#0284c7",  # Sky-600 (blue)
+    "Span": "#7c3aed",  # Violet-600
     # Structure elements
     "Document": "#1f2937",  # Gray-800
-    "Part": "#374151",      # Gray-700
-    "Sect": "#4b5563",      # Gray-600
-    "Div": "#6b7280",       # Gray-500
-    "Art": "#0891b2",       # Cyan-600
-
+    "Part": "#374151",  # Gray-700
+    "Sect": "#4b5563",  # Gray-600
+    "Div": "#6b7280",  # Gray-500
+    "Art": "#0891b2",  # Cyan-600
     # Media
-    "Figure": "#a855f7",    # Purple-500
-    "Formula": "#ec4899",   # Pink-500
-    "Caption": "#f472b6",   # Pink-400
-
+    "Figure": "#a855f7",  # Purple-500
+    "Formula": "#ec4899",  # Pink-500
+    "Caption": "#f472b6",  # Pink-400
     # Tables
-    "Table": "#06b6d4",     # Cyan-500
-    "TR": "#67e8f9",        # Cyan-300
-    "TH": "#0e7490",        # Cyan-700
-    "TD": "#22d3ee",        # Cyan-400
-
+    "Table": "#06b6d4",  # Cyan-500
+    "TR": "#67e8f9",  # Cyan-300
+    "TH": "#0e7490",  # Cyan-700
+    "TD": "#22d3ee",  # Cyan-400
     # Lists
-    "L": "#f97316",         # Orange-500
-    "LI": "#fb923c",        # Orange-400
-    "Lbl": "#fdba74",       # Orange-300
-    "LBody": "#fed7aa",     # Orange-200
-
+    "L": "#f97316",  # Orange-500
+    "LI": "#fb923c",  # Orange-400
+    "Lbl": "#fdba74",  # Orange-300
+    "LBody": "#fed7aa",  # Orange-200
     # Links and navigation
-    "Link": "#eab308",      # Yellow-500
-    "Reference": "#facc15", # Yellow-400
-    "Annot": "#fde047",     # Yellow-300
-    "TOC": "#84cc16",       # Lime-500
-    "TOCI": "#a3e635",      # Lime-400
-
+    "Link": "#eab308",  # Yellow-500
+    "Reference": "#facc15",  # Yellow-400
+    "Annot": "#fde047",  # Yellow-300
+    "TOC": "#84cc16",  # Lime-500
+    "TOCI": "#a3e635",  # Lime-400
     # Forms
-    "Form": "#ec4899",      # Pink-500
-
+    "Form": "#ec4899",  # Pink-500
     # Block-level elements
-    "BlockQuote": "#8b5cf6", # Violet-500
-    "Quote": "#a78bfa",      # Violet-400
-    "Note": "#c4b5fd",       # Violet-300
-    "Code": "#6366f1",       # Indigo-500
-    "Index": "#818cf8",      # Indigo-400
-
+    "BlockQuote": "#8b5cf6",  # Violet-500
+    "Quote": "#a78bfa",  # Violet-400
+    "Note": "#c4b5fd",  # Violet-300
+    "Code": "#6366f1",  # Indigo-500
+    "Index": "#818cf8",  # Indigo-400
     # Default
-    "Unknown": "#9ca3af",   # Gray-400
+    "Unknown": "#9ca3af",  # Gray-400
 }
 
 
@@ -112,7 +103,7 @@ class PageTagVisualization:
     """Tag visualization for a single page."""
 
     page_num: int  # 0-indexed
-    width: float   # Page width in points
+    width: float  # Page width in points
     height: float  # Page height in points
     tags: list[TagOverlay] = field(default_factory=list)
     image_base64: str | None = None  # Rendered visualization
@@ -144,10 +135,12 @@ class PDFTagVisualizer:
     def __enter__(self) -> PDFTagVisualizer:
         """Open PDF files."""
         import pikepdf
+
         self._pdf = pikepdf.open(self.pdf_path)
 
         try:
             import fitz
+
             self._fitz_doc = fitz.open(self.pdf_path)
         except ImportError:
             logger.warning("PyMuPDF not available for rendering")
@@ -279,23 +272,41 @@ class PDFTagVisualizer:
                         # Get text preview for content elements
                         text_preview = None
                         detected_language = None
-                        if tag_type in ("P", "Span", "H1", "H2", "H3", "H4", "H5", "H6", "Caption", "LBody", "TD", "TH"):
+                        if tag_type in (
+                            "P",
+                            "Span",
+                            "H1",
+                            "H2",
+                            "H3",
+                            "H4",
+                            "H5",
+                            "H6",
+                            "Caption",
+                            "LBody",
+                            "TD",
+                            "TH",
+                        ):
                             text = extract_text_from_block(block)
                             text_preview = text[:200] if text else None
                             # Detect language if text is long enough
                             if text and len(text) >= 50:
                                 from inspekt.services.pdf_report import _detect_language_from_text
-                                detected_language = _detect_language_from_text(text, sample_size=500)
 
-                        tags.append(TagOverlay(
-                            tag_type=tag_type,
-                            bbox=pdf_bbox,
-                            reading_order=reading_order[0],
-                            text_preview=text_preview,
-                            alt_text=None,  # PyMuPDF doesn't expose Alt text directly
-                            has_issues=False,
-                            detected_language=detected_language,
-                        ))
+                                detected_language = _detect_language_from_text(
+                                    text, sample_size=500
+                                )
+
+                        tags.append(
+                            TagOverlay(
+                                tag_type=tag_type,
+                                bbox=pdf_bbox,
+                                reading_order=reading_order[0],
+                                text_preview=text_preview,
+                                alt_text=None,  # PyMuPDF doesn't expose Alt text directly
+                                has_issues=False,
+                                detected_language=detected_language,
+                            )
+                        )
 
                 # Always traverse children to find nested content
                 for child in block.get("blocks", []):
@@ -400,21 +411,27 @@ class PDFTagVisualizer:
                     if "/ActualText" in element:
                         text_preview = str(element["/ActualText"])[:50]
                     elif tag_type in ("P", "Span", "H1", "H2", "H3", "H4", "H5", "H6", "Caption"):
-                        text_preview = self._extract_text_from_element(element)[:50] if self._extract_text_from_element(element) else None
+                        text_preview = (
+                            self._extract_text_from_element(element)[:50]
+                            if self._extract_text_from_element(element)
+                            else None
+                        )
 
                     # Get alt text for figures
                     alt_text = None
                     if "/Alt" in element:
                         alt_text = str(element["/Alt"])
 
-                    tags.append(TagOverlay(
-                        tag_type=tag_type,
-                        bbox=bbox,
-                        reading_order=reading_order,
-                        text_preview=text_preview,
-                        alt_text=alt_text,
-                        has_issues=False,
-                    ))
+                    tags.append(
+                        TagOverlay(
+                            tag_type=tag_type,
+                            bbox=bbox,
+                            reading_order=reading_order,
+                            text_preview=text_preview,
+                            alt_text=alt_text,
+                            has_issues=False,
+                        )
+                    )
 
                 # Traverse children
                 if "/K" in element:
@@ -572,10 +589,10 @@ class PDFTagVisualizer:
         if tags is None:
             tags = self.extract_page_tags(page_num)
 
-
         # Render the page
         import fitz
         from PIL import Image, ImageDraw, ImageFont
+
         page = self._fitz_doc[page_num]
         zoom = dpi / 72  # 72 is the default PDF resolution
         mat = fitz.Matrix(zoom, zoom)
@@ -588,7 +605,9 @@ class PDFTagVisualizer:
         # Try to load a font for labels
         try:
             font = ImageFont.truetype("/System/Library/Fonts/Helvetica.ttc", size=int(12 * zoom))
-            small_font = ImageFont.truetype("/System/Library/Fonts/Helvetica.ttc", size=int(10 * zoom))
+            small_font = ImageFont.truetype(
+                "/System/Library/Fonts/Helvetica.ttc", size=int(10 * zoom)
+            )
         except Exception:
             font = ImageFont.load_default()
             small_font = font
@@ -623,11 +642,14 @@ class PDFTagVisualizer:
                 # Red triangle warning indicator
                 warn_x = scaled_bbox[2] - 15
                 warn_y = scaled_bbox[1] + 5
-                draw.polygon([
-                    (warn_x, warn_y + 12),
-                    (warn_x + 6, warn_y),
-                    (warn_x + 12, warn_y + 12),
-                ], fill=(220, 38, 38, 230))
+                draw.polygon(
+                    [
+                        (warn_x, warn_y + 12),
+                        (warn_x + 6, warn_y),
+                        (warn_x + 12, warn_y + 12),
+                    ],
+                    fill=(220, 38, 38, 230),
+                )
 
             # Draw reading order number
             if show_reading_order:
@@ -647,9 +669,16 @@ class PDFTagVisualizer:
                     text_height = text_bbox[3] - text_bbox[1]
                 except AttributeError:
                     # Fallback for older Pillow
-                    text_width, text_height = small_font.getsize(order_text) if hasattr(small_font, 'getsize') else (10, 10)
+                    text_width, text_height = (
+                        small_font.getsize(order_text)
+                        if hasattr(small_font, "getsize")
+                        else (10, 10)
+                    )
                 draw.text(
-                    (circle_x + circle_r - text_width / 2, circle_y + circle_r - text_height / 2 - 2),
+                    (
+                        circle_x + circle_r - text_width / 2,
+                        circle_y + circle_r - text_height / 2 - 2,
+                    ),
                     order_text,
                     fill=(255, 255, 255, 255),
                     font=small_font,
@@ -666,7 +695,11 @@ class PDFTagVisualizer:
                     label_width = label_bbox[2] - label_bbox[0]
                     label_height = label_bbox[3] - label_bbox[1]
                 except AttributeError:
-                    label_width, label_height = small_font.getsize(label_text) if hasattr(small_font, 'getsize') else (30, 12)
+                    label_width, label_height = (
+                        small_font.getsize(label_text)
+                        if hasattr(small_font, "getsize")
+                        else (30, 12)
+                    )
                 draw.rectangle(
                     [label_x, label_y, label_x + label_width + 6, label_y + label_height + 4],
                     fill=(r, g, b, 200),
@@ -759,25 +792,31 @@ class PDFTagVisualizer:
                 # Issue: backwards jump (next element is significantly higher/left)
                 if cy2 < cy1 - 50 * zoom and abs(cx2 - cx1) < 100 * zoom:
                     is_issue = True
-                    issues.append({
-                        "type": "backwards_jump",
-                        "from_order": i + 1,
-                        "to_order": i + 2,
-                        "message": f"Reading order jumps backwards from element {i + 1} to {i + 2}",
-                    })
+                    issues.append(
+                        {
+                            "type": "backwards_jump",
+                            "from_order": i + 1,
+                            "to_order": i + 2,
+                            "message": f"Reading order jumps backwards from element {i + 1} to {i + 2}",
+                        }
+                    )
 
                 # Issue: large horizontal jump might indicate column skipping
                 if abs(cx2 - cx1) > pix.width * 0.4:
                     is_issue = True
-                    issues.append({
-                        "type": "column_jump",
-                        "from_order": i + 1,
-                        "to_order": i + 2,
-                        "message": f"Large horizontal jump between elements {i + 1} and {i + 2} (possible column issue)",
-                    })
+                    issues.append(
+                        {
+                            "type": "column_jump",
+                            "from_order": i + 1,
+                            "to_order": i + 2,
+                            "message": f"Large horizontal jump between elements {i + 1} and {i + 2} (possible column issue)",
+                        }
+                    )
 
                 # Draw arrow line
-                arrow_color = (220, 38, 38, 180) if is_issue else (30, 64, 175, 120)  # Red if issue, blue otherwise
+                arrow_color = (
+                    (220, 38, 38, 180) if is_issue else (30, 64, 175, 120)
+                )  # Red if issue, blue otherwise
                 draw.line([(cx1, cy1), (cx2, cy2)], fill=arrow_color, width=int(2 * zoom))
 
                 # Draw arrowhead
@@ -794,8 +833,7 @@ class PDFTagVisualizer:
         for i, (cx, cy, _tag) in enumerate(centroids):
             # Circle background
             is_issue_element = any(
-                issue["from_order"] == i + 1 or issue["to_order"] == i + 1
-                for issue in issues
+                issue["from_order"] == i + 1 or issue["to_order"] == i + 1 for issue in issues
             )
             circle_color = (220, 38, 38, 240) if is_issue_element else (30, 41, 59, 230)
 
@@ -873,13 +911,15 @@ class PDFTagVisualizer:
                 except Exception as e:
                     logger.warning(f"Failed to render page {page_num + 1}: {e}")
 
-            results.append(PageTagVisualization(
-                page_num=page_num,
-                width=page.rect.width,
-                height=page.rect.height,
-                tags=tags,
-                image_base64=image_base64,
-            ))
+            results.append(
+                PageTagVisualization(
+                    page_num=page_num,
+                    width=page.rect.width,
+                    height=page.rect.height,
+                    tags=tags,
+                    image_base64=image_base64,
+                )
+            )
 
         return results
 

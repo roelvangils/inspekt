@@ -83,9 +83,7 @@ class OllamaProvider(AIProvider):
         return self._provider_config.get("default-text-model", self.DEFAULT_TEXT_MODEL)
 
     def get_default_vision_model(self) -> str:
-        return self._provider_config.get(
-            "default-vision-model", self.DEFAULT_VISION_MODEL
-        )
+        return self._provider_config.get("default-vision-model", self.DEFAULT_VISION_MODEL)
 
     def supports_vision(self) -> bool:
         # Ollama supports vision with specific models (llava, etc.)

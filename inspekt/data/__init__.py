@@ -55,9 +55,7 @@ def load_engine_metadata() -> dict[str, dict[str, Any]]:
     for engine_id, engine_data in data.items():
         missing = [f for f in required_fields if f not in engine_data]
         if missing:
-            raise ValueError(
-                f"Engine '{engine_id}' missing required fields: {', '.join(missing)}"
-            )
+            raise ValueError(f"Engine '{engine_id}' missing required fields: {', '.join(missing)}")
 
     _METADATA_CACHE = data
     return data

@@ -87,14 +87,14 @@ class SubcommandAwareGroup(click.Group):
         # This allows `inspekt record test.yaml --replay` to work like `inspekt record --replay test.yaml`
         first_positional_idx = None
         for i, arg in enumerate(args):
-            if not arg.startswith('-'):
+            if not arg.startswith("-"):
                 first_positional_idx = i
                 break
 
         if first_positional_idx is not None:
             first_arg = args[first_positional_idx]
             first_arg_lower = first_arg.lower()
-            has_yaml_ext = first_arg_lower.endswith('.yaml') or first_arg_lower.endswith('.yml')
+            has_yaml_ext = first_arg_lower.endswith(".yaml") or first_arg_lower.endswith(".yml")
 
             # If this looks like a filename (has .yaml/.yml extension), collect trailing options
             # and move them before the filename so Click parses them as group options
@@ -105,15 +105,22 @@ class SubcommandAwareGroup(click.Group):
                 i = first_positional_idx + 1
                 while i < len(args):
                     arg = args[i]
-                    if arg.startswith('-'):
+                    if arg.startswith("-"):
                         trailing_options.append(arg)
                         # Check if this option takes a value (next arg doesn't start with -)
-                        if i + 1 < len(args) and not args[i + 1].startswith('-'):
+                        if i + 1 < len(args) and not args[i + 1].startswith("-"):
                             # Could be an option value, but we need to be careful
                             # For flags like --replay, there's no value
                             # For options like -o/--output, there is a value
                             # Check if this is a known option that takes a value
-                            if arg in ('-o', '--output', '-b', '--browser', '--wait', '--inactivity-timeout'):
+                            if arg in (
+                                "-o",
+                                "--output",
+                                "-b",
+                                "--browser",
+                                "--wait",
+                                "--inactivity-timeout",
+                            ):
                                 i += 1
                                 trailing_options.append(args[i])
                     else:
@@ -123,21 +130,21 @@ class SubcommandAwareGroup(click.Group):
                 if trailing_options:
                     # Rebuild args: options before filename, then filename, then remaining
                     args = (
-                        args[:first_positional_idx] +  # Options before filename
-                        trailing_options +              # Trailing options moved here
-                        [first_arg] +                   # The filename
-                        remaining_args                  # Any remaining positional args
+                        args[:first_positional_idx]  # Options before filename
+                        + trailing_options  # Trailing options moved here
+                        + [first_arg]  # The filename
+                        + remaining_args  # Any remaining positional args
                     )
 
             # If matches a subcommand and doesn't have yaml extension, skip filename param
             elif first_arg in self.commands:
                 # Temporarily remove the 'filename' parameter so it doesn't consume this arg
                 original_params = self.params
-                self.params = [p for p in self.params if p.name != 'filename']
+                self.params = [p for p in self.params if p.name != "filename"]
                 try:
                     ctx = super().make_context(info_name, args, parent=parent, **extra)
                     # Set filename to None in the context params
-                    ctx.params['filename'] = None
+                    ctx.params["filename"] = None
                     return ctx
                 finally:
                     # Restore original params
@@ -158,8 +165,7 @@ def check_csp_bypass_enabled() -> bool:
     """Check if global CSP bypass is enabled in the browser extension."""
     try:
         response = requests.get(
-            f"http://{BRIDGE_HTTP_HOST}:{BRIDGE_HTTP_PORT}/csp/global",
-            timeout=2.0
+            f"http://{BRIDGE_HTTP_HOST}:{BRIDGE_HTTP_PORT}/csp/global", timeout=2.0
         )
         if response.status_code == 200:
             data = response.json()
@@ -184,6 +190,7 @@ def set_vm_terminal_hidden(hidden: bool) -> None:
         hidden: True to hide terminal, False to show it
     """
     from inspekt.config import is_isolated_mode
+
     if not is_isolated_mode():
         return  # Only in VM mode
 
@@ -192,17 +199,17 @@ def set_vm_terminal_hidden(hidden: bool) -> None:
     try:
         # Control server runs on port 8888 in VM
         req = urllib.request.Request(
-            'http://localhost:8888/ui/terminal-state',
-            data=json.dumps({'hidden': hidden}).encode(),
-            headers={'Content-Type': 'application/json'},
-            method='POST'
+            "http://localhost:8888/ui/terminal-state",
+            data=json.dumps({"hidden": hidden}).encode(),
+            headers={"Content-Type": "application/json"},
+            method="POST",
         )
         with urllib.request.urlopen(req, timeout=2):
             pass  # We don't need the response
 
         # Also focus Chrome when hiding terminal (recording starting)
         if hidden:
-            urllib.request.urlopen('http://localhost:8888/chrome', timeout=2)
+            urllib.request.urlopen("http://localhost:8888/chrome", timeout=2)
     except Exception:
         pass  # Terminal control is optional - don't fail recording
 
@@ -215,7 +222,10 @@ def set_vm_terminal_hidden(hidden: bool) -> None:
 def _format_closed_shadow_warning(warnings: list) -> str:
     """Format warning message for closed shadow DOM components."""
     lines = []
-    lines.append(click.style("⚠ Warning: ", fg="yellow", bold=True) + "This page contains Web Components with closed shadow DOM.")
+    lines.append(
+        click.style("⚠ Warning: ", fg="yellow", bold=True)
+        + "This page contains Web Components with closed shadow DOM."
+    )
     lines.append("  Interactions inside these components may not be recorded:")
     for warning in warnings[:5]:
         tag = warning.get("tagName", "unknown")
@@ -242,7 +252,9 @@ def _format_media_hint(media_elements: dict) -> str:
     msg = f"This page contains {element_desc} with native controls. Media players are treated as a single `Tab` stop. Use `Space`/`Enter` to play/pause, `Arrow keys` for seek/volume."
     # Lightbulb icon: \uf400 (nf-oct-light_bulb)
     wrapped = wrap_text(msg, indent="", subsequent_indent="  ")
-    return click.style("\uf400 ", fg="blue", bold=True) + _style_with_inline_code(wrapped, base_fg="blue")
+    return click.style("\uf400 ", fg="blue", bold=True) + _style_with_inline_code(
+        wrapped, base_fg="blue"
+    )
 
 
 def _format_native_inputs_hint(native_inputs: dict) -> str:
@@ -258,7 +270,7 @@ def _format_native_inputs_hint(native_inputs: dict) -> str:
         "month": "month picker",
         "week": "week picker",
         "number": "number spinner",
-        "color": "color picker"
+        "color": "color picker",
     }
 
     type_parts = []
@@ -280,7 +292,9 @@ def _format_native_inputs_hint(native_inputs: dict) -> str:
     msg = f"This page has {type_desc}. You can adjust {pronoun} values, but Inspekt intentionally does not record user interactions on native elements. The final selected value will be recorded once you leave the element."
     # Lightbulb icon: \uf400 (nf-oct-light_bulb)
     wrapped = wrap_text(msg, indent="", subsequent_indent="  ")
-    return click.style("\uf400 ", fg="blue", bold=True) + _style_with_inline_code(wrapped, base_fg="blue")
+    return click.style("\uf400 ", fg="blue", bold=True) + _style_with_inline_code(
+        wrapped, base_fg="blue"
+    )
 
 
 def _format_file_inputs_warning(file_inputs: dict) -> str:
@@ -291,7 +305,9 @@ def _format_file_inputs_warning(file_inputs: dict) -> str:
     count_str = "a file input" if count == 1 else f"{count} file inputs"
     msg = f"This page has {count_str}. Inspekt cannot access the file picker or view files on your computer, but it will record file uploads and save the files for replay (maximum size: `10 MB`). Do not upload sensitive files."
     wrapped = wrap_text(msg, indent="", subsequent_indent="           ")
-    return click.style("⚠ Warning: ", fg="yellow", bold=True) + _style_with_inline_code(wrapped, base_fg="yellow")
+    return click.style("⚠ Warning: ", fg="yellow", bold=True) + _style_with_inline_code(
+        wrapped, base_fg="yellow"
+    )
 
 
 def _format_js_dialogs_hint(js_dialogs: dict) -> str:
@@ -308,8 +324,11 @@ def _format_js_dialogs_hint(js_dialogs: dict) -> str:
     )
     # Lightbulb icon: \uf400 (nf-oct-light_bulb)
     from inspekt.app.cli.table import _style_with_inline_code
+
     wrapped = wrap_text(msg, indent="", subsequent_indent="  ")
-    return click.style("\uf400 ", fg="blue", bold=True) + _style_with_inline_code(wrapped, base_fg="blue")
+    return click.style("\uf400 ", fg="blue", bold=True) + _style_with_inline_code(
+        wrapped, base_fg="blue"
+    )
 
 
 def _format_fullscreen_hint(window_mode: dict) -> str:
@@ -332,7 +351,9 @@ def _format_fullscreen_hint(window_mode: dict) -> str:
 
     # Lightbulb icon: \uf400 (nf-oct-light_bulb)
     wrapped = wrap_text(msg, indent="", subsequent_indent="  ")
-    return click.style("\uf400 ", fg="blue", bold=True) + _style_with_inline_code(wrapped, base_fg="blue")
+    return click.style("\uf400 ", fg="blue", bold=True) + _style_with_inline_code(
+        wrapped, base_fg="blue"
+    )
 
 
 def display_pre_recording_hints(response: dict, synthetic_dialogs: bool = False) -> None:
@@ -633,7 +654,9 @@ def _describe_assertion(expect: dict) -> str:
 
     # Count assertions
     if expect.get("count") and expect.get("count_equals") is not None:
-        parts.append(f"verify {expect['count_equals']} elements match '{_truncate(expect['count'], 20)}'")
+        parts.append(
+            f"verify {expect['count_equals']} elements match '{_truncate(expect['count'], 20)}'"
+        )
 
     # Inspekt-specific assertions
     if expect.get("allowed_violations") is not None or expect.get("allowed-violations") is not None:
@@ -739,7 +762,9 @@ def construct_step_comment(step_num: int, step: dict, include_assertions: bool =
         if key == "Tab":
             accessible_name = target.get("accessible_name", "") if target else ""
             if accessible_name:
-                description = f"Press {key_combo} (focus moves to '{_truncate(accessible_name, 25)}')"
+                description = (
+                    f"Press {key_combo} (focus moves to '{_truncate(accessible_name, 25)}')"
+                )
             else:
                 description = f"Press {key_combo}"
         elif key == "Enter":
@@ -857,7 +882,7 @@ def _extract_comment_description(comment: str) -> str:
     Returns:
         Just the description: "Click on button 'Submit'"
     """
-    match = re.match(r'^#\s*Step\s+\d+\s*·\s*(.*)$', comment)
+    match = re.match(r"^#\s*Step\s+\d+\s*·\s*(.*)$", comment)
     return match.group(1).strip() if match else comment.lstrip("# ").strip()
 
 
@@ -871,16 +896,16 @@ def _detect_fragile_selectors(steps: list) -> list:
     # Patterns that indicate fragile selectors
     fragile_patterns = [
         # Auto-generated IDs from frameworks
-        (r'#react-select-\d+', "React Select auto-generated ID"),
-        (r'#ember\d+', "Ember.js auto-generated ID"),
-        (r'#ng-\w+-\d+', "Angular auto-generated ID"),
-        (r'#radix-', "Radix UI auto-generated ID"),
-        (r'#headlessui-', "Headless UI auto-generated ID"),
-        (r'#__next', "Next.js internal ID"),
-        (r'#__nuxt', "Nuxt.js internal ID"),
+        (r"#react-select-\d+", "React Select auto-generated ID"),
+        (r"#ember\d+", "Ember.js auto-generated ID"),
+        (r"#ng-\w+-\d+", "Angular auto-generated ID"),
+        (r"#radix-", "Radix UI auto-generated ID"),
+        (r"#headlessui-", "Headless UI auto-generated ID"),
+        (r"#__next", "Next.js internal ID"),
+        (r"#__nuxt", "Nuxt.js internal ID"),
         # Index-based selectors (fragile when content changes)
-        (r':nth-child\(\d+\)', "Index-based selector (:nth-child)"),
-        (r':nth-of-type\(\d+\)', "Index-based selector (:nth-of-type)"),
+        (r":nth-child\(\d+\)", "Index-based selector (:nth-child)"),
+        (r":nth-of-type\(\d+\)", "Index-based selector (:nth-of-type)"),
     ]
 
     for i, step in enumerate(steps):
@@ -901,7 +926,9 @@ def _detect_fragile_selectors(steps: list) -> list:
 
         # Check for overly long CSS paths (> 5 levels deep) - skip if already warned
         if not found_pattern and (selector.count(" > ") >= 5 or selector.count(" ") >= 6):
-            warnings.append((step_num, selector, "Long CSS path (may break if DOM structure changes)"))
+            warnings.append(
+                (step_num, selector, "Long CSS path (may break if DOM structure changes)")
+            )
 
     return warnings
 
@@ -1096,7 +1123,13 @@ def tidy_recording(
         if line.strip() == "steps:":
             in_steps_section = True
             continue
-        if in_steps_section and line.strip() and not line.startswith(" ") and not line.startswith("-") and not line.startswith("#"):
+        if (
+            in_steps_section
+            and line.strip()
+            and not line.startswith(" ")
+            and not line.startswith("-")
+            and not line.startswith("#")
+        ):
             in_steps_section = False
         if in_steps_section and line.strip().startswith("# Step"):
             original_comments[step_index] = line.strip()
@@ -1132,18 +1165,24 @@ def tidy_recording(
         for i, _step in enumerate(new_steps):
             step_num = i + 1
             existing_comment = original_comments.get(i, "")
-            existing_desc = _extract_comment_description(existing_comment) if existing_comment else ""
+            existing_desc = (
+                _extract_comment_description(existing_comment) if existing_comment else ""
+            )
 
             # Get step from recording model for proper comment generation
             rec_step = recording.steps[i]
             step_model_dict = rec_step.model_dump(exclude_none=True)
 
             # Generate base comment (without assertions) for comparison
-            base_comment = construct_step_comment(step_num, step_model_dict, include_assertions=False)
+            base_comment = construct_step_comment(
+                step_num, step_model_dict, include_assertions=False
+            )
             base_desc = _extract_comment_description(base_comment)
 
             # Generate full comment (with assertions)
-            full_comment = construct_step_comment(step_num, step_model_dict, include_assertions=True)
+            full_comment = construct_step_comment(
+                step_num, step_model_dict, include_assertions=True
+            )
             full_desc = _extract_comment_description(full_comment)
 
             # Decide what to do
@@ -1151,37 +1190,43 @@ def tidy_recording(
                 new_comments[i] = full_comment
                 if existing_desc and existing_desc != full_desc:
                     report["stats"]["comments_forced"] += 1
-                    report["comment_changes"].append({
-                        "step": step_num,
-                        "old": existing_desc,
-                        "new": full_desc,
-                        "type": "forced",
-                    })
+                    report["comment_changes"].append(
+                        {
+                            "step": step_num,
+                            "old": existing_desc,
+                            "new": full_desc,
+                            "type": "forced",
+                        }
+                    )
             elif not existing_desc or existing_desc == base_desc:
                 # No existing comment or user hasn't customized → use full comment
                 new_comments[i] = full_comment
                 if existing_desc and full_desc != base_desc:
                     report["stats"]["comments_enriched"] += 1
-                    report["comment_changes"].append({
-                        "step": step_num,
-                        "old": existing_desc,
-                        "new": full_desc,
-                        "type": "enriched",
-                    })
+                    report["comment_changes"].append(
+                        {
+                            "step": step_num,
+                            "old": existing_desc,
+                            "new": full_desc,
+                            "type": "enriched",
+                        }
+                    )
             else:
                 # User has customized → preserve but update step number
                 new_comments[i] = f"# Step {step_num:04d} · {existing_desc}"
                 report["stats"]["comments_preserved"] += 1
-                report["comment_changes"].append({
-                    "step": step_num,
-                    "old": existing_desc,
-                    "new": existing_desc,
-                    "type": "preserved",
-                })
+                report["comment_changes"].append(
+                    {
+                        "step": step_num,
+                        "old": existing_desc,
+                        "new": existing_desc,
+                        "type": "preserved",
+                    }
+                )
 
             # Check for renumbering
             if existing_comment:
-                old_num_match = re.match(r'^#\s*Step\s+(\d+)', existing_comment)
+                old_num_match = re.match(r"^#\s*Step\s+(\d+)", existing_comment)
                 if old_num_match:
                     old_num = int(old_num_match.group(1))
                     if old_num != step_num:
@@ -1211,20 +1256,21 @@ def tidy_recording(
         # Build header
         metadata = data.get("metadata", {})
         # Format date nicely (e.g., "December 30, 2025 at 11:06")
-        created_at = metadata.get('created_at', 'unknown')
-        if created_at != 'unknown':
+        created_at = metadata.get("created_at", "unknown")
+        if created_at != "unknown":
             try:
                 from datetime import datetime
-                dt = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+
+                dt = datetime.fromisoformat(created_at.replace("Z", "+00:00"))
                 formatted_date = dt.strftime("%B %d, %Y at %H:%M")
             except Exception:
                 formatted_date = created_at
         else:
             formatted_date = created_at
-        header = f"""# Inspekt Recording (File format v{metadata.get('version', '1.1')})
+        header = f"""# Inspekt Recording (File format v{metadata.get("version", "1.1")})
 # Generated: {formatted_date}
-# Duration: {metadata.get('duration_ms', 0) / 1000:.1f}s
-# URL: {metadata.get('starting_url', 'unknown')}
+# Duration: {metadata.get("duration_ms", 0) / 1000:.1f}s
+# URL: {metadata.get("starting_url", "unknown")}
 #
 # Edit this file to:
 # * Add `expect:` assertions to steps
@@ -1245,14 +1291,21 @@ def tidy_recording(
         for i, step in enumerate(new_steps):
             if i in new_comments:
                 steps_yaml += new_comments[i] + "\n"
-            step_yaml = yaml.dump([step], default_flow_style=False, allow_unicode=True, sort_keys=False)
+            step_yaml = yaml.dump(
+                [step], default_flow_style=False, allow_unicode=True, sort_keys=False
+            )
             steps_yaml += step_yaml
 
         # Build other sections
         other_yaml = ""
         for key in ["metadata", "state", "preconditions", "replay"]:
             if key in new_data and key != "steps":
-                section_yaml = yaml.dump({key: new_data[key]}, default_flow_style=False, allow_unicode=True, sort_keys=False)
+                section_yaml = yaml.dump(
+                    {key: new_data[key]},
+                    default_flow_style=False,
+                    allow_unicode=True,
+                    sort_keys=False,
+                )
                 other_yaml += section_yaml
 
         # Write output
@@ -1314,7 +1367,9 @@ def process_upload_files(recording: Recording, filepath: Path) -> None:
                     file_info.external_path = f"{recording_name}_files/{file_path.name}"
                 except Exception as e:
                     # If decoding fails, keep the inline content
-                    click.echo(f"Warning: Could not save external file {file_info.name}: {e}", err=True)
+                    click.echo(
+                        f"Warning: Could not save external file {file_info.name}: {e}", err=True
+                    )
 
 
 def process_download_files(recording: Recording, filepath: Path) -> None:
@@ -1431,9 +1486,7 @@ def process_download_files(recording: Recording, filepath: Path) -> None:
 
         # Update download_info with new path structure
         if file_saved:
-            download_info.external_path = (
-                f"{recording_name}_files/downloads/during-recording/{timestamp_str}/{dest_path.name}"
-            )
+            download_info.external_path = f"{recording_name}_files/downloads/during-recording/{timestamp_str}/{dest_path.name}"
             # Track for duplicate resolution
             saved_paths[step_number] = download_info.external_path
 
@@ -1445,7 +1498,9 @@ def process_download_files(recording: Recording, filepath: Path) -> None:
         if download_info.url and download_info.url.startswith("data:"):
             # Extract just the MIME type from data URL, e.g., "data:application/json;base64,…"
             # becomes "data:application/json (content saved to external_path)"
-            mime_part = download_info.url.split(",")[0] if "," in download_info.url else download_info.url
+            mime_part = (
+                download_info.url.split(",")[0] if "," in download_info.url else download_info.url
+            )
             download_info.url = f"{mime_part} (content saved to external_path)"
 
         if not file_saved:
@@ -1458,14 +1513,14 @@ def process_download_files(recording: Recording, filepath: Path) -> None:
 
 # Patterns that may indicate sensitive data in dialog messages or responses
 SENSITIVE_PATTERNS = [
-    (r'api[_\-\s]?key', 'API key'),
-    (r'password', 'password'),
-    (r'secret', 'secret'),
-    (r'token', 'token'),
-    (r'ssn|social.?security', 'Social Security Number'),
-    (r'credit.?card', 'credit card'),
-    (r'cvv|cvc', 'CVV/CVC'),
-    (r'pin.?code|pin.?number', 'PIN'),
+    (r"api[_\-\s]?key", "API key"),
+    (r"password", "password"),
+    (r"secret", "secret"),
+    (r"token", "token"),
+    (r"ssn|social.?security", "Social Security Number"),
+    (r"credit.?card", "credit card"),
+    (r"cvv|cvc", "CVV/CVC"),
+    (r"pin.?code|pin.?number", "PIN"),
 ]
 
 
@@ -1477,7 +1532,7 @@ def check_sensitive_dialog_content(steps: list[RecordingStep]) -> list[str]:
     warnings = []
 
     for i, step in enumerate(steps):
-        if step.action != 'jsdialog':
+        if step.action != "jsdialog":
             continue
 
         step_num = i + 1
@@ -1486,18 +1541,14 @@ def check_sensitive_dialog_content(steps: list[RecordingStep]) -> list[str]:
         if step.message:
             for pattern, label in SENSITIVE_PATTERNS:
                 if re.search(pattern, step.message, re.IGNORECASE):
-                    warnings.append(
-                        f"Step {step_num}: Dialog message may request {label}"
-                    )
+                    warnings.append(f"Step {step_num}: Dialog message may request {label}")
                     break  # One warning per step message
 
         # Check result (user's response)
         if step.result and isinstance(step.result, str):
             for pattern, label in SENSITIVE_PATTERNS:
                 if re.search(pattern, str(step.result), re.IGNORECASE):
-                    warnings.append(
-                        f"Step {step_num}: Dialog response may contain {label}"
-                    )
+                    warnings.append(f"Step {step_num}: Dialog response may contain {label}")
                     break  # One warning per step result
 
     return warnings
@@ -1536,6 +1587,7 @@ def handle_existing_recording_file(output_path: Path) -> tuple[Path, bool] | Non
 
     # Show warning and options
     from inspekt.app.cli.table import print_warning
+
     click.echo()
     print_warning(f"File already exists: `{output_path.name}`", bold=True)
     click.echo(existing_info)
@@ -1544,7 +1596,9 @@ def handle_existing_recording_file(output_path: Path) -> tuple[Path, bool] | Non
     click.echo()
     click.echo(f"  [1] Create a new timestamped recording ({timestamped_name})")
     step_word = "step" if step_count == 1 else "steps"
-    click.echo(f"  [2] Overwrite the existing recording (all {step_count} {step_word} will be lost)")
+    click.echo(
+        f"  [2] Overwrite the existing recording (all {step_count} {step_word} will be lost)"
+    )
     click.echo("  [3] Append steps to the existing recording (metadata will remain intact)")
     click.echo("  [4] Cancel")
     click.echo()
@@ -1653,29 +1707,34 @@ def save_recording_to_yaml(
     )
 
     # Post-process to add comments and blank lines between steps
-    lines = yaml_content.split('\n')
+    lines = yaml_content.split("\n")
     output_lines = []
     step_number = 0
     in_steps_section = False
 
     for line in lines:
         # Track when we enter/exit the steps section
-        if line.strip() == 'steps:':
+        if line.strip() == "steps:":
             in_steps_section = True
             output_lines.append(line)
             continue
-        elif in_steps_section and line.strip() and not line.startswith(' ') and not line.startswith('-'):
+        elif (
+            in_steps_section
+            and line.strip()
+            and not line.startswith(" ")
+            and not line.startswith("-")
+        ):
             # We've exited the steps section (hit another top-level key)
             in_steps_section = False
             # Add section separator before metadata/state
             if output_lines and output_lines[-1].strip():
-                output_lines.append('')
+                output_lines.append("")
 
         # Check if this is a step entry (starts with "- " at step indent level)
-        if in_steps_section and line.startswith('- '):
+        if in_steps_section and line.startswith("- "):
             # Add blank line before step (except first step)
             if step_number > 0 and output_lines and output_lines[-1].strip():
-                output_lines.append('')
+                output_lines.append("")
 
             # Insert the pre-built comment
             if step_number < len(step_comments):
@@ -1687,7 +1746,7 @@ def save_recording_to_yaml(
 
     with _builtin_open(filepath, "w") as f:
         f.write(header)
-        f.write('\n'.join(output_lines))
+        f.write("\n".join(output_lines))
 
 
 def get_recording_metadata(filepath: Path) -> dict | None:
@@ -1705,6 +1764,7 @@ def get_recording_metadata(filepath: Path) -> dict | None:
 
         # Get file modification time
         from datetime import datetime
+
         mtime = os.path.getmtime(filepath)
         modified_at = datetime.fromtimestamp(mtime)
 
@@ -1725,7 +1785,8 @@ def get_recording_metadata(filepath: Path) -> dict | None:
 @click.group(cls=SubcommandAwareGroup, invoke_without_command=True)
 @click.argument("filename", required=False, default=None)
 @click.option(
-    "-o", "--output",
+    "-o",
+    "--output",
     "output",
     default=None,
     help="Output filename (auto-generated if not specified)",
@@ -1971,6 +2032,7 @@ def record(
     # Determine whether to show milliseconds in timestamps
     # CLI flag takes precedence over config setting
     from inspekt.config import load_config
+
     config_data = load_config()
     show_milliseconds = not no_milliseconds and config_data.get("show-milliseconds", True)
 
@@ -1979,7 +2041,13 @@ def record(
 
     if not client.is_alive():
         from inspekt.app.cli.table import _style_with_inline_code
-        click.echo(_style_with_inline_code("Error: Bridge server is not running. Start it with `inspekt start`.", base_fg="red"), err=True)
+
+        click.echo(
+            _style_with_inline_code(
+                "Error: Bridge server is not running. Start it with `inspekt start`.", base_fg="red"
+            ),
+            err=True,
+        )
         sys.exit(1)
 
     # In VM mode, hide the terminal overlay so user can interact with browser immediately
@@ -2018,7 +2086,7 @@ def record(
                         f"Warning: Browser is in {mode_name} mode. Viewport cannot be resized.\n"
                         f"   The --viewport {target_viewport} option will be ignored.\n"
                         f"   Exit {mode_name} mode (press F11 or Esc) to enable viewport resizing.",
-                        fg="yellow"
+                        fg="yellow",
                     )
                     # Skip resize - set parsed_viewport to None
                     parsed_viewport = None
@@ -2065,7 +2133,9 @@ def record(
 
         # Helper to verify actual viewport via JavaScript
         def get_actual_viewport() -> tuple[int | None, int | None]:
-            verify_js = "(function(){ return { width: window.innerWidth, height: window.innerHeight }; })()"
+            verify_js = (
+                "(function(){ return { width: window.innerWidth, height: window.innerHeight }; })()"
+            )
             try:
                 result = client.execute(verify_js, timeout=5.0)
                 if result.get("ok"):
@@ -2139,7 +2209,9 @@ def record(
                 else:
                     # Cached offsets are stale - recalibrate
                     if actual_w is not None:
-                        click.echo(f"  Cached offsets outdated (got {actual_w}×{actual_h}), recalibrating…")
+                        click.echo(
+                            f"  Cached offsets outdated (got {actual_w}×{actual_h}), recalibrating…"
+                        )
                     else:
                         click.echo("  Could not verify with cached offsets, recalibrating…")
                     need_calibration = True
@@ -2172,7 +2244,11 @@ def record(
                 if attempt_num == 0:
                     return "dialing it in…"
                 # 1px off on either dimension: "shaving off that last pixel…"
-                if (abs(err_w) == 1 and err_h == 0) or (err_w == 0 and abs(err_h) == 1) or (abs(err_w) == 1 and abs(err_h) == 1):
+                if (
+                    (abs(err_w) == 1 and err_h == 0)
+                    or (err_w == 0 and abs(err_h) == 1)
+                    or (abs(err_w) == 1 and abs(err_h) == 1)
+                ):
                     return "shaving off that last pixel…"
                 # In-between: use shuffled pool, cycle through without repeats
                 msg = nudge_pool[nudge_index % len(nudge_pool)]
@@ -2199,7 +2275,7 @@ def record(
                 attempt_resize(adjusted_w, adjusted_h)
 
                 # Exponential backoff - increase delay on each attempt
-                delay = base_delay * (1.1 ** attempt)  # 0.3, 0.33, 0.36, 0.40...
+                delay = base_delay * (1.1**attempt)  # 0.3, 0.33, 0.36, 0.40...
                 time.sleep(min(delay, 1.5))  # Cap at 1.5 seconds
 
                 # Verify actual viewport (retry on failure)
@@ -2238,11 +2314,16 @@ def record(
                     offset_w = max(0, -adjustment_w)  # Clamp to non-negative
                     offset_h = max(0, -adjustment_h)  # Clamp to non-negative
                     if save_viewport_offsets(offset_w, offset_h):
-                        click.secho(f"✓ Viewport set to {actual_w}×{actual_h}, offsets saved.", fg="green")
+                        click.secho(
+                            f"✓ Viewport set to {actual_w}×{actual_h}, offsets saved.", fg="green"
+                        )
                     else:
                         # Only show warning if offsets were non-zero (meaningful calibration)
                         if offset_w > 0 or offset_h > 0:
-                            click.secho(f"✓ Viewport set to {actual_w}×{actual_h} (offsets not saved).", fg="yellow")
+                            click.secho(
+                                f"✓ Viewport set to {actual_w}×{actual_h} (offsets not saved).",
+                                fg="yellow",
+                            )
                         else:
                             click.secho(f"✓ Viewport set to {actual_w}×{actual_h}.", fg="green")
                     resize_achieved = True
@@ -2355,15 +2436,25 @@ def record(
         result = client.execute(start_code, timeout=10.0)
 
         if not result.get("ok"):
-            error = result.get('error', 'unknown error')
+            error = result.get("error", "unknown error")
             click.echo()
             click.secho("⚠ The recording could not be started", fg="yellow", bold=True, err=True)
             click.echo(err=True)
-            click.echo("  • Ensure that the latest version of the Inspekt extension is installed", err=True)
+            click.echo(
+                "  • Ensure that the latest version of the Inspekt extension is installed", err=True
+            )
             click.echo("    and enabled in Firefox or Chrome.", err=True)
-            click.echo("  • Make sure that a JavaScript dialog is not blocking access to the page.", err=True)
-            click.echo("  • In some cases, you may need to disable CSP. You can do this by clicking", err=True)
-            click.echo("    the toggle in the Inspekt UI that appears when you click the icon in", err=True)
+            click.echo(
+                "  • Make sure that a JavaScript dialog is not blocking access to the page.",
+                err=True,
+            )
+            click.echo(
+                "  • In some cases, you may need to disable CSP. You can do this by clicking",
+                err=True,
+            )
+            click.echo(
+                "    the toggle in the Inspekt UI that appears when you click the icon in", err=True
+            )
             click.echo("    your toolbar.", err=True)
             if error and error != "no_browser_connected":
                 click.echo(err=True)
@@ -2440,13 +2531,18 @@ def record(
         # Play start sound (target the specific browser we're recording in)
         if visual_script:
             try:
-                client.execute("window.__INSPEKT_VISUAL__.audio.playStart()", timeout=5.0, browser_index=recording_browser_index)
+                client.execute(
+                    "window.__INSPEKT_VISUAL__.audio.playStart()",
+                    timeout=5.0,
+                    browser_index=recording_browser_index,
+                )
                 time.sleep(0.4)  # Wait for start sound to complete
             except Exception:
                 pass  # Audio is optional
 
         # Display recording header
         from inspekt.config import is_isolated_mode, is_nerdfont_enabled
+
         record_icon = "\U000f044a " if is_nerdfont_enabled() else ""  # 󰑊 nf-md-record
         recording_label = click.style(f"{record_icon}Now recording", fg="red", bold=True)
         browser_active = click.style("(browser is now active)", fg="bright_black")
@@ -2460,13 +2556,15 @@ def record(
         redo_icon = "\U000f044e " if is_nerdfont_enabled() else ""  # 󰑎 nf-md-redo
         click.echo(f"\n{recording_label}: {start_url} {browser_active}\n")
         click.echo(f"Press {ctrl_c} {stop_location} to stop and save")
-        click.echo(f"      {ctrl_shift_z} {in_browser} to {undo_icon}remove step(s) from the recording")
+        click.echo(
+            f"      {ctrl_shift_z} {in_browser} to {undo_icon}remove step(s) from the recording"
+        )
         click.echo(f"      {ctrl_shift_y} {in_browser} to {redo_icon}re-add (steps won't re-run)\n")
 
         # In VM mode, emit escape sequence to auto-hide terminal
         # This allows the user to immediately interact with the browser
         if is_isolated_mode():
-            print('\033]1337;hide-terminal\007', end='', flush=True)
+            print("\033]1337;hide-terminal\007", end="", flush=True)
 
         # Prepare poll and stop codes
         poll_code = script_template.replace("ACTION_PLACEHOLDER", "poll")
@@ -2555,13 +2653,19 @@ def record(
             # Play stop/completion sound (target the specific browser we're recording in)
             if visual_script:
                 try:
-                    client.execute("window.__INSPEKT_VISUAL__.audio.playStop()", timeout=2.0, browser_index=recording_browser_index)
+                    client.execute(
+                        "window.__INSPEKT_VISUAL__.audio.playStop()",
+                        timeout=2.0,
+                        browser_index=recording_browser_index,
+                    )
                 except Exception:
                     pass  # Audio is optional
 
             try:
                 # Stop recording and get final events (target the specific browser)
-                stop_result = client.execute(stop_code, timeout=2.0, browser_index=recording_browser_index)
+                stop_result = client.execute(
+                    stop_code, timeout=2.0, browser_index=recording_browser_index
+                )
 
                 if stop_result.get("ok"):
                     stop_response = stop_result.get("result", {})
@@ -2608,9 +2712,11 @@ def record(
             # Capture additional state if --capture-state flag was used
             if capture_state:
                 import base64
+
                 # Capture cookies via extension
                 try:
-                    cookies_result = client.execute("""
+                    cookies_result = client.execute(
+                        """
                         new Promise((resolve) => {
                             const requestId = 'cookies-' + Date.now() + '-' + Math.random().toString(36).slice(2);
                             const handler = (event) => {
@@ -2633,7 +2739,10 @@ def record(
                                 resolve({ ok: false, error: 'timeout' });
                             }, 3000);
                         })
-                    """, timeout=5.0, browser_index=recording_browser_index)
+                    """,
+                        timeout=5.0,
+                        browser_index=recording_browser_index,
+                    )
                     if cookies_result.get("ok"):
                         cookies_data = cookies_result.get("result", {})
                         if cookies_data.get("ok") and cookies_data.get("cookies"):
@@ -2663,25 +2772,36 @@ def record(
                                 sessionStorage: getStorage(sessionStorage)
                             };
                         })()
-                    """.replace("KEYS_PLACEHOLDER", json.dumps(storage_keys_list) if storage_keys_list else "null")
+                    """.replace(
+                        "KEYS_PLACEHOLDER",
+                        json.dumps(storage_keys_list) if storage_keys_list else "null",
+                    )
 
-                    storage_result = client.execute(storage_code, timeout=3.0, browser_index=recording_browser_index)
+                    storage_result = client.execute(
+                        storage_code, timeout=3.0, browser_index=recording_browser_index
+                    )
                     if storage_result.get("ok"):
                         storage_data = storage_result.get("result", {})
                         if storage_data.get("localStorage"):
                             local_json = json.dumps(storage_data["localStorage"])
-                            state_info.local_storage = base64.b64encode(local_json.encode()).decode()
+                            state_info.local_storage = base64.b64encode(
+                                local_json.encode()
+                            ).decode()
                         if storage_data.get("sessionStorage"):
                             session_json = json.dumps(storage_data["sessionStorage"])
-                            state_info.session_storage = base64.b64encode(session_json.encode()).decode()
+                            state_info.session_storage = base64.b64encode(
+                                session_json.encode()
+                            ).decode()
                 except Exception as e:
                     click.echo(f"Warning: Failed to capture storage: {e}", err=True)
 
             # Capture DOM checksum if --checksum flag was used
             if checksum:
                 import hashlib
+
                 try:
-                    checksum_result = client.execute("""
+                    checksum_result = client.execute(
+                        """
                         (function() {
                             // Generate a hash of the DOM structure (tags only, no text/attrs)
                             function getStructure(node) {
@@ -2691,7 +2811,10 @@ def record(
                             }
                             return getStructure(document.body);
                         })()
-                    """, timeout=5.0, browser_index=recording_browser_index)
+                    """,
+                        timeout=5.0,
+                        browser_index=recording_browser_index,
+                    )
                     if checksum_result.get("ok"):
                         structure = checksum_result.get("result", "")
                         hash_value = hashlib.sha256(structure.encode()).hexdigest()
@@ -2702,23 +2825,27 @@ def record(
             # Extract browser info from user agent
             recorded_on = None
             import platform as platform_module
+
             if user_agent:
                 browser_name = "Chrome"  # Default
                 browser_version = None
                 if "Firefox/" in user_agent:
                     browser_name = "Firefox"
                     import re
+
                     match = re.search(r"Firefox/([\d.]+)", user_agent)
                     if match:
                         browser_version = match.group(1)
                 elif "Edg/" in user_agent:
                     browser_name = "Edge"
                     import re
+
                     match = re.search(r"Edg/([\d.]+)", user_agent)
                     if match:
                         browser_version = match.group(1)
                 elif "Chrome/" in user_agent:
                     import re
+
                     match = re.search(r"Chrome/([\d.]+)", user_agent)
                     if match:
                         browser_version = match.group(1)
@@ -2731,6 +2858,7 @@ def record(
 
             # Build recording
             from inspekt.services.image_metadata import get_username
+
             recording = Recording(
                 metadata=RecordingMetadata(
                     version="1.1",
@@ -2747,10 +2875,7 @@ def record(
             )
 
             # Check for failed recording (only navigate action = likely JS conflict)
-            is_failed_recording = (
-                len(all_steps) == 1 and
-                all_steps[0].action == "navigate"
-            )
+            is_failed_recording = len(all_steps) == 1 and all_steps[0].action == "navigate"
 
             if is_failed_recording:
                 # Recording failed - likely due to leftover JS from previous recording
@@ -2759,14 +2884,18 @@ def record(
                     click.echo(success_icon(""))
                 click.echo()
                 click.secho("⚠ Recording failed", fg="yellow", bold=True)
-                click.echo("  This typically happens when the last recording session was interrupted or the current session was abandoned.")
+                click.echo(
+                    "  This typically happens when the last recording session was interrupted or the current session was abandoned."
+                )
                 click.echo()
 
                 if allow_retry:
                     # Show Enter/Ctrl+C options with styled keys
                     enter_key = style_primary_key("Enter")
                     ctrl_c_key = style_secondary_key("Ctrl+C")
-                    click.echo(f"  Press {enter_key} to try again (Inspekt will refresh the page for you)")
+                    click.echo(
+                        f"  Press {enter_key} to try again (Inspekt will refresh the page for you)"
+                    )
                     click.echo(f"        {ctrl_c_key} to cancel and discard\n")
 
                     try:
@@ -2774,7 +2903,9 @@ def record(
                         click.pause(info="")
                         # Refresh the page
                         click.echo("Refreshing page… " + success_icon(""))
-                        client.execute("location.reload()", timeout=5.0, browser_index=recording_browser_index)
+                        client.execute(
+                            "location.reload()", timeout=5.0, browser_index=recording_browser_index
+                        )
                         time.sleep(1.5)  # Wait for page reload
                         # Re-focus the browser so user can continue interacting
                         _focus_browser_if_requested(focus=True, silent=True)
@@ -2822,23 +2953,33 @@ def record(
                     if recording.steps:
                         recording.metadata.duration_ms = recording.steps[-1].timestamp or 0
                     new_step_count = len(recording.steps) - original_step_count
-                    click.echo(f"Appended {new_step_count} new steps to existing {original_step_count} steps.")
+                    click.echo(
+                        f"Appended {new_step_count} new steps to existing {original_step_count} steps."
+                    )
                 except Exception as e:
-                    click.secho(f"Warning: Could not read existing file for append: {e}", fg="yellow")
+                    click.secho(
+                        f"Warning: Could not read existing file for append: {e}", fg="yellow"
+                    )
                     click.echo("Saving as new recording instead.")
 
             # Save recording
             try:
-                save_recording_to_yaml(recording, output_path, cookie_consent_provider=cookie_consent_provider)
+                save_recording_to_yaml(
+                    recording, output_path, cookie_consent_provider=cookie_consent_provider
+                )
 
                 # Check for potentially sensitive content in dialog steps
                 sensitive_warnings = check_sensitive_dialog_content(all_steps)
                 if sensitive_warnings:
                     click.echo()
-                    click.secho("  ⚠️  Security Warning: Recording may contain sensitive data:", fg="yellow")
+                    click.secho(
+                        "  ⚠️  Security Warning: Recording may contain sensitive data:", fg="yellow"
+                    )
                     for warning in sensitive_warnings:
                         click.secho(f"      • {warning}", fg="yellow")
-                    click.secho("      Consider reviewing/redacting before sharing this file.", fg="yellow")
+                    click.secho(
+                        "      Consider reviewing/redacting before sharing this file.", fg="yellow"
+                    )
                     click.echo()
 
                 # Count steps excluding hovers
@@ -2850,7 +2991,10 @@ def record(
                     click.echo()  # Blank line before "Recording saved"
 
                 # Display simplified recording saved info
-                click.echo(f"Recording saved to {click.style(output_path.name, bold=True)} ({format_duration(duration_ms)}, {non_hover_steps} actions) " + success_icon(""))
+                click.echo(
+                    f"Recording saved to {click.style(output_path.name, bold=True)} ({format_duration(duration_ms)}, {non_hover_steps} actions) "
+                    + success_icon("")
+                )
 
                 # Merge --open and --edit (backwards compat) flags
                 should_open = open_after or edit_after
@@ -2867,6 +3011,7 @@ def record(
                     click.echo(f"  Replay with `inspekt replay {output_path.name}`")
                     click.echo()
                     from inspekt.app.cli.table import print_hint
+
                     print_hint("For more replay options, type `inspekt replay --help`")
             except Exception as e:
                 click.echo(f"Error saving recording: {e}", err=True)
@@ -2894,6 +3039,7 @@ def record(
 
                 # Create a fresh client for pre-replay setup
                 from inspekt.app.cli.replay import replay as replay_cmd
+
                 replay_client = BridgeClient()
 
                 # Refresh the page before replay to reset state (focus, scroll position, etc.)
@@ -2920,7 +3066,9 @@ def record(
                     with _builtin_open(countdown_visual_path) as f:
                         countdown_visual_script = f.read()
                     # Inject shared dialog styles
-                    countdown_visual_script = countdown_visual_script.replace("DIALOG_STYLES_PLACEHOLDER", DIALOG_STYLES)
+                    countdown_visual_script = countdown_visual_script.replace(
+                        "DIALOG_STYLES_PLACEHOLDER", DIALOG_STYLES
+                    )
                     replay_client.execute(countdown_visual_script, timeout=10.0)
                 except Exception:
                     pass  # Continue without audio
@@ -3114,9 +3262,13 @@ def record(
                     start_time = datetime.now(UTC)
 
                     # Re-inject recording script (must target the same browser tab)
-                    retry_result = client.execute(start_code, timeout=10.0, browser_index=recording_browser_index)
+                    retry_result = client.execute(
+                        start_code, timeout=10.0, browser_index=recording_browser_index
+                    )
                     if not retry_result.get("ok"):
-                        click.echo(f"Error restarting recording: {retry_result.get('error')}", err=True)
+                        click.echo(
+                            f"Error restarting recording: {retry_result.get('error')}", err=True
+                        )
                         sys.exit(1)
 
                     retry_response = retry_result.get("result", {})
@@ -3129,7 +3281,11 @@ def record(
                     # Play start sound
                     if visual_script:
                         try:
-                            client.execute("window.__INSPEKT_VISUAL__.audio.playStart()", timeout=5.0, browser_index=recording_browser_index)
+                            client.execute(
+                                "window.__INSPEKT_VISUAL__.audio.playStart()",
+                                timeout=5.0,
+                                browser_index=recording_browser_index,
+                            )
                             time.sleep(0.4)
                         except Exception:
                             pass
@@ -3151,7 +3307,11 @@ def record(
                 prefix = click.style(f"----   {elapsed_str}", fg="bright_black")
                 stop_icon = get_indicator("stop") or ""
                 icon_str = f"{stop_icon} " if stop_icon else ""
-                msg = click.style("No activity for 60 seconds. Stopping recording… ", fg="bright_black", italic=True)
+                msg = click.style(
+                    "No activity for 60 seconds. Stopping recording… ",
+                    fg="bright_black",
+                    italic=True,
+                )
                 click.echo(f"{prefix}   {icon_str}{msg}", nl=False)
                 # For inactivity timeout, don't offer retry - just discard if failed
                 # Note: do_cleanup handles the checkmark + blank line for silent mode
@@ -3165,28 +3325,42 @@ def record(
                 elapsed_str = format_elapsed(elapsed_ms, show_milliseconds=False)
                 prefix = click.style(f"----   {elapsed_str}", fg="bright_black")
                 hourglass = "\uf252"  # nf-fa-hourglass_end
-                msg = click.style("No activity for 30 seconds. Recording will stop in 30 seconds…", fg="bright_black", italic=True)
+                msg = click.style(
+                    "No activity for 30 seconds. Recording will stop in 30 seconds…",
+                    fg="bright_black",
+                    italic=True,
+                )
                 click.echo(f"{prefix}   {hourglass} {msg}")
                 # Add hint about Ctrl+C (aligned with message)
-                hint = click.style("Press ", fg="bright_black") + style_primary_key("Ctrl+C") + click.style(" to stop and save", fg="bright_black")
+                hint = (
+                    click.style("Press ", fg="bright_black")
+                    + style_primary_key("Ctrl+C")
+                    + click.style(" to stop and save", fg="bright_black")
+                )
                 click.echo(f"                 {hint}")
                 inactivity_warning_shown = True
 
             try:
                 debug_log("Sending poll request…")
                 # Always target the specific browser tab where recording started
-                result = client.execute(poll_code, timeout=2.0, browser_index=recording_browser_index)
-                debug_log(f"Poll result: ok={result.get('ok')}, has_result={result.get('result') is not None}")
+                result = client.execute(
+                    poll_code, timeout=2.0, browser_index=recording_browser_index
+                )
+                debug_log(
+                    f"Poll result: ok={result.get('ok')}, has_result={result.get('result') is not None}"
+                )
 
                 # Reset error count on successful communication
                 if consecutive_errors > 0 and waiting_for_reconnect:
                     elapsed_ms = int((datetime.now(UTC) - start_time).total_seconds() * 1000)
-                    click.echo(format_system_message(
-                        "Reconnected",
-                        icon="resume",
-                        elapsed_ms=elapsed_ms,
-                        show_milliseconds=show_milliseconds
-                    ))
+                    click.echo(
+                        format_system_message(
+                            "Reconnected",
+                            icon="resume",
+                            elapsed_ms=elapsed_ms,
+                            show_milliseconds=show_milliseconds,
+                        )
+                    )
                 consecutive_errors = 0
                 waiting_for_reconnect = False
 
@@ -3201,25 +3375,33 @@ def record(
                         except json.JSONDecodeError:
                             response = {}
 
-                    debug_log(f"Response: recordingActive={response.get('recordingActive')}, currentUrl={response.get('currentUrl', 'N/A')[:50] if response.get('currentUrl') else 'N/A'}")
+                    debug_log(
+                        f"Response: recordingActive={response.get('recordingActive')}, currentUrl={response.get('currentUrl', 'N/A')[:50] if response.get('currentUrl') else 'N/A'}"
+                    )
 
                     # Check if stop was requested from browser (Ctrl+C or limit reached)
                     if response.get("stopRequested"):
                         stop_reason = response.get("stopReason")
                         if stop_reason and stop_reason.startswith("download_limit:"):
                             limit = stop_reason.split(":")[1]
-                            click.echo(format_system_message(
-                                f"Download limit ({limit}) reached. Recording has been stopped as a precaution.",
-                                icon="tip"
-                            ))
+                            click.echo(
+                                format_system_message(
+                                    f"Download limit ({limit}) reached. Recording has been stopped as a precaution.",
+                                    icon="tip",
+                                )
+                            )
                             debug_log(f"Stop requested from browser (download limit: {limit})")
                         elif stop_reason and stop_reason.startswith("action_rate_limit:"):
                             limit = stop_reason.split(":")[1]
-                            click.echo(format_system_message(
-                                f"Action rate limit ({limit}/second) exceeded. Recording has been stopped as a precaution.",
-                                icon="tip"
-                            ))
-                            debug_log(f"Stop requested from browser (action rate limit: {limit}/sec)")
+                            click.echo(
+                                format_system_message(
+                                    f"Action rate limit ({limit}/second) exceeded. Recording has been stopped as a precaution.",
+                                    icon="tip",
+                                )
+                            )
+                            debug_log(
+                                f"Stop requested from browser (action rate limit: {limit}/sec)"
+                            )
                         else:
                             debug_log("Stop requested from browser (Ctrl+C)")
                         result = do_cleanup()
@@ -3240,9 +3422,14 @@ def record(
                             start_time = datetime.now(UTC)
 
                             # Re-inject recording script (must target the same browser tab)
-                            retry_result = client.execute(start_code, timeout=10.0, browser_index=recording_browser_index)
+                            retry_result = client.execute(
+                                start_code, timeout=10.0, browser_index=recording_browser_index
+                            )
                             if not retry_result.get("ok"):
-                                click.echo(f"Error restarting recording: {retry_result.get('error')}", err=True)
+                                click.echo(
+                                    f"Error restarting recording: {retry_result.get('error')}",
+                                    err=True,
+                                )
                                 sys.exit(1)
 
                             retry_response = retry_result.get("result", {})
@@ -3255,7 +3442,11 @@ def record(
                             # Play start sound
                             if visual_script:
                                 try:
-                                    client.execute("window.__INSPEKT_VISUAL__.audio.playStart()", timeout=5.0, browser_index=recording_browser_index)
+                                    client.execute(
+                                        "window.__INSPEKT_VISUAL__.audio.playStart()",
+                                        timeout=5.0,
+                                        browser_index=recording_browser_index,
+                                    )
                                     time.sleep(0.4)
                                 except Exception:
                                     pass
@@ -3276,8 +3467,12 @@ def record(
                         if is_paused:
                             pause_start_time = time.time()
                             # Show pause message with timestamp
-                            elapsed_ms = int((datetime.now(UTC) - start_time).total_seconds() * 1000)
-                            elapsed_str = format_elapsed(elapsed_ms, show_milliseconds=show_milliseconds)
+                            elapsed_ms = int(
+                                (datetime.now(UTC) - start_time).total_seconds() * 1000
+                            )
+                            elapsed_str = format_elapsed(
+                                elapsed_ms, show_milliseconds=show_milliseconds
+                            )
                             prefix = click.style(f"----   {elapsed_str}", fg="bright_black")
                             pause_icon = get_indicator("pause") or ""
                             icon_str = f"{pause_icon}  " if pause_icon else ""
@@ -3285,9 +3480,15 @@ def record(
                             click.echo(f"{prefix}   {icon_str}{msg}")
                         else:
                             # Calculate pause duration and elapsed time
-                            elapsed_ms = int((datetime.now(UTC) - start_time).total_seconds() * 1000)
-                            elapsed_str = format_elapsed(elapsed_ms, show_milliseconds=show_milliseconds)
-                            pause_duration_sec = int(time.time() - pause_start_time) if pause_start_time else 0
+                            elapsed_ms = int(
+                                (datetime.now(UTC) - start_time).total_seconds() * 1000
+                            )
+                            elapsed_str = format_elapsed(
+                                elapsed_ms, show_milliseconds=show_milliseconds
+                            )
+                            pause_duration_sec = (
+                                int(time.time() - pause_start_time) if pause_start_time else 0
+                            )
                             pause_start_time = None
                             # Format: "0001   00:56   󰐊  Recording resumed after 45 seconds"
                             prefix = click.style(f"----   {elapsed_str}", fg="bright_black")
@@ -3300,14 +3501,18 @@ def record(
                                 duration_str = "one second"
                             else:
                                 duration_str = f"{pause_duration_sec} seconds"
-                            msg = click.style(f"Resumed after {duration_str}", fg="bright_black", italic=True)
+                            msg = click.style(
+                                f"Resumed after {duration_str}", fg="bright_black", italic=True
+                            )
                             click.echo(f"{prefix}   {icon_str}{msg}")
 
                     # Handle undo request (Ctrl+Shift+Z in browser)
                     if response.get("undoRequested"):
                         # Calculate elapsed time for timestamp
                         elapsed_ms = int((datetime.now(UTC) - start_time).total_seconds() * 1000)
-                        elapsed_str = format_elapsed(elapsed_ms, show_milliseconds=show_milliseconds)
+                        elapsed_str = format_elapsed(
+                            elapsed_ms, show_milliseconds=show_milliseconds
+                        )
                         if all_steps:
                             undone_step = all_steps.pop()
                             undo_stack.append(undone_step)
@@ -3317,12 +3522,20 @@ def record(
                             # Format: "----   00:15   󰕌 Step #0003 (keypress) removed from the recording"
                             action = undone_step.action
                             # For "set" actions, include the input type (e.g., "set color", "set range")
-                            if action == "set" and undone_step.target and undone_step.target.input_type:
+                            if (
+                                action == "set"
+                                and undone_step.target
+                                and undone_step.target.input_type
+                            ):
                                 action = f"set {undone_step.target.input_type}"
                             prefix = click.style(f"----   {elapsed_str}", fg="bright_black")
                             undo_icon = get_indicator("undo") or ""
                             icon_str = f"{undo_icon} " if undo_icon else ""
-                            msg = click.style(f"Step #{undone_step_num:04d} ({action}) removed from the recording", fg="bright_black", italic=True)
+                            msg = click.style(
+                                f"Step #{undone_step_num:04d} ({action}) removed from the recording",
+                                fg="bright_black",
+                                italic=True,
+                            )
                             click.echo(f"{prefix}   {icon_str}{msg}")
                             # Sound already played by JavaScript
                         else:
@@ -3334,7 +3547,11 @@ def record(
                             click.echo(f"{prefix}   {icon_str}{msg}")
                             # Play error sound in browser (after the undo sound already played)
                             try:
-                                client.execute("window.__INSPEKT_RECORD_AUDIO__.playError()", timeout=0.5, browser_index=recording_browser_index)
+                                client.execute(
+                                    "window.__INSPEKT_RECORD_AUDIO__.playError()",
+                                    timeout=0.5,
+                                    browser_index=recording_browser_index,
+                                )
                             except Exception:
                                 pass
 
@@ -3342,7 +3559,9 @@ def record(
                     if response.get("redoRequested"):
                         # Calculate elapsed time for timestamp
                         elapsed_ms = int((datetime.now(UTC) - start_time).total_seconds() * 1000)
-                        elapsed_str = format_elapsed(elapsed_ms, show_milliseconds=show_milliseconds)
+                        elapsed_str = format_elapsed(
+                            elapsed_ms, show_milliseconds=show_milliseconds
+                        )
                         if undo_stack:
                             redone_step = undo_stack.pop()
                             all_steps.append(redone_step)
@@ -3350,12 +3569,20 @@ def record(
                             # Format: "----   00:15   󰑎 Step #0003 (keypress) re-added to the recording"
                             action = redone_step.action
                             # For "set" actions, include the input type (e.g., "set color", "set range")
-                            if action == "set" and redone_step.target and redone_step.target.input_type:
+                            if (
+                                action == "set"
+                                and redone_step.target
+                                and redone_step.target.input_type
+                            ):
                                 action = f"set {redone_step.target.input_type}"
                             prefix = click.style(f"----   {elapsed_str}", fg="bright_black")
                             redo_icon = get_indicator("redo") or ""
                             icon_str = f"{redo_icon} " if redo_icon else ""
-                            msg = click.style(f"Step #{step_count:04d} ({action}) re-added to the recording", fg="bright_black", italic=True)
+                            msg = click.style(
+                                f"Step #{step_count:04d} ({action}) re-added to the recording",
+                                fg="bright_black",
+                                italic=True,
+                            )
                             click.echo(f"{prefix}   {icon_str}{msg}")
                             # Sound already played by JavaScript
                         else:
@@ -3367,7 +3594,11 @@ def record(
                             click.echo(f"{prefix}   {icon_str}{msg}")
                             # Play error sound in browser (after the redo sound already played)
                             try:
-                                client.execute("window.__INSPEKT_RECORD_AUDIO__.playError()", timeout=0.5, browser_index=recording_browser_index)
+                                client.execute(
+                                    "window.__INSPEKT_RECORD_AUDIO__.playError()",
+                                    timeout=0.5,
+                                    browser_index=recording_browser_index,
+                                )
                             except Exception:
                                 pass
 
@@ -3383,7 +3614,9 @@ def record(
 
                         if new_url and new_url != last_known_url:
                             # Calculate elapsed time for the navigation event
-                            elapsed_ms = int((datetime.now(UTC) - start_time).total_seconds() * 1000)
+                            elapsed_ms = int(
+                                (datetime.now(UTC) - start_time).total_seconds() * 1000
+                            )
 
                             # Add navigation event
                             nav_step = RecordingStep(
@@ -3396,7 +3629,13 @@ def record(
 
                             # Display navigation (no indent during recording)
                             nav_event = {"action": "navigate", "url": new_url}
-                            display = format_step_for_display(nav_event, step_count, elapsed_ms, indent=False, show_milliseconds=show_milliseconds)
+                            display = format_step_for_display(
+                                nav_event,
+                                step_count,
+                                elapsed_ms,
+                                indent=False,
+                                show_milliseconds=show_milliseconds,
+                            )
                             click.echo(display)
 
                             last_known_url = new_url
@@ -3408,41 +3647,57 @@ def record(
                         # Target the specific browser tab where recording started
                         if visual_script:
                             try:
-                                client.execute(visual_script, timeout=5.0, browser_index=recording_browser_index)
+                                client.execute(
+                                    visual_script,
+                                    timeout=5.0,
+                                    browser_index=recording_browser_index,
+                                )
                             except Exception:
                                 pass
 
                         resume_code = get_resume_code(elapsed_ms)
                         debug_log("Sending resume command…")
                         # Target the specific browser tab where recording started
-                        resume_result = client.execute(resume_code, timeout=5.0, browser_index=recording_browser_index)
-                        debug_log(f"Resume result: ok={resume_result.get('ok')}, result={resume_result.get('result')}")
+                        resume_result = client.execute(
+                            resume_code, timeout=5.0, browser_index=recording_browser_index
+                        )
+                        debug_log(
+                            f"Resume result: ok={resume_result.get('ok')}, result={resume_result.get('result')}"
+                        )
 
                         if resume_result.get("ok"):
                             # Recording resumed successfully
                             debug_log("Recording resumed successfully")
                             resumed_url = new_url or last_known_url
                             # Calculate elapsed time for timestamp display
-                            elapsed_ms = int((datetime.now(UTC) - start_time).total_seconds() * 1000)
-                            click.echo(format_system_message(
-                                f"Recording resumed on {resumed_url}",
-                                icon="resume",
-                                elapsed_ms=elapsed_ms,
-                                show_milliseconds=show_milliseconds,
-                                truncate=False  # Don't truncate URLs
-                            ))
+                            elapsed_ms = int(
+                                (datetime.now(UTC) - start_time).total_seconds() * 1000
+                            )
+                            click.echo(
+                                format_system_message(
+                                    f"Recording resumed on {resumed_url}",
+                                    icon="resume",
+                                    elapsed_ms=elapsed_ms,
+                                    show_milliseconds=show_milliseconds,
+                                    truncate=False,  # Don't truncate URLs
+                                )
+                            )
                             # Reset inactivity tracking
                             last_activity_time = time.time()
                             inactivity_warning_shown = False
                         else:
                             # Failed to resume - might be on a restricted page
                             debug_log(f"Resume failed: {resume_result.get('error')}")
-                            elapsed_ms = int((datetime.now(UTC) - start_time).total_seconds() * 1000)
-                            click.echo(format_system_message(
-                                "Recording paused - waiting for supported page",
-                                elapsed_ms=elapsed_ms,
-                                show_milliseconds=show_milliseconds
-                            ))
+                            elapsed_ms = int(
+                                (datetime.now(UTC) - start_time).total_seconds() * 1000
+                            )
+                            click.echo(
+                                format_system_message(
+                                    "Recording paused - waiting for supported page",
+                                    elapsed_ms=elapsed_ms,
+                                    show_milliseconds=show_milliseconds,
+                                )
+                            )
 
                         continue  # Skip to next poll iteration
 
@@ -3492,7 +3747,11 @@ def record(
 
                         # Display table header before first step
                         if not header_shown:
-                            click.echo(format_step_header(indent=False, show_milliseconds=show_milliseconds))
+                            click.echo(
+                                format_step_header(
+                                    indent=False, show_milliseconds=show_milliseconds
+                                )
+                            )
                             header_shown = True
 
                         # For upload events, strip the content field before displaying
@@ -3531,7 +3790,13 @@ def record(
                                     }
 
                         # Display real-time feedback with step number and elapsed time (no indent during recording)
-                        display = format_step_for_display(display_event, step_count, elapsed_ms, indent=False, show_milliseconds=show_milliseconds)
+                        display = format_step_for_display(
+                            display_event,
+                            step_count,
+                            elapsed_ms,
+                            indent=False,
+                            show_milliseconds=show_milliseconds,
+                        )
                         click.echo(display)
 
                         # Show informational message for download duplicates/changes (after the step display)
@@ -3539,28 +3804,34 @@ def record(
                             download_info = event["download"]
                             if download_info.get("_duplicate_of_step"):
                                 orig_step = download_info["_duplicate_of_step"]
-                                click.echo(format_system_message(
-                                    f"This file is identical to the one we downloaded in step #{orig_step:04d}.",
-                                    icon="tip"
-                                ))
+                                click.echo(
+                                    format_system_message(
+                                        f"This file is identical to the one we downloaded in step #{orig_step:04d}.",
+                                        icon="tip",
+                                    )
+                                )
                             elif download_info.get("_differs_from_step"):
                                 orig_step = download_info["_differs_from_step"]
-                                click.echo(format_system_message(
-                                    f"This file differs from the one we downloaded in step #{orig_step:04d}. A copy is saved.",
-                                    icon="tip"
-                                ))
+                                click.echo(
+                                    format_system_message(
+                                        f"This file differs from the one we downloaded in step #{orig_step:04d}. A copy is saved.",
+                                        icon="tip",
+                                    )
+                                )
 
                         # Show one-time hint for cookie consent dialog Tab navigation
                         if event.get("in_cookie_consent") and not cookie_consent_hint_shown:
                             provider = event.get("cookie_consent_provider", "cookie consent dialog")
                             cookie_consent_provider = provider  # Store for YAML comment
                             cookie_consent_hint_shown = True
-                            click.echo(format_system_message(
-                                f"Tab landed in a {provider}. "
-                                "These dialogs manage focus internally—accessible names may not be captured. "
-                                "Replay will still work correctly.",
-                                icon="tip"
-                            ))
+                            click.echo(
+                                format_system_message(
+                                    f"Tab landed in a {provider}. "
+                                    "These dialogs manage focus internally—accessible names may not be captured. "
+                                    "Replay will still work correctly.",
+                                    icon="tip",
+                                )
+                            )
 
                 else:
                     # Poll failed - might be due to navigation
@@ -3569,13 +3840,20 @@ def record(
             except (ConnectionError, TimeoutError) as e:
                 # Handle connection errors gracefully (page might be navigating)
                 consecutive_errors += 1
-                debug_log(f"Connection/Timeout error #{consecutive_errors}: {type(e).__name__}: {e}")
+                debug_log(
+                    f"Connection/Timeout error #{consecutive_errors}: {type(e).__name__}: {e}"
+                )
 
                 # Check if original browser tab is still available
                 current_browser_count = client.get_browser_count()
-                if recording_browser_index is not None and current_browser_count <= recording_browser_index:
+                if (
+                    recording_browser_index is not None
+                    and current_browser_count <= recording_browser_index
+                ):
                     # Original tab is no longer available - auto-stop recording
-                    click.echo(format_system_message("Recording tab was closed. Stopping recording."))
+                    click.echo(
+                        format_system_message("Recording tab was closed. Stopping recording.")
+                    )
                     # Tab is closed, can't retry
                     do_cleanup(allow_retry=False)
                     break
@@ -3608,7 +3886,15 @@ def record(
 @click.option("--no-normalize", is_flag=True, help="Skip key order normalization")
 @click.option("--no-clean", is_flag=True, help="Skip empty value removal")
 @click.option("--quiet", "-q", is_flag=True, help="Only show warnings and summary")
-def tidy(file: str | None, dry_run: bool, force: bool, no_comments: bool, no_normalize: bool, no_clean: bool, quiet: bool):
+def tidy(
+    file: str | None,
+    dry_run: bool,
+    force: bool,
+    no_comments: bool,
+    no_normalize: bool,
+    no_clean: bool,
+    quiet: bool,
+):
     """
     Tidy up a recording file.
 
@@ -3699,10 +3985,14 @@ def tidy(file: str | None, dry_run: bool, force: bool, no_comments: bool, no_nor
                     click.echo(f"  {step_label}: {old_truncated}")
                     click.echo(f"           → {click.style(new_truncated, fg='green')}")
                 elif change_type == "forced":
-                    click.echo(f"  {step_label}: {click.style(old_truncated, fg='red', strikethrough=True)}")
+                    click.echo(
+                        f"  {step_label}: {click.style(old_truncated, fg='red', strikethrough=True)}"
+                    )
                     click.echo(f"           → {click.style(new_truncated, fg='yellow')}")
                 elif change_type == "preserved":
-                    click.echo(f"  {step_label}: {old_truncated} {click.style('(preserved)', fg='bright_black')}")
+                    click.echo(
+                        f"  {step_label}: {old_truncated} {click.style('(preserved)', fg='bright_black')}"
+                    )
             click.echo()
 
         # Summary report
@@ -3734,7 +4024,9 @@ def tidy(file: str | None, dry_run: bool, force: bool, no_comments: bool, no_nor
 
         # Warning counts
         if warnings["fragile_selectors"]:
-            summary_items.append(("Fragile selectors", len(warnings["fragile_selectors"]), "yellow"))
+            summary_items.append(
+                ("Fragile selectors", len(warnings["fragile_selectors"]), "yellow")
+            )
         if warnings["timestamps"]:
             summary_items.append(("Timestamp issues", len(warnings["timestamps"]), "yellow"))
 
@@ -3810,17 +4102,24 @@ def list_recordings(limit: int | None, output_json: bool):
     if output_json:
         output = []
         for r in recordings:
-            output.append({
-                "name": r["name"],
-                "path": str(r["path"]),
-                "created_at": r["created_at"].isoformat() if hasattr(r.get("created_at"), "isoformat") else str(r.get("created_at")),
-                "modified_at": r["modified_at"].isoformat() if hasattr(r.get("modified_at"), "isoformat") else str(r.get("modified_at")),
-                "duration_ms": r["duration_ms"],
-                "steps": r["steps"],
-                "assertions": r.get("assertions", 0),
-                "url": r["url"],
-            })
+            output.append(
+                {
+                    "name": r["name"],
+                    "path": str(r["path"]),
+                    "created_at": r["created_at"].isoformat()
+                    if hasattr(r.get("created_at"), "isoformat")
+                    else str(r.get("created_at")),
+                    "modified_at": r["modified_at"].isoformat()
+                    if hasattr(r.get("modified_at"), "isoformat")
+                    else str(r.get("modified_at")),
+                    "duration_ms": r["duration_ms"],
+                    "steps": r["steps"],
+                    "assertions": r.get("assertions", 0),
+                    "url": r["url"],
+                }
+            )
         from inspekt.app.cli.table import print_json
+
         print_json(output, summary=f"{len(output)} recordings")
         return
 
@@ -3873,17 +4172,26 @@ def list_recordings(limit: int | None, output_json: bool):
         total_assertions += assertions
         total_duration_ms += duration_ms
 
-        rows.append({
-            "path": r["path"],
-            "values": [filename, created_str, modified_str, duration, str(steps), str(assertions)]
-        })
+        rows.append(
+            {
+                "path": r["path"],
+                "values": [
+                    filename,
+                    created_str,
+                    modified_str,
+                    duration,
+                    str(steps),
+                    str(assertions),
+                ],
+            }
+        )
 
     # Create table with title
     table = Table(
         ["File", "Created", "Modified", "Duration", "Steps", "Assertions"],
         title=f"Recordings ({len(rows)})",
         icon="󰕧",
-        alignments=["left", "left", "left", "right", "right", "right"]
+        alignments=["left", "left", "left", "right", "right", "right"],
     )
     table.set_data([r["values"] for r in rows])
 
@@ -3895,23 +4203,39 @@ def list_recordings(limit: int | None, output_json: bool):
         table.print_row(r["values"], highlight=is_last_modified)
 
     # Print summary with totals
-    table.print_summary(["Total", "", "", format_duration(total_duration_ms), str(total_steps), str(total_assertions)])
+    table.print_summary(
+        [
+            "Total",
+            "",
+            "",
+            format_duration(total_duration_ms),
+            str(total_steps),
+            str(total_assertions),
+        ]
+    )
     table.print_footer()
 
     # VM terminal: offer a "Data ready to copy" toast
     from inspekt.app.cli.table import emit_copyable_data
+
     _record_json_list = []
     for r in recordings:
-        _record_json_list.append({
-            "name": r["name"],
-            "path": str(r["path"]),
-            "created_at": r["created_at"].isoformat() if hasattr(r.get("created_at"), "isoformat") else str(r.get("created_at")),
-            "modified_at": r["modified_at"].isoformat() if hasattr(r.get("modified_at"), "isoformat") else str(r.get("modified_at")),
-            "duration_ms": r["duration_ms"],
-            "steps": r["steps"],
-            "assertions": r.get("assertions", 0),
-            "url": r["url"],
-        })
+        _record_json_list.append(
+            {
+                "name": r["name"],
+                "path": str(r["path"]),
+                "created_at": r["created_at"].isoformat()
+                if hasattr(r.get("created_at"), "isoformat")
+                else str(r.get("created_at")),
+                "modified_at": r["modified_at"].isoformat()
+                if hasattr(r.get("modified_at"), "isoformat")
+                else str(r.get("modified_at")),
+                "duration_ms": r["duration_ms"],
+                "steps": r["steps"],
+                "assertions": r.get("assertions", 0),
+                "url": r["url"],
+            }
+        )
     emit_copyable_data(
         headers=["File", "Created", "Modified", "Duration", "Steps", "Assertions"],
         rows=[r["values"] for r in rows],
@@ -3923,14 +4247,24 @@ def list_recordings(limit: int | None, output_json: bool):
     if total_assertions == 0 and len(rows) > 0:
         click.echo()
         from inspekt.app.cli.table import _style_with_inline_code, print_hint
+
         print_hint("Add assertions to your recordings to verify expected outcomes.")
-        doc_link = click.style("http://localhost:8008/guide/recording-replay/#adding-assertions", fg="blue", underline=True)
+        doc_link = click.style(
+            "http://localhost:8008/guide/recording-replay/#adding-assertions",
+            fg="blue",
+            underline=True,
+        )
         click.echo(f"  See {doc_link}")
         click.echo(_style_with_inline_code("  (requires: `inspekt start --docs`)", base_fg="white"))
 
 
 @record.command("info")
-@click.argument("recording_file", type=click.Path(exists=True), required=False, shell_complete=complete_recording_files)
+@click.argument(
+    "recording_file",
+    type=click.Path(exists=True),
+    required=False,
+    shell_complete=complete_recording_files,
+)
 def show_recording(recording_file: str | None):
     """
     Show details of a recording file.
@@ -4028,7 +4362,12 @@ def show_recording(recording_file: str | None):
 
 
 @record.command("delete")
-@click.argument("recording_file", type=click.Path(exists=True), required=False, shell_complete=complete_recording_files)
+@click.argument(
+    "recording_file",
+    type=click.Path(exists=True),
+    required=False,
+    shell_complete=complete_recording_files,
+)
 @click.option("--force", "-f", is_flag=True, help="Skip confirmation")
 def delete_recording(recording_file: str | None, force: bool):
     """
@@ -4068,7 +4407,12 @@ def delete_recording(recording_file: str | None, force: bool):
 
 
 @record.command("edit")
-@click.argument("recording_file", type=click.Path(exists=True), required=False, shell_complete=complete_recording_files)
+@click.argument(
+    "recording_file",
+    type=click.Path(exists=True),
+    required=False,
+    shell_complete=complete_recording_files,
+)
 def edit_recording(recording_file: str | None):
     """
     Open a recording file in your default editor.
@@ -4127,11 +4471,18 @@ def record_tutorial(speak: bool):
 
     if not client.is_alive():
         from inspekt.app.cli.table import _style_with_inline_code
-        click.echo(_style_with_inline_code("Error: Bridge server is not running. Start it with `inspekt start`.", base_fg="red"), err=True)
+
+        click.echo(
+            _style_with_inline_code(
+                "Error: Bridge server is not running. Start it with `inspekt start`.", base_fg="red"
+            ),
+            err=True,
+        )
         sys.exit(1)
 
     # Load config for milliseconds setting
     from inspekt.config import load_config
+
     config_data = load_config()
     show_milliseconds = config_data.get("show-milliseconds", True)
 
@@ -4142,7 +4493,12 @@ def record_tutorial(speak: bool):
     click.echo("  " + "─" * 50)
     click.echo()
     from inspekt.app.cli.table import _style_with_inline_code
-    click.echo(_style_with_inline_code("  `inspekt record` allows you to capture an exact", base_fg="white"))
+
+    click.echo(
+        _style_with_inline_code(
+            "  `inspekt record` allows you to capture an exact", base_fg="white"
+        )
+    )
     click.echo("  browsing session from the terminal.")
     click.echo()
     click.echo("  It tracks:")
@@ -4219,7 +4575,8 @@ def record_tutorial(speak: bool):
 
             # Now initialize audio after user has clicked in browser
             try:
-                init_result = client.execute("""
+                init_result = client.execute(
+                    """
                     (function() {
                         if (!window.__INSPEKT_VISUAL__) {
                             return { ok: false, error: 'Visual module not found' };
@@ -4234,12 +4591,18 @@ def record_tutorial(speak: bool):
                             return { ok: false, error: e.message };
                         }
                     })()
-                """, timeout=3.0)
+                """,
+                    timeout=3.0,
+                )
 
                 if init_result.get("ok"):
                     audio_result = init_result.get("result", {})
                     if not audio_result.get("ok"):
-                        click.echo(format_system_message(f"Audio error: {audio_result.get('error', 'unknown')}"))
+                        click.echo(
+                            format_system_message(
+                                f"Audio error: {audio_result.get('error', 'unknown')}"
+                            )
+                        )
             except Exception as e:
                 click.echo(format_system_message(f"Audio init error: {e}"))
 
@@ -4453,13 +4816,16 @@ def record_tutorial(speak: bool):
         cli_audio.play_start_playback()
     elif use_browser_audio:
         try:
-            client.execute("""
+            client.execute(
+                """
                 (function() {
                     if (window.__INSPEKT_VISUAL__) {
                         window.__INSPEKT_VISUAL__.audio.playStartPlayback();
                     }
                 })()
-            """, timeout=2.0)
+            """,
+                timeout=2.0,
+            )
         except Exception:
             pass
         time.sleep(0.5)
@@ -4479,7 +4845,9 @@ def record_tutorial(speak: bool):
         step_data = sample_steps.get(action, {"action": action})
 
         # Format and display using the shared formatting function
-        display = format_step_for_display(step_data, step_num, elapsed_ms, show_milliseconds=show_milliseconds)
+        display = format_step_for_display(
+            step_data, step_num, elapsed_ms, show_milliseconds=show_milliseconds
+        )
         click.echo(display)
 
         # Get description for this action
@@ -4543,13 +4911,16 @@ def record_tutorial(speak: bool):
         cli_audio.play_stop_playback()
     elif use_browser_audio:
         try:
-            client.execute("""
+            client.execute(
+                """
                 (function() {
                     if (window.__INSPEKT_VISUAL__) {
                         window.__INSPEKT_VISUAL__.audio.playStopPlayback();
                     }
                 })()
-            """, timeout=2.0)
+            """,
+                timeout=2.0,
+            )
         except Exception:
             pass
         time.sleep(0.5)
@@ -4569,7 +4940,9 @@ def record_tutorial(speak: bool):
     time.sleep(0.5)
 
     # Show the failure step display (use step_num + 1 for display)
-    click.echo(f"  {click.style('✗', fg='red')}    00:00  {click.style('failure', fg='red')}   → Element not found: #missing-button")
+    click.echo(
+        f"  {click.style('✗', fg='red')}    00:00  {click.style('failure', fg='red')}   → Element not found: #missing-button"
+    )
 
     if speak:
         description = action_descriptions.get("failure", "Action failed")
@@ -4591,20 +4964,27 @@ def record_tutorial(speak: bool):
         except Exception:
             pass
     else:
-        click.secho(f"     {action_descriptions.get('failure', 'Action failed')}", fg="bright_black", italic=True)
+        click.secho(
+            f"     {action_descriptions.get('failure', 'Action failed')}",
+            fg="bright_black",
+            italic=True,
+        )
 
     # Play failure sound
     if cli_audio:
         cli_audio.play_failure()
     elif use_browser_audio:
         try:
-            client.execute("""
+            client.execute(
+                """
                 (function() {
                     if (window.__INSPEKT_VISUAL__) {
                         window.__INSPEKT_VISUAL__.audio.playError();
                     }
                 })()
-            """, timeout=2.0)
+            """,
+                timeout=2.0,
+            )
         except Exception:
             pass
         time.sleep(0.8)

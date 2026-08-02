@@ -97,9 +97,7 @@ class ProviderManager:
     @property
     def fallback_chain(self) -> list[str]:
         """Get the fallback chain for provider selection."""
-        return self._config.get(
-            "fallback-chain", ["thoth", "openai", "anthropic", "ollama"]
-        )
+        return self._config.get("fallback-chain", ["thoth", "openai", "anthropic", "ollama"])
 
     def get_provider(self, name: str) -> AIProvider | None:
         """Get a provider by name."""

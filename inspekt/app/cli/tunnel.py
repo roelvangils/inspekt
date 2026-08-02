@@ -106,7 +106,9 @@ def _ensure_bore(verbose: bool = False) -> str:
     hidden=True,
 )
 @click.pass_context
-def tunnel(ctx, port: int, host: str | None, secret: str | None, remote_port: int | None, transport: str):
+def tunnel(
+    ctx, port: int, host: str | None, secret: str | None, remote_port: int | None, transport: str
+):
     """Expose a local port to the Inspekt Browser VM.
 
     Makes your local development server accessible from within the VM's
@@ -160,9 +162,12 @@ def tunnel(ctx, port: int, host: str | None, secret: str | None, remote_port: in
         bore_binary,
         "local",
         str(port),
-        "--to", host,
-        "--port", str(remote_port),
-        "--secret", secret,
+        "--to",
+        host,
+        "--port",
+        str(remote_port),
+        "--secret",
+        secret,
     ]
 
     if verbose:

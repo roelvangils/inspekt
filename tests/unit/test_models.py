@@ -165,9 +165,7 @@ class TestControlConfig:
 
     def test_control_config_with_values(self):
         """Test control config with custom values."""
-        config = ControlConfig(
-            auto_refocus="always", focus_outline="none", click_delay=100
-        )
+        config = ControlConfig(auto_refocus="always", focus_outline="none", click_delay=100)
         assert config.auto_refocus == "always"
         assert config.focus_outline == "none"
         assert config.click_delay == 100

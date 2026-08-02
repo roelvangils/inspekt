@@ -238,7 +238,10 @@ class TestAnalyzeTextDiscrepancy:
 
     def test_analyze_returns_unavailable_when_no_tesseract(self):
         """Test graceful degradation when Tesseract is not available."""
-        with patch("inspekt.services.pdf_ocr.get_ocr_availability", return_value=(False, "Tesseract not installed")):
+        with patch(
+            "inspekt.services.pdf_ocr.get_ocr_availability",
+            return_value=(False, "Tesseract not installed"),
+        ):
             from inspekt.services.pdf_ocr import analyze_text_discrepancy
 
             result = analyze_text_discrepancy("/some/path.pdf")

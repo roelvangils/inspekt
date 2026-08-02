@@ -48,10 +48,12 @@ from inspekt.app.api.routers import (
 templates_dir = Path(__file__).parent
 templates = Jinja2Templates(directory=str(templates_dir))
 
+
 # Configure logging to filter out /health endpoint requests
 class EndpointFilter(logging.Filter):
     def filter(self, record: logging.LogRecord) -> bool:
         return record.getMessage().find("/health") == -1
+
 
 # Apply filter to uvicorn access logger
 logging.getLogger("uvicorn.access").addFilter(EndpointFilter())
@@ -220,14 +222,11 @@ async def status_dashboard(request: Request):
     """Live status dashboard showing bridge and API server health."""
     try:
         return templates.TemplateResponse(
-            request=request,
-            name="dashboard.html",
-            context={"active_page": "dashboard"}
+            request=request, name="dashboard.html", context={"active_page": "dashboard"}
         )
     except Exception as e:
         return HTMLResponse(
-            content=f"<h1>Dashboard not found</h1><p>Error: {e}</p>",
-            status_code=500
+            content=f"<h1>Dashboard not found</h1><p>Error: {e}</p>", status_code=500
         )
 
 
@@ -257,14 +256,11 @@ async def plugins_ui(request: Request):
     """Plugin management UI."""
     try:
         return templates.TemplateResponse(
-            request=request,
-            name="plugins.html",
-            context={"active_page": "plugins"}
+            request=request, name="plugins.html", context={"active_page": "plugins"}
         )
     except Exception as e:
         return HTMLResponse(
-            content=f"<h1>Plugins UI not found</h1><p>Error: {e}</p>",
-            status_code=500
+            content=f"<h1>Plugins UI not found</h1><p>Error: {e}</p>", status_code=500
         )
 
 
@@ -273,14 +269,11 @@ async def commands_ui(request: Request):
     """Commands dashboard UI - view and manage all Inspekt commands."""
     try:
         return templates.TemplateResponse(
-            request=request,
-            name="commands.html",
-            context={"active_page": "commands"}
+            request=request, name="commands.html", context={"active_page": "commands"}
         )
     except Exception as e:
         return HTMLResponse(
-            content=f"<h1>Commands UI not found</h1><p>Error: {e}</p>",
-            status_code=500
+            content=f"<h1>Commands UI not found</h1><p>Error: {e}</p>", status_code=500
         )
 
 

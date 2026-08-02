@@ -54,9 +54,7 @@ class ReinitControlRequest(BaseModel):
     """
 
     type: Literal["reinit_control"] = "reinit_control"
-    config: dict[str, Any] = Field(
-        default_factory=dict, description="Control mode configuration"
-    )
+    config: dict[str, Any] = Field(default_factory=dict, description="Control mode configuration")
 
     model_config = {"extra": "forbid"}
 
@@ -227,8 +225,12 @@ class BrowserConnection(BaseModel):
     url: str = Field(..., description="Current page URL")
     title: str = Field(..., description="Current page title")
     user_agent: str = Field(..., description="Browser user agent string")
-    is_most_recent: bool = Field(..., description="Whether this is the most recently active connection")
-    connected_duration: float = Field(..., description="How long the connection has been active (seconds)")
+    is_most_recent: bool = Field(
+        ..., description="Whether this is the most recently active connection"
+    )
+    connected_duration: float = Field(
+        ..., description="How long the connection has been active (seconds)"
+    )
 
     model_config = {"extra": "allow"}
 
@@ -244,14 +246,18 @@ class HealthResponse(BaseModel):
     port: int = Field(..., description="HTTP API port")
     websocket_port: int = Field(..., description="WebSocket port")
     connected_browsers: int
-    browsers: list[BrowserConnection] = Field(default_factory=list, description="List of connected browsers")
+    browsers: list[BrowserConnection] = Field(
+        default_factory=list, description="List of connected browsers"
+    )
     pending: int
     completed: int
     total_processed: int = Field(..., description="Total requests processed since startup")
     total_succeeded: int = Field(..., description="Total successful requests since startup")
     total_failed: int = Field(..., description="Total failed requests since startup")
     last_activity: float = Field(..., description="Timestamp of last activity")
-    cached_scripts: list[str] = Field(default_factory=list, description="List of cached script names")
+    cached_scripts: list[str] = Field(
+        default_factory=list, description="List of cached script names"
+    )
 
     model_config = {"extra": "forbid"}
 

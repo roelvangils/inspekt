@@ -238,9 +238,7 @@ class WCAGMapper:
             wcag_criteria=wcag_criteria,
         )
 
-    def map_violations(
-        self, violations: list[VeraPDFViolation]
-    ) -> list[ViolationWithWCAG]:
+    def map_violations(self, violations: list[VeraPDFViolation]) -> list[ViolationWithWCAG]:
         """
         Enrich a list of violations with WCAG mappings.
 
@@ -295,8 +293,14 @@ def _load_mapping_data() -> dict:
             return json.load(f)
     except (FileNotFoundError, json.JSONDecodeError) as e:
         import logging
+
         logging.getLogger(__name__).warning(f"Failed to load WCAG mapping: {e}")
-        return {"mappings": {}, "iso_32000_mappings": {}, "matterhorn_mappings": {}, "wcag_reference": {}}
+        return {
+            "mappings": {},
+            "iso_32000_mappings": {},
+            "matterhorn_mappings": {},
+            "wcag_reference": {},
+        }
 
 
 # Singleton instance for convenience

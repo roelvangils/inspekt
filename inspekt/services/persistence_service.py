@@ -91,9 +91,7 @@ class PersistenceService:
         conn.commit()
         conn.close()
 
-    def add_hidden_element(
-        self, domain: str, selector: str, reason: str = ""
-    ) -> dict[str, Any]:
+    def add_hidden_element(self, domain: str, selector: str, reason: str = "") -> dict[str, Any]:
         """Add element to hidden list."""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
@@ -244,9 +242,7 @@ class PersistenceService:
                 LIMIT 5
             """
             )
-            top_domains = [
-                {"domain": row[0], "count": row[1]} for row in cursor.fetchall()
-            ]
+            top_domains = [{"domain": row[0], "count": row[1]} for row in cursor.fetchall()]
 
             return {
                 "ok": True,

@@ -26,9 +26,7 @@ class AxeParams(BaseModel):
     include_incomplete: bool = Field(
         False, description="Include incomplete checks (require manual review)"
     )
-    timeout: float = Field(
-        30.0, description="Execution timeout in seconds", ge=0.1, le=300.0
-    )
+    timeout: float = Field(30.0, description="Execution timeout in seconds", ge=0.1, le=300.0)
 
 
 class AxeNode(BaseModel):
@@ -36,21 +34,15 @@ class AxeNode(BaseModel):
 
     target: list[str] = Field(..., description="CSS selector path to element")
     html: str = Field(..., description="HTML snippet of the element")
-    impact: str = Field(
-        ..., description="Impact level: critical, serious, moderate, minor"
-    )
-    failure_summary: str | None = Field(
-        default=None, description="Description of the failure"
-    )
+    impact: str = Field(..., description="Impact level: critical, serious, moderate, minor")
+    failure_summary: str | None = Field(default=None, description="Description of the failure")
 
 
 class AxeViolation(BaseModel):
     """A single accessibility violation."""
 
     id: str = Field(..., description="Rule ID (e.g., 'color-contrast')")
-    impact: str = Field(
-        ..., description="Impact level: critical, serious, moderate, minor"
-    )
+    impact: str = Field(..., description="Impact level: critical, serious, moderate, minor")
     description: str = Field(..., description="What the rule checks")
     help: str = Field(..., description="Short description of how to fix")
     help_url: str = Field(..., description="URL to detailed documentation")
@@ -112,12 +104,8 @@ class AutocompleteParams(BaseModel):
         ge=0.0,
         le=1.0,
     )
-    include_hidden: bool = Field(
-        False, description="Include hidden input fields in analysis"
-    )
-    include_disabled: bool = Field(
-        False, description="Include disabled input fields in analysis"
-    )
+    include_hidden: bool = Field(False, description="Include hidden input fields in analysis")
+    include_disabled: bool = Field(False, description="Include disabled input fields in analysis")
 
 
 class AutocompleteField(BaseModel):
@@ -145,15 +133,9 @@ class AutocompleteSummary(BaseModel):
 
     total: int = Field(..., description="Total form fields found")
     analyzed: int = Field(..., description="Fields that could be analyzed")
-    needs_autocomplete: int = Field(
-        ..., description="Fields that need autocomplete per WCAG"
-    )
-    has_autocomplete: int = Field(
-        ..., description="Fields with autocomplete attribute"
-    )
-    has_correct_autocomplete: int = Field(
-        ..., description="Fields with correct autocomplete value"
-    )
+    needs_autocomplete: int = Field(..., description="Fields that need autocomplete per WCAG")
+    has_autocomplete: int = Field(..., description="Fields with autocomplete attribute")
+    has_correct_autocomplete: int = Field(..., description="Fields with correct autocomplete value")
     violations: int = Field(..., description="Fields with violations")
     warnings: int = Field(..., description="Fields with warnings")
 

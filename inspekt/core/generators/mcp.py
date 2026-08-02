@@ -23,7 +23,9 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-def generate_mcp_tool(cmd: CommandDefinition, registry: CommandRegistry | None = None) -> types.Tool:
+def generate_mcp_tool(
+    cmd: CommandDefinition, registry: CommandRegistry | None = None
+) -> types.Tool:
     """
     Generate an MCP Tool definition from a CommandDefinition.
 
@@ -148,8 +150,7 @@ class MCPToolRouter:
     def _rebuild_map(self) -> None:
         """Rebuild the command lookup map using effective MCP names."""
         self._command_map = {
-            self.registry.get_effective_mcp_name(cmd): cmd
-            for cmd in self.registry.get_for_mcp()
+            self.registry.get_effective_mcp_name(cmd): cmd for cmd in self.registry.get_for_mcp()
         }
 
     def get_tools(self) -> list[types.Tool]:

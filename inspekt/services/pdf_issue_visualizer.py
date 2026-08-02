@@ -139,9 +139,9 @@ class PDFIssueVisualizer:
                 result.screenshots_failed += 1
 
         # Track unique pages rendered
-        result.pages_rendered = len(set(
-            v.page_num for v in result.visualizations if v.has_screenshot
-        ))
+        result.pages_rendered = len(
+            set(v.page_num for v in result.visualizations if v.has_screenshot)
+        )
 
         return result
 
@@ -218,10 +218,9 @@ class PDFIssueVisualizer:
             List of (page_num, screenshot_path) tuples
         """
         # Collect unique pages with issues
-        pages_with_issues = sorted(set(
-            v.page_number for v in violations
-            if v.page_number is not None
-        ))[:max_pages]
+        pages_with_issues = sorted(
+            set(v.page_number for v in violations if v.page_number is not None)
+        )[:max_pages]
 
         screenshots = []
         for page_num in pages_with_issues:

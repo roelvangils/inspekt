@@ -30,7 +30,9 @@ def prompt_install_oxipng() -> bool:
         bool: True if user wants to install, False otherwise
     """
     click.echo("\n📦 oxipng is not installed.")
-    click.echo("oxipng is a fast PNG optimizer written in Rust that can reduce file sizes by 10-50%.")
+    click.echo(
+        "oxipng is a fast PNG optimizer written in Rust that can reduce file sizes by 10-50%."
+    )
     click.echo("\nInstallation options:")
     click.echo("  • macOS:   brew install oxipng")
     click.echo("  • Linux:   cargo install oxipng  (requires Rust)")
@@ -60,10 +62,7 @@ def install_oxipng_via_cargo() -> bool:
     try:
         # Run cargo install oxipng
         result = subprocess.run(
-            ["cargo", "install", "oxipng"],
-            check=True,
-            capture_output=True,
-            text=True
+            ["cargo", "install", "oxipng"], check=True, capture_output=True, text=True
         )
 
         if result.returncode == 0:
@@ -109,13 +108,19 @@ def optimize_png(file_path: Path, level: int = 3, strip: bool = True) -> int | N
             if install_oxipng_via_cargo():
                 # Verify installation
                 if not is_oxipng_installed():
-                    click.echo("❌ Installation completed but oxipng is still not available.", err=True)
-                    click.echo("You may need to restart your shell or add cargo bin to PATH.", err=True)
+                    click.echo(
+                        "❌ Installation completed but oxipng is still not available.", err=True
+                    )
+                    click.echo(
+                        "You may need to restart your shell or add cargo bin to PATH.", err=True
+                    )
                     return None
             else:
                 return None
         else:
-            click.echo("\n💡 Tip: Install oxipng for automatic PNG optimization with --optimize flag.")
+            click.echo(
+                "\n💡 Tip: Install oxipng for automatic PNG optimization with --optimize flag."
+            )
             return None
 
     # Run oxipng
@@ -124,18 +129,13 @@ def optimize_png(file_path: Path, level: int = 3, strip: bool = True) -> int | N
             "oxipng",
             str(file_path),
             f"-o{level}",  # Optimization level
-            "--quiet",    # Suppress progress output
+            "--quiet",  # Suppress progress output
         ]
 
         if strip:
             args.append("--strip=all")  # Strip all metadata
 
-        subprocess.run(
-            args,
-            check=True,
-            capture_output=True,
-            text=True
-        )
+        subprocess.run(args, check=True, capture_output=True, text=True)
 
         # Get optimized file size
         return file_path.stat().st_size
@@ -181,7 +181,9 @@ def optimize_png_data(png_bytes: bytes, level: int = 3, strip: bool = True) -> b
             pass
 
 
-def optimize_png_batch(file_paths: list[Path], level: int = 3, strip: bool = True) -> dict[Path, int]:
+def optimize_png_batch(
+    file_paths: list[Path], level: int = 3, strip: bool = True
+) -> dict[Path, int]:
     """
     Optimize multiple PNG files.
 

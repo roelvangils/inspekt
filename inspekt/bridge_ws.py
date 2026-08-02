@@ -75,6 +75,7 @@ def promote_if_visible(ws: "web.WebSocketResponse", data: dict, message_type: st
     if visible:
         set_active_connection(ws)
 
+
 # Pending requests from CLI
 pending_requests: dict[str, dict[str, Any]] = {}
 
@@ -122,7 +123,9 @@ screencast_active: bool = False
 screencast_frames: list[dict] = []  # List of {timestamp, data} dicts
 screencast_max_frames: int = 10000  # Max frames to buffer (prevent memory overflow)
 screencast_settings: dict = {}  # fps, quality, format
-screencast_interrupted: dict | None = None  # Set when recording is interrupted (e.g., user opens DevTools)
+screencast_interrupted: dict | None = (
+    None  # Set when recording is interrupted (e.g., user opens DevTools)
+)
 
 # Audio cue state (for video audio effects)
 audio_cues: list[dict] = []  # List of {timestamp_ms, action} dicts
@@ -166,11 +169,13 @@ async def _run_autorun_plugins(ws, url: str) -> None:
 
             try:
                 request_id = str(uuid.uuid4())
-                msg = json.dumps({
-                    "type": "execute",
-                    "requestId": request_id,
-                    "code": plugin["code"],
-                })
+                msg = json.dumps(
+                    {
+                        "type": "execute",
+                        "requestId": request_id,
+                        "code": plugin["code"],
+                    }
+                )
                 await ws.send_str(msg)
                 plugin_service.increment_run_count(plugin["id"])
                 print(f"[Autorun] Executed plugin '{plugin['name']}' on {url[:60]}")
@@ -191,10 +196,11 @@ def generate_instance_id() -> str:
     """
     import random
     import string
+
     chars = string.ascii_lowercase + string.digits
     # Ensure uniqueness by checking against existing IDs
     while True:
-        new_id = ''.join(random.choices(chars, k=4))
+        new_id = "".join(random.choices(chars, k=4))
         if new_id not in instance_ids:
             return new_id
 
@@ -218,8 +224,7 @@ def cleanup_instance_for_ws(ws: Any) -> str | None:
 
         # Remove any aliases pointing to this instance
         aliases_to_remove = [
-            alias for alias, iid in instance_aliases.items()
-            if iid == instance_id_to_remove
+            alias for alias, iid in instance_aliases.items() if iid == instance_id_to_remove
         ]
         for alias in aliases_to_remove:
             del instance_aliases[alias]
@@ -261,9 +266,7 @@ class SocketProtocolHandler:
     - Payload is UTF-8 encoded JSON
     """
 
-    def __init__(
-        self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter
-    ) -> None:
+    def __init__(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
         self.reader = reader
         self.writer = writer
 
@@ -334,11 +337,13 @@ async def dispatch_socket_method(method: str, params: dict) -> dict:
                     return {
                         "success": False,
                         "error": "instance_not_found",
-                        "message": f"No browser instance found for '{instance}'"
+                        "message": f"No browser instance found for '{instance}'",
                     }
 
             request_id = str(uuid.uuid4())
-            await send_code_to_browser_with_id(code, request_id, browser_index=browser_index, target_ws=target_ws)
+            await send_code_to_browser_with_id(
+                code, request_id, browser_index=browser_index, target_ws=target_ws
+            )
             return {"success": True, "data": {"ok": True, "request_id": request_id}}
 
         elif method == "result":
@@ -393,13 +398,16 @@ async def dispatch_socket_method(method: str, params: dict) -> dict:
             uptime = int(time.time() - server_start_time)
             # Note: browser_info is keyed by WebSocket object, not id(ws)
             valid_connections = [
-                ws for ws in active_connections
+                ws
+                for ws in active_connections
                 if ws in browser_info and is_valid_browser_info(browser_info.get(ws))
             ]
 
             # Build browser list with full details (same as HTTP /health)
             # Sort by connection time for consistent ordering
-            sorted_connections = sorted(valid_connections, key=lambda ws: connection_times.get(ws, time.time()))
+            sorted_connections = sorted(
+                valid_connections, key=lambda ws: connection_times.get(ws, time.time())
+            )
             most_recent = get_active_connection()
 
             browsers = []
@@ -433,20 +441,22 @@ async def dispatch_socket_method(method: str, params: dict) -> dict:
                     if match:
                         browser_version = match.group(1)
 
-                browsers.append({
-                    "instance_id": inst_id,
-                    "alias": alias,
-                    "browser_name": browser_name,
-                    "browser_version": browser_version,
-                    "extension_version": info.get("extensionVersion"),
-                    "url": info.get("url", ""),
-                    "title": info.get("title", ""),
-                    "user_agent": ua,
-                    "is_most_recent": ws == most_recent,
-                    "connected_duration": time.time() - connection_times.get(ws, time.time()),
-                    "visible": info.get("visible", True),
-                    "last_command_time": last_command_per_connection.get(ws),
-                })
+                browsers.append(
+                    {
+                        "instance_id": inst_id,
+                        "alias": alias,
+                        "browser_name": browser_name,
+                        "browser_version": browser_version,
+                        "extension_version": info.get("extensionVersion"),
+                        "url": info.get("url", ""),
+                        "title": info.get("title", ""),
+                        "user_agent": ua,
+                        "is_most_recent": ws == most_recent,
+                        "connected_duration": time.time() - connection_times.get(ws, time.time()),
+                        "visible": info.get("visible", True),
+                        "last_command_time": last_command_per_connection.get(ws),
+                    }
+                )
 
             total_requests_succeeded += 1
             return {
@@ -459,7 +469,7 @@ async def dispatch_socket_method(method: str, params: dict) -> dict:
                     "completed": len(completed_requests),
                     "uptime_seconds": uptime,
                     "total_requests": total_requests_processed,
-                }
+                },
             }
 
         elif method == "status":
@@ -467,7 +477,8 @@ async def dispatch_socket_method(method: str, params: dict) -> dict:
             uptime = int(time.time() - server_start_time)
             # Note: browser_info is keyed by WebSocket object, not id(ws)
             valid_connections = [
-                ws for ws in active_connections
+                ws
+                for ws in active_connections
                 if ws in browser_info and is_valid_browser_info(browser_info.get(ws))
             ]
 
@@ -476,14 +487,16 @@ async def dispatch_socket_method(method: str, params: dict) -> dict:
                 info = browser_info.get(ws, {})
                 inst_id = get_instance_id_for_ws(ws)
                 alias = get_alias_for_instance(inst_id) if inst_id else None
-                browsers.append({
-                    "instance_id": inst_id,
-                    "alias": alias,
-                    "userAgent": info.get("userAgent", "Unknown"),
-                    "url": info.get("url", ""),
-                    "title": info.get("title", ""),
-                    "extensionVersion": info.get("extensionVersion"),
-                })
+                browsers.append(
+                    {
+                        "instance_id": inst_id,
+                        "alias": alias,
+                        "userAgent": info.get("userAgent", "Unknown"),
+                        "url": info.get("url", ""),
+                        "title": info.get("title", ""),
+                        "extensionVersion": info.get("extensionVersion"),
+                    }
+                )
 
             total_requests_succeeded += 1
             return {
@@ -495,7 +508,7 @@ async def dispatch_socket_method(method: str, params: dict) -> dict:
                     "completed_requests": len(completed_requests),
                     "uptime_seconds": uptime,
                     "socket_path": str(socket_path) if socket_path else None,
-                }
+                },
             }
 
         elif method == "console_logs":
@@ -508,10 +521,7 @@ async def dispatch_socket_method(method: str, params: dict) -> dict:
             request_id = str(uuid.uuid4())
             message = {"type": "GET_CONSOLE_LOGS", "requestId": request_id}
 
-            pending_requests[request_id] = {
-                "timestamp": time.time(),
-                "type": "GET_CONSOLE_LOGS"
-            }
+            pending_requests[request_id] = {"timestamp": time.time(), "type": "GET_CONSOLE_LOGS"}
 
             await target_ws.send_json(message)
 
@@ -547,10 +557,7 @@ async def dispatch_socket_method(method: str, params: dict) -> dict:
             request_id = str(uuid.uuid4())
             message = {"type": "CLEAR_CONSOLE_LOGS", "requestId": request_id}
 
-            pending_requests[request_id] = {
-                "timestamp": time.time(),
-                "type": "CLEAR_CONSOLE_LOGS"
-            }
+            pending_requests[request_id] = {"timestamp": time.time(), "type": "CLEAR_CONSOLE_LOGS"}
 
             await target_ws.send_json(message)
 
@@ -708,19 +715,19 @@ def parse_user_agent(user_agent: str) -> tuple[str, str]:
 
     # Detect Zen Browser (based on Firefox)
     if "Zen/" in ua:
-        match = re.search(r'Zen/([\d.]+)', ua)
+        match = re.search(r"Zen/([\d.]+)", ua)
         version = match.group(1) if match else ""
         return ("Zen Browser", version)
 
     # Detect Firefox
     if "Firefox/" in ua and "Seamonkey" not in ua:
-        match = re.search(r'Firefox/([\d.]+)', ua)
+        match = re.search(r"Firefox/([\d.]+)", ua)
         version = match.group(1) if match else ""
         return ("Firefox", version)
 
     # Detect Edge (Chromium-based)
     if "Edg/" in ua:
-        match = re.search(r'Edg/([\d.]+)', ua)
+        match = re.search(r"Edg/([\d.]+)", ua)
         version = match.group(1) if match else ""
         return ("Edge", version)
 
@@ -728,12 +735,12 @@ def parse_user_agent(user_agent: str) -> tuple[str, str]:
     if "Chrome/" in ua and "Edg/" not in ua:
         # Check if it's a Chromium-based browser with a different identity
         if "OPR/" in ua or "Opera/" in ua:
-            match = re.search(r'(?:OPR|Opera)/([\d.]+)', ua)
+            match = re.search(r"(?:OPR|Opera)/([\d.]+)", ua)
             version = match.group(1) if match else ""
             return ("Opera", version)
 
         # Generic Chromium detection
-        match = re.search(r'Chrome/([\d.]+)', ua)
+        match = re.search(r"Chrome/([\d.]+)", ua)
         version = match.group(1) if match else ""
 
         # Check if it's actually Chrome or just Chromium
@@ -745,12 +752,12 @@ def parse_user_agent(user_agent: str) -> tuple[str, str]:
     # Detect Safari (but not Chrome on iOS which also has Safari in UA)
     if "Safari/" in ua and "Chrome" not in ua and "Chromium" not in ua:
         # Try to get version from Version/ token first
-        match = re.search(r'Version/([\d.]+)', ua)
+        match = re.search(r"Version/([\d.]+)", ua)
         if match:
             version = match.group(1)
         else:
             # Fallback to Safari/ version
-            match = re.search(r'Safari/([\d.]+)', ua)
+            match = re.search(r"Safari/([\d.]+)", ua)
             version = match.group(1) if match else ""
         return ("Safari", version)
 
@@ -868,7 +875,9 @@ async def cleanup_watchdog():
             last_activity = last_activity_per_connection.get(ws, connection_times.get(ws, now))
             if now - last_activity > STALE_CONNECTION_THRESHOLD:
                 stale_count += 1
-                print(f"[Cleanup] Closing stale connection (no activity for {now - last_activity:.0f}s)")
+                print(
+                    f"[Cleanup] Closing stale connection (no activity for {now - last_activity:.0f}s)"
+                )
                 try:
                     await ws.close()
                 except Exception:
@@ -922,10 +931,10 @@ def get_queue_stats() -> dict:
             {
                 "request_id": rid,
                 "age_seconds": round(now - r["timestamp"], 1),
-                "type": r.get("type", "execute")
+                "type": r.get("type", "execute"),
             }
             for rid, r in pending_requests.items()
-        ]
+        ],
     }
 
 
@@ -951,11 +960,7 @@ def clear_queue(older_than: float = 0) -> dict:
                 del pending_events[req_id]
             cleared += 1
 
-    return {
-        "ok": True,
-        "cleared": cleared,
-        "remaining": len(pending_requests)
-    }
+    return {"ok": True, "cleared": cleared, "remaining": len(pending_requests)}
 
 
 async def sync_domains_to_browser(ws):
@@ -968,11 +973,7 @@ async def sync_domains_to_browser(ws):
 
         if domains:
             request_id = str(uuid.uuid4())
-            message = {
-                "type": "SYNC_ALLOWED_DOMAINS",
-                "requestId": request_id,
-                "domains": domains
-            }
+            message = {"type": "SYNC_ALLOWED_DOMAINS", "requestId": request_id, "domains": domains}
             await ws.send_json(message)
             print(f"✓ Auto-synced {len(domains)} domain(s) to browser")
     except Exception as e:
@@ -988,11 +989,7 @@ async def enable_permanent_bypass_if_isolated(ws):
         # Enable permanent domain bypass
         try:
             request_id = str(uuid.uuid4())
-            message = {
-                "type": "PERMANENT_BYPASS",
-                "requestId": request_id,
-                "enabled": True
-            }
+            message = {"type": "PERMANENT_BYPASS", "requestId": request_id, "enabled": True}
             await ws.send_json(message)
             print("✓ Enabled permanent bypass in browser (isolated mode)")
         except Exception as e:
@@ -1001,11 +998,7 @@ async def enable_permanent_bypass_if_isolated(ws):
         # Enable global CSP bypass
         try:
             request_id = str(uuid.uuid4())
-            message = {
-                "type": "CSP_BYPASS_GLOBAL",
-                "requestId": request_id,
-                "enabled": True
-            }
+            message = {"type": "CSP_BYPASS_GLOBAL", "requestId": request_id, "enabled": True}
             await ws.send_json(message)
             print("✓ Enabled global CSP bypass in browser (isolated mode)")
         except Exception as e:
@@ -1083,7 +1076,10 @@ async def websocket_handler(request):
                     if message_type == "result":
                         request_id = data.get("request_id")
                         if request_id and request_id in pending_requests:
-                            global total_requests_processed, total_requests_succeeded, total_requests_failed
+                            global \
+                                total_requests_processed, \
+                                total_requests_succeeded, \
+                                total_requests_failed
                             del pending_requests[request_id]
 
                             request_ok = data.get("ok", False)
@@ -1101,7 +1097,9 @@ async def websocket_handler(request):
                             else:
                                 total_requests_failed += 1
                             last_activity_time = time.time()
-                            last_command_per_connection[ws] = time.time()  # Track last command for this connection
+                            last_command_per_connection[ws] = (
+                                time.time()
+                            )  # Track last command for this connection
                             print(f"Received result for request {request_id}")
 
                             # Notify any waiting HTTP long-poll requests
@@ -1168,20 +1166,25 @@ async def websocket_handler(request):
                             "url": data.get("url", ""),
                             "title": data.get("title", ""),
                             "extensionVersion": data.get("extensionVersion"),
-                            "visible": data.get("visible", True)
+                            "visible": data.get("visible", True),
                         }
                         browser_name = data.get("browserName", "Unknown")
                         page_title = data.get("title", "")[:50]
                         ext_version = data.get("extensionVersion", "unknown")
                         visible_status = "visible" if data.get("visible", True) else "hidden"
-                        print(f"Browser info received: {browser_name} v{ext_version} ({visible_status}) - {page_title}")
+                        print(
+                            f"Browser info received: {browser_name} v{ext_version} ({visible_status}) - {page_title}"
+                        )
 
                         # Trigger autorun plugins after a short delay
                         page_url = data.get("url", "")
                         if page_url.startswith("http"):
                             loop = asyncio.get_running_loop()
                             loop.call_later(
-                                0.5, lambda w=ws, u=page_url: asyncio.ensure_future(_run_autorun_plugins(w, u))
+                                0.5,
+                                lambda w=ws, u=page_url: asyncio.ensure_future(
+                                    _run_autorun_plugins(w, u)
+                                ),
                             )
 
                     elif message_type == "visibility_change":
@@ -1202,7 +1205,7 @@ async def websocket_handler(request):
                             # Store the response
                             completed_requests[request_id] = {
                                 "response": data.get("response"),
-                                "timestamp": time.time()
+                                "timestamp": time.time(),
                             }
 
                             # Remove from pending
@@ -1225,7 +1228,7 @@ async def websocket_handler(request):
                             completed_requests[request_id] = {
                                 "ok": data.get("ok", True),
                                 "error": data.get("error"),
-                                "timestamp": time.time()
+                                "timestamp": time.time(),
                             }
 
                             # Remove from pending
@@ -1247,7 +1250,7 @@ async def websocket_handler(request):
         # Cancel all pending requests for this connection
         cancelled_count = 0
         for req_id, req_data in list(pending_requests.items()):
-            if req_data.get('connection') == ws:
+            if req_data.get("connection") == ws:
                 del pending_requests[req_id]
                 # Notify any waiting HTTP clients
                 if req_id in pending_events:
@@ -1285,10 +1288,7 @@ async def send_code_to_browser(code: str, browser_index: int | None = None) -> s
 
 
 async def send_code_to_browser_with_id(
-    code: str,
-    request_id: str,
-    browser_index: int | None = None,
-    target_ws: Any = None
+    code: str, request_id: str, browser_index: int | None = None, target_ws: Any = None
 ) -> None:
     """Send code to browser for execution with a pre-generated request_id.
 
@@ -1301,7 +1301,7 @@ async def send_code_to_browser_with_id(
     pending_requests[request_id] = {
         "code": code,
         "timestamp": time.time(),
-        "connection": None  # Will be set after selecting target
+        "connection": None,  # Will be set after selecting target
     }
 
     # Send to most recent active browser only
@@ -1312,11 +1312,15 @@ async def send_code_to_browser_with_id(
         if browser_index is not None:
             # Target specific browser by index
             # Sort by connection time for consistent ordering (matches /health endpoint)
-            connections_list = sorted(active_connections, key=lambda ws: connection_times.get(ws, time.time()))
+            connections_list = sorted(
+                active_connections, key=lambda ws: connection_times.get(ws, time.time())
+            )
             if 0 <= browser_index < len(connections_list):
                 target_ws = connections_list[browser_index]
             else:
-                print(f"[Server] WARNING: Invalid browser_index {browser_index}, only {len(connections_list)} browsers connected")
+                print(
+                    f"[Server] WARNING: Invalid browser_index {browser_index}, only {len(connections_list)} browsers connected"
+                )
         else:
             # Use most recent connection if available, otherwise use any active connection
             target_ws = get_active_connection()
@@ -1337,7 +1341,9 @@ async def send_code_to_browser_with_id(
             browser_name = info.get("browserName", "Unknown browser")
             page_title = info.get("title", "")
             if page_title:
-                print(f"[Server] Sent request {request_id[:8]} to {browser_name} - {page_title[:50]}")
+                print(
+                    f"[Server] Sent request {request_id[:8]} to {browser_name} - {page_title[:50]}"
+                )
             else:
                 print(f"[Server] Sent request {request_id[:8]} to {browser_name}")
         except Exception as e:
@@ -1373,10 +1379,7 @@ async def handle_http_run(request):
 
         # Check if any browsers are connected before sending
         if not active_connections:
-            return web.json_response(
-                {"ok": False, "error": "no_browser_connected"},
-                status=503
-            )
+            return web.json_response({"ok": False, "error": "no_browser_connected"}, status=503)
 
         # Resolve target browser instance
         target_ws = None
@@ -1385,14 +1388,20 @@ async def handle_http_run(request):
             target_ws = resolve_instance(instance)
             if target_ws is None:
                 return web.json_response(
-                    {"ok": False, "error": "instance_not_found", "message": f"No browser instance found for '{instance}'"},
-                    status=404
+                    {
+                        "ok": False,
+                        "error": "instance_not_found",
+                        "message": f"No browser instance found for '{instance}'",
+                    },
+                    status=404,
                 )
 
         request_id = str(uuid.uuid4())
 
         # Send code to browser
-        await send_code_to_browser_with_id(code, request_id, browser_index=browser_index, target_ws=target_ws)
+        await send_code_to_browser_with_id(
+            code, request_id, browser_index=browser_index, target_ws=target_ws
+        )
 
         # Return immediately — the client polls /result for the outcome
         return web.json_response({"ok": True, "request_id": request_id})
@@ -1429,9 +1438,7 @@ async def handle_http_result(request):
             # Don't wait, return error immediately
             del pending_requests[request_id]
             pending_events.pop(request_id, None)
-            return web.json_response(
-                {"ok": False, "error": "no_browser_connected"}
-            )
+            return web.json_response({"ok": False, "error": "no_browser_connected"})
 
         try:
             # Wait for result with timeout (long polling)
@@ -1486,19 +1493,15 @@ async def handle_http_cancel(request):
 
     # Already completed
     elif request_id in completed_requests:
-        return web.json_response({
-            "ok": False,
-            "error": "Request already completed",
-            "cancelled": False
-        }, status=400)
+        return web.json_response(
+            {"ok": False, "error": "Request already completed", "cancelled": False}, status=400
+        )
 
     # Unknown request
     else:
-        return web.json_response({
-            "ok": False,
-            "error": "Unknown request_id",
-            "cancelled": False
-        }, status=404)
+        return web.json_response(
+            {"ok": False, "error": "Unknown request_id", "cancelled": False}, status=404
+        )
 
 
 async def handle_http_reinit_control(request):
@@ -1558,11 +1561,14 @@ async def handle_http_health(request):
     # Build browser connection list
     # Filter out ghost connections (those without browser_info or with incomplete info)
     valid_connections = [
-        ws for ws in active_connections
+        ws
+        for ws in active_connections
         if ws in browser_info and is_valid_browser_info(browser_info.get(ws))
     ]
     # Sort connections by connection time for consistent ordering
-    sorted_connections = sorted(valid_connections, key=lambda ws: connection_times.get(ws, current_time))
+    sorted_connections = sorted(
+        valid_connections, key=lambda ws: connection_times.get(ws, current_time)
+    )
 
     active_ws = get_active_connection()
 
@@ -1591,20 +1597,22 @@ async def handle_http_health(request):
         inst_id = get_instance_id_for_ws(ws)
         alias = get_alias_for_instance(inst_id) if inst_id else None
 
-        browsers_list.append({
-            "instance_id": inst_id,
-            "alias": alias,
-            "browser_name": browser_name,
-            "browser_version": browser_version,
-            "extension_version": info.get("extensionVersion"),
-            "url": info.get("url", ""),
-            "title": info.get("title", ""),
-            "user_agent": user_agent,
-            "is_most_recent": (ws is active_ws),
-            "connected_duration": duration,
-            "visible": info.get("visible", True),
-            "last_command_time": last_command_per_connection.get(ws),  # None if never commanded
-        })
+        browsers_list.append(
+            {
+                "instance_id": inst_id,
+                "alias": alias,
+                "browser_name": browser_name,
+                "browser_version": browser_version,
+                "extension_version": info.get("extensionVersion"),
+                "url": info.get("url", ""),
+                "title": info.get("title", ""),
+                "user_agent": user_agent,
+                "is_most_recent": (ws is active_ws),
+                "connected_duration": duration,
+                "visible": info.get("visible", True),
+                "last_command_time": last_command_per_connection.get(ws),  # None if never commanded
+            }
+        )
 
     # Get cached scripts from script loader
     cached = list(script_loader.get_cached_scripts())
@@ -1613,8 +1621,11 @@ async def handle_http_health(request):
     api_server_info = None
     try:
         import aiohttp
+
         async with aiohttp.ClientSession() as session:
-            async with session.get("http://127.0.0.1:8000/health", timeout=aiohttp.ClientTimeout(total=2)) as resp:
+            async with session.get(
+                "http://127.0.0.1:8000/health", timeout=aiohttp.ClientTimeout(total=2)
+            ) as resp:
                 if resp.status == 200:
                     api_data = await resp.json()
                     api_server_info = {
@@ -1661,7 +1672,7 @@ async def handle_http_health(request):
             "Access-Control-Allow-Origin": "*",
             "Access-Control-Allow-Methods": "GET, OPTIONS",
             "Access-Control-Allow-Headers": "Content-Type",
-        }
+        },
     )
 
 
@@ -1684,10 +1695,7 @@ async def handle_http_queue_clear(request):
         return web.json_response(result)
 
     except Exception as e:
-        return web.json_response(
-            {"ok": False, "error": str(e)},
-            status=500
-        )
+        return web.json_response({"ok": False, "error": str(e)}, status=500)
 
 
 # ============================================================================
@@ -1701,14 +1709,14 @@ async def handle_http_instances_list(request):
 
     # Get valid connections
     valid_connections = [
-        ws for ws in active_connections
+        ws
+        for ws in active_connections
         if ws in browser_info and is_valid_browser_info(browser_info.get(ws))
     ]
 
     # Sort by connection time for consistent ordering
     sorted_connections = sorted(
-        valid_connections,
-        key=lambda ws: connection_times.get(ws, current_time)
+        valid_connections, key=lambda ws: connection_times.get(ws, current_time)
     )
 
     active_ws = get_active_connection()
@@ -1752,28 +1760,32 @@ async def handle_http_instances_list(request):
             else:
                 last_cmd_str = f"{int(ago / 3600)}h ago"
 
-        instances.append({
-            "id": inst_id,
-            "alias": alias,
-            "index": index,
-            "browser": f"{browser_name} {browser_version}".strip(),
-            "browser_name": browser_name,
-            "browser_version": browser_version,
-            "url": info.get("url", ""),
-            "title": info.get("title", ""),
-            "is_active": (ws is active_ws),
-            "connected_duration": duration,
-            "connected_duration_str": duration_str,
-            "last_command_time": last_cmd_time,
-            "last_command_time_str": last_cmd_str,
-            "visible": info.get("visible", True),
-        })
+        instances.append(
+            {
+                "id": inst_id,
+                "alias": alias,
+                "index": index,
+                "browser": f"{browser_name} {browser_version}".strip(),
+                "browser_name": browser_name,
+                "browser_version": browser_version,
+                "url": info.get("url", ""),
+                "title": info.get("title", ""),
+                "is_active": (ws is active_ws),
+                "connected_duration": duration,
+                "connected_duration_str": duration_str,
+                "last_command_time": last_cmd_time,
+                "last_command_time_str": last_cmd_str,
+                "visible": info.get("visible", True),
+            }
+        )
 
-    return web.json_response({
-        "ok": True,
-        "instances": instances,
-        "count": len(instances),
-    })
+    return web.json_response(
+        {
+            "ok": True,
+            "instances": instances,
+            "count": len(instances),
+        }
+    )
 
 
 async def handle_http_instance_alias_set(request):
@@ -1785,29 +1797,29 @@ async def handle_http_instance_alias_set(request):
 
         if not instance_id:
             return web.json_response(
-                {"ok": False, "error": "Missing 'instance_id' parameter"},
-                status=400
+                {"ok": False, "error": "Missing 'instance_id' parameter"}, status=400
             )
 
         if not alias:
             return web.json_response(
-                {"ok": False, "error": "Missing 'alias' parameter"},
-                status=400
+                {"ok": False, "error": "Missing 'alias' parameter"}, status=400
             )
 
         # Validate instance exists
         if instance_id not in instance_ids:
             return web.json_response(
-                {"ok": False, "error": f"Instance '{instance_id}' not found"},
-                status=404
+                {"ok": False, "error": f"Instance '{instance_id}' not found"}, status=404
             )
 
         # Check if alias is already used by another instance
         if alias in instance_aliases and instance_aliases[alias] != instance_id:
             existing_id = instance_aliases[alias]
             return web.json_response(
-                {"ok": False, "error": f"Alias '{alias}' is already used by instance '{existing_id}'"},
-                status=409
+                {
+                    "ok": False,
+                    "error": f"Alias '{alias}' is already used by instance '{existing_id}'",
+                },
+                status=409,
             )
 
         # Remove any existing alias for this instance
@@ -1821,18 +1833,17 @@ async def handle_http_instance_alias_set(request):
 
         print(f"[Instances] Set alias '{alias}' for instance {instance_id}")
 
-        return web.json_response({
-            "ok": True,
-            "instance_id": instance_id,
-            "alias": alias,
-            "message": f"Alias '{alias}' set for instance {instance_id}",
-        })
+        return web.json_response(
+            {
+                "ok": True,
+                "instance_id": instance_id,
+                "alias": alias,
+                "message": f"Alias '{alias}' set for instance {instance_id}",
+            }
+        )
 
     except Exception as e:
-        return web.json_response(
-            {"ok": False, "error": str(e)},
-            status=500
-        )
+        return web.json_response({"ok": False, "error": str(e)}, status=500)
 
 
 async def handle_http_instance_alias_remove(request):
@@ -1848,32 +1859,29 @@ async def handle_http_instance_alias_remove(request):
 
         if not alias:
             return web.json_response(
-                {"ok": False, "error": "Missing 'alias' parameter"},
-                status=400
+                {"ok": False, "error": "Missing 'alias' parameter"}, status=400
             )
 
         if alias not in instance_aliases:
             return web.json_response(
-                {"ok": False, "error": f"Alias '{alias}' not found"},
-                status=404
+                {"ok": False, "error": f"Alias '{alias}' not found"}, status=404
             )
 
         instance_id = instance_aliases.pop(alias)
 
         print(f"[Instances] Removed alias '{alias}' from instance {instance_id}")
 
-        return web.json_response({
-            "ok": True,
-            "alias": alias,
-            "instance_id": instance_id,
-            "message": f"Alias '{alias}' removed from instance {instance_id}",
-        })
+        return web.json_response(
+            {
+                "ok": True,
+                "alias": alias,
+                "instance_id": instance_id,
+                "message": f"Alias '{alias}' removed from instance {instance_id}",
+            }
+        )
 
     except Exception as e:
-        return web.json_response(
-            {"ok": False, "error": str(e)},
-            status=500
-        )
+        return web.json_response({"ok": False, "error": str(e)}, status=500)
 
 
 def resolve_instance(identifier: str) -> Any:
@@ -1909,12 +1917,12 @@ def resolve_instance(identifier: str) -> Any:
     if identifier.isdigit():
         index = int(identifier)
         valid_connections = [
-            ws for ws in active_connections
+            ws
+            for ws in active_connections
             if ws in browser_info and is_valid_browser_info(browser_info.get(ws))
         ]
         sorted_connections = sorted(
-            valid_connections,
-            key=lambda ws: connection_times.get(ws, time.time())
+            valid_connections, key=lambda ws: connection_times.get(ws, time.time())
         )
         if 0 <= index < len(sorted_connections):
             return sorted_connections[index]
@@ -1930,30 +1938,25 @@ async def handle_http_domain_add(request):
 
         if not domain:
             return web.json_response(
-                {"ok": False, "error": "Missing 'domain' parameter"},
-                status=400
+                {"ok": False, "error": "Missing 'domain' parameter"}, status=400
             )
 
         # Send message to extension via WebSocket
         target_ws = get_active_connection()
         if target_ws is None:
             return web.json_response(
-                {"ok": False, "error": "No browser connected. If Chrome is open, make sure you're on a regular webpage (not chrome://, new tab, or extension pages where content scripts can't run)."},
-                status=503
+                {
+                    "ok": False,
+                    "error": "No browser connected. If Chrome is open, make sure you're on a regular webpage (not chrome://, new tab, or extension pages where content scripts can't run).",
+                },
+                status=503,
             )
 
         request_id = str(uuid.uuid4())
-        message = {
-            "type": "DOMAIN_ADD",
-            "requestId": request_id,
-            "domain": domain
-        }
+        message = {"type": "DOMAIN_ADD", "requestId": request_id, "domain": domain}
 
         # Store pending request
-        pending_requests[request_id] = {
-            "timestamp": time.time(),
-            "type": "DOMAIN_ADD"
-        }
+        pending_requests[request_id] = {"timestamp": time.time(), "type": "DOMAIN_ADD"}
 
         # Send to browser
         await target_ws.send_json(message)
@@ -1967,19 +1970,13 @@ async def handle_http_domain_add(request):
             result = completed_requests.get(request_id, {})
             return web.json_response(result.get("response", {"ok": False, "error": "No response"}))
         except TimeoutError:
-            return web.json_response(
-                {"ok": False, "error": "Request timed out"},
-                status=504
-            )
+            return web.json_response({"ok": False, "error": "Request timed out"}, status=504)
         finally:
             pending_events.pop(request_id, None)
             completed_requests.pop(request_id, None)
 
     except Exception as e:
-        return web.json_response(
-            {"ok": False, "error": str(e)},
-            status=500
-        )
+        return web.json_response({"ok": False, "error": str(e)}, status=500)
 
 
 async def handle_http_domain_remove(request):
@@ -1990,30 +1987,25 @@ async def handle_http_domain_remove(request):
 
         if not domain:
             return web.json_response(
-                {"ok": False, "error": "Missing 'domain' parameter"},
-                status=400
+                {"ok": False, "error": "Missing 'domain' parameter"}, status=400
             )
 
         # Send message to extension via WebSocket
         target_ws = get_active_connection()
         if target_ws is None:
             return web.json_response(
-                {"ok": False, "error": "No browser connected. If Chrome is open, make sure you're on a regular webpage (not chrome://, new tab, or extension pages where content scripts can't run)."},
-                status=503
+                {
+                    "ok": False,
+                    "error": "No browser connected. If Chrome is open, make sure you're on a regular webpage (not chrome://, new tab, or extension pages where content scripts can't run).",
+                },
+                status=503,
             )
 
         request_id = str(uuid.uuid4())
-        message = {
-            "type": "DOMAIN_REMOVE",
-            "requestId": request_id,
-            "domain": domain
-        }
+        message = {"type": "DOMAIN_REMOVE", "requestId": request_id, "domain": domain}
 
         # Store pending request
-        pending_requests[request_id] = {
-            "timestamp": time.time(),
-            "type": "DOMAIN_REMOVE"
-        }
+        pending_requests[request_id] = {"timestamp": time.time(), "type": "DOMAIN_REMOVE"}
 
         # Send to browser
         await target_ws.send_json(message)
@@ -2027,19 +2019,13 @@ async def handle_http_domain_remove(request):
             result = completed_requests.get(request_id, {})
             return web.json_response(result.get("response", {"ok": False, "error": "No response"}))
         except TimeoutError:
-            return web.json_response(
-                {"ok": False, "error": "Request timed out"},
-                status=504
-            )
+            return web.json_response({"ok": False, "error": "Request timed out"}, status=504)
         finally:
             pending_events.pop(request_id, None)
             completed_requests.pop(request_id, None)
 
     except Exception as e:
-        return web.json_response(
-            {"ok": False, "error": str(e)},
-            status=500
-        )
+        return web.json_response({"ok": False, "error": str(e)}, status=500)
 
 
 async def handle_http_domain_list(request):
@@ -2049,21 +2035,18 @@ async def handle_http_domain_list(request):
         target_ws = get_active_connection()
         if target_ws is None:
             return web.json_response(
-                {"ok": False, "error": "No browser connected. If Chrome is open, make sure you're on a regular webpage (not chrome://, new tab, or extension pages where content scripts can't run)."},
-                status=503
+                {
+                    "ok": False,
+                    "error": "No browser connected. If Chrome is open, make sure you're on a regular webpage (not chrome://, new tab, or extension pages where content scripts can't run).",
+                },
+                status=503,
             )
 
         request_id = str(uuid.uuid4())
-        message = {
-            "type": "DOMAIN_LIST",
-            "requestId": request_id
-        }
+        message = {"type": "DOMAIN_LIST", "requestId": request_id}
 
         # Store pending request
-        pending_requests[request_id] = {
-            "timestamp": time.time(),
-            "type": "DOMAIN_LIST"
-        }
+        pending_requests[request_id] = {"timestamp": time.time(), "type": "DOMAIN_LIST"}
 
         # Send to browser
         await target_ws.send_json(message)
@@ -2077,19 +2060,13 @@ async def handle_http_domain_list(request):
             result = completed_requests.get(request_id, {})
             return web.json_response(result.get("response", {"ok": False, "error": "No response"}))
         except TimeoutError:
-            return web.json_response(
-                {"ok": False, "error": "Request timed out"},
-                status=504
-            )
+            return web.json_response({"ok": False, "error": "Request timed out"}, status=504)
         finally:
             pending_events.pop(request_id, None)
             completed_requests.pop(request_id, None)
 
     except Exception as e:
-        return web.json_response(
-            {"ok": False, "error": str(e)},
-            status=500
-        )
+        return web.json_response({"ok": False, "error": str(e)}, status=500)
 
 
 async def handle_http_domain_bypass(request):
@@ -2100,8 +2077,7 @@ async def handle_http_domain_bypass(request):
 
         if duration is None:
             return web.json_response(
-                {"ok": False, "error": "Missing 'duration' parameter"},
-                status=400
+                {"ok": False, "error": "Missing 'duration' parameter"}, status=400
             )
 
         # Status queries (duration=-1) and disable requests (duration=0)
@@ -2114,22 +2090,18 @@ async def handle_http_domain_bypass(request):
             if duration in (-1, 0):
                 return web.json_response({"ok": True, "enabled": False})
             return web.json_response(
-                {"ok": False, "error": "No browser connected. If Chrome is open, make sure you're on a regular webpage (not chrome://, new tab, or extension pages where content scripts can't run)."},
-                status=503
+                {
+                    "ok": False,
+                    "error": "No browser connected. If Chrome is open, make sure you're on a regular webpage (not chrome://, new tab, or extension pages where content scripts can't run).",
+                },
+                status=503,
             )
 
         request_id = str(uuid.uuid4())
-        message = {
-            "type": "DOMAIN_BYPASS",
-            "requestId": request_id,
-            "duration": duration
-        }
+        message = {"type": "DOMAIN_BYPASS", "requestId": request_id, "duration": duration}
 
         # Store pending request
-        pending_requests[request_id] = {
-            "timestamp": time.time(),
-            "type": "DOMAIN_BYPASS"
-        }
+        pending_requests[request_id] = {"timestamp": time.time(), "type": "DOMAIN_BYPASS"}
 
         # Send to browser
         await target_ws.send_json(message)
@@ -2143,19 +2115,13 @@ async def handle_http_domain_bypass(request):
             result = completed_requests.get(request_id, {})
             return web.json_response(result.get("response", {"ok": False, "error": "No response"}))
         except TimeoutError:
-            return web.json_response(
-                {"ok": False, "error": "Request timed out"},
-                status=504
-            )
+            return web.json_response({"ok": False, "error": "Request timed out"}, status=504)
         finally:
             pending_events.pop(request_id, None)
             completed_requests.pop(request_id, None)
 
     except Exception as e:
-        return web.json_response(
-            {"ok": False, "error": str(e)},
-            status=500
-        )
+        return web.json_response({"ok": False, "error": str(e)}, status=500)
 
 
 async def handle_http_domain_sync(request):
@@ -2185,16 +2151,16 @@ async def handle_http_domain_sync(request):
                 dt = datetime.fromtimestamp(item["added_at"], tz=UTC)
                 iso_timestamp = dt.isoformat().replace("+00:00", "Z")
 
-                domains[item["domain"]] = {
-                    "addedAt": iso_timestamp,
-                    "permanent": item["permanent"]
-                }
+                domains[item["domain"]] = {"addedAt": iso_timestamp, "permanent": item["permanent"]}
 
         # Check if any browsers are connected
         if not active_connections:
             return web.json_response(
-                {"ok": False, "error": "No browser connected. If Chrome is open, make sure you're on a regular webpage (not chrome://, new tab, or extension pages where content scripts can't run)."},
-                status=503
+                {
+                    "ok": False,
+                    "error": "No browser connected. If Chrome is open, make sure you're on a regular webpage (not chrome://, new tab, or extension pages where content scripts can't run).",
+                },
+                status=503,
             )
 
         # Broadcast sync to ALL connected browsers
@@ -2205,16 +2171,12 @@ async def handle_http_domain_sync(request):
 
         for ws in list(active_connections):
             request_id = str(uuid.uuid4())
-            message = {
-                "type": "SYNC_ALLOWED_DOMAINS",
-                "requestId": request_id,
-                "domains": domains
-            }
+            message = {"type": "SYNC_ALLOWED_DOMAINS", "requestId": request_id, "domains": domains}
 
             # Store pending request
             pending_requests[request_id] = {
                 "timestamp": time.time(),
-                "type": "SYNC_ALLOWED_DOMAINS"
+                "type": "SYNC_ALLOWED_DOMAINS",
             }
 
             try:
@@ -2230,8 +2192,7 @@ async def handle_http_domain_sync(request):
 
         if not events:
             return web.json_response(
-                {"ok": False, "error": "Failed to send sync to any browser"},
-                status=500
+                {"ok": False, "error": "Failed to send sync to any browser"}, status=500
             )
 
         # Wait for at least one response (with timeout)
@@ -2241,7 +2202,7 @@ async def handle_http_domain_sync(request):
             _done, pending_tasks = await asyncio.wait(
                 [asyncio.create_task(e.wait()) for _, e, _ in events],
                 timeout=10.0,
-                return_when=asyncio.FIRST_COMPLETED
+                return_when=asyncio.FIRST_COMPLETED,
             )
 
             # Cancel remaining waits
@@ -2260,16 +2221,11 @@ async def handle_http_domain_sync(request):
                 completed_requests.pop(request_id, None)
 
             if synced_count > 0:
-                return web.json_response({
-                    "ok": True,
-                    "synced": len(domains),
-                    "browsers_synced": synced_count
-                })
+                return web.json_response(
+                    {"ok": True, "synced": len(domains), "browsers_synced": synced_count}
+                )
             else:
-                return web.json_response({
-                    "ok": False,
-                    "error": "No browser confirmed sync"
-                })
+                return web.json_response({"ok": False, "error": "No browser confirmed sync"})
 
         except TimeoutError:
             # Clean up all pending
@@ -2277,21 +2233,16 @@ async def handle_http_domain_sync(request):
                 pending_events.pop(request_id, None)
                 completed_requests.pop(request_id, None)
 
-            return web.json_response(
-                {"ok": False, "error": "Request timed out"},
-                status=504
-            )
+            return web.json_response({"ok": False, "error": "Request timed out"}, status=504)
 
     except Exception as e:
-        return web.json_response(
-            {"ok": False, "error": str(e)},
-            status=500
-        )
+        return web.json_response({"ok": False, "error": str(e)}, status=500)
 
 
 # ============================================================================
 # Navigation Endpoint
 # ============================================================================
+
 
 async def handle_http_navigate(request):
     """HTTP endpoint: Navigate browser to a URL.
@@ -2307,15 +2258,11 @@ async def handle_http_navigate(request):
         timeout = data.get("timeout", 30)
 
         if not url:
-            return web.json_response(
-                {"ok": False, "error": "Missing 'url' parameter"},
-                status=400
-            )
+            return web.json_response({"ok": False, "error": "Missing 'url' parameter"}, status=400)
 
         if not url.startswith(("http://", "https://")):
             return web.json_response(
-                {"ok": False, "error": "URL must start with http:// or https://"},
-                status=400
+                {"ok": False, "error": "URL must start with http:// or https://"}, status=400
             )
 
         # Send message to extension via WebSocket
@@ -2323,8 +2270,11 @@ async def handle_http_navigate(request):
         if target_ws is None:
             print("[Bridge /navigate] No browser connected - user may be on a Chrome internal page")
             return web.json_response(
-                {"ok": False, "error": "No browser connected. If Chrome is open, make sure you're on a regular webpage (not chrome://, new tab, or extension pages where content scripts can't run)."},
-                status=503
+                {
+                    "ok": False,
+                    "error": "No browser connected. If Chrome is open, make sure you're on a regular webpage (not chrome://, new tab, or extension pages where content scripts can't run).",
+                },
+                status=503,
             )
 
         request_id = str(uuid.uuid4())
@@ -2336,13 +2286,12 @@ async def handle_http_navigate(request):
             "timeout": timeout,
         }
 
-        print(f"[Bridge /navigate] Sending NAVIGATE message: {url} (requestId: {request_id}, timeout: {timeout}s)")
+        print(
+            f"[Bridge /navigate] Sending NAVIGATE message: {url} (requestId: {request_id}, timeout: {timeout}s)"
+        )
 
         # Store pending request
-        pending_requests[request_id] = {
-            "timestamp": time.time(),
-            "type": "NAVIGATE"
-        }
+        pending_requests[request_id] = {"timestamp": time.time(), "type": "NAVIGATE"}
 
         # Send to browser
         await target_ws.send_json(message)
@@ -2358,18 +2307,14 @@ async def handle_http_navigate(request):
             return web.json_response(result.get("response", {"ok": False, "error": "No response"}))
         except TimeoutError:
             return web.json_response(
-                {"ok": False, "error": f"Navigation timed out after {timeout}s"},
-                status=504
+                {"ok": False, "error": f"Navigation timed out after {timeout}s"}, status=504
             )
         finally:
             pending_events.pop(request_id, None)
             completed_requests.pop(request_id, None)
 
     except Exception as e:
-        return web.json_response(
-            {"ok": False, "error": str(e)},
-            status=500
-        )
+        return web.json_response({"ok": False, "error": str(e)}, status=500)
 
 
 async def handle_http_navigate_callback(request):
@@ -2385,8 +2330,7 @@ async def handle_http_navigate_callback(request):
 
         if not request_id:
             return web.json_response(
-                {"ok": False, "error": "Missing 'requestId' parameter"},
-                status=400
+                {"ok": False, "error": "Missing 'requestId' parameter"}, status=400
             )
 
         # Check if there's a pending request waiting for this callback
@@ -2408,20 +2352,17 @@ async def handle_http_navigate_callback(request):
         else:
             # Request might have already timed out
             return web.json_response(
-                {"ok": False, "error": "No pending request found for this requestId"},
-                status=404
+                {"ok": False, "error": "No pending request found for this requestId"}, status=404
             )
 
     except Exception as e:
-        return web.json_response(
-            {"ok": False, "error": str(e)},
-            status=500
-        )
+        return web.json_response({"ok": False, "error": str(e)}, status=500)
 
 
 # ============================================================================
 # CSP Bypass Endpoints
 # ============================================================================
+
 
 async def handle_http_csp_bypass_enable(request):
     """HTTP endpoint: Enable CSP bypass for a domain."""
@@ -2431,30 +2372,25 @@ async def handle_http_csp_bypass_enable(request):
 
         if not domain:
             return web.json_response(
-                {"ok": False, "error": "Missing 'domain' parameter"},
-                status=400
+                {"ok": False, "error": "Missing 'domain' parameter"}, status=400
             )
 
         # Send message to extension via WebSocket
         target_ws = get_active_connection()
         if target_ws is None:
             return web.json_response(
-                {"ok": False, "error": "No browser connected. If Chrome is open, make sure you're on a regular webpage (not chrome://, new tab, or extension pages where content scripts can't run)."},
-                status=503
+                {
+                    "ok": False,
+                    "error": "No browser connected. If Chrome is open, make sure you're on a regular webpage (not chrome://, new tab, or extension pages where content scripts can't run).",
+                },
+                status=503,
             )
 
         request_id = str(uuid.uuid4())
-        message = {
-            "type": "CSP_BYPASS_ENABLE",
-            "requestId": request_id,
-            "domain": domain
-        }
+        message = {"type": "CSP_BYPASS_ENABLE", "requestId": request_id, "domain": domain}
 
         # Store pending request
-        pending_requests[request_id] = {
-            "timestamp": time.time(),
-            "type": "CSP_BYPASS_ENABLE"
-        }
+        pending_requests[request_id] = {"timestamp": time.time(), "type": "CSP_BYPASS_ENABLE"}
 
         # Send to browser
         await target_ws.send_json(message)
@@ -2468,19 +2404,13 @@ async def handle_http_csp_bypass_enable(request):
             result = completed_requests.get(request_id, {})
             return web.json_response(result.get("response", {"ok": False, "error": "No response"}))
         except TimeoutError:
-            return web.json_response(
-                {"ok": False, "error": "Request timed out"},
-                status=504
-            )
+            return web.json_response({"ok": False, "error": "Request timed out"}, status=504)
         finally:
             pending_events.pop(request_id, None)
             completed_requests.pop(request_id, None)
 
     except Exception as e:
-        return web.json_response(
-            {"ok": False, "error": str(e)},
-            status=500
-        )
+        return web.json_response({"ok": False, "error": str(e)}, status=500)
 
 
 async def handle_http_csp_bypass_disable(request):
@@ -2491,30 +2421,25 @@ async def handle_http_csp_bypass_disable(request):
 
         if not domain:
             return web.json_response(
-                {"ok": False, "error": "Missing 'domain' parameter"},
-                status=400
+                {"ok": False, "error": "Missing 'domain' parameter"}, status=400
             )
 
         # Send message to extension via WebSocket
         target_ws = get_active_connection()
         if target_ws is None:
             return web.json_response(
-                {"ok": False, "error": "No browser connected. If Chrome is open, make sure you're on a regular webpage (not chrome://, new tab, or extension pages where content scripts can't run)."},
-                status=503
+                {
+                    "ok": False,
+                    "error": "No browser connected. If Chrome is open, make sure you're on a regular webpage (not chrome://, new tab, or extension pages where content scripts can't run).",
+                },
+                status=503,
             )
 
         request_id = str(uuid.uuid4())
-        message = {
-            "type": "CSP_BYPASS_DISABLE",
-            "requestId": request_id,
-            "domain": domain
-        }
+        message = {"type": "CSP_BYPASS_DISABLE", "requestId": request_id, "domain": domain}
 
         # Store pending request
-        pending_requests[request_id] = {
-            "timestamp": time.time(),
-            "type": "CSP_BYPASS_DISABLE"
-        }
+        pending_requests[request_id] = {"timestamp": time.time(), "type": "CSP_BYPASS_DISABLE"}
 
         # Send to browser
         await target_ws.send_json(message)
@@ -2528,19 +2453,13 @@ async def handle_http_csp_bypass_disable(request):
             result = completed_requests.get(request_id, {})
             return web.json_response(result.get("response", {"ok": False, "error": "No response"}))
         except TimeoutError:
-            return web.json_response(
-                {"ok": False, "error": "Request timed out"},
-                status=504
-            )
+            return web.json_response({"ok": False, "error": "Request timed out"}, status=504)
         finally:
             pending_events.pop(request_id, None)
             completed_requests.pop(request_id, None)
 
     except Exception as e:
-        return web.json_response(
-            {"ok": False, "error": str(e)},
-            status=500
-        )
+        return web.json_response({"ok": False, "error": str(e)}, status=500)
 
 
 async def handle_http_csp_bypass_status(request):
@@ -2558,30 +2477,25 @@ async def handle_http_csp_bypass_status(request):
 
         if not domain:
             return web.json_response(
-                {"ok": False, "error": "Missing 'domain' parameter"},
-                status=400
+                {"ok": False, "error": "Missing 'domain' parameter"}, status=400
             )
 
         # Send message to extension via WebSocket
         target_ws = get_active_connection()
         if target_ws is None:
             return web.json_response(
-                {"ok": False, "error": "No browser connected. If Chrome is open, make sure you're on a regular webpage (not chrome://, new tab, or extension pages where content scripts can't run)."},
-                status=503
+                {
+                    "ok": False,
+                    "error": "No browser connected. If Chrome is open, make sure you're on a regular webpage (not chrome://, new tab, or extension pages where content scripts can't run).",
+                },
+                status=503,
             )
 
         request_id = str(uuid.uuid4())
-        message = {
-            "type": "CSP_BYPASS_STATUS",
-            "requestId": request_id,
-            "domain": domain
-        }
+        message = {"type": "CSP_BYPASS_STATUS", "requestId": request_id, "domain": domain}
 
         # Store pending request
-        pending_requests[request_id] = {
-            "timestamp": time.time(),
-            "type": "CSP_BYPASS_STATUS"
-        }
+        pending_requests[request_id] = {"timestamp": time.time(), "type": "CSP_BYPASS_STATUS"}
 
         # Send to browser
         await target_ws.send_json(message)
@@ -2595,19 +2509,13 @@ async def handle_http_csp_bypass_status(request):
             result = completed_requests.get(request_id, {})
             return web.json_response(result.get("response", {"ok": False, "error": "No response"}))
         except TimeoutError:
-            return web.json_response(
-                {"ok": False, "error": "Request timed out"},
-                status=504
-            )
+            return web.json_response({"ok": False, "error": "Request timed out"}, status=504)
         finally:
             pending_events.pop(request_id, None)
             completed_requests.pop(request_id, None)
 
     except Exception as e:
-        return web.json_response(
-            {"ok": False, "error": str(e)},
-            status=500
-        )
+        return web.json_response({"ok": False, "error": str(e)}, status=500)
 
 
 async def handle_http_csp_bypass_global(request):
@@ -2618,30 +2526,25 @@ async def handle_http_csp_bypass_global(request):
 
         if enabled is None:
             return web.json_response(
-                {"ok": False, "error": "Missing 'enabled' parameter (true/false)"},
-                status=400
+                {"ok": False, "error": "Missing 'enabled' parameter (true/false)"}, status=400
             )
 
         # Send message to extension via WebSocket
         target_ws = get_active_connection()
         if target_ws is None:
             return web.json_response(
-                {"ok": False, "error": "No browser connected. If Chrome is open, make sure you're on a regular webpage (not chrome://, new tab, or extension pages where content scripts can't run)."},
-                status=503
+                {
+                    "ok": False,
+                    "error": "No browser connected. If Chrome is open, make sure you're on a regular webpage (not chrome://, new tab, or extension pages where content scripts can't run).",
+                },
+                status=503,
             )
 
         request_id = str(uuid.uuid4())
-        message = {
-            "type": "CSP_BYPASS_GLOBAL",
-            "requestId": request_id,
-            "enabled": bool(enabled)
-        }
+        message = {"type": "CSP_BYPASS_GLOBAL", "requestId": request_id, "enabled": bool(enabled)}
 
         # Store pending request
-        pending_requests[request_id] = {
-            "timestamp": time.time(),
-            "type": "CSP_BYPASS_GLOBAL"
-        }
+        pending_requests[request_id] = {"timestamp": time.time(), "type": "CSP_BYPASS_GLOBAL"}
 
         # Send to browser
         await target_ws.send_json(message)
@@ -2655,19 +2558,13 @@ async def handle_http_csp_bypass_global(request):
             result = completed_requests.get(request_id, {})
             return web.json_response(result.get("response", {"ok": False, "error": "No response"}))
         except TimeoutError:
-            return web.json_response(
-                {"ok": False, "error": "Request timed out"},
-                status=504
-            )
+            return web.json_response({"ok": False, "error": "Request timed out"}, status=504)
         finally:
             pending_events.pop(request_id, None)
             completed_requests.pop(request_id, None)
 
     except Exception as e:
-        return web.json_response(
-            {"ok": False, "error": str(e)},
-            status=500
-        )
+        return web.json_response({"ok": False, "error": str(e)}, status=500)
 
 
 async def handle_http_csp_bypass_global_status(request):
@@ -2681,15 +2578,12 @@ async def handle_http_csp_bypass_global_status(request):
             return web.json_response({"ok": True, "enabled": False})
 
         request_id = str(uuid.uuid4())
-        message = {
-            "type": "CSP_BYPASS_GLOBAL_STATUS",
-            "requestId": request_id
-        }
+        message = {"type": "CSP_BYPASS_GLOBAL_STATUS", "requestId": request_id}
 
         # Store pending request
         pending_requests[request_id] = {
             "timestamp": time.time(),
-            "type": "CSP_BYPASS_GLOBAL_STATUS"
+            "type": "CSP_BYPASS_GLOBAL_STATUS",
         }
 
         # Send to browser
@@ -2704,19 +2598,13 @@ async def handle_http_csp_bypass_global_status(request):
             result = completed_requests.get(request_id, {})
             return web.json_response(result.get("response", {"ok": False, "error": "No response"}))
         except TimeoutError:
-            return web.json_response(
-                {"ok": False, "error": "Request timed out"},
-                status=504
-            )
+            return web.json_response({"ok": False, "error": "Request timed out"}, status=504)
         finally:
             pending_events.pop(request_id, None)
             completed_requests.pop(request_id, None)
 
     except Exception as e:
-        return web.json_response(
-            {"ok": False, "error": str(e)},
-            status=500
-        )
+        return web.json_response({"ok": False, "error": str(e)}, status=500)
 
 
 @web.middleware
@@ -2753,21 +2641,18 @@ async def handle_http_get_har(request):
     target_ws = get_active_connection()
     if target_ws is None:
         return web.json_response(
-            {"ok": False, "error": "No browser connected. If Chrome is open, make sure you're on a regular webpage (not chrome://, new tab, or extension pages where content scripts can't run)."},
-            status=503
+            {
+                "ok": False,
+                "error": "No browser connected. If Chrome is open, make sure you're on a regular webpage (not chrome://, new tab, or extension pages where content scripts can't run).",
+            },
+            status=503,
         )
 
     request_id = str(uuid.uuid4())
-    message = {
-        "type": "GET_HAR",
-        "requestId": request_id
-    }
+    message = {"type": "GET_HAR", "requestId": request_id}
 
     # Store pending request
-    pending_requests[request_id] = {
-        "timestamp": time.time(),
-        "type": "GET_HAR"
-    }
+    pending_requests[request_id] = {"timestamp": time.time(), "type": "GET_HAR"}
 
     # Send to browser
     await target_ws.send_json(message)
@@ -2785,9 +2670,9 @@ async def handle_http_get_har(request):
             {
                 "ok": False,
                 "error": "HAR request timed out. Is Chrome DevTools open?",
-                "hint": "Open DevTools (F12) and refresh the page, then try again."
+                "hint": "Open DevTools (F12) and refresh the page, then try again.",
             },
-            status=504
+            status=504,
         )
 
     # Get result
@@ -2795,10 +2680,7 @@ async def handle_http_get_har(request):
     pending_events.pop(request_id, None)
 
     if result is None:
-        return web.json_response(
-            {"ok": False, "error": "No response received"},
-            status=500
-        )
+        return web.json_response({"ok": False, "error": "No response received"}, status=500)
 
     return web.json_response(result.get("response", result))
 
@@ -2812,21 +2694,18 @@ async def handle_http_get_console_logs(request):
     target_ws = get_active_connection()
     if target_ws is None:
         return web.json_response(
-            {"ok": False, "error": "No browser connected. If Chrome is open, make sure you're on a regular webpage (not chrome://, new tab, or extension pages where content scripts can't run)."},
-            status=503
+            {
+                "ok": False,
+                "error": "No browser connected. If Chrome is open, make sure you're on a regular webpage (not chrome://, new tab, or extension pages where content scripts can't run).",
+            },
+            status=503,
         )
 
     request_id = str(uuid.uuid4())
-    message = {
-        "type": "GET_CONSOLE_LOGS",
-        "requestId": request_id
-    }
+    message = {"type": "GET_CONSOLE_LOGS", "requestId": request_id}
 
     # Store pending request
-    pending_requests[request_id] = {
-        "timestamp": time.time(),
-        "type": "GET_CONSOLE_LOGS"
-    }
+    pending_requests[request_id] = {"timestamp": time.time(), "type": "GET_CONSOLE_LOGS"}
 
     # Send to browser
     await target_ws.send_json(message)
@@ -2841,8 +2720,7 @@ async def handle_http_get_console_logs(request):
         pending_requests.pop(request_id, None)
         pending_events.pop(request_id, None)
         return web.json_response(
-            {"ok": False, "error": "Console logs request timed out"},
-            status=504
+            {"ok": False, "error": "Console logs request timed out"}, status=504
         )
 
     # Get result
@@ -2850,10 +2728,7 @@ async def handle_http_get_console_logs(request):
     pending_events.pop(request_id, None)
 
     if result is None:
-        return web.json_response(
-            {"ok": False, "error": "No response received"},
-            status=500
-        )
+        return web.json_response({"ok": False, "error": "No response received"}, status=500)
 
     return web.json_response(result.get("response", result))
 
@@ -2863,21 +2738,18 @@ async def handle_http_clear_console_logs(request):
     target_ws = get_active_connection()
     if target_ws is None:
         return web.json_response(
-            {"ok": False, "error": "No browser connected. If Chrome is open, make sure you're on a regular webpage (not chrome://, new tab, or extension pages where content scripts can't run)."},
-            status=503
+            {
+                "ok": False,
+                "error": "No browser connected. If Chrome is open, make sure you're on a regular webpage (not chrome://, new tab, or extension pages where content scripts can't run).",
+            },
+            status=503,
         )
 
     request_id = str(uuid.uuid4())
-    message = {
-        "type": "CLEAR_CONSOLE_LOGS",
-        "requestId": request_id
-    }
+    message = {"type": "CLEAR_CONSOLE_LOGS", "requestId": request_id}
 
     # Store pending request
-    pending_requests[request_id] = {
-        "timestamp": time.time(),
-        "type": "CLEAR_CONSOLE_LOGS"
-    }
+    pending_requests[request_id] = {"timestamp": time.time(), "type": "CLEAR_CONSOLE_LOGS"}
 
     # Send to browser
     await target_ws.send_json(message)
@@ -2892,8 +2764,7 @@ async def handle_http_clear_console_logs(request):
         pending_requests.pop(request_id, None)
         pending_events.pop(request_id, None)
         return web.json_response(
-            {"ok": False, "error": "Clear console logs request timed out"},
-            status=504
+            {"ok": False, "error": "Clear console logs request timed out"}, status=504
         )
 
     # Get result
@@ -2901,10 +2772,7 @@ async def handle_http_clear_console_logs(request):
     pending_events.pop(request_id, None)
 
     if result is None:
-        return web.json_response(
-            {"ok": False, "error": "No response received"},
-            status=500
-        )
+        return web.json_response({"ok": False, "error": "No response received"}, status=500)
 
     return web.json_response(result.get("response", result))
 
@@ -2912,6 +2780,7 @@ async def handle_http_clear_console_logs(request):
 # ============================================================================
 # REPLAY MODE
 # ============================================================================
+
 
 async def handle_replay_mode_enable(request):
     """Enable replay mode in the browser extension.
@@ -2922,8 +2791,11 @@ async def handle_replay_mode_enable(request):
     target_ws = get_active_connection()
     if target_ws is None:
         return web.json_response(
-            {"ok": False, "error": "No browser connected. If Chrome is open, make sure you're on a regular webpage (not chrome://, new tab, or extension pages where content scripts can't run)."},
-            status=503
+            {
+                "ok": False,
+                "error": "No browser connected. If Chrome is open, make sure you're on a regular webpage (not chrome://, new tab, or extension pages where content scripts can't run).",
+            },
+            status=503,
         )
 
     # Get the visual script from request body
@@ -2931,28 +2803,15 @@ async def handle_replay_mode_enable(request):
         data = await request.json()
         visual_script = data.get("visualScript")
         if not visual_script:
-            return web.json_response(
-                {"ok": False, "error": "visualScript is required"},
-                status=400
-            )
+            return web.json_response({"ok": False, "error": "visualScript is required"}, status=400)
     except Exception as e:
-        return web.json_response(
-            {"ok": False, "error": f"Invalid JSON: {e}"},
-            status=400
-        )
+        return web.json_response({"ok": False, "error": f"Invalid JSON: {e}"}, status=400)
 
     request_id = str(uuid.uuid4())
-    message = {
-        "type": "REPLAY_MODE_ENABLE",
-        "requestId": request_id,
-        "visualScript": visual_script
-    }
+    message = {"type": "REPLAY_MODE_ENABLE", "requestId": request_id, "visualScript": visual_script}
 
     # Store pending request
-    pending_requests[request_id] = {
-        "timestamp": time.time(),
-        "type": "REPLAY_MODE_ENABLE"
-    }
+    pending_requests[request_id] = {"timestamp": time.time(), "type": "REPLAY_MODE_ENABLE"}
 
     # Send to browser
     print(f"[Bridge] Sending REPLAY_MODE_ENABLE to browser (script length: {len(visual_script)})")
@@ -2970,8 +2829,7 @@ async def handle_replay_mode_enable(request):
         pending_requests.pop(request_id, None)
         pending_events.pop(request_id, None)
         return web.json_response(
-            {"ok": False, "error": "Replay mode enable request timed out"},
-            status=504
+            {"ok": False, "error": "Replay mode enable request timed out"}, status=504
         )
 
     # Get result
@@ -2979,10 +2837,7 @@ async def handle_replay_mode_enable(request):
     pending_events.pop(request_id, None)
 
     if result is None:
-        return web.json_response(
-            {"ok": False, "error": "No response received"},
-            status=500
-        )
+        return web.json_response({"ok": False, "error": "No response received"}, status=500)
 
     return web.json_response(result.get("response", result))
 
@@ -2992,21 +2847,18 @@ async def handle_replay_mode_disable(request):
     target_ws = get_active_connection()
     if target_ws is None:
         return web.json_response(
-            {"ok": False, "error": "No browser connected. If Chrome is open, make sure you're on a regular webpage (not chrome://, new tab, or extension pages where content scripts can't run)."},
-            status=503
+            {
+                "ok": False,
+                "error": "No browser connected. If Chrome is open, make sure you're on a regular webpage (not chrome://, new tab, or extension pages where content scripts can't run).",
+            },
+            status=503,
         )
 
     request_id = str(uuid.uuid4())
-    message = {
-        "type": "REPLAY_MODE_DISABLE",
-        "requestId": request_id
-    }
+    message = {"type": "REPLAY_MODE_DISABLE", "requestId": request_id}
 
     # Store pending request
-    pending_requests[request_id] = {
-        "timestamp": time.time(),
-        "type": "REPLAY_MODE_DISABLE"
-    }
+    pending_requests[request_id] = {"timestamp": time.time(), "type": "REPLAY_MODE_DISABLE"}
 
     # Send to browser
     await target_ws.send_json(message)
@@ -3021,8 +2873,7 @@ async def handle_replay_mode_disable(request):
         pending_requests.pop(request_id, None)
         pending_events.pop(request_id, None)
         return web.json_response(
-            {"ok": False, "error": "Replay mode disable request timed out"},
-            status=504
+            {"ok": False, "error": "Replay mode disable request timed out"}, status=504
         )
 
     # Get result
@@ -3030,10 +2881,7 @@ async def handle_replay_mode_disable(request):
     pending_events.pop(request_id, None)
 
     if result is None:
-        return web.json_response(
-            {"ok": False, "error": "No response received"},
-            status=500
-        )
+        return web.json_response({"ok": False, "error": "No response received"}, status=500)
 
     return web.json_response(result.get("response", result))
 
@@ -3043,21 +2891,18 @@ async def handle_replay_mode_status(request):
     target_ws = get_active_connection()
     if target_ws is None:
         return web.json_response(
-            {"ok": False, "error": "No browser connected. If Chrome is open, make sure you're on a regular webpage (not chrome://, new tab, or extension pages where content scripts can't run)."},
-            status=503
+            {
+                "ok": False,
+                "error": "No browser connected. If Chrome is open, make sure you're on a regular webpage (not chrome://, new tab, or extension pages where content scripts can't run).",
+            },
+            status=503,
         )
 
     request_id = str(uuid.uuid4())
-    message = {
-        "type": "REPLAY_MODE_STATUS",
-        "requestId": request_id
-    }
+    message = {"type": "REPLAY_MODE_STATUS", "requestId": request_id}
 
     # Store pending request
-    pending_requests[request_id] = {
-        "timestamp": time.time(),
-        "type": "REPLAY_MODE_STATUS"
-    }
+    pending_requests[request_id] = {"timestamp": time.time(), "type": "REPLAY_MODE_STATUS"}
 
     # Send to browser
     await target_ws.send_json(message)
@@ -3072,8 +2917,7 @@ async def handle_replay_mode_status(request):
         pending_requests.pop(request_id, None)
         pending_events.pop(request_id, None)
         return web.json_response(
-            {"ok": False, "error": "Replay mode status request timed out"},
-            status=504
+            {"ok": False, "error": "Replay mode status request timed out"}, status=504
         )
 
     # Get result
@@ -3081,10 +2925,7 @@ async def handle_replay_mode_status(request):
     pending_events.pop(request_id, None)
 
     if result is None:
-        return web.json_response(
-            {"ok": False, "error": "No response received"},
-            status=500
-        )
+        return web.json_response({"ok": False, "error": "No response received"}, status=500)
 
     return web.json_response(result.get("response", result))
 
@@ -3110,9 +2951,9 @@ async def handle_static_singlefile(request):
                 return web.Response(
                     text=f"// Error: {filename} not found",
                     content_type="application/javascript",
-                    status=404
+                    status=404,
                 )
-            with open(filepath, encoding='utf-8') as f:
+            with open(filepath, encoding="utf-8") as f:
                 scripts.append(f"// === {filename} ===\n{f.read()}")
 
         combined = "\n\n".join(scripts)
@@ -3123,19 +2964,20 @@ async def handle_static_singlefile(request):
             headers={
                 "Access-Control-Allow-Origin": "*",
                 "Cache-Control": "public, max-age=86400",  # Cache for 1 day
-            }
+            },
         )
     except Exception as e:
         return web.Response(
             text=f"// Error loading SingleFile: {e}",
             content_type="application/javascript",
-            status=500
+            status=500,
         )
 
 
 # ============================================================================
 # SCREENCAST (VIDEO RECORDING) ENDPOINTS
 # ============================================================================
+
 
 async def handle_screencast_start(request):
     """HTTP endpoint: Start screencast recording.
@@ -3151,8 +2993,11 @@ async def handle_screencast_start(request):
     target_ws = get_active_connection()
     if target_ws is None:
         return web.json_response(
-            {"ok": False, "error": "No browser connected. If Chrome is open, make sure you're on a regular webpage (not chrome://, new tab, or extension pages where content scripts can't run)."},
-            status=503
+            {
+                "ok": False,
+                "error": "No browser connected. If Chrome is open, make sure you're on a regular webpage (not chrome://, new tab, or extension pages where content scripts can't run).",
+            },
+            status=503,
         )
 
     if screencast_active:
@@ -3182,16 +3027,9 @@ async def handle_screencast_start(request):
 
     # Send start command to browser
     request_id = str(uuid.uuid4())
-    message = {
-        "type": "START_SCREENCAST",
-        "requestId": request_id,
-        "settings": screencast_settings
-    }
+    message = {"type": "START_SCREENCAST", "requestId": request_id, "settings": screencast_settings}
 
-    pending_requests[request_id] = {
-        "timestamp": time.time(),
-        "type": "START_SCREENCAST"
-    }
+    pending_requests[request_id] = {"timestamp": time.time(), "type": "START_SCREENCAST"}
 
     print(f"[Bridge] Sending START_SCREENCAST to browser, requestId={request_id[:8]}…")
     await target_ws.send_json(message)
@@ -3208,26 +3046,20 @@ async def handle_screencast_start(request):
         print("[Bridge] START_SCREENCAST timed out after 10s - no acknowledgment received")
         pending_requests.pop(request_id, None)
         pending_events.pop(request_id, None)
-        return web.json_response(
-            {"ok": False, "error": "Screencast start timed out"},
-            status=504
-        )
+        return web.json_response({"ok": False, "error": "Screencast start timed out"}, status=504)
 
     result = completed_requests.pop(request_id, None)
     pending_events.pop(request_id, None)
 
     if result and result.get("ok"):
         screencast_active = True
-        return web.json_response({
-            "ok": True,
-            "message": "Screencast started",
-            "settings": screencast_settings
-        })
+        return web.json_response(
+            {"ok": True, "message": "Screencast started", "settings": screencast_settings}
+        )
     else:
         error = result.get("error", "Unknown error") if result else "No response"
         return web.json_response(
-            {"ok": False, "error": f"Failed to start screencast: {error}"},
-            status=500
+            {"ok": False, "error": f"Failed to start screencast: {error}"}, status=500
         )
 
 
@@ -3246,27 +3078,30 @@ async def handle_screencast_stop(request):
         frames_count = len(screencast_frames)
         # Don't clear buffer - let Python side collect remaining frames
         return web.json_response(
-            {"ok": True, "message": "No browser connected, screencast marked inactive", "frames_buffered": frames_count}
+            {
+                "ok": True,
+                "message": "No browser connected, screencast marked inactive",
+                "frames_buffered": frames_count,
+            }
         )
 
     if not screencast_active:
         frames_count = len(screencast_frames)
         # Don't clear buffer - let Python side collect remaining frames
         return web.json_response(
-            {"ok": True, "message": "Screencast not active", "active": False, "frames_buffered": frames_count}
+            {
+                "ok": True,
+                "message": "Screencast not active",
+                "active": False,
+                "frames_buffered": frames_count,
+            }
         )
 
     # Send stop command to browser
     request_id = str(uuid.uuid4())
-    message = {
-        "type": "STOP_SCREENCAST",
-        "requestId": request_id
-    }
+    message = {"type": "STOP_SCREENCAST", "requestId": request_id}
 
-    pending_requests[request_id] = {
-        "timestamp": time.time(),
-        "type": "STOP_SCREENCAST"
-    }
+    pending_requests[request_id] = {"timestamp": time.time(), "type": "STOP_SCREENCAST"}
 
     await target_ws.send_json(message)
 
@@ -3291,11 +3126,9 @@ async def handle_screencast_stop(request):
     # Buffer is cleared when frames are retrieved via /screencast/frames
     frames_count = len(screencast_frames)
 
-    return web.json_response({
-        "ok": True,
-        "message": "Screencast stopped",
-        "frames_buffered": frames_count
-    })
+    return web.json_response(
+        {"ok": True, "message": "Screencast stopped", "frames_buffered": frames_count}
+    )
 
 
 async def handle_screencast_frames(request):
@@ -3309,23 +3142,27 @@ async def handle_screencast_frames(request):
     frames_to_return = screencast_frames.copy()
     screencast_frames = []  # Clear buffer after retrieval
 
-    return web.json_response({
-        "ok": True,
-        "frames": frames_to_return,
-        "count": len(frames_to_return),
-        "active": screencast_active
-    })
+    return web.json_response(
+        {
+            "ok": True,
+            "frames": frames_to_return,
+            "count": len(frames_to_return),
+            "active": screencast_active,
+        }
+    )
 
 
 async def handle_screencast_status(request):
     """HTTP endpoint: Get screencast status."""
-    return web.json_response({
-        "ok": True,
-        "active": screencast_active,
-        "frames_buffered": len(screencast_frames),
-        "settings": screencast_settings if screencast_active else None,
-        "interrupted": screencast_interrupted
-    })
+    return web.json_response(
+        {
+            "ok": True,
+            "active": screencast_active,
+            "frames_buffered": len(screencast_frames),
+            "settings": screencast_settings if screencast_active else None,
+            "interrupted": screencast_interrupted,
+        }
+    )
 
 
 async def handle_screencast_interrupted(request):
@@ -3349,14 +3186,11 @@ async def handle_screencast_interrupted(request):
     screencast_interrupted = {
         "reason": reason,
         "frames_captured": frames_captured,
-        "timestamp": time.time()
+        "timestamp": time.time(),
     }
     screencast_active = False
 
-    return web.json_response({
-        "ok": True,
-        "message": f"Interrupt notification received: {reason}"
-    })
+    return web.json_response({"ok": True, "message": f"Interrupt notification received: {reason}"})
 
 
 async def handle_screencast_frame_post(request):
@@ -3384,10 +3218,12 @@ async def handle_screencast_frame_post(request):
         # Buffer full - drop oldest frame
         screencast_frames.pop(0)
 
-    screencast_frames.append({
-        "timestamp": data.get("timestamp", time.time()),
-        "data": data.get("data", ""),  # Base64 encoded image
-    })
+    screencast_frames.append(
+        {
+            "timestamp": data.get("timestamp", time.time()),
+            "data": data.get("data", ""),  # Base64 encoded image
+        }
+    )
 
     return web.json_response({"ok": True, "frames_buffered": len(screencast_frames)})
 
@@ -3414,16 +3250,20 @@ async def handle_video_captured(request):
         "mimeType": data.get("mimeType", "video/webm"),
         "size": data.get("size", 0),
         "duration": data.get("duration", 0),
-        "timestamp": time.time()
+        "timestamp": time.time(),
     }
 
-    print(f"[Bridge] Received captured video: {captured_video_data['size']} bytes, {captured_video_data['duration']:.1f}s")
+    print(
+        f"[Bridge] Received captured video: {captured_video_data['size']} bytes, {captured_video_data['duration']:.1f}s"
+    )
 
-    return web.json_response({
-        "ok": True,
-        "size": captured_video_data["size"],
-        "duration": captured_video_data["duration"]
-    })
+    return web.json_response(
+        {
+            "ok": True,
+            "size": captured_video_data["size"],
+            "duration": captured_video_data["duration"],
+        }
+    )
 
 
 async def handle_video_get(request):
@@ -3440,13 +3280,15 @@ async def handle_video_get(request):
     data = captured_video_data
     captured_video_data = None
 
-    return web.json_response({
-        "ok": True,
-        "data": data["data"],
-        "mimeType": data["mimeType"],
-        "size": data["size"],
-        "duration": data["duration"]
-    })
+    return web.json_response(
+        {
+            "ok": True,
+            "data": data["data"],
+            "mimeType": data["mimeType"],
+            "size": data["size"],
+            "duration": data["duration"],
+        }
+    )
 
 
 def handle_screencast_frame(data: dict):
@@ -3463,10 +3305,12 @@ def handle_screencast_frame(data: dict):
         # Buffer full - drop oldest frame
         screencast_frames.pop(0)
 
-    screencast_frames.append({
-        "timestamp": data.get("timestamp", time.time()),
-        "data": data.get("data", ""),  # Base64 encoded image
-    })
+    screencast_frames.append(
+        {
+            "timestamp": data.get("timestamp", time.time()),
+            "data": data.get("data", ""),  # Base64 encoded image
+        }
+    )
 
 
 # ============================================================================
@@ -3486,11 +3330,13 @@ async def handle_audio_start(request):
     audio_recording_active = True
     audio_recording_start_time = time.time()
 
-    return web.json_response({
-        "ok": True,
-        "message": "Audio cue recording started",
-        "start_time": audio_recording_start_time
-    })
+    return web.json_response(
+        {
+            "ok": True,
+            "message": "Audio cue recording started",
+            "start_time": audio_recording_start_time,
+        }
+    )
 
 
 async def handle_audio_stop(request):
@@ -3503,11 +3349,9 @@ async def handle_audio_stop(request):
     audio_recording_active = False
     cue_count = len(audio_cues)
 
-    return web.json_response({
-        "ok": True,
-        "message": "Audio cue recording stopped",
-        "cues_recorded": cue_count
-    })
+    return web.json_response(
+        {"ok": True, "message": "Audio cue recording stopped", "cues_recorded": cue_count}
+    )
 
 
 async def handle_audio_cue(request):
@@ -3519,31 +3363,19 @@ async def handle_audio_cue(request):
     global audio_cues
 
     if not audio_recording_active:
-        return web.json_response({
-            "ok": False,
-            "error": "Audio recording not active"
-        })
+        return web.json_response({"ok": False, "error": "Audio recording not active"})
 
     try:
         data = await request.json()
     except Exception:
-        return web.json_response({
-            "ok": False,
-            "error": "Invalid JSON"
-        })
+        return web.json_response({"ok": False, "error": "Invalid JSON"})
 
     timestamp_ms = data.get("timestamp_ms", 0)
     action = data.get("action", "unknown")
 
-    audio_cues.append({
-        "timestamp_ms": timestamp_ms,
-        "action": action
-    })
+    audio_cues.append({"timestamp_ms": timestamp_ms, "action": action})
 
-    return web.json_response({
-        "ok": True,
-        "cues_buffered": len(audio_cues)
-    })
+    return web.json_response({"ok": True, "cues_buffered": len(audio_cues)})
 
 
 async def handle_audio_cues(request):
@@ -3557,21 +3389,19 @@ async def handle_audio_cues(request):
     cues_to_return = audio_cues.copy()
     audio_cues = []  # Clear buffer after retrieval
 
-    return web.json_response({
-        "ok": True,
-        "cues": cues_to_return,
-        "count": len(cues_to_return)
-    })
+    return web.json_response({"ok": True, "cues": cues_to_return, "count": len(cues_to_return)})
 
 
 async def handle_audio_status(request):
     """HTTP endpoint: Get audio recording status."""
-    return web.json_response({
-        "ok": True,
-        "active": audio_recording_active,
-        "cues_buffered": len(audio_cues),
-        "start_time": audio_recording_start_time if audio_recording_active else None
-    })
+    return web.json_response(
+        {
+            "ok": True,
+            "active": audio_recording_active,
+            "cues_buffered": len(audio_cues),
+            "start_time": audio_recording_start_time if audio_recording_active else None,
+        }
+    )
 
 
 async def handle_http_proxy(request):
@@ -3628,6 +3458,7 @@ async def handle_http_proxy(request):
 
                 if is_binary:
                     import base64
+
                     if max_bytes:
                         chunks = []
                         total = 0
@@ -3640,14 +3471,16 @@ async def handle_http_proxy(request):
                         raw = b"".join(chunks)
                     else:
                         raw = await resp.read()
-                    return web.json_response({
-                        "ok": True,
-                        "status": resp.status,
-                        "headers": resp_headers,
-                        "body": base64.b64encode(raw).decode(),
-                        "binary": True,
-                        "url": final_url,
-                    })
+                    return web.json_response(
+                        {
+                            "ok": True,
+                            "status": resp.status,
+                            "headers": resp_headers,
+                            "body": base64.b64encode(raw).decode(),
+                            "binary": True,
+                            "url": final_url,
+                        }
+                    )
                 else:
                     if max_bytes:
                         # Read up to max_bytes — loop because chunked responses
@@ -3664,14 +3497,16 @@ async def handle_http_proxy(request):
                         text = raw.decode(resp.get_encoding() or "utf-8", errors="replace")
                     else:
                         text = await resp.text()
-                    return web.json_response({
-                        "ok": True,
-                        "status": resp.status,
-                        "headers": resp_headers,
-                        "body": text,
-                        "binary": False,
-                        "url": final_url,
-                    })
+                    return web.json_response(
+                        {
+                            "ok": True,
+                            "status": resp.status,
+                            "headers": resp_headers,
+                            "body": text,
+                            "binary": False,
+                            "url": final_url,
+                        }
+                    )
 
     except TimeoutError:
         return web.json_response(
@@ -3751,11 +3586,17 @@ def create_app() -> web.Application:
     app.router.add_post("/screencast/stop", handle_screencast_stop)
     app.router.add_get("/screencast/frames", handle_screencast_frames)
     app.router.add_get("/screencast/status", handle_screencast_status)
-    app.router.add_post("/screencast/frame", handle_screencast_frame_post)  # Direct frame POST from background.js
-    app.router.add_post("/screencast/interrupted", handle_screencast_interrupted)  # DevTools interrupt notification
+    app.router.add_post(
+        "/screencast/frame", handle_screencast_frame_post
+    )  # Direct frame POST from background.js
+    app.router.add_post(
+        "/screencast/interrupted", handle_screencast_interrupted
+    )  # DevTools interrupt notification
 
     # Video capture endpoints (MediaRecorder output from tabCapture)
-    app.router.add_post("/video/captured", handle_video_captured)  # Receive captured video from offscreen document
+    app.router.add_post(
+        "/video/captured", handle_video_captured
+    )  # Receive captured video from offscreen document
     app.router.add_get("/video/get", handle_video_get)  # Retrieve captured video
 
     # Audio cue endpoints (for video audio effects)
@@ -3829,11 +3670,15 @@ async def main(enable_socket: bool = True, socket_path_override: str | None = No
     ssl_context = None
     cert_paths = [
         ("/opt/certs/cert.pem", "/opt/certs/key.pem"),  # Docker VM
-        (os.path.expanduser("~/.inspekt/cert.pem"), os.path.expanduser("~/.inspekt/key.pem")),  # Local
+        (
+            os.path.expanduser("~/.inspekt/cert.pem"),
+            os.path.expanduser("~/.inspekt/key.pem"),
+        ),  # Local
     ]
     for cert_path, key_path in cert_paths:
         if os.path.exists(cert_path) and os.path.exists(key_path):
             import ssl
+
             ssl_context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
             ssl_context.load_cert_chain(cert_path, key_path)
             break
@@ -3882,35 +3727,24 @@ Examples:
   python bridge_ws.py --isolated         # Docker VM mode (bypass all protections)
   python bridge_ws.py --host 0.0.0.0     # Allow external connections
   python bridge_ws.py --port 9000        # Use custom port
-        """
+        """,
     )
     parser.add_argument(
         "--isolated",
         action="store_true",
-        help="Enable isolated mode (bypass all privacy protections). For Docker VM use only."
+        help="Enable isolated mode (bypass all privacy protections). For Docker VM use only.",
     )
-    parser.add_argument(
-        "--host",
-        default="127.0.0.1",
-        help="Host to bind to (default: 127.0.0.1)"
-    )
-    parser.add_argument(
-        "--port",
-        type=int,
-        default=8765,
-        help="Port to bind to (default: 8765)"
-    )
+    parser.add_argument("--host", default="127.0.0.1", help="Host to bind to (default: 127.0.0.1)")
+    parser.add_argument("--port", type=int, default=8765, help="Port to bind to (default: 8765)")
     parser.add_argument(
         "--socket",
         type=str,
         default=None,
         metavar="PATH",
-        help="Unix socket path (default: ~/.inspekt/inspekt.sock)"
+        help="Unix socket path (default: ~/.inspekt/inspekt.sock)",
     )
     parser.add_argument(
-        "--no-socket",
-        action="store_true",
-        help="Disable Unix socket transport (HTTP only)"
+        "--no-socket", action="store_true", help="Disable Unix socket transport (HTTP only)"
     )
 
     args = parser.parse_args()

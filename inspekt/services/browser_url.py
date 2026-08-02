@@ -16,11 +16,13 @@ _INTERNAL_HOSTS = {"inspekt", "localhost"}
 
 class BrowserURLError(Exception):
     """Raised when the browser URL cannot be retrieved."""
+
     pass
 
 
 class InternalURLError(Exception):
     """Raised when the browser is on an internal/non-web page."""
+
     pass
 
 
@@ -39,9 +41,7 @@ def _execute_and_extract(js_expression: str) -> str:
     result = executor.execute(js_expression, timeout=5.0)
 
     if not result.get("ok"):
-        raise BrowserURLError(
-            f"Could not get current page URL: {result.get('error')}"
-        )
+        raise BrowserURLError(f"Could not get current page URL: {result.get('error')}")
 
     value = result.get("result", "")
     if isinstance(value, dict):

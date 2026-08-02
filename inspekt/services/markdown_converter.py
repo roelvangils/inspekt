@@ -196,7 +196,7 @@ def convert_frontmatter_to_h1(markdown: str) -> str:
 
     # Extract frontmatter YAML
     frontmatter_yaml = markdown[4:end_marker]
-    body = markdown[end_marker + 5:].lstrip()
+    body = markdown[end_marker + 5 :].lstrip()
 
     # Parse YAML to get title
     try:
@@ -257,24 +257,24 @@ def flatten_inline_markdown(markdown: str) -> str:
     import re
 
     # Remove links but keep text: [text](url) → text
-    markdown = re.sub(r'\[([^\]]+)\]\([^)]+\)', r'\1', markdown)
+    markdown = re.sub(r"\[([^\]]+)\]\([^)]+\)", r"\1", markdown)
 
     # Remove reference-style links: [text][ref] → text
-    markdown = re.sub(r'\[([^\]]+)\]\[[^\]]*\]', r'\1', markdown)
+    markdown = re.sub(r"\[([^\]]+)\]\[[^\]]*\]", r"\1", markdown)
 
     # Remove bold: **text** or __text__ → text
-    markdown = re.sub(r'\*\*([^*]+)\*\*', r'\1', markdown)
-    markdown = re.sub(r'__([^_]+)__', r'\1', markdown)
+    markdown = re.sub(r"\*\*([^*]+)\*\*", r"\1", markdown)
+    markdown = re.sub(r"__([^_]+)__", r"\1", markdown)
 
     # Remove italic: *text* or _text_ → text (careful not to match bold)
-    markdown = re.sub(r'(?<!\*)\*([^*]+)\*(?!\*)', r'\1', markdown)
-    markdown = re.sub(r'(?<!_)_([^_]+)_(?!_)', r'\1', markdown)
+    markdown = re.sub(r"(?<!\*)\*([^*]+)\*(?!\*)", r"\1", markdown)
+    markdown = re.sub(r"(?<!_)_([^_]+)_(?!_)", r"\1", markdown)
 
     # Remove inline code: `text` → text
-    markdown = re.sub(r'`([^`]+)`', r'\1', markdown)
+    markdown = re.sub(r"`([^`]+)`", r"\1", markdown)
 
     # Remove strikethrough: ~~text~~ → text
-    markdown = re.sub(r'~~([^~]+)~~', r'\1', markdown)
+    markdown = re.sub(r"~~([^~]+)~~", r"\1", markdown)
 
     return markdown
 
@@ -297,16 +297,16 @@ def strip_images(markdown: str) -> str:
     import re
 
     # Remove inline images: ![alt text](url "optional title")
-    markdown = re.sub(r'!\[[^\]]*\]\([^)]+\)\s*', '', markdown)
+    markdown = re.sub(r"!\[[^\]]*\]\([^)]+\)\s*", "", markdown)
 
     # Remove reference-style images: ![alt text][ref]
-    markdown = re.sub(r'!\[[^\]]*\]\[[^\]]*\]\s*', '', markdown)
+    markdown = re.sub(r"!\[[^\]]*\]\[[^\]]*\]\s*", "", markdown)
 
     # Remove image reference definitions: [ref]: url
-    markdown = re.sub(r'^\[[^\]]+\]:\s+\S+.*$\n?', '', markdown, flags=re.MULTILINE)
+    markdown = re.sub(r"^\[[^\]]+\]:\s+\S+.*$\n?", "", markdown, flags=re.MULTILINE)
 
     # Clean up extra blank lines (more than 2 consecutive)
-    markdown = re.sub(r'\n{3,}', '\n\n', markdown)
+    markdown = re.sub(r"\n{3,}", "\n\n", markdown)
 
     return markdown.strip()
 

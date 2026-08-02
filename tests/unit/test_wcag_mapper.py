@@ -74,7 +74,9 @@ class TestWCAGMapping:
 
         criteria = [
             WCAGCriterion(id="1.1.1", title="Non-text Content", level="A", principle="Perceivable"),
-            WCAGCriterion(id="1.3.1", title="Info and Relationships", level="A", principle="Perceivable"),
+            WCAGCriterion(
+                id="1.3.1", title="Info and Relationships", level="A", principle="Perceivable"
+            ),
         ]
 
         mapping = WCAGMapping(
@@ -181,27 +183,38 @@ class TestMappingDataFile:
     def test_mapping_file_exists(self):
         """Test that the mapping JSON file exists."""
 
-        mapping_file = Path(__file__).parent.parent.parent / "inspekt" / "data" / "pdfua_wcag_mapping.json"
+        mapping_file = (
+            Path(__file__).parent.parent.parent / "inspekt" / "data" / "pdfua_wcag_mapping.json"
+        )
         assert mapping_file.exists(), f"Mapping file not found: {mapping_file}"
 
     def test_mapping_file_is_valid_json(self):
         """Test that the mapping file contains valid JSON."""
         import json
 
-        mapping_file = Path(__file__).parent.parent.parent / "inspekt" / "data" / "pdfua_wcag_mapping.json"
+        mapping_file = (
+            Path(__file__).parent.parent.parent / "inspekt" / "data" / "pdfua_wcag_mapping.json"
+        )
 
         with open(mapping_file) as f:
             data = json.load(f)
 
         assert isinstance(data, dict)
         # Should have main sections
-        assert "mappings" in data or "iso_32000_mappings" in data or "matterhorn_mappings" in data or "wcag_reference" in data
+        assert (
+            "mappings" in data
+            or "iso_32000_mappings" in data
+            or "matterhorn_mappings" in data
+            or "wcag_reference" in data
+        )
 
     def test_mapping_entries_have_required_fields(self):
         """Test that mapping entries have required fields."""
         import json
 
-        mapping_file = Path(__file__).parent.parent.parent / "inspekt" / "data" / "pdfua_wcag_mapping.json"
+        mapping_file = (
+            Path(__file__).parent.parent.parent / "inspekt" / "data" / "pdfua_wcag_mapping.json"
+        )
 
         with open(mapping_file) as f:
             data = json.load(f)
@@ -213,5 +226,7 @@ class TestMappingDataFile:
                 for rule_id, mapping in list(section.items())[:5]:  # Check first 5
                     # Each mapping should have wcag_criteria
                     assert "wcag_criteria" in mapping, f"Missing wcag_criteria in {rule_id}"
-                    assert isinstance(mapping["wcag_criteria"], list), f"wcag_criteria should be a list in {rule_id}"
+                    assert isinstance(mapping["wcag_criteria"], list), (
+                        f"wcag_criteria should be a list in {rule_id}"
+                    )
                 break

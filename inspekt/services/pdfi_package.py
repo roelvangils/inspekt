@@ -166,7 +166,9 @@ class PDFIPackageBuilder:
             return
 
         # Strip cover image base64
-        if self.report_data.get("cover_image") and self.report_data["cover_image"].get("image_base64"):
+        if self.report_data.get("cover_image") and self.report_data["cover_image"].get(
+            "image_base64"
+        ):
             # Save the image first
             b64_data = self.report_data["cover_image"]["image_base64"]
             if b64_data:
@@ -179,12 +181,16 @@ class PDFIPackageBuilder:
             for i, screenshot in enumerate(self.report_data["issue_screenshots"]):
                 if screenshot.get("screenshot_base64"):
                     filename = f"issue-{i + 1:03d}.png"
-                    self._save_base64_asset(screenshot["screenshot_base64"], "screenshots", filename)
+                    self._save_base64_asset(
+                        screenshot["screenshot_base64"], "screenshots", filename
+                    )
                     screenshot["screenshot_base64"] = None
                     screenshot["asset_path"] = f"assets/screenshots/{filename}"
 
         # Strip contrast analysis screenshots
-        if self.report_data.get("contrast_analysis") and self.report_data["contrast_analysis"].get("issues"):
+        if self.report_data.get("contrast_analysis") and self.report_data["contrast_analysis"].get(
+            "issues"
+        ):
             for i, issue in enumerate(self.report_data["contrast_analysis"]["issues"]):
                 if issue.get("screenshot_base64"):
                     filename = f"contrast-{i + 1:03d}.png"
@@ -193,7 +199,9 @@ class PDFIPackageBuilder:
                     issue["asset_path"] = f"assets/screenshots/{filename}"
 
         # Strip content audit thumbnails
-        if self.report_data.get("content_audit") and self.report_data["content_audit"].get("images"):
+        if self.report_data.get("content_audit") and self.report_data["content_audit"].get(
+            "images"
+        ):
             for img in self.report_data["content_audit"]["images"]:
                 if img.get("thumbnail_base64"):
                     filename = f"img-p{img.get('page', 0)}-{img.get('index', 0)}.png"
@@ -202,7 +210,9 @@ class PDFIPackageBuilder:
                     img["asset_path"] = f"assets/untagged/{filename}"
 
         # Strip text layer thumbnails
-        if self.report_data.get("text_layer") and self.report_data["text_layer"].get("page_comparisons"):
+        if self.report_data.get("text_layer") and self.report_data["text_layer"].get(
+            "page_comparisons"
+        ):
             for comp in self.report_data["text_layer"]["page_comparisons"]:
                 if comp.get("thumbnail_base64"):
                     filename = f"textlayer-p{comp.get('page', 0)}.png"
@@ -235,11 +245,13 @@ class PDFIPackageBuilder:
             if full_path.exists():
                 checksum = calculate_file_checksum(full_path)
 
-        self.manifest.assets.append({
-            "path": path,
-            "size": size,
-            "checksum": checksum,
-        })
+        self.manifest.assets.append(
+            {
+                "path": path,
+                "size": size,
+                "checksum": checksum,
+            }
+        )
         self.manifest.total_assets = len(self.manifest.assets)
 
     def add_page_image(self, page_num: int, image_bytes: bytes) -> str:
@@ -314,7 +326,9 @@ class PDFIPackageBuilder:
         logger.debug(f"Added page PDF: {filename} ({len(pdf_bytes)} bytes)")
         return asset_path
 
-    def add_preview_data(self, preview_pages: list[dict[str, Any]], structure_tree: dict | None = None) -> None:
+    def add_preview_data(
+        self, preview_pages: list[dict[str, Any]], structure_tree: dict | None = None
+    ) -> None:
         """
         Add interactive preview data to the report.
 
@@ -365,7 +379,9 @@ class PDFIPackageBuilder:
                     zf.write(file_path, arcname)
 
         self._finalized = True
-        logger.info(f"Created PDFI package: {self.output_path} ({self.output_path.stat().st_size} bytes)")
+        logger.info(
+            f"Created PDFI package: {self.output_path} ({self.output_path.stat().st_size} bytes)"
+        )
 
         return self.output_path
 
@@ -503,11 +519,7 @@ class PDFIPackageReader:
         if not assets_dir.exists():
             return []
 
-        return [
-            str(p.relative_to(self.temp_dir))
-            for p in assets_dir.rglob("*")
-            if p.is_file()
-        ]
+        return [str(p.relative_to(self.temp_dir)) for p in assets_dir.rglob("*") if p.is_file()]
 
     def extract_to(self, destination: Path | str) -> Path:
         """
@@ -673,7 +685,9 @@ def _generate_preview_data(
 
                 # Extract single-page PDF for vector rendering (WebKit feature)
                 single_page_doc = fitz.open()
-                single_page_doc.insert_pdf(visualizer._fitz_doc, from_page=page_num, to_page=page_num)
+                single_page_doc.insert_pdf(
+                    visualizer._fitz_doc, from_page=page_num, to_page=page_num
+                )
                 pdf_bytes = single_page_doc.tobytes()
                 single_page_doc.close()
                 pdf_src_path = builder.add_page_pdf(page_num + 1, pdf_bytes)
@@ -706,37 +720,43 @@ def _generate_preview_data(
                 if content_audit_result:
                     for img in getattr(content_audit_result, "images", []):
                         if img.page == page_num and img.bbox:
-                            untagged_images.append({
-                                "index": img.index,
-                                "bbox": list(img.bbox),
-                                "width": img.width,
-                                "height": img.height,
-                            })
+                            untagged_images.append(
+                                {
+                                    "index": img.index,
+                                    "bbox": list(img.bbox),
+                                    "width": img.width,
+                                    "height": img.height,
+                                }
+                            )
 
                 # Extract vector graphics for this page
                 vector_graphics = []
                 if content_audit_result:
                     for vg in getattr(content_audit_result, "vector_graphics", []):
                         if vg.page == page_num and vg.bbox:
-                            vector_graphics.append({
-                                "index": vg.index,
-                                "bbox": list(vg.bbox),
-                                "width": vg.width,
-                                "height": vg.height,
-                            })
+                            vector_graphics.append(
+                                {
+                                    "index": vg.index,
+                                    "bbox": list(vg.bbox),
+                                    "width": vg.width,
+                                    "height": vg.height,
+                                }
+                            )
 
-                preview_pages.append({
-                    "page_num": page_num + 1,  # 1-indexed
-                    "page_width": page_width,
-                    "page_height": page_height,
-                    "dpi": dpi,
-                    "page_image": page_image_path,
-                    "pdf_src": pdf_src_path,  # Single-page PDF for vector rendering
-                    "thumbnail": thumbnail_path,
-                    "tags": tags_data,
-                    "untagged_images": untagged_images,
-                    "vector_graphics": vector_graphics,
-                })
+                preview_pages.append(
+                    {
+                        "page_num": page_num + 1,  # 1-indexed
+                        "page_width": page_width,
+                        "page_height": page_height,
+                        "dpi": dpi,
+                        "page_image": page_image_path,
+                        "pdf_src": pdf_src_path,  # Single-page PDF for vector rendering
+                        "thumbnail": thumbnail_path,
+                        "tags": tags_data,
+                        "untagged_images": untagged_images,
+                        "vector_graphics": vector_graphics,
+                    }
+                )
 
                 logger.debug(f"Processed page {page_num + 1}: {len(tags_data)} tags")
 
@@ -779,8 +799,7 @@ def _serialize_structure_tree_for_package(node: Any, depth: int = 0) -> dict:
     children = getattr(node, "children", [])
     if children:
         serialized["children"] = [
-            _serialize_structure_tree_for_package(child, depth + 1)
-            for child in children
+            _serialize_structure_tree_for_package(child, depth + 1) for child in children
         ]
 
     return serialized

@@ -47,6 +47,7 @@ def service(mock_prompts_dir):
 def reset_singleton():
     """Reset the global singleton between tests."""
     import inspekt.services.ai_integration
+
     inspekt.services.ai_integration._default_service = None
     yield
     inspekt.services.ai_integration._default_service = None
@@ -92,10 +93,7 @@ def test_init_converts_string_to_path(tmp_path):
 def test_get_target_language_with_override(service):
     """Test that language_override takes highest priority."""
     with mock.patch("inspekt.config.load_config", return_value={"ai-language": "nl"}):
-        result = service.get_target_language(
-            language_override="fr",
-            page_lang="en"
-        )
+        result = service.get_target_language(language_override="fr", page_lang="en")
 
         assert result == "fr"
 
@@ -103,10 +101,7 @@ def test_get_target_language_with_override(service):
 def test_get_target_language_with_config_setting(service):
     """Test language from config when no override provided."""
     with mock.patch("inspekt.config.load_config", return_value={"ai-language": "nl"}):
-        result = service.get_target_language(
-            language_override=None,
-            page_lang="en"
-        )
+        result = service.get_target_language(language_override=None, page_lang="en")
 
         assert result == "nl"
 
@@ -114,10 +109,7 @@ def test_get_target_language_with_config_setting(service):
 def test_get_target_language_with_auto_config_and_page_lang(service):
     """Test auto-detection from page_lang when config is 'auto'."""
     with mock.patch("inspekt.config.load_config", return_value={"ai-language": "auto"}):
-        result = service.get_target_language(
-            language_override=None,
-            page_lang="de"
-        )
+        result = service.get_target_language(language_override=None, page_lang="de")
 
         assert result == "de"
 
@@ -125,10 +117,7 @@ def test_get_target_language_with_auto_config_and_page_lang(service):
 def test_get_target_language_with_auto_config_no_page_lang(service):
     """Test that None is returned when config is 'auto' but no page_lang."""
     with mock.patch("inspekt.config.load_config", return_value={"ai-language": "auto"}):
-        result = service.get_target_language(
-            language_override=None,
-            page_lang=None
-        )
+        result = service.get_target_language(language_override=None, page_lang=None)
 
         assert result is None
 
@@ -136,10 +125,7 @@ def test_get_target_language_with_auto_config_no_page_lang(service):
 def test_get_target_language_with_defaults(service):
     """Test default behavior returns None (let AI decide)."""
     with mock.patch("inspekt.config.load_config", return_value={}):
-        result = service.get_target_language(
-            language_override=None,
-            page_lang=None
-        )
+        result = service.get_target_language(language_override=None, page_lang=None)
 
         assert result is None
 
@@ -147,10 +133,7 @@ def test_get_target_language_with_defaults(service):
 def test_get_target_language_empty_config_setting(service):
     """Test that empty config setting is treated as 'auto'."""
     with mock.patch("inspekt.config.load_config", return_value={"ai-language": ""}):
-        result = service.get_target_language(
-            language_override=None,
-            page_lang="es"
-        )
+        result = service.get_target_language(language_override=None, page_lang="es")
 
         assert result == "es"
 
@@ -186,11 +169,11 @@ def test_extract_page_language_json_pattern(service):
 
 def test_extract_page_language_markdown_priority_over_json(service):
     """Test that markdown pattern takes priority over JSON."""
-    content = '''
+    content = """
     **Language:** nl
 
     Some content with "lang": "en" in it.
-    '''
+    """
 
     result = service.extract_page_language(content)
 
@@ -274,10 +257,7 @@ def test_load_prompt_io_error(service, mock_prompts_dir):
 
 def test_format_prompt_base_and_content(service):
     """Test formatting with just base prompt and content."""
-    result = service.format_prompt(
-        base_prompt="Analyze this:",
-        content="Test content"
-    )
+    result = service.format_prompt(base_prompt="Analyze this:", content="Test content")
 
     expected = "Analyze this:\n\n---\n\nTest content"
     assert result == expected
@@ -286,9 +266,7 @@ def test_format_prompt_base_and_content(service):
 def test_format_prompt_with_target_lang(service):
     """Test formatting with target language."""
     result = service.format_prompt(
-        base_prompt="Analyze this:",
-        content="Test content",
-        target_lang="fr"
+        base_prompt="Analyze this:", content="Test content", target_lang="fr"
     )
 
     assert "Analyze this:" in result
@@ -299,9 +277,7 @@ def test_format_prompt_with_target_lang(service):
 def test_format_prompt_with_extra_instructions(service):
     """Test formatting with extra instructions."""
     result = service.format_prompt(
-        base_prompt="Analyze this:",
-        content="Test content",
-        extra_instructions="Be concise."
+        base_prompt="Analyze this:", content="Test content", extra_instructions="Be concise."
     )
 
     assert "Analyze this:" in result
@@ -315,7 +291,7 @@ def test_format_prompt_with_all_parameters(service):
         base_prompt="Analyze this:",
         content="Test content",
         target_lang="de",
-        extra_instructions="Focus on key points."
+        extra_instructions="Focus on key points.",
     )
 
     assert "Analyze this:" in result
@@ -328,10 +304,7 @@ def test_format_prompt_with_all_parameters(service):
 def test_format_prompt_order(service):
     """Test that prompt parts are in correct order."""
     result = service.format_prompt(
-        base_prompt="BASE",
-        content="CONTENT",
-        target_lang="en",
-        extra_instructions="EXTRA"
+        base_prompt="BASE", content="CONTENT", target_lang="en", extra_instructions="EXTRA"
     )
 
     parts = result.split("\n\n")
@@ -398,10 +371,7 @@ def test_generate_description_with_language_override(service):
         with mock.patch.object(service, "format_prompt") as mock_format:
             with mock.patch.object(service, "call_thoth_text", return_value="Description"):
                 with mock.patch("click.echo"):
-                    service.generate_description(
-                        page_structure,
-                        language_override="fr"
-                    )
+                    service.generate_description(page_structure, language_override="fr")
 
     # Check that format_prompt was called with correct target_lang
     call_kwargs = mock_format.call_args[1]
@@ -415,10 +385,7 @@ def test_generate_description_with_debug_mode(service):
     with mock.patch.object(service, "load_prompt", return_value="Base"):
         with mock.patch.object(service, "show_debug_prompt") as mock_debug:
             with mock.patch.object(service, "call_thoth_text") as mock_call:
-                result = service.generate_description(
-                    page_structure,
-                    debug=True
-                )
+                result = service.generate_description(page_structure, debug=True)
 
     assert result is None
     mock_debug.assert_called_once()
@@ -463,11 +430,7 @@ def test_generate_description_formats_content_correctly(service):
 
 def test_generate_summary_success(service):
     """Test successful summary generation."""
-    article = {
-        "title": "Test Article",
-        "content": "Article content here",
-        "lang": "en"
-    }
+    article = {"title": "Test Article", "content": "Article content here", "lang": "en"}
 
     with mock.patch.object(service, "load_prompt", return_value="Base prompt"):
         with mock.patch.object(service, "call_thoth_text", return_value="Generated summary"):
@@ -479,20 +442,13 @@ def test_generate_summary_success(service):
 
 def test_generate_summary_with_language_override(service):
     """Test summary generation with language override."""
-    article = {
-        "title": "Article",
-        "content": "Content",
-        "lang": "en"
-    }
+    article = {"title": "Article", "content": "Content", "lang": "en"}
 
     with mock.patch.object(service, "load_prompt", return_value="Base"):
         with mock.patch.object(service, "format_prompt") as mock_format:
             with mock.patch.object(service, "call_thoth_text", return_value="Summary"):
                 with mock.patch("click.echo"):
-                    service.generate_summary(
-                        article,
-                        language_override="de"
-                    )
+                    service.generate_summary(article, language_override="de")
 
     call_kwargs = mock_format.call_args[1]
     assert call_kwargs["target_lang"] == "de"
@@ -500,10 +456,7 @@ def test_generate_summary_with_language_override(service):
 
 def test_generate_summary_with_debug_mode(service):
     """Test summary generation in debug mode."""
-    article = {
-        "title": "Test",
-        "content": "Content"
-    }
+    article = {"title": "Test", "content": "Content"}
 
     with mock.patch.object(service, "load_prompt", return_value="Base"):
         with mock.patch.object(service, "show_debug_prompt") as mock_debug:
@@ -517,11 +470,7 @@ def test_generate_summary_with_debug_mode(service):
 
 def test_generate_summary_uses_article_language(service):
     """Test that summary uses language from article data."""
-    article = {
-        "title": "Article",
-        "content": "Content",
-        "lang": "fr"
-    }
+    article = {"title": "Article", "content": "Content", "lang": "fr"}
 
     with mock.patch("inspekt.config.load_config", return_value={"ai-language": "auto"}):
         with mock.patch.object(service, "load_prompt", return_value="Base"):
@@ -551,10 +500,7 @@ def test_generate_summary_handles_missing_fields(service):
 
 def test_generate_summary_formats_content_with_title(service):
     """Test that summary formats content with title."""
-    article = {
-        "title": "My Article",
-        "content": "The content"
-    }
+    article = {"title": "My Article", "content": "The content"}
 
     with mock.patch.object(service, "load_prompt", return_value="Base"):
         with mock.patch.object(service, "format_prompt") as mock_format:
@@ -569,10 +515,7 @@ def test_generate_summary_formats_content_with_title(service):
 
 def test_generate_summary_displays_progress_message(service):
     """Test that summary displays progress message with title."""
-    article = {
-        "title": "Important Article",
-        "content": "Content"
-    }
+    article = {"title": "Important Article", "content": "Content"}
 
     with mock.patch.object(service, "load_prompt", return_value="Base"):
         with mock.patch.object(service, "call_thoth_text", return_value="Summary"):
@@ -581,8 +524,7 @@ def test_generate_summary_displays_progress_message(service):
 
     # Find the progress message call
     progress_calls = [
-        call for call in mock_echo.call_args_list
-        if "Generating summary" in str(call)
+        call for call in mock_echo.call_args_list if "Generating summary" in str(call)
     ]
     assert len(progress_calls) == 1
     assert "Important Article" in str(progress_calls[0])

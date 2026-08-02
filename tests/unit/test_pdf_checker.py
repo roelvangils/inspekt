@@ -91,8 +91,12 @@ class TestSimplePDFChecker:
         language = result.get_check("language")
         assert language is not None
         # Should be warn or fail depending on validation strictness
-        assert language.status in ("warn", "fail"), f"Language check should warn or fail: {language.message}"
-        assert language.details.get("valid") is False or language.details.get("invalid_lang") is True
+        assert language.status in ("warn", "fail"), (
+            f"Language check should warn or fail: {language.message}"
+        )
+        assert (
+            language.details.get("valid") is False or language.details.get("invalid_lang") is True
+        )
 
     def test_forms_pdf_warns_about_fields(self, with_forms_pdf):
         """A PDF with form fields should warn about them."""
@@ -128,7 +132,9 @@ class TestSimplePDFChecker:
 
         bookmarks = result.get_check("bookmarks")
         assert bookmarks is not None
-        assert bookmarks.status == "fail", f"Bookmarks check should fail for long doc: {bookmarks.message}"
+        assert bookmarks.status == "fail", (
+            f"Bookmarks check should fail for long doc: {bookmarks.message}"
+        )
         assert bookmarks.details.get("required") is True
         assert bookmarks.details.get("page_count") >= 20
 

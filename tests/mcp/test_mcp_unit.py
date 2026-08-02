@@ -184,10 +184,7 @@ class TestResponseSerialization:
     def test_navigate_response_to_json(self):
         """NavigateResponse serializes to valid JSON."""
         response = schemas.NavigateResponse(
-            success=True,
-            url="https://example.com",
-            title="Example",
-            message="OK"
+            success=True, url="https://example.com", title="Example", message="OK"
         )
         json_str = response.model_dump_json()
         parsed = json.loads(json_str)
@@ -198,9 +195,7 @@ class TestResponseSerialization:
     def test_navigate_response_without_optional_fields(self):
         """NavigateResponse works without optional message."""
         response = schemas.NavigateResponse(
-            success=True,
-            url="https://example.com",
-            title="Example"
+            success=True, url="https://example.com", title="Example"
         )
         json_str = response.model_dump_json()
         parsed = json.loads(json_str)
@@ -208,10 +203,7 @@ class TestResponseSerialization:
 
     def test_execute_javascript_response(self):
         """ExecuteJavaScriptResponse serializes correctly."""
-        response = schemas.ExecuteJavaScriptResponse(
-            success=True,
-            result={"foo": "bar"}
-        )
+        response = schemas.ExecuteJavaScriptResponse(success=True, result={"foo": "bar"})
         json_str = response.model_dump_json()
         parsed = json.loads(json_str)
         assert parsed["success"] is True
@@ -220,9 +212,7 @@ class TestResponseSerialization:
     def test_execute_javascript_response_with_console(self):
         """ExecuteJavaScriptResponse includes console output."""
         response = schemas.ExecuteJavaScriptResponse(
-            success=True,
-            result=42,
-            console_output=["log: hello", "log: world"]
+            success=True, result=42, console_output=["log: hello", "log: world"]
         )
         json_str = response.model_dump_json()
         parsed = json.loads(json_str)
@@ -237,7 +227,7 @@ class TestResponseSerialization:
             viewport_width=1920,
             viewport_height=1080,
             scroll_x=0,
-            scroll_y=100
+            scroll_y=100,
         )
         json_str = response.model_dump_json()
         parsed = json.loads(json_str)
@@ -252,10 +242,10 @@ class TestResponseSerialization:
                 schemas.LinkInfo(
                     url="https://example.com/page1",  # Note: uses 'url' not 'href'
                     text="Page 1",
-                    type="internal"
+                    type="internal",
                 )
             ],
-            count=1
+            count=1,
         )
         json_str = response.model_dump_json()
         parsed = json.loads(json_str)

@@ -381,11 +381,7 @@ class CommandRegistry:
 
     def get_for_mcp(self) -> list[CommandDefinition]:
         """Get commands enabled for MCP (respects database setting)."""
-        return [
-            cmd
-            for cmd in self._commands.values()
-            if self.is_mcp_enabled(cmd.id)
-        ]
+        return [cmd for cmd in self._commands.values() if self.is_mcp_enabled(cmd.id)]
 
     def get_by_category(self, category: Category) -> list[CommandDefinition]:
         """Get commands in a specific category."""

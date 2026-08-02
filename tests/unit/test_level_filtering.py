@@ -70,39 +70,54 @@ class TestScMatchesLevelA:
     """Tests for Level A filtering."""
 
     # WCAG 2.0 Level A criteria
-    @pytest.mark.parametrize("sc", [
-        "1.1.1",  # Non-text Content
-        "1.2.1",  # Audio-only and Video-only
-        "1.3.1",  # Info and Relationships
-        "2.1.1",  # Keyboard
-        "2.4.1",  # Bypass Blocks
-        "3.1.1",  # Language of Page
-        "4.1.2",  # Name, Role, Value
-    ])
+    @pytest.mark.parametrize(
+        "sc",
+        [
+            "1.1.1",  # Non-text Content
+            "1.2.1",  # Audio-only and Video-only
+            "1.3.1",  # Info and Relationships
+            "2.1.1",  # Keyboard
+            "2.4.1",  # Bypass Blocks
+            "3.1.1",  # Language of Page
+            "4.1.2",  # Name, Role, Value
+        ],
+    )
     def test_level_a_criteria_match_2a(self, sc):
         """Level A criteria should match 2a."""
         assert _sc_matches_level(sc, "2a") is True
 
-    @pytest.mark.parametrize("sc", [
-        "1.1.1", "1.3.1", "2.1.1", "4.1.2",
-    ])
+    @pytest.mark.parametrize(
+        "sc",
+        [
+            "1.1.1",
+            "1.3.1",
+            "2.1.1",
+            "4.1.2",
+        ],
+    )
     def test_level_a_criteria_match_21a(self, sc):
         """Level A criteria should match 21a."""
         assert _sc_matches_level(sc, "21a") is True
 
-    @pytest.mark.parametrize("sc", [
-        "1.4.3",  # Contrast (Minimum) - Level AA
-        "2.4.5",  # Multiple Ways - Level AA
-        "2.4.7",  # Focus Visible - Level AA
-    ])
+    @pytest.mark.parametrize(
+        "sc",
+        [
+            "1.4.3",  # Contrast (Minimum) - Level AA
+            "2.4.5",  # Multiple Ways - Level AA
+            "2.4.7",  # Focus Visible - Level AA
+        ],
+    )
     def test_level_aa_criteria_excluded_from_2a(self, sc):
         """Level AA criteria should NOT match 2a."""
         assert _sc_matches_level(sc, "2a") is False
 
-    @pytest.mark.parametrize("sc", [
-        "1.4.6",  # Contrast (Enhanced) - Level AAA
-        "2.4.9",  # Link Purpose (Link Only) - Level AAA
-    ])
+    @pytest.mark.parametrize(
+        "sc",
+        [
+            "1.4.6",  # Contrast (Enhanced) - Level AAA
+            "2.4.9",  # Link Purpose (Link Only) - Level AAA
+        ],
+    )
     def test_level_aaa_criteria_excluded_from_2a(self, sc):
         """Level AAA criteria should NOT match 2a."""
         assert _sc_matches_level(sc, "2a") is False
@@ -111,19 +126,25 @@ class TestScMatchesLevelA:
 class TestScMatchesLevelAA:
     """Tests for Level AA filtering."""
 
-    @pytest.mark.parametrize("sc", [
-        "1.1.1",  # Level A
-        "1.4.3",  # Level AA
-        "2.4.7",  # Level AA
-    ])
+    @pytest.mark.parametrize(
+        "sc",
+        [
+            "1.1.1",  # Level A
+            "1.4.3",  # Level AA
+            "2.4.7",  # Level AA
+        ],
+    )
     def test_level_a_and_aa_criteria_match_2aa(self, sc):
         """Level A and AA criteria should match 2aa."""
         assert _sc_matches_level(sc, "2aa") is True
 
-    @pytest.mark.parametrize("sc", [
-        "1.4.6",  # Contrast (Enhanced) - Level AAA
-        "2.4.9",  # Link Purpose (Link Only) - Level AAA
-    ])
+    @pytest.mark.parametrize(
+        "sc",
+        [
+            "1.4.6",  # Contrast (Enhanced) - Level AAA
+            "2.4.9",  # Link Purpose (Link Only) - Level AAA
+        ],
+    )
     def test_level_aaa_criteria_excluded_from_2aa(self, sc):
         """Level AAA criteria should NOT match 2aa."""
         assert _sc_matches_level(sc, "2aa") is False
@@ -132,11 +153,14 @@ class TestScMatchesLevelAA:
 class TestScMatchesLevelAAA:
     """Tests for Level AAA filtering."""
 
-    @pytest.mark.parametrize("sc", [
-        "1.1.1",  # Level A
-        "1.4.3",  # Level AA
-        "1.4.6",  # Level AAA
-    ])
+    @pytest.mark.parametrize(
+        "sc",
+        [
+            "1.1.1",  # Level A
+            "1.4.3",  # Level AA
+            "1.4.6",  # Level AAA
+        ],
+    )
     def test_all_levels_match_2aaa(self, sc):
         """All levels should match 2aaa."""
         assert _sc_matches_level(sc, "2aaa") is True
@@ -175,10 +199,10 @@ class TestScMatchesLevelVersionFiltering:
 
     def test_wcag_20_21_criteria_included_in_22(self):
         """WCAG 2.0 and 2.1 criteria should be included in WCAG 2.2 checks."""
-        assert _sc_matches_level("1.1.1", "22aa") is True    # 2.0 Level A
-        assert _sc_matches_level("1.4.3", "22aa") is True    # 2.0 Level AA
-        assert _sc_matches_level("2.5.3", "22aa") is True    # 2.1 Level A
-        assert _sc_matches_level("1.4.12", "22aa") is True   # 2.1 Level AA
+        assert _sc_matches_level("1.1.1", "22aa") is True  # 2.0 Level A
+        assert _sc_matches_level("1.4.3", "22aa") is True  # 2.0 Level AA
+        assert _sc_matches_level("2.5.3", "22aa") is True  # 2.1 Level A
+        assert _sc_matches_level("1.4.12", "22aa") is True  # 2.1 Level AA
 
 
 class TestScMatchesLevelCaseSensitivity:

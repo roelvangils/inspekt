@@ -210,7 +210,9 @@ def url_scheme(
 
                 # Filter output modes to only show allowed ones
                 if allowed_output_modes:
-                    active_modes = {k: v for k, v in OUTPUT_MODES.items() if k in allowed_output_modes}
+                    active_modes = {
+                        k: v for k, v in OUTPUT_MODES.items() if k in allowed_output_modes
+                    }
                 else:
                     active_modes = OUTPUT_MODES
 
@@ -241,7 +243,9 @@ def url_scheme(
 
                 # Show hints at bottom
                 click.echo()
-                print_hint("Use with Raycast, Alfred, Apple Shortcuts, shell scripts, or any tool that supports custom URL schemes.")
+                print_hint(
+                    "Use with Raycast, Alfred, Apple Shortcuts, shell scripts, or any tool that supports custom URL schemes."
+                )
                 if "?" in base_url:
                     jq_example = f"{base_url}&jq=.fieldname"
                 else:

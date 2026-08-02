@@ -309,7 +309,7 @@ async def do(params: DoParams) -> DoResponse:
 And these clickable elements on the page:
 {elements_text}
 
-Which element number (0-{len(elements)-1}) best matches the user's intent?
+Which element number (0-{len(elements) - 1}) best matches the user's intent?
 Respond with ONLY the number and a confidence score (0-100) in format: NUMBER,CONFIDENCE
 Example: 5,85"""
 
@@ -341,7 +341,7 @@ Example: 5,85"""
         # Only auto-click if confidence >= 75%
         if confidence >= 0.75:
             # Click the element using actionId as class selector
-            action_id = target_element.get('actionId', '')
+            action_id = target_element.get("actionId", "")
             selector = f".{action_id}" if action_id else ""
             click_script = f"""
             (function() {{
@@ -494,34 +494,26 @@ def _precheck_element_sync(executor, source: str, timeout: float = 3.0) -> dict:
         result = executor.execute(
             precheck_code,
             timeout,  # Use the provided timeout directly
-            False,    # retry_on_timeout
-            True,     # skip_domain_check (pre-check shouldn't prompt)
-            True,     # fast_poll (short HTTP timeout for fail-fast)
+            False,  # retry_on_timeout
+            True,  # skip_domain_check (pre-check shouldn't prompt)
+            True,  # fast_poll (short HTTP timeout for fail-fast)
         )
     except TimeoutError:
         return {
             "ok": False,
             "error": "Bridge connection timed out",
-            "hint": "Try refreshing the page or restarting `inspekt start`"
+            "hint": "Try refreshing the page or restarting `inspekt start`",
         }
     except ConnectionError as e:
-        return {
-            "ok": False,
-            "error": str(e),
-            "hint": "Make sure `inspekt start` is running"
-        }
+        return {"ok": False, "error": str(e), "hint": "Make sure `inspekt start` is running"}
     except Exception as e:
-        return {
-            "ok": False,
-            "error": f"Pre-check failed: {e}",
-            "hint": "Try refreshing the page"
-        }
+        return {"ok": False, "error": f"Pre-check failed: {e}", "hint": "Try refreshing the page"}
 
     if not result.get("ok"):
         return {
             "ok": False,
             "error": result.get("error", "Bridge not responding"),
-            "hint": "Try refreshing the page"
+            "hint": "Try refreshing the page",
         }
 
     precheck_data = result.get("result", {})
@@ -529,7 +521,7 @@ def _precheck_element_sync(executor, source: str, timeout: float = 3.0) -> dict:
         return {
             "ok": False,
             "error": precheck_data.get("error", "Unknown error"),
-            "hint": precheck_data.get("hint", "")
+            "hint": precheck_data.get("hint", ""),
         }
 
     return {"ok": True, "tag": precheck_data.get("tag", "unknown")}
@@ -551,7 +543,10 @@ async def _get_element_data(executor, script_loader, source: str) -> dict:
 
         selection_data = result.get("result", {})
         if not selection_data.get("hasSelection"):
-            return {"error": "No text is currently selected", "hint": "Select some text on the page first"}
+            return {
+                "error": "No text is currently selected",
+                "hint": "Select some text on the page first",
+            }
 
         # Return selection data in a format similar to element data
         return {
@@ -619,8 +614,7 @@ def _get_cdp_event_listeners(executor, script_loader, source: str) -> dict | Non
     """
     try:
         script = script_loader.load_with_substitution_sync(
-            "get_event_listeners_cdp.js",
-            {"SOURCE_TYPE_PLACEHOLDER": source}
+            "get_event_listeners_cdp.js", {"SOURCE_TYPE_PLACEHOLDER": source}
         )
         response = executor.execute(script, timeout=20.0)
 
@@ -648,7 +642,7 @@ def _get_accessibility_tree(executor, script_loader, source: str, depth: int = 1
             {
                 "SOURCE_TYPE_PLACEHOLDER": source,
                 "DEPTH_PLACEHOLDER": str(depth),
-            }
+            },
         )
         response = executor.execute(script, timeout=20.0)
 
@@ -675,18 +669,20 @@ def _merge_event_handlers(inline_handlers: dict, cdp_listeners: dict) -> dict:
     # Add CDP listeners
     if cdp_listeners and cdp_listeners.get("ok"):
         for listener in cdp_listeners.get("listeners", []):
-            merged_handlers.append({
-                "selector": "(CDP)",
-                "type": listener.get("type", "unknown"),
-                "source": "addEventListener",
-                "code": listener.get("handler", {}).get("description", "[function]"),
-                "element": "",
-                "useCapture": listener.get("useCapture", False),
-                "passive": listener.get("passive", False),
-                "once": listener.get("once", False),
-                "lineNumber": listener.get("lineNumber"),
-                "columnNumber": listener.get("columnNumber"),
-            })
+            merged_handlers.append(
+                {
+                    "selector": "(CDP)",
+                    "type": listener.get("type", "unknown"),
+                    "source": "addEventListener",
+                    "code": listener.get("handler", {}).get("description", "[function]"),
+                    "element": "",
+                    "useCapture": listener.get("useCapture", False),
+                    "passive": listener.get("passive", False),
+                    "once": listener.get("once", False),
+                    "lineNumber": listener.get("lineNumber"),
+                    "columnNumber": listener.get("columnNumber"),
+                }
+            )
             event_type = listener.get("type", "unknown")
             merged_summary[event_type] = merged_summary.get(event_type, 0) + 1
 
@@ -716,7 +712,9 @@ def _format_audit_section_for_prompt(audit_results: dict) -> str:
     engines = ", ".join(summary.get("engines_used", []))
 
     lines.append(f"Engines: {engines or 'none'}")
-    lines.append(f"Summary: {violations_count} violations, {warnings_count} warnings, {passes_count} passes")
+    lines.append(
+        f"Summary: {violations_count} violations, {warnings_count} warnings, {passes_count} passes"
+    )
 
     # Violations (most important)
     violations = audit_results.get("violations", [])
@@ -727,14 +725,18 @@ def _format_audit_section_for_prompt(audit_results: dict) -> str:
             wcag = ", ".join(v.get("wcag", [])) or "N/A"
             engines = ", ".join(v.get("engines", []))
             lines.append(f"  [{impact.upper()}] {v.get('description', 'No description')}")
-            lines.append(f"    Rule: {v.get('rule_id', 'unknown')} | WCAG: {wcag} | Found by: {engines}")
+            lines.append(
+                f"    Rule: {v.get('rule_id', 'unknown')} | WCAG: {wcag} | Found by: {engines}"
+            )
 
     # Warnings (if few violations)
     warnings = audit_results.get("warnings", [])
     if warnings and violations_count < 5:
         lines.append("\nWARNINGS (needs review):")
         for w in warnings[:5]:
-            lines.append(f"  - {w.get('description', 'No description')} ({w.get('rule_id', 'unknown')})")
+            lines.append(
+                f"  - {w.get('description', 'No description')} ({w.get('rule_id', 'unknown')})"
+            )
 
     if not violations and not warnings:
         lines.append("\nNo accessibility issues found by automated testing.")
@@ -760,7 +762,9 @@ def _format_event_handlers_section(handlers_data: dict) -> str:
     if not handlers:
         lines.append("No event handlers found on this element or its descendants.")
         if not cdp_available:
-            lines.append("(Note: Only inline handlers checked; addEventListener listeners require DevTools)")
+            lines.append(
+                "(Note: Only inline handlers checked; addEventListener listeners require DevTools)"
+            )
         return "\n".join(lines)
 
     # Summary by event type
@@ -834,7 +838,15 @@ def _format_accessibility_tree_section(ax_tree: dict) -> str:
         for prop in properties:
             prop_name = prop.get("name", "")
             prop_value = prop.get("value", {}).get("value", "")
-            if prop_name in ["focusable", "disabled", "expanded", "pressed", "checked", "selected", "required"]:
+            if prop_name in [
+                "focusable",
+                "disabled",
+                "expanded",
+                "pressed",
+                "checked",
+                "selected",
+                "required",
+            ]:
                 if prop_value:
                     result.append(f"{prefix}  {prop_name}: {prop_value}")
 
@@ -956,8 +968,8 @@ def _optimize_screenshot_for_ai(data_url: str, max_size: int = 1024, quality: in
         img = Image.open(io.BytesIO(image_bytes))
 
         # Convert to RGB if necessary (e.g., RGBA or palette mode)
-        if img.mode not in ('RGB', 'L'):
-            img = img.convert('RGB')
+        if img.mode not in ("RGB", "L"):
+            img = img.convert("RGB")
 
         # Resize if too large
         width, height = img.size
@@ -974,17 +986,19 @@ def _optimize_screenshot_for_ai(data_url: str, max_size: int = 1024, quality: in
 
         # Convert to JPEG in memory
         buffer = io.BytesIO()
-        img.save(buffer, format='JPEG', quality=quality, optimize=True)
+        img.save(buffer, format="JPEG", quality=quality, optimize=True)
         buffer.seek(0)
 
         # Encode to base64
-        optimized_base64 = base64.b64encode(buffer.read()).decode('utf-8')
+        optimized_base64 = base64.b64encode(buffer.read()).decode("utf-8")
         optimized_url = f"data:image/jpeg;base64,{optimized_base64}"
 
         original_size = len(base64_data)
         new_size = len(optimized_base64)
         reduction = (1 - new_size / original_size) * 100
-        logger.debug(f"Optimized image: {original_size} -> {new_size} bytes ({reduction:.1f}% reduction)")
+        logger.debug(
+            f"Optimized image: {original_size} -> {new_size} bytes ({reduction:.1f}% reduction)"
+        )
 
         return optimized_url
 
@@ -1022,7 +1036,7 @@ def _optimize_screenshot_for_report(data_url: str) -> str:
 
         # Convert to PNG in memory
         buffer = io.BytesIO()
-        img.save(buffer, format='PNG', optimize=True)
+        img.save(buffer, format="PNG", optimize=True)
         png_bytes = buffer.getvalue()
 
         original_size = len(png_bytes)
@@ -1032,10 +1046,12 @@ def _optimize_screenshot_for_report(data_url: str) -> str:
             png_bytes = optimize_png_data(png_bytes, level=3, strip=True)
             new_size = len(png_bytes)
             reduction = (1 - new_size / original_size) * 100
-            logger.debug(f"oxipng optimization: {original_size} -> {new_size} bytes ({reduction:.1f}% reduction)")
+            logger.debug(
+                f"oxipng optimization: {original_size} -> {new_size} bytes ({reduction:.1f}% reduction)"
+            )
 
         # Encode to base64
-        optimized_base64 = base64.b64encode(png_bytes).decode('utf-8')
+        optimized_base64 = base64.b64encode(png_bytes).decode("utf-8")
         return f"data:image/png;base64,{optimized_base64}"
 
     except Exception as e:
@@ -1170,14 +1186,14 @@ def _format_element_context(element_data: dict) -> str:
     # Accessibility info
     a11y = element_data.get("accessibility", {})
     if a11y.get("accessibleName"):
-        lines.append(f"Accessible Name: \"{a11y['accessibleName']}\"")
+        lines.append(f'Accessible Name: "{a11y["accessibleName"]}"')
         lines.append(f"Name Source: {a11y.get('accessibleNameSource', 'unknown')}")
 
     if a11y.get("role"):
         lines.append(f"Role: {a11y['role']}")
 
     if a11y.get("ariaLabel"):
-        lines.append(f"aria-label: \"{a11y['ariaLabel']}\"")
+        lines.append(f'aria-label: "{a11y["ariaLabel"]}"')
 
     lines.append(f"Focusable: {'Yes' if a11y.get('focusable') else 'No'}")
 
@@ -1219,7 +1235,7 @@ def _format_element_context(element_data: dict) -> str:
     # Text content (truncated)
     text = element_data.get("textContent", "")
     if text:
-        lines.append(f"Text Content: \"{text[:100]}{'…' if len(text) > 100 else ''}\"")
+        lines.append(f'Text Content: "{text[:100]}{"…" if len(text) > 100 else ""}"')
 
     return "\n".join(lines)
 
@@ -1265,16 +1281,21 @@ async def element_describe(params: ElementDescribeParams) -> ElementDescribeResp
         if element_data.get("error"):
             debug_print(f"Error getting element data: {element_data.get('error')}")
             return ElementDescribeResponse(
-                description=f"Error: {element_data['error']}" + (f" ({element_data.get('hint', '')})" if element_data.get('hint') else ""),
+                description=f"Error: {element_data['error']}"
+                + (f" ({element_data.get('hint', '')})" if element_data.get("hint") else ""),
                 element_type="unknown",
                 accessible_name=None,
                 source=params.source,
             )
 
-        debug_print(f"Element data: tag=<{element_data.get('tag')}>, id={element_data.get('id')}, classes={element_data.get('classes')}")
+        debug_print(
+            f"Element data: tag=<{element_data.get('tag')}>, id={element_data.get('id')}, classes={element_data.get('classes')}"
+        )
         if params.debug:
             a11y = element_data.get("accessibility", {})
-            debug_print(f"Accessibility: name='{a11y.get('accessibleName', '')}', role={a11y.get('role')}, focusable={a11y.get('focusable')}")
+            debug_print(
+                f"Accessibility: name='{a11y.get('accessibleName', '')}', role={a11y.get('role')}, focusable={a11y.get('focusable')}"
+            )
 
         # Step 2: Take screenshot
         debug_print("Step 2: Taking element screenshot")
@@ -1289,13 +1310,17 @@ async def element_describe(params: ElementDescribeParams) -> ElementDescribeResp
                 source=params.source,
             )
 
-        debug_print(f"Screenshot captured: {len(screenshot)} chars ({len(screenshot) * 3 // 4 // 1024} KB approx)")
+        debug_print(
+            f"Screenshot captured: {len(screenshot)} chars ({len(screenshot) * 3 // 4 // 1024} KB approx)"
+        )
 
         # Step 3: Optimize screenshot for AI (resize and convert to JPEG)
         debug_print("Step 3: Optimizing screenshot (resize to 1024px max, JPEG 80%)")
         optimized_screenshot = _optimize_screenshot_for_ai(screenshot, max_size=1024, quality=80)
         reduction = (1 - len(optimized_screenshot) / len(screenshot)) * 100
-        debug_print(f"Optimized: {len(screenshot)} → {len(optimized_screenshot)} chars ({reduction:.1f}% reduction)")
+        debug_print(
+            f"Optimized: {len(screenshot)} → {len(optimized_screenshot)} chars ({reduction:.1f}% reduction)"
+        )
 
         # Step 4: Load prompt and format with element context
         debug_print("Step 4: Loading prompt and formatting context")
@@ -1362,8 +1387,7 @@ def _run_scoped_audits(client, source: str = "inspected") -> dict:
     # Verify inspected element exists
     if source == "inspected":
         check_result = client.execute(
-            "(function() { return !!window.__INSPEKT_INSPECTED_ELEMENT__; })()",
-            timeout=5.0
+            "(function() { return !!window.__INSPEKT_INSPECTED_ELEMENT__; })()", timeout=5.0
         )
         if not check_result.get("ok") or not check_result.get("result"):
             return {
@@ -1375,8 +1399,8 @@ def _run_scoped_audits(client, source: str = "inspected") -> dict:
                     "warnings": 0,
                     "passes": 0,
                     "engines_used": [],
-                    "error": "No element inspected"
-                }
+                    "error": "No element inspected",
+                },
             }
 
     scripts_dir = Path(__file__).parent.parent.parent / "scripts"
@@ -1430,10 +1454,7 @@ def _run_scoped_axe(client, scripts_dir: Path, vendor_dir: Path) -> dict | None:
 
     # Build config for WCAG 2.1 AA
     config = {
-        "runOnly": {
-            "type": "tag",
-            "values": ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]
-        },
+        "runOnly": {"type": "tag", "values": ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]},
         "resultTypes": ["violations", "passes", "incomplete"],
         "__showBadges": False,
     }
@@ -1443,17 +1464,10 @@ def _run_scoped_axe(client, scripts_dir: Path, vendor_dir: Path) -> dict | None:
 
     # KEY: Replace 'document' with inspected element reference for scoping
     # This replaces the first occurrence (the axe.run context parameter)
-    audit_script = audit_script.replace(
-        "document",
-        "window.__INSPEKT_INSPECTED_ELEMENT__",
-        1
-    )
+    audit_script = audit_script.replace("document", "window.__INSPEKT_INSPECTED_ELEMENT__", 1)
 
     # Check if axe is already loaded
-    is_loaded = client.execute(
-        "(function() { return typeof axe !== 'undefined'; })()",
-        timeout=5.0
-    )
+    is_loaded = client.execute("(function() { return typeof axe !== 'undefined'; })()", timeout=5.0)
 
     if not is_loaded.get("result"):
         # Inject axe-core library
@@ -1509,8 +1523,7 @@ def _run_scoped_ibm(client, scripts_dir: Path, vendor_dir: Path) -> dict | None:
 
     # Check if ace is already loaded
     is_loaded = client.execute(
-        "(function() { return typeof window.ace !== 'undefined'; })()",
-        timeout=5.0
+        "(function() { return typeof window.ace !== 'undefined'; })()", timeout=5.0
     )
 
     if not is_loaded.get("result"):
@@ -1574,8 +1587,7 @@ def _run_scoped_htmlcs(client, scripts_dir: Path, vendor_dir: Path) -> dict | No
 
     # Check if htmlcs is already loaded
     is_loaded = client.execute(
-        "(function() { return typeof HTMLCS !== 'undefined'; })()",
-        timeout=5.0
+        "(function() { return typeof HTMLCS !== 'undefined'; })()", timeout=5.0
     )
 
     if not is_loaded.get("result"):
@@ -1615,44 +1627,50 @@ def _consolidate_audit_results(raw_results: dict, engines_used: list) -> dict:
     if raw_results.get("axe"):
         axe = raw_results["axe"]
         for v in axe.get("violations", []):
-            violations.append({
-                "rule_id": v.get("id", "unknown"),
-                "description": v.get("description", v.get("help", "")),
-                "wcag": _extract_wcag_tags(v.get("tags", [])),
-                "impact": v.get("impact", "moderate"),
-                "engines": ["axe"],
-                "instances": [
-                    {
-                        "engine": "axe",
-                        "html": n.get("html", ""),
-                        "message": n.get("failureSummary", ""),
-                        "help_url": v.get("helpUrl", ""),
-                    }
-                    for n in v.get("nodes", [])[:3]  # Limit to 3 instances
-                ]
-            })
+            violations.append(
+                {
+                    "rule_id": v.get("id", "unknown"),
+                    "description": v.get("description", v.get("help", "")),
+                    "wcag": _extract_wcag_tags(v.get("tags", [])),
+                    "impact": v.get("impact", "moderate"),
+                    "engines": ["axe"],
+                    "instances": [
+                        {
+                            "engine": "axe",
+                            "html": n.get("html", ""),
+                            "message": n.get("failureSummary", ""),
+                            "help_url": v.get("helpUrl", ""),
+                        }
+                        for n in v.get("nodes", [])[:3]  # Limit to 3 instances
+                    ],
+                }
+            )
         for p in axe.get("passes", []):
-            passes.append({
-                "rule_id": p.get("id", "unknown"),
-                "engines": ["axe"],
-            })
+            passes.append(
+                {
+                    "rule_id": p.get("id", "unknown"),
+                    "engines": ["axe"],
+                }
+            )
         for i in axe.get("incomplete", []):
-            warnings.append({
-                "rule_id": i.get("id", "unknown"),
-                "description": i.get("description", i.get("help", "")),
-                "wcag": _extract_wcag_tags(i.get("tags", [])),
-                "impact": i.get("impact", "moderate"),
-                "engines": ["axe"],
-                "instances": [
-                    {
-                        "engine": "axe",
-                        "html": n.get("html", ""),
-                        "message": n.get("message", "Needs manual review"),
-                        "help_url": i.get("helpUrl", ""),
-                    }
-                    for n in i.get("nodes", [])[:3]
-                ]
-            })
+            warnings.append(
+                {
+                    "rule_id": i.get("id", "unknown"),
+                    "description": i.get("description", i.get("help", "")),
+                    "wcag": _extract_wcag_tags(i.get("tags", [])),
+                    "impact": i.get("impact", "moderate"),
+                    "engines": ["axe"],
+                    "instances": [
+                        {
+                            "engine": "axe",
+                            "html": n.get("html", ""),
+                            "message": n.get("message", "Needs manual review"),
+                            "help_url": i.get("helpUrl", ""),
+                        }
+                        for n in i.get("nodes", [])[:3]
+                    ],
+                }
+            )
 
     # Process IBM results
     if raw_results.get("ibm"):
@@ -1665,12 +1683,14 @@ def _consolidate_audit_results(raw_results: dict, engines_used: list) -> dict:
                 "wcag": [issue.get("reasonId", "")],
                 "impact": _map_ibm_level_to_impact(level),
                 "engines": ["ibm"],
-                "instances": [{
-                    "engine": "ibm",
-                    "html": issue.get("snippet", ""),
-                    "message": issue.get("message", ""),
-                    "help_url": issue.get("help", ""),
-                }]
+                "instances": [
+                    {
+                        "engine": "ibm",
+                        "html": issue.get("snippet", ""),
+                        "message": issue.get("message", ""),
+                        "help_url": issue.get("help", ""),
+                    }
+                ],
             }
             if level == "violation":
                 violations.append(item)
@@ -1690,12 +1710,14 @@ def _consolidate_audit_results(raw_results: dict, engines_used: list) -> dict:
                 "wcag": _extract_wcag_from_code(msg.get("code", "")),
                 "impact": "serious" if msg_type == "error" else "moderate",
                 "engines": ["hcs"],
-                "instances": [{
-                    "engine": "hcs",
-                    "html": msg.get("element", ""),
-                    "message": msg.get("msg", ""),
-                    "help_url": "",
-                }]
+                "instances": [
+                    {
+                        "engine": "hcs",
+                        "html": msg.get("element", ""),
+                        "message": msg.get("msg", ""),
+                        "help_url": "",
+                    }
+                ],
             }
             if msg_type == "error":
                 violations.append(item)
@@ -1711,8 +1733,8 @@ def _consolidate_audit_results(raw_results: dict, engines_used: list) -> dict:
             "violations": len(violations),
             "warnings": len(warnings),
             "passes": len(passes),
-            "engines_used": engines_used
-        }
+            "engines_used": engines_used,
+        },
     }
 
 
@@ -1776,14 +1798,16 @@ async def _collect_rich_report_data(
     # 2. Get CSS tree via get_computed_css.js
     css_tree = {}
     try:
-        js_options = json.dumps({
-            "allProperties": False,
-            "includeDefaults": False,
-            "roundPixels": True,
-        })
+        js_options = json.dumps(
+            {
+                "allProperties": False,
+                "includeDefaults": False,
+                "roundPixels": True,
+            }
+        )
         css_script = script_loader.load_with_substitution_sync(
             "get_computed_css.js",
-            {"OPTIONS_PLACEHOLDER": js_options, "SOURCE_TYPE_PLACEHOLDER": source}
+            {"OPTIONS_PLACEHOLDER": js_options, "SOURCE_TYPE_PLACEHOLDER": source},
         )
         css_result = await asyncio.to_thread(executor.execute, css_script, 30.0)
         if css_result.get("ok"):
@@ -1833,9 +1857,7 @@ async def _collect_rich_report_data(
     # 6. Run accessibility audits (scoped to the inspected element)
     audit_results = None
     try:
-        audit_results = await asyncio.to_thread(
-            _run_scoped_audits, executor.client, source
-        )
+        audit_results = await asyncio.to_thread(_run_scoped_audits, executor.client, source)
     except Exception as e:
         logger.warning(f"Failed to run accessibility audits: {e}")
         audit_results = {
@@ -1847,8 +1869,8 @@ async def _collect_rich_report_data(
                 "warnings": 0,
                 "passes": 0,
                 "engines_used": [],
-                "error": str(e)
-            }
+                "error": str(e),
+            },
         }
 
     # 7. Optimize screenshot for report (PNG + oxipng)
@@ -1927,16 +1949,21 @@ async def element_ask(params: ElementAskParams) -> ElementAskResponse:
         if element_data.get("error"):
             debug_print(f"Error getting element data: {element_data.get('error')}")
             return ElementAskResponse(
-                answer=f"Error: {element_data['error']}" + (f" ({element_data.get('hint', '')})" if element_data.get('hint') else ""),
+                answer=f"Error: {element_data['error']}"
+                + (f" ({element_data.get('hint', '')})" if element_data.get("hint") else ""),
                 element_type="unknown",
                 source=params.source,
             )
 
-        debug_print(f"Element data: tag=<{element_data.get('tag')}>, id={element_data.get('id')}, classes={element_data.get('classes')}")
+        debug_print(
+            f"Element data: tag=<{element_data.get('tag')}>, id={element_data.get('id')}, classes={element_data.get('classes')}"
+        )
 
         # Step 1.5: Check cache (unless debug mode is on)
         if not params.debug and current_url and content_cache.is_enabled("element_ask"):
-            fingerprint = content_cache.create_element_ask_fingerprint(element_data, params.question)
+            fingerprint = content_cache.create_element_ask_fingerprint(
+                element_data, params.question
+            )
             cache_key = content_cache.get_element_cache_key(element_data, params.question)
             debug_print(f"Step 1.5: Checking cache with key={cache_key[:16]}…")
 
@@ -1956,7 +1983,9 @@ async def element_ask(params: ElementAskParams) -> ElementAskResponse:
                 else:
                     age_str = f"{age_seconds // 3600}h"
 
-                debug_print(f"Cache hit! Age: {age_str}, similarity: {cached.get('similarity', 1.0):.2f}")
+                debug_print(
+                    f"Cache hit! Age: {age_str}, similarity: {cached.get('similarity', 1.0):.2f}"
+                )
 
                 return ElementAskResponse(
                     answer=cached["output"],
@@ -1977,13 +2006,17 @@ async def element_ask(params: ElementAskParams) -> ElementAskResponse:
                 source=params.source,
             )
 
-        debug_print(f"Screenshot captured: {len(screenshot)} chars ({len(screenshot) * 3 // 4 // 1024} KB approx)")
+        debug_print(
+            f"Screenshot captured: {len(screenshot)} chars ({len(screenshot) * 3 // 4 // 1024} KB approx)"
+        )
 
         # Step 3: Optimize screenshot for AI (resize and convert to JPEG)
         debug_print("Step 3: Optimizing screenshot (resize to 1024px max, JPEG 80%)")
         optimized_screenshot = _optimize_screenshot_for_ai(screenshot, max_size=1024, quality=80)
         reduction = (1 - len(optimized_screenshot) / len(screenshot)) * 100
-        debug_print(f"Optimized: {len(screenshot)} → {len(optimized_screenshot)} chars ({reduction:.1f}% reduction)")
+        debug_print(
+            f"Optimized: {len(screenshot)} → {len(optimized_screenshot)} chars ({reduction:.1f}% reduction)"
+        )
 
         # Step 4: Load prompt and format with element context and question
         debug_print("Step 4: Loading prompt and formatting context")
@@ -2005,7 +2038,9 @@ async def element_ask(params: ElementAskParams) -> ElementAskResponse:
                 audit_results = await asyncio.to_thread(
                     _run_scoped_audits, executor.client, params.source
                 )
-                debug_print(f"  - Audit complete: {audit_results.get('summary', {}).get('violations', 0)} violations")
+                debug_print(
+                    f"  - Audit complete: {audit_results.get('summary', {}).get('violations', 0)} violations"
+                )
             except Exception as e:
                 debug_print(f"  - Audit failed: {e}")
                 audit_results = None
@@ -2016,7 +2051,9 @@ async def element_ask(params: ElementAskParams) -> ElementAskResponse:
                 inline_handlers = await _get_event_handlers(executor, script_loader, params.source)
                 cdp_listeners = _get_cdp_event_listeners(executor, script_loader, params.source)
                 event_handlers = _merge_event_handlers(inline_handlers, cdp_listeners)
-                debug_print(f"  - Found {event_handlers.get('totalCount', 0)} handlers (CDP: {event_handlers.get('cdpAvailable', False)})")
+                debug_print(
+                    f"  - Found {event_handlers.get('totalCount', 0)} handlers (CDP: {event_handlers.get('cdpAvailable', False)})"
+                )
             except Exception as e:
                 debug_print(f"  - Event handlers failed: {e}")
                 event_handlers = None
@@ -2024,7 +2061,9 @@ async def element_ask(params: ElementAskParams) -> ElementAskResponse:
             # Get accessibility tree
             try:
                 debug_print("  - Getting accessibility tree via CDP")
-                accessibility_tree = _get_accessibility_tree(executor, script_loader, params.source, depth=10)
+                accessibility_tree = _get_accessibility_tree(
+                    executor, script_loader, params.source, depth=10
+                )
                 if accessibility_tree:
                     debug_print(f"  - A11y tree: {accessibility_tree.get('count', 0)} nodes")
                 else:
@@ -2074,7 +2113,9 @@ async def element_ask(params: ElementAskParams) -> ElementAskResponse:
 
         # Step 6: Store in cache (if caching is enabled and we have a URL)
         if current_url and content_cache.is_enabled("element_ask") and not params.debug:
-            fingerprint = content_cache.create_element_ask_fingerprint(element_data, params.question)
+            fingerprint = content_cache.create_element_ask_fingerprint(
+                element_data, params.question
+            )
             cache_key = content_cache.get_element_cache_key(element_data, params.question)
             content_cache.store_content(
                 url=current_url,
@@ -2110,7 +2151,9 @@ async def element_ask(params: ElementAskParams) -> ElementAskResponse:
                 current_url,
                 debug_data=debug_data,
             )
-            debug_print(f"Rich data collected: HTML={len(rich_data.get('html_original', ''))} chars, CSS tree present={bool(rich_data.get('css_tree'))}")
+            debug_print(
+                f"Rich data collected: HTML={len(rich_data.get('html_original', ''))} chars, CSS tree present={bool(rich_data.get('css_tree'))}"
+            )
 
         return ElementAskResponse(
             answer=answer,

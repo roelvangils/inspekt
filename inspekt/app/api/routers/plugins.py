@@ -90,7 +90,9 @@ class PluginUpdateRequest(BaseModel):
     returns_data: bool | None = Field(None, description="Returns data flag")
     timeout: int | None = Field(None, ge=1, le=300, description="New timeout")
     mcp_exposed: bool | None = Field(None, description="MCP exposure flag")
-    unload_mode: str | None = Field(None, description="Unload behavior: 'toggle', 'custom', or 'none'")
+    unload_mode: str | None = Field(
+        None, description="Unload behavior: 'toggle', 'custom', or 'none'"
+    )
     unload_code: str | None = Field(None, description="Custom unload JavaScript code")
     proxy_config: dict | None = Field(None, description="Proxy script configuration")
 
@@ -484,7 +486,9 @@ def run_plugin(plugin_id: str, capture_console: bool = True, domain: str | None 
             raise HTTPException(status_code=404, detail=f"Plugin '{plugin_id}' not found")
 
         if plugin["engine"] == "proxy":
-            result = _toggle_proxy_script(plugin["code"], enabled=True, config=plugin.get("proxy_config"))
+            result = _toggle_proxy_script(
+                plugin["code"], enabled=True, config=plugin.get("proxy_config")
+            )
         else:
             result = _execute_plugin_code(
                 code=plugin["code"],
@@ -656,7 +660,9 @@ def import_plugins(request: PluginImportRequest):
 # ============================================================================
 
 
-def _toggle_proxy_script(script_name: str, enabled: bool, config: dict | None = None) -> dict[str, Any]:
+def _toggle_proxy_script(
+    script_name: str, enabled: bool, config: dict | None = None
+) -> dict[str, Any]:
     """
     Enable or disable a mitmproxy script via the control server.
 

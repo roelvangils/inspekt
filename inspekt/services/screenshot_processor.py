@@ -73,7 +73,9 @@ class ScreenshotProcessor:
         """Check if we should display output messages."""
         return not self.quiet and not self.json_output
 
-    def save_to_temp(self, image_data: bytes, width: int | None = None, height: int | None = None) -> Path:
+    def save_to_temp(
+        self, image_data: bytes, width: int | None = None, height: int | None = None
+    ) -> Path:
         """
         Write image data to a temporary file.
 
@@ -110,7 +112,9 @@ class ScreenshotProcessor:
         if self._should_output():
             size_str = format_filesize(self.original_size)
             if width and height:
-                click.echo(icons.chrome_received(f"Received from Chrome: {width}×{height} ({size_str})"))
+                click.echo(
+                    icons.chrome_received(f"Received from Chrome: {width}×{height} ({size_str})")
+                )
             else:
                 click.echo(icons.chrome_received(f"Received from Chrome: {size_str}"))
 
@@ -179,7 +183,9 @@ class ScreenshotProcessor:
 
             if not is_pillow_installed():
                 if self._should_output():
-                    click.echo("Note: Metadata requires Pillow. Install with: pip install Pillow", err=True)
+                    click.echo(
+                        "Note: Metadata requires Pillow. Install with: pip install Pillow", err=True
+                    )
                 return
         except ImportError:
             # Fallback if is_pillow_installed doesn't exist yet
@@ -260,10 +266,12 @@ class ScreenshotProcessor:
         if self.compression == "auto" and file_size > SIZE_5MB:
             # Skip compression for very large files
             if self._should_output():
-                click.echo(icons.optimizing(
-                    "Skipping lossless compression for files larger than 5 MB "
-                    "(force with --enable-compression)…"
-                ))
+                click.echo(
+                    icons.optimizing(
+                        "Skipping lossless compression for files larger than 5 MB "
+                        "(force with --enable-compression)…"
+                    )
+                )
             self.compression_skipped = True
             return
 
@@ -306,14 +314,20 @@ class ScreenshotProcessor:
             # Display save message
             filename_display = self.output_path.name
             if auto_generated:
-                click.echo(icons.save(f"Screenshot saved: {filename_display} (filename auto-generated)"))
+                click.echo(
+                    icons.save(f"Screenshot saved: {filename_display} (filename auto-generated)")
+                )
             else:
                 click.echo(icons.save(f"Screenshot saved: {filename_display}"))
 
             # Show optimization summary if optimization was performed
             if self.optimized and self.original_size > 0:
                 reduction = ((self.original_size - self.final_size) / self.original_size) * 100
-                click.echo(icons.optimized_summary(f"Optimized: {format_filesize(self.original_size)} → {format_filesize(self.final_size)} ({reduction:.1f}% decrease)"))
+                click.echo(
+                    icons.optimized_summary(
+                        f"Optimized: {format_filesize(self.original_size)} → {format_filesize(self.final_size)} ({reduction:.1f}% decrease)"
+                    )
+                )
 
     def display_source_url(self, url: str | None) -> None:
         """

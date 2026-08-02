@@ -41,7 +41,9 @@ from inspekt.services.content_cache import ContentCache
 from inspekt.services.formatting_utils import format_filesize
 
 
-def _speak_text(text: str, voice_name: str, audio_output: str | None = None, force_refresh: bool = False) -> None:
+def _speak_text(
+    text: str, voice_name: str, audio_output: str | None = None, force_refresh: bool = False
+) -> None:
     """
     Speak text using TTS service, with caching and support for long content.
 
@@ -88,7 +90,7 @@ def _speak_text(text: str, voice_name: str, audio_output: str | None = None, for
     # Detached mode buffers audio to temp file so playback survives process termination
     detached = os.environ.get("INSPEKT_TTS_DETACHED") == "1"
 
-    speak_icon = get_icon("speak") or "\U0001F50A"  # Speaker icon
+    speak_icon = get_icon("speak") or "\U0001f50a"  # Speaker icon
     cached_icon = get_icon("cached") or "⚡"
 
     # Initialize TTS cache
@@ -101,11 +103,15 @@ def _speak_text(text: str, voice_name: str, audio_output: str | None = None, for
 
         click.echo()
         click.secho(f"Content is {len(text):,} characters", fg="yellow", err=True)
-        click.echo(f"ElevenLabs has a {ELEVENLABS_CHAR_LIMIT:,} character limit per request.", err=True)
+        click.echo(
+            f"ElevenLabs has a {ELEVENLABS_CHAR_LIMIT:,} character limit per request.", err=True
+        )
         click.echo(err=True)
         click.echo("Options:", err=True)
         click.echo("  1. Truncate at sentence boundary (one API request)", err=True)
-        click.echo(f"  2. Split into {chunk_count} chunks (multiple requests, play sequentially)", err=True)
+        click.echo(
+            f"  2. Split into {chunk_count} chunks (multiple requests, play sequentially)", err=True
+        )
         click.echo("  3. Cancel", err=True)
         click.echo(err=True)
 
@@ -137,9 +143,15 @@ def _speak_text(text: str, voice_name: str, audio_output: str | None = None, for
             click.echo()
             similarity_pct = int(cached["similarity"] * 100)
             if cached.get("exact_match"):
-                click.echo(f"{cached_icon} {speak_icon} Playing cached audio (voice: {voice_name})…", err=True)
+                click.echo(
+                    f"{cached_icon} {speak_icon} Playing cached audio (voice: {voice_name})…",
+                    err=True,
+                )
             else:
-                click.echo(f"{cached_icon} {speak_icon} Playing cached audio ({similarity_pct}% match, voice: {voice_name})…", err=True)
+                click.echo(
+                    f"{cached_icon} {speak_icon} Playing cached audio ({similarity_pct}% match, voice: {voice_name})…",
+                    err=True,
+                )
 
             try:
                 play_audio_bytes(cached["audio_bytes"])
@@ -215,7 +227,7 @@ def _process_tts_chunks(
     from inspekt.services.tts_cache import TTSCache
     from inspekt.services.tts_service import TTSError, generate_audio, play_audio_bytes, speak_text
 
-    speak_icon = get_icon("speak") or "\U0001F50A"
+    speak_icon = get_icon("speak") or "\U0001f50a"
     all_audio_bytes: list[bytes] = []
     _tts_cache = TTSCache()  # instantiated for its side effects (cache dir setup)
 
@@ -237,7 +249,7 @@ def _process_tts_chunks(
         if all_audio_bytes:
             output_path = Path(audio_output)
             output_path.parent.mkdir(parents=True, exist_ok=True)
-            combined = b''.join(all_audio_bytes)
+            combined = b"".join(all_audio_bytes)
             output_path.write_bytes(combined)
             click.echo(success(f"Saved: {output_path}"), err=True)
         return
@@ -249,8 +261,8 @@ def _process_tts_chunks(
         prefetch_future: Future | None = None
 
         for i, chunk in enumerate(chunks, 1):
-            is_first_chunk = (i == 1)
-            is_last_chunk = (i == len(chunks))
+            is_first_chunk = i == 1
+            is_last_chunk = i == len(chunks)
             next_chunk = chunks[i] if not is_last_chunk else None
 
             click.echo(f"  Chunk {i}/{len(chunks)} ({len(chunk):,} chars)", err=True)
@@ -271,7 +283,9 @@ def _process_tts_chunks(
                         voice_name=voice_name,
                         detached=detached,
                         on_start=start_prefetch,
-                        on_error=lambda msg: click.echo(click.style(f"    TTS error: {msg}", fg="red"), err=True),
+                        on_error=lambda msg: click.echo(
+                            click.style(f"    TTS error: {msg}", fg="red"), err=True
+                        ),
                     )
                 except TTSError as e:
                     click.secho(f"    ✗ {e}", fg="red", err=True)
@@ -285,7 +299,9 @@ def _process_tts_chunks(
 
                         # Start prefetching next chunk before playing current
                         if next_chunk:
-                            prefetch_future = executor.submit(generate_audio, next_chunk, voice_name)
+                            prefetch_future = executor.submit(
+                                generate_audio, next_chunk, voice_name
+                            )
 
                         # Play the prefetched audio
                         play_audio_bytes(audio_bytes)
@@ -316,7 +332,9 @@ def _parse_page_structure(markdown_structure: str) -> dict:
 
     # Extract landmarks (look for sections like ### Landmarks)
     landmarks = []
-    landmarks_section = re.search(r"###\s+Landmarks\s*\n(.+?)(?:\n#{1,3}\s|$)", markdown_structure, re.DOTALL)
+    landmarks_section = re.search(
+        r"###\s+Landmarks\s*\n(.+?)(?:\n#{1,3}\s|$)", markdown_structure, re.DOTALL
+    )
     if landmarks_section:
         for line in landmarks_section.group(1).split("\n"):
             if line.strip().startswith("-"):
@@ -336,7 +354,9 @@ def _parse_page_structure(markdown_structure: str) -> dict:
     data["imageCount"] = int(image_match.group(1)) if image_match else 0
 
     # Extract main text excerpt (first paragraph or content)
-    text_match = re.search(r"###\s+Main Content\s*\n(.+?)(?:\n#{1,3}\s|$)", markdown_structure, re.DOTALL)
+    text_match = re.search(
+        r"###\s+Main Content\s*\n(.+?)(?:\n#{1,3}\s|$)", markdown_structure, re.DOTALL
+    )
     if text_match:
         data["mainText"] = text_match.group(1).strip()[:200]
     else:
@@ -376,7 +396,13 @@ def describe(language, debug, force_refresh, output_json):
 
     if not client.is_alive():
         from inspekt.app.cli.table import _style_with_inline_code
-        click.echo(_style_with_inline_code("Error: Bridge server is not running. Start it with `inspekt start`.", base_fg="red"), err=True)
+
+        click.echo(
+            _style_with_inline_code(
+                "Error: Bridge server is not running. Start it with `inspekt start`.", base_fg="red"
+            ),
+            err=True,
+        )
         sys.exit(1)
 
     # Load and execute the extraction script
@@ -433,7 +459,9 @@ def describe(language, debug, force_refresh, output_json):
 
         if not force_refresh and not debug and content_cache.is_enabled("describe"):
             fingerprint = content_cache.create_describe_fingerprint(page_data)
-            cached_result = content_cache.get_cached_content(current_url, "describe", fingerprint, target_lang or "auto")
+            cached_result = content_cache.get_cached_content(
+                current_url, "describe", fingerprint, target_lang or "auto"
+            )
 
             if cached_result:
                 cache_similarity = cached_result["similarity"]
@@ -459,6 +487,7 @@ def describe(language, debug, force_refresh, output_json):
                         "ai": model_info,
                     }
                     from inspekt.app.cli.table import print_json
+
                     print_json(json_output, summary="page description (cached)")
                     return
 
@@ -470,7 +499,12 @@ def describe(language, debug, force_refresh, output_json):
                 else:
                     age_str = f"{age_seconds // 86400} days ago"
 
-                click.echo(cached_icon(f"Using cached description (similarity: {cache_similarity:.0%}, cached {age_str})"), err=True)
+                click.echo(
+                    cached_icon(
+                        f"Using cached description (similarity: {cache_similarity:.0%}, cached {age_str})"
+                    ),
+                    err=True,
+                )
                 click.echo()
                 print_wrapped(cached_result["output"], fg="white", bold=False)
                 return
@@ -482,9 +516,7 @@ def describe(language, debug, force_refresh, output_json):
             click.echo(generate_icon("Generating description…"), err=True)
 
         output = ai_service.generate_description(
-            page_structure=page_structure,
-            language_override=language,
-            debug=debug
+            page_structure=page_structure, language_override=language, debug=debug
         )
 
         # If debug mode, generate_description returns None after showing prompt
@@ -495,7 +527,9 @@ def describe(language, debug, force_refresh, output_json):
         generation_timestamp = time.time()
         if content_cache.is_enabled("describe") and current_url:
             fingerprint = content_cache.create_describe_fingerprint(page_data)
-            content_cache.store_content(current_url, "describe", fingerprint, output, target_lang or "auto")
+            content_cache.store_content(
+                current_url, "describe", fingerprint, output, target_lang or "auto"
+            )
             if not output_json:
                 click.echo(success("Description cached for future use"), err=True)
 
@@ -511,6 +545,7 @@ def describe(language, debug, force_refresh, output_json):
                 "ai": model_info,
             }
             from inspekt.app.cli.table import print_json
+
             print_json(json_output, summary="page description")
         else:
             click.echo()
@@ -550,6 +585,7 @@ def _parse_compound_instruction(instruction: str) -> tuple[str, str | None]:
     ]
 
     import re
+
     for pattern, action in compound_patterns:
         m = re.match(pattern, lower)
         if m:
@@ -561,8 +597,9 @@ def _parse_compound_instruction(instruction: str) -> tuple[str, str | None]:
     return instruction, None
 
 
-def _execute_element_action(client: BridgeClient, action_id: str, element: dict,
-                            instruction: str | None = None):
+def _execute_element_action(
+    client: BridgeClient, action_id: str, element: dict, instruction: str | None = None
+):
     """Helper function to execute an action on an element."""
     # Step 1: Get element info and highlight it
     inspect_script = f"""
@@ -616,7 +653,10 @@ def _execute_element_action(client: BridgeClient, action_id: str, element: dict,
     result = client.execute(inspect_script, timeout=10.0)
 
     if not result.get("ok"):
-        click.echo(click.style(error(f"Failed to execute action: {result.get('error')}"), fg="red"), err=True)
+        click.echo(
+            click.style(error(f"Failed to execute action: {result.get('error')}"), fg="red"),
+            err=True,
+        )
         sys.exit(1)
 
     action_result = result.get("result", {})
@@ -654,7 +694,7 @@ def _execute_element_action(client: BridgeClient, action_id: str, element: dict,
         else:
             click.echo(f"  Navigated to: {path}")
 
-        if element_info.get('text'):
+        if element_info.get("text"):
             click.echo(f"  Text: {element_info.get('text')}")
 
     elif el_type == "select" and payload:
@@ -684,15 +724,24 @@ def _execute_element_action(client: BridgeClient, action_id: str, element: dict,
             click.echo(click.style(success("Action executed successfully!"), fg="green", bold=True))
             click.echo(f"  Selected: {select_data.get('selected')}")
         else:
-            click.echo(click.style(error(select_data.get("error", "Failed to select option")), fg="red"), err=True)
+            click.echo(
+                click.style(error(select_data.get("error", "Failed to select option")), fg="red"),
+                err=True,
+            )
 
-    elif el_type.startswith("input-") and el_type in ("input-checkbox", "input-radio") and parsed_action in ("check", "uncheck"):
+    elif (
+        el_type.startswith("input-")
+        and el_type in ("input-checkbox", "input-radio")
+        and parsed_action in ("check", "uncheck")
+    ):
         # Smart checkbox/radio: set to desired state
         want_checked = parsed_action == "check"
         current_checked = element.get("checked", False)
         if want_checked == current_checked:
             click.echo(click.style(success("Already in desired state"), fg="green", bold=True))
-            click.echo(f"  {'Checked' if current_checked else 'Unchecked'}: {element.get('text', 'N/A')[:80]}")
+            click.echo(
+                f"  {'Checked' if current_checked else 'Unchecked'}: {element.get('text', 'N/A')[:80]}"
+            )
         else:
             click_script = f"""
 (function() {{
@@ -703,7 +752,9 @@ def _execute_element_action(client: BridgeClient, action_id: str, element: dict,
 """
             client.execute(click_script, timeout=5.0)
             click.echo(click.style(success("Action executed successfully!"), fg="green", bold=True))
-            click.echo(f"  {'Checked' if want_checked else 'Unchecked'}: {element.get('text', 'N/A')[:80]}")
+            click.echo(
+                f"  {'Checked' if want_checked else 'Unchecked'}: {element.get('text', 'N/A')[:80]}"
+            )
 
     elif el_type.startswith("input-") and payload and parsed_action in ("search", "type"):
         # Smart input: focus and type the payload
@@ -727,6 +778,7 @@ def _execute_element_action(client: BridgeClient, action_id: str, element: dict,
         # If this was a search action, also press Enter
         if parsed_action == "search":
             import time
+
             time.sleep(0.3)
             press_script = """
 (function() {
@@ -760,7 +812,7 @@ def _execute_element_action(client: BridgeClient, action_id: str, element: dict,
         # Show click info
         click.echo(click.style(success("Action executed successfully!"), fg="green", bold=True))
         click.echo(f"  Clicked: <{element_info.get('tag')}>")
-        if element_info.get('text'):
+        if element_info.get("text"):
             click.echo(f"  Text: {element_info.get('text')}")
 
 
@@ -794,7 +846,9 @@ def _execute_multi_step(client: BridgeClient, steps: list[dict], actionable_elem
 """
             result = client.execute(click_script, timeout=10.0)
             if not result.get("ok") or not result.get("result", {}).get("ok", True):
-                err_msg = result.get("result", {}).get("error", result.get("error", "Unknown error"))
+                err_msg = result.get("result", {}).get(
+                    "error", result.get("error", "Unknown error")
+                )
                 click.echo(click.style(f"    Failed: {err_msg}", fg="red"), err=True)
 
         elif action == "type":
@@ -835,7 +889,9 @@ def _execute_multi_step(client: BridgeClient, steps: list[dict], actionable_elem
             action_id = step.get("actionId")
             value = step.get("value", "")
             if not action_id or not value:
-                click.echo(click.style("    Skipped: missing actionId or value", fg="yellow"), err=True)
+                click.echo(
+                    click.style("    Skipped: missing actionId or value", fg="yellow"), err=True
+                )
                 continue
             escaped_value = json.dumps(value)
             select_script = f"""
@@ -865,7 +921,9 @@ def _execute_multi_step(client: BridgeClient, steps: list[dict], actionable_elem
     click.echo(click.style(success(f"Completed {total} steps"), fg="green", bold=True))
 
 
-def _partition_elements_by_viewport(actionable_elements: list[dict]) -> tuple[list[dict], list[dict]]:
+def _partition_elements_by_viewport(
+    actionable_elements: list[dict],
+) -> tuple[list[dict], list[dict]]:
     """
     Partition actionable elements into viewport-visible and off-viewport groups.
 
@@ -952,16 +1010,24 @@ def _try_matching_strategies(
             # Try to find element using cached identifier
             cached_id = cached_action["identifier"]
             for el in elements:
-                if (el.get("type") == cached_id.get("type") and
-                    el.get("text") == cached_id.get("text") and
-                    el.get("href") == cached_id.get("href")):
+                if (
+                    el.get("type") == cached_id.get("type")
+                    and el.get("text") == cached_id.get("text")
+                    and el.get("href") == cached_id.get("href")
+                ):
                     matched_element = el
                     match_method = "CACHED"
                     match_score = 1.0
-                    click.echo(click.style(
-                        cached_icon(f"Found cached match in {scope_label} (similarity: {cached_action['similarity']:.0%})"),
-                        fg="cyan", bold=True
-                    ), err=True)
+                    click.echo(
+                        click.style(
+                            cached_icon(
+                                f"Found cached match in {scope_label} (similarity: {cached_action['similarity']:.0%})"
+                            ),
+                            fg="cyan",
+                            bold=True,
+                        ),
+                        err=True,
+                    )
                     break
 
     # 2. TRY LITERAL MATCHING
@@ -971,10 +1037,14 @@ def _try_matching_strategies(
             matched_element = literal_match["element"]
             match_method = "LITERAL"
             match_score = literal_match["score"]
-            click.echo(click.style(
-                success(f"Found literal match in {scope_label} (score: {match_score:.0%})"),
-                fg="cyan", bold=True
-            ), err=True)
+            click.echo(
+                click.style(
+                    success(f"Found literal match in {scope_label} (score: {match_score:.0%})"),
+                    fg="cyan",
+                    bold=True,
+                ),
+                err=True,
+            )
 
     # 3. TRY COMMON ACTIONS
     if not matched_element:
@@ -983,10 +1053,16 @@ def _try_matching_strategies(
             matched_element = common_match["element"]
             match_method = "COMMON"
             match_score = common_match["score"]
-            click.echo(click.style(
-                success(f"Found common action match in {scope_label} (score: {match_score:.0%})"),
-                fg="cyan", bold=True
-            ), err=True)
+            click.echo(
+                click.style(
+                    success(
+                        f"Found common action match in {scope_label} (score: {match_score:.0%})"
+                    ),
+                    fg="cyan",
+                    bold=True,
+                ),
+                err=True,
+            )
 
     # 4. TRY SUBSTRING MATCHING (e.g., "bewijs" matches "Bewijsstukken")
     if not matched_element:
@@ -996,10 +1072,16 @@ def _try_matching_strategies(
             match_method = "SUBSTRING"
             match_score = substring_match["score"]
             match_type = substring_match.get("match_type", "substring")
-            click.echo(click.style(
-                success(f"Found substring match in {scope_label} (score: {match_score:.0%}, type: {match_type})"),
-                fg="cyan", bold=True
-            ), err=True)
+            click.echo(
+                click.style(
+                    success(
+                        f"Found substring match in {scope_label} (score: {match_score:.0%}, type: {match_type})"
+                    ),
+                    fg="cyan",
+                    bold=True,
+                ),
+                err=True,
+            )
 
     # 5. TRY FUZZY MATCHING
     if not matched_element:
@@ -1008,10 +1090,14 @@ def _try_matching_strategies(
             matched_element = fuzzy_match["element"]
             match_method = "FUZZY"
             match_score = fuzzy_match["score"]
-            click.echo(click.style(
-                success(f"Found fuzzy match in {scope_label} (score: {match_score:.0%})"),
-                fg="cyan", bold=True
-            ), err=True)
+            click.echo(
+                click.style(
+                    success(f"Found fuzzy match in {scope_label} (score: {match_score:.0%})"),
+                    fg="cyan",
+                    bold=True,
+                ),
+                err=True,
+            )
 
     # 6. TRY SYNONYM MATCHING
     if not matched_element:
@@ -1020,10 +1106,14 @@ def _try_matching_strategies(
             matched_element = synonym_match["element"]
             match_method = "SYNONYM"
             match_score = synonym_match["score"]
-            click.echo(click.style(
-                success(f"Found synonym match in {scope_label} (score: {match_score:.0%})"),
-                fg="cyan", bold=True
-            ), err=True)
+            click.echo(
+                click.style(
+                    success(f"Found synonym match in {scope_label} (score: {match_score:.0%})"),
+                    fg="cyan",
+                    bold=True,
+                ),
+                err=True,
+            )
 
     if verbose and not matched_element:
         click.echo(f"  No match found in {scope_label}", err=True)
@@ -1039,10 +1129,21 @@ def _try_matching_strategies(
 @click.argument("instruction", type=str)
 @click.option("--debug", is_flag=True, help="Show the full prompt instead of calling AI")
 @click.option("--no-execute", is_flag=True, help="Show matches but don't execute any actions")
-@click.option("--force-ai", is_flag=True, help="Force AI matching, bypass cache and literal matching")
-@click.option("--no-cache", is_flag=True, help="Bypass cache lookup and don't cache results (useful for testing)")
-@click.option("--focus", "-f", is_flag=True, default=False,
-              help="Focus the browser window before executing action (macOS only)")
+@click.option(
+    "--force-ai", is_flag=True, help="Force AI matching, bypass cache and literal matching"
+)
+@click.option(
+    "--no-cache",
+    is_flag=True,
+    help="Bypass cache lookup and don't cache results (useful for testing)",
+)
+@click.option(
+    "--focus",
+    "-f",
+    is_flag=True,
+    default=False,
+    help="Focus the browser window before executing action (macOS only)",
+)
 @click.option("--verbose", "-v", is_flag=True, help="Show detailed diagnostic logging")
 def do(instruction, debug, no_execute, force_ai, no_cache, focus, verbose):
     """
@@ -1071,7 +1172,13 @@ def do(instruction, debug, no_execute, force_ai, no_cache, focus, verbose):
 
     if not client.is_alive():
         from inspekt.app.cli.table import _style_with_inline_code
-        click.echo(_style_with_inline_code("Error: Bridge server is not running. Start it with `inspekt start`.", base_fg="red"), err=True)
+
+        click.echo(
+            _style_with_inline_code(
+                "Error: Bridge server is not running. Start it with `inspekt start`.", base_fg="red"
+            ),
+            err=True,
+        )
         sys.exit(1)
 
     # Focus browser AFTER connection is verified (and domain is approved)
@@ -1116,10 +1223,13 @@ def do(instruction, debug, no_execute, force_ai, no_cache, focus, verbose):
         if active_modal:
             modal_type = active_modal.get("type", "modal")
             modal_count = active_modal.get("modalElementCount", 0)
-            click.echo(click.style(
-                f"Detected {modal_type} overlay — trying {modal_count} modal elements first",
-                fg="yellow"
-            ), err=True)
+            click.echo(
+                click.style(
+                    f"Detected {modal_type} overlay — trying {modal_count} modal elements first",
+                    fg="yellow",
+                ),
+                err=True,
+            )
             actionable_elements = active_modal.get("modalElements", actionable_elements)
             total_actions = len(actionable_elements)
             page_data["actionableElements"] = actionable_elements
@@ -1127,7 +1237,10 @@ def do(instruction, debug, no_execute, force_ai, no_cache, focus, verbose):
 
         # Display element counts including viewport info
         viewport_count = page_data.get("viewportActionsCount", 0)
-        click.echo(f"Found {total_actions} actionable elements (prioritizing {viewport_count} in viewport)", err=True)
+        click.echo(
+            f"Found {total_actions} actionable elements (prioritizing {viewport_count} in viewport)",
+            err=True,
+        )
 
         # Initialize cache and matcher with config
         cache = ActionCache()
@@ -1220,20 +1333,27 @@ def do(instruction, debug, no_execute, force_ai, no_cache, focus, verbose):
 
             # PHASE 3: If modal was active but no match found, retry with ALL elements
             if not matched_element and active_modal and all_elements:
-                click.echo(click.style(
-                    "No match in modal — expanding search to full page",
-                    fg="yellow"
-                ), err=True)
+                click.echo(
+                    click.style("No match in modal — expanding search to full page", fg="yellow"),
+                    err=True,
+                )
                 full_viewport, full_offscreen = _partition_elements_by_viewport(all_elements)
-                for scope_els, scope_name in [(full_viewport, "full-page viewport"), (full_offscreen, "full-page off-screen")]:
+                for scope_els, scope_name in [
+                    (full_viewport, "full-page viewport"),
+                    (full_offscreen, "full-page off-screen"),
+                ]:
                     if matched_element or not scope_els:
                         continue
                     matched_element, match_method, match_score = _try_matching_strategies(
-                        matcher=matcher, cache=cache,
+                        matcher=matcher,
+                        cache=cache,
                         action_normalized=action_normalized,
-                        elements=scope_els, languages=languages,
-                        current_url=current_url, page_data=page_data,
-                        scope_label=scope_name, verbose=verbose,
+                        elements=scope_els,
+                        languages=languages,
+                        current_url=current_url,
+                        page_data=page_data,
+                        scope_label=scope_name,
+                        verbose=verbose,
                         skip_cache=no_cache,
                     )
                     if matched_element:
@@ -1248,15 +1368,29 @@ def do(instruction, debug, no_execute, force_ai, no_cache, focus, verbose):
                 # High confidence match (80%+) - auto-execute
                 click.echo()
                 scope_info = f" in {search_scope}" if search_scope else ""
-                click.echo(click.style(f"High confidence match{scope_info} (confidence: {match_score:.0%}) [{match_method}]", fg="green", bold=True))
-                click.echo(f"  → {matched_element.get('type')}: {matched_element.get('text', 'N/A')[:80]}")
-                if matched_element.get('href'):
+                click.echo(
+                    click.style(
+                        f"High confidence match{scope_info} (confidence: {match_score:.0%}) [{match_method}]",
+                        fg="green",
+                        bold=True,
+                    )
+                )
+                click.echo(
+                    f"  → {matched_element.get('type')}: {matched_element.get('text', 'N/A')[:80]}"
+                )
+                if matched_element.get("href"):
                     click.echo(f"  → URL: {matched_element.get('href')}")
                 should_execute = True
             else:
                 # Low confidence - fall back to AI
                 matched_element = None
-                click.echo(click.style(f"Match confidence too low ({match_score:.0%}), falling back to AI…", fg="yellow"), err=True)
+                click.echo(
+                    click.style(
+                        f"Match confidence too low ({match_score:.0%}), falling back to AI…",
+                        fg="yellow",
+                    ),
+                    err=True,
+                )
 
             # Execute if approved
             if should_execute and not no_execute:
@@ -1272,8 +1406,12 @@ def do(instruction, debug, no_execute, force_ai, no_cache, focus, verbose):
 
                 # Store in cache for future use (skip if --no-cache)
                 if cache.is_enabled() and match_method != "CACHED" and not no_cache:
-                    cache.store_action(current_url, instruction, action_normalized, matched_element, page_data)
-                    click.echo(click.style(success("Action cached for future use"), fg="green"), err=True)
+                    cache.store_action(
+                        current_url, instruction, action_normalized, matched_element, page_data
+                    )
+                    click.echo(
+                        click.style(success("Action cached for future use"), fg="green"), err=True
+                    )
 
                 return  # Exit successfully without calling AI
 
@@ -1282,7 +1420,9 @@ def do(instruction, debug, no_execute, force_ai, no_cache, focus, verbose):
             if force_ai:
                 click.echo(click.style("Forcing AI matching (--force-ai)…", fg="yellow"), err=True)
             else:
-                click.echo(click.style("No automatic match found, using AI…", fg="yellow"), err=True)
+                click.echo(
+                    click.style("No automatic match found, using AI…", fg="yellow"), err=True
+                )
 
         # Read the prompt
         prompt_path = Path(__file__).parent.parent.parent.parent / "prompts" / "do.prompt"
@@ -1317,7 +1457,7 @@ def do(instruction, debug, no_execute, force_ai, no_cache, focus, verbose):
             "headings": page_data.get("headings", []),
             # Elements are ordered: viewport first, then off-screen
             "actionableElements": elements_with_visibility,
-            "_note": f"Elements are prioritized: first {len(viewport_elements)} are in viewport, rest are off-screen"
+            "_note": f"Elements are prioritized: first {len(viewport_elements)} are in viewport, rest are off-screen",
         }
 
         # Combine prompt with instruction and page data
@@ -1372,7 +1512,10 @@ def do(instruction, debug, no_execute, force_ai, no_cache, focus, verbose):
                 try:
                     response = json.loads(raw_output)
                 except json.JSONDecodeError as e:
-                    click.echo(f"Error: AI returned invalid JSON even after stripping markdown: {e}", err=True)
+                    click.echo(
+                        f"Error: AI returned invalid JSON even after stripping markdown: {e}",
+                        err=True,
+                    )
                     click.echo("Raw response:", err=True)
                     click.echo(raw_output, err=True)
                     sys.exit(1)
@@ -1399,7 +1542,7 @@ def do(instruction, debug, no_execute, force_ai, no_cache, focus, verbose):
                 if action == "click":
                     detail = f" → {step.get('actionId', '?')}"
                 elif action == "type":
-                    detail = f" → \"{step.get('text', '')}\""
+                    detail = f' → "{step.get("text", "")}"'
                 elif action == "press":
                     detail = f" → {step.get('key', '?')}"
                 elif action == "select":
@@ -1416,13 +1559,31 @@ def do(instruction, debug, no_execute, force_ai, no_cache, focus, verbose):
                     _execute_multi_step(client, steps, actionable_elements)
 
                     # Cache the first element for future single-step use
-                    first_action_id = next((s.get("actionId") for s in steps if s.get("actionId")), None)
+                    first_action_id = next(
+                        (s.get("actionId") for s in steps if s.get("actionId")), None
+                    )
                     if first_action_id and cache.is_enabled() and not no_cache:
-                        first_element = next((el for el in actionable_elements if el.get("actionId") == first_action_id), None)
+                        first_element = next(
+                            (
+                                el
+                                for el in actionable_elements
+                                if el.get("actionId") == first_action_id
+                            ),
+                            None,
+                        )
                         if first_element:
-                            cache.store_action(current_url, instruction, action_normalized, first_element, page_data)
+                            cache.store_action(
+                                current_url,
+                                instruction,
+                                action_normalized,
+                                first_element,
+                                page_data,
+                            )
                 except (ConnectionError, TimeoutError, RuntimeError) as e:
-                    click.echo(click.style(error(f"Error during multi-step execution: {e}"), fg="red"), err=True)
+                    click.echo(
+                        click.style(error(f"Error during multi-step execution: {e}"), fg="red"),
+                        err=True,
+                    )
                     sys.exit(1)
 
             return  # Done — skip single-match handling
@@ -1441,7 +1602,9 @@ def do(instruction, debug, no_execute, force_ai, no_cache, focus, verbose):
             reasoning = match.get("reasoning", "")
 
             # Find the full element details
-            element = next((el for el in actionable_elements if el.get("actionId") == action_id), None)
+            element = next(
+                (el for el in actionable_elements if el.get("actionId") == action_id), None
+            )
 
             # Determine visibility status for display
             visibility_info = ""
@@ -1455,13 +1618,13 @@ def do(instruction, debug, no_execute, force_ai, no_cache, focus, verbose):
             if element:
                 click.echo(f"   Type: {element.get('type')}")
                 click.echo(f"   Text: {element.get('text', 'N/A')[:100]}")
-                if element.get('href'):
+                if element.get("href"):
                     click.echo(f"   URL: {element.get('href')}")
-                if element.get('context'):
-                    ctx = element['context']
-                    if ctx.get('type') == 'heading':
+                if element.get("context"):
+                    ctx = element["context"]
+                    if ctx.get("type") == "heading":
                         click.echo(f"   Context: Under heading '{ctx.get('text', '')[:50]}'")
-                    elif ctx.get('type') == 'landmark':
+                    elif ctx.get("type") == "landmark":
                         click.echo(f"   Context: In {ctx.get('role')} landmark")
             click.echo(f"   Reasoning: {reasoning}")
             click.echo()
@@ -1471,7 +1634,9 @@ def do(instruction, debug, no_execute, force_ai, no_cache, focus, verbose):
             top_match = matches[0]
             top_probability = top_match.get("probability", 0)
             top_action_id = top_match.get("actionId")
-            top_element = next((el for el in actionable_elements if el.get("actionId") == top_action_id), None)
+            top_element = next(
+                (el for el in actionable_elements if el.get("actionId") == top_action_id), None
+            )
 
             should_execute = False
 
@@ -1485,20 +1650,36 @@ def do(instruction, debug, no_execute, force_ai, no_cache, focus, verbose):
 
             if top_probability >= 0.8:
                 # High confidence (80%+) - auto-execute
-                click.echo(click.style(f"High confidence match{visibility_note} (confidence: {top_probability:.0%}) [AI]", fg="green", bold=True))
+                click.echo(
+                    click.style(
+                        f"High confidence match{visibility_note} (confidence: {top_probability:.0%}) [AI]",
+                        fg="green",
+                        bold=True,
+                    )
+                )
                 if top_element:
-                    click.echo(f"  → {top_element.get('type')}: {top_element.get('text', 'N/A')[:80]}")
-                    if top_element.get('href'):
+                    click.echo(
+                        f"  → {top_element.get('type')}: {top_element.get('text', 'N/A')[:80]}"
+                    )
+                    if top_element.get("href"):
                         click.echo(f"  → URL: {top_element.get('href')}")
                 click.echo(click.style("Auto-executing…", fg="green"))
                 should_execute = True
             else:
                 # Lower confidence - ask for confirmation
                 click.echo()
-                click.echo(click.style(f"Would you like to execute this action?{visibility_note} (confidence: {top_probability:.0%})", fg="yellow", bold=True))
+                click.echo(
+                    click.style(
+                        f"Would you like to execute this action?{visibility_note} (confidence: {top_probability:.0%})",
+                        fg="yellow",
+                        bold=True,
+                    )
+                )
                 if top_element:
-                    click.echo(f"  → {top_element.get('type')}: {top_element.get('text', 'N/A')[:80]}")
-                    if top_element.get('href'):
+                    click.echo(
+                        f"  → {top_element.get('type')}: {top_element.get('text', 'N/A')[:80]}"
+                    )
+                    if top_element.get("href"):
                         click.echo(f"  → URL: {top_element.get('href')}")
                 click.echo()
 
@@ -1518,11 +1699,18 @@ def do(instruction, debug, no_execute, force_ai, no_cache, focus, verbose):
 
                     # Store in cache for future use [AI] (skip if --no-cache)
                     if cache.is_enabled() and not no_cache:
-                        cache.store_action(current_url, instruction, action_normalized, top_element, page_data)
-                        click.echo(click.style(success("Action cached for future use [AI]"), fg="green"), err=True)
+                        cache.store_action(
+                            current_url, instruction, action_normalized, top_element, page_data
+                        )
+                        click.echo(
+                            click.style(success("Action cached for future use [AI]"), fg="green"),
+                            err=True,
+                        )
 
                 except (ConnectionError, TimeoutError, RuntimeError) as e:
-                    click.echo(click.style(error(f"Error executing action: {e}"), fg="red"), err=True)
+                    click.echo(
+                        click.style(error(f"Error executing action: {e}"), fg="red"), err=True
+                    )
                     sys.exit(1)
 
         # Output as JSON for easy parsing (only in verbose mode to reduce noise)
@@ -1555,14 +1743,16 @@ def _process_outline_headings(headings: list) -> list:
 
         # Insert missing levels before this heading
         while expected_level < level:
-            processed.append({
-                "level": expected_level,
-                "text": "",
-                "type": "missing",
-                "is_missing": True,
-                "is_empty": False,
-                "is_duplicate": False
-            })
+            processed.append(
+                {
+                    "level": expected_level,
+                    "text": "",
+                    "type": "missing",
+                    "is_missing": True,
+                    "is_empty": False,
+                    "is_duplicate": False,
+                }
+            )
             expected_level += 1
 
         # Check for duplicates (2nd+ occurrence only, skip empty text)
@@ -1573,14 +1763,16 @@ def _process_outline_headings(headings: list) -> list:
         # Check for empty headings (real heading but no text content)
         is_empty = not text.strip()
 
-        processed.append({
-            "level": level,
-            "text": text,
-            "type": heading.get("type", "native"),
-            "is_missing": False,
-            "is_empty": is_empty,
-            "is_duplicate": is_duplicate
-        })
+        processed.append(
+            {
+                "level": level,
+                "text": text,
+                "type": heading.get("type", "native"),
+                "is_missing": False,
+                "is_empty": is_empty,
+                "is_duplicate": is_duplicate,
+            }
+        )
 
         # Update expected level: after H2, expect H2 or H3 next
         # But if next heading is H1 again, that resets context
@@ -1596,7 +1788,9 @@ def _process_outline_headings(headings: list) -> list:
     exclude_params=["truncate"],
 )
 @click.option("--json", "-j", "output_json", is_flag=True, help="Output as JSON")
-@click.option("--truncate", type=int, default=None, help="Truncate headings to specified number of characters")
+@click.option(
+    "--truncate", type=int, default=None, help="Truncate headings to specified number of characters"
+)
 def outline(output_json, truncate):
     """
     Display the page's heading structure as a nested outline.
@@ -1613,7 +1807,13 @@ def outline(output_json, truncate):
 
     if not client.is_alive():
         from inspekt.app.cli.table import _style_with_inline_code
-        click.echo(_style_with_inline_code("Error: Bridge server is not running. Start it with `inspekt start`.", base_fg="red"), err=True)
+
+        click.echo(
+            _style_with_inline_code(
+                "Error: Bridge server is not running. Start it with `inspekt start`.", base_fg="red"
+            ),
+            err=True,
+        )
         sys.exit(1)
 
     # Load and execute the extract_outline script
@@ -1639,6 +1839,7 @@ def outline(output_json, truncate):
         if not headings:
             if output_json:
                 from inspekt.app.cli.table import print_json
+
                 print_json({"headings": [], "count": 0}, summary="0 headings")
             else:
                 click.echo("No headings found on this page.", err=True)
@@ -1666,6 +1867,7 @@ def outline(output_json, truncate):
 
         if output_json:
             from inspekt.app.cli.table import print_json
+
             print_json(output_data, summary=toast_summary)
             return
 
@@ -1695,7 +1897,7 @@ def outline(output_json, truncate):
 
                 # Truncate headings only if --truncate is specified
                 if truncate and len(text) > truncate:
-                    text = text[:truncate - 1] + "…"
+                    text = text[: truncate - 1] + "…"
 
                 heading_text = text
 
@@ -1710,6 +1912,7 @@ def outline(output_json, truncate):
                     heading_text = f"{heading_text} {' '.join(indicators)}"
 
             from inspekt.app.cli.sitemap import wrap_styled_line
+
             for line in wrap_styled_line(
                 prefix=f"{indent}{level_label} ",
                 text=heading_text,
@@ -1729,6 +1932,7 @@ def outline(output_json, truncate):
 
         # VM terminal: offer a "Data ready to copy" toast in default mode too
         from inspekt.app.cli.table import emit_copyable_data
+
         outline_rows = []
         for h in processed_headings:
             flags = []
@@ -1742,11 +1946,13 @@ def outline(output_json, truncate):
                 flags.append("aria")
             level = h["level"]
             text = "" if h.get("is_missing") else h.get("text", "")
-            outline_rows.append([
-                f"H{level}",
-                "  " * (level - 1) + text,
-                ", ".join(flags),
-            ])
+            outline_rows.append(
+                [
+                    f"H{level}",
+                    "  " * (level - 1) + text,
+                    ", ".join(flags),
+                ]
+            )
         emit_copyable_data(
             headers=["Level", "Heading", "Flags"],
             rows=outline_rows,
@@ -1915,7 +2121,11 @@ def _enrich_external_links(links: list) -> list:
 @click.option("--alphabetically", is_flag=True, help="Sort links alphabetically")
 @click.option("--only-urls", is_flag=True, help="Show only URLs without anchor text")
 @click.option(
-    "--json", "-j", "output_json", is_flag=True, help="Output as JSON with detailed link information"
+    "--json",
+    "-j",
+    "output_json",
+    is_flag=True,
+    help="Output as JSON with detailed link information",
 )
 @click.option(
     "--enrich-external",
@@ -1942,7 +2152,13 @@ def links(only_internal, only_external, alphabetically, only_urls, output_json, 
 
     if not client.is_alive():
         from inspekt.app.cli.table import _style_with_inline_code
-        click.echo(_style_with_inline_code("Error: Bridge server is not running. Start it with `inspekt start`.", base_fg="red"), err=True)
+
+        click.echo(
+            _style_with_inline_code(
+                "Error: Bridge server is not running. Start it with `inspekt start`.", base_fg="red"
+            ),
+            err=True,
+        )
         sys.exit(1)
 
     # Check for conflicting flags
@@ -2004,6 +2220,7 @@ def links(only_internal, only_external, alphabetically, only_urls, output_json, 
         if output_json:
             output_data = {"links": filtered_links, "total": len(filtered_links), "domain": domain}
             from inspekt.app.cli.table import print_json
+
             print_json(output_data, summary=f"{len(filtered_links)} links")
             return
 
@@ -2069,6 +2286,7 @@ def links(only_internal, only_external, alphabetically, only_urls, output_json, 
 
         # VM terminal: offer a "Data ready to copy" toast
         from inspekt.app.cli.table import emit_copyable_data
+
         link_rows = [
             [link.get("type", ""), link.get("text", "") or "", link.get("href", "") or ""]
             for link in filtered_links
@@ -2104,7 +2322,8 @@ def links(only_internal, only_external, alphabetically, only_urls, output_json, 
 @click.option("--force-refresh", is_flag=True, help="Force refresh, bypass cache")
 @click.option("--json", "-j", "output_json", is_flag=True, help="Output as JSON with metadata")
 @click.option(
-    "--output", "-o",
+    "--output",
+    "-o",
     type=click.Path(),
     help="Save output to file (.txt for text, .mp3 for audio)",
 )
@@ -2137,7 +2356,13 @@ def summarize(format, language, debug, force_refresh, output_json, output, speak
 
     if not client.is_alive():
         from inspekt.app.cli.table import _style_with_inline_code
-        click.echo(_style_with_inline_code("Error: Bridge server is not running. Start it with `inspekt start`.", base_fg="red"), err=True)
+
+        click.echo(
+            _style_with_inline_code(
+                "Error: Bridge server is not running. Start it with `inspekt start`.", base_fg="red"
+            ),
+            err=True,
+        )
         sys.exit(1)
 
     # Get extractor config
@@ -2210,7 +2435,10 @@ return ({extraction_script})
 
         if not output_json:
             if page_title_for_display:
-                click.echo(analyze_icon(f'Extracting article content from "{page_title_for_display}"…'), err=True)
+                click.echo(
+                    analyze_icon(f'Extracting article content from "{page_title_for_display}"…'),
+                    err=True,
+                )
             else:
                 click.echo(analyze_icon("Extracting article content…"), err=True)
         result = client.execute(script, timeout=30.0)
@@ -2222,7 +2450,10 @@ return ({extraction_script})
         article = result.get("result") or {}
 
         if not article:
-            click.echo("Error: No content extracted. The page may not be an article or may have restricted access.", err=True)
+            click.echo(
+                "Error: No content extracted. The page may not be an article or may have restricted access.",
+                err=True,
+            )
             sys.exit(1)
 
         if article.get("error"):
@@ -2266,7 +2497,9 @@ return ({extraction_script})
 
         if not force_refresh and not debug and content_cache.is_enabled("summarize"):
             fingerprint = content_cache.create_summarize_fingerprint(article_data)
-            cached_result = content_cache.get_cached_content(current_url, "summarize", fingerprint, target_lang or "auto")
+            cached_result = content_cache.get_cached_content(
+                current_url, "summarize", fingerprint, target_lang or "auto"
+            )
 
             if cached_result:
                 cache_similarity = cached_result["similarity"]
@@ -2293,6 +2526,7 @@ return ({extraction_script})
                         "ai": model_info,
                     }
                     from inspekt.app.cli.table import print_json
+
                     print_json(json_output, summary="article summary (cached)")
                     return
 
@@ -2304,7 +2538,12 @@ return ({extraction_script})
                 else:
                     age_str = f"{age_seconds // 86400} days ago"
 
-                click.echo(cached_icon(f"Using cached summary (similarity: {cache_similarity:.0%}, cached {age_str})"), err=True)
+                click.echo(
+                    cached_icon(
+                        f"Using cached summary (similarity: {cache_similarity:.0%}, cached {age_str})"
+                    ),
+                    err=True,
+                )
                 click.echo()
                 if byline:
                     click.echo(f"By: {byline}")
@@ -2329,9 +2568,7 @@ return ({extraction_script})
             click.echo(generate_icon("Generating summary…"), err=True)
 
         summary_text = ai_service.generate_summary(
-            article=article,
-            language_override=language,
-            debug=debug
+            article=article, language_override=language, debug=debug
         )
 
         # If debug mode, generate_summary returns None after showing prompt
@@ -2342,7 +2579,9 @@ return ({extraction_script})
         generation_timestamp = time.time()
         if content_cache.is_enabled("summarize") and current_url:
             fingerprint = content_cache.create_summarize_fingerprint(article_data)
-            content_cache.store_content(current_url, "summarize", fingerprint, summary_text, target_lang or "auto")
+            content_cache.store_content(
+                current_url, "summarize", fingerprint, summary_text, target_lang or "auto"
+            )
             if not output_json:
                 click.echo(success("Summary cached for future use"), err=True)
 
@@ -2359,11 +2598,12 @@ return ({extraction_script})
                 "ai": model_info,
             }
             from inspekt.app.cli.table import print_json
+
             print_json(json_output, summary="article summary")
         elif output:
             # Smart output detection by extension
             output_path = Path(output)
-            audio_extensions = {'.mp3', '.wav', '.m4a', '.aac'}
+            audio_extensions = {".mp3", ".wav", ".m4a", ".aac"}
             is_audio_output = output_path.suffix.lower() in audio_extensions
 
             if is_audio_output:
@@ -2398,8 +2638,14 @@ return ({extraction_script})
 @click.command()
 @click.option("--no-cache", is_flag=True, help="Don't save to cache")
 @click.option("--output", "-o", type=click.Path(), help="Save to specific file instead of cache")
-@click.option("--headless", is_flag=True, help="Run in headless Chrome (no browser extension required)")
-@click.option("--mirror-session", is_flag=True, help="Mirror cookies/storage from live browser (implies --headless)")
+@click.option(
+    "--headless", is_flag=True, help="Run in headless Chrome (no browser extension required)"
+)
+@click.option(
+    "--mirror-session",
+    is_flag=True,
+    help="Mirror cookies/storage from live browser (implies --headless)",
+)
 @click.option("--url", "headless_url", default=None, help="URL to index in headless mode")
 def index(no_cache, output, headless, mirror_session, headless_url):
     """
@@ -2489,6 +2735,7 @@ def index(no_cache, output, headless, mirror_session, headless_url):
             from urllib.parse import urlparse
 
             from inspekt.services.content_cache import ContentCache
+
             _content_cache = ContentCache()  # instantiated for its side effects (cache dir setup)
             parsed = urlparse(current_url)
             domain = parsed.netloc
@@ -2506,7 +2753,13 @@ def index(no_cache, output, headless, mirror_session, headless_url):
 
     if not client.is_alive():
         from inspekt.app.cli.table import _style_with_inline_code
-        click.echo(_style_with_inline_code("Error: Bridge server is not running. Start it with `inspekt start`.", base_fg="red"), err=True)
+
+        click.echo(
+            _style_with_inline_code(
+                "Error: Bridge server is not running. Start it with `inspekt start`.", base_fg="red"
+            ),
+            err=True,
+        )
         sys.exit(1)
 
     # Load and execute the index_page script
@@ -2573,28 +2826,40 @@ def index(no_cache, output, headless, mirror_session, headless_url):
                     img_width = largest_image.get("width", 0)
                     img_height = largest_image.get("height", 0)
 
-                    click.echo(f"Inserting description for image: alt='{img_alt[:50]}…', size={img_width}x{img_height}", err=True)
+                    click.echo(
+                        f"Inserting description for image: alt='{img_alt[:50]}…', size={img_width}x{img_height}",
+                        err=True,
+                    )
 
                     # Create pattern to find this specific image
                     if img_alt:
                         # Image with alt text (no regex escaping needed for plain string replace)
                         pattern = f"![{img_alt}] ({img_width}x{img_height}px)"
-                        replacement = f"![{img_alt}] ({img_width}x{img_height}px)\n\nVisual description of this image: \"{vision_description}\""
+                        replacement = f'![{img_alt}] ({img_width}x{img_height}px)\n\nVisual description of this image: "{vision_description}"'
 
                         if pattern in indexed_content:
                             indexed_content = indexed_content.replace(pattern, replacement, 1)
                             click.echo(success("Vision description inserted"), err=True)
                         else:
-                            click.echo(f"Warning: Could not find image pattern in markdown: {pattern}", err=True)
+                            click.echo(
+                                f"Warning: Could not find image pattern in markdown: {pattern}",
+                                err=True,
+                            )
                     else:
                         # Image without alt text - add description at the top of main content
                         # Find where main content starts (after the "---" separator)
-                        parts = indexed_content.split('---\n\n', 1)
+                        parts = indexed_content.split("---\n\n", 1)
                         if len(parts) == 2:
-                            header = parts[0] + '---\n\n'
+                            header = parts[0] + "---\n\n"
                             content = parts[1]
-                            indexed_content = header + f"![Largest image on page (no alt text)] ({img_width}x{img_height}px)\n\nVisual description of this image: \"{vision_description}\"\n\n" + content
-                            click.echo(success("Vision description inserted (no alt text)"), err=True)
+                            indexed_content = (
+                                header
+                                + f'![Largest image on page (no alt text)] ({img_width}x{img_height}px)\n\nVisual description of this image: "{vision_description}"\n\n'
+                                + content
+                            )
+                            click.echo(
+                                success("Vision description inserted (no alt text)"), err=True
+                            )
                 else:
                     click.echo("Warning: No vision description received", err=True)
 
@@ -2610,7 +2875,7 @@ def index(no_cache, output, headless, mirror_session, headless_url):
             # Save to specific file
             output_path = Path(output)
             output_path.parent.mkdir(parents=True, exist_ok=True)
-            with builtin_open(output_path, 'w', encoding='utf-8') as f:
+            with builtin_open(output_path, "w", encoding="utf-8") as f:
                 f.write(indexed_content)
             click.echo(f"\n{success(f'Saved to: {output_path}')}", err=True)
 
@@ -2626,32 +2891,31 @@ def index(no_cache, output, headless, mirror_session, headless_url):
 
             # Generate filename from URL (sanitize for filesystem)
             import hashlib
+
             url_hash = hashlib.sha256(current_url.encode()).hexdigest()[:12]
 
             # Also create a readable filename from URL
             from urllib.parse import urlparse
+
             parsed = urlparse(current_url)
-            readable_name = parsed.netloc.replace(':', '_') + parsed.path.replace('/', '_')
-            readable_name = re.sub(r'[^\w\-_.]', '_', readable_name)[:50]
+            readable_name = parsed.netloc.replace(":", "_") + parsed.path.replace("/", "_")
+            readable_name = re.sub(r"[^\w\-_.]", "_", readable_name)[:50]
 
             filename = f"{readable_name}_{url_hash}.md"
             cache_path = cache_dir / filename
 
-            with builtin_open(cache_path, 'w', encoding='utf-8') as f:
+            with builtin_open(cache_path, "w", encoding="utf-8") as f:
                 f.write(indexed_content)
 
             click.echo(f"\n{success(f'Cached to: {cache_path}')}", err=True)
 
             # Also save a metadata file with URL and timestamp
             import time
-            metadata = {
-                "url": current_url,
-                "timestamp": time.time(),
-                "filename": filename
-            }
+
+            metadata = {"url": current_url, "timestamp": time.time(), "filename": filename}
 
             metadata_path = cache_dir / f"{readable_name}_{url_hash}.json"
-            with builtin_open(metadata_path, 'w', encoding='utf-8') as f:
+            with builtin_open(metadata_path, "w", encoding="utf-8") as f:
                 json.dump(metadata, f, indent=2)
 
     except (ConnectionError, TimeoutError, RuntimeError) as e:
@@ -2688,7 +2952,13 @@ def ask(question, debug, no_cache):
 
     if not client.is_alive():
         from inspekt.app.cli.table import _style_with_inline_code
-        click.echo(_style_with_inline_code("Error: Bridge server is not running. Start it with `inspekt start`.", base_fg="red"), err=True)
+
+        click.echo(
+            _style_with_inline_code(
+                "Error: Bridge server is not running. Start it with `inspekt start`.", base_fg="red"
+            ),
+            err=True,
+        )
         sys.exit(1)
 
     # Initialize content cache for AI response caching
@@ -2710,9 +2980,7 @@ def ask(question, debug, no_cache):
         fingerprint = content_cache.create_ask_fingerprint(question)
         question_hash = content_cache.get_question_hash(question)
 
-        cached = content_cache.get_cached_content(
-            current_url, "ask", fingerprint, question_hash
-        )
+        cached = content_cache.get_cached_content(current_url, "ask", fingerprint, question_hash)
 
         if cached:
             # Found cached AI response
@@ -2737,6 +3005,7 @@ def ask(question, debug, no_cache):
 
             if cache_dir.exists():
                 import hashlib
+
                 url_hash = hashlib.sha256(current_url.encode()).hexdigest()[:12]
 
                 # Find cache file with this URL hash
@@ -2745,7 +3014,7 @@ def ask(question, debug, no_cache):
                 if cache_files:
                     # Use the most recent one
                     cache_file = max(cache_files, key=lambda p: p.stat().st_mtime)
-                    with builtin_open(cache_file, 'r', encoding='utf-8') as f:
+                    with builtin_open(cache_file, "r", encoding="utf-8") as f:
                         indexed_content = f.read()
                     click.echo(cached_icon("Using cached index for current page"), err=True)
                 else:

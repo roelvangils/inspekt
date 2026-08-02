@@ -3,6 +3,7 @@ CSS optimization utilities using Lightning CSS.
 
 Requires: npm install -g lightningcss-cli
 """
+
 from __future__ import annotations
 
 import re
@@ -214,7 +215,6 @@ CSS_PROPERTY_CATEGORY = {
     "grid-column": 1,
     "grid-row": 1,
     "grid-area": 1,
-
     # Category 2: Box - position, spacing, borders
     "position": 2,
     "top": 2,
@@ -267,7 +267,6 @@ CSS_PROPERTY_CATEGORY = {
     "outline-style": 2,
     "outline-color": 2,
     "outline-offset": 2,
-
     # Category 3: Typography - text appearance
     "color": 3,
     "font": 3,
@@ -296,7 +295,6 @@ CSS_PROPERTY_CATEGORY = {
     "hyphens": 3,
     "direction": 3,
     "writing-mode": 3,
-
     # Category 4: Animation - motion and transforms
     "transform": 4,
     "transform-origin": 4,
@@ -314,7 +312,6 @@ CSS_PROPERTY_CATEGORY = {
     "animation-direction": 4,
     "animation-fill-mode": 4,
     "animation-play-state": 4,
-
     # Category 5 (Other) is the default - no need to list properties
 }
 
@@ -368,7 +365,6 @@ CSS_PROPERTY_ORDER = {
     "grid-column": 148,
     "grid-row": 149,
     "grid-area": 150,
-
     # Box (200-299) - position, spacing, borders
     "position": 200,
     "inset": 201,
@@ -421,7 +417,6 @@ CSS_PROPERTY_ORDER = {
     "outline-style": 262,
     "outline-color": 263,
     "outline-offset": 264,
-
     # Typography (300-399)
     "color": 300,
     "font": 301,
@@ -450,7 +445,6 @@ CSS_PROPERTY_ORDER = {
     "hyphens": 324,
     "direction": 325,
     "writing-mode": 326,
-
     # Animation (400-499)
     "transform": 400,
     "transform-origin": 401,
@@ -468,7 +462,6 @@ CSS_PROPERTY_ORDER = {
     "animation-direction": 426,
     "animation-fill-mode": 427,
     "animation-play-state": 428,
-
     # Other (500+) - alphabetized
 }
 
@@ -577,7 +570,9 @@ def sort_properties_in_block(block_content: str, add_category_comments: bool = T
                 current_lines.append(line)
                 # Check if this continuation line completes the property
                 # (e.g., last value in a multi-line transition ending with ";")
-                if stripped.endswith(";") or (";" in stripped and "/*" in stripped and "*/" in stripped):
+                if stripped.endswith(";") or (
+                    ";" in stripped and "/*" in stripped and "*/" in stripped
+                ):
                     properties.append("\n".join(current_lines))
                     current_lines = []
 
@@ -716,13 +711,9 @@ def optimize_css(
         from inspekt.services.css_color_converter import add_rounded_property_comments
 
         if rounded_props:
-            optimized = add_rounded_property_comments(
-                optimized, rounded_props, "Browser-computed"
-            )
+            optimized = add_rounded_property_comments(optimized, rounded_props, "Browser-computed")
         elif computed_props:
-            optimized = add_rounded_property_comments(
-                optimized, computed_props, "Browser-computed"
-            )
+            optimized = add_rounded_property_comments(optimized, computed_props, "Browser-computed")
 
         # Step 6: Add color name comments (when not using oklch conversion)
         # Runs AFTER Prettier so comments don't cause unwanted line wrapping
@@ -819,7 +810,9 @@ def format_css_columns(css_content: str, column_format: str) -> str:
     return "\n".join(result)
 
 
-def _process_css_block(lines: list[str], start_idx: int, column_format: str) -> tuple[list[str], int]:
+def _process_css_block(
+    lines: list[str], start_idx: int, column_format: str
+) -> tuple[list[str], int]:
     """
     Process a CSS block, handling properties, nested blocks, and multi-line values.
 
@@ -837,7 +830,7 @@ def _process_css_block(lines: list[str], start_idx: int, column_format: str) -> 
 
         # Determine indentation from first content line
         if not block_indent and stripped and not stripped.startswith("/*"):
-            block_indent = line[:len(line) - len(line.lstrip())]
+            block_indent = line[: len(line) - len(line.lstrip())]
 
         # End of block
         if stripped == "}":
@@ -913,7 +906,9 @@ def _process_css_block(lines: list[str], start_idx: int, column_format: str) -> 
             item_type, item_lines, parsed = block_items[idx]
 
             if item_type == "property":
-                formatted = _format_single_property(parsed, block_indent, column_format, max_prop_len, max_value_len)
+                formatted = _format_single_property(
+                    parsed, block_indent, column_format, max_prop_len, max_value_len
+                )
                 result.append(formatted)
             elif item_type == "multiline":
                 # Format multi-line property with block's column width
@@ -939,7 +934,9 @@ def _process_css_block(lines: list[str], start_idx: int, column_format: str) -> 
     return result, i
 
 
-def _format_multiline_property(prop_lines: list[str], block_indent: str, block_prop_len: int = 0) -> list[str]:
+def _format_multiline_property(
+    prop_lines: list[str], block_indent: str, block_prop_len: int = 0
+) -> list[str]:
     """
     Format a multi-line property with comma-separated values.
 
@@ -973,7 +970,7 @@ def _format_multiline_property(prop_lines: list[str], block_indent: str, block_p
     for line in value_lines:
         stripped = line.strip()
         # Determine the indentation of this line
-        line_indent = line[:len(line) - len(line.lstrip())]
+        line_indent = line[: len(line) - len(line.lstrip())]
 
         # Try to parse as "name value," or "name value;"
         # Split on whitespace, first part is name, rest is value
@@ -993,10 +990,10 @@ def _format_multiline_property(prop_lines: list[str], block_indent: str, block_p
                 and stripped_value.endswith(("s", "ms", "%", "px", "em", "rem"))
             )
             is_value_like = (
-                is_css_measurement or
-                stripped_value.replace(".", "").isdigit() or
-                "(" in value or
-                value.startswith("#")
+                is_css_measurement
+                or stripped_value.replace(".", "").isdigit()
+                or "(" in value
+                or value.startswith("#")
             )
             if is_property_like or is_value_like:
                 parsed_values.append((line_indent, name, value, True))
@@ -1014,10 +1011,7 @@ def _format_multiline_property(prop_lines: list[str], block_indent: str, block_p
         return prop_lines
 
     # Use block's property length for alignment, or calculate from local names
-    max_name_len = max(
-        (len(pv[1]) for pv in parsed_values if pv[2] is not None),
-        default=0
-    )
+    max_name_len = max((len(pv[1]) for pv in parsed_values if pv[2] is not None), default=0)
     # Use the larger of block width or local width for alignment
     target_width = max(block_prop_len, max_name_len + 2)
 
@@ -1034,7 +1028,9 @@ def _format_multiline_property(prop_lines: list[str], block_indent: str, block_p
     return result
 
 
-def _format_single_property(parsed: tuple, indent: str, column_format: str, max_prop_len: int, max_value_len: int) -> str:
+def _format_single_property(
+    parsed: tuple, indent: str, column_format: str, max_prop_len: int, max_value_len: int
+) -> str:
     """Format a single property with given column widths."""
     prop_name, value, comment = parsed
 
@@ -1135,11 +1131,11 @@ def _parse_property_line(line: str) -> tuple[str, str, str] | None:
 
     # First, check for comment
     comment = ""
-    comment_match = re.search(r'/\*.*?\*/', line)
+    comment_match = re.search(r"/\*.*?\*/", line)
     if comment_match:
         comment = comment_match.group(0)
         # Remove comment from line for easier parsing
-        line_no_comment = line[:comment_match.start()] + line[comment_match.end():]
+        line_no_comment = line[: comment_match.start()] + line[comment_match.end() :]
     else:
         line_no_comment = line
 
@@ -1152,7 +1148,7 @@ def _parse_property_line(line: str) -> tuple[str, str, str] | None:
 
     colon_idx = line_no_comment.index(":")
     prop_name = line_no_comment[:colon_idx].strip() + ":"
-    value = line_no_comment[colon_idx + 1:].strip()
+    value = line_no_comment[colon_idx + 1 :].strip()
 
     # Clean any remaining semicolons from value
     value = value.rstrip(";").strip()

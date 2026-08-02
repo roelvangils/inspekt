@@ -133,7 +133,13 @@ def _get_bridge_client() -> BridgeClient:
     client = BridgeClient()
     if not client.is_alive():
         from inspekt.app.cli.table import _style_with_inline_code
-        click.echo(_style_with_inline_code("Error: Bridge server is not running. Start it with `inspekt start`.", base_fg="red"), err=True)
+
+        click.echo(
+            _style_with_inline_code(
+                "Error: Bridge server is not running. Start it with `inspekt start`.", base_fg="red"
+            ),
+            err=True,
+        )
         sys.exit(1)
     return client
 
@@ -853,7 +859,9 @@ def _get_domain_metrics(domain: str) -> dict | None:
                     cert = ssock.getpeercert()
 
                     issuer = dict(x[0] for x in cert.get("issuer", []))
-                    issuer_name = issuer.get("organizationName", issuer.get("commonName", "Unknown"))
+                    issuer_name = issuer.get(
+                        "organizationName", issuer.get("commonName", "Unknown")
+                    )
 
                     not_after = cert.get("notAfter")
                     if not_after:
@@ -880,7 +888,9 @@ def _get_domain_metrics(domain: str) -> dict | None:
                 creation_date = creation_date[0]
             if creation_date:
                 whois_data["creation_date"] = (
-                    creation_date.strftime("%Y-%m-%d") if hasattr(creation_date, "strftime") else str(creation_date)
+                    creation_date.strftime("%Y-%m-%d")
+                    if hasattr(creation_date, "strftime")
+                    else str(creation_date)
                 )
 
             expiration_date = w.expiration_date
@@ -897,7 +907,9 @@ def _get_domain_metrics(domain: str) -> dict | None:
                 whois_data["registrar"] = (
                     w.registrar
                     if isinstance(w.registrar, str)
-                    else w.registrar[0] if isinstance(w.registrar, list) else str(w.registrar)
+                    else w.registrar[0]
+                    if isinstance(w.registrar, list)
+                    else str(w.registrar)
                 )
 
             if whois_data:
@@ -992,8 +1004,14 @@ def _get_robots_txt(url: str) -> dict | None:
 # =============================================================================
 
 
-def _print_summary(data: dict, version: str, bridge_type: str, browser: str,
-                   instance_id: str | None = None, instance_alias: str | None = None) -> None:
+def _print_summary(
+    data: dict,
+    version: str,
+    bridge_type: str,
+    browser: str,
+    instance_id: str | None = None,
+    instance_alias: str | None = None,
+) -> None:
     """Print summary output."""
     bridge_label = "Extension" if bridge_type == "extension" else "Userscript"
     protocol = data.get("protocol", "N/A")
@@ -1012,7 +1030,9 @@ def _print_summary(data: dict, version: str, bridge_type: str, browser: str,
     # Format instance display: ID with optional alias
     if instance_id:
         if instance_alias:
-            instance_display = click.style(f"{instance_id}", fg="cyan", bold=True) + click.style(f" ({instance_alias})", fg="yellow")
+            instance_display = click.style(f"{instance_id}", fg="cyan", bold=True) + click.style(
+                f" ({instance_alias})", fg="yellow"
+            )
         else:
             instance_display = click.style(instance_id, fg="cyan", bold=True)
     else:
@@ -1279,7 +1299,9 @@ def _print_accessibility(data: dict) -> None:
     landmarks = data.get("landmarks", {})
     if landmarks:
         landmark_summary = ", ".join([f"{role}: {count}" for role, count in landmarks.items()])
-        a11y_rows.append(("Landmarks", f"{data.get('landmarkCount', 0)} total ({landmark_summary})", None))
+        a11y_rows.append(
+            ("Landmarks", f"{data.get('landmarkCount', 0)} total ({landmark_summary})", None)
+        )
     else:
         a11y_rows.append(("Landmarks", f"{data.get('landmarkCount', 0)} total", None))
 
@@ -1322,7 +1344,11 @@ def _print_accessibility(data: dict) -> None:
     form_issues = data.get("formLabelsIssues", {})
     if form_issues.get("missingLabels", 0) > 0:
         issue_rows.append(
-            ("Form inputs without labels", f"{form_issues['missingLabels']}/{form_issues['total']}", "yellow")
+            (
+                "Form inputs without labels",
+                f"{form_issues['missingLabels']}/{form_issues['total']}",
+                "yellow",
+            )
         )
 
     if data.get("linksWithoutText", 0) > 0:
@@ -1334,6 +1360,7 @@ def _print_accessibility(data: dict) -> None:
     if issue_rows:
         _print_info_table("Accessibility Issues", issue_rows)
         from inspekt.app.cli.table import print_hint
+
         print_hint("Run `inspekt axe` for detailed accessibility analysis.")
 
     # Forms
@@ -1343,12 +1370,21 @@ def _print_accessibility(data: dict) -> None:
         form_colors = []
         for form in forms:
             issues = len(form.get("issues", []))
-            action = _truncate_value(form["action"], 30) if form["action"] and form["action"] != "JavaScript" else "-"
+            action = (
+                _truncate_value(form["action"], 30)
+                if form["action"] and form["action"] != "JavaScript"
+                else "-"
+            )
             issue_text = str(issues) if issues > 0 else "0"
-            form_list_rows.append([form["id"], form["method"], action, str(form["fieldCount"]), issue_text])
+            form_list_rows.append(
+                [form["id"], form["method"], action, str(form["fieldCount"]), issue_text]
+            )
             form_colors.append([None, None, None, None, "yellow" if issues > 0 else None])
         _print_list_table(
-            f"Forms ({len(forms)})", ["ID", "Method", "Action", "Fields", "Issues"], form_list_rows, colors=form_colors
+            f"Forms ({len(forms)})",
+            ["ID", "Method", "Action", "Fields", "Issues"],
+            form_list_rows,
+            colors=form_colors,
         )
 
 
@@ -1361,7 +1397,9 @@ def _print_resources(data: dict) -> None:
     link_count = data.get("linkCount", 0)
     form_count = data.get("formCount", 0)
     iframe_count = data.get("iframeCount", 0)
-    total_count = script_count + stylesheet_count + image_count + link_count + form_count + iframe_count
+    total_count = (
+        script_count + stylesheet_count + image_count + link_count + form_count + iframe_count
+    )
 
     resource_rows = [
         ["Scripts", str(script_count)],
@@ -1374,7 +1412,9 @@ def _print_resources(data: dict) -> None:
 
     click.echo()
     resources_icon = get_icon("Resources")
-    table = Table(["Resource", "Count"], alignments=["left", "right"], title="Resources", icon=resources_icon)
+    table = Table(
+        ["Resource", "Count"], alignments=["left", "right"], title="Resources", icon=resources_icon
+    )
     table.set_data(resource_rows)
     table.print_header()
     for row in resource_rows:
@@ -1395,7 +1435,9 @@ def _print_resources(data: dict) -> None:
 
     # Fonts
     fonts = data.get("fonts", {})
-    if fonts and (fonts.get("googleFonts") or fonts.get("customFonts") or fonts.get("totalFontFiles", 0) > 0):
+    if fonts and (
+        fonts.get("googleFonts") or fonts.get("customFonts") or fonts.get("totalFontFiles", 0) > 0
+    ):
         font_rows = []
         google_fonts = fonts.get("googleFonts", [])
         if google_fonts:
@@ -1452,7 +1494,11 @@ def _print_storage(data: dict) -> None:
         return f"{kb:.2f} KB"
 
     storage_rows = [
-        ("Cookies", str(data.get("cookieCount", 0)) if data.get("cookieCount", 0) > 0 else "None", None),
+        (
+            "Cookies",
+            str(data.get("cookieCount", 0)) if data.get("cookieCount", 0) > 0 else "None",
+            None,
+        ),
         ("LocalStorage", format_size(data.get("localStorageSize", 0) / 1024), None),
         ("SessionStorage", format_size(data.get("sessionStorageSize", 0) / 1024), None),
         ("Service Worker", "Yes" if data.get("hasServiceWorker") else "No", None),
@@ -1557,8 +1603,16 @@ def _print_domain(metrics: dict | None) -> None:
 def _print_layout(data: dict) -> None:
     """Print layout output."""
     layout_rows = [
-        ("Viewport", f"{data.get('viewportWidth', 'N/A')}\u00d7{data.get('viewportHeight', 'N/A')}px", None),
-        ("Document Size", f"{data.get('documentWidth', 'N/A')}\u00d7{data.get('documentHeight', 'N/A')}px", None),
+        (
+            "Viewport",
+            f"{data.get('viewportWidth', 'N/A')}\u00d7{data.get('viewportHeight', 'N/A')}px",
+            None,
+        ),
+        (
+            "Document Size",
+            f"{data.get('documentWidth', 'N/A')}\u00d7{data.get('documentHeight', 'N/A')}px",
+            None,
+        ),
         ("Scroll Position", f"X: {data.get('scrollX', 0)}, Y: {data.get('scrollY', 0)}", None),
         ("Visible", f"{data.get('visiblePercentage', 100):.0f}% of page height", None),
     ]
@@ -1612,6 +1666,7 @@ def info(ctx, output_json):
                 data["instanceId"] = instance_id
                 data["instanceAlias"] = instance_alias
                 from inspekt.app.cli.table import print_json
+
                 print_json(data, summary="page info")
             else:
                 _print_summary(data, version, bridge_type, browser, instance_id, instance_alias)
@@ -1658,6 +1713,7 @@ def info_all(ctx):
                 "robotsTxt": _get_robots_txt(url),
             }
             from inspekt.app.cli.table import print_json
+
             print_json(all_data, summary="full page info")
         else:
             # Print all sections
@@ -1738,6 +1794,7 @@ def info_performance(ctx):
 
         if output_json:
             from inspekt.app.cli.table import print_json
+
             print_json(data, summary="performance info")
         else:
             _print_performance(data)
@@ -1763,6 +1820,7 @@ def info_meta(ctx):
 
         if output_json:
             from inspekt.app.cli.table import print_json
+
             print_json(data, summary="meta info")
         else:
             _print_meta(data)
@@ -1791,6 +1849,7 @@ def info_seo(ctx):
         if output_json:
             data["robotsTxt"] = robots_data
             from inspekt.app.cli.table import print_json
+
             print_json(data, summary="SEO info")
         else:
             _print_seo(data, robots_data)
@@ -1819,6 +1878,7 @@ def info_security(ctx):
         if output_json:
             data["responseHeaders"] = headers
             from inspekt.app.cli.table import print_json
+
             print_json(data, summary="security info")
         else:
             _print_security(data, headers)
@@ -1844,6 +1904,7 @@ def info_accessibility(ctx):
 
         if output_json:
             from inspekt.app.cli.table import print_json
+
             print_json(data, summary="accessibility info")
         else:
             _print_accessibility(data)
@@ -1869,6 +1930,7 @@ def info_resources(ctx):
 
         if output_json:
             from inspekt.app.cli.table import print_json
+
             print_json(data, summary="resources info")
         else:
             _print_resources(data)
@@ -1894,6 +1956,7 @@ def info_storage(ctx):
 
         if output_json:
             from inspekt.app.cli.table import print_json
+
             print_json(data, summary="storage info")
         else:
             _print_storage(data)
@@ -1919,6 +1982,7 @@ def info_tech(ctx):
 
         if output_json:
             from inspekt.app.cli.table import print_json
+
             print_json(data, summary="tech info")
         else:
             _print_tech(data)
@@ -1946,6 +2010,7 @@ def info_domain(ctx):
 
         if output_json:
             from inspekt.app.cli.table import print_json
+
             print_json(metrics or {}, summary="domain info")
         else:
             _print_domain(metrics)
@@ -1971,6 +2036,7 @@ def info_layout(ctx):
 
         if output_json:
             from inspekt.app.cli.table import print_json
+
             print_json(data, summary="layout info")
         else:
             _print_layout(data)

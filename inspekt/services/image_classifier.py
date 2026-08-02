@@ -211,7 +211,9 @@ class ImageClassifier:
             logger.debug("CLIP dependencies available")
         except ImportError:
             self._clip_available = False
-            logger.debug("CLIP dependencies not available (install with: pip install transformers torch)")
+            logger.debug(
+                "CLIP dependencies not available (install with: pip install transformers torch)"
+            )
 
         return self._clip_available
 
@@ -496,9 +498,7 @@ Respond with ONLY the category name (e.g., "photograph"), nothing else."""
                 return result
 
         # Fall back to heuristics only if CLIP unavailable
-        return self.classify_with_heuristics(
-            width, height, color_space, bits_per_component
-        )
+        return self.classify_with_heuristics(width, height, color_space, bits_per_component)
 
     def classify_from_file(
         self,

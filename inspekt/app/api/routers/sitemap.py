@@ -118,7 +118,8 @@ def _find_nearest_ancestor(
 
 
 def _node_to_info(
-    node: sitemap_service.TreeNode, origin: str,
+    node: sitemap_service.TreeNode,
+    origin: str,
 ) -> SitemapNodeInfo:
     """Convert a TreeNode to a SitemapNodeInfo response object."""
     entry = node.entry
@@ -164,9 +165,7 @@ def _enrich_nodes(
     # Cap at 50 entries, use lower concurrency for background enrichment
     entries_to_enrich = entries_to_enrich[:50]
     try:
-        sitemap_service.fetch_titles(
-            entries_to_enrich, max_concurrent=10, timeout=3.0
-        )
+        sitemap_service.fetch_titles(entries_to_enrich, max_concurrent=10, timeout=3.0)
         # Persist virtual entries that got a title into the cache so
         # subsequent /tree calls don't need to re-fetch them.
         # Check by URL to avoid duplicates from repeated calls.
@@ -210,14 +209,14 @@ def _build_recursive_children(
     # For huge child lists (e.g., BBC /news with 131k), use partial sort
     if total > 1000:
         import heapq
+
         child_nodes = heapq.nsmallest(
-            per_level, node.children.values(),
+            per_level,
+            node.children.values(),
             key=_sort_key,
         )
     else:
-        child_nodes = sorted(
-            node.children.values(), key=_sort_key
-        )[:per_level]
+        child_nodes = sorted(node.children.values(), key=_sort_key)[:per_level]
 
     result = []
     for child in child_nodes:
@@ -296,7 +295,9 @@ def fetch_sitemap(request: SitemapFetchRequest):
     # Cap: don't auto-fetch massive sitemaps beyond the first index
     # (the CLI handles these interactively with depth/language options)
     if result.total_urls > 50_000:
-        logger.info(f"Large sitemap ({result.total_urls} entries) — caching but navigation may be slow")
+        logger.info(
+            f"Large sitemap ({result.total_urls} entries) — caching but navigation may be slow"
+        )
 
     # Preserve titles from expired cache before saving
     sitemap_service.merge_titles_from_stale_cache(result)
@@ -413,6 +414,4 @@ def get_sitemap_status(
     if not result:
         return SitemapStatusResponse(ok=True, cached=False)
 
-    return SitemapStatusResponse(
-        ok=True, cached=True, total_urls=result.total_urls
-    )
+    return SitemapStatusResponse(ok=True, cached=True, total_urls=result.total_urls)

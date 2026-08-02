@@ -206,9 +206,7 @@ class TestTCPPortCalculation:
         test_sessions = [None, "default", "test", "prod", "1234567890"]
         for session in test_sessions:
             port = get_tcp_port(session)
-            assert (
-                49152 <= port <= 65534
-            ), f"Port {port} for session '{session}' outside range"
+            assert 49152 <= port <= 65534, f"Port {port} for session '{session}' outside range"
 
     def test_port_with_none_uses_default(self):
         """Test that None session uses 'default' internally."""
@@ -312,9 +310,7 @@ class TestIsServerAvailable:
         socket_file = tmp_path / "test.sock"
         socket_file.touch()
 
-        with patch.dict(
-            os.environ, {"INSPEKT_SOCKET_PATH": str(socket_file)}, clear=True
-        ):
+        with patch.dict(os.environ, {"INSPEKT_SOCKET_PATH": str(socket_file)}, clear=True):
             result = is_server_available(transport_type="unix")
             assert result is True
 
@@ -322,9 +318,7 @@ class TestIsServerAvailable:
         """Test Unix availability check with missing socket."""
         socket_file = tmp_path / "nonexistent.sock"
 
-        with patch.dict(
-            os.environ, {"INSPEKT_SOCKET_PATH": str(socket_file)}, clear=True
-        ):
+        with patch.dict(os.environ, {"INSPEKT_SOCKET_PATH": str(socket_file)}, clear=True):
             result = is_server_available(transport_type="unix")
             assert result is False
 

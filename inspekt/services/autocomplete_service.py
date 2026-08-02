@@ -34,9 +34,7 @@ class AutocompleteService:
             with open(self.vendor_dir / "autocomplete-values.json", encoding="utf-8") as f:
                 self.autocomplete_values = json.load(f)
 
-            with open(
-                self.vendor_dir / "matchingClassesInfluence.json", encoding="utf-8"
-            ) as f:
+            with open(self.vendor_dir / "matchingClassesInfluence.json", encoding="utf-8") as f:
                 self.matching_influence = json.load(f)
 
             # Load JavaScript source files
@@ -336,9 +334,7 @@ class AutocompleteService:
             # Execute the script in the browser (using asyncio.to_thread for sync executor)
             import asyncio
 
-            exec_result = await asyncio.to_thread(
-                bridge_executor.execute, script, 30.0
-            )
+            exec_result = await asyncio.to_thread(bridge_executor.execute, script, 30.0)
 
             if not exec_result.get("ok"):
                 logger.error(f"Script execution failed: {exec_result.get('error')}")

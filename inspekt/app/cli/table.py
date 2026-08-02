@@ -32,9 +32,7 @@ from typing import Any
 import click
 
 # Regex pattern for detecting numeric values (including formatted ones)
-NUMERIC_PATTERN = re.compile(
-    r"^-?\d+(\.\d+)?\s*(B|KB|MB|GB|TB|ms|s|m|h|%)?$|^-$"
-)
+NUMERIC_PATTERN = re.compile(r"^-?\d+(\.\d+)?\s*(B|KB|MB|GB|TB|ms|s|m|h|%)?$|^-$")
 
 # Regex pattern for stripping ANSI escape codes
 ANSI_ESCAPE_PATTERN = re.compile(r"\x1b\[[0-9;]*m")
@@ -121,6 +119,7 @@ def emit_copyable_data(
         return
 
     from inspekt.app.cli.util import _vm_data_signal
+
     _vm_data_signal(json_text, table_md, summary)
 
 
@@ -136,10 +135,12 @@ def print_json(data: Any, *, summary: str = "") -> None:
     click.echo(json_text)
 
     from inspekt.config import is_isolated_mode
+
     if not is_isolated_mode():
         return
 
     from inspekt.app.cli.util import _vm_data_signal
+
     _vm_data_signal(json_text, None, summary)
 
 
@@ -276,9 +277,7 @@ class Table:
                 # Check if all non-empty values in this column are numeric
                 values = [row[col_idx] for row in rows if col_idx < len(row)]
                 non_empty = [v for v in values if v and str(v).strip()]
-                if non_empty and all(
-                    NUMERIC_PATTERN.match(str(v).strip()) for v in non_empty
-                ):
+                if non_empty and all(NUMERIC_PATTERN.match(str(v).strip()) for v in non_empty):
                     self.alignments[col_idx] = "right"
 
     def _ensure_widths(self) -> None:
@@ -488,7 +487,9 @@ class Table:
             highlight: If True, use default highlight background color and add asterisk marker
         """
         bg = row_bg if row_bg is not None else (self.HIGHLIGHT_BG if highlight else None)
-        click.echo(self._format_row(values, colors, row_bg=bg, highlight_marker=highlight), color=True)
+        click.echo(
+            self._format_row(values, colors, row_bg=bg, highlight_marker=highlight), color=True
+        )
 
     def print_separator(self) -> None:
         """Print a horizontal separator between rows."""
@@ -589,9 +590,7 @@ def get_type_color(resource_type: str) -> str | None:
     return type_colors.get(resource_type)
 
 
-def format_status_icon(
-    status: str | bool | None, with_color: bool = True
-) -> str:
+def format_status_icon(status: str | bool | None, with_color: bool = True) -> str:
     """
     Format status with appropriate icon.
 
@@ -759,7 +758,7 @@ def _style_with_inline_code(text: str, base_fg: str, bold: bool = False) -> str:
     import re
 
     # Pattern to match `code` (backtick-wrapped text)
-    pattern = r'`([^`]+)`'
+    pattern = r"`([^`]+)`"
 
     # Find all matches and their positions
     parts = []
@@ -768,7 +767,7 @@ def _style_with_inline_code(text: str, base_fg: str, bold: bool = False) -> str:
     for match in re.finditer(pattern, text):
         # Add text before this match (in base color)
         if match.start() > last_end:
-            before_text = text[last_end:match.start()]
+            before_text = text[last_end : match.start()]
             parts.append(click.style(before_text, fg=base_fg, bold=bold))
 
         # Add the code snippet (in cyan italic, no backticks)

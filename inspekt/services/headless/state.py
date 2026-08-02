@@ -227,7 +227,9 @@ class StateMirror:
         response = await loop.run_in_executor(None, _execute, state_script)
 
         if not response.get("ok"):
-            raise RuntimeError(f"Failed to extract browser state: {response.get('error', 'Unknown error')}")
+            raise RuntimeError(
+                f"Failed to extract browser state: {response.get('error', 'Unknown error')}"
+            )
 
         result = response.get("result", {})
 
@@ -240,18 +242,21 @@ class StateMirror:
         if cookie_string and url:
             # Extract domain from URL
             from urllib.parse import urlparse
+
             parsed_url = urlparse(url)
             domain = parsed_url.hostname or ""
 
             for cookie in cookie_string.split("; "):
                 if "=" in cookie:
                     name, value = cookie.split("=", 1)
-                    cookies.append({
-                        "name": name.strip(),
-                        "value": value,
-                        "domain": domain,
-                        "path": "/",
-                    })
+                    cookies.append(
+                        {
+                            "name": name.strip(),
+                            "value": value,
+                            "domain": domain,
+                            "path": "/",
+                        }
+                    )
 
         # Build local_storage dict with origin as key
         local_storage = {}

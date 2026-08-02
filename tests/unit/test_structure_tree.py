@@ -183,7 +183,9 @@ class TestBuildTreeHtml:
         from inspekt.services.pdf_report import _build_tree_html
         from inspekt.services.pdf_structure_extractor import StructureNode
 
-        children = [StructureNode(tag_type="P", children=[], text_content=f"Para {i}") for i in range(25)]
+        children = [
+            StructureNode(tag_type="P", children=[], text_content=f"Para {i}") for i in range(25)
+        ]
         parent = StructureNode(tag_type="Sect", children=children)
         html = _build_tree_html(parent)
 
@@ -414,12 +416,20 @@ class TestStaticAssetLoading:
 
     def test_css_file_exists(self):
         """Test that the CSS file exists in the expected location."""
-        css_path = Path(__file__).parent.parent.parent / "inspekt" / "static" / "css" / "structure-tree.css"
+        css_path = (
+            Path(__file__).parent.parent.parent
+            / "inspekt"
+            / "static"
+            / "css"
+            / "structure-tree.css"
+        )
         assert css_path.exists(), f"CSS file should exist at {css_path}"
 
     def test_js_file_exists(self):
         """Test that the JS file exists in the expected location."""
-        js_path = Path(__file__).parent.parent.parent / "inspekt" / "static" / "js" / "structure-tree.js"
+        js_path = (
+            Path(__file__).parent.parent.parent / "inspekt" / "static" / "js" / "structure-tree.js"
+        )
         assert js_path.exists(), f"JS file should exist at {js_path}"
 
 
@@ -442,8 +452,17 @@ class TestCssTagColors:
         css = _get_structure_tree_css()
 
         required_tags = [
-            "P", "Span", "Figure", "Table", "L", "LI", "Link", "Form",
-            "Document", "Part", "Sect"
+            "P",
+            "Span",
+            "Figure",
+            "Table",
+            "L",
+            "LI",
+            "Link",
+            "Form",
+            "Document",
+            "Part",
+            "Sect",
         ]
 
         for tag in required_tags:
@@ -483,6 +502,7 @@ class TestCssTagColors:
         css = _get_structure_tree_css()
 
         assert ".toolbar-separator" in css
+
 
 class TestJavaScriptFeatures:
     """Tests for JavaScript feature implementations."""

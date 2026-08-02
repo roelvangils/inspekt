@@ -12,7 +12,9 @@ from inspekt.services.autocomplete_service import get_autocomplete_service
 router = APIRouter()
 
 
-def _build_axe_config(level: str, tags: str | None, include_passes: bool, include_incomplete: bool) -> dict:
+def _build_axe_config(
+    level: str, tags: str | None, include_passes: bool, include_incomplete: bool
+) -> dict:
     """
     Build axe-core configuration object from request parameters.
 
@@ -44,13 +46,7 @@ def _build_axe_config(level: str, tags: str | None, include_passes: bool, includ
         axe_tags.extend(additional_tags)
 
     # Build config
-    config = {
-        "runOnly": {
-            "type": "tag",
-            "values": axe_tags
-        },
-        "resultTypes": ["violations"]
-    }
+    config = {"runOnly": {"type": "tag", "values": axe_tags}, "resultTypes": ["violations"]}
 
     # Add optional result types
     if include_passes:
@@ -105,14 +101,13 @@ def run_axe_audit(request: AxeRequest):
 
     # Build axe configuration
     config = _build_axe_config(
-        request.level,
-        request.tags,
-        request.include_passes,
-        request.include_incomplete
+        request.level, request.tags, request.include_passes, request.include_incomplete
     )
 
     # Load axe-core library (bundled locally)
-    axe_lib_path = Path(__file__).parent.parent.parent.parent / "scripts" / "vendor" / "axe-core.min.js"
+    axe_lib_path = (
+        Path(__file__).parent.parent.parent.parent / "scripts" / "vendor" / "axe-core.min.js"
+    )
     if not axe_lib_path.exists():
         raise HTTPException(status_code=500, detail=f"axe-core library not found: {axe_lib_path}")
 
@@ -168,10 +163,10 @@ def run_axe_audit(request: AxeRequest):
                 "violations": data.get("violations", []),
                 "passes": data.get("passes", []) if request.include_passes else [],
                 "incomplete": data.get("incomplete", []) if request.include_incomplete else [],
-                "summary": data.get("summary", {})
+                "summary": data.get("summary", {}),
             },
             "url": data.get("url"),
-            "title": data.get("title")
+            "title": data.get("title"),
         }
 
     except ConnectionError as e:
@@ -269,15 +264,19 @@ async def run_autocomplete_check(request: AutocompleteRequest):
             bridge_executor=client,
             confidence_threshold=request.confidence_threshold,
             include_hidden=request.include_hidden,
-            include_disabled=request.include_disabled
+            include_disabled=request.include_disabled,
         )
 
         # Check if there was an error
         if "error" in result and result.get("summary", {}).get("analyzed", 0) == 0:
-            raise HTTPException(status_code=500, detail=result.get("error", "Autocomplete check failed"))
+            raise HTTPException(
+                status_code=500, detail=result.get("error", "Autocomplete check failed")
+            )
 
         # Get current page info
-        page_info = client.execute("JSON.stringify({url: window.location.href, title: document.title})")
+        page_info = client.execute(
+            "JSON.stringify({url: window.location.href, title: document.title})"
+        )
         page_data = {}
         if page_info.get("ok"):
             try:
@@ -289,7 +288,7 @@ async def run_autocomplete_check(request: AutocompleteRequest):
             "ok": True,
             "result": result,
             "url": page_data.get("url"),
-            "title": page_data.get("title")
+            "title": page_data.get("title"),
         }
 
     except ConnectionError as e:

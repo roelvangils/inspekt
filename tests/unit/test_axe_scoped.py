@@ -190,9 +190,7 @@ def test_build_axe_context_scoped_selector(mock_bridge_client):
         },
     }
 
-    context_expr, _warning = _build_axe_context(
-        mock_bridge_client, "main", [], timeout=5.0
-    )
+    context_expr, _warning = _build_axe_context(mock_bridge_client, "main", [], timeout=5.0)
 
     assert context_expr == '"main"'
 
@@ -207,9 +205,7 @@ def test_build_axe_context_scoped_multiple_selectors(mock_bridge_client):
         },
     }
 
-    context_expr, _warning = _build_axe_context(
-        mock_bridge_client, "main,nav", [], timeout=5.0
-    )
+    context_expr, _warning = _build_axe_context(mock_bridge_client, "main,nav", [], timeout=5.0)
 
     context_obj = json.loads(context_expr)
     assert context_obj == ["main", "nav"]
@@ -260,9 +256,7 @@ def test_build_axe_context_inspected_element(mock_bridge_client):
         },
     }
 
-    context_expr, warning = _build_axe_context(
-        mock_bridge_client, "inspected", [], timeout=5.0
-    )
+    context_expr, warning = _build_axe_context(mock_bridge_client, "inspected", [], timeout=5.0)
 
     assert "window.__INSPEKT_INSPECTED_ELEMENT__" in context_expr
     assert warning is not None
@@ -341,7 +335,10 @@ def test_build_axe_context_require_panel_selection_devtools_failure(mock_bridge_
 
     with pytest.raises(SystemExit):
         _build_axe_context(
-            mock_bridge_client, "inspected", [], timeout=5.0,
+            mock_bridge_client,
+            "inspected",
+            [],
+            timeout=5.0,
             require_panel_selection=True,
         )
 
@@ -359,6 +356,9 @@ def test_build_axe_context_require_panel_selection_unknown_source(mock_bridge_cl
 
     with pytest.raises(SystemExit):
         _build_axe_context(
-            mock_bridge_client, "inspected", [], timeout=5.0,
+            mock_bridge_client,
+            "inspected",
+            [],
+            timeout=5.0,
             require_panel_selection=True,
         )

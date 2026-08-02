@@ -321,7 +321,8 @@ def list_url_scheme_enabled():
                 # Read from registry - SINGLE SOURCE OF TRUTH
                 "default_output_mode": cmd.url_scheme_output_mode,
                 "url_scheme_timeout": cmd.url_scheme_timeout,
-                "available_output_modes": cmd.url_scheme_allowed_output_modes or ["clipboard", "notification", "dialog", "both", "silent"],
+                "available_output_modes": cmd.url_scheme_allowed_output_modes
+                or ["clipboard", "notification", "dialog", "both", "silent"],
                 "is_group": cmd.is_group,
                 "subcommands": [
                     {
@@ -329,7 +330,9 @@ def list_url_scheme_enabled():
                         "url_scheme_action": sub.url_scheme_action,
                     }
                     for sub in cmd.subcommands
-                ] if cmd.is_group else [],
+                ]
+                if cmd.is_group
+                else [],
             }
         )
 
@@ -367,7 +370,9 @@ def get_command(command_id: str):
     # Get output mode from registry if this is a URL scheme command (SINGLE SOURCE OF TRUTH)
     default_output_mode = cmd.url_scheme_output_mode if cmd.has_url_scheme() else None
     all_modes = ["clipboard", "notification", "dialog", "both", "silent"]
-    available_output_modes = (cmd.url_scheme_allowed_output_modes or all_modes) if cmd.has_url_scheme() else []
+    available_output_modes = (
+        (cmd.url_scheme_allowed_output_modes or all_modes) if cmd.has_url_scheme() else []
+    )
 
     return CommandDetail(
         id=cmd.id,

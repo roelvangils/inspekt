@@ -84,6 +84,7 @@ def plugin_list(category, mcp, output_json):
 
         if output_json:
             from inspekt.app.cli.table import print_json
+
             print_json(plugins, summary=f"{len(plugins)} plugins")
         else:
             _display_plugins(plugins)
@@ -106,7 +107,20 @@ def plugin_list(category, mcp, output_json):
 @click.option("--autorun", is_flag=True, help="Enable autorun on page load")
 @click.option("--domains", help="Comma-separated domain patterns for autorun")
 @click.option("--update", is_flag=True, help="Update if plugin already exists")
-def plugin_add(name, code, file_path, url, description, category, tags, mcp, returns_data, autorun, domains, update):
+def plugin_add(
+    name,
+    code,
+    file_path,
+    url,
+    description,
+    category,
+    tags,
+    mcp,
+    returns_data,
+    autorun,
+    domains,
+    update,
+):
     """
     Add a new plugin.
 
@@ -304,6 +318,7 @@ def plugin_run(name_or_id, interactive, category, timeout, output_json, quiet):
 
         if output_json:
             from inspekt.app.cli.table import print_json
+
             print_json(result, summary=f"ran plugin {plugin_data['name']}")
         else:
             if result.get("ok"):
@@ -329,7 +344,9 @@ def plugin_run(name_or_id, interactive, category, timeout, output_json, quiet):
                 icon = get_icon("Plugin")
                 time_ms = result.get("execution_time_ms", 0)
                 run_count = plugin_data.get("run_count", 0) + 1
-                print_success(f"{icon} `{plugin_data['name']}` executed in {time_ms}ms (run #{run_count})")
+                print_success(
+                    f"{icon} `{plugin_data['name']}` executed in {time_ms}ms (run #{run_count})"
+                )
 
                 # Show page context
                 if page_title or page_url:
@@ -399,7 +416,9 @@ def plugin_unload(name_or_id, timeout, output_json, quiet):
         unload_mode = plugin_data.get("unload_mode", "none")
 
         if unload_mode == "none":
-            click.echo(f"Error: Plugin '{plugin_data['name']}' does not support unloading", err=True)
+            click.echo(
+                f"Error: Plugin '{plugin_data['name']}' does not support unloading", err=True
+            )
             sys.exit(1)
 
         # Determine which code to run
@@ -426,6 +445,7 @@ def plugin_unload(name_or_id, timeout, output_json, quiet):
 
         if output_json:
             from inspekt.app.cli.table import print_json
+
             print_json(result, summary=f"{action} plugin {plugin_data['name']}")
         else:
             if result.get("ok"):
@@ -479,12 +499,14 @@ def plugin_show(name_or_id, output_json):
 
         if output_json:
             from inspekt.app.cli.table import print_json
+
             print_json(plugin_data, summary=f"plugin {plugin_data.get('name', '')}")
         else:
             _display_plugin_details(plugin_data)
 
             # VM terminal: offer a "Data ready to copy" toast (flat key-value)
             from inspekt.app.cli.table import emit_copyable_data
+
             rows = []
             for k, v in plugin_data.items():
                 if k == "code":
@@ -504,7 +526,9 @@ def plugin_show(name_or_id, output_json):
 
 @plugin.command(name="autorun")
 @click.argument("name_or_id", shell_complete=complete_plugin_names)
-@click.option("--domains", "-d", help="Comma-separated domain/path patterns (e.g. 'github.com, *.gitlab.com')")
+@click.option(
+    "--domains", "-d", help="Comma-separated domain/path patterns (e.g. 'github.com, *.gitlab.com')"
+)
 @click.option("--off", is_flag=True, help="Disable autorun for this plugin")
 def plugin_autorun(name_or_id, domains, off):
     """
@@ -575,8 +599,12 @@ def plugin_autorun(name_or_id, domains, off):
 @plugin.command(name="export")
 @click.option("--output", "-o", type=click.Path(), help="Output file path")
 @click.option("--ids", help="Comma-separated plugin IDs to export")
-@click.option("--open", "open_after", is_flag=True, help="Open exported file in default application")
-@click.option("--reveal", "reveal_after", is_flag=True, help="Reveal exported file in file explorer")
+@click.option(
+    "--open", "open_after", is_flag=True, help="Open exported file in default application"
+)
+@click.option(
+    "--reveal", "reveal_after", is_flag=True, help="Reveal exported file in file explorer"
+)
 def plugin_export(output, ids, open_after, reveal_after):
     """
     Export plugins to JSON file.
@@ -716,13 +744,20 @@ def _interactive_plugin_select(category: str | None = None) -> str | None:
     try:
         result = subprocess.run(
             [
-                "gum", "filter",
-                "--header", header,
-                "--placeholder", "Type to search…",
-                "--height", str(max(10, min(len(lines) + 2, 20))),
-                "--header.foreground", "39",
-                "--indicator.foreground", "39",
-                "--match.foreground", "39",
+                "gum",
+                "filter",
+                "--header",
+                header,
+                "--placeholder",
+                "Type to search…",
+                "--height",
+                str(max(10, min(len(lines) + 2, 20))),
+                "--header.foreground",
+                "39",
+                "--indicator.foreground",
+                "39",
+                "--match.foreground",
+                "39",
             ],
             input="\n".join(lines),
             stdout=subprocess.PIPE,
@@ -845,13 +880,15 @@ def _display_plugins(plugins: list[dict]) -> None:
     for p in plugins:
         mcp_indicator = "*" if p.get("mcp_exposed") else ""
         auto_indicator = "*" if p.get("autorun") else ""
-        rows.append([
-            p["name"],
-            p.get("category") or "-",
-            mcp_indicator,
-            auto_indicator,
-            str(p.get("run_count", 0)),
-        ])
+        rows.append(
+            [
+                p["name"],
+                p.get("category") or "-",
+                mcp_indicator,
+                auto_indicator,
+                str(p.get("run_count", 0)),
+            ]
+        )
 
     table = Table(headers, alignments=alignments, title=title, icon=icon)
     table.set_data(rows)
@@ -864,6 +901,7 @@ def _display_plugins(plugins: list[dict]) -> None:
 
     # VM terminal: offer a "Data ready to copy" toast
     from inspekt.app.cli.table import emit_copyable_data
+
     emit_copyable_data(
         headers=headers,
         rows=rows,

@@ -26,6 +26,7 @@ def _format_release_date(iso_date: str | None) -> str:
         return ""
     try:
         from datetime import datetime
+
         # Parse ISO date (e.g., "2025-10-09T16:39:18.813Z")
         dt = datetime.fromisoformat(iso_date.replace("Z", "+00:00"))
         # Use %d and strip leading zero manually for cross-platform compatibility
@@ -51,12 +52,17 @@ def _check_engine_updates():
 
             if not latest:
                 # Network error - show concise error status
-                click.echo(f"  {engine_display}: {click.style('check failed', fg='yellow')}", err=True)
+                click.echo(
+                    f"  {engine_display}: {click.style('check failed', fg='yellow')}", err=True
+                )
                 continue
 
             if not current:
                 # Not installed - install it
-                click.echo(f"  {engine_display}: {click.style('not installed', fg='yellow')} → installing {latest}", err=True)
+                click.echo(
+                    f"  {engine_display}: {click.style('not installed', fg='yellow')} → installing {latest}",
+                    err=True,
+                )
 
                 def show_progress(msg):
                     click.echo(f"    {msg}", err=True)
@@ -70,13 +76,20 @@ def _check_engine_updates():
                 continue
 
             if not update_available:
-                click.echo(f"  {engine_display}: {click.style('up to date', fg='green')} ({current})", err=True)
+                click.echo(
+                    f"  {engine_display}: {click.style('up to date', fg='green')} ({current})",
+                    err=True,
+                )
                 continue
 
             # Update available - show status and prompt user
-            click.echo(f"  {engine_display}: {click.style('update available', fg='cyan')} ({current} → {latest})", err=True)
+            click.echo(
+                f"  {engine_display}: {click.style('update available', fg='cyan')} ({current} → {latest})",
+                err=True,
+            )
 
             if click.confirm(f"    Update to {engine.engine_name} {latest}?", default=True):
+
                 def show_progress(msg):
                     click.echo(f"    {msg}", err=True)
 
@@ -119,17 +132,25 @@ def _check_readability_updates():
 
         if not current:
             # Not installed - this shouldn't happen normally but handle it
-            click.echo(f"  @mozilla/readability: {click.style('not installed', fg='yellow')}", err=True)
+            click.echo(
+                f"  @mozilla/readability: {click.style('not installed', fg='yellow')}", err=True
+            )
             click.echo("    Run `inspekt update readability` to install", err=True)
             return
 
         if not update_available:
             # Up to date - show briefly
-            click.echo(f"  @mozilla/readability: {click.style('up to date', fg='green')} ({current})", err=True)
+            click.echo(
+                f"  @mozilla/readability: {click.style('up to date', fg='green')} ({current})",
+                err=True,
+            )
             return
 
         # Update available - show without auto-updating
-        click.echo(f"  @mozilla/readability: {click.style('update available', fg='cyan')} ({current} → {latest}{date_suffix})", err=True)
+        click.echo(
+            f"  @mozilla/readability: {click.style('update available', fg='cyan')} ({current} → {latest}{date_suffix})",
+            err=True,
+        )
         click.echo("    Run `inspekt update readability` to update", err=True)
 
     except Exception:
@@ -164,7 +185,10 @@ def _check_axe_updates():
             return
 
         # Update available - prompt user
-        click.echo(f"  {success(f'axe-core {latest} is available{date_suffix} (current: {current})')}", err=True)
+        click.echo(
+            f"  {success(f'axe-core {latest} is available{date_suffix} (current: {current})')}",
+            err=True,
+        )
         click.echo("", err=True)
 
         # Ask user if they want to update
@@ -180,6 +204,7 @@ def _check_axe_updates():
 
             if update_success:
                 from inspekt.app.cli.icons import success as success_msg
+
                 click.echo(f"\n{success_msg(message)}\n", err=True)
             else:
                 click.echo(f"\n{error(f'Update failed: {message}')}", err=True)
@@ -215,7 +240,9 @@ def _check_ibm_updates():
 
         if not current:
             # Not installed yet - install it
-            click.echo(f"  {info(f'IBM Equal Access {latest} will be installed{date_suffix}')}", err=True)
+            click.echo(
+                f"  {info(f'IBM Equal Access {latest} will be installed{date_suffix}')}", err=True
+            )
             click.echo("", err=True)
 
             def show_progress(msg):
@@ -225,6 +252,7 @@ def _check_ibm_updates():
 
             if install_success:
                 from inspekt.app.cli.icons import success as success_msg
+
                 click.echo(f"\n{success_msg(message)}\n", err=True)
             else:
                 click.echo(f"\n{error(f'Installation failed: {message}')}", err=True)
@@ -232,11 +260,16 @@ def _check_ibm_updates():
 
         if not update_available:
             # Already on latest version
-            click.echo(f"  {success(f'IBM Equal Access is up-to-date ({current}{date_suffix})')}", err=True)
+            click.echo(
+                f"  {success(f'IBM Equal Access is up-to-date ({current}{date_suffix})')}", err=True
+            )
             return
 
         # Update available - prompt user
-        click.echo(f"  {success(f'IBM Equal Access {latest} is available{date_suffix} (current: {current})')}", err=True)
+        click.echo(
+            f"  {success(f'IBM Equal Access {latest} is available{date_suffix} (current: {current})')}",
+            err=True,
+        )
         click.echo("", err=True)
 
         # Ask user if they want to update
@@ -250,6 +283,7 @@ def _check_ibm_updates():
 
             if update_success:
                 from inspekt.app.cli.icons import success as success_msg
+
                 click.echo(f"\n{success_msg(message)}\n", err=True)
             else:
                 click.echo(f"\n{error(f'Update failed: {message}')}", err=True)
@@ -281,7 +315,9 @@ def _start_bridge_server(port=8765):
     bridge_client = BridgeClient(port=port)
 
     if bridge_client.is_alive():
-        click.echo(f"  {info(f'Bridge server is already running on ports {port} (HTTP) and {port + 1} (WebSocket)')}")
+        click.echo(
+            f"  {info(f'Bridge server is already running on ports {port} (HTTP) and {port + 1} (WebSocket)')}"
+        )
         return True
 
     click.echo(f"  {progress('Starting bridge server…')}")
@@ -295,7 +331,9 @@ def _start_bridge_server(port=8765):
     # Wait for it to start
     time.sleep(1)
     if bridge_client.is_alive():
-        click.echo(f"  {success(f'Bridge server started on ports {port} (HTTP) and {port + 1} (WebSocket)')}")
+        click.echo(
+            f"  {success(f'Bridge server started on ports {port} (HTTP) and {port + 1} (WebSocket)')}"
+        )
         return True
     else:
         click.echo(f"  {error('Failed to start bridge server')}", err=True)
@@ -315,10 +353,14 @@ def _start_api_server(host="127.0.0.1", port=8000):
     click.echo(f"  {progress('Starting API server…')}")
     subprocess.Popen(
         [
-            sys.executable, "-m", "uvicorn",
+            sys.executable,
+            "-m",
+            "uvicorn",
             "inspekt.app.api.server:app",
-            "--host", host,
-            "--port", str(port)
+            "--host",
+            host,
+            "--port",
+            str(port),
         ],
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
@@ -341,10 +383,7 @@ def _stop_bridge_server():
     Returns:
         bool: True if stopped, False if it wasn't running
     """
-    result = subprocess.run(
-        ["pkill", "-f", "inspekt.bridge_ws"],
-        capture_output=True
-    )
+    result = subprocess.run(["pkill", "-f", "inspekt.bridge_ws"], capture_output=True)
     return result.returncode == 0
 
 
@@ -354,16 +393,14 @@ def _stop_api_server():
     Returns:
         bool: True if stopped, False if it wasn't running
     """
-    result = subprocess.run(
-        ["pkill", "-f", "uvicorn inspekt.app.api.server"],
-        capture_output=True
-    )
+    result = subprocess.run(["pkill", "-f", "uvicorn inspekt.app.api.server"], capture_output=True)
     return result.returncode == 0
 
 
 def _get_project_root():
     """Get the Inspekt project root directory (where mkdocs.yml lives)."""
     import inspekt
+
     return os.path.dirname(os.path.dirname(inspekt.__file__))
 
 
@@ -382,17 +419,14 @@ def _start_mkdocs_server(host="127.0.0.1", port=8008):
     mkdocs_config = os.path.join(project_root, "mkdocs.yml")
 
     if not os.path.exists(mkdocs_config):
-        click.echo(f"  {error('mkdocs.yml not found - docs not available in this installation')}", err=True)
+        click.echo(
+            f"  {error('mkdocs.yml not found - docs not available in this installation')}", err=True
+        )
         return False
 
     click.echo(f"  {progress('Starting MkDocs server (building docs)…')}")
     proc = subprocess.Popen(
-        [
-            sys.executable, "-m", "mkdocs",
-            "serve",
-            "--dev-addr", f"{host}:{port}",
-            "--quiet"
-        ],
+        [sys.executable, "-m", "mkdocs", "serve", "--dev-addr", f"{host}:{port}", "--quiet"],
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
         start_new_session=True,
@@ -412,7 +446,9 @@ def _start_mkdocs_server(host="127.0.0.1", port=8008):
         if proc.poll() is not None:
             # Process has exited - something went wrong
             click.echo(f"  {error('MkDocs server exited unexpectedly')}", err=True)
-            click.echo("    Check that mkdocs is installed: pip install mkdocs mkdocs-material", err=True)
+            click.echo(
+                "    Check that mkdocs is installed: pip install mkdocs mkdocs-material", err=True
+            )
             return False
 
         # Check if port is now open
@@ -432,10 +468,7 @@ def _stop_mkdocs_server():
     Returns:
         bool: True if stopped, False if it wasn't running
     """
-    result = subprocess.run(
-        ["pkill", "-f", "mkdocs serve"],
-        capture_output=True
-    )
+    result = subprocess.run(["pkill", "-f", "mkdocs serve"], capture_output=True)
     return result.returncode == 0
 
 
@@ -476,9 +509,7 @@ async def _start_foreground(
     if docs:
         project_root = _get_project_root()
         click.echo(f"  {progress(f'Starting docs on {host}:{docs_port}…')}")
-        managed = await manager.start_docs(
-            host=host, port=docs_port, project_root=project_root
-        )
+        managed = await manager.start_docs(host=host, port=docs_port, project_root=project_root)
         startup_tasks.append(managed)
 
     click.echo()
@@ -533,10 +564,14 @@ async def _start_foreground(
 @click.option("--host", default="127.0.0.1", help="Host to bind to (default: 127.0.0.1)")
 @click.option("--docs", is_flag=True, help="Start local MkDocs documentation server")
 @click.option("--docs-port", type=int, default=8008, help="MkDocs server port (default: 8008)")
-@click.option("--no-update-check", is_flag=True,
-              help="Skip the startup engine/library update check (useful for non-interactive contexts like overmind)")
-def start(bridge_only, api_only, foreground, api_port, bridge_port, host, docs, docs_port,
-          no_update_check):
+@click.option(
+    "--no-update-check",
+    is_flag=True,
+    help="Skip the startup engine/library update check (useful for non-interactive contexts like overmind)",
+)
+def start(
+    bridge_only, api_only, foreground, api_port, bridge_port, host, docs, docs_port, no_update_check
+):
     """Start Inspekt servers (bridge + API).
 
     By default, starts both bridge and API servers in background (daemon mode).
@@ -636,12 +671,17 @@ def start(bridge_only, api_only, foreground, api_port, bridge_port, host, docs, 
         if not docs:
             click.echo()
             from inspekt.app.cli.table import print_hint
-            print_hint(f"Run with `--docs` to start a local documentation server at http://localhost:{docs_port}")
+
+            print_hint(
+                f"Run with `--docs` to start a local documentation server at http://localhost:{docs_port}"
+            )
 
         # Show dev mode reminder about syncing extensions
         from inspekt.config import is_dev_mode
+
         if is_dev_mode():
             from inspekt.app.cli.table import print_hint
+
             print_hint("Dev mode: If you changed shared extension code, run `make sync-extension`")
     else:
         click.echo(f"\n{error('Failed to start one or more servers')}", err=True)
@@ -824,7 +864,10 @@ def restart(foreground, api_port, bridge_port, host, docs, docs_port):
     if not docs:
         click.echo()
         from inspekt.app.cli.table import print_hint
-        print_hint(f"Run with `--docs` to start a local documentation server at http://localhost:{docs_port}")
+
+        print_hint(
+            f"Run with `--docs` to start a local documentation server at http://localhost:{docs_port}"
+        )
 
 
 @click.group(invoke_without_command=True)
@@ -867,9 +910,9 @@ def status(ctx, output_json):
         if ago < 60:
             return f"{int(ago)} seconds ago"
         elif ago < 3600:
-            return f"{int(ago/60)} minutes ago"
+            return f"{int(ago / 60)} minutes ago"
         else:
-            return f"{int(ago/3600)} hours ago"
+            return f"{int(ago / 3600)} hours ago"
 
     # Check bridge server status
     bridge_running = bridge_client.is_alive()
@@ -883,14 +926,12 @@ def status(ctx, output_json):
         output_data = {
             "bridge_server": {
                 "running": bridge_running,
-                "status": bridge_status if bridge_status else None
+                "status": bridge_status if bridge_status else None,
             },
-            "api_server": {
-                "running": api_running,
-                "port": 8000 if api_running else None
-            }
+            "api_server": {"running": api_running, "port": 8000 if api_running else None},
         }
         from inspekt.app.cli.table import print_json
+
         print_json(output_data, summary="server status")
     else:
         # Human-readable output using Table formatting
@@ -908,12 +949,12 @@ def status(ctx, output_json):
         if bridge_running and bridge_status:
             status_text = click.style("Running", fg="green")
             bridge_data.append(["Status", f"{format_status_icon('pass')} {status_text}"])
-            bridge_data.append(["Version", bridge_status.get('server_version', 'Unknown')])
-            uptime = bridge_status.get('uptime_seconds', 0)
+            bridge_data.append(["Version", bridge_status.get("server_version", "Unknown")])
+            uptime = bridge_status.get("uptime_seconds", 0)
             bridge_data.append(["Uptime", format_duration(uptime)])
-            host = bridge_status.get('host', '127.0.0.1')
-            port = bridge_status.get('port', 8765)
-            ws_port = bridge_status.get('websocket_port', 8766)
+            host = bridge_status.get("host", "127.0.0.1")
+            port = bridge_status.get("port", 8765)
+            ws_port = bridge_status.get("websocket_port", 8766)
             bridge_data.append(["HTTP API", f"http://{host}:{port}"])
             bridge_data.append(["WebSocket", f"ws://{host}:{ws_port}"])
         elif bridge_running:
@@ -935,8 +976,8 @@ def status(ctx, output_json):
         # CONNECTED INSTANCES TABLE (only if bridge is running)
         # ═══════════════════════════════════════════════════════════════════
         if bridge_running and bridge_status:
-            browser_count = bridge_status.get('connected_browsers', 0)
-            browsers = bridge_status.get('browsers', [])
+            browser_count = bridge_status.get("connected_browsers", 0)
+            browsers = bridge_status.get("browsers", [])
 
             click.echo()  # Spacing between tables
             browser_icon = get_icon("Connected Browsers") or ""
@@ -947,12 +988,12 @@ def status(ctx, output_json):
                 browser_data = []
                 for browser in browsers:
                     # Instance ID and alias
-                    instance_id = browser.get('instance_id', '?')
-                    alias = browser.get('alias')
+                    instance_id = browser.get("instance_id", "?")
+                    alias = browser.get("alias")
 
                     # Browser name with version
-                    browser_name = browser['browser_name']
-                    browser_version = browser.get('browser_version', '')
+                    browser_name = browser["browser_name"]
+                    browser_version = browser.get("browser_version", "")
                     if browser_version:
                         browser_display = f"{browser_name} {browser_version}"
                     else:
@@ -960,12 +1001,14 @@ def status(ctx, output_json):
 
                     # Format instance identifier: [ID] or [ID:alias]
                     if alias:
-                        instance_label = click.style(f"[{instance_id}:{alias}]", fg="cyan", bold=True)
+                        instance_label = click.style(
+                            f"[{instance_id}:{alias}]", fg="cyan", bold=True
+                        )
                     else:
                         instance_label = click.style(f"[{instance_id}]", fg="cyan", bold=True)
 
                     # Mark active instance
-                    if browser['is_most_recent']:
+                    if browser["is_most_recent"]:
                         browser_display = click.style(browser_display, bold=True)
                         active_marker = click.style(" ● ACTIVE", fg="green")
                     else:
@@ -973,32 +1016,39 @@ def status(ctx, output_json):
 
                     # Build info parts
                     info_parts = []
-                    url = browser.get('url', '')
+                    url = browser.get("url", "")
                     if url:
-                        display_url = url if len(url) <= 45 else url[:42] + '…'
+                        display_url = url if len(url) <= 45 else url[:42] + "…"
                         info_parts.append(display_url)
-                    title = browser.get('title', '')
+                    title = browser.get("title", "")
                     if title:
-                        display_title = title if len(title) <= 45 else title[:42] + '…'
+                        display_title = title if len(title) <= 45 else title[:42] + "…"
                         info_parts.append(click.style(display_title, fg="bright_black"))
 
                     # Extension version and connection duration
                     meta_parts = []
-                    if browser.get('extension_version'):
+                    if browser.get("extension_version"):
                         meta_parts.append(f"v{browser['extension_version']}")
-                    duration = browser.get('connected_duration', 0)
+                    duration = browser.get("connected_duration", 0)
                     meta_parts.append(format_duration(duration))
                     meta_line = click.style(" • ".join(meta_parts), fg="bright_black")
 
                     # First row: instance ID + browser name + URL
-                    browser_data.append([f"{instance_label} {browser_display}{active_marker}", info_parts[0] if info_parts else ""])
+                    browser_data.append(
+                        [
+                            f"{instance_label} {browser_display}{active_marker}",
+                            info_parts[0] if info_parts else "",
+                        ]
+                    )
                     # Second row: title (if exists)
                     if len(info_parts) > 1:
                         browser_data.append(["", info_parts[1]])
                     # Third row: meta info
                     browser_data.append(["", meta_line])
 
-            browser_table = Table(["Instance", "Details"], title="Connected Instances", icon=browser_icon)
+            browser_table = Table(
+                ["Instance", "Details"], title="Connected Instances", icon=browser_icon
+            )
             browser_table.set_data(browser_data)
             browser_table.print_header(skip_column_headers=True)
             for row in browser_data:
@@ -1011,18 +1061,21 @@ def status(ctx, output_json):
             click.echo()  # Spacing
             stats_icon = get_icon("Request Statistics") or ""
 
-            total = bridge_status.get('total_processed', 0)
-            succeeded = bridge_status.get('total_succeeded', 0)
-            failed = bridge_status.get('total_failed', 0)
-            pending = bridge_status.get('pending', 0)
+            total = bridge_status.get("total_processed", 0)
+            succeeded = bridge_status.get("total_succeeded", 0)
+            failed = bridge_status.get("total_failed", 0)
+            pending = bridge_status.get("pending", 0)
             success_rate = f"{(succeeded / total) * 100:.1f}%" if total > 0 else "-"
-            last_activity = bridge_status.get('last_activity')
+            last_activity = bridge_status.get("last_activity")
             last_activity_str = format_time_ago(last_activity) if last_activity else "-"
 
             stats_data = [
                 ["Pending", str(pending)],
                 ["Processed", f"{total} (since startup)"],
-                ["Succeeded", click.style(str(succeeded), fg="green") if succeeded > 0 else str(succeeded)],
+                [
+                    "Succeeded",
+                    click.style(str(succeeded), fg="green") if succeeded > 0 else str(succeeded),
+                ],
                 ["Failed", click.style(str(failed), fg="red") if failed > 0 else str(failed)],
                 ["Success Rate", success_rate],
                 ["Last Activity", last_activity_str],
@@ -1064,6 +1117,7 @@ def status(ctx, output_json):
 
         # VM terminal: offer a "Data ready to copy" toast
         from inspekt.app.cli.table import emit_copyable_data
+
         status_rows = list(bridge_data) + list(api_data)
         emit_copyable_data(
             headers=["Property", "Value"],
@@ -1079,6 +1133,7 @@ def status(ctx, output_json):
         if api_running:
             click.echo()
             from inspekt.app.cli.table import print_hint
+
             print_hint("Web-based status: http://localhost:8000/status")
 
     # Exit with error if either server is not running
@@ -1106,7 +1161,10 @@ def status_web(port):
     if not _is_port_open("127.0.0.1", port):
         click.echo(f"Error: API server is not running on port {port}", err=True)
         from inspekt.app.cli.table import _style_with_inline_code
-        click.echo(_style_with_inline_code("\nStart it with: `inspekt start`", base_fg="red"), err=True)
+
+        click.echo(
+            _style_with_inline_code("\nStart it with: `inspekt start`", base_fg="red"), err=True
+        )
         sys.exit(1)
 
     click.echo(f"Opening {url} in your browser…")
@@ -1154,6 +1212,7 @@ def queue_status(output_json):
 
         if output_json:
             from inspekt.app.cli.table import print_json
+
             print_json(data, summary="queue status")
             return
 
@@ -1190,6 +1249,7 @@ def queue_status(output_json):
 
         # VM terminal: offer a "Data ready to copy" toast
         from inspekt.app.cli.table import emit_copyable_data
+
         queue_rows = [
             [r.get("request_id", "")[:8], f"{r.get('age_seconds', 0):.1f}s", r.get("type", "")]
             for r in pending_requests
@@ -1207,8 +1267,12 @@ def queue_status(output_json):
 
 
 @queue.command("clear")
-@click.option("--older-than", type=float, default=0,
-              help="Only clear requests older than N seconds (default: all)")
+@click.option(
+    "--older-than",
+    type=float,
+    default=0,
+    help="Only clear requests older than N seconds (default: all)",
+)
 @click.option("--force", "-f", is_flag=True, help="Skip confirmation")
 def queue_clear(older_than, force):
     """Clear pending requests from the queue.
@@ -1265,9 +1329,7 @@ def queue_clear(older_than, force):
 
         # Clear the queue
         response = http_requests.post(
-            f"{client.base_url}/queue/clear",
-            json={"older_than": older_than},
-            timeout=5
+            f"{client.base_url}/queue/clear", json={"older_than": older_than}, timeout=5
         )
         result = response.json()
 

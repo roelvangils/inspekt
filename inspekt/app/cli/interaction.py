@@ -60,8 +60,8 @@ def _send_text(text, selector, delay_ms, clear=True, skill=None):
 
     # Get typing configuration
     typing_config = get_typing_config()
-    typo_rate = typing_config['human-like-typo-rate']
-    resolved_skill = skill if skill is not None else typing_config['human-like-skill']
+    typo_rate = typing_config["human-like-typo-rate"]
+    resolved_skill = skill if skill is not None else typing_config["human-like-skill"]
 
     # Replace placeholders with properly escaped values
     # Use JSON encoding for proper JavaScript string escaping
@@ -99,7 +99,8 @@ def _send_text(text, selector, delay_ms, clear=True, skill=None):
             click.echo(f"Error: {response['error']}", err=True)
             if response.get("hint"):
                 from inspekt.app.cli.table import print_hint
-                print_hint(response['hint'])
+
+                print_hint(response["hint"])
             sys.exit(1)
 
         click.echo(response.get("message", "Text sent successfully"))
@@ -112,9 +113,19 @@ def _send_text(text, selector, delay_ms, clear=True, skill=None):
 @click.command()
 @click.argument("text")
 @click.option("--selector", "-s", help="CSS selector to focus before typing")
-@click.option("--speed", type=int, help="Characters per second (default: fastest; 0: human-like with realistic rhythm, pauses, and typos)")
-@click.option("--clear/--no-clear", default=True, help="Clear existing text before typing (default: true)")
-@click.option("--skill", type=float, help="Human-mode typist skill, 0.0 (beginner, ~340 cpm) to 1.0 (expert, ~500 cpm). Only with --speed 0.")
+@click.option(
+    "--speed",
+    type=int,
+    help="Characters per second (default: fastest; 0: human-like with realistic rhythm, pauses, and typos)",
+)
+@click.option(
+    "--clear/--no-clear", default=True, help="Clear existing text before typing (default: true)"
+)
+@click.option(
+    "--skill",
+    type=float,
+    help="Human-mode typist skill, 0.0 (beginner, ~340 cpm) to 1.0 (expert, ~500 cpm). Only with --speed 0.",
+)
 def type_text(text, selector, speed, clear, skill):
     """
     Type text character by character into the browser.
@@ -171,7 +182,9 @@ def type_text(text, selector, speed, clear, skill):
 @click.command()
 @click.argument("text")
 @click.option("--selector", "-s", help="CSS selector to focus before pasting")
-@click.option("--clear/--no-clear", default=True, help="Clear existing text before pasting (default: true)")
+@click.option(
+    "--clear/--no-clear", default=True, help="Clear existing text before pasting (default: true)"
+)
 def paste(text, selector, clear):
     """
     Paste text instantly into the browser.
@@ -208,7 +221,10 @@ def send(text, selector):
         inspekt type "Hello World"
         inspekt paste "test@example.com" --selector "input[type=email]"
     """
-    click.echo("Warning: 'inspekt send' is deprecated. Use 'inspekt type' or 'inspekt paste' instead.\n", err=True)
+    click.echo(
+        "Warning: 'inspekt send' is deprecated. Use 'inspekt type' or 'inspekt paste' instead.\n",
+        err=True,
+    )
     _send_text(text, selector, 0, clear=True)
 
 

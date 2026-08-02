@@ -48,7 +48,11 @@ def render_console_table(table_json: str) -> None:
         else:
             # Get column headers for object arrays
             if not columns:
-                columns = list(dict.fromkeys(k for row in rows for k in (row.keys() if isinstance(row, dict) else [])))
+                columns = list(
+                    dict.fromkeys(
+                        k for row in rows for k in (row.keys() if isinstance(row, dict) else [])
+                    )
+                )
             # Add index column and index value to each row
             columns = ["#", *columns]
             rows = [{"#": i, **row} for i, row in enumerate(rows)]
@@ -71,6 +75,7 @@ def render_console_table(table_json: str) -> None:
     except Exception as e:
         click.echo(f"           [table] (parse error: {e})")
 
+
 # Bridge server defaults
 BRIDGE_HTTP_HOST = "127.0.0.1"
 BRIDGE_HTTP_PORT = 8765
@@ -84,27 +89,17 @@ def console():
 
 @console.command(name="list")
 @click.option(
-    '--level', '-l',
-    type=click.Choice(['all', 'error', 'warn', 'log', 'info', 'debug']),
-    default='all',
-    help='Filter by log level (default: all)'
+    "--level",
+    "-l",
+    type=click.Choice(["all", "error", "warn", "log", "info", "debug"]),
+    default="all",
+    help="Filter by log level (default: all)",
 )
 @click.option(
-    '--limit', '-n',
-    type=int,
-    default=100,
-    help='Maximum number of messages to show (default: 100)'
+    "--limit", "-n", type=int, default=100, help="Maximum number of messages to show (default: 100)"
 )
-@click.option(
-    '--json', '-j', 'output_json',
-    is_flag=True,
-    help='Output as JSON'
-)
-@click.option(
-    '--tail', '-t',
-    is_flag=True,
-    help='Show most recent messages first'
-)
+@click.option("--json", "-j", "output_json", is_flag=True, help="Output as JSON")
+@click.option("--tail", "-t", is_flag=True, help="Show most recent messages first")
 def list_logs(level, limit, output_json, tail):
     """
     Show captured console messages from the browser.
@@ -126,20 +121,22 @@ def list_logs(level, limit, output_json, tail):
 
         if not client.is_alive():
             if output_json:
-                click.echo(json.dumps({
-                    "ok": False,
-                    "error": "Bridge server is not running"
-                }))
+                click.echo(json.dumps({"ok": False, "error": "Bridge server is not running"}))
             else:
                 from inspekt.app.cli.table import _style_with_inline_code
+
                 click.echo(
-                    _style_with_inline_code("Error: Bridge server is not running. Start it with `inspekt start`.", base_fg="red"),
-                    err=True
+                    _style_with_inline_code(
+                        "Error: Bridge server is not running. Start it with `inspekt start`.",
+                        base_fg="red",
+                    ),
+                    err=True,
                 )
             sys.exit(1)
 
         # Use session for HTTP requests
         import requests
+
         url = f"http://{BRIDGE_HTTP_HOST}:{BRIDGE_HTTP_PORT}/console/logs"
 
         response = requests.get(url, timeout=15)
@@ -157,7 +154,7 @@ def list_logs(level, limit, output_json, tail):
         hooked = data.get("hooked", False)
 
         # Filter by level if specified
-        if level != 'all':
+        if level != "all":
             entries = [e for e in entries if e.get("level") == level]
 
         # Sort by timestamp (newest first if tail, oldest first otherwise)
@@ -169,15 +166,20 @@ def list_logs(level, limit, output_json, tail):
 
         if output_json:
             # Filter out command markers from JSON output
-            json_entries = [e for e in entries if not e.get("message", "").startswith("[inspekt:cmd]")]
+            json_entries = [
+                e for e in entries if not e.get("message", "").startswith("[inspekt:cmd]")
+            ]
             from inspekt.app.cli.table import print_json
+
             print_json(
                 {"ok": True, "count": len(json_entries), "entries": json_entries, "hooked": hooked},
                 summary=f"{len(json_entries)} console log entries",
             )
         else:
             if not hooked:
-                click.echo("Note: Console hooks not active. Reload the page to start capturing.", err=True)
+                click.echo(
+                    "Note: Console hooks not active. Reload the page to start capturing.", err=True
+                )
                 click.echo("", err=True)
 
             if not entries:
@@ -186,11 +188,11 @@ def list_logs(level, limit, output_json, tail):
 
             # Format and display messages
             level_colors = {
-                'error': 'red',
-                'warn': 'yellow',
-                'log': 'white',
-                'info': 'cyan',
-                'debug': 'bright_black'
+                "error": "red",
+                "warn": "yellow",
+                "log": "white",
+                "info": "cyan",
+                "debug": "bright_black",
             }
 
             for entry in entries:
@@ -209,14 +211,16 @@ def list_logs(level, limit, output_json, tail):
                     except (ValueError, TypeError):
                         time_str = timestamp[:8] if len(timestamp) > 8 else timestamp
 
-                color = level_colors.get(entry_level, 'white')
+                color = level_colors.get(entry_level, "white")
 
                 # Get log level icon (if nerdfont enabled)
                 level_icon = get_log_level_icon(entry_level)
-                level_display = f"{level_icon} [{entry_level}]" if level_icon else f"[{entry_level}]"
+                level_display = (
+                    f"{level_icon} [{entry_level}]" if level_icon else f"[{entry_level}]"
+                )
 
                 # Check for special table format
-                if message.startswith('[table:json]'):
+                if message.startswith("[table:json]"):
                     click.echo(
                         f"{click.style(time_str, dim=True)} "
                         f"{click.style(level_display, fg=color)} "
@@ -226,7 +230,7 @@ def list_logs(level, limit, output_json, tail):
                     continue
 
                 # Check for command marker (from inspekt eval)
-                if message.startswith('[inspekt:cmd]'):
+                if message.startswith("[inspekt:cmd]"):
                     cmd_text = message[13:]  # Skip '[inspekt:cmd]' prefix
                     cmd_icon = get_indicator("command") or "▸"
                     click.echo(
@@ -238,30 +242,32 @@ def list_logs(level, limit, output_json, tail):
 
                 # Colorize special prefixes
                 prefix_colors = {
-                    '[dir]': 'blue',
-                    '[trace]': 'magenta',
-                    '[group]': 'cyan',
-                    '[assert]': 'red',
-                    '[clear]': 'bright_black',
+                    "[dir]": "blue",
+                    "[trace]": "magenta",
+                    "[group]": "cyan",
+                    "[assert]": "red",
+                    "[clear]": "bright_black",
                 }
                 display_message = message
                 for prefix, prefix_color in prefix_colors.items():
                     if message.startswith(prefix):
-                        display_message = click.style(prefix, fg=prefix_color) + message[len(prefix):]
+                        display_message = (
+                            click.style(prefix, fg=prefix_color) + message[len(prefix) :]
+                        )
                         break
 
                 # Colorize special values
-                if display_message == '(empty)':
-                    display_message = click.style('(empty)', dim=True)
-                elif display_message == 'undefined':
-                    display_message = click.style('undefined', dim=True)
-                elif display_message == 'null':
-                    display_message = click.style('null', dim=True)
-                elif display_message in ('NaN', 'Infinity', '-Infinity'):
-                    display_message = click.style(display_message, fg='yellow')
+                if display_message == "(empty)":
+                    display_message = click.style("(empty)", dim=True)
+                elif display_message == "undefined":
+                    display_message = click.style("undefined", dim=True)
+                elif display_message == "null":
+                    display_message = click.style("null", dim=True)
+                elif display_message in ("NaN", "Infinity", "-Infinity"):
+                    display_message = click.style(display_message, fg="yellow")
 
                 # Truncate very long single-line messages, but keep multiline intact
-                if '\n' not in message and len(message) > 200 and not output_json:
+                if "\n" not in message and len(message) > 200 and not output_json:
                     display_message = message[:200] + "…"
 
                 click.echo(
@@ -272,9 +278,11 @@ def list_logs(level, limit, output_json, tail):
 
             # VM terminal: offer a "Data ready to copy" toast
             from inspekt.app.cli.table import emit_copyable_data
+
             rows = [
                 [e.get("timestamp", ""), e.get("level", ""), e.get("message", "")]
-                for e in entries if not e.get("message", "").startswith("[inspekt:cmd]")
+                for e in entries
+                if not e.get("message", "").startswith("[inspekt:cmd]")
             ]
             emit_copyable_data(
                 headers=["Timestamp", "Level", "Message"],
@@ -298,11 +306,7 @@ def list_logs(level, limit, output_json, tail):
 
 
 @console.command(name="clear")
-@click.option(
-    '--json', '-j', 'output_json',
-    is_flag=True,
-    help='Output as JSON'
-)
+@click.option("--json", "-j", "output_json", is_flag=True, help="Output as JSON")
 def clear_logs(output_json):
     """
     Clear the console message buffer.
@@ -319,19 +323,21 @@ def clear_logs(output_json):
 
         if not client.is_alive():
             if output_json:
-                click.echo(json.dumps({
-                    "ok": False,
-                    "error": "Bridge server is not running"
-                }))
+                click.echo(json.dumps({"ok": False, "error": "Bridge server is not running"}))
             else:
                 from inspekt.app.cli.table import _style_with_inline_code
+
                 click.echo(
-                    _style_with_inline_code("Error: Bridge server is not running. Start it with `inspekt start`.", base_fg="red"),
-                    err=True
+                    _style_with_inline_code(
+                        "Error: Bridge server is not running. Start it with `inspekt start`.",
+                        base_fg="red",
+                    ),
+                    err=True,
                 )
             sys.exit(1)
 
         import requests
+
         url = f"http://{BRIDGE_HTTP_HOST}:{BRIDGE_HTTP_PORT}/console/clear"
 
         response = requests.post(url, timeout=15)

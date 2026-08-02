@@ -22,10 +22,8 @@ class TestKnownIssues:
         Issue: Empty dict {} is not valid JSON Schema. MCP clients
         expect {"type": "object", "properties": {}} at minimum.
         """
-        assert EMPTY_SCHEMA.get("type") == "object", \
-            "EMPTY_SCHEMA must have type: object"
-        assert "properties" in EMPTY_SCHEMA, \
-            "EMPTY_SCHEMA must have properties key"
+        assert EMPTY_SCHEMA.get("type") == "object", "EMPTY_SCHEMA must have type: object"
+        assert "properties" in EMPTY_SCHEMA, "EMPTY_SCHEMA must have properties key"
 
     def test_mcp_names_no_underscore_prefix(self):
         """
@@ -35,8 +33,7 @@ class TestKnownIssues:
         and may confuse MCP clients.
         """
         for tool in BUILTIN_TOOLS:
-            assert not tool.name.startswith("_"), \
-                f"{tool.name} starts with underscore"
+            assert not tool.name.startswith("_"), f"{tool.name} starts with underscore"
 
     def test_all_required_fields_have_descriptions(self):
         """
@@ -76,10 +73,8 @@ class TestDualRegistryIssues:
         Issue: Missing input_schema causes MCP client errors.
         """
         for tool in BUILTIN_TOOLS:
-            assert tool.input_schema is not None, \
-                f"{tool.name} has None input_schema"
-            assert isinstance(tool.input_schema, dict), \
-                f"{tool.name} input_schema is not dict"
+            assert tool.input_schema is not None, f"{tool.name} has None input_schema"
+            assert isinstance(tool.input_schema, dict), f"{tool.name} input_schema is not dict"
 
     def test_all_tools_have_response_schema(self):
         """
@@ -89,8 +84,9 @@ class TestDualRegistryIssues:
         """
         for tool in BUILTIN_TOOLS:
             if not tool.is_plugin:
-                assert tool.response_schema_class is not None, \
+                assert tool.response_schema_class is not None, (
                     f"{tool.name} missing response_schema_class"
+                )
 
 
 class TestSchemaValidation:
@@ -104,8 +100,9 @@ class TestSchemaValidation:
         """
         for tool in BUILTIN_TOOLS:
             schema_type = tool.input_schema.get("type")
-            assert schema_type == "object", \
+            assert schema_type == "object", (
                 f"{tool.name} schema type is '{schema_type}', expected 'object'"
+            )
 
     def test_schemas_have_properties_key(self):
         """
@@ -114,8 +111,7 @@ class TestSchemaValidation:
         Issue: Missing properties key causes JSON Schema validation errors.
         """
         for tool in BUILTIN_TOOLS:
-            assert "properties" in tool.input_schema, \
-                f"{tool.name} schema missing 'properties' key"
+            assert "properties" in tool.input_schema, f"{tool.name} schema missing 'properties' key"
 
     def test_enum_fields_have_valid_values(self):
         """
@@ -128,14 +124,14 @@ class TestSchemaValidation:
             for field_name, field_def in props.items():
                 if "enum" in field_def:
                     enum_values = field_def["enum"]
-                    assert len(enum_values) > 0, \
-                        f"{tool.name}.{field_name} has empty enum"
+                    assert len(enum_values) > 0, f"{tool.name}.{field_name} has empty enum"
                 # Also check anyOf for Literal types
                 if "anyOf" in field_def:
                     for option in field_def["anyOf"]:
                         if "enum" in option:
-                            assert len(option["enum"]) > 0, \
+                            assert len(option["enum"]) > 0, (
                                 f"{tool.name}.{field_name} has empty enum in anyOf"
+                            )
 
 
 class TestNamingConflicts:
@@ -159,8 +155,7 @@ class TestNamingConflicts:
 
         tool_names = {t.name for t in BUILTIN_TOOLS}
         for expected in expected_tools:
-            assert expected in tool_names, \
-                f"Essential tool '{expected}' is missing"
+            assert expected in tool_names, f"Essential tool '{expected}' is missing"
 
     def test_tool_categories_are_valid(self):
         """
@@ -169,14 +164,23 @@ class TestNamingConflicts:
         Issue: Invalid categories break grouping in MCP clients.
         """
         valid_categories = {
-            "Navigation", "Execution", "Extraction", "Interaction",
-            "Inspection", "Selection", "Storage", "Accessibility",
-            "Network", "Console", "Plugins"
+            "Navigation",
+            "Execution",
+            "Extraction",
+            "Interaction",
+            "Inspection",
+            "Selection",
+            "Storage",
+            "Accessibility",
+            "Network",
+            "Console",
+            "Plugins",
         }
 
         for tool in BUILTIN_TOOLS:
-            assert tool.category in valid_categories, \
+            assert tool.category in valid_categories, (
                 f"{tool.name} has invalid category: {tool.category}"
+            )
 
 
 class TestResponseConsistency:
@@ -193,8 +197,7 @@ class TestResponseConsistency:
                 fields = tool.response_schema_class.model_fields
                 if "success" in fields:
                     field = fields["success"]
-                    assert field.annotation is bool, \
-                        f"{tool.name} response success is not bool"
+                    assert field.annotation is bool, f"{tool.name} response success is not bool"
 
     def test_error_responses_have_message(self):
         """
@@ -209,9 +212,7 @@ class TestResponseConsistency:
                 # Most responses should have some error indication
                 if not has_error_field:
                     # Skip this as a warning, not failure
-                    pytest.skip(
-                        f"{tool.name} response lacks message/error field"
-                    )
+                    pytest.skip(f"{tool.name} response lacks message/error field")
 
 
 class TestSecurityIssues:
@@ -223,15 +224,11 @@ class TestSecurityIssues:
 
         Issue: Without timeout, malicious JS could run indefinitely.
         """
-        exec_tool = next(
-            (t for t in BUILTIN_TOOLS if t.name == "execute_javascript"),
-            None
-        )
+        exec_tool = next((t for t in BUILTIN_TOOLS if t.name == "execute_javascript"), None)
         assert exec_tool, "execute_javascript tool not found"
 
         props = exec_tool.input_schema.get("properties", {})
-        assert "timeout" in props, \
-            "execute_javascript missing timeout parameter"
+        assert "timeout" in props, "execute_javascript missing timeout parameter"
 
     def test_no_sensitive_defaults(self):
         """
@@ -240,14 +237,12 @@ class TestSecurityIssues:
         Issue: Default values that could expose sensitive data.
         """
         # Check that httpOnly defaults to False for set_cookie
-        set_cookie = next(
-            (t for t in BUILTIN_TOOLS if t.name == "set_cookie"),
-            None
-        )
+        set_cookie = next((t for t in BUILTIN_TOOLS if t.name == "set_cookie"), None)
         if set_cookie:
             props = set_cookie.input_schema.get("properties", {})
             if "httpOnly" in props:
                 default = props["httpOnly"].get("default")
                 # httpOnly should default to False (safer for debugging)
-                assert default is False or default is None, \
+                assert default is False or default is None, (
                     "set_cookie httpOnly should default to False"
+                )

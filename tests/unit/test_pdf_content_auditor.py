@@ -248,13 +248,39 @@ class TestContentAuditResult:
         ]
 
         forms = [
-            FormFieldAudit(page=0, index=0, field_type="text", field_name="name", has_label=True, has_tooltip=True),
-            FormFieldAudit(page=0, index=1, field_type="text", field_name="email", has_label=False, has_tooltip=False),
+            FormFieldAudit(
+                page=0,
+                index=0,
+                field_type="text",
+                field_name="name",
+                has_label=True,
+                has_tooltip=True,
+            ),
+            FormFieldAudit(
+                page=0,
+                index=1,
+                field_type="text",
+                field_name="email",
+                has_label=False,
+                has_tooltip=False,
+            ),
         ]
 
         links = [
-            LinkAudit(page=0, index=0, link_text="Learn more", destination="https://example.com", is_descriptive=True),
-            LinkAudit(page=0, index=1, link_text="click here", destination="https://example.com", is_descriptive=False),
+            LinkAudit(
+                page=0,
+                index=0,
+                link_text="Learn more",
+                destination="https://example.com",
+                is_descriptive=True,
+            ),
+            LinkAudit(
+                page=0,
+                index=1,
+                link_text="click here",
+                destination="https://example.com",
+                is_descriptive=False,
+            ),
             LinkAudit(page=1, index=0, link_text=None, destination="https://example.com"),
         ]
 

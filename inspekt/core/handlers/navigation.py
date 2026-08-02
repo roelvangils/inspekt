@@ -402,9 +402,7 @@ async def get_sitemap(params: SitemapParams) -> SitemapResponse:
     if sitemap_result is None:
         sitemap_urls, discovery_method = discover_sitemap(origin)
         if not sitemap_urls:
-            return SitemapResponse(
-                success=False, origin=origin, message="No sitemap found"
-            )
+            return SitemapResponse(success=False, origin=origin, message="No sitemap found")
 
         sitemap_result = fetch_sitemap(sitemap_urls[0], flatten=True)
         seen = {e.loc for e in sitemap_result.entries}
@@ -423,9 +421,7 @@ async def get_sitemap(params: SitemapParams) -> SitemapResponse:
 
         # Fetch titles
         if sitemap_result.entries:
-            await asyncio.to_thread(
-                fetch_titles, sitemap_result.entries, 30, 10.0
-            )
+            await asyncio.to_thread(fetch_titles, sitemap_result.entries, 30, 10.0)
 
             strip_site_names_from_entries(sitemap_result.entries)
 
@@ -439,19 +435,22 @@ async def get_sitemap(params: SitemapParams) -> SitemapResponse:
 
     # Detect languages
     from inspekt.services.sitemap_service import detect_languages
+
     languages = sorted(detect_languages(sitemap_result.entries))
 
     # Build response
     items = []
     for i, entry in enumerate(entries, 1):
         parsed = urlparse(entry.loc)
-        items.append(SitemapEntryItem(
-            index=i,
-            url=entry.loc,
-            title=entry.title,
-            lastmod=entry.lastmod,
-            path=parsed.path or "/",
-        ))
+        items.append(
+            SitemapEntryItem(
+                index=i,
+                url=entry.loc,
+                title=entry.title,
+                lastmod=entry.lastmod,
+                path=parsed.path or "/",
+            )
+        )
 
     return SitemapResponse(
         success=True,

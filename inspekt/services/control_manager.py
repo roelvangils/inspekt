@@ -75,10 +75,7 @@ class ControlManager:
             if resp.status_code == 200:
                 data = resp.json()
                 if data.get("ok") and data.get("notifications"):
-                    return [
-                        ControlNotification.from_dict(n)
-                        for n in data["notifications"]
-                    ]
+                    return [ControlNotification.from_dict(n) for n in data["notifications"]]
         except (requests.RequestException, ValueError):
             # Silently ignore notification check errors
             pass

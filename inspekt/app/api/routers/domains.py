@@ -26,43 +26,40 @@ BRIDGE_HTTP_PORT = 8765
 # Request/Response Models
 # ============================================================================
 
+
 class DomainAddRequest(BaseModel):
     """Request model for adding a domain."""
+
     domain: str = Field(..., description="Domain name to add to the allow list")
 
-    model_config = {"json_schema_extra": {
-        "example": {"domain": "github.com"}
-    }}
+    model_config = {"json_schema_extra": {"example": {"domain": "github.com"}}}
 
 
 class DomainRemoveRequest(BaseModel):
     """Request model for removing a domain."""
+
     domain: str = Field(..., description="Domain name to remove from the allow list")
 
-    model_config = {"json_schema_extra": {
-        "example": {"domain": "github.com"}
-    }}
+    model_config = {"json_schema_extra": {"example": {"domain": "github.com"}}}
 
 
 class DomainBypassRequest(BaseModel):
     """Request model for setting temporary bypass."""
+
     duration: int = Field(
-        ...,
-        description="Duration in minutes (0 to disable, -1 to get status only)"
+        ..., description="Duration in minutes (0 to disable, -1 to get status only)"
     )
 
-    model_config = {"json_schema_extra": {
-        "examples": [
-            {"duration": 15},
-            {"duration": 60},
-            {"duration": 0},
-            {"duration": -1}
-        ]
-    }}
+    model_config = {
+        "json_schema_extra": {
+            "examples": [{"duration": 15}, {"duration": 60}, {"duration": 0}, {"duration": -1}]
+        }
+    }
 
 
 class DomainAddResponse(BaseModel):
     """Response model for add domain operation."""
+
     ok: bool
     already_exists: bool | None = None
     error: str | None = None
@@ -70,6 +67,7 @@ class DomainAddResponse(BaseModel):
 
 class DomainRemoveResponse(BaseModel):
     """Response model for remove domain operation."""
+
     ok: bool
     not_found: bool | None = None
     error: str | None = None
@@ -77,6 +75,7 @@ class DomainRemoveResponse(BaseModel):
 
 class DomainListResponse(BaseModel):
     """Response model for list domains operation."""
+
     ok: bool
     domains: dict | None = None
     error: str | None = None
@@ -84,6 +83,7 @@ class DomainListResponse(BaseModel):
 
 class DomainBypassResponse(BaseModel):
     """Response model for bypass operation."""
+
     ok: bool
     enabled: bool | None = None
     expiresAt: str | None = None
@@ -93,18 +93,15 @@ class DomainBypassResponse(BaseModel):
 
 class CspGlobalRequest(BaseModel):
     """Request model for global CSP bypass."""
+
     enabled: bool = Field(..., description="Enable or disable global CSP bypass")
 
-    model_config = {"json_schema_extra": {
-        "examples": [
-            {"enabled": True},
-            {"enabled": False}
-        ]
-    }}
+    model_config = {"json_schema_extra": {"examples": [{"enabled": True}, {"enabled": False}]}}
 
 
 class CspGlobalResponse(BaseModel):
     """Response model for global CSP bypass operation."""
+
     ok: bool
     enabled: bool | None = None
     enabledAt: str | None = None
@@ -114,6 +111,7 @@ class CspGlobalResponse(BaseModel):
 # ============================================================================
 # API Endpoints
 # ============================================================================
+
 
 @router.post("/add", response_model=DomainAddResponse)
 def add_domain(request: DomainAddRequest):
@@ -162,10 +160,7 @@ def add_domain(request: DomainAddRequest):
         # Sync to browser extension
         _sync_domains_to_browser()
 
-        return {
-            "ok": True,
-            "already_exists": already_exists
-        }
+        return {"ok": True, "already_exists": already_exists}
 
     except HTTPException:
         # Already well-formed (e.g. 503 from bridge proxy) — don't rewrap as 500
@@ -219,10 +214,7 @@ def remove_domain(request: DomainRemoveRequest):
         # Sync to browser extension
         _sync_domains_to_browser()
 
-        return {
-            "ok": True,
-            "not_found": not_found
-        }
+        return {"ok": True, "not_found": not_found}
 
     except HTTPException:
         # Already well-formed (e.g. 503 from bridge proxy) — don't rewrap as 500
@@ -282,15 +274,9 @@ def list_domains():
             dt = datetime.fromtimestamp(item["added_at"], tz=UTC)
             iso_timestamp = dt.isoformat().replace("+00:00", "Z")
 
-            domains[item["domain"]] = {
-                "addedAt": iso_timestamp,
-                "permanent": item["permanent"]
-            }
+            domains[item["domain"]] = {"addedAt": iso_timestamp, "permanent": item["permanent"]}
 
-        return {
-            "ok": True,
-            "domains": domains
-        }
+        return {"ok": True, "domains": domains}
 
     except HTTPException:
         # Already well-formed (e.g. 503 from bridge proxy) — don't rewrap as 500
@@ -362,7 +348,7 @@ def set_bypass(request: DomainBypassRequest):
         response = requests.post(
             f"http://{BRIDGE_HTTP_HOST}:{BRIDGE_HTTP_PORT}/domains/bypass",
             json={"duration": request.duration},
-            timeout=10.0
+            timeout=10.0,
         )
 
         if response.status_code == 200:
@@ -370,13 +356,13 @@ def set_bypass(request: DomainBypassRequest):
         else:
             raise HTTPException(
                 status_code=response.status_code,
-                detail=f"Bridge server returned HTTP {response.status_code}"
+                detail=f"Bridge server returned HTTP {response.status_code}",
             )
 
     except requests.exceptions.ConnectionError:
         raise HTTPException(
             status_code=503,
-            detail="Could not connect to bridge server. Ensure server is running: inspekt start"
+            detail="Could not connect to bridge server. Ensure server is running: inspekt start",
         )
     except requests.exceptions.Timeout:
         raise HTTPException(status_code=504, detail="Request to bridge server timed out")
@@ -464,7 +450,7 @@ def toggle_global_csp(request: CspGlobalRequest):
         response = requests.post(
             f"http://{BRIDGE_HTTP_HOST}:{BRIDGE_HTTP_PORT}/csp/global",
             json={"enabled": request.enabled},
-            timeout=10.0
+            timeout=10.0,
         )
 
         if response.status_code == 200:
@@ -472,13 +458,13 @@ def toggle_global_csp(request: CspGlobalRequest):
         else:
             raise HTTPException(
                 status_code=response.status_code,
-                detail=f"Bridge server returned HTTP {response.status_code}"
+                detail=f"Bridge server returned HTTP {response.status_code}",
             )
 
     except requests.exceptions.ConnectionError:
         raise HTTPException(
             status_code=503,
-            detail="Could not connect to bridge server. Ensure server is running: inspekt start"
+            detail="Could not connect to bridge server. Ensure server is running: inspekt start",
         )
     except requests.exceptions.Timeout:
         raise HTTPException(status_code=504, detail="Request to bridge server timed out")
@@ -516,8 +502,7 @@ def get_global_csp_status():
     """
     try:
         response = requests.get(
-            f"http://{BRIDGE_HTTP_HOST}:{BRIDGE_HTTP_PORT}/csp/global",
-            timeout=10.0
+            f"http://{BRIDGE_HTTP_HOST}:{BRIDGE_HTTP_PORT}/csp/global", timeout=10.0
         )
 
         if response.status_code == 200:
@@ -525,13 +510,13 @@ def get_global_csp_status():
         else:
             raise HTTPException(
                 status_code=response.status_code,
-                detail=f"Bridge server returned HTTP {response.status_code}"
+                detail=f"Bridge server returned HTTP {response.status_code}",
             )
 
     except requests.exceptions.ConnectionError:
         raise HTTPException(
             status_code=503,
-            detail="Could not connect to bridge server. Ensure server is running: inspekt start"
+            detail="Could not connect to bridge server. Ensure server is running: inspekt start",
         )
     except requests.exceptions.Timeout:
         raise HTTPException(status_code=504, detail="Request to bridge server timed out")
@@ -545,6 +530,7 @@ def get_global_csp_status():
 # ============================================================================
 # Helper Functions
 # ============================================================================
+
 
 def _sync_domains_to_browser():
     """
@@ -568,39 +554,24 @@ def _sync_domains_to_browser():
             dt = datetime.fromtimestamp(item["added_at"], tz=UTC)
             iso_timestamp = dt.isoformat().replace("+00:00", "Z")
 
-            domains[item["domain"]] = {
-                "addedAt": iso_timestamp,
-                "permanent": item["permanent"]
-            }
+            domains[item["domain"]] = {"addedAt": iso_timestamp, "permanent": item["permanent"]}
 
         # Send sync request to bridge server
         response = requests.post(
             f"http://{BRIDGE_HTTP_HOST}:{BRIDGE_HTTP_PORT}/domains/sync",
             json={"domains": domains},
-            timeout=10.0
+            timeout=10.0,
         )
 
         if response.status_code == 200:
-            return {
-                "ok": True,
-                "synced": len(domains)
-            }
+            return {"ok": True, "synced": len(domains)}
         else:
             # Sync failed, but don't raise error (graceful degradation)
-            return {
-                "ok": False,
-                "error": f"Bridge server returned HTTP {response.status_code}"
-            }
+            return {"ok": False, "error": f"Bridge server returned HTTP {response.status_code}"}
 
     except (requests.exceptions.ConnectionError, requests.exceptions.Timeout):
         # Bridge server not available, but domain was saved to SQLite
         # This is okay - sync will happen when server starts
-        return {
-            "ok": False,
-            "error": "Bridge server not available (domain saved to database)"
-        }
+        return {"ok": False, "error": "Bridge server not available (domain saved to database)"}
     except Exception as e:
-        return {
-            "ok": False,
-            "error": str(e)
-        }
+        return {"ok": False, "error": str(e)}

@@ -151,6 +151,7 @@ def _read_embedded_python() -> str | None:
 # CLI Commands
 # ============================================================================
 
+
 @click.group()
 def autostart():
     """Manage automatic startup at login (macOS).
@@ -197,8 +198,7 @@ def enable():
 
     if not _verify_python(python_path):
         click.echo(
-            click.style("Error: ", fg="red")
-            + f"Cannot import inspekt with {python_path}",
+            click.style("Error: ", fg="red") + f"Cannot import inspekt with {python_path}",
             err=True,
         )
         raise SystemExit(1)
@@ -230,8 +230,7 @@ def enable():
 
     if result.returncode != 0:
         click.echo(
-            click.style("Error: ", fg="red")
-            + f"launchctl load failed: {result.stderr.strip()}",
+            click.style("Error: ", fg="red") + f"launchctl load failed: {result.stderr.strip()}",
             err=True,
         )
         raise SystemExit(1)
@@ -258,7 +257,9 @@ def enable():
     table.print_footer()
 
     click.echo()
-    print_hint("Servers will now start automatically at login. Check with `inspekt autostart status`.")
+    print_hint(
+        "Servers will now start automatically at login. Check with `inspekt autostart status`."
+    )
 
 
 @autostart.command()
@@ -275,8 +276,7 @@ def disable():
     """
     if platform.system() != "Darwin":
         click.echo(
-            click.style("Error: ", fg="red")
-            + "Autostart is only supported on macOS.",
+            click.style("Error: ", fg="red") + "Autostart is only supported on macOS.",
             err=True,
         )
         raise SystemExit(1)
@@ -294,7 +294,10 @@ def disable():
             click.echo(f"  {get_status_icon('pass')} Agent unloaded")
             anything_removed = True
         else:
-            click.echo(f"  {get_status_icon('warning')} Could not unload agent: {result.stderr.strip()}", err=True)
+            click.echo(
+                f"  {get_status_icon('warning')} Could not unload agent: {result.stderr.strip()}",
+                err=True,
+            )
 
     # Remove plist
     if PLIST_PATH.exists():
@@ -336,8 +339,7 @@ def status():
     """
     if platform.system() != "Darwin":
         click.echo(
-            click.style("Error: ", fg="red")
-            + "Autostart is only supported on macOS.",
+            click.style("Error: ", fg="red") + "Autostart is only supported on macOS.",
             err=True,
         )
         raise SystemExit(1)
@@ -358,24 +360,33 @@ def status():
     if loaded:
         status_text = f"{format_status_icon('pass')} " + click.style("Enabled & loaded", fg="green")
     elif plist_exists:
-        status_text = f"{format_status_icon('warning')} " + click.style("Installed but not loaded", fg="yellow")
+        status_text = f"{format_status_icon('warning')} " + click.style(
+            "Installed but not loaded", fg="yellow"
+        )
     else:
         status_text = f"{format_status_icon('fail')} " + click.style("Not enabled", fg="red")
 
     data = [
         ["Status", status_text],
         ["Plist", str(PLIST_PATH) if plist_exists else click.style("not found", fg="bright_black")],
-        ["Wrapper", str(WRAPPER_PATH) if WRAPPER_PATH.exists() else click.style("not found", fg="bright_black")],
+        [
+            "Wrapper",
+            str(WRAPPER_PATH)
+            if WRAPPER_PATH.exists()
+            else click.style("not found", fg="bright_black"),
+        ],
     ]
 
     # Python path info
     if embedded_python:
         data.append(["Python (embedded)", embedded_python])
         if embedded_python != current_python:
-            data.append([
-                "",
-                click.style(f"⚠ Current Python differs: {current_python}", fg="yellow"),
-            ])
+            data.append(
+                [
+                    "",
+                    click.style(f"⚠ Current Python differs: {current_python}", fg="yellow"),
+                ]
+            )
     else:
         data.append(["Python (current)", current_python])
 

@@ -25,19 +25,55 @@ logger = logging.getLogger(__name__)
 # Standard PDF structure tag types
 STANDARD_TAGS = {
     # Grouping elements
-    "Document", "Part", "Art", "Sect", "Div", "BlockQuote", "Caption",
-    "TOC", "TOCI", "Index", "NonStruct", "Private",
+    "Document",
+    "Part",
+    "Art",
+    "Sect",
+    "Div",
+    "BlockQuote",
+    "Caption",
+    "TOC",
+    "TOCI",
+    "Index",
+    "NonStruct",
+    "Private",
     # Block-level elements
-    "H", "H1", "H2", "H3", "H4", "H5", "H6",
-    "P", "L", "LI", "Lbl", "LBody",
+    "H",
+    "H1",
+    "H2",
+    "H3",
+    "H4",
+    "H5",
+    "H6",
+    "P",
+    "L",
+    "LI",
+    "Lbl",
+    "LBody",
     # Table elements
-    "Table", "TR", "TH", "TD", "THead", "TBody", "TFoot",
+    "Table",
+    "TR",
+    "TH",
+    "TD",
+    "THead",
+    "TBody",
+    "TFoot",
     # Inline elements
-    "Span", "Quote", "Note", "Reference", "BibEntry", "Code",
+    "Span",
+    "Quote",
+    "Note",
+    "Reference",
+    "BibEntry",
+    "Code",
     # Illustration elements
-    "Figure", "Formula", "Form",
+    "Figure",
+    "Formula",
+    "Form",
     # Special elements
-    "Link", "Annot", "Ruby", "Warichu",
+    "Link",
+    "Annot",
+    "Ruby",
+    "Warichu",
 }
 
 # Heading tags for hierarchy validation
@@ -217,6 +253,7 @@ class PDFStructureExtractor:
     def __enter__(self) -> PDFStructureExtractor:
         """Open the PDF file."""
         import pikepdf
+
         self._pdf = pikepdf.open(self.pdf_path)
         self._load_role_map()
         return self
@@ -412,15 +449,17 @@ class PDFStructureExtractor:
 
         # Add to reading order if it has content
         if has_content and not is_root and page_number is not None:
-            self._reading_order.append(ReadingOrderItem(
-                index=len(self._reading_order) + 1,
-                tag_type=tag_type,
-                text_preview=text_content[:100] if text_content else "",
-                page_number=page_number,
-                node_id=node_id,
-                has_alt_text=alt_text is not None,
-                has_issues=len(issues) > 0,
-            ))
+            self._reading_order.append(
+                ReadingOrderItem(
+                    index=len(self._reading_order) + 1,
+                    tag_type=tag_type,
+                    text_preview=text_content[:100] if text_content else "",
+                    page_number=page_number,
+                    node_id=node_id,
+                    has_alt_text=alt_text is not None,
+                    has_issues=len(issues) > 0,
+                )
+            )
 
         # Process children
         if "/K" in element:
@@ -673,13 +712,15 @@ class PDFStructureExtractor:
                 if level > 0 and level > last_level + 1:
                     issues.append(f"Skipped from H{last_level} to H{level}")
 
-                outline.append(HeadingOutlineItem(
-                    level=level,
-                    text=text[:200],  # Truncate long headings
-                    page=node.page_number,
-                    node_id=node.node_id,
-                    issues=issues,
-                ))
+                outline.append(
+                    HeadingOutlineItem(
+                        level=level,
+                        text=text[:200],  # Truncate long headings
+                        page=node.page_number,
+                        node_id=node.node_id,
+                        issues=issues,
+                    )
+                )
 
                 if level > 0:
                     last_level = level
@@ -780,7 +821,9 @@ def format_heading_outline_text(outline: list[HeadingOutlineItem]) -> str:
         page_indicator = f" (p. {item.display_page})" if item.display_page else ""
         issue_indicator = " ⚠" if item.issues else ""
 
-        lines.append(f"{item.indent}{level_indicator}: {item.text}{page_indicator}{issue_indicator}")
+        lines.append(
+            f"{item.indent}{level_indicator}: {item.text}{page_indicator}{issue_indicator}"
+        )
 
     return "\n".join(lines)
 

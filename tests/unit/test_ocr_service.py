@@ -14,6 +14,7 @@ class TestOCRAvailability:
         """Test that is_pytesseract_available returns True when pytesseract is installed."""
         # Clear cached service instances first
         from inspekt.services.ocr_service import clear_ocr_service_cache
+
         clear_ocr_service_cache()
 
         from inspekt.services.ocr_service import is_pytesseract_available

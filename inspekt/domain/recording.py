@@ -205,12 +205,20 @@ class ExpectInfo(BaseModel):
 
     # Inspekt command assertions
     empty: bool | None = None  # For console checks (no messages)
-    allowed_violations: int | None = Field(default=None, alias="allowed-violations")  # For axe checks (max violations allowed, default 0 if checking axe)
+    allowed_violations: int | None = Field(
+        default=None, alias="allowed-violations"
+    )  # For axe checks (max violations allowed, default 0 if checking axe)
 
     # Generic output assertions (work with any inspekt command)
-    output_contains: str | None = Field(default=None, alias="output-contains")  # Check stdout contains text
-    output_not_contains: str | None = Field(default=None, alias="output-not-contains")  # Check stdout doesn't contain text
-    output_matches: str | None = Field(default=None, alias="output-matches")  # Check stdout matches regex
+    output_contains: str | None = Field(
+        default=None, alias="output-contains"
+    )  # Check stdout contains text
+    output_not_contains: str | None = Field(
+        default=None, alias="output-not-contains"
+    )  # Check stdout doesn't contain text
+    output_matches: str | None = Field(
+        default=None, alias="output-matches"
+    )  # Check stdout matches regex
 
     # Download assertions
     download_exists: bool | None = None  # File was successfully downloaded
@@ -230,7 +238,28 @@ class ExpectInfo(BaseModel):
     message: str | None = None  # Description of expectation
 
 
-ActionType = Literal["navigate", "click", "rightclick", "activate", "type", "set", "keypress", "hover", "check", "uncheck", "radio", "select", "scroll", "toggle", "dialog", "jsdialog", "upload", "download", "plugin", "inspekt"]
+ActionType = Literal[
+    "navigate",
+    "click",
+    "rightclick",
+    "activate",
+    "type",
+    "set",
+    "keypress",
+    "hover",
+    "check",
+    "uncheck",
+    "radio",
+    "select",
+    "scroll",
+    "toggle",
+    "dialog",
+    "jsdialog",
+    "upload",
+    "download",
+    "plugin",
+    "inspekt",
+]
 
 # Step execution modes for replay
 StepMode = Literal["continue", "skip", "pause"]

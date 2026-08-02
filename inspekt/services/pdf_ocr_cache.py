@@ -50,6 +50,7 @@ class TextLine:
         height: Line height in pixels (for large text detection)
         confidence: OCR confidence score (0-100)
     """
+
     text: str
     bbox: tuple[int, int, int, int]  # (x0, y0, x1, y1)
     height: int
@@ -75,6 +76,7 @@ class PageOCRResult:
     Contains both structured (text_lines) and raw (raw_text) data
     to serve different analysis needs from a single OCR run.
     """
+
     page_num: int  # 0-indexed
     text_lines: list[TextLine] = field(default_factory=list)
     raw_text: str = ""
@@ -157,6 +159,7 @@ class PDFOCRCache:
         """Open PDF document."""
         try:
             import fitz
+
             self._fitz_doc = fitz.open(self.pdf_path)
         except ImportError:
             raise RuntimeError("PyMuPDF required: pip install pymupdf")
@@ -335,17 +338,19 @@ class PDFOCRCache:
         # Convert to TextLine objects
         text_lines = []
         for line_data in lines_dict.values():
-            text_lines.append(TextLine(
-                text=" ".join(line_data["words"]),
-                bbox=(
-                    line_data["x0"],
-                    line_data["y0"],
-                    line_data["x1"],
-                    line_data["y1"],
-                ),
-                height=line_data["height"],
-                confidence=line_data["conf_sum"] / line_data["word_count"],
-            ))
+            text_lines.append(
+                TextLine(
+                    text=" ".join(line_data["words"]),
+                    bbox=(
+                        line_data["x0"],
+                        line_data["y0"],
+                        line_data["x1"],
+                        line_data["y1"],
+                    ),
+                    height=line_data["height"],
+                    confidence=line_data["conf_sum"] / line_data["word_count"],
+                )
+            )
 
         # Build raw text (preserving some structure)
         raw_text = " ".join(raw_words)
@@ -512,6 +517,7 @@ def check_ocr_available() -> tuple[bool, str | None]:
     """
     try:
         import pytesseract
+
         pytesseract.get_tesseract_version()
         return True, None
     except ImportError:

@@ -39,7 +39,7 @@ def _show_deprecation_warning():
         f"{warn_icon(deprecation_msg)}\n"
         "   Use 'inspekt storage --cookies' instead\n"
         "   Example: inspekt cookies list → inspekt storage list --cookies\n",
-        err=True
+        err=True,
     )
 
 
@@ -147,7 +147,7 @@ def _try_parse_json(value: str):
         return value
 
     # Skip if it doesn't look like JSON
-    if not (value.startswith('{') or value.startswith('[')):
+    if not (value.startswith("{") or value.startswith("[")):
         return value
 
     try:
@@ -216,7 +216,7 @@ def _display_enhanced_cookies(cookies: list):
         if isinstance(parsed_value, (dict, list)):
             # JSON value
             json_str = json.dumps(parsed_value, indent=4)
-            lines = json_str.split('\n')
+            lines = json_str.split("\n")
             if len(lines) > 5:
                 # Show first few lines
                 for line in lines[:5]:
@@ -285,7 +285,9 @@ def _display_legacy_cookies(cookies_dict: dict):
             click.echo(f"{name}{padding}    {display_value}")
 
 
-def _execute_cookie_action(action, cookie_name="", cookie_value="", options=None, output_json=False):
+def _execute_cookie_action(
+    action, cookie_name="", cookie_value="", options=None, output_json=False
+):
     """Helper function to execute cookie actions."""
     executor = get_executor()
     loader = ScriptLoader()
@@ -326,6 +328,7 @@ def _execute_cookie_action(action, cookie_name="", cookie_value="", options=None
         if output_json:
             # Return enhanced data as-is for JSON output
             from inspekt.app.cli.table import print_json
+
             print_json(response, summary=f"{count} cookie{'s' if count != 1 else ''}")
         elif count == 0:
             click.echo("No cookies found")
@@ -348,10 +351,12 @@ def _execute_cookie_action(action, cookie_name="", cookie_value="", options=None
 
             # VM terminal: offer a "Data ready to copy" toast
             from inspekt.app.cli.table import emit_copyable_data
+
             if isinstance(cookies_data, list):
                 rows = [
                     [c.get("name", ""), c.get("value", ""), c.get("domain", ""), c.get("path", "/")]
-                    for c in cookies_data if isinstance(c, dict)
+                    for c in cookies_data
+                    if isinstance(c, dict)
                 ]
                 headers = ["Name", "Value", "Domain", "Path"]
             else:
@@ -373,13 +378,12 @@ def _execute_cookie_action(action, cookie_name="", cookie_value="", options=None
             # Parse JSON value if applicable
             parsed_value = _try_parse_json(value) if exists else value
 
-            output_data = {
-                "name": name,
-                "value": parsed_value,
-                "exists": exists
-            }
+            output_data = {"name": name, "value": parsed_value, "exists": exists}
             from inspekt.app.cli.table import print_json
-            print_json(output_data, summary=f"cookie {name}" if exists else f"cookie {name} (missing)")
+
+            print_json(
+                output_data, summary=f"cookie {name}" if exists else f"cookie {name} (missing)"
+            )
             if not exists:
                 sys.exit(1)
         elif exists:

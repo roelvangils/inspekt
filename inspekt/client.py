@@ -30,15 +30,17 @@ from inspekt.transport import (
 
 def _verbose_log(message: str, data: Any = None) -> None:
     """Log verbose output if INSPEKT_VERBOSE is set."""
-    if os.environ.get('INSPEKT_VERBOSE') != '1':
+    if os.environ.get("INSPEKT_VERBOSE") != "1":
         return
 
-    timestamp = time.strftime('%H:%M:%S')
+    timestamp = time.strftime("%H:%M:%S")
     if data is not None:
         import sys
+
         print(f"[{timestamp}] {message}: {data}", file=sys.stderr)
     else:
         import sys
+
         print(f"[{timestamp}] {message}", file=sys.stderr)
 
 
@@ -113,7 +115,13 @@ class SocketClientMixin:
         except (TransportConnectionError, TransportTimeoutError):
             return None
 
-    def _socket_run(self, code: str, timeout: float = 10.0, browser_index: int | None = None, instance: str | None = None) -> dict[str, Any]:
+    def _socket_run(
+        self,
+        code: str,
+        timeout: float = 10.0,
+        browser_index: int | None = None,
+        instance: str | None = None,
+    ) -> dict[str, Any]:
         """Execute code via socket transport.
 
         Args:
@@ -165,7 +173,11 @@ class SocketClientMixin:
                     "  • Check that the Inspekt extension is enabled"
                 )
             elif error == "instance_not_found":
-                message = response.data.get("message", f"Instance '{instance}' not found") if response.data else f"Instance '{instance}' not found"
+                message = (
+                    response.data.get("message", f"Instance '{instance}' not found")
+                    if response.data
+                    else f"Instance '{instance}' not found"
+                )
                 raise RuntimeError(
                     f"{message}\n\n"
                     "The specified browser instance could not be found.\n\n"
@@ -192,7 +204,7 @@ class SocketClientMixin:
 
         response = transport.send(
             Request(method="result", params={"request_id": request_id, "timeout": timeout}),
-            timeout=timeout + 5
+            timeout=timeout + 5,
         )
 
         if response.success:
@@ -209,6 +221,7 @@ class BridgeClient(SocketClientMixin):
         # INSPEKT_BRIDGE_URL takes precedence, then INSPEKT_BRIDGE_PORT,
         # then auto-detect based on environment (VM vs normal)
         from inspekt.config import get_bridge_port
+
         env_url = os.environ.get("INSPEKT_BRIDGE_URL")
         env_port = os.environ.get("INSPEKT_BRIDGE_PORT")
 
@@ -216,6 +229,7 @@ class BridgeClient(SocketClientMixin):
             self.base_url = env_url.rstrip("/")
             # Extract host/port from URL for compatibility
             from urllib.parse import urlparse
+
             parsed = urlparse(self.base_url)
             self.host = parsed.hostname or host
             self.port = parsed.port or get_bridge_port()
@@ -234,16 +248,19 @@ class BridgeClient(SocketClientMixin):
 
         # Track if socket transport should be used (auto-detected)
         self._use_socket = _use_socket_transport()
-        _verbose_log("BridgeClient initialized", f"use_socket={self._use_socket}, base_url={self.base_url}")
+        _verbose_log(
+            "BridgeClient initialized", f"use_socket={self._use_socket}, base_url={self.base_url}"
+        )
 
     def _extract_domain(self, url: str) -> str | None:
         """Extract domain from URL."""
         from urllib.parse import urlparse
+
         try:
             parsed = urlparse(url)
             hostname = parsed.netloc or parsed.hostname
-            if hostname and ':' in hostname:
-                hostname = hostname.split(':')[0]
+            if hostname and ":" in hostname:
+                hostname = hostname.split(":")[0]
             return hostname
         except Exception:
             return None
@@ -274,7 +291,9 @@ class BridgeClient(SocketClientMixin):
                 # Try to sync and retry
                 self._sync_domains_to_browser()
                 time.sleep(0.5)
-                self._last_retry_result = self.execute(code, timeout=timeout, _skip_domain_check=True)
+                self._last_retry_result = self.execute(
+                    code, timeout=timeout, _skip_domain_check=True
+                )
                 return self._last_retry_result.get("ok", False)
 
             # Prompt user
@@ -282,13 +301,10 @@ class BridgeClient(SocketClientMixin):
             click.echo("", err=True)
 
             response = click.prompt(
-                "Would you like to add it now? [Y/n]",
-                type=str,
-                default="Y",
-                show_default=False
+                "Would you like to add it now? [Y/n]", type=str, default="Y", show_default=False
             )
 
-            if response.lower() in ('n', 'no'):
+            if response.lower() in ("n", "no"):
                 click.echo("\nDomain not added. You can add it later with:", err=True)
                 click.echo(f"  inspekt domain add {normalized}", err=True)
                 click.echo("", err=True)
@@ -320,11 +336,14 @@ class BridgeClient(SocketClientMixin):
             # Retry execution
             # Use shorter timeout for retry since we just synced and browser should respond quickly
             retry_timeout = min(timeout, 15.0)
-            self._last_retry_result = self.execute(code, timeout=retry_timeout, _skip_domain_check=True, _fast_poll=True)
+            self._last_retry_result = self.execute(
+                code, timeout=retry_timeout, _skip_domain_check=True, _fast_poll=True
+            )
             return self._last_retry_result.get("ok", False)
 
         except Exception as e:
             import click
+
             click.echo(f"Error handling domain prompt: {e}", err=True)
             return False
 
@@ -338,15 +357,19 @@ class BridgeClient(SocketClientMixin):
         _verbose_log("Syncing domains to browser extension")
         try:
             from inspekt.services.domain_service import get_domain_service
+
             sync_start = time.time()
             domains = get_domain_service().get_domains_for_browser_sync()
             _verbose_log("Domains to sync", len(domains))
             response = self._session.post(
                 f"{self.base_url}/domains/sync",
                 json={"domains": domains},
-                timeout=10.0  # Wait for browser to confirm
+                timeout=10.0,  # Wait for browser to confirm
             )
-            _verbose_log("Sync response", f"status={response.status_code}, time={time.time() - sync_start:.3f}s")
+            _verbose_log(
+                "Sync response",
+                f"status={response.status_code}, time={time.time() - sync_start:.3f}s",
+            )
             if response.status_code == 200:
                 data = response.json()
                 # Check browsers_synced > 0 for actual confirmation
@@ -431,7 +454,15 @@ class BridgeClient(SocketClientMixin):
             return 0
         return status.get("connected_browsers", 0)
 
-    def execute(self, code: str, timeout: float = 10.0, _skip_domain_check: bool = False, browser_index: int | None = None, _fast_poll: bool = False, instance: str | None = None) -> dict[str, Any]:
+    def execute(
+        self,
+        code: str,
+        timeout: float = 10.0,
+        _skip_domain_check: bool = False,
+        browser_index: int | None = None,
+        _fast_poll: bool = False,
+        instance: str | None = None,
+    ) -> dict[str, Any]:
         """
         Execute JavaScript code in the browser and wait for result.
 
@@ -456,9 +487,19 @@ class BridgeClient(SocketClientMixin):
         """
         # Check for instance from environment variable if not provided
         if instance is None:
-            instance = os.environ.get('INSPEKT_INSTANCE')
+            instance = os.environ.get("INSPEKT_INSTANCE")
 
-        _verbose_log("BridgeClient.execute() called", {"timeout": timeout, "code_length": len(code), "browser_index": browser_index, "instance": instance, "fast_poll": _fast_poll, "use_socket": self._use_socket})
+        _verbose_log(
+            "BridgeClient.execute() called",
+            {
+                "timeout": timeout,
+                "code_length": len(code),
+                "browser_index": browser_index,
+                "instance": instance,
+                "fast_poll": _fast_poll,
+                "use_socket": self._use_socket,
+            },
+        )
 
         # Try socket transport first (faster, more reliable)
         if self._use_socket and not self._socket_unhealthy and not _skip_domain_check:
@@ -467,7 +508,9 @@ class BridgeClient(SocketClientMixin):
                 start_time = time.time()
 
                 # Submit code via socket
-                run_result = self._socket_run(code, timeout=timeout, browser_index=browser_index, instance=instance)
+                run_result = self._socket_run(
+                    code, timeout=timeout, browser_index=browser_index, instance=instance
+                )
                 request_id = run_result.get("request_id")
 
                 if not request_id:
@@ -479,16 +522,22 @@ class BridgeClient(SocketClientMixin):
                 remaining_timeout = max(timeout - (time.time() - start_time), 1.0)
                 result = self._socket_result(request_id, timeout=remaining_timeout)
 
-                _verbose_log("Socket result received", f"time={time.time() - start_time:.3f}s, status={result.get('status')}")
+                _verbose_log(
+                    "Socket result received",
+                    f"time={time.time() - start_time:.3f}s, status={result.get('status')}",
+                )
 
                 # Handle domain authorization error (needs HTTP for domain prompt flow)
                 if not result.get("ok"):
                     error_msg = str(result.get("error", "")).lower()
-                    is_domain_error = any(phrase in error_msg for phrase in [
-                        "not allowed to access this domain",
-                        "domain not authorized",
-                        "not authorized"
-                    ])
+                    is_domain_error = any(
+                        phrase in error_msg
+                        for phrase in [
+                            "not allowed to access this domain",
+                            "domain not authorized",
+                            "not authorized",
+                        ]
+                    )
                     if is_domain_error:
                         _verbose_log("Domain error detected, falling back to HTTP for prompt flow")
                         # Fall through to HTTP to handle domain prompt
@@ -531,7 +580,10 @@ class BridgeClient(SocketClientMixin):
             # This allows slow operations to complete
             # For fast_poll mode, use the raw timeout (fail fast on pre-validation checks)
             http_timeout = timeout if _fast_poll else timeout + 5
-            _verbose_log("Submitting code to bridge", f"POST {self.base_url}/run, http_timeout={http_timeout}")
+            _verbose_log(
+                "Submitting code to bridge",
+                f"POST {self.base_url}/run, http_timeout={http_timeout}",
+            )
             submit_start = time.time()
 
             # Build request payload
@@ -545,7 +597,10 @@ class BridgeClient(SocketClientMixin):
             response = self._session.post(
                 f"{self.base_url}/run", json=payload, timeout=http_timeout
             )
-            _verbose_log("Code submitted", f"status={response.status_code}, time={time.time() - submit_start:.3f}s")
+            _verbose_log(
+                "Code submitted",
+                f"status={response.status_code}, time={time.time() - submit_start:.3f}s",
+            )
 
             # Parse JSON first to get detailed error messages (before raise_for_status)
             try:
@@ -610,7 +665,9 @@ class BridgeClient(SocketClientMixin):
                 # Use shorter minimum timeout for domain retry scenarios (browser should respond quickly)
                 # For quick checks (pre-validation), use remaining time directly (fail fast)
                 if _fast_poll:
-                    request_timeout = max(remaining_time + 1, 2)  # At least 2s, but respect overall timeout
+                    request_timeout = max(
+                        remaining_time + 1, 2
+                    )  # At least 2s, but respect overall timeout
                 else:
                     # Use remaining time + small buffer, with reasonable min/max bounds
                     # Min of 5s to allow for network latency, but cap at remaining_time + 5s
@@ -628,7 +685,10 @@ class BridgeClient(SocketClientMixin):
                     status = data.get("status", "unknown")
 
                     if status == "completed":
-                        _verbose_log(f"Result received (poll #{poll_count})", f"time={time.time() - start_time:.3f}s, ok={data.get('ok')}")
+                        _verbose_log(
+                            f"Result received (poll #{poll_count})",
+                            f"time={time.time() - start_time:.3f}s, ok={data.get('ok')}",
+                        )
 
                     # Check if result contains CSP error
                     if data.get("status") == "completed" and not data.get("ok"):
@@ -703,7 +763,9 @@ class BridgeClient(SocketClientMixin):
 
                                     if csp_result.status_code == 200:
                                         csp_data = csp_result.json()
-                                        if csp_data.get("status") == "completed" and csp_data.get("result"):
+                                        if csp_data.get("status") == "completed" and csp_data.get(
+                                            "result"
+                                        ):
                                             raise RuntimeError(
                                                 "Content Security Policy (CSP) is blocking Inspekt on this site.\n\n"
                                                 "This website has security restrictions that prevent WebSocket connections "
@@ -726,14 +788,19 @@ class BridgeClient(SocketClientMixin):
                     # Check for domain authorization error and prompt user
                     if not _skip_domain_check and not data.get("ok"):
                         error_msg = data.get("error", "").lower()
-                        is_domain_error = any(phrase in error_msg for phrase in [
-                            "not allowed to access this domain",
-                            "domain not authorized",
-                            "not authorized"
-                        ])
+                        is_domain_error = any(
+                            phrase in error_msg
+                            for phrase in [
+                                "not allowed to access this domain",
+                                "domain not authorized",
+                                "not authorized",
+                            ]
+                        )
 
                         if is_domain_error:
-                            _verbose_log("Domain authorization error detected", data.get("url", "unknown"))
+                            _verbose_log(
+                                "Domain authorization error detected", data.get("url", "unknown")
+                            )
                             url = data.get("url", "")
                             if url and self._handle_domain_prompt(url, code, timeout):
                                 # User added domain, retry was successful
@@ -746,7 +813,9 @@ class BridgeClient(SocketClientMixin):
             except requests.RequestException as e:
                 raise ConnectionError(f"Failed to get result: {e}")
 
-        _verbose_log(f"Timeout after {poll_count} polls", f"elapsed={time.time() - start_time:.3f}s")
+        _verbose_log(
+            f"Timeout after {poll_count} polls", f"elapsed={time.time() - start_time:.3f}s"
+        )
         raise TimeoutError(f"No response from browser after {timeout} seconds.")
 
     def execute_file(self, filepath: str, timeout: float = 10.0) -> dict[str, Any]:
@@ -781,9 +850,7 @@ class BridgeClient(SocketClientMixin):
         url = f"{self.base_url}/replay/enable"
         try:
             response = self._session.post(
-                url,
-                json={"visualScript": visual_script},
-                timeout=timeout
+                url, json={"visualScript": visual_script}, timeout=timeout
             )
             return response.json()
         except requests.exceptions.Timeout:

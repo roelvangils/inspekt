@@ -138,7 +138,9 @@ class ContentCache:
         article_length = len(article_text.split())
 
         # Create content hash from first 500 and last 100 characters
-        content_sample = article_text[:500] + article_text[-100:] if len(article_text) > 600 else article_text
+        content_sample = (
+            article_text[:500] + article_text[-100:] if len(article_text) > 600 else article_text
+        )
         content_hash = hashlib.sha256(content_sample.encode()).hexdigest()[:16]
 
         fingerprint = {
@@ -300,7 +302,9 @@ class ContentCache:
                 count_similarities.append(1.0 - abs(c1 - c2) / max(c1, c2, 1))
             else:
                 count_similarities.append(1.0)
-        count_similarity = sum(count_similarities) / len(count_similarities) if count_similarities else 1.0
+        count_similarity = (
+            sum(count_similarities) / len(count_similarities) if count_similarities else 1.0
+        )
 
         # Compare text excerpt
         text1 = fp1.get("mainTextExcerpt", "")
@@ -309,11 +313,11 @@ class ContentCache:
 
         # Weighted average
         similarity = (
-            title_similarity * 0.2 +
-            heading_similarity * 0.25 +
-            landmark_similarity * 0.2 +
-            count_similarity * 0.2 +
-            text_similarity * 0.15
+            title_similarity * 0.2
+            + heading_similarity * 0.25
+            + landmark_similarity * 0.2
+            + count_similarity * 0.2
+            + text_similarity * 0.15
         )
         return similarity
 
@@ -338,10 +342,10 @@ class ContentCache:
 
         # Weighted average (hash is most important for articles)
         similarity = (
-            title_similarity * 0.15 +
-            hash_similarity * 0.55 +
-            length_similarity * 0.15 +
-            date_similarity * 0.15
+            title_similarity * 0.15
+            + hash_similarity * 0.55
+            + length_similarity * 0.15
+            + date_similarity * 0.15
         )
         return similarity
 
@@ -376,10 +380,10 @@ class ContentCache:
 
         # Weighted average (hash is most important for extract)
         similarity = (
-            title_similarity * 0.15 +
-            hash_similarity * 0.55 +
-            length_similarity * 0.15 +
-            date_similarity * 0.15
+            title_similarity * 0.15
+            + hash_similarity * 0.55
+            + length_similarity * 0.15
+            + date_similarity * 0.15
         )
         return similarity
 
@@ -416,11 +420,7 @@ class ContentCache:
         dims_similarity = 1.0 if dims1 == dims2 else 0.7
 
         # Weighted average
-        similarity = (
-            hash_similarity * 0.5 +
-            name_similarity * 0.3 +
-            dims_similarity * 0.2
-        )
+        similarity = hash_similarity * 0.5 + name_similarity * 0.3 + dims_similarity * 0.2
         return similarity
 
     def get_cached_content(
@@ -468,14 +468,18 @@ class ContentCache:
 
             # Check similarity (skip if no fingerprint provided - just check freshness)
             if current_fingerprint:
-                similarity = self.calculate_similarity(cached_fingerprint, current_fingerprint, command)
+                similarity = self.calculate_similarity(
+                    cached_fingerprint, current_fingerprint, command
+                )
 
                 # For ask and element_ask, require high threshold (0.85)
                 # This ensures question + element identity must match closely
                 if command in ("ask", "element_ask"):
                     threshold = command_config.get("similarity_threshold", 0.85)
                 else:
-                    threshold = command_config.get("similarity_threshold", 0.85 if command == "describe" else 0.90)
+                    threshold = command_config.get(
+                        "similarity_threshold", 0.85 if command == "describe" else 0.90
+                    )
 
                 if similarity < threshold:
                     return None

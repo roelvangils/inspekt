@@ -158,9 +158,7 @@ class AIIntegrationService:
 
         # Add language instruction if specified
         if target_lang:
-            prompt_parts.append(
-                f"\n\nIMPORTANT: Provide your response in {target_lang} language."
-            )
+            prompt_parts.append(f"\n\nIMPORTANT: Provide your response in {target_lang} language.")
 
         # Add extra instructions if provided
         if extra_instructions:
@@ -285,8 +283,8 @@ class AIIntegrationService:
 
         try:
             # Extract base64 data from data URL
-            if ';base64,' in image_data_url:
-                base64_data = image_data_url.split(';base64,')[1]
+            if ";base64," in image_data_url:
+                base64_data = image_data_url.split(";base64,")[1]
             else:
                 click.echo("Error: Invalid image data URL format", err=True)
                 return ""
@@ -371,8 +369,8 @@ class AIIntegrationService:
             img = Image.open(io.BytesIO(response.content))
 
             # Convert to RGB if necessary (e.g., RGBA or palette mode)
-            if img.mode not in ('RGB', 'L'):
-                img = img.convert('RGB')
+            if img.mode not in ("RGB", "L"):
+                img = img.convert("RGB")
 
             # Resize if too large
             width, height = img.size
@@ -392,11 +390,11 @@ class AIIntegrationService:
 
             # Convert to JPEG in memory
             buffer = io.BytesIO()
-            img.save(buffer, format='JPEG', quality=quality, optimize=True)
+            img.save(buffer, format="JPEG", quality=quality, optimize=True)
             buffer.seek(0)
 
             # Encode to base64
-            img_base64 = base64.b64encode(buffer.read()).decode('utf-8')
+            img_base64 = base64.b64encode(buffer.read()).decode("utf-8")
             data_url = f"data:image/jpeg;base64,{img_base64}"
 
             click.echo(f"✓ Image converted to base64 ({len(img_base64)} bytes)", err=True)
@@ -409,9 +407,7 @@ class AIIntegrationService:
             click.echo(f"Error processing image: {e}", err=True)
             return ""
 
-    def get_image_description(
-        self, image_data_url: str, prompt: str | None = None
-    ) -> str:
+    def get_image_description(self, image_data_url: str, prompt: str | None = None) -> str:
         """
         Get a vision AI description of an image.
 

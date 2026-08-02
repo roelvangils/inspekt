@@ -147,9 +147,7 @@ class AxeEngine(AccessibilityEngine):
         violations = []
 
         for violation in raw_results.get("violations", []):
-            impact = self.IMPACT_MAPPING.get(
-                violation.get("impact", "minor"), ImpactLevel.MINOR
-            )
+            impact = self.IMPACT_MAPPING.get(violation.get("impact", "minor"), ImpactLevel.MINOR)
 
             for node in violation.get("nodes", []):
                 violations.append(
@@ -181,7 +179,9 @@ class AxeEngine(AccessibilityEngine):
             incomplete=raw_results.get("incomplete", []),
             inapplicable=raw_results.get("inapplicable", []),
             summary={
-                "violation_count": summary.get("violationCount", len(raw_results.get("violations", []))),
+                "violation_count": summary.get(
+                    "violationCount", len(raw_results.get("violations", []))
+                ),
                 "pass_count": summary.get("passCount", 0),
                 "incomplete_count": summary.get("incompleteCount", 0),
                 "critical_count": summary.get("criticalCount", 0),

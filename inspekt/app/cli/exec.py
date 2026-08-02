@@ -47,40 +47,40 @@ def _format_console_entry(entry: dict) -> str:
 
     # Color map
     level_colors = {
-        'error': 'red',
-        'warn': 'yellow',
-        'log': 'white',
-        'info': 'cyan',
-        'debug': 'bright_black'
+        "error": "red",
+        "warn": "yellow",
+        "log": "white",
+        "info": "cyan",
+        "debug": "bright_black",
     }
-    color = level_colors.get(level, 'white')
+    color = level_colors.get(level, "white")
 
     # Handle special prefixes
     prefix_colors = {
-        '[table:json]': 'blue',
-        '[dir]': 'blue',
-        '[trace]': 'magenta',
-        '[group]': 'cyan',
-        '[assert]': 'red',
-        '[clear]': 'bright_black',
+        "[table:json]": "blue",
+        "[dir]": "blue",
+        "[trace]": "magenta",
+        "[group]": "cyan",
+        "[assert]": "red",
+        "[clear]": "bright_black",
     }
 
     display_msg = message
     for prefix, pcolor in prefix_colors.items():
         if message.startswith(prefix):
-            if prefix == '[table:json]':
-                display_msg = click.style('[table]', fg='blue') + ' …'
+            if prefix == "[table:json]":
+                display_msg = click.style("[table]", fg="blue") + " …"
             else:
-                display_msg = click.style(prefix, fg=pcolor) + message[len(prefix):]
+                display_msg = click.style(prefix, fg=pcolor) + message[len(prefix) :]
             break
 
     # Colorize special values
-    if display_msg == '(empty)':
-        display_msg = click.style('(empty)', dim=True)
-    elif display_msg in ('undefined', 'null'):
+    if display_msg == "(empty)":
+        display_msg = click.style("(empty)", dim=True)
+    elif display_msg in ("undefined", "null"):
         display_msg = click.style(display_msg, dim=True)
-    elif display_msg in ('NaN', 'Infinity', '-Infinity'):
-        display_msg = click.style(display_msg, fg='yellow')
+    elif display_msg in ("NaN", "Infinity", "-Infinity"):
+        display_msg = click.style(display_msg, fg="yellow")
 
     return f"  {click.style(f'[{level}]', fg=color)} {display_msg}"
 
@@ -120,7 +120,8 @@ def eval(code, file, timeout, format, url, title, no_console):
             code = sys.stdin.read()
         else:
             click.echo(
-                "Error: No code provided. Use: inspekt eval CODE or inspekt eval --file FILE", err=True
+                "Error: No code provided. Use: inspekt eval CODE or inspekt eval --file FILE",
+                err=True,
             )
             sys.exit(1)
 
@@ -133,7 +134,7 @@ def eval(code, file, timeout, format, url, title, no_console):
         else:
             # Inject a context marker so console list shows what code was executed
             # Escape the code for safe embedding in a string
-            escaped_code = code.replace('\\', '\\\\').replace('`', '\\`').replace('${', '\\${')
+            escaped_code = code.replace("\\", "\\\\").replace("`", "\\`").replace("${", "\\${")
             # Use comma operator (not semicolon) since executor wraps in return()
             # Prefix with [inspekt:cmd] for console.py to recognize and format specially
             code_with_marker = f"(console.debug('[inspekt:cmd]' + `{escaped_code}`), {code})"

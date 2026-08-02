@@ -115,6 +115,7 @@ class AccessibilityEngine(ABC):
     def engine_name(self) -> str:
         """Human-readable name loaded from engines.json (e.g., 'Axe-core', 'Equal Access Checker')."""
         from inspekt.data import get_engine_metadata
+
         try:
             return get_engine_metadata(self.engine_id)["official_name"]
         except KeyError:
@@ -125,6 +126,7 @@ class AccessibilityEngine(ABC):
     def provider(self) -> str:
         """Provider/vendor name loaded from engines.json (e.g., 'Deque Systems', 'IBM')."""
         from inspekt.data import get_engine_metadata
+
         try:
             return get_engine_metadata(self.engine_id)["provider"]
         except KeyError:

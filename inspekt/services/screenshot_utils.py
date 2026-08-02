@@ -202,11 +202,14 @@ def display_adjustment_feedback(
         zoom_percent = int(original_zoom * 100)
         # Use zoom-out icon if reducing, zoom-in if increasing
         zoom_icon = "\uf532" if original_zoom > 1.0 else "\uf531"
-        click.echo(click.style(f"{zoom_icon}  ", fg="blue") + f"Resetting zoom level from {zoom_percent}% to 100%…")
+        click.echo(
+            click.style(f"{zoom_icon}  ", fg="blue")
+            + f"Resetting zoom level from {zoom_percent}% to 100%…"
+        )
 
     # Selection cleared feedback
     if response.get("selectionCleared"):
-        click.echo(click.style("\U000F09A9  ", fg="blue") + "Clearing text selection…")
+        click.echo(click.style("\U000f09a9  ", fg="blue") + "Clearing text selection…")
 
 
 def display_capture_feedback(
@@ -235,7 +238,10 @@ def display_capture_feedback(
     elif mode == "viewport":
         click.echo(click.style("\ueada  ", fg="blue") + "Capturing viewport…")
     elif mode == "page":
-        click.echo(click.style("\ueada  ", fg="blue") + "Capturing full page (debugger will attach briefly)…")
+        click.echo(
+            click.style("\ueada  ", fg="blue")
+            + "Capturing full page (debugger will attach briefly)…"
+        )
 
 
 def display_restoration_feedback(

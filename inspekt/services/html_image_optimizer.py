@@ -329,8 +329,8 @@ def optimize_html_images(
             if debug:
                 savings = original_len - optimized_len
                 print(
-                    f"  Image {i+1}: {original_len:,} → {optimized_len:,} bytes "
-                    f"(-{savings:,}, {savings/original_len*100:.1f}%)"
+                    f"  Image {i + 1}: {original_len:,} → {optimized_len:,} bytes "
+                    f"(-{savings:,}, {savings / original_len * 100:.1f}%)"
                 )
         else:
             stats.skipped_images += 1

@@ -134,9 +134,7 @@ class TestOverlayBusDomCleanliness:
             ctx.add_init_script(_BUS_STUB_JS)
             page = ctx.new_page()
             # Empty <button> triggers axe's `button-name` rule (no accessible name).
-            page.set_content(
-                "<!doctype html><html><body><button id='b'></button></body></html>"
-            )
+            page.set_content("<!doctype html><html><body><button id='b'></button></body></html>")
             page.add_script_tag(content=axe_lib_source)
 
             result = _run_axe_and_emit(page, run_axe_template)
@@ -146,12 +144,11 @@ class TestOverlayBusDomCleanliness:
             bus_calls = page.evaluate("window.__inspektBusCalls")
             methods = [c["method"] for c in bus_calls]
             assert "set" in methods, (
-                f"Expected at least one InspektOverlayBus.set() call; "
-                f"got methods={methods!r}"
+                f"Expected at least one InspektOverlayBus.set() call; got methods={methods!r}"
             )
-            assert any(
-                c["method"] == "set" and c["kind"] == "badge" for c in bus_calls
-            ), f"Expected a 'badge' overlay set call; got {bus_calls!r}"
+            assert any(c["method"] == "set" and c["kind"] == "badge" for c in bus_calls), (
+                f"Expected a 'badge' overlay set call; got {bus_calls!r}"
+            )
 
             # ── DOM-cleanliness invariant ──────────────────────────────
             in_page_badges = page.evaluate(

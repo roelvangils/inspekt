@@ -24,8 +24,8 @@ class TestToolExecution:
                 "url": "https://example.com",
                 "title": "Example Domain",
                 "viewport": {"width": 1920, "height": 1080},
-                "scroll": {"x": 0, "y": 0}
-            }
+                "scroll": {"x": 0, "y": 0},
+            },
         }
 
         result = await tool_provider.get_page_info()
@@ -43,8 +43,8 @@ class TestToolExecution:
                 "url": "https://example.com/long-page",
                 "title": "Long Page",
                 "viewport": {"width": 1920, "height": 1080},
-                "scroll": {"x": 0, "y": 0}
-            }
+                "scroll": {"x": 0, "y": 0},
+            },
         }
 
         result = await tool_provider.get_page_info()
@@ -73,9 +73,7 @@ class TestToolExecution:
         """execute_javascript returns complex objects."""
         with patch(
             "inspekt.services.execution.execute_javascript",
-            new=AsyncMock(
-                return_value={"success": True, "result": {"foo": "bar", "count": 42}}
-            ),
+            new=AsyncMock(return_value={"success": True, "result": {"foo": "bar", "count": 42}}),
         ):
             params = schemas.ExecuteJavaScriptParams(code="({foo: 'bar', count: 42})")
             result = await tool_provider.execute_javascript(params)
@@ -109,8 +107,8 @@ class TestToolExecution:
             "ok": True,
             "result": [
                 {"url": "https://example.com/page1", "text": "Page 1", "type": "internal"},
-                {"url": "https://example.com/page2", "text": "Page 2", "type": "internal"}
-            ]
+                {"url": "https://example.com/page2", "text": "Page 2", "type": "internal"},
+            ],
         }
 
         params = schemas.ExtractLinksParams()
@@ -123,10 +121,7 @@ class TestToolExecution:
     @pytest.mark.asyncio
     async def test_extract_links_empty_page(self, tool_provider, mock_bridge_executor):
         """extract_links handles page with no links."""
-        mock_bridge_executor.execute.return_value = {
-            "ok": True,
-            "result": []
-        }
+        mock_bridge_executor.execute.return_value = {"ok": True, "result": []}
 
         params = schemas.ExtractLinksParams()
         result = await tool_provider.extract_links(params)
@@ -144,9 +139,9 @@ class TestToolExecution:
                 "headings": [
                     {"level": 1, "text": "Main Title", "id": "main-title"},
                     {"level": 2, "text": "Section 1", "id": "section-1"},
-                    {"level": 2, "text": "Section 2", "id": "section-2"}
+                    {"level": 2, "text": "Section 2", "id": "section-2"},
                 ]
-            }
+            },
         }
 
         result = await tool_provider.extract_outline()
@@ -160,11 +155,7 @@ class TestToolExecution:
         """click_element clicks and returns element info."""
         mock_bridge_executor.execute.return_value = {
             "ok": True,
-            "result": {
-                "clicked": True,
-                "elementText": "Submit",
-                "tagName": "BUTTON"
-            }
+            "result": {"clicked": True, "elementText": "Submit", "tagName": "BUTTON"},
         }
 
         params = schemas.ClickElementParams(selector="#submit-btn")
@@ -178,7 +169,7 @@ class TestToolExecution:
         """click_element handles element not found."""
         mock_bridge_executor.execute.return_value = {
             "ok": False,
-            "error": "Element not found: #nonexistent"
+            "error": "Element not found: #nonexistent",
         }
 
         params = schemas.ClickElementParams(selector="#nonexistent")
@@ -191,10 +182,7 @@ class TestToolExecution:
         """type_text types into focused element."""
         mock_bridge_executor.execute.return_value = {
             "ok": True,
-            "result": {
-                "typed": True,
-                "length": 5
-            }
+            "result": {"typed": True, "length": 5},
         }
 
         params = schemas.TypeTextParams(text="hello")
@@ -234,10 +222,7 @@ class TestNavigationTools:
         """go_back navigates back in history."""
         mock_bridge_executor.execute.return_value = {
             "ok": True,
-            "result": {
-                "url": "https://example.com/previous",
-                "title": "Previous Page"
-            }
+            "result": {"url": "https://example.com/previous", "title": "Previous Page"},
         }
 
         result = await tool_provider.go_back()
@@ -250,10 +235,7 @@ class TestNavigationTools:
         """reload_page reloads current page."""
         mock_bridge_executor.execute.return_value = {
             "ok": True,
-            "result": {
-                "url": "https://example.com",
-                "title": "Example"
-            }
+            "result": {"url": "https://example.com", "title": "Example"},
         }
 
         result = await tool_provider.reload_page()
@@ -272,9 +254,9 @@ class TestStorageTools:
             "result": {
                 "cookies": [
                     {"name": "session", "value": "abc123", "domain": "example.com"},
-                    {"name": "prefs", "value": "dark", "domain": "example.com"}
+                    {"name": "prefs", "value": "dark", "domain": "example.com"},
                 ]
-            }
+            },
         }
 
         result = await tool_provider.get_cookies()
@@ -285,10 +267,7 @@ class TestStorageTools:
     @pytest.mark.asyncio
     async def test_set_cookie(self, tool_provider, mock_bridge_executor):
         """set_cookie sets a cookie."""
-        mock_bridge_executor.execute.return_value = {
-            "ok": True,
-            "result": {"set": True}
-        }
+        mock_bridge_executor.execute.return_value = {"ok": True, "result": {"set": True}}
 
         params = schemas.SetCookieParams(name="test", value="value123")
         result = await tool_provider.set_cookie(params)
@@ -315,8 +294,8 @@ class TestAccessibilityTools:
                 "violations": [],
                 "passes": [{"id": "color-contrast", "nodes": []}],
                 "incomplete": [],
-                "inapplicable": []
-            }
+                "inapplicable": [],
+            },
         }
 
         params = schemas.RunAxeParams()
@@ -340,10 +319,10 @@ class TestAccessibilityTools:
             "result": {
                 "fields": [
                     {"name": "email", "autocomplete": "email", "status": "pass"},
-                    {"name": "phone", "autocomplete": None, "status": "violation"}
+                    {"name": "phone", "autocomplete": None, "status": "violation"},
                 ],
-                "summary": {"total": 2, "violations": 1}
-            }
+                "summary": {"total": 2, "violations": 1},
+            },
         }
 
         params = schemas.CheckAutocompleteParams()

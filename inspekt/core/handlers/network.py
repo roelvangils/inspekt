@@ -83,9 +83,7 @@ async def get_network_requests(params: GetNetworkRequestsParams) -> GetNetworkRe
                 entries = [e for e in entries if e.get("type") == params.resource_type]
                 # Update summary counts
                 summary["totalRequests"] = len(entries)
-                summary["totalTransferSize"] = sum(
-                    e.get("transferSize", 0) for e in entries
-                )
+                summary["totalTransferSize"] = sum(e.get("transferSize", 0) for e in entries)
 
             # Filter external only
             if params.external_only:
@@ -169,9 +167,7 @@ async def get_har(params: GetHARParams) -> GetHARResponse:
                 timestamp="",
                 entries=[],
                 summary={},
-                message=data.get(
-                    "error", "Failed to get HAR data. Is DevTools open (F12)?"
-                ),
+                message=data.get("error", "Failed to get HAR data. Is DevTools open (F12)?"),
             )
 
         entries = data.get("entries", [])
@@ -183,11 +179,7 @@ async def get_har(params: GetHARParams) -> GetHARResponse:
 
         # Filter errors only (4xx/5xx status)
         if params.errors_only:
-            entries = [
-                e
-                for e in entries
-                if e.get("status", 0) >= 400
-            ]
+            entries = [e for e in entries if e.get("status", 0) >= 400]
 
         # Sort entries
         sort_keys = {

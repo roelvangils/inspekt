@@ -149,7 +149,7 @@ class IbmUpdater:
             response.raise_for_status()
 
             # Create temporary file (delete=False: file must outlive this scope)
-            with tempfile.NamedTemporaryFile(mode='wb', delete=False, suffix='.js') as temp_file:
+            with tempfile.NamedTemporaryFile(mode="wb", delete=False, suffix=".js") as temp_file:
                 temp_file.write(response.content)
 
             return Path(temp_file.name)
@@ -230,10 +230,10 @@ class IbmUpdater:
                 "version": ver,
                 "installed_at": datetime.utcnow().isoformat() + "Z",
                 "source": self.cdn_base_url.format(version=ver),
-                "checksum": f"sha256:{checksum}"
+                "checksum": f"sha256:{checksum}",
             }
 
-            with open(self.version_file, 'w') as f:
+            with open(self.version_file, "w") as f:
                 json.dump(metadata, f, indent=2)
 
             return True
@@ -271,6 +271,7 @@ class IbmUpdater:
         Returns:
             Tuple of (success: bool, message: str)
         """
+
         def progress(msg: str):
             if progress_callback:
                 progress_callback(msg)

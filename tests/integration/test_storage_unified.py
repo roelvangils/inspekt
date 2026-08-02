@@ -578,7 +578,9 @@ class TestScriptPlaceholders:
             "ok": True,
             "result": {
                 "ok": True,
-                "storage": {"localStorage": {"ok": True, "key": "test", "value": "val", "exists": True}},
+                "storage": {
+                    "localStorage": {"ok": True, "key": "test", "value": "val", "exists": True}
+                },
             },
         }
 

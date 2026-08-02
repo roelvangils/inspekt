@@ -78,9 +78,7 @@ class ToolProvider:
             })()
             """
 
-            result = await asyncio.to_thread(
-            self.executor.execute, code, 10.0
-        )
+            result = await asyncio.to_thread(self.executor.execute, code, 10.0)
 
             if result.get("ok"):
                 data = result.get("result", {})
@@ -118,9 +116,7 @@ class ToolProvider:
             }})()
             """
 
-            result = await asyncio.to_thread(
-            self.executor.execute, code, 15.0
-        )
+            result = await asyncio.to_thread(self.executor.execute, code, 15.0)
 
             if result.get("ok"):
                 data = result.get("result", {})
@@ -183,11 +179,7 @@ class ToolProvider:
             script = await self.script_loader.load_script_async("extract_links.js")
 
             # Execute the script
-            result = await asyncio.to_thread(
-
-                self.executor.execute, script, 15.0
-
-            )
+            result = await asyncio.to_thread(self.executor.execute, script, 15.0)
 
             if result.get("ok"):
                 links_data = result.get("result", [])
@@ -200,9 +192,7 @@ class ToolProvider:
 
                 # Filter anchors if not included
                 if not params.include_anchors:
-                    links_data = [
-                        link for link in links_data if link.get("type") != "anchor"
-                    ]
+                    links_data = [link for link in links_data if link.get("type") != "anchor"]
 
                 # Convert to Pydantic models
                 links = [
@@ -215,13 +205,9 @@ class ToolProvider:
                     for link in links_data
                 ]
 
-                return schemas.ExtractLinksResponse(
-                    success=True, links=links, count=len(links)
-                )
+                return schemas.ExtractLinksResponse(success=True, links=links, count=len(links))
             else:
-                return schemas.ExtractLinksResponse(
-                    success=False, links=[], count=0
-                )
+                return schemas.ExtractLinksResponse(success=False, links=[], count=0)
 
         except Exception as e:
             logger.error(f"Extract links error: {e}")
@@ -233,14 +219,14 @@ class ToolProvider:
             # Load the extract_outline.js script
             script = await self.script_loader.load_script_async("extract_outline.js")
 
-            result = await asyncio.to_thread(
-                self.executor.execute, script, 15.0
-            )
+            result = await asyncio.to_thread(self.executor.execute, script, 15.0)
 
             if result.get("ok"):
                 result_data = result.get("result", {})
                 # The script returns {"headings": [...]}
-                outline_data = result_data.get("headings", []) if isinstance(result_data, dict) else []
+                outline_data = (
+                    result_data.get("headings", []) if isinstance(result_data, dict) else []
+                )
 
                 # Convert to Pydantic models
                 outline = [
@@ -268,9 +254,7 @@ class ToolProvider:
             # Load extended_info.js script
             script = await self.script_loader.load_script_async("extended_info.js")
 
-            result = await asyncio.to_thread(
-            self.executor.execute, script, 15.0
-        )
+            result = await asyncio.to_thread(self.executor.execute, script, 15.0)
 
             if result.get("ok"):
                 data = result.get("result", {})
@@ -312,9 +296,7 @@ class ToolProvider:
             # Load extract_article.js script
             script = await self.script_loader.load_script_async("extract_article.js")
 
-            result = await asyncio.to_thread(
-            self.executor.execute, script, 15.0
-        )
+            result = await asyncio.to_thread(self.executor.execute, script, 15.0)
 
             if result.get("ok"):
                 data = result.get("result", {})
@@ -328,9 +310,7 @@ class ToolProvider:
                     length=len(data.get("textContent", "")),
                 )
             else:
-                return schemas.ExtractArticleResponse(
-                    success=False, content="", length=0
-                )
+                return schemas.ExtractArticleResponse(success=False, content="", length=0)
 
         except Exception as e:
             logger.error(f"Extract article error: {e}")
@@ -357,9 +337,7 @@ class ToolProvider:
                 },
             )
 
-            result = await asyncio.to_thread(
-            self.executor.execute, script, 10.0
-        )
+            result = await asyncio.to_thread(self.executor.execute, script, 10.0)
 
             if result.get("ok"):
                 data = result.get("result", {})
@@ -386,9 +364,7 @@ class ToolProvider:
                 message=f"Error: {e!s}",
             )
 
-    async def type_text(
-        self, params: schemas.TypeTextParams
-    ) -> schemas.TypeTextResponse:
+    async def type_text(self, params: schemas.TypeTextParams) -> schemas.TypeTextResponse:
         """Type text into focused element."""
         try:
             # Build typing code based on speed
@@ -441,11 +417,7 @@ class ToolProvider:
             """
 
             timeout = max(30, len(params.text) * delay / 1000 + 10)
-            result = await asyncio.to_thread(
-
-                self.executor.execute, code, timeout
-
-            )
+            result = await asyncio.to_thread(self.executor.execute, code, timeout)
 
             if result.get("ok"):
                 data = result.get("result", {})
@@ -485,9 +457,7 @@ class ToolProvider:
             })
             """
 
-            result = await asyncio.to_thread(
-            self.executor.execute, code, 5.0
-        )
+            result = await asyncio.to_thread(self.executor.execute, code, 5.0)
 
             if result.get("ok"):
                 data = result.get("result", {})
@@ -538,8 +508,7 @@ class ToolProvider:
             # Load screenshot script
             try:
                 script = await asyncio.wait_for(
-                    self.script_loader.load_script_async("screenshot_unified.js"),
-                    timeout=5.0
+                    self.script_loader.load_script_async("screenshot_unified.js"), timeout=5.0
                 )
             except (TimeoutError, FileNotFoundError):
                 return schemas.TakeScreenshotResponse(
@@ -566,12 +535,8 @@ class ToolProvider:
             # This avoids BridgeExecutor's sys.exit() calls
             try:
                 result = await asyncio.wait_for(
-                    asyncio.to_thread(
-                        self.executor.client.execute,
-                        script,
-                        float(timeout_seconds)
-                    ),
-                    timeout=timeout_seconds + 2  # Small buffer for thread overhead
+                    asyncio.to_thread(self.executor.client.execute, script, float(timeout_seconds)),
+                    timeout=timeout_seconds + 2,  # Small buffer for thread overhead
                 )
             except TimeoutError:
                 return schemas.TakeScreenshotResponse(
@@ -599,7 +564,9 @@ class ToolProvider:
                 # If we got ok=True but no actual data, something went wrong
                 # (e.g., element picker was cancelled or timed out)
                 if not data_url:
-                    error_msg = data.get("error") or data.get("message") or "No screenshot data returned"
+                    error_msg = (
+                        data.get("error") or data.get("message") or "No screenshot data returned"
+                    )
                     return schemas.TakeScreenshotResponse(
                         success=False,
                         data=None,
@@ -687,9 +654,7 @@ class ToolProvider:
             # Load get_selection.js script
             script = await self.script_loader.load_script_async("get_selection.js")
 
-            result = await asyncio.to_thread(
-            self.executor.execute, script, 5.0
-        )
+            result = await asyncio.to_thread(self.executor.execute, script, 5.0)
 
             if result.get("ok"):
                 data = result.get("result", {})
@@ -721,9 +686,7 @@ class ToolProvider:
             # Load cookies.js script
             script = await self.script_loader.load_script_async("cookies.js")
 
-            result = await asyncio.to_thread(
-            self.executor.execute, script, 10.0
-        )
+            result = await asyncio.to_thread(self.executor.execute, script, 10.0)
 
             if result.get("ok"):
                 data = result.get("result", {})
@@ -747,9 +710,7 @@ class ToolProvider:
                     for cookie in cookies_data
                 ]
 
-                return schemas.GetCookiesResponse(
-                    success=True, cookies=cookies, count=len(cookies)
-                )
+                return schemas.GetCookiesResponse(success=True, cookies=cookies, count=len(cookies))
             else:
                 return schemas.GetCookiesResponse(success=False, cookies=[], count=0)
 
@@ -757,9 +718,7 @@ class ToolProvider:
             logger.error(f"Get cookies error: {e}")
             return schemas.GetCookiesResponse(success=False, cookies=[], count=0)
 
-    async def set_cookie(
-        self, params: schemas.SetCookieParams
-    ) -> schemas.SetCookieResponse:
+    async def set_cookie(self, params: schemas.SetCookieParams) -> schemas.SetCookieResponse:
         """Set a cookie."""
         try:
             # Build cookie string
@@ -785,14 +744,10 @@ class ToolProvider:
             }})()
             """
 
-            result = await asyncio.to_thread(
-            self.executor.execute, code, 5.0
-        )
+            result = await asyncio.to_thread(self.executor.execute, code, 5.0)
 
             if result.get("ok"):
-                return schemas.SetCookieResponse(
-                    success=True, message="Cookie set successfully"
-                )
+                return schemas.SetCookieResponse(success=True, message="Cookie set successfully")
             else:
                 return schemas.SetCookieResponse(
                     success=False, message=result.get("error", "Failed to set cookie")
@@ -852,13 +807,9 @@ class ToolProvider:
 
         except Exception as e:
             logger.error(f"Autocomplete check error: {e}")
-            return schemas.CheckAutocompleteResponse(
-                success=False, message=f"Error: {e!s}"
-            )
+            return schemas.CheckAutocompleteResponse(success=False, message=f"Error: {e!s}")
 
-    async def run_axe(
-        self, params: schemas.RunAxeParams
-    ) -> schemas.RunAxeResponse:
+    async def run_axe(self, params: schemas.RunAxeParams) -> schemas.RunAxeResponse:
         """
         Run axe-core accessibility tests on current page.
 
@@ -878,7 +829,7 @@ class ToolProvider:
                 # Single rule check
                 config = {
                     "runOnly": {"type": "rule", "values": [params.rule]},
-                    "resultTypes": ["violations"]
+                    "resultTypes": ["violations"],
                 }
             else:
                 # WCAG level-based check
@@ -891,12 +842,11 @@ class ToolProvider:
                     "22aa": ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"],
                 }
                 axe_tags = level_mapping.get(
-                    params.level or "21aa",
-                    ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]
+                    params.level or "21aa", ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]
                 )
                 config = {
                     "runOnly": {"type": "tag", "values": axe_tags},
-                    "resultTypes": ["violations"]
+                    "resultTypes": ["violations"],
                 }
 
             if params.include_passes:
@@ -912,61 +862,48 @@ class ToolProvider:
             context_expr = "document"
             if params.selector:
                 if params.exclude:
-                    context_expr = json.dumps({
-                        "include": params.selector,
-                        "exclude": params.exclude
-                    })
+                    context_expr = json.dumps(
+                        {"include": params.selector, "exclude": params.exclude}
+                    )
                 else:
                     context_expr = json.dumps(params.selector)
             elif params.exclude:
                 context_expr = json.dumps({"exclude": params.exclude})
 
             # Load axe-core library
-            axe_lib = await self.script_loader.load_script_async(
-                "vendor/axe-core.min.js"
-            )
+            axe_lib = await self.script_loader.load_script_async("vendor/axe-core.min.js")
 
             # Load run_axe script
             run_axe_script = await self.script_loader.load_script_async("run_axe.js")
 
             # Substitute config placeholder
-            run_axe_script = run_axe_script.replace(
-                "__AXE_CONFIG__", json.dumps(config)
-            )
+            run_axe_script = run_axe_script.replace("__AXE_CONFIG__", json.dumps(config))
             # Substitute context (first occurrence only)
             run_axe_script = run_axe_script.replace("document", context_expr, 1)
 
             # First inject axe-core library
-            axe_lib_wrapped = (
-                f"(function() {{ {axe_lib} return typeof axe !== 'undefined'; }})()"
-            )
-            inject_result = await asyncio.to_thread(
-                self.executor.execute, axe_lib_wrapped, 10.0
-            )
+            axe_lib_wrapped = f"(function() {{ {axe_lib} return typeof axe !== 'undefined'; }})()"
+            inject_result = await asyncio.to_thread(self.executor.execute, axe_lib_wrapped, 10.0)
 
             if not inject_result.get("ok") or not inject_result.get("result"):
                 return schemas.RunAxeResponse(
                     success=False,
-                    message=f"Failed to load axe-core: {inject_result.get('error', 'axe undefined')}"
+                    message=f"Failed to load axe-core: {inject_result.get('error', 'axe undefined')}",
                 )
 
             # Execute audit script
-            result = await asyncio.to_thread(
-                self.executor.execute, run_axe_script, 60.0
-            )
+            result = await asyncio.to_thread(self.executor.execute, run_axe_script, 60.0)
 
             if not result.get("ok"):
                 return schemas.RunAxeResponse(
-                    success=False,
-                    message=f"Axe execution failed: {result.get('error')}"
+                    success=False, message=f"Axe execution failed: {result.get('error')}"
                 )
 
             data = result.get("result", {})
 
             if not data.get("ok"):
                 return schemas.RunAxeResponse(
-                    success=False,
-                    message=f"Axe audit error: {data.get('error')}"
+                    success=False, message=f"Axe audit error: {data.get('error')}"
                 )
 
             # Parse violations into structured format
@@ -977,19 +914,21 @@ class ToolProvider:
                         target=n.get("target", []),
                         html=n.get("html", ""),
                         impact=n.get("impact", "unknown"),
-                        failure_summary=n.get("failureSummary")
+                        failure_summary=n.get("failureSummary"),
                     )
                     for n in v.get("nodes", [])
                 ]
-                violations.append(schemas.AxeViolation(
-                    id=v.get("id", ""),
-                    impact=v.get("impact", "unknown"),
-                    description=v.get("description", ""),
-                    help=v.get("help", ""),
-                    help_url=v.get("helpUrl", ""),
-                    nodes=nodes,
-                    node_count=len(nodes)
-                ))
+                violations.append(
+                    schemas.AxeViolation(
+                        id=v.get("id", ""),
+                        impact=v.get("impact", "unknown"),
+                        description=v.get("description", ""),
+                        help=v.get("help", ""),
+                        help_url=v.get("helpUrl", ""),
+                        nodes=nodes,
+                        node_count=len(nodes),
+                    )
+                )
 
             # Parse summary
             summary_data = data.get("summary", {})
@@ -1000,7 +939,7 @@ class ToolProvider:
                 critical_count=summary_data.get("criticalCount", 0),
                 serious_count=summary_data.get("seriousCount", 0),
                 moderate_count=summary_data.get("moderateCount", 0),
-                minor_count=summary_data.get("minorCount", 0)
+                minor_count=summary_data.get("minorCount", 0),
             )
 
             return schemas.RunAxeResponse(
@@ -1011,15 +950,12 @@ class ToolProvider:
                 incomplete=data.get("incomplete", []) if params.include_incomplete else [],
                 summary=summary,
                 axe_version=data.get("axeVersion"),
-                message=f"Found {len(violations)} accessibility violation(s)"
+                message=f"Found {len(violations)} accessibility violation(s)",
             )
 
         except Exception as e:
             logger.error(f"Run axe error: {e}")
-            return schemas.RunAxeResponse(
-                success=False,
-                message=f"Error: {e!s}"
-            )
+            return schemas.RunAxeResponse(success=False, message=f"Error: {e!s}")
 
     # ========================================================================
     # Network Tools
@@ -1049,9 +985,7 @@ class ToolProvider:
             # Load the get_network.js script
             script = await self.script_loader.load_script_async("get_network.js")
 
-            result = await asyncio.to_thread(
-                self.executor.execute, script, 30.0
-            )
+            result = await asyncio.to_thread(self.executor.execute, script, 30.0)
 
             if result.get("ok"):
                 data = result.get("result", {})
@@ -1095,7 +1029,7 @@ class ToolProvider:
 
                 # Apply limit
                 if params.limit:
-                    entries = entries[:params.limit]
+                    entries = entries[: params.limit]
 
                 return schemas.GetNetworkRequestsResponse(
                     success=True,
@@ -1126,9 +1060,7 @@ class ToolProvider:
                 message=f"Error: {e!s}",
             )
 
-    async def get_har(
-        self, params: schemas.GetHARParams
-    ) -> schemas.GetHARResponse:
+    async def get_har(self, params: schemas.GetHARParams) -> schemas.GetHARResponse:
         """
         Get full network data from DevTools (HAR format).
 
@@ -1153,10 +1085,7 @@ class ToolProvider:
         try:
             # Get HAR data from bridge server (which gets it from DevTools)
             bridge_url = f"http://127.0.0.1:{get_bridge_port()}/network/har"
-            response = http_requests.get(
-                bridge_url,
-                timeout=20.0
-            )
+            response = http_requests.get(bridge_url, timeout=20.0)
             data = response.json()
 
             if not data.get("ok", False):
@@ -1184,7 +1113,13 @@ class ToolProvider:
             # Sort entries
             sort_keys = {
                 "start": lambda e: e.get("startedDateTime", ""),
-                "time": lambda e: -(e.get("timing", {}).get("total", 0) if isinstance(e.get("timing"), dict) else 0),
+                "time": lambda e: (
+                    -(
+                        e.get("timing", {}).get("total", 0)
+                        if isinstance(e.get("timing"), dict)
+                        else 0
+                    )
+                ),
                 "size": lambda e: -e.get("transferSize", 0),
                 "name": lambda e: e.get("name", "").lower(),
                 "type": lambda e: e.get("type", ""),
@@ -1197,7 +1132,7 @@ class ToolProvider:
 
             # Apply limit
             if params.limit:
-                entries = entries[:params.limit]
+                entries = entries[: params.limit]
 
             # Update summary for filtered results
             if params.resource_type or params.errors_only:
@@ -1281,10 +1216,7 @@ class ToolProvider:
         try:
             # Get console logs from bridge server
             bridge_url = f"http://127.0.0.1:{get_bridge_port()}/console/logs"
-            response = http_requests.get(
-                bridge_url,
-                timeout=15.0
-            )
+            response = http_requests.get(bridge_url, timeout=15.0)
             data = response.json()
 
             if not data.get("ok", False):
@@ -1305,7 +1237,7 @@ class ToolProvider:
 
             # Apply limit
             if params.limit and params.limit > 0:
-                entries = entries[-params.limit:]  # Get most recent
+                entries = entries[-params.limit :]  # Get most recent
 
             # Convert to Pydantic models
             console_entries = [
@@ -1322,9 +1254,8 @@ class ToolProvider:
                 entries=console_entries,
                 count=len(console_entries),
                 hooked=hooked,
-                message=f"Found {len(console_entries)} console message(s)" + (
-                    f" (filtered: {params.level})" if params.level != "all" else ""
-                ),
+                message=f"Found {len(console_entries)} console message(s)"
+                + (f" (filtered: {params.level})" if params.level != "all" else ""),
             )
 
         except http_requests.exceptions.ConnectionError:
@@ -1373,10 +1304,7 @@ class ToolProvider:
         try:
             # Clear console logs via bridge server
             bridge_url = f"http://127.0.0.1:{get_bridge_port()}/console/clear"
-            response = http_requests.post(
-                bridge_url,
-                timeout=15.0
-            )
+            response = http_requests.post(bridge_url, timeout=15.0)
             data = response.json()
 
             if not data.get("ok", False):
@@ -1484,7 +1412,9 @@ class ToolProvider:
         from inspekt.core.handlers.display import set_viewport
         from inspekt.core.schemas.display import ViewportSetParams
 
-        core_params = ViewportSetParams(width=params.width, height=params.height, auto_height=params.auto_height)
+        core_params = ViewportSetParams(
+            width=params.width, height=params.height, auto_height=params.auto_height
+        )
         result = await set_viewport(core_params)
         return schemas.ViewportResponse(
             success=result.success,

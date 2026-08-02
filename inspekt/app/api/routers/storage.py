@@ -35,7 +35,9 @@ class SetStorageRequest(BaseModel):
 
     key: str = Field(..., description="Storage key / cookie name")
     value: str = Field(..., description="Storage value / cookie value")
-    type: Literal["cookies", "local", "session"] = Field("local", description="Storage type (default: local)")
+    type: Literal["cookies", "local", "session"] = Field(
+        "local", description="Storage type (default: local)"
+    )
 
     # Cookie-specific options (only used when type="cookies")
     max_age: int | None = Field(None, description="Cookie max age in seconds (cookies only)")
@@ -43,7 +45,9 @@ class SetStorageRequest(BaseModel):
     path: str = Field("/", description="Cookie path (cookies only, default: /)")
     domain: str | None = Field(None, description="Cookie domain (cookies only)")
     secure: bool = Field(False, description="Secure flag - HTTPS only (cookies only)")
-    same_site: Literal["Strict", "Lax", "None"] | None = Field(None, description="SameSite attribute (cookies only)")
+    same_site: Literal["Strict", "Lax", "None"] | None = Field(
+        None, description="SameSite attribute (cookies only)"
+    )
 
 
 # Response Models
@@ -117,8 +121,13 @@ def _parse_types_param(types_str: str | None, default: list[str] | None = None) 
 @router.get("", response_model=StorageListResponse)
 @router.get("/", response_model=StorageListResponse)
 def list_storage(
-    types: str | None = Query(None, description="Comma-separated storage types: cookies,local,session or 'all' (default: all)"),
-    type: Literal["local", "session", "cookies", "all"] | None = Query(None, description="[DEPRECATED] Single storage type - use 'types' instead")
+    types: str | None = Query(
+        None,
+        description="Comma-separated storage types: cookies,local,session or 'all' (default: all)",
+    ),
+    type: Literal["local", "session", "cookies", "all"] | None = Query(
+        None, description="[DEPRECATED] Single storage type - use 'types' instead"
+    ),
 ):
     """
     List all storage items across specified storage types.
@@ -197,7 +206,7 @@ def list_storage(
 @router.get("/{key}", response_model=StorageGetResponse)
 def get_storage(
     key: str,
-    type: Literal["cookies", "local", "session"] = Query("local", description="Storage type")
+    type: Literal["cookies", "local", "session"] = Query("local", description="Storage type"),
 ):
     """
     Get the value of a specific storage item.
@@ -236,11 +245,21 @@ def get_storage(
         response = _execute_unified_storage_action([type], "get", key=key)
 
         # Check if item exists in the response
-        storage_key = "cookies" if type == "cookies" else "localStorage" if type == "local" else "sessionStorage"
+        storage_key = (
+            "cookies"
+            if type == "cookies"
+            else "localStorage"
+            if type == "local"
+            else "sessionStorage"
+        )
         storage_result = response.get("storage", {}).get(storage_key, {})
 
         if not storage_result.get("exists"):
-            storage_name = "cookies" if type == "cookies" else ("localStorage" if type == "local" else "sessionStorage")
+            storage_name = (
+                "cookies"
+                if type == "cookies"
+                else ("localStorage" if type == "local" else "sessionStorage")
+            )
             raise HTTPException(status_code=404, detail=f"Key not found in {storage_name}: {key}")
 
         return {
@@ -335,7 +354,7 @@ def set_storage(request: SetStorageRequest):
 @router.delete("/{key}", response_model=CommandResponse)
 def delete_storage(
     key: str,
-    type: Literal["cookies", "local", "session"] = Query("local", description="Storage type")
+    type: Literal["cookies", "local", "session"] = Query("local", description="Storage type"),
 ):
     """
     Delete a specific storage item or cookie.
@@ -388,8 +407,13 @@ def delete_storage(
 @router.delete("", response_model=CommandResponse)
 @router.delete("/", response_model=CommandResponse)
 def clear_storage(
-    types: str | None = Query(None, description="Comma-separated storage types: cookies,local,session or 'all' (default: all)"),
-    type: Literal["local", "session", "cookies", "all"] | None = Query(None, description="[DEPRECATED] Single storage type - use 'types' instead")
+    types: str | None = Query(
+        None,
+        description="Comma-separated storage types: cookies,local,session or 'all' (default: all)",
+    ),
+    type: Literal["local", "session", "cookies", "all"] | None = Query(
+        None, description="[DEPRECATED] Single storage type - use 'types' instead"
+    ),
 ):
     """
     Clear all storage items across specified storage types.

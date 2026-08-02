@@ -39,8 +39,12 @@ class ReadabilityUpdater:
         self.backup_path = self.vendor_dir / "Readability.backup.js"
         self.npm_package = "@mozilla/readability"
         self.npm_registry_url = "https://registry.npmjs.org/@mozilla/readability/latest"
-        self.raw_github_url = "https://raw.githubusercontent.com/mozilla/readability/main/Readability.js"
-        self._cache_file = Path(__file__).parent.parent.parent / ".cache" / "readability_latest_version.json"
+        self.raw_github_url = (
+            "https://raw.githubusercontent.com/mozilla/readability/main/Readability.js"
+        )
+        self._cache_file = (
+            Path(__file__).parent.parent.parent / ".cache" / "readability_latest_version.json"
+        )
 
     def get_current_version(self) -> str | None:
         """

@@ -17,6 +17,7 @@ router = APIRouter()
 # Try to import protego for RFC 9309 compliance
 try:
     from protego import Protego
+
     HAS_PROTEGO = True
 except ImportError:
     HAS_PROTEGO = False
@@ -28,8 +29,10 @@ except ImportError:
 # Response Models
 # ============================================================================
 
+
 class RobotsMetadata(BaseModel):
     """Metadata about the robots.txt file."""
+
     size: int = Field(..., description="File size in bytes")
     lines: int = Field(..., description="Number of lines")
     encoding: str = Field(..., description="Character encoding")
@@ -41,6 +44,7 @@ class RobotsMetadata(BaseModel):
 
 class RobotsRule(BaseModel):
     """A single robots.txt rule (Allow or Disallow)."""
+
     directive: str = Field(..., description="Directive type (Allow or Disallow)")
     path: str = Field(..., description="Path pattern")
     line: int = Field(..., description="Line number in robots.txt")
@@ -48,6 +52,7 @@ class RobotsRule(BaseModel):
 
 class RobotsGroup(BaseModel):
     """A user-agent group with rules."""
+
     userAgents: list[str] = Field(..., description="List of user-agents")
     rules: list[RobotsRule] = Field(..., description="List of rules for this group")
     crawlDelay: float | None = Field(None, description="Crawl delay in seconds")
@@ -56,18 +61,21 @@ class RobotsGroup(BaseModel):
 
 class RobotsComment(BaseModel):
     """A comment from the robots.txt file."""
+
     line: int = Field(..., description="Line number")
     text: str = Field(..., description="Comment text")
 
 
 class RobotsValidation(BaseModel):
     """Validation results for robots.txt."""
+
     errors: list[str] = Field(default_factory=list, description="Syntax errors")
     warnings: list[str] = Field(default_factory=list, description="Warnings and recommendations")
 
 
 class RobotsResponse(BaseModel):
     """Complete robots.txt response."""
+
     url: str = Field(..., description="URL of the robots.txt file")
     status: int = Field(..., description="HTTP status code")
     exists: bool = Field(..., description="Whether robots.txt exists")
@@ -84,6 +92,7 @@ class RobotsResponse(BaseModel):
 # Helper Functions (from CLI robots.py)
 # ============================================================================
 
+
 def _fetch_robots_txt(robots_url: str) -> dict[str, Any]:
     """
     Fetch robots.txt from the given URL.
@@ -99,7 +108,7 @@ def _fetch_robots_txt(robots_url: str) -> dict[str, Any]:
             robots_url,
             timeout=5,
             headers={"User-Agent": "Inspekt-API-RobotsTxt-Checker"},
-            allow_redirects=True
+            allow_redirects=True,
         )
 
         # Check if robots.txt is too large (RFC 9309: should be < 500KB)
@@ -109,20 +118,20 @@ def _fetch_robots_txt(robots_url: str) -> dict[str, Any]:
                 "url": robots_url,
                 "status": 413,
                 "exists": False,
-                "error": f"robots.txt too large: {int(content_length) / 1024:.1f}KB (max 500KB per RFC 9309)"
+                "error": f"robots.txt too large: {int(content_length) / 1024:.1f}KB (max 500KB per RFC 9309)",
             }
 
         if response.status_code == 200:
             # Calculate actual size
             content = response.text
-            size_bytes = len(content.encode('utf-8'))
+            size_bytes = len(content.encode("utf-8"))
 
             # Extract metadata
             metadata = {
                 "size": size_bytes,
                 "lines": len(content.splitlines()),
                 "encoding": response.encoding or "utf-8",
-                "contentType": response.headers.get("Content-Type", "unknown")
+                "contentType": response.headers.get("Content-Type", "unknown"),
             }
 
             # Optional metadata
@@ -141,14 +150,14 @@ def _fetch_robots_txt(robots_url: str) -> dict[str, Any]:
                 "status": 200,
                 "exists": True,
                 "content": content,
-                "metadata": metadata
+                "metadata": metadata,
             }
         else:
             return {
                 "url": robots_url,
                 "status": response.status_code,
                 "exists": False,
-                "error": f"HTTP {response.status_code}"
+                "error": f"HTTP {response.status_code}",
             }
 
     except requests.Timeout:
@@ -156,22 +165,17 @@ def _fetch_robots_txt(robots_url: str) -> dict[str, Any]:
             "url": robots_url,
             "status": 0,
             "exists": False,
-            "error": "Request timeout after 5 seconds"
+            "error": "Request timeout after 5 seconds",
         }
     except requests.ConnectionError as e:
         return {
             "url": robots_url,
             "status": 0,
             "exists": False,
-            "error": f"Connection error: {e!s}"
+            "error": f"Connection error: {e!s}",
         }
     except requests.RequestException as e:
-        return {
-            "url": robots_url,
-            "status": 0,
-            "exists": False,
-            "error": f"Request failed: {e!s}"
-        }
+        return {"url": robots_url, "status": 0, "exists": False, "error": f"Request failed: {e!s}"}
 
 
 def _parse_robots_txt(content: str, robots_url: str) -> dict[str, Any]:
@@ -206,80 +210,78 @@ def _parse_with_protego(content: str, robots_url: str) -> dict[str, Any]:
     for line_num, line in enumerate(lines, 1):
         stripped = line.strip()
 
-        if not stripped or stripped.startswith('#'):
+        if not stripped or stripped.startswith("#"):
             continue
 
-        if ':' in stripped:
-            directive, _, value = stripped.partition(':')
+        if ":" in stripped:
+            directive, _, value = stripped.partition(":")
             directive = directive.strip().lower()
             value = value.strip()
 
-            if directive == 'user-agent':
+            if directive == "user-agent":
                 # Start new group if we have rules
                 if current_agents and current_rules:
-                    groups.append({
-                        "userAgents": current_agents,
-                        "rules": current_rules,
-                        **({"crawlDelay": current_crawl_delay} if current_crawl_delay else {}),
-                        **({"requestRate": current_request_rate} if current_request_rate else {})
-                    })
+                    groups.append(
+                        {
+                            "userAgents": current_agents,
+                            "rules": current_rules,
+                            **({"crawlDelay": current_crawl_delay} if current_crawl_delay else {}),
+                            **(
+                                {"requestRate": current_request_rate}
+                                if current_request_rate
+                                else {}
+                            ),
+                        }
+                    )
                     current_rules = []
                     current_crawl_delay = None
                     current_request_rate = None
 
                 current_agents.append(value)
 
-            elif directive in ('allow', 'disallow'):
-                current_rules.append({
-                    "directive": directive.capitalize(),
-                    "path": value,
-                    "line": line_num
-                })
+            elif directive in ("allow", "disallow"):
+                current_rules.append(
+                    {"directive": directive.capitalize(), "path": value, "line": line_num}
+                )
 
-            elif directive == 'crawl-delay':
+            elif directive == "crawl-delay":
                 try:
                     current_crawl_delay = float(value)
                 except ValueError:
                     pass
 
-            elif directive == 'request-rate':
+            elif directive == "request-rate":
                 current_request_rate = value
 
     # Add last group
     if current_agents and current_rules:
-        groups.append({
-            "userAgents": current_agents,
-            "rules": current_rules,
-            **({"crawlDelay": current_crawl_delay} if current_crawl_delay else {}),
-            **({"requestRate": current_request_rate} if current_request_rate else {})
-        })
+        groups.append(
+            {
+                "userAgents": current_agents,
+                "rules": current_rules,
+                **({"crawlDelay": current_crawl_delay} if current_crawl_delay else {}),
+                **({"requestRate": current_request_rate} if current_request_rate else {}),
+            }
+        )
 
     # Extract sitemaps
     sitemaps = []
     for line in lines:
-        if line.strip().lower().startswith('sitemap:'):
-            _, _, sitemap_url = line.partition(':')
+        if line.strip().lower().startswith("sitemap:"):
+            _, _, sitemap_url = line.partition(":")
             sitemaps.append(sitemap_url.strip())
 
     # Extract comments
     comments = []
     for line_num, line in enumerate(lines, 1):
-        if '#' in line:
+        if "#" in line:
             # Handle inline comments
-            comment_start = line.index('#')
+            comment_start = line.index("#")
             comment_text = line[comment_start:].strip()
             if comment_text:
-                comments.append({
-                    "line": line_num,
-                    "text": comment_text
-                })
+                comments.append({"line": line_num, "text": comment_text})
 
-    return {
-        "groups": groups,
-        "sitemaps": sitemaps,
-        "comments": comments,
-        "raw": content
-    }
+    return {"groups": groups, "sitemaps": sitemaps, "comments": comments, "raw": content}
 
 
 def _parse_with_urllib(content: str, robots_url: str) -> dict[str, Any]:
@@ -301,52 +303,36 @@ def _parse_with_urllib(content: str, robots_url: str) -> dict[str, Any]:
         if not stripped:
             continue
 
-        if stripped.startswith('#'):
-            comments.append({
-                "line": line_num,
-                "text": stripped
-            })
+        if stripped.startswith("#"):
+            comments.append({"line": line_num, "text": stripped})
             continue
 
-        if ':' in stripped:
-            directive, _, value = stripped.partition(':')
+        if ":" in stripped:
+            directive, _, value = stripped.partition(":")
             directive = directive.strip().lower()
             value = value.strip()
 
-            if directive == 'user-agent':
+            if directive == "user-agent":
                 # Start new group if we have rules
                 if current_agents and current_rules:
-                    groups.append({
-                        "userAgents": current_agents,
-                        "rules": current_rules
-                    })
+                    groups.append({"userAgents": current_agents, "rules": current_rules})
                     current_rules = []
 
                 current_agents.append(value)
 
-            elif directive in ('allow', 'disallow'):
-                current_rules.append({
-                    "directive": directive.capitalize(),
-                    "path": value,
-                    "line": line_num
-                })
+            elif directive in ("allow", "disallow"):
+                current_rules.append(
+                    {"directive": directive.capitalize(), "path": value, "line": line_num}
+                )
 
-            elif directive == 'sitemap':
+            elif directive == "sitemap":
                 sitemaps.append(value)
 
     # Add last group
     if current_agents and current_rules:
-        groups.append({
-            "userAgents": current_agents,
-            "rules": current_rules
-        })
+        groups.append({"userAgents": current_agents, "rules": current_rules})
 
-    return {
-        "groups": groups,
-        "sitemaps": sitemaps,
-        "comments": comments,
-        "raw": content
-    }
+    return {"groups": groups, "sitemaps": sitemaps, "comments": comments, "raw": content}
 
 
 def _validate_robots_txt(content: str, parsed_data: dict[str, Any]) -> dict[str, Any]:
@@ -366,19 +352,21 @@ def _validate_robots_txt(content: str, parsed_data: dict[str, Any]) -> dict[str,
     lines = content.splitlines()
 
     # Check for non-standard directives
-    non_standard = ['crawl-delay', 'request-rate', 'visit-time', 'host']
+    non_standard = ["crawl-delay", "request-rate", "visit-time", "host"]
     for line_num, line in enumerate(lines, 1):
         stripped = line.strip().lower()
-        if ':' in stripped:
-            directive = stripped.split(':', 1)[0].strip()
+        if ":" in stripped:
+            directive = stripped.split(":", 1)[0].strip()
             if directive in non_standard:
-                warnings.append(f"Non-standard directive '{directive}' at line {line_num} (may not be supported by all crawlers)")
+                warnings.append(
+                    f"Non-standard directive '{directive}' at line {line_num} (may not be supported by all crawlers)"
+                )
 
     # Check for invalid user-agent tokens
-    user_agent_pattern = re.compile(r'^[a-zA-Z0-9_-]+$|^\*$')
+    user_agent_pattern = re.compile(r"^[a-zA-Z0-9_-]+$|^\*$")
     for group in parsed_data.get("groups", []):
         for agent in group.get("userAgents", []):
-            if agent != '*' and not user_agent_pattern.match(agent):
+            if agent != "*" and not user_agent_pattern.match(agent):
                 warnings.append(f"User-agent '{agent}' contains non-standard characters")
 
     # Check for empty groups
@@ -388,21 +376,21 @@ def _validate_robots_txt(content: str, parsed_data: dict[str, Any]) -> dict[str,
 
     # Warn if using urllib instead of protego
     if not HAS_PROTEGO:
-        warnings.append("Using urllib.robotparser instead of protego (install with: pip install protego for full RFC 9309 compliance)")
+        warnings.append(
+            "Using urllib.robotparser instead of protego (install with: pip install protego for full RFC 9309 compliance)"
+        )
 
-    return {
-        "errors": errors,
-        "warnings": warnings
-    }
+    return {"errors": errors, "warnings": warnings}
 
 
 # ============================================================================
 # API Endpoint
 # ============================================================================
 
+
 @router.get("", response_model=RobotsResponse)
 def get_robots_txt(
-    validate: bool = Query(False, description="Include validation errors and warnings")
+    validate: bool = Query(False, description="Include validation errors and warnings"),
 ):
     """
     Fetch and parse robots.txt for the current browser page.
@@ -470,7 +458,7 @@ def get_robots_txt(
         if not result.get("ok"):
             raise HTTPException(
                 status_code=503,
-                detail=f"Failed to get current URL from browser: {result.get('error')}"
+                detail=f"Failed to get current URL from browser: {result.get('error')}",
             )
 
         current_url = result.get("result")
@@ -478,36 +466,21 @@ def get_robots_txt(
             current_url = current_url.get("url") or current_url
 
     except ConnectionError as e:
-        raise HTTPException(
-            status_code=503,
-            detail=f"Could not connect to bridge server: {e!s}"
-        )
+        raise HTTPException(status_code=503, detail=f"Could not connect to bridge server: {e!s}")
     except TimeoutError:
-        raise HTTPException(
-            status_code=504,
-            detail="Timeout getting URL from browser"
-        )
+        raise HTTPException(status_code=504, detail="Timeout getting URL from browser")
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Error getting current URL: {e!s}"
-        )
+        raise HTTPException(status_code=500, detail=f"Error getting current URL: {e!s}")
 
     # Construct robots.txt URL from origin
     try:
         parsed = urlparse(str(current_url))
         if not parsed.scheme or not parsed.netloc:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Invalid URL from browser: {current_url}"
-            )
+            raise HTTPException(status_code=400, detail=f"Invalid URL from browser: {current_url}")
 
         robots_url = f"{parsed.scheme}://{parsed.netloc}/robots.txt"
     except Exception as e:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Error parsing URL: {e!s}"
-        )
+        raise HTTPException(status_code=400, detail=f"Error parsing URL: {e!s}")
 
     # Fetch robots.txt
     robots_data = _fetch_robots_txt(robots_url)
@@ -518,7 +491,7 @@ def get_robots_txt(
             url=robots_url,
             status=robots_data.get("status", 0),
             exists=False,
-            error=robots_data.get("error")
+            error=robots_data.get("error"),
         )
 
     # Parse robots.txt content
@@ -531,7 +504,7 @@ def get_robots_txt(
         "status": robots_data.get("status"),
         "exists": robots_data.get("exists"),
         "metadata": robots_data.get("metadata"),
-        **parsed_data
+        **parsed_data,
     }
 
     # Add validation if requested

@@ -38,7 +38,7 @@ def _truncate(text: str, max_length: int = 40) -> str:
         return ""
     if len(text) <= max_length:
         return text
-    return text[:max_length - 1] + "…"
+    return text[: max_length - 1] + "…"
 
 
 @click.group(invoke_without_command=True)
@@ -73,7 +73,9 @@ def _list_instances(output_json: bool) -> None:
         response = requests.get(f"{_get_base_url()}/instances", timeout=5.0)
         data = response.json()
     except requests.ConnectionError:
-        click.secho("Error: Bridge server is not running. Start it with: inspekt start", fg="red", err=True)
+        click.secho(
+            "Error: Bridge server is not running. Start it with: inspekt start", fg="red", err=True
+        )
         sys.exit(1)
     except Exception as e:
         click.secho(f"Error: {e}", fg="red", err=True)
@@ -93,7 +95,9 @@ def _list_instances(output_json: bool) -> None:
         click.echo()
         click.secho("No browser instances connected.", fg="yellow")
         click.echo()
-        print_hint("Make sure a browser with the Inspekt extension is open and the extension is enabled.")
+        print_hint(
+            "Make sure a browser with the Inspekt extension is open and the extension is enabled."
+        )
         return
 
     click.echo()
@@ -102,7 +106,7 @@ def _list_instances(output_json: bool) -> None:
     table = Table(
         ["ID", "Alias", "Browser", "Title", "Status", "Last Command"],
         title="Browser Instances",
-        icon=get_indicator("browser")
+        icon=get_indicator("browser"),
     )
 
     rows = []
@@ -126,14 +130,18 @@ def _list_instances(output_json: bool) -> None:
         else:
             last_cmd = click.style("never", fg="bright_black")
 
-        rows.append([
-            click.style(instance_id, fg="cyan", bold=True),
-            click.style(alias, fg="yellow") if alias != "-" else click.style("-", fg="bright_black"),
-            browser,
-            title,
-            status,
-            last_cmd
-        ])
+        rows.append(
+            [
+                click.style(instance_id, fg="cyan", bold=True),
+                click.style(alias, fg="yellow")
+                if alias != "-"
+                else click.style("-", fg="bright_black"),
+                browser,
+                title,
+                status,
+                last_cmd,
+            ]
+        )
 
     table.set_data(rows)
     table.print_header()
@@ -143,6 +151,7 @@ def _list_instances(output_json: bool) -> None:
 
     # VM terminal: offer a "Data ready to copy" toast
     from inspekt.app.cli.table import emit_copyable_data
+
     emit_copyable_data(
         headers=["ID", "Alias", "Browser", "Title", "Status", "Last Command"],
         rows=rows,
@@ -176,11 +185,13 @@ def set_alias(instance_id: str, alias: str):
         response = requests.post(
             f"{_get_base_url()}/instances/alias",
             json={"instance_id": instance_id, "alias": alias},
-            timeout=5.0
+            timeout=5.0,
         )
         data = response.json()
     except requests.ConnectionError:
-        click.secho("Error: Bridge server is not running. Start it with: inspekt start", fg="red", err=True)
+        click.secho(
+            "Error: Bridge server is not running. Start it with: inspekt start", fg="red", err=True
+        )
         sys.exit(1)
     except Exception as e:
         click.secho(f"Error: {e}", fg="red", err=True)
@@ -212,13 +223,13 @@ def remove_alias(alias: str):
     """
     try:
         response = requests.delete(
-            f"{_get_base_url()}/instances/alias",
-            params={"alias": alias},
-            timeout=5.0
+            f"{_get_base_url()}/instances/alias", params={"alias": alias}, timeout=5.0
         )
         data = response.json()
     except requests.ConnectionError:
-        click.secho("Error: Bridge server is not running. Start it with: inspekt start", fg="red", err=True)
+        click.secho(
+            "Error: Bridge server is not running. Start it with: inspekt start", fg="red", err=True
+        )
         sys.exit(1)
     except Exception as e:
         click.secho(f"Error: {e}", fg="red", err=True)
@@ -318,7 +329,11 @@ def identify(instance: str | None):
             if result.get("ok"):
                 click.secho(f"✓ Identified instance '{instance}'", fg="green")
             else:
-                click.secho(f"Error: {result.get('error', 'Failed to identify instance')}", fg="red", err=True)
+                click.secho(
+                    f"Error: {result.get('error', 'Failed to identify instance')}",
+                    fg="red",
+                    err=True,
+                )
                 sys.exit(1)
         else:
             # Identify all instances - get list first
@@ -326,7 +341,9 @@ def identify(instance: str | None):
             data = response.json()
 
             if not data.get("ok"):
-                click.secho(f"Error: {data.get('error', 'Failed to get instances')}", fg="red", err=True)
+                click.secho(
+                    f"Error: {data.get('error', 'Failed to get instances')}", fg="red", err=True
+                )
                 sys.exit(1)
 
             instances_list = data.get("instances", [])
@@ -347,7 +364,9 @@ def identify(instance: str | None):
             click.secho(f"✓ Identified {len(instances_list)} instance(s)", fg="green")
 
     except requests.ConnectionError:
-        click.secho("Error: Bridge server is not running. Start it with: inspekt start", fg="red", err=True)
+        click.secho(
+            "Error: Bridge server is not running. Start it with: inspekt start", fg="red", err=True
+        )
         sys.exit(1)
     except Exception as e:
         click.secho(f"Error: {e}", fg="red", err=True)

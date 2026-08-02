@@ -41,6 +41,7 @@ def _has_language_data() -> bool:
     """Check if the language_data package is installed."""
     try:
         import language_data  # noqa: F401
+
         return True
     except ImportError:
         return False
@@ -58,6 +59,7 @@ def _get_language_display_name(lang_code: str) -> str | None:
 
     try:
         from langcodes import Language
+
         parsed = Language.get(lang_code)
         if parsed.is_valid():
             return parsed.display_name()
@@ -179,6 +181,7 @@ class SimplePDFChecker:
 
     def __init__(self):
         from inspekt.services.pdf_checker import load_check_metadata
+
         self._metadata = load_check_metadata()
         self._checks_info = {c["id"]: c for c in self._metadata.get("checks", [])}
 
@@ -396,7 +399,7 @@ class SimplePDFChecker:
             return self._make_result(
                 "title",
                 "pass",
-                f"Document title is set and displayed: \"{title[:50]}{'…' if len(title) > 50 else ''}\"",
+                f'Document title is set and displayed: "{title[:50]}{"…" if len(title) > 50 else ""}"',
                 {"title": title, "display_doc_title": True},
             )
         elif has_title and not display_doc_title:
@@ -443,6 +446,7 @@ class SimplePDFChecker:
         if _has_language_data():
             try:
                 from langcodes import Language
+
                 parsed = Language.get(lang)
 
                 if parsed.is_valid():
@@ -450,14 +454,14 @@ class SimplePDFChecker:
                     return self._make_result(
                         "language",
                         "pass",
-                        f"Document language is defined: \"{lang}\" ({display_name})",
+                        f'Document language is defined: "{lang}" ({display_name})',
                         {"language": lang, "display_name": display_name, "valid": True},
                     )
                 else:
                     return self._make_result(
                         "language",
                         "warn",
-                        f"Document language is set but not a valid BCP 47 tag: \"{lang}\"",
+                        f'Document language is set but not a valid BCP 47 tag: "{lang}"',
                         {"language": lang, "valid": False, "invalid_lang": True},
                     )
             except Exception:
@@ -468,14 +472,14 @@ class SimplePDFChecker:
             return self._make_result(
                 "language",
                 "pass",
-                f"Document language is defined: \"{lang}\"",
+                f'Document language is defined: "{lang}"',
                 {"language": lang, "valid": True},
             )
         else:
             return self._make_result(
                 "language",
                 "warn",
-                f"Document language is set but may not be a valid BCP 47 tag: \"{lang}\"",
+                f'Document language is set but may not be a valid BCP 47 tag: "{lang}"',
                 {"language": lang, "valid": False},
             )
 
@@ -561,14 +565,24 @@ class SimplePDFChecker:
                     "bookmarks",
                     "pass",
                     f"Document has bookmarks ({bookmark_count} found) - not required for {page_count} pages",
-                    {"has_bookmarks": True, "bookmark_count": bookmark_count, "page_count": page_count, "required": False},
+                    {
+                        "has_bookmarks": True,
+                        "bookmark_count": bookmark_count,
+                        "page_count": page_count,
+                        "required": False,
+                    },
                 )
             else:
                 return self._make_result(
                     "bookmarks",
                     "skip",
                     f"Document has {page_count} pages (bookmarks recommended for {threshold}+ pages)",
-                    {"has_bookmarks": False, "bookmark_count": 0, "page_count": page_count, "required": False},
+                    {
+                        "has_bookmarks": False,
+                        "bookmark_count": 0,
+                        "page_count": page_count,
+                        "required": False,
+                    },
                 )
         else:
             # 20+ pages - bookmarks are required
@@ -577,14 +591,24 @@ class SimplePDFChecker:
                     "bookmarks",
                     "pass",
                     f"Document has navigation bookmarks ({bookmark_count} found)",
-                    {"has_bookmarks": True, "bookmark_count": bookmark_count, "page_count": page_count, "required": True},
+                    {
+                        "has_bookmarks": True,
+                        "bookmark_count": bookmark_count,
+                        "page_count": page_count,
+                        "required": True,
+                    },
                 )
             else:
                 return self._make_result(
                     "bookmarks",
                     "fail",
                     f"Document has {page_count} pages but no bookmarks for navigation",
-                    {"has_bookmarks": False, "bookmark_count": 0, "page_count": page_count, "required": True},
+                    {
+                        "has_bookmarks": False,
+                        "bookmark_count": 0,
+                        "page_count": page_count,
+                        "required": True,
+                    },
                 )
 
     def _check_scanned(self, pdf: pikepdf.Pdf) -> SimplePDFCheckResult:
@@ -613,7 +637,8 @@ class SimplePDFChecker:
                     if isinstance(contents, pikepdf.Array):
                         content_stream = b"".join(
                             pikepdf.Object.parse(obj).read_bytes()
-                            if hasattr(obj, "read_bytes") else b""
+                            if hasattr(obj, "read_bytes")
+                            else b""
                             for obj in contents
                         )
                     elif hasattr(contents, "read_bytes"):
@@ -656,14 +681,22 @@ class SimplePDFChecker:
                 "scanned",
                 "fail",
                 f"Document appears to be scanned/image-only ({image_only_pages}/{pages_checked} sampled pages have no text)",
-                {"image_only_pages": image_only_pages, "pages_checked": pages_checked, "is_scanned": True},
+                {
+                    "image_only_pages": image_only_pages,
+                    "pages_checked": pages_checked,
+                    "is_scanned": True,
+                },
             )
         else:
             return self._make_result(
                 "scanned",
                 "pass",
                 "Document contains text content (not a scanned image)",
-                {"image_only_pages": image_only_pages, "pages_checked": pages_checked, "is_scanned": False},
+                {
+                    "image_only_pages": image_only_pages,
+                    "pages_checked": pages_checked,
+                    "is_scanned": False,
+                },
             )
 
     # ========================================================================
@@ -743,7 +776,9 @@ class SimplePDFChecker:
                 {"has_xfa": False},
             )
 
-    def _check_xmp_metadata(self, pdf: pikepdf.Pdf, metadata: SimplePDFMetadata) -> SimplePDFCheckResult:
+    def _check_xmp_metadata(
+        self, pdf: pikepdf.Pdf, metadata: SimplePDFMetadata
+    ) -> SimplePDFCheckResult:
         """
         Check if the PDF contains XMP metadata.
 

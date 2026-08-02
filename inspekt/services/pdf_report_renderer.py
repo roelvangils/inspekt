@@ -158,7 +158,7 @@ def truncate_text_filter(text: str | None, length: int = 50, suffix: str = "…"
     if len(text) <= length:
         return text
 
-    return text[:length - len(suffix)] + suffix
+    return text[: length - len(suffix)] + suffix
 
 
 def status_icon_filter(status: str) -> str:
@@ -174,7 +174,7 @@ def status_icon_filter(status: str) -> str:
     icons = {
         "pass": "\u2713",  # ✓
         "fail": "\u2717",  # ✗
-        "warn": "\u26A0",  # ⚠
+        "warn": "\u26a0",  # ⚠
         "skip": "\u2014",  # —
     }
     return icons.get(status.lower(), "\u2014")
@@ -457,12 +457,14 @@ def export_json_with_assets(
                             asset_path.write_bytes(decoded)
 
                             # Track asset
-                            assets.append({
-                                "asset_id": asset_id,
-                                "filename": filename,
-                                "asset_type": _infer_asset_type(path_prefix),
-                                "file_size": len(decoded),
-                            })
+                            assets.append(
+                                {
+                                    "asset_id": asset_id,
+                                    "filename": filename,
+                                    "asset_type": _infer_asset_type(path_prefix),
+                                    "file_size": len(decoded),
+                                }
+                            )
                             total_size += len(decoded)
 
                             # Replace base64 with None, add asset_id
@@ -476,10 +478,7 @@ def export_json_with_assets(
             return result
 
         elif isinstance(obj, list):
-            return [
-                extract_large_images(item, f"{path_prefix}[{i}]")
-                for i, item in enumerate(obj)
-            ]
+            return [extract_large_images(item, f"{path_prefix}[{i}]") for i, item in enumerate(obj)]
 
         else:
             return obj

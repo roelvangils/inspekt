@@ -136,11 +136,13 @@ class InspektMCPServer:
                 if console_response.status_code == 200:
                     console_data = console_response.json()
                     for entry in console_data.get("entries", []):
-                        console_output.append(schemas.ConsoleEntry(
-                            level=entry.get("level", "log"),
-                            timestamp=entry.get("timestamp", ""),
-                            message=entry.get("message", ""),
-                        ))
+                        console_output.append(
+                            schemas.ConsoleEntry(
+                                level=entry.get("level", "log"),
+                                timestamp=entry.get("timestamp", ""),
+                                message=entry.get("message", ""),
+                            )
+                        )
             except Exception:
                 pass
 
@@ -274,11 +276,13 @@ class InspektMCPServer:
                 if console_response.status_code == 200:
                     console_data = console_response.json()
                     for entry in console_data.get("entries", []):
-                        console_output.append(schemas.ConsoleEntry(
-                            level=entry.get("level", "log"),
-                            timestamp=entry.get("timestamp", ""),
-                            message=entry.get("message", ""),
-                        ))
+                        console_output.append(
+                            schemas.ConsoleEntry(
+                                level=entry.get("level", "log"),
+                                timestamp=entry.get("timestamp", ""),
+                                message=entry.get("message", ""),
+                            )
+                        )
             except Exception:
                 pass
 
@@ -402,7 +406,9 @@ class InspektMCPServer:
                     params = schemas.TakeScreenshotParams(**arguments)
                     result = await self.tool_provider.take_screenshot(params)
                     # For screenshots, return both JSON and image if available
-                    contents = [types.TextContent(type="text", text=result.model_dump_json(indent=2))]
+                    contents = [
+                        types.TextContent(type="text", text=result.model_dump_json(indent=2))
+                    ]
                     if result.success and result.data:
                         # TODO: Return ImageContent if needed
                         pass
@@ -480,19 +486,11 @@ class InspektMCPServer:
                     return [types.TextContent(type="text", text=result.model_dump_json(indent=2))]
 
                 else:
-                    return [
-                        types.TextContent(
-                            type="text", text=f"Error: Unknown tool '{name}'"
-                        )
-                    ]
+                    return [types.TextContent(type="text", text=f"Error: Unknown tool '{name}'")]
 
             except Exception as e:
                 logger.error(f"Error executing tool {name}: {e}", exc_info=True)
-                return [
-                    types.TextContent(
-                        type="text", text=f"Error executing tool: {e!s}"
-                    )
-                ]
+                return [types.TextContent(type="text", text=f"Error executing tool: {e!s}")]
 
         # ====================================================================
         # List available resources
@@ -530,9 +528,7 @@ class InspektMCPServer:
 
         # Check bridge server before starting
         if not self.executor.is_server_running():
-            logger.warning(
-                "Bridge server is not running. Tools will fail until server is started."
-            )
+            logger.warning("Bridge server is not running. Tools will fail until server is started.")
             logger.warning("Start bridge server with: inspekt start")
 
         # Run server
@@ -554,9 +550,7 @@ class InspektMCPServer:
         Note: HTTP transport implementation requires additional SSE setup.
         This is a placeholder for future HTTP support.
         """
-        raise NotImplementedError(
-            "HTTP transport not yet implemented. Use stdio mode for now."
-        )
+        raise NotImplementedError("HTTP transport not yet implemented. Use stdio mode for now.")
 
 
 async def main() -> None:

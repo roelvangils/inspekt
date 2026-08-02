@@ -80,8 +80,8 @@ class TestArticleExtractionLogic:
                 "excerpt": "Article content here.",
                 "length": 21,
                 "url": "https://example.com/article",
-                "lang": "en"
-            }
+                "lang": "en",
+            },
         }
 
         result = mock_client.execute(extract_article_script)
@@ -100,8 +100,8 @@ class TestArticleExtractionLogic:
                 "excerpt": "Article content.",
                 "length": 16,
                 "url": "https://example.com",
-                "lang": "en"
-            }
+                "lang": "en",
+            },
         }
 
         result = mock_client.execute("script")
@@ -119,8 +119,8 @@ class TestArticleExtractionLogic:
                 "excerpt": "This is the main article content with multiple paragraphs.",
                 "length": 58,
                 "url": "https://example.com",
-                "lang": "en"
-            }
+                "lang": "en",
+            },
         }
 
         result = mock_client.execute("script")
@@ -140,8 +140,8 @@ class TestArticleExtractionLogic:
                 "excerpt": long_content[:200] + "…",
                 "length": 300,
                 "url": "https://example.com",
-                "lang": "en"
-            }
+                "lang": "en",
+            },
         }
 
         result = mock_client.execute("script")
@@ -156,8 +156,8 @@ class TestArticleExtractionLogic:
             "ok": True,
             "result": {
                 "error": "Could not extract sufficient article content. This page may not be an article.",
-                "url": "https://example.com"
-            }
+                "url": "https://example.com",
+            },
         }
 
         result = mock_client.execute("script")
@@ -176,8 +176,8 @@ class TestArticleExtractionLogic:
                 "excerpt": "Content",
                 "length": 7,
                 "url": "https://example.com/test",
-                "lang": "en"
-            }
+                "lang": "en",
+            },
         }
 
         result = mock_client.execute("script")
@@ -196,8 +196,8 @@ class TestArticleExtractionLogic:
                 "excerpt": "Content",
                 "length": 7,
                 "url": "https://example.com",
-                "lang": "fr"
-            }
+                "lang": "fr",
+            },
         }
 
         result = mock_client.execute("script")
@@ -220,8 +220,8 @@ class TestContentFiltering:
                 "excerpt": "Main article content only.",
                 "length": 26,
                 "url": "https://example.com",
-                "lang": "en"
-            }
+                "lang": "en",
+            },
         }
 
         result = mock_client.execute("script")
@@ -241,8 +241,8 @@ class TestContentFiltering:
                 "excerpt": "Article content without ads.",
                 "length": 28,
                 "url": "https://example.com",
-                "lang": "en"
-            }
+                "lang": "en",
+            },
         }
 
         result = mock_client.execute("script")
@@ -262,8 +262,8 @@ class TestContentFiltering:
                 "excerpt": "Heading 1 Paragraph text • List item 1 • List item 2",
                 "length": 55,
                 "url": "https://example.com",
-                "lang": "en"
-            }
+                "lang": "en",
+            },
         }
 
         result = mock_client.execute("script")
@@ -283,8 +283,8 @@ class TestErrorHandling:
             "ok": True,
             "result": {
                 "error": "Error extracting article: Cannot read property 'textContent' of null",
-                "url": "https://example.com"
-            }
+                "url": "https://example.com",
+            },
         }
 
         result = mock_client.execute("script")
@@ -298,8 +298,8 @@ class TestErrorHandling:
             "ok": True,
             "result": {
                 "error": "Could not identify main content area",
-                "url": "https://example.com"
-            }
+                "url": "https://example.com",
+            },
         }
 
         result = mock_client.execute("script")
@@ -314,7 +314,7 @@ class TestScriptPerformance:
     def test_script_size_reasonable(self, extract_article_script):
         """Test that script size is reasonable (not too large)."""
         # Script should be under 15KB for reasonable loading time
-        script_size = len(extract_article_script.encode('utf-8'))
+        script_size = len(extract_article_script.encode("utf-8"))
         assert script_size < 15 * 1024, f"Script is {script_size} bytes, should be < 15KB"
 
     def test_script_has_no_blocking_operations(self, extract_article_script):

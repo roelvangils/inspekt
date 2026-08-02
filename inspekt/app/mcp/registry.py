@@ -369,7 +369,9 @@ def get_plugin_tools() -> list[ToolDefinition]:
             unload_mode = plugin.get("unload_mode", "none")
             if unload_mode != "none":
                 if unload_mode == "toggle":
-                    unload_desc = f"Unload '{plugin_name}' (toggle - runs the plugin again to reverse)"
+                    unload_desc = (
+                        f"Unload '{plugin_name}' (toggle - runs the plugin again to reverse)"
+                    )
                 else:
                     unload_desc = f"Unload '{plugin_name}' (custom unload code)"
 

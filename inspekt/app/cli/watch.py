@@ -36,7 +36,13 @@ def input():
 
     if not client.is_alive():
         from inspekt.app.cli.table import _style_with_inline_code
-        click.echo(_style_with_inline_code("Error: Bridge server is not running. Start it with `inspekt start`.", base_fg="red"), err=True)
+
+        click.echo(
+            _style_with_inline_code(
+                "Error: Bridge server is not running. Start it with `inspekt start`.", base_fg="red"
+            ),
+            err=True,
+        )
         sys.exit(1)
 
     # Start watching keyboard
@@ -124,7 +130,13 @@ def all():
 
     if not client.is_alive():
         from inspekt.app.cli.table import _style_with_inline_code
-        click.echo(_style_with_inline_code("Error: Bridge server is not running. Start it with `inspekt start`.", base_fg="red"), err=True)
+
+        click.echo(
+            _style_with_inline_code(
+                "Error: Bridge server is not running. Start it with `inspekt start`.", base_fg="red"
+            ),
+            err=True,
+        )
         sys.exit(1)
 
     # Load watch_all script
@@ -228,7 +240,13 @@ def control():
 
     if not client.is_alive():
         from inspekt.app.cli.table import _style_with_inline_code
-        click.echo(_style_with_inline_code("Error: Bridge server is not running. Start it with `inspekt start`.", base_fg="red"), err=True)
+
+        click.echo(
+            _style_with_inline_code(
+                "Error: Bridge server is not running. Start it with `inspekt start`.", base_fg="red"
+            ),
+            err=True,
+        )
         sys.exit(1)
 
     # Load configuration

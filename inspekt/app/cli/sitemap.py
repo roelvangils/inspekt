@@ -27,6 +27,7 @@ from inspekt.services.bridge_executor import get_executor
 # Date formatting
 # ============================================================================
 
+
 def _format_date(iso_str: str) -> str:
     """
     Format an ISO date string as a compact relative date.
@@ -80,7 +81,15 @@ def _shorten_relative_date(text: str) -> str:
     core = text[:-4]  # remove " ago"
 
     # Replace units in each comma-separated part
-    units = {"year": "y", "month": "m", "week": "w", "day": "d", "hour": "h", "minute": "min", "second": "s"}
+    units = {
+        "year": "y",
+        "month": "m",
+        "week": "w",
+        "day": "d",
+        "hour": "h",
+        "minute": "min",
+        "second": "s",
+    }
     parts = [p.strip() for p in core.split(",")]
     short_parts = []
     for part in parts:
@@ -104,29 +113,97 @@ def _shorten_relative_date(text: str) -> str:
 
 # ISO 639-1 language code → English name (for display in tree)
 _LANG_NAMES = {
-    "af": "Afrikaans", "am": "Amharic", "ar": "Arabic", "az": "Azerbaijani",
-    "be": "Belarusian", "bg": "Bulgarian", "bn": "Bengali", "bs": "Bosnian",
-    "ca": "Catalan", "cs": "Czech", "cy": "Welsh",
-    "da": "Danish", "de": "German",
-    "el": "Greek", "en": "English", "eo": "Esperanto", "es": "Spanish", "et": "Estonian", "eu": "Basque",
-    "fa": "Persian", "fi": "Finnish", "fr": "French", "fy": "Frisian",
-    "ga": "Irish", "gd": "Scottish Gaelic", "gl": "Galician", "gu": "Gujarati",
-    "ha": "Hausa", "he": "Hebrew", "hi": "Hindi", "hr": "Croatian", "hu": "Hungarian", "hy": "Armenian",
-    "id": "Indonesian", "is": "Icelandic", "it": "Italian",
-    "ja": "Japanese", "jv": "Javanese",
-    "ka": "Georgian", "kk": "Kazakh", "km": "Khmer", "kn": "Kannada", "ko": "Korean", "ku": "Kurdish", "ky": "Kyrgyz",
-    "la": "Latin", "lb": "Luxembourgish", "lo": "Lao", "lt": "Lithuanian", "lv": "Latvian",
-    "mk": "Macedonian", "ml": "Malayalam", "mn": "Mongolian", "mr": "Marathi", "ms": "Malay", "mt": "Maltese", "my": "Burmese",
-    "nb": "Norwegian Bokmål", "ne": "Nepali", "nl": "Dutch", "nn": "Norwegian Nynorsk", "no": "Norwegian",
-    "pa": "Punjabi", "pl": "Polish", "ps": "Pashto", "pt": "Portuguese",
-    "ro": "Romanian", "ru": "Russian", "rw": "Kinyarwanda",
-    "si": "Sinhala", "sk": "Slovak", "sl": "Slovenian", "so": "Somali", "sq": "Albanian", "sr": "Serbian", "sv": "Swedish", "sw": "Swahili",
-    "ta": "Tamil", "te": "Telugu", "tg": "Tajik", "th": "Thai", "tk": "Turkmen", "tl": "Tagalog", "tr": "Turkish",
-    "uk": "Ukrainian", "ur": "Urdu", "uz": "Uzbek",
+    "af": "Afrikaans",
+    "am": "Amharic",
+    "ar": "Arabic",
+    "az": "Azerbaijani",
+    "be": "Belarusian",
+    "bg": "Bulgarian",
+    "bn": "Bengali",
+    "bs": "Bosnian",
+    "ca": "Catalan",
+    "cs": "Czech",
+    "cy": "Welsh",
+    "da": "Danish",
+    "de": "German",
+    "el": "Greek",
+    "en": "English",
+    "eo": "Esperanto",
+    "es": "Spanish",
+    "et": "Estonian",
+    "eu": "Basque",
+    "fa": "Persian",
+    "fi": "Finnish",
+    "fr": "French",
+    "fy": "Frisian",
+    "ga": "Irish",
+    "gd": "Scottish Gaelic",
+    "gl": "Galician",
+    "gu": "Gujarati",
+    "ha": "Hausa",
+    "he": "Hebrew",
+    "hi": "Hindi",
+    "hr": "Croatian",
+    "hu": "Hungarian",
+    "hy": "Armenian",
+    "id": "Indonesian",
+    "is": "Icelandic",
+    "it": "Italian",
+    "ja": "Japanese",
+    "jv": "Javanese",
+    "ka": "Georgian",
+    "kk": "Kazakh",
+    "km": "Khmer",
+    "kn": "Kannada",
+    "ko": "Korean",
+    "ku": "Kurdish",
+    "ky": "Kyrgyz",
+    "la": "Latin",
+    "lb": "Luxembourgish",
+    "lo": "Lao",
+    "lt": "Lithuanian",
+    "lv": "Latvian",
+    "mk": "Macedonian",
+    "ml": "Malayalam",
+    "mn": "Mongolian",
+    "mr": "Marathi",
+    "ms": "Malay",
+    "mt": "Maltese",
+    "my": "Burmese",
+    "nb": "Norwegian Bokmål",
+    "ne": "Nepali",
+    "nl": "Dutch",
+    "nn": "Norwegian Nynorsk",
+    "no": "Norwegian",
+    "pa": "Punjabi",
+    "pl": "Polish",
+    "ps": "Pashto",
+    "pt": "Portuguese",
+    "ro": "Romanian",
+    "ru": "Russian",
+    "rw": "Kinyarwanda",
+    "si": "Sinhala",
+    "sk": "Slovak",
+    "sl": "Slovenian",
+    "so": "Somali",
+    "sq": "Albanian",
+    "sr": "Serbian",
+    "sv": "Swedish",
+    "sw": "Swahili",
+    "ta": "Tamil",
+    "te": "Telugu",
+    "tg": "Tajik",
+    "th": "Thai",
+    "tk": "Turkmen",
+    "tl": "Tagalog",
+    "tr": "Turkish",
+    "uk": "Ukrainian",
+    "ur": "Urdu",
+    "uz": "Uzbek",
     "vi": "Vietnamese",
-    "zh": "Chinese", "zu": "Zulu",
+    "zh": "Chinese",
+    "zu": "Zulu",
 }
-
 
 
 # ============================================================================
@@ -134,10 +211,10 @@ _LANG_NAMES = {
 # ============================================================================
 
 # Box-drawing characters for tree view
-PIPE = "\u2502"      # │
-TEE = "\u251c"       # ├
-ELBOW = "\u2570"     # ╰
-DASH = "\u2500"      # ─
+PIPE = "\u2502"  # │
+TEE = "\u251c"  # ├
+ELBOW = "\u2570"  # ╰
+DASH = "\u2500"  # ─
 
 
 def _build_entry_meta(entry) -> str:
@@ -287,7 +364,15 @@ def _wrap_text(text: str, first_width: int, next_width: int) -> list[str]:
     return lines or [text]
 
 
-def _render_tree(node, prefix: str = "", is_last: bool = True, filter_path: str = "", lines: list | None = None, is_root: bool = True, max_width: int = 0) -> list[str]:
+def _render_tree(
+    node,
+    prefix: str = "",
+    is_last: bool = True,
+    filter_path: str = "",
+    lines: list | None = None,
+    is_root: bool = True,
+    max_width: int = 0,
+) -> list[str]:
     """
     Render a tree node and its children as styled text lines.
 
@@ -327,11 +412,22 @@ def _render_tree(node, prefix: str = "", is_last: bool = True, filter_path: str 
             is_last_child = i == len(children) - 1
             if isinstance(child_or_group, TitleGroup):
                 _render_title_group(
-                    child_or_group, prefix="", is_last=is_last_child,
-                    lines=lines, max_width=max_width,
+                    child_or_group,
+                    prefix="",
+                    is_last=is_last_child,
+                    lines=lines,
+                    max_width=max_width,
                 )
             else:
-                _render_tree(child_or_group, "", is_last_child, filter_path, lines, is_root=False, max_width=max_width)
+                _render_tree(
+                    child_or_group,
+                    "",
+                    is_last_child,
+                    filter_path,
+                    lines,
+                    is_root=False,
+                    max_width=max_width,
+                )
 
         return lines
 
@@ -383,11 +479,22 @@ def _render_tree(node, prefix: str = "", is_last: bool = True, filter_path: str 
 
         if isinstance(child_or_group, TitleGroup):
             _render_title_group(
-                child_or_group, prefix=child_prefix, is_last=is_last_child,
-                lines=lines, max_width=max_width,
+                child_or_group,
+                prefix=child_prefix,
+                is_last=is_last_child,
+                lines=lines,
+                max_width=max_width,
             )
         else:
-            _render_tree(child_or_group, child_prefix, is_last_child, filter_path, lines, is_root=False, max_width=max_width)
+            _render_tree(
+                child_or_group,
+                child_prefix,
+                is_last_child,
+                filter_path,
+                lines,
+                is_root=False,
+                max_width=max_width,
+            )
 
     return lines
 
@@ -426,10 +533,14 @@ def _render_title_group(group: TitleGroup, prefix: str, is_last: bool, lines: li
         slug_str = click.style(slugs[node.entry.loc], fg="cyan")
 
         # Alias indicator
-        alias_indicator = click.style(" \u2192 alias", fg="yellow") if node.entry.loc in group.alias_locs else ""
+        alias_indicator = (
+            click.style(" \u2192 alias", fg="yellow") if node.entry.loc in group.alias_locs else ""
+        )
 
         member_meta = _build_entry_meta(node.entry)
-        lines.append(f"{child_prefix}{member_connector}{idx_str} {slug_str}{alias_indicator}{member_meta}")
+        lines.append(
+            f"{child_prefix}{member_connector}{idx_str} {slug_str}{alias_indicator}{member_meta}"
+        )
 
 
 def _filtered_children(node, filter_path: str) -> list[tuple]:
@@ -472,6 +583,7 @@ def _subtree_matches(node, filter_path: str) -> bool:
 @dataclass
 class TitleGroup:
     """Virtual group node for sibling pages that share the same title."""
+
     title: str
     members: list[tuple[str, object]]  # (name, TreeNode) pairs
     alias_locs: set[str] = field(default_factory=set)  # URLs detected as aliases
@@ -597,6 +709,7 @@ def _distinguishing_slug(members: list[tuple[str, object]]) -> dict[str, str]:
 # Interactive mode
 # ============================================================================
 
+
 def _sort_by_lastmod(items: list[dict]) -> list[dict]:
     """Sort items by lastmod, most recent first. Items without lastmod go last."""
     with_date = [i for i in items if i.get("lastmod")]
@@ -608,6 +721,7 @@ def _sort_by_lastmod(items: list[dict]) -> list[dict]:
 def _has_gum() -> bool:
     """Check if gum (charmbracelet/gum) is available."""
     import shutil
+
     return shutil.which("gum") is not None
 
 
@@ -659,6 +773,7 @@ def _gum_picker(items: list[dict]) -> str | None:
 
     # No /dev/tty — use `script` to allocate a PTY (available via util-linux)
     import shutil
+
     if shutil.which("script"):
         return _gum_via_script(lines, line_to_url, len(items))
 
@@ -672,10 +787,14 @@ def _gum_direct(lines: list[str], line_to_url: dict, count: int) -> str | None:
     try:
         proc = subprocess.Popen(
             [
-                "gum", "filter",
-                "--placeholder", "Search sitemap\u2026",
-                "--height", "20",
-                "--header", f"  {count} URLs \u2014 type to search, enter to navigate",
+                "gum",
+                "filter",
+                "--placeholder",
+                "Search sitemap\u2026",
+                "--height",
+                "20",
+                "--header",
+                f"  {count} URLs \u2014 type to search, enter to navigate",
             ],
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
@@ -708,14 +827,16 @@ def _gum_via_script(lines: list[str], line_to_url: dict, count: int) -> str | No
         # script -qc runs the command with a PTY, -q suppresses "Script started"
         # gum reads items from the file via redirection, writes selection to a result file
         import os
+
         result_path = items_path + ".result"
 
         result = subprocess.run(
             [
-                "script", "-qc",
-                f'gum filter '
+                "script",
+                "-qc",
+                f"gum filter "
                 f'--placeholder "Search sitemap\u2026" '
-                f'--height 20 '
+                f"--height 20 "
                 f'--header "  {count} URLs \u2014 type to search, enter to navigate" '
                 f'< "{items_path}" > "{result_path}"',
                 "/dev/null",
@@ -769,7 +890,8 @@ def _simple_picker(items: list[dict]) -> str | None:
             # Search both titles and slugs
             query = user_input.lower()
             matches = [
-                item for item in items
+                item
+                for item in items
                 if query in item["path"].lower() or query in item.get("title", "").lower()
             ]
             if not matches:
@@ -787,7 +909,11 @@ def _simple_picker(items: list[dict]) -> str | None:
                 idx_str = click.style(f"[{item['index']}]", fg="bright_black")
                 display = item.get("title") or item["path"]
                 lastmod = item.get("lastmod")
-                date_str = f"  {click.style(f'({_format_date(lastmod)})', fg='bright_black')}" if lastmod else ""
+                date_str = (
+                    f"  {click.style(f'({_format_date(lastmod)})', fg='bright_black')}"
+                    if lastmod
+                    else ""
+                )
                 click.echo(f"  {idx_str} {display}{date_str}")
 
             if len(matches) > 20:
@@ -801,6 +927,7 @@ def _simple_picker(items: list[dict]) -> str | None:
 # ============================================================================
 # Navigation helper
 # ============================================================================
+
 
 def _navigate_to(url: str):
     """Navigate the browser to a URL using the bridge."""
@@ -850,7 +977,9 @@ def _handle_open_target(target: str, result, origin: str):
 
     target = target.lower().strip()
     if target not in _NAMED_TARGETS:
-        print_error(f"Unknown target `{target}`. Use a number or one of: {', '.join(sorted(_NAMED_TARGETS))}")
+        print_error(
+            f"Unknown target `{target}`. Use a number or one of: {', '.join(sorted(_NAMED_TARGETS))}"
+        )
         sys.exit(1)
 
     # Named targets require knowing where we are in the sitemap tree
@@ -916,23 +1045,57 @@ def _get_origin(override_url: str | None) -> str:
 # Main command
 # ============================================================================
 
+
 @click.command()
 @click.argument("url", required=False)
 @click.option("--flat", is_flag=True, help="Show flat URL list instead of tree")
 @click.option("--filter", "filter_path", type=str, help="Filter URLs by path (e.g., /blog)")
 @click.option("--lang", type=str, help="Filter by language path prefix (e.g., nl, en, fr)")
-@click.option("--open", "open_target", type=str, help="Navigate by index (5) or target (parent, up, next, prev, first-child)")
+@click.option(
+    "--open",
+    "open_target",
+    type=str,
+    help="Navigate by index (5) or target (parent, up, next, prev, first-child)",
+)
 @click.option("--interactive", "-i", is_flag=True, help="Interactive fuzzy search picker")
-@click.option("--where", is_flag=False, flag_value="compact", default=None, help="Breadcrumb: compact (default), nearby (windowed), or full (all siblings)")
-@click.option("--neighbors", is_flag=True, help="Show parent, siblings, and children of current page")
-@click.option("--from-here", "from_here", is_flag=True, help="Show subtree from current browser page")
+@click.option(
+    "--where",
+    is_flag=False,
+    flag_value="compact",
+    default=None,
+    help="Breadcrumb: compact (default), nearby (windowed), or full (all siblings)",
+)
+@click.option(
+    "--neighbors", is_flag=True, help="Show parent, siblings, and children of current page"
+)
+@click.option(
+    "--from-here", "from_here", is_flag=True, help="Show subtree from current browser page"
+)
 @click.option("--stats", is_flag=True, help="Show sitemap statistics")
-@click.option("--no-flatten", is_flag=True, help="Show sitemap index without expanding child sitemaps")
+@click.option(
+    "--no-flatten", is_flag=True, help="Show sitemap index without expanding child sitemaps"
+)
 @click.option("--refresh", is_flag=True, help="Force re-fetch (bypass cache)")
 @click.option("--no-titles", is_flag=True, help="Skip fetching page titles")
 @click.option("--debug-titles", is_flag=True, hidden=True, help="Debug title fetching")
 @click.option("--json", "-j", "output_json", is_flag=True, help="Output as JSON")
-def sitemap(url, flat, filter_path, lang, open_target, interactive, where, neighbors, from_here, stats, no_flatten, refresh, no_titles, debug_titles, output_json):
+def sitemap(
+    url,
+    flat,
+    filter_path,
+    lang,
+    open_target,
+    interactive,
+    where,
+    neighbors,
+    from_here,
+    stats,
+    no_flatten,
+    refresh,
+    no_titles,
+    debug_titles,
+    output_json,
+):
     """
     Discover and browse a site's sitemap.
 
@@ -1009,7 +1172,9 @@ def sitemap(url, flat, filter_path, lang, open_target, interactive, where, neigh
                     click.echo(json.dumps({"error": "No sitemap found", "origin": origin}))
                 else:
                     print_error(f"No sitemap found for `{origin}`")
-                    print_hint("Try specifying the URL directly: `inspekt sitemap https://example.com/sitemap.xml`")
+                    print_hint(
+                        "Try specifying the URL directly: `inspekt sitemap https://example.com/sitemap.xml`"
+                    )
                 sys.exit(1)
 
         # Fetch all discovered sitemaps and merge entries (deduplicate by URL)
@@ -1051,6 +1216,7 @@ def sitemap(url, flat, filter_path, lang, open_target, interactive, where, neigh
     # Debug title fetching — test one URL and report diagnostics
     if debug_titles and result.entries:
         from inspekt.services.sitemap_service import debug_title_fetch
+
         test_url = result.entries[0].loc
         click.echo(f"  Debugging title fetch for: {test_url}")
         click.echo()
@@ -1073,12 +1239,16 @@ def sitemap(url, flat, filter_path, lang, open_target, interactive, where, neigh
         no_titles = True
 
     # Skip bulk title fetch for targeted operations on huge sitemaps
-    has_targeted_flag = stats or open_target is not None or from_here or interactive or output_json or filter_path
+    has_targeted_flag = (
+        stats or open_target is not None or from_here or interactive or output_json or filter_path
+    )
     if total > 50_000 and has_targeted_flag:
         no_titles = True
 
     # Count how many titles still need fetching (used by menu threshold)
-    needs_title = sum(1 for e in result.entries if not e.title and e.http_status in {0, 429, 500, 502, 503, 504})
+    needs_title = sum(
+        1 for e in result.entries if not e.title and e.http_status in {0, 429, 500, 502, 503, 504}
+    )
 
     # For large sitemaps, offer an interactive menu instead of blindly fetching
     fetch_subset = None  # if set, only fetch titles for this subset of entries
@@ -1096,14 +1266,14 @@ def sitemap(url, flat, filter_path, lang, open_target, interactive, where, neigh
             filter_path = f"/{lang_code}/"
             # Only fetch titles for this language (but keep full result for caching)
             fetch_subset = [
-                e for e in result.entries
-                if f"/{lang_code}/" in urlparse(e.loc).path.lower()
+                e for e in result.entries if f"/{lang_code}/" in urlparse(e.loc).path.lower()
             ]
         elif choice.startswith("depth:"):
             # Only fetch titles for entries at or above the chosen depth
             max_depth = int(choice[6:])
             fetch_subset = [
-                e for e in result.entries
+                e
+                for e in result.entries
                 if (urlparse(e.loc).path.rstrip("/") or "/").count("/") <= max_depth
             ]
     elif not no_titles and needs_title > 500 and not output_json:
@@ -1111,14 +1281,20 @@ def sitemap(url, flat, filter_path, lang, open_target, interactive, where, neigh
 
     # Fetch page titles
     entries_to_fetch = fetch_subset if fetch_subset is not None else result.entries
-    needs_title = sum(1 for e in entries_to_fetch if not e.title and e.http_status in {0, 429, 500, 502, 503, 504})
+    needs_title = sum(
+        1 for e in entries_to_fetch if not e.title and e.http_status in {0, 429, 500, 502, 503, 504}
+    )
 
     if not no_titles and needs_title > 0:
         # Send progress to stderr so it doesn't corrupt --json output
         err = output_json
 
         already_titled_in_subset = sum(1 for e in entries_to_fetch if e.title)
-        already_checked_in_subset = sum(1 for e in entries_to_fetch if not e.title and e.http_status not in {0, 429, 500, 502, 503, 504})
+        already_checked_in_subset = sum(
+            1
+            for e in entries_to_fetch
+            if not e.title and e.http_status not in {0, 429, 500, 502, 503, 504}
+        )
 
         if already_titled_in_subset > 0 or already_checked_in_subset > 0:
             parts = []
@@ -1127,7 +1303,6 @@ def sitemap(url, flat, filter_path, lang, open_target, interactive, where, neigh
             if already_checked_in_subset > 0:
                 parts.append(f"{already_checked_in_subset} unreachable")
             click.echo(f"  {', '.join(parts)} (of {len(entries_to_fetch)} total)", err=err)
-
 
         # Progress bar with throttle notification
         bar = click.progressbar(
@@ -1155,12 +1330,17 @@ def sitemap(url, flat, filter_path, lang, open_target, interactive, where, neigh
             if not _reassured and concurrency < _max_concurrent:
                 _reassured = True
                 click.echo(err=err)
-                print_hint(f"Slowing down to avoid overloading the server (concurrency: {concurrency}/{_max_concurrent})")
+                print_hint(
+                    f"Slowing down to avoid overloading the server (concurrency: {concurrency}/{_max_concurrent})"
+                )
 
         bar.__enter__()
         try:
             fetched = fetch_titles(
-                entries_to_fetch, max_concurrent=_max_concurrent, timeout=10.0, progress_callback=_progress
+                entries_to_fetch,
+                max_concurrent=_max_concurrent,
+                timeout=10.0,
+                progress_callback=_progress,
             )
         finally:
             # Ensure bar completes to 100%
@@ -1192,6 +1372,7 @@ def sitemap(url, flat, filter_path, lang, open_target, interactive, where, neigh
     if result.is_index and not result.entries:
         if output_json:
             from inspekt.app.cli.table import print_json
+
             print_json(result.to_dict(), summary=f"{len(result.child_sitemaps)} child sitemaps")
             return
 
@@ -1202,7 +1383,7 @@ def sitemap(url, flat, filter_path, lang, open_target, interactive, where, neigh
         via = f"cache ({result.discovered_via})" if from_cache else result.discovered_via
         for line in wrap_styled_line(
             prefix=f"  {icon}{click.style('Sitemap Index', fg='cyan', bold=True)}  ",
-            text=click.style(result.source_url, fg='bright_black'),
+            text=click.style(result.source_url, fg="bright_black"),
         ):
             click.echo(line)
         click.echo(f"  {click.style(f'Discovered via {via}', fg='bright_black')}")
@@ -1215,7 +1396,9 @@ def sitemap(url, flat, filter_path, lang, open_target, interactive, where, neigh
             rows.append([str(i), child_url])
 
         sitemap_icon = get_icon("Sitemaps")
-        table = Table(headers, title=f"Child Sitemaps ({len(result.child_sitemaps)})", icon=sitemap_icon)
+        table = Table(
+            headers, title=f"Child Sitemaps ({len(result.child_sitemaps)})", icon=sitemap_icon
+        )
         table.set_data(rows)
         table.print_header()
         for row in rows:
@@ -1229,6 +1412,7 @@ def sitemap(url, flat, filter_path, lang, open_target, interactive, where, neigh
     # JSON output
     if output_json:
         from inspekt.app.cli.table import print_json
+
         entry_count = len(result.entries)
         if stats:
             output = result.to_dict()
@@ -1276,16 +1460,18 @@ def sitemap(url, flat, filter_path, lang, open_target, interactive, where, neigh
             print_warning("No URLs to display")
             return
 
-        selected = _interactive_picker([
-            {
-                "index": i + 1,
-                "path": urlparse(e.loc).path or "/",
-                "title": e.title,
-                "url": e.loc,
-                "lastmod": e.lastmod,
-            }
-            for i, e in enumerate(entries)
-        ])
+        selected = _interactive_picker(
+            [
+                {
+                    "index": i + 1,
+                    "path": urlparse(e.loc).path or "/",
+                    "title": e.title,
+                    "url": e.loc,
+                    "lastmod": e.lastmod,
+                }
+                for i, e in enumerate(entries)
+            ]
+        )
         if selected:
             _navigate_to(selected)
         return
@@ -1301,10 +1487,14 @@ def sitemap(url, flat, filter_path, lang, open_target, interactive, where, neigh
         icon = get_icon("Sitemaps") or ""
         if icon:
             icon += " "
-        click.echo(f"  {icon}{click.style('Sitemap', fg='cyan', bold=True)}  {click.style(result.source_url, fg='bright_black')}")
+        click.echo(
+            f"  {icon}{click.style('Sitemap', fg='cyan', bold=True)}  {click.style(result.source_url, fg='bright_black')}"
+        )
         click.echo(f"  {click.style(f'{len(result.entries):,} URLs', fg='bright_black')}")
         click.echo()
-        print_warning(f"This sitemap has {len(result.entries):,} pages — too large to display as a tree")
+        print_warning(
+            f"This sitemap has {len(result.entries):,} pages — too large to display as a tree"
+        )
         click.echo()
         print_hint("Use one of these to explore the sitemap:")
         click.echo(f"    {'`--filter /path`':22s} show only a section")
@@ -1425,7 +1615,9 @@ def _display_where(result, origin: str, mode: str = "compact"):
         _display_where_compact(ancestors, max_width)
     elif mode == "full":
         if len(result.entries) > 500:
-            print_error(f"Sitemap has {len(result.entries)} entries — `--where=full` would be too large")
+            print_error(
+                f"Sitemap has {len(result.entries)} entries — `--where=full` would be too large"
+            )
             print_hint("Use `--where=nearby` for a windowed view of siblings at each level")
             return
         _render_where_levels(ancestors, max_width, windowed=False)
@@ -1463,7 +1655,7 @@ def _compute_window(total: int, followed_idx: int, radius: int = 1):
 
     # Build the set of indices to show: anchors + window
     show = set(range(win_start, win_end))
-    show.add(0)          # first anchor
+    show.add(0)  # first anchor
     show.add(total - 1)  # last anchor
 
     # Walk through all indices and build render instructions
@@ -1511,7 +1703,9 @@ def _render_where_levels(ancestors, max_width: int, windowed: bool, compact: boo
         _render_where_children_inline(root, "", max_width)
     else:
         click.echo(f"{click.style(root.name, fg='cyan', bold=True)}")
-        _render_where_branch(ancestors, depth=1, prefix="", max_width=max_width, windowed=windowed, compact=compact)
+        _render_where_branch(
+            ancestors, depth=1, prefix="", max_width=max_width, windowed=windowed, compact=compact
+        )
 
     click.echo()
     if compact:
@@ -1523,7 +1717,9 @@ def _render_where_levels(ancestors, max_width: int, windowed: bool, compact: boo
     print_hint("Use `--open parent` to navigate up, or `--open first-child` to go deeper")
 
 
-def _render_where_branch(ancestors, depth: int, prefix: str, max_width: int, windowed: bool, compact: bool = False):
+def _render_where_branch(
+    ancestors, depth: int, prefix: str, max_width: int, windowed: bool, compact: bool = False
+):
     """Recursively render one level of the --where tree.
 
     Shows a windowed set of siblings at this level. For the followed sibling,
@@ -1548,7 +1744,9 @@ def _render_where_branch(ancestors, depth: int, prefix: str, max_width: int, win
 
     for item_idx, (kind, value) in enumerate(items):
         is_last_line = item_idx == len(items) - 1
-        conn = click.style(f"{ELBOW}{DASH}{DASH} " if is_last_line else f"{TEE}{DASH}{DASH} ", fg="bright_black")
+        conn = click.style(
+            f"{ELBOW}{DASH}{DASH} " if is_last_line else f"{TEE}{DASH}{DASH} ", fg="bright_black"
+        )
         child_prefix = prefix + ("    " if is_last_line else f"{styled_pipe}   ")
         cont = child_prefix
 
@@ -1581,7 +1779,9 @@ def _render_where_branch(ancestors, depth: int, prefix: str, max_width: int, win
 
                 # Recurse: render children of the followed node inline
                 if not is_final:
-                    _render_where_branch(ancestors, depth + 1, child_prefix, max_width, windowed, compact=compact)
+                    _render_where_branch(
+                        ancestors, depth + 1, child_prefix, max_width, windowed, compact=compact
+                    )
                 else:
                     _render_where_children_inline(ancestor, child_prefix, max_width)
             else:
@@ -1633,7 +1833,9 @@ def _render_where_children_inline(node, prefix: str, max_width: int):
 
     for item_idx, (kind, value) in enumerate(items):
         is_last_line = item_idx == len(items) - 1
-        conn = click.style(f"{ELBOW}{DASH}{DASH} " if is_last_line else f"{TEE}{DASH}{DASH} ", fg="bright_black")
+        conn = click.style(
+            f"{ELBOW}{DASH}{DASH} " if is_last_line else f"{TEE}{DASH}{DASH} ", fg="bright_black"
+        )
         child_prefix = prefix + ("    " if is_last_line else f"{styled_pipe}   ")
 
         if kind == "more":
@@ -1652,7 +1854,6 @@ def _render_where_children_inline(node, prefix: str, max_width: int):
 
             if child.children:
                 _render_subpage_hint(child, child_prefix)
-
 
 
 def _display_neighbors(result, origin: str):
@@ -1759,16 +1960,18 @@ def _display_from_here(result, origin: str, flat: bool, interactive: bool):
 
     # Scoped interactive picker
     if interactive:
-        selected = _interactive_picker([
-            {
-                "index": i + 1,
-                "path": urlparse(e.loc).path or "/",
-                "title": e.title,
-                "url": e.loc,
-                "lastmod": e.lastmod,
-            }
-            for i, e in enumerate(subtree_entries)
-        ])
+        selected = _interactive_picker(
+            [
+                {
+                    "index": i + 1,
+                    "path": urlparse(e.loc).path or "/",
+                    "title": e.title,
+                    "url": e.loc,
+                    "lastmod": e.lastmod,
+                }
+                for i, e in enumerate(subtree_entries)
+            ]
+        )
         if selected:
             _navigate_to(selected)
         return
@@ -1780,7 +1983,7 @@ def _display_from_here(result, origin: str, flat: bool, interactive: bool):
     current_name = _node_display_name(node)
     for line in wrap_styled_line(
         prefix=f"  {click.style('Subtree from', fg='bright_black')} ",
-        text=click.style(current_name, fg='cyan', bold=True),
+        text=click.style(current_name, fg="cyan", bold=True),
         suffix=f"  {click.style(f'({count} {pages_word})', fg='bright_black')}",
     ):
         click.echo(line)
@@ -1824,10 +2027,12 @@ def _display_sitemap(result, flat: bool, filter_path: str, from_cache: bool = Fa
     via = f"cache ({result.discovered_via})" if from_cache else result.discovered_via
     for line in wrap_styled_line(
         prefix=f"  {icon}{click.style('Sitemap', fg='cyan', bold=True)}  ",
-        text=click.style(result.source_url, fg='bright_black'),
+        text=click.style(result.source_url, fg="bright_black"),
     ):
         click.echo(line)
-    click.echo(f"  {click.style(f'Discovered via {via}', fg='bright_black')}  {click.style(f'{result.total_urls} URLs', fg='bright_black')}")
+    click.echo(
+        f"  {click.style(f'Discovered via {via}', fg='bright_black')}  {click.style(f'{result.total_urls} URLs', fg='bright_black')}"
+    )
 
     if result.fetch_time > 0 and not from_cache:
         click.echo(f"  {click.style(f'Fetched in {result.fetch_time:.2f}s', fg='bright_black')}")
@@ -1845,6 +2050,7 @@ def _display_sitemap(result, flat: bool, filter_path: str, from_cache: bool = Fa
     # Detect available languages from URL path prefixes
     if not filter_path:
         from inspekt.services.sitemap_service import detect_languages
+
         langs = detect_languages(result.entries)
         if langs:
             lang_str = ", ".join(f"`{lang}`" for lang in sorted(langs))
@@ -1852,7 +2058,9 @@ def _display_sitemap(result, flat: bool, filter_path: str, from_cache: bool = Fa
 
     if not filter_path and result.total_urls > 50:
         print_hint("Use `--filter /path` to narrow down the tree")
-    print_hint("Use `--open N` to navigate by index, or `--open parent/next/prev` for structural navigation")
+    print_hint(
+        "Use `--open N` to navigate by index, or `--open parent/next/prev` for structural navigation"
+    )
     print_hint("Use `--interactive` for a searchable picker")
 
 
@@ -1887,19 +2095,23 @@ def _display_flat(result, filter_path: str):
         parsed = urlparse(entry.loc)
         path = parsed.path or "/"
         if has_titles:
-            rows.append([
-                str(i),
-                path,
-                entry.title or "",
-                _format_date(entry.lastmod) if entry.lastmod else "",
-            ])
+            rows.append(
+                [
+                    str(i),
+                    path,
+                    entry.title or "",
+                    _format_date(entry.lastmod) if entry.lastmod else "",
+                ]
+            )
         else:
-            rows.append([
-                str(i),
-                path,
-                _format_date(entry.lastmod) if entry.lastmod else "",
-                entry.priority or "",
-            ])
+            rows.append(
+                [
+                    str(i),
+                    path,
+                    _format_date(entry.lastmod) if entry.lastmod else "",
+                    entry.priority or "",
+                ]
+            )
 
     icon = get_icon("Sitemaps")
     count_label = f"{len(entries)} URLs"
@@ -1918,6 +2130,7 @@ def _display_flat(result, filter_path: str):
 
     # VM terminal: offer a "Data ready to copy" toast
     from inspekt.app.cli.table import emit_copyable_data
+
     emit_copyable_data(
         headers=headers,
         rows=rows,
@@ -1985,9 +2198,15 @@ def _large_sitemap_menu(result, needs_title: int) -> str:
             break  # don't offer a tier that includes everything
         # Offer this tier if it's meaningfully larger than the last one,
         # stays under 10k pages (keep it practical), and under half the total
-        if cumulative > max(last_offered * 2, 10) and cumulative <= 10_000 and cumulative < total * 0.5:
+        if (
+            cumulative > max(last_offered * 2, 10)
+            and cumulative <= 10_000
+            and cumulative < total * 0.5
+        ):
             levels = f"level{'s' if d > 1 else ''}"
-            _add_option(f"depth:{d}", f"Top {d} {levels} ({cumulative:,} pages)", _estimate_time(cumulative))
+            _add_option(
+                f"depth:{d}", f"Top {d} {levels} ({cumulative:,} pages)", _estimate_time(cumulative)
+            )
             last_offered = cumulative
 
     # Option: language filter (prefer English, otherwise largest language)
@@ -2004,7 +2223,12 @@ def _large_sitemap_menu(result, needs_title: int) -> str:
         if lang_counts:
             preferred = "en" if "en" in lang_counts else max(lang_counts, key=lang_counts.get)
             lang_total = lang_counts[preferred]
-            _add_option(f"lang:{preferred}", f"{preferred.upper()} pages only ({lang_total:,} pages)", _estimate_time(lang_total), " *")
+            _add_option(
+                f"lang:{preferred}",
+                f"{preferred.upper()} pages only ({lang_total:,} pages)",
+                _estimate_time(lang_total),
+                " *",
+            )
 
     # Option: skip titles
     _add_option("skip", "Skip title fetching (show paths only)", "instant")
@@ -2016,12 +2240,19 @@ def _large_sitemap_menu(result, needs_title: int) -> str:
     max_label_len = max(len(line[1]) for line in option_lines)
     for num, label, time_str, suffix in option_lines:
         padding = max_label_len - len(label) + 4
-        click.echo(f"  [{num}] {label}{' ' * padding}{click.style(time_str, fg='bright_black')}{suffix}")
+        click.echo(
+            f"  [{num}] {label}{' ' * padding}{click.style(time_str, fg='bright_black')}{suffix}"
+        )
 
     # Footnotes
     click.echo()
     if any(v.startswith("lang:") for v in options.values()):
-        click.echo(click.style("  (*) Use --lang to see all languages, or --lang=LANG to pick one", fg="bright_black"))
+        click.echo(
+            click.style(
+                "  (*) Use --lang to see all languages, or --lang=LANG to pick one",
+                fg="bright_black",
+            )
+        )
     print_hint("Titles are cached \u2014 run again later to fill in the rest")
     click.echo()
 
@@ -2043,7 +2274,7 @@ def _display_stats(result, stats: dict):
         icon += " "
     for line in wrap_styled_line(
         prefix=f"  {icon}{click.style('Sitemap Statistics', fg='cyan', bold=True)}  ",
-        text=click.style(result.source_url, fg='bright_black'),
+        text=click.style(result.source_url, fg="bright_black"),
     ):
         click.echo(line)
     click.echo()
@@ -2073,7 +2304,9 @@ def _display_stats(result, stats: dict):
     depth_dist = stats.get("depth_distribution", {})
     if depth_dist:
         depth_rows = [[str(depth), str(count)] for depth, count in depth_dist.items()]
-        depth_table = Table(["Path Depth", "URL Count"], title="Depth Distribution", icon=get_icon("Layout"))
+        depth_table = Table(
+            ["Path Depth", "URL Count"], title="Depth Distribution", icon=get_icon("Layout")
+        )
         depth_table.set_data(depth_rows)
         depth_table.print_header()
         for row in depth_rows:
@@ -2085,7 +2318,9 @@ def _display_stats(result, stats: dict):
     freq_dist = stats.get("changefreq_distribution", {})
     if freq_dist:
         freq_rows = [[freq, str(count)] for freq, count in freq_dist.items()]
-        freq_table = Table(["Change Frequency", "URL Count"], title="Change Frequency", icon=get_icon("Summary"))
+        freq_table = Table(
+            ["Change Frequency", "URL Count"], title="Change Frequency", icon=get_icon("Summary")
+        )
         freq_table.set_data(freq_rows)
         freq_table.print_header()
         for row in freq_rows:
@@ -2098,7 +2333,10 @@ def _display_stats(result, stats: dict):
     if prio_dist:
         # Clean up priority values: round floats, sanitize strings
         prio_rows = []
-        for prio, count in sorted(prio_dist.items(), key=lambda x: -float(x[0]) if x[0].replace('.', '', 1).isdigit() else 0):
+        for prio, count in sorted(
+            prio_dist.items(),
+            key=lambda x: -float(x[0]) if x[0].replace(".", "", 1).isdigit() else 0,
+        ):
             # Round ugly floating-point values (e.g., 0.21749999999999997 → 0.217)
             try:
                 clean_prio = f"{float(prio):g}"

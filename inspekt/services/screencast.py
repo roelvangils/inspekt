@@ -38,6 +38,7 @@ atexit.register(_cleanup_temp_dirs)
 
 class ScreencastError(Exception):
     """Error during screencast capture."""
+
     pass
 
 
@@ -138,7 +139,9 @@ class ScreencastCapture:
 
             data = response.json()
             if not data.get("ok"):
-                raise ScreencastError(f"Failed to start screencast: {data.get('error', 'Unknown error')}")
+                raise ScreencastError(
+                    f"Failed to start screencast: {data.get('error', 'Unknown error')}"
+                )
 
             self._is_capturing = True
             self._frames = []

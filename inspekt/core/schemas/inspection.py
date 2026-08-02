@@ -34,12 +34,8 @@ class TakeScreenshotParams(BaseModel):
         default=None,
         description="CSS selector for element screenshot (required if target='element')",
     )
-    format: Literal["png", "jpeg"] | None = Field(
-        default="png", description="Image format"
-    )
-    quality: int | None = Field(
-        default=90, description="JPEG quality (1-100, ignored for PNG)"
-    )
+    format: Literal["png", "jpeg"] | None = Field(default="png", description="Image format")
+    quality: int | None = Field(default=90, description="JPEG quality (1-100, ignored for PNG)")
 
 
 class TakeScreenshotResponse(BaseModel):

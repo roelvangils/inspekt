@@ -1,6 +1,5 @@
 """Display API endpoints — zoom and viewport control."""
 
-
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
@@ -11,22 +10,28 @@ router = APIRouter()
 # Request/Response Models
 # ============================================================================
 
+
 class ZoomSetRequest(BaseModel):
     """Request body for POST /zoom."""
+
     level: int | None = Field(default=None, description="Zoom percentage (25–500)")
     action: str | None = Field(default=None, description="Action: in, out, reset")
 
 
 class ViewportSetRequest(BaseModel):
     """Request body for POST /viewport."""
+
     width: int = Field(..., description="Viewport width in pixels", ge=320, le=3840)
-    height: int | None = Field(default=None, description="Viewport height in pixels", ge=240, le=2160)
+    height: int | None = Field(
+        default=None, description="Viewport height in pixels", ge=240, le=2160
+    )
     auto_height: bool = Field(default=False, description="Auto-fill display height (VM only)")
 
 
 # ============================================================================
 # Zoom Endpoints
 # ============================================================================
+
 
 @router.get("/zoom")
 async def get_zoom():
@@ -68,6 +73,7 @@ async def set_zoom(request: ZoomSetRequest):
 # Viewport Endpoints
 # ============================================================================
 
+
 @router.get("/viewport")
 async def get_viewport():
     """Get the current browser viewport dimensions."""
@@ -90,7 +96,9 @@ async def set_viewport(request: ViewportSetRequest):
     from inspekt.core.handlers.display import set_viewport as _set_viewport
     from inspekt.core.schemas.display import ViewportSetParams
 
-    params = ViewportSetParams(width=request.width, height=request.height, auto_height=request.auto_height)
+    params = ViewportSetParams(
+        width=request.width, height=request.height, auto_height=request.auto_height
+    )
     result = await _set_viewport(params)
     if not result.success:
         raise HTTPException(status_code=500, detail=result.message)

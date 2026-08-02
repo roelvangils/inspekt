@@ -14,6 +14,7 @@ import click
 # Terminal control for suppressing keyboard echo during recording/replay (Unix-only)
 try:
     import termios
+
     HAS_TERMIOS = True
 except ImportError:
     HAS_TERMIOS = False
@@ -80,7 +81,7 @@ def clean_filename(filename: str) -> str:
     This function removes those indices to get the original filename.
     """
     # Match pattern: " (N)" before file extension or at end of filename
-    return re.sub(r'\s*\(\d+\)(?=\.[^.]+$|$)', '', filename)
+    return re.sub(r"\s*\(\d+\)(?=\.[^.]+$|$)", "", filename)
 
 
 def complete_recording_files(ctx, param, incomplete):
@@ -157,7 +158,9 @@ def load_external_file_content(step_dict: dict, recording_dir: Path) -> dict:
                     mime_type = file_info.get("type", "application/octet-stream")
                     file_info["external_content"] = f"data:{mime_type};base64,{base64_data}"
                 except Exception as e:
-                    click.echo(f"Warning: Could not load external file {external_path}: {e}", err=True)
+                    click.echo(
+                        f"Warning: Could not load external file {external_path}: {e}", err=True
+                    )
             else:
                 click.echo(f"Warning: External file not found: {external_path}", err=True)
 

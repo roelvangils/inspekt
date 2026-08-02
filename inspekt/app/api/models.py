@@ -117,9 +117,13 @@ class AxeRequest(BaseModel):
     """Request model for running axe-core accessibility audit."""
 
     level: str = Field("2aa", description="WCAG conformance level (2a, 2aa, 2aaa, 21a, 21aa, 22aa)")
-    tags: str | None = Field(None, description="Additional comma-separated tags (e.g., 'best-practice,experimental')")
+    tags: str | None = Field(
+        None, description="Additional comma-separated tags (e.g., 'best-practice,experimental')"
+    )
     include_passes: bool = Field(False, description="Include passing checks in output")
-    include_incomplete: bool = Field(False, description="Include incomplete checks (require manual review)")
+    include_incomplete: bool = Field(
+        False, description="Include incomplete checks (require manual review)"
+    )
     timeout: float = Field(30.0, description="Execution timeout in seconds", ge=0.1, le=300.0)
 
 
@@ -130,7 +134,7 @@ class AutocompleteRequest(BaseModel):
         0.5,
         description="Minimum confidence (0-1) to consider autocomplete required per WCAG 2.1 SC 1.3.5",
         ge=0.0,
-        le=1.0
+        le=1.0,
     )
     include_hidden: bool = Field(False, description="Include hidden input fields in analysis")
     include_disabled: bool = Field(False, description="Include disabled input fields in analysis")

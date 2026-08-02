@@ -4,6 +4,7 @@ Unit tests for TTY detection in inspected commands.
 Tests that decorations (tables, tips, headers) are automatically suppressed
 when stdout is piped or redirected.
 """
+
 import json
 from unittest.mock import MagicMock, patch
 
@@ -188,7 +189,7 @@ class TestCssCommandTTYDetection:
                         "strippedAsDefault": 30,
                         "strippedAsInherited": 20,
                     },
-                }
+                },
             }
             mock_executor.return_value = mock_instance
             yield mock_executor

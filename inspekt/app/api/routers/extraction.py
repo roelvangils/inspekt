@@ -28,13 +28,15 @@ def _process_outline_headings(headings: list) -> list:
 
         # Insert missing levels before this heading
         while expected_level < level:
-            processed.append({
-                "level": expected_level,
-                "text": "",
-                "type": "missing",
-                "is_missing": True,
-                "is_duplicate": False
-            })
+            processed.append(
+                {
+                    "level": expected_level,
+                    "text": "",
+                    "type": "missing",
+                    "is_missing": True,
+                    "is_duplicate": False,
+                }
+            )
             expected_level += 1
 
         # Check for duplicates (2nd+ occurrence only, skip empty text)
@@ -42,13 +44,15 @@ def _process_outline_headings(headings: list) -> list:
         if text_lower and not is_duplicate:
             seen_texts[text_lower] = True
 
-        processed.append({
-            "level": level,
-            "text": text,
-            "type": heading.get("type", "native"),
-            "is_missing": False,
-            "is_duplicate": is_duplicate
-        })
+        processed.append(
+            {
+                "level": level,
+                "text": text,
+                "type": heading.get("type", "native"),
+                "is_missing": False,
+                "is_duplicate": is_duplicate,
+            }
+        )
 
         # Update expected level: after H2, expect H2 or H3 next
         expected_level = level + 1
@@ -108,7 +112,9 @@ def get_page_info():
         result = client.execute(code, timeout=10.0)
 
         if not result.get("ok"):
-            raise HTTPException(status_code=500, detail=result.get("error", "Failed to get page info"))
+            raise HTTPException(
+                status_code=500, detail=result.get("error", "Failed to get page info")
+            )
 
         return result
 
@@ -158,7 +164,9 @@ def get_page_links(include_text: bool = True):
         result = client.execute(code, timeout=10.0)
 
         if not result.get("ok"):
-            raise HTTPException(status_code=500, detail=result.get("error", "Failed to extract links"))
+            raise HTTPException(
+                status_code=500, detail=result.get("error", "Failed to extract links")
+            )
 
         return result
 
@@ -223,7 +231,9 @@ def get_page_outline():
         result = client.execute(script, timeout=30.0)
 
         if not result.get("ok"):
-            raise HTTPException(status_code=500, detail=result.get("error", "Failed to extract outline"))
+            raise HTTPException(
+                status_code=500, detail=result.get("error", "Failed to extract outline")
+            )
 
         data = result.get("result", {})
         headings = data.get("headings", [])
@@ -244,8 +254,8 @@ def get_page_outline():
                 "missing_count": missing_count,
                 "duplicate_count": duplicate_count,
                 "url": data.get("url", ""),
-                "title": data.get("title", "")
-            }
+                "title": data.get("title", ""),
+            },
         }
 
     except ConnectionError as e:

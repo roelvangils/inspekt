@@ -308,9 +308,7 @@ def activate_browser_tab(browser_name: str, url: str) -> AppleScriptResult:
         )
 
     try:
-        script = BrowserAppleScriptTemplates.generate_activate_tab_script(
-            browser_name, url
-        )
+        script = BrowserAppleScriptTemplates.generate_activate_tab_script(browser_name, url)
     except UnsupportedBrowserError as e:
         return AppleScriptResult(ok=False, error=str(e), error_code=-1)
 
@@ -415,12 +413,12 @@ def resize_browser_window(
     app_name = BrowserAppleScriptTemplates.get_app_name(browser_type)
 
     # Issue 17: Get screen bounds dynamically via AppleScript
-    screen_script = '''
+    screen_script = """
 tell application "Finder"
     set screenBounds to bounds of window of desktop
     return screenBounds
 end tell
-'''
+"""
     screen_result = executor.execute(screen_script, timeout=3.0)
 
     # Default screen size if we can't get it

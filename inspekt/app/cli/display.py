@@ -22,6 +22,7 @@ def _run_async(coro):
         loop = asyncio.get_event_loop()
         if loop.is_running():
             import concurrent.futures
+
             with concurrent.futures.ThreadPoolExecutor() as pool:
                 return pool.submit(asyncio.run, coro).result()
         return loop.run_until_complete(coro)
@@ -50,10 +51,12 @@ def _viewport_label(width: int) -> str | None:
 def _vm_toast(message: str, toast_type: str = "dark") -> None:
     """Show a toast in the Inspekt VM control panel via OSC escape relay."""
     import os
+
     if os.environ.get("INSPEKT_RESTRICTED") != "1":
         return
     try:
         import urllib.request
+
         req = urllib.request.Request(
             "http://localhost:8888/toast",
             data=json.dumps({"message": message, "type": toast_type}).encode("utf-8"),
@@ -72,6 +75,7 @@ def _vm_toast(message: str, toast_type: str = "dark") -> None:
 # Zoom Command Group
 # ============================================================================
 
+
 class ZoomGroup(click.Group):
     """
     Custom Click Group that handles both numeric arguments and subcommands.
@@ -88,14 +92,14 @@ class ZoomGroup(click.Group):
 
     def parse_args(self, ctx, args):
         """Check if first arg is numeric; if so, treat as zoom level, not subcommand."""
-        if args and not args[0].startswith('-'):
+        if args and not args[0].startswith("-"):
             first = args[0]
             # If it looks numeric, it's a zoom level — not a subcommand
             try:
                 float(first)
                 # Store the level and remove from args so the group handles it
                 ctx.ensure_object(dict)
-                ctx.obj['_zoom_level'] = first
+                ctx.obj["_zoom_level"] = first
                 args = args[1:]
             except ValueError:
                 pass  # Not numeric — let Click dispatch to subcommand
@@ -129,8 +133,8 @@ def zoom(ctx, wcag, reflow, as_json):
         return
 
     ctx.ensure_object(dict)
-    ctx.obj['_as_json'] = as_json
-    level_str = ctx.obj.get('_zoom_level')
+    ctx.obj["_as_json"] = as_json
+    level_str = ctx.obj.get("_zoom_level")
 
     from inspekt.core.schemas.display import ZoomSetParams
 
@@ -211,6 +215,7 @@ def zoom_in():
     110%, 125%, 150%, 175%, 200%, 250%, 300%, 400%, 500%.
     """
     from inspekt.core.schemas.display import ZoomSetParams
+
     _set_zoom(ZoomSetParams(action="in"))
 
 
@@ -222,6 +227,7 @@ def zoom_out():
     110%, 125%, 150%, 175%, 200%, 250%, 300%, 400%, 500%.
     """
     from inspekt.core.schemas.display import ZoomSetParams
+
     _set_zoom(ZoomSetParams(action="out"))
 
 
@@ -229,6 +235,7 @@ def zoom_out():
 def reset():
     """Reset zoom to 100%."""
     from inspekt.core.schemas.display import ZoomSetParams
+
     _set_zoom(ZoomSetParams(action="reset"))
 
 
@@ -255,24 +262,24 @@ class ViewportGroup(click.Group):
 
     def parse_args(self, ctx, args):
         """Check if first arg is numeric; if so, consume width (and optional height) before subcommand dispatch."""
-        if args and not args[0].startswith('-'):
+        if args and not args[0].startswith("-"):
             first = args[0]
             try:
                 int(first)
                 # First arg is a number — it's a width value
                 ctx.ensure_object(dict)
-                ctx.obj['_viewport_width'] = first
+                ctx.obj["_viewport_width"] = first
                 args = args[1:]
                 # Check for optional second arg (height or "auto")
-                if args and not args[0].startswith('-'):
+                if args and not args[0].startswith("-"):
                     second = args[0]
-                    if second.lower() == 'auto':
-                        ctx.obj['_viewport_height'] = 'auto'
+                    if second.lower() == "auto":
+                        ctx.obj["_viewport_height"] = "auto"
                         args = args[1:]
                     else:
                         try:
                             int(second)
-                            ctx.obj['_viewport_height'] = second
+                            ctx.obj["_viewport_height"] = second
                             args = args[1:]
                         except ValueError:
                             pass  # Not a number or "auto" — leave for subcommand dispatch
@@ -312,9 +319,9 @@ def viewport(ctx, as_json):
         return
 
     ctx.ensure_object(dict)
-    ctx.obj['_as_json'] = as_json
-    width_str = ctx.obj.get('_viewport_width')
-    height_str = ctx.obj.get('_viewport_height')
+    ctx.obj["_as_json"] = as_json
+    width_str = ctx.obj.get("_viewport_width")
+    height_str = ctx.obj.get("_viewport_height")
 
     if width_str:
         try:
@@ -323,7 +330,7 @@ def viewport(ctx, as_json):
             click.echo(error(f"Invalid width: {width_str}"), err=True)
             sys.exit(1)
 
-        auto_height = bool(height_str and height_str.lower() == 'auto')
+        auto_height = bool(height_str and height_str.lower() == "auto")
         height = None
         if height_str and not auto_height:
             try:
@@ -405,13 +412,16 @@ def _adjust_viewport(delta: int):
 
     new_width = max(320, min(3840, result.width + delta))
     if new_width == result.width:
-        click.echo(warning(f"Already at {'maximum' if delta > 0 else 'minimum'} width ({result.width}px)"))
+        click.echo(
+            warning(f"Already at {'maximum' if delta > 0 else 'minimum'} width ({result.width}px)")
+        )
         return
 
     _set_viewport(new_width)
 
 
 # ── Preset subcommands ─────────────────────────────────────────────────────
+
 
 @viewport.command()
 def mobile():
@@ -442,6 +452,7 @@ def wide():
 
 
 # ── Relative adjustment subcommands ────────────────────────────────────────
+
 
 @viewport.command()
 @click.argument("pixels", required=False, default=VIEWPORT_STEP_DEFAULT, type=int)
@@ -478,6 +489,7 @@ def narrower(pixels):
 
 
 # ── Fit subcommand (VM only) ──────────────────────────────────────────────
+
 
 @viewport.command()
 def fit():

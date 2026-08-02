@@ -164,21 +164,21 @@ def _render_summary_grid(passed: int, failed: int, warnings: int = 0) -> str:
         HTML string for the summary grid
     """
     items = [
-        f'''<div class="summary-item passed">
+        f"""<div class="summary-item passed">
             <span class="summary-count">{passed}</span>
             <span class="summary-label">Passed</span>
-        </div>''',
-        f'''<div class="summary-item failed">
+        </div>""",
+        f"""<div class="summary-item failed">
             <span class="summary-count">{failed}</span>
             <span class="summary-label">Failed</span>
-        </div>''',
+        </div>""",
     ]
 
     if warnings > 0:
-        items.append(f'''<div class="summary-item warnings">
+        items.append(f"""<div class="summary-item warnings">
             <span class="summary-count">{warnings}</span>
             <span class="summary-label">Warnings</span>
-        </div>''')
+        </div>""")
 
     return f'<div class="summary-grid">{"".join(items)}</div>'
 
@@ -217,10 +217,10 @@ PAPER_SIZES = {
 # Score color thresholds for accessibility grading
 SCORE_COLORS = {
     "excellent": "#22c55e",  # 90-100: Green (A)
-    "good": "#84cc16",       # 80-89: Lime (B)
-    "fair": "#eab308",       # 70-79: Yellow (C)
-    "poor": "#f97316",       # 60-69: Orange (D)
-    "failing": "#ef4444",    # 0-59: Red (F)
+    "good": "#84cc16",  # 80-89: Lime (B)
+    "fair": "#eab308",  # 70-79: Yellow (C)
+    "poor": "#f97316",  # 60-69: Orange (D)
+    "failing": "#ef4444",  # 0-59: Red (F)
 }
 
 # Score thresholds (lower bound for each grade)
@@ -233,7 +233,9 @@ SCORE_THRESHOLDS = {
 }
 
 
-def _identify_paper_size(width_pts: float, height_pts: float, tolerance: float = 3.0) -> tuple[str | None, str]:
+def _identify_paper_size(
+    width_pts: float, height_pts: float, tolerance: float = 3.0
+) -> tuple[str | None, str]:
     """
     Identify standard paper size and orientation from dimensions in points.
 
@@ -292,7 +294,7 @@ def _get_page_size_icon_svg(width_pts: float, height_pts: float, size: int = 32)
     return f'''<svg width="{size}" height="{size}" viewBox="0 0 {size} {size}" xmlns="http://www.w3.org/2000/svg">
         <rect x="{x:.1f}" y="{y:.1f}" width="{icon_w:.1f}" height="{icon_h:.1f}"
               fill="{fill_color}" stroke="{stroke_color}" stroke-width="1.5" rx="1"/>
-        <line x1="{x + icon_w/2:.1f}" y1="{y + 2:.1f}" x2="{x + icon_w/2:.1f}" y2="{y + icon_h - 2:.1f}"
+        <line x1="{x + icon_w / 2:.1f}" y1="{y + 2:.1f}" x2="{x + icon_w / 2:.1f}" y2="{y + icon_h - 2:.1f}"
               stroke="{stroke_color}" stroke-width="0.5" stroke-dasharray="2,2" opacity="0.5"/>
     </svg>'''
 
@@ -300,6 +302,7 @@ def _get_page_size_icon_svg(width_pts: float, height_pts: float, size: int = 32)
 # =============================================================================
 # Creator/Producer Icons (using pdf_tool_matcher service)
 # =============================================================================
+
 
 def _get_creator_icon(creator: str | None, producer: str | None) -> tuple[str, str | None]:
     """
@@ -321,6 +324,7 @@ def _get_creator_icon(creator: str | None, producer: str | None) -> tuple[str, s
 # =============================================================================
 # Language Detection and Verification
 # =============================================================================
+
 
 def _detect_language_from_text(text: str, sample_size: int = 5000) -> str | None:
     """
@@ -409,16 +413,37 @@ LANGUAGE_NAMES = {
 # Language code to flag emoji mapping
 LANGUAGE_FLAGS = {
     # Base codes → primary country
-    "en": "🇬🇧", "nl": "🇳🇱", "fr": "🇫🇷", "de": "🇩🇪", "es": "🇪🇸",
-    "it": "🇮🇹", "pt": "🇵🇹", "ja": "🇯🇵", "zh": "🇨🇳", "ko": "🇰🇷",
-    "ar": "🇸🇦", "ru": "🇷🇺", "pl": "🇵🇱", "sv": "🇸🇪", "da": "🇩🇰",
-    "no": "🇳🇴", "fi": "🇫🇮",
+    "en": "🇬🇧",
+    "nl": "🇳🇱",
+    "fr": "🇫🇷",
+    "de": "🇩🇪",
+    "es": "🇪🇸",
+    "it": "🇮🇹",
+    "pt": "🇵🇹",
+    "ja": "🇯🇵",
+    "zh": "🇨🇳",
+    "ko": "🇰🇷",
+    "ar": "🇸🇦",
+    "ru": "🇷🇺",
+    "pl": "🇵🇱",
+    "sv": "🇸🇪",
+    "da": "🇩🇰",
+    "no": "🇳🇴",
+    "fi": "🇫🇮",
     # Regional variants
-    "en-US": "🇺🇸", "en-GB": "🇬🇧", "en-AU": "🇦🇺",
-    "nl-NL": "🇳🇱", "nl-BE": "🇧🇪",
-    "fr-FR": "🇫🇷", "fr-BE": "🇧🇪", "fr-CA": "🇨🇦",
-    "de-DE": "🇩🇪", "de-AT": "🇦🇹", "de-CH": "🇨🇭",
-    "pt-BR": "🇧🇷", "pt-PT": "🇵🇹",
+    "en-US": "🇺🇸",
+    "en-GB": "🇬🇧",
+    "en-AU": "🇦🇺",
+    "nl-NL": "🇳🇱",
+    "nl-BE": "🇧🇪",
+    "fr-FR": "🇫🇷",
+    "fr-BE": "🇧🇪",
+    "fr-CA": "🇨🇦",
+    "de-DE": "🇩🇪",
+    "de-AT": "🇦🇹",
+    "de-CH": "🇨🇭",
+    "pt-BR": "🇧🇷",
+    "pt-PT": "🇵🇹",
 }
 
 
@@ -500,7 +525,10 @@ def _format_date_locale_aware(iso_date: str | None, locale: str = "en_GB") -> st
             "%Y-%m-%d",
         ]:
             try:
-                dt = datetime.strptime(iso_date.replace("Z", "+00:00")[:19], fmt[:len(fmt) - (1 if fmt.endswith("%z") else 0)])
+                dt = datetime.strptime(
+                    iso_date.replace("Z", "+00:00")[:19],
+                    fmt[: len(fmt) - (1 if fmt.endswith("%z") else 0)],
+                )
                 break
             except ValueError:
                 continue
@@ -544,7 +572,10 @@ def _format_relative_time(earlier_date: str | None, later_date: str | None) -> s
                 "%Y-%m-%d",
             ]:
                 try:
-                    return datetime.strptime(iso_str.replace("Z", "+00:00")[:19], fmt[:len(fmt) - (1 if fmt.endswith("%z") else 0)])
+                    return datetime.strptime(
+                        iso_str.replace("Z", "+00:00")[:19],
+                        fmt[: len(fmt) - (1 if fmt.endswith("%z") else 0)],
+                    )
                 except ValueError:
                     continue
             return None
@@ -688,12 +719,18 @@ def generate_pdf_report(
     # Names indicate: (local) = no API cost, (AI) = uses API tokens
     step_definitions = [
         ("Create cover preview", config.get("show-cover-page", True) and assets),
-        ("Capture issue screenshots", config.get("show-issue-screenshots", True) and result.verapdf and assets),
+        (
+            "Capture issue screenshots",
+            config.get("show-issue-screenshots", True) and result.verapdf and assets,
+        ),
         ("Analyze text layer (local OCR)", config.get("show-text-discrepancy-section", True)),
         ("Analyze color contrast (OCR)", config.get("check-contrast", False)),
         ("Extract structure tree", True),
         ("Extract images & tables", config.get("show-content-audit", True)),
-        ("Generate thumbnails", config.get("show-content-audit", True) and config.get("show-image-thumbnails", True)),
+        (
+            "Generate thumbnails",
+            config.get("show-content-audit", True) and config.get("show-image-thumbnails", True),
+        ),
         ("Classify images (local ML)", config.get("classify-images", True)),
         ("Generate alt-text (AI)", config.get("generate-alt-text", False)),
         ("Build report", True),
@@ -708,6 +745,7 @@ def generate_pdf_report(
     # Import and setup progress display
     if show_progress:
         from inspekt.app.cli.table import ProgressChecklist
+
         checklist = ProgressChecklist(step_names)
         checklist.start()
 
@@ -717,6 +755,7 @@ def generate_pdf_report(
                 return checklist.step(step_map[orig_index])
             else:
                 from contextlib import nullcontext
+
                 return nullcontext()
 
         def print_substep(msg):
@@ -724,10 +763,13 @@ def generate_pdf_report(
     else:
         # No-op when progress is disabled
         from contextlib import nullcontext
+
         def run_step(idx):
             return nullcontext()
+
         def print_substep(msg):
             return None
+
         checklist = None
 
     # Generate executive summary section (accessibility score)
@@ -831,9 +873,7 @@ def generate_pdf_report(
     )
 
     # Generate content audit section (includes steps 4-7)
-    content_audit_section = _generate_content_audit_section(
-        pdf_path, config, run_step
-    )
+    content_audit_section = _generate_content_audit_section(pdf_path, config, run_step)
 
     # Step 9: Build report - assemble all HTML sections
     with run_step(9):
@@ -870,16 +910,23 @@ def generate_pdf_report(
             <section class="verapdf-results">
                 <h2>PDF/{vera.profile.upper()} Validation</h2>
                 <div class="compliance-status {compliance_class}">
-                    <span class="compliance-icon">{('✓' if vera.compliant else '✗')}</span>
-                    <span class="compliance-text">PDF/{vera.profile.upper()} {compliance_text}</span>
+                    <span class="compliance-icon">{("✓" if vera.compliant else "✗")}</span>
+                    <span class="compliance-text">PDF/{vera.profile.upper()} {
+                compliance_text
+            }</span>
                 </div>
                 <dl class="verapdf-meta">
                     <dt>Passed Rules</dt><dd>{vera.passed_rules}</dd>
                     <dt>Failed Rules</dt><dd>{vera.failed_rules}</dd>
                     <dt>Total Violations</dt><dd>{vera.total_violations}</dd>
-                    {f'<dt>veraPDF Version</dt><dd>{vera.verapdf_version}</dd>' if vera.verapdf_version else ''}
+                    {
+                f"<dt>veraPDF Version</dt><dd>{vera.verapdf_version}</dd>"
+                if vera.verapdf_version
+                else ""
+            }
                 </dl>
-                {f'''
+                {
+                f'''
                 <h3>Violations</h3>
                 <table class="violations-table">
                     <thead>
@@ -895,7 +942,10 @@ def generate_pdf_report(
                     </tbody>
                 </table>
                 {more_violations}
-                ''' if violation_rows else '<p class="no-violations">No violations found!</p>'}
+                '''
+                if violation_rows
+                else '<p class="no-violations">No violations found!</p>'
+            }
             </section>
             """
 
@@ -908,7 +958,7 @@ def generate_pdf_report(
                     remediation_items.append(f"""
                     <div class="remediation-item">
                         <h4>{_escape_html(check.name)}</h4>
-                        <p class="remediation-text">{_escape_html(check_info['remediation'])}</p>
+                        <p class="remediation-text">{_escape_html(check_info["remediation"])}</p>
                     </div>
                     """)
 
@@ -917,7 +967,7 @@ def generate_pdf_report(
             remediation_section = f"""
             <section id="remediation" class="remediation">
                 <h2>Remediation Guidance</h2>
-                {''.join(remediation_items)}
+                {"".join(remediation_items)}
             </section>
             """
 
@@ -964,10 +1014,14 @@ def generate_pdf_report(
                     <span class="summary-count">{summary.failed}</span>
                     <span class="summary-label">Failed</span>
                 </div>
-                {f'''<div class="summary-item warnings">
+                {
+        f'''<div class="summary-item warnings">
                     <span class="summary-count">{summary.warnings}</span>
                     <span class="summary-label">Warnings</span>
-                </div>''' if summary.warnings > 0 else ''}
+                </div>'''
+        if summary.warnings > 0
+        else ""
+    }
             </div>
         </section>
 
@@ -988,7 +1042,7 @@ def generate_pdf_report(
                     </tr>
                 </thead>
                 <tbody>
-                    {''.join(check_rows)}
+                    {"".join(check_rows)}
                 </tbody>
             </table>
         </section>
@@ -1018,7 +1072,9 @@ def generate_pdf_report(
         {disclaimer_section}
 
         <footer>
-            <p>Generated by <a href="https://github.com/roelvangils/inspekt">Inspekt</a> on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</p>
+            <p>Generated by <a href="https://github.com/roelvangils/inspekt">Inspekt</a> on {
+        datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    }</p>
         </footer>
     </div>
     {_get_interactive_js()}
@@ -1032,7 +1088,7 @@ def generate_pdf_report(
             output_path = Path(output_path)
             # Add .html extension if not present
             if not output_path.suffix:
-                output_path = output_path.with_suffix('.html')
+                output_path = output_path.with_suffix(".html")
             output_path.write_text(html_content)
 
             # Clean up orphaned assets
@@ -1559,7 +1615,6 @@ def _get_toc_js() -> str:
     })();
     </script>
     """
-
 
 
 def _generate_disclaimer_section() -> str:
@@ -2541,14 +2596,14 @@ def _generate_executive_summary_section(
             pigeon_path = Path(__file__).parent.parent / "static" / "images" / "elly_party.png"
             if pigeon_path.exists():
                 pigeon_b64 = base64.b64encode(pigeon_path.read_bytes()).decode("utf-8")
-                celebration_html = f'''
+                celebration_html = f"""
                 <div class="celebration-container" aria-hidden="true">
                     <img src="data:image/png;base64,{pigeon_b64}"
                          alt=""
                          class="celebration-pigeon"
                          title="Perfect score! Elly is proud of you!">
                 </div>
-                '''
+                """
         except Exception:
             pass  # Silently skip if image can't be loaded
 
@@ -2574,15 +2629,27 @@ def _generate_executive_summary_section(
     # Severity breakdown
     severity_items = []
     if score.critical_count > 0:
-        severity_items.append(f'<span class="severity-count critical">{score.critical_count} critical</span>')
+        severity_items.append(
+            f'<span class="severity-count critical">{score.critical_count} critical</span>'
+        )
     if score.serious_count > 0:
-        severity_items.append(f'<span class="severity-count serious">{score.serious_count} serious</span>')
+        severity_items.append(
+            f'<span class="severity-count serious">{score.serious_count} serious</span>'
+        )
     if score.moderate_count > 0:
-        severity_items.append(f'<span class="severity-count moderate">{score.moderate_count} moderate</span>')
+        severity_items.append(
+            f'<span class="severity-count moderate">{score.moderate_count} moderate</span>'
+        )
     if score.minor_count > 0:
-        severity_items.append(f'<span class="severity-count minor">{score.minor_count} minor</span>')
+        severity_items.append(
+            f'<span class="severity-count minor">{score.minor_count} minor</span>'
+        )
 
-    severity_html = " ".join(severity_items) if severity_items else '<span class="no-issues">No issues found</span>'
+    severity_html = (
+        " ".join(severity_items)
+        if severity_items
+        else '<span class="no-issues">No issues found</span>'
+    )
 
     # Knockout warning
     knockout_html = ""
@@ -2625,7 +2692,7 @@ def _generate_executive_summary_section(
         <div class="category-breakdown">
             <h3>Score by Category</h3>
             <div class="category-rows">
-                {''.join(category_bars)}
+                {"".join(category_bars)}
             </div>
         </div>
     </section>
@@ -2706,6 +2773,7 @@ def _generate_about_document_section(
     def _author_link(author: str) -> str:
         """Create a DuckDuckGo search link for the author."""
         import urllib.parse
+
         query = urllib.parse.quote(author)
         return f'<a href="https://duckduckgo.com/?q={query}" target="_blank" rel="noopener noreferrer" title="Search for {_escape_html(author)} on DuckDuckGo">{_escape_html(author)}</a>'
 
@@ -2740,24 +2808,26 @@ def _generate_about_document_section(
         basic_items.append(f"<dt>Title</dt><dd>{_escape_html(meta.title)}</dd>")
 
     # 2. Filename (download link, with version warning if multiple versions detected)
-    file_path_str = str(meta.file_path.absolute()) if meta.file_path.is_absolute() else str(meta.file_path)
+    file_path_str = (
+        str(meta.file_path.absolute()) if meta.file_path.is_absolute() else str(meta.file_path)
+    )
     filename_html = f'<a href="{_escape_html(file_path_str)}" download class="download-link">{_escape_html(meta.file_path.name)}</a>'
-    version_count = getattr(meta, 'version_count', 1)
+    version_count = getattr(meta, "version_count", 1)
     if version_count > 1:
-        filename_html += f'''
+        filename_html += f"""
             <small class="file-size-warning">
                 <strong>Note:</strong> This PDF contains {version_count} incremental save versions.
                 Previous versions may contain content that was later modified or removed.
                 Consider using <a href="https://github.com/enferex/pdfresurrect" target="_blank" rel="noopener">pdfresurrect</a>
                 to extract and review embedded versions.
             </small>
-        '''
-    basic_items.append(f'<dt>Filename</dt><dd>{filename_html}</dd>')
+        """
+    basic_items.append(f"<dt>Filename</dt><dd>{filename_html}</dd>")
 
     # 3. File Size (with warning for large files)
     file_size_html = _format_file_size(meta.file_size)
     if meta.file_size > 10 * 1024 * 1024:  # > 10 MB
-        file_size_html += '''
+        file_size_html += """
             <small class="file-size-warning">
                 <strong>Warning:</strong> this file is larger than 10 MB. Depending on the user's internet speed,
                 it may take a while to download, and some email providers may refuse attachments this large.
@@ -2765,7 +2835,7 @@ def _generate_about_document_section(
                 <a href="https://apps.apple.com/us/app/pdf-squeezer-4/id1502111349?mt=12" target="_blank" rel="noopener">PDF Squeezer</a> (Mac App Store)
                 or <a href="https://smallpdf.com/compress-pdf" target="_blank" rel="noopener">Smallpdf</a> (online).
             </small>
-        '''
+        """
     basic_items.append(f"<dt>File Size</dt><dd>{file_size_html}</dd>")
 
     # 4. Pages
@@ -2782,22 +2852,24 @@ def _generate_about_document_section(
             detected_norm = _normalize_language_code(detected_lang)
 
             if declared_norm == detected_norm:
-                lang_html = f'''
+                lang_html = f"""
                 <span class="lang-verified">
                     {flag_html}{_escape_html(lang_display_name)} ({_escape_html(declared_lang)})
                     <span class="lang-check" title="Detected language matches declared language">✓</span>
                 </span>
-                '''
+                """
             else:
                 detected_name = _get_language_display_name(detected_lang)
-                lang_html = f'''
+                lang_html = f"""
                 <span class="lang-mismatch">
                     {flag_html}{_escape_html(lang_display_name)} ({_escape_html(declared_lang)})
                     <span class="lang-warning" title="Detected language ({detected_name}) may differ from declared">⚠</span>
                 </span>
-                '''
+                """
         else:
-            lang_html = f'{flag_html}{_escape_html(lang_display_name)} ({_escape_html(declared_lang)})'
+            lang_html = (
+                f"{flag_html}{_escape_html(lang_display_name)} ({_escape_html(declared_lang)})"
+            )
         basic_items.append(f"<dt>Language</dt><dd>{lang_html}</dd>")
 
     # 6. Author (DuckDuckGo link)
@@ -2821,28 +2893,34 @@ def _generate_about_document_section(
 
         # Dimensions with data attributes for toggle
         size_inches = f'{w_in:.1f}" × {h_in:.1f}"'
-        size_cm = f'{w_cm:.1f} × {h_cm:.1f} cm'
-        dimensions_html = f'''<span class="page-size-dimensions" data-size-inches='{size_inches}' data-size-cm='{size_cm}' data-current-unit="inches">{size_inches}</span>'''
+        size_cm = f"{w_cm:.1f} × {h_cm:.1f} cm"
+        dimensions_html = f"""<span class="page-size-dimensions" data-size-inches='{size_inches}' data-size-cm='{size_cm}' data-current-unit="inches">{size_inches}</span>"""
         size_parts.append(dimensions_html)
-        size_parts.append(f'<span class="orientation-badge orientation-{orientation}">{orientation.capitalize()}</span>')
-        size_parts.append('<button type="button" class="page-size-toggle" onclick="togglePageSizeUnit(this)">Show in cm</button>')
+        size_parts.append(
+            f'<span class="orientation-badge orientation-{orientation}">{orientation.capitalize()}</span>'
+        )
+        size_parts.append(
+            '<button type="button" class="page-size-toggle" onclick="togglePageSizeUnit(this)">Show in cm</button>'
+        )
 
-        page_size_html = f'''
+        page_size_html = f"""
         <span class="page-size-display">
             <span class="page-size-icon">{size_icon}</span>
             <span class="page-size-info">{" · ".join(size_parts)}</span>
         </span>
-        '''
+        """
         basic_items.append(f"<dt>Page Size</dt><dd>{page_size_html}</dd>")
 
     # 8. Created with (tool icon + name)
     if meta.creator or meta.producer:
-        creator_icon, tool_name, accessibility_docs_url = get_creator_info(meta.creator, meta.producer)
+        creator_icon, tool_name, accessibility_docs_url = get_creator_info(
+            meta.creator, meta.producer
+        )
 
         # Build the docs link icon if we have a URL
         docs_link_html = ""
         if accessibility_docs_url:
-            docs_link_html = f'''<a href="{_escape_html(accessibility_docs_url)}" class="creator-docs-link" target="_blank" rel="noopener" title="View accessibility documentation for {_escape_html(tool_name or 'this tool')}">
+            docs_link_html = f'''<a href="{_escape_html(accessibility_docs_url)}" class="creator-docs-link" target="_blank" rel="noopener" title="View accessibility documentation for {_escape_html(tool_name or "this tool")}">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
                     <path d="M12 7v6M12 16v1" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
@@ -2850,9 +2928,9 @@ def _generate_about_document_section(
             </a>'''
 
         if tool_name:
-            creator_display = f'''<span class="creator-with-icon">{creator_icon} <span class="creator-name">{_escape_html(tool_name)}</span>{docs_link_html}</span>'''
+            creator_display = f"""<span class="creator-with-icon">{creator_icon} <span class="creator-name">{_escape_html(tool_name)}</span>{docs_link_html}</span>"""
         else:
-            creator_display = f'''<span class="creator-with-icon">{creator_icon} {_escape_html(meta.creator or meta.producer)}</span>'''
+            creator_display = f"""<span class="creator-with-icon">{creator_icon} {_escape_html(meta.creator or meta.producer)}</span>"""
         basic_items.append(f"<dt>Created with</dt><dd>{creator_display}</dd>")
 
     # 9. Created (locale-aware)
@@ -2865,7 +2943,9 @@ def _generate_about_document_section(
         relative_time = _format_relative_time(meta.creation_date, meta.modification_date)
         if relative_time:  # Only show if different from creation date
             display_date = _format_date_locale_aware(meta.modification_date)
-            basic_items.append(f'<dt>Modified</dt><dd>{_escape_html(display_date)}<br><span class="relative-time">{_escape_html(relative_time)}</span></dd>')
+            basic_items.append(
+                f'<dt>Modified</dt><dd>{_escape_html(display_date)}<br><span class="relative-time">{_escape_html(relative_time)}</span></dd>'
+            )
 
     # ==========================================================================
     # Group 2: Extended details (collapsible "Show more")
@@ -2884,14 +2964,16 @@ def _generate_about_document_section(
         extended_items.append(f"<dt>Producer</dt><dd>{_escape_html(meta.producer)}</dd>")
 
     # Linearized status
-    is_linearized = getattr(meta, 'is_linearized', False)
+    is_linearized = getattr(meta, "is_linearized", False)
     if is_linearized:
-        extended_items.append('<dt>Linearized</dt><dd><span class="bool-true">✓ Yes</span> <span class="help-text">(optimized for web)</span></dd>')
+        extended_items.append(
+            '<dt>Linearized</dt><dd><span class="bool-true">✓ Yes</span> <span class="help-text">(optimized for web)</span></dd>'
+        )
     else:
         extended_items.append('<dt>Linearized</dt><dd><span class="bool-false">✗ No</span></dd>')
 
     # Trapped status
-    trapped = getattr(meta, 'trapped', None)
+    trapped = getattr(meta, "trapped", None)
     if trapped:
         if trapped == "True":
             trapped_display = '<span class="bool-true">✓ Yes</span>'
@@ -2905,10 +2987,12 @@ def _generate_about_document_section(
         extended_items.append('<dt>Encrypted</dt><dd><span class="bool-true">✓ Yes</span> ⚠</dd>')
 
     # XMP metadata highlights - PDF/A conformance
-    xmp_metadata = getattr(meta, 'xmp_metadata', None)
+    xmp_metadata = getattr(meta, "xmp_metadata", None)
     if xmp_metadata:
         if "pdfa_conformance" in xmp_metadata:
-            extended_items.append(f'<dt>PDF/A</dt><dd><span class="ua-badge">{_escape_html(xmp_metadata["pdfa_conformance"])}</span></dd>')
+            extended_items.append(
+                f'<dt>PDF/A</dt><dd><span class="ua-badge">{_escape_html(xmp_metadata["pdfa_conformance"])}</span></dd>'
+            )
 
     # Custom metadata fields with special styling
     # Fields to style with <code>: tanDocumentId, tanDocumentVersionId, tanDocumentType
@@ -2916,7 +3000,7 @@ def _generate_about_document_section(
     CODE_STYLED_FIELDS = {"tanDocumentId", "tanDocumentVersionId", "tanDocumentType"}
     BOOLEAN_FIELDS = {"tanUserGenerated"}
 
-    custom_metadata = getattr(meta, 'custom_metadata', None)
+    custom_metadata = getattr(meta, "custom_metadata", None)
     if custom_metadata:
         for key, value in custom_metadata.items():
             # Truncate long values
@@ -2924,16 +3008,24 @@ def _generate_about_document_section(
 
             # Check if it's a code-styled field
             if key in CODE_STYLED_FIELDS:
-                extended_items.append(f'<dt>{_escape_html(key)}</dt><dd><code class="metadata-code">{_escape_html(display_value)}</code></dd>')
+                extended_items.append(
+                    f'<dt>{_escape_html(key)}</dt><dd><code class="metadata-code">{_escape_html(display_value)}</code></dd>'
+                )
             # Check if it's a boolean field
             elif key in BOOLEAN_FIELDS or value.lower() in ("true", "false", "yes", "no", "1", "0"):
                 is_true = value.lower() in ("true", "yes", "1")
                 if is_true:
-                    extended_items.append(f'<dt>{_escape_html(key)}</dt><dd><span class="bool-true">✓ Yes</span></dd>')
+                    extended_items.append(
+                        f'<dt>{_escape_html(key)}</dt><dd><span class="bool-true">✓ Yes</span></dd>'
+                    )
                 else:
-                    extended_items.append(f'<dt>{_escape_html(key)}</dt><dd><span class="bool-false">✗ No</span></dd>')
+                    extended_items.append(
+                        f'<dt>{_escape_html(key)}</dt><dd><span class="bool-false">✗ No</span></dd>'
+                    )
             else:
-                extended_items.append(f"<dt>{_escape_html(key)}</dt><dd>{_escape_html(display_value)}</dd>")
+                extended_items.append(
+                    f"<dt>{_escape_html(key)}</dt><dd>{_escape_html(display_value)}</dd>"
+                )
 
     # ==========================================================================
     # Group 3: Accessibility
@@ -2944,6 +3036,7 @@ def _generate_about_document_section(
     is_tagged = False
     try:
         import pikepdf
+
         with pikepdf.open(pdf_path) as pdf:
             is_tagged = "/StructTreeRoot" in pdf.Root
     except Exception:
@@ -2958,7 +3051,9 @@ def _generate_about_document_section(
     # PDF/UA
     if meta.has_ua_marker:
         level = meta.conformance_level or "PDF/UA"
-        a11y_items.append(f'<dt>PDF/UA</dt><dd><span class="ua-badge">{_escape_html(level)}</span></dd>')
+        a11y_items.append(
+            f'<dt>PDF/UA</dt><dd><span class="ua-badge">{_escape_html(level)}</span></dd>'
+        )
     else:
         a11y_items.append('<dt>PDF/UA</dt><dd><span class="not-set">Not declared</span></dd>')
 
@@ -2974,42 +3069,44 @@ def _generate_about_document_section(
             detected_name = _get_language_display_name(detected_lang)
 
             if declared_norm == detected_norm:
-                lang_html = f'''
+                lang_html = f"""
                 <span class="lang-verified">
                     {flag_html}{_escape_html(lang_display_name)}
                     <span class="lang-check" title="Detected language matches declared language">✓</span>
                 </span>
-                '''
+                """
             else:
-                lang_html = f'''
+                lang_html = f"""
                 <span class="lang-mismatch">
                     {flag_html}{_escape_html(lang_display_name)}
                     <span class="lang-warning" title="Detected language ({detected_name}) may differ from declared">⚠</span>
                 </span>
                 <span class="lang-detected">Detected: {_escape_html(detected_name or detected_lang)}</span>
-                '''
+                """
         else:
-            lang_html = f'{flag_html}{_escape_html(lang_display_name)}'
+            lang_html = f"{flag_html}{_escape_html(lang_display_name)}"
         a11y_items.append(f"<dt>Language</dt><dd>{lang_html}</dd>")
     else:
         if detected_lang:
             detected_name = _get_language_display_name(detected_lang)
-            a11y_items.append(f'''
+            a11y_items.append(f"""
             <dt>Language</dt>
             <dd>
                 <span class="not-set">Not specified</span>
                 <span class="lang-detected">Detected: {_escape_html(detected_name or detected_lang)}</span>
             </dd>
-            ''')
+            """)
         else:
-            a11y_items.append('<dt>Language</dt><dd><span class="not-set">Not specified</span></dd>')
+            a11y_items.append(
+                '<dt>Language</dt><dd><span class="not-set">Not specified</span></dd>'
+            )
 
     # Structure statistics: Headings
     if structure_stats["heading_count"] > 0:
-        heading_text = f'{structure_stats["heading_count"]} headings'
+        heading_text = f"{structure_stats['heading_count']} headings"
         if structure_stats["heading_depth"] > 0:
-            heading_text += f', {structure_stats["heading_depth"]} levels deep'
-        a11y_items.append(f'<dt>Headings</dt><dd>{heading_text}</dd>')
+            heading_text += f", {structure_stats['heading_depth']} levels deep"
+        a11y_items.append(f"<dt>Headings</dt><dd>{heading_text}</dd>")
     elif is_tagged:
         a11y_items.append('<dt>Headings</dt><dd><span class="not-set">None found</span></dd>')
 
@@ -3018,24 +3115,26 @@ def _generate_about_document_section(
         if structure_stats["images_without_alt"] > 0:
             image_html = f'{structure_stats["image_count"]} images <span class="structure-stat-warn">({structure_stats["images_without_alt"]} without alt text)</span>'
         else:
-            image_html = f'{structure_stats["image_count"]} images, all with alt text ✓'
-        a11y_items.append(f'<dt>Images</dt><dd>{image_html}</dd>')
+            image_html = f"{structure_stats['image_count']} images, all with alt text ✓"
+        a11y_items.append(f"<dt>Images</dt><dd>{image_html}</dd>")
 
     # Structure statistics: Content (tables, lists, forms)
     content_parts = []
     if structure_stats["table_count"] > 0:
-        content_parts.append(f'tables ({structure_stats["table_count"]})')
+        content_parts.append(f"tables ({structure_stats['table_count']})")
     if structure_stats["list_count"] > 0:
-        content_parts.append(f'lists ({structure_stats["list_count"]})')
+        content_parts.append(f"lists ({structure_stats['list_count']})")
     if structure_stats["form_field_count"] > 0:
-        content_parts.append(f'form fields ({structure_stats["form_field_count"]})')
+        content_parts.append(f"form fields ({structure_stats['form_field_count']})")
 
     if content_parts:
-        a11y_items.append(f'<dt>Content</dt><dd>Contains {", ".join(content_parts)}</dd>')
+        a11y_items.append(f"<dt>Content</dt><dd>Contains {', '.join(content_parts)}</dd>")
 
     # OCR Quality warning
     if meta.has_suspects_flag:
-        a11y_items.append('<dt>OCR Quality</dt><dd><span class="suspects-warning">⚠ Document may have OCR errors</span></dd>')
+        a11y_items.append(
+            '<dt>OCR Quality</dt><dd><span class="suspects-warning">⚠ Document may have OCR errors</span></dd>'
+        )
 
     # Build the "Show more" details section
     show_more_html = ""
@@ -3043,7 +3142,7 @@ def _generate_about_document_section(
         show_more_html = f"""
         <details class="metadata-details">
             <summary>Show more details</summary>
-            <dl>{''.join(extended_items)}</dl>
+            <dl>{"".join(extended_items)}</dl>
         </details>
         """
 
@@ -3052,16 +3151,16 @@ def _generate_about_document_section(
     <section id="about" class="about-document">
         <h2>About This Document</h2>
         <div class="about-layout">
-            {f'<div class="about-cover">{cover_html}</div>' if cover_html else ''}
+            {f'<div class="about-cover">{cover_html}</div>' if cover_html else ""}
             <div class="about-metadata">
                 <div class="metadata-group">
                     <h3>Basic Information</h3>
-                    <dl>{''.join(basic_items)}</dl>
+                    <dl>{"".join(basic_items)}</dl>
                     {show_more_html}
                 </div>
                 <div class="metadata-group">
                     <h3>Accessibility</h3>
-                    <dl>{''.join(a11y_items)}</dl>
+                    <dl>{"".join(a11y_items)}</dl>
                 </div>
             </div>
         </div>
@@ -3097,7 +3196,7 @@ def _generate_issue_screenshots_section(
             <img src="{viz.screenshot_path}" alt="Screenshot of issue: {_escape_html(viz.rule_id)}" loading="lazy">
             <div class="issue-card-body">
                 <h4 class="issue-card-title">{_escape_html(viz.rule_id)}</h4>
-                <p class="issue-card-desc">{_escape_html(viz.description[:150])}{'…' if len(viz.description) > 150 else ''}</p>
+                <p class="issue-card-desc">{_escape_html(viz.description[:150])}{"…" if len(viz.description) > 150 else ""}</p>
                 <p class="issue-card-page">Page {viz.page_num + 1}</p>
             </div>
         </div>
@@ -3110,7 +3209,7 @@ def _generate_issue_screenshots_section(
             Visual preview of accessibility issues found in the document
         </p>
         <div class="issue-gallery">
-            {''.join(cards)}
+            {"".join(cards)}
         </div>
     </section>
     """
@@ -3127,7 +3226,7 @@ def _generate_text_discrepancy_section(pdf_path: Path | str, config: dict) -> st
         <section id="text-analysis" class="text-analysis">
             <h2>Text Layer Analysis</h2>
             <div class="ocr-unavailable">
-                <p>OCR comparison unavailable: {_escape_html(result.unavailable_reason or 'Unknown error')}</p>
+                <p>OCR comparison unavailable: {_escape_html(result.unavailable_reason or "Unknown error")}</p>
                 <p><em>Install Tesseract OCR to enable text layer comparison.</em></p>
             </div>
         </section>
@@ -3141,7 +3240,7 @@ def _generate_text_discrepancy_section(pdf_path: Path | str, config: dict) -> st
     if result.is_sampled:
         sampling_notice_html = f"""
         <div class="sampling-notice">
-            <span class="sampling-notice-title"><span class="material-icons">analytics</span> Sampled Analysis:</span> {_escape_html(result.sampling_description or '')}
+            <span class="sampling-notice-title"><span class="material-icons">analytics</span> Sampled Analysis:</span> {_escape_html(result.sampling_description or "")}
             <p class="sampling-notice-text">
                 For large documents, a representative sample of pages is analyzed (first 10, last 5, plus random middle pages).
                 Use <code class="sampling-notice-code">--ocr-all-pages</code> to analyze every page.
@@ -3199,7 +3298,7 @@ def _generate_text_discrepancy_section(pdf_path: Path | str, config: dict) -> st
             tabs_html.append(
                 f'<button class="{tab_class}" data-page="{page.page_num + 1}" '
                 f'aria-selected="{str(is_first).lower()}">'
-                f'Page {page.page_num + 1}{warning_indicator}</button>'
+                f"Page {page.page_num + 1}{warning_indicator}</button>"
             )
 
             # Panel content
@@ -3207,7 +3306,13 @@ def _generate_text_discrepancy_section(pdf_path: Path | str, config: dict) -> st
             if is_first:
                 panel_class += " active"
 
-            similarity_class = "good" if page.similarity >= 0.9 else "warning" if page.similarity >= 0.7 else "poor"
+            similarity_class = (
+                "good"
+                if page.similarity >= 0.9
+                else "warning"
+                if page.similarity >= 0.7
+                else "poor"
+            )
 
             # Generate diff HTML if available
             diff_html = ""
@@ -3264,11 +3369,11 @@ def _generate_text_discrepancy_section(pdf_path: Path | str, config: dict) -> st
                 <div class="text-comparison">
                     <div class="text-column pdf-text">
                         <h4>PDF Text Layer</h4>
-                        <pre>{_escape_html(page.pdf_text) if page.pdf_text else '<em>No text extracted</em>'}</pre>
+                        <pre>{_escape_html(page.pdf_text) if page.pdf_text else "<em>No text extracted</em>"}</pre>
                     </div>
                     <div class="text-column ocr-text">
                         <h4>OCR Result</h4>
-                        <pre>{_escape_html(page.ocr_text) if page.ocr_text else '<em>No text detected</em>'}</pre>
+                        <pre>{_escape_html(page.ocr_text) if page.ocr_text else "<em>No text detected</em>"}</pre>
                     </div>
                 </div>
                 {diff_html}
@@ -3280,12 +3385,12 @@ def _generate_text_discrepancy_section(pdf_path: Path | str, config: dict) -> st
             <div class="page-nav-container">
                 <button class="nav-arrow prev" onclick="navigatePage(-1)" aria-label="Previous page">‹</button>
                 <div class="page-tabs vertical">
-                    {''.join(tabs_html)}
+                    {"".join(tabs_html)}
                 </div>
                 <button class="nav-arrow next" onclick="navigatePage(1)" aria-label="Next page">›</button>
             </div>
             <div class="tab-content">
-                {''.join(panels_html)}
+                {"".join(panels_html)}
             </div>
         </div>
         """
@@ -3359,7 +3464,7 @@ def _generate_contrast_section(
             <p class="success-message">
                 <span class="status-pass">✓</span>
                 No contrast issues detected in {contrast_result.total_text_regions} text regions
-                across {contrast_result.total_pages_analyzed} page{'s' if contrast_result.total_pages_analyzed != 1 else ''}.
+                across {contrast_result.total_pages_analyzed} page{"s" if contrast_result.total_pages_analyzed != 1 else ""}.
             </p>
         </section>
         """
@@ -3402,9 +3507,9 @@ def _generate_contrast_section(
     <section id="contrast" class="contrast-analysis collapsible">
         <h2>Color Contrast Analysis</h2>
         <p class="section-summary">
-            Found <strong>{contrast_result.total_issues}</strong> contrast issue{'s' if contrast_result.total_issues != 1 else ''}
+            Found <strong>{contrast_result.total_issues}</strong> contrast issue{"s" if contrast_result.total_issues != 1 else ""}
             ({contrast_result.serious_issues} serious, {contrast_result.moderate_issues} moderate)
-            across {pages_with_issues} of {contrast_result.total_pages_analyzed} page{'s' if contrast_result.total_pages_analyzed != 1 else ''} analyzed.
+            across {pages_with_issues} of {contrast_result.total_pages_analyzed} page{"s" if contrast_result.total_pages_analyzed != 1 else ""} analyzed.
         </p>
         <div class="contrast-legend">
             <span class="legend-item"><span class="severity-badge serious">serious</span> Ratio &lt; {3.375:.2f}:1 (below 75% of requirement)</span>
@@ -3424,7 +3529,7 @@ def _generate_contrast_section(
                     </tr>
                 </thead>
                 <tbody>
-                    {''.join(issue_rows)}
+                    {"".join(issue_rows)}
                 </tbody>
             </table>
         </div>
@@ -3491,7 +3596,11 @@ def _generate_structure_tree_section(
 
         # Build tree HTML (with optional figure thumbnails for tooltips)
         figure_thumbnails = {}  # TODO: Populate from image extraction if available
-        tree_html = _build_tree_html(result.root, figure_thumbnails=figure_thumbnails) if result.root else ""
+        tree_html = (
+            _build_tree_html(result.root, figure_thumbnails=figure_thumbnails)
+            if result.root
+            else ""
+        )
 
         # Statistics summary
         stats = result.statistics
@@ -3523,7 +3632,9 @@ def _generate_structure_tree_section(
         # Validation issues
         validation_html = ""
         if result.validation.issues:
-            issues_list = "".join(f"<li>{_escape_html(issue)}</li>" for issue in result.validation.issues)
+            issues_list = "".join(
+                f"<li>{_escape_html(issue)}</li>" for issue in result.validation.issues
+            )
             validation_html = f"""
             <div class="validation-issues">
                 <h4>⚠ Structure Issues</h4>
@@ -3633,18 +3744,17 @@ def _build_tree_html(node, depth: int = 0, figure_thumbnails: dict | None = None
         content += ' <span class="tag-warning">⚠</span>'
 
     if not node.children:
-        return f'<li>{content}</li>'
+        return f"<li>{content}</li>"
 
     children_html = "".join(
-        _build_tree_html(child, depth + 1, figure_thumbnails)
-        for child in node.children[:20]
+        _build_tree_html(child, depth + 1, figure_thumbnails) for child in node.children[:20]
     )
     if len(node.children) > 20:
         children_html += f'<li class="more-items">... and {len(node.children) - 20} more</li>'
 
     return f"""
     <li>
-        <details{' open' if depth < 2 else ''}>
+        <details{" open" if depth < 2 else ""}>
             <summary>{content}</summary>
             <ul>{children_html}</ul>
         </details>
@@ -3709,7 +3819,7 @@ def _generate_tag_visualization_section(
             # Page panel
             image_html = ""
             if viz.image_base64:
-                image_html = f'''
+                image_html = f"""
                     <img src="data:image/png;base64,{viz.image_base64}"
                          alt="Tag visualization for page {viz.display_page}"
                          class="tag-viz-image lightbox-trigger"
@@ -3717,9 +3827,11 @@ def _generate_tag_visualization_section(
                          data-lightbox-caption="Tag Visualization - Page {viz.display_page}"
                          loading="lazy"
                          style="max-width: 100%; height: auto; border: 1px solid #e5e7eb; border-radius: 8px;">
-                '''
+                """
             else:
-                image_html = '<p class="no-tags">No tags with bounding boxes found on this page.</p>'
+                image_html = (
+                    '<p class="no-tags">No tags with bounding boxes found on this page.</p>'
+                )
 
             page_panels.append(f'''
                 <div class="tag-viz-panel {is_active}" data-page="{viz.page_num}">
@@ -3736,23 +3848,23 @@ def _generate_tag_visualization_section(
 
         for tag_type in sorted(used_tags):
             color = TAG_COLORS.get(tag_type, TAG_COLORS.get("Unknown", "#9ca3af"))
-            legend_items.append(f'''
+            legend_items.append(f"""
                 <span class="legend-item" style="display: inline-flex; align-items: center; gap: 4px; margin-right: 12px;">
                     <span style="width: 12px; height: 12px; background: {color}; border-radius: 2px;"></span>
                     <span style="font-size: 0.85rem;">{tag_type}</span>
                 </span>
-            ''')
+            """)
 
-        legend_html = f'''
+        legend_html = f"""
             <div class="tag-legend" style="margin-top: 1rem; padding: 0.75rem; background: #f9fafb; border-radius: 6px; line-height: 2;">
                 <strong style="font-size: 0.85rem; color: #4b5563;">Legend:</strong>
-                {''.join(legend_items[:20])}
-                {f'<span style="color: #6b7280; font-size: 0.85rem;">... and {len(legend_items) - 20} more</span>' if len(legend_items) > 20 else ''}
+                {"".join(legend_items[:20])}
+                {f'<span style="color: #6b7280; font-size: 0.85rem;">... and {len(legend_items) - 20} more</span>' if len(legend_items) > 20 else ""}
             </div>
-        '''
+        """
 
         # JavaScript for tab switching
-        tab_js = '''
+        tab_js = """
         <script>
         function showTagVizPage(pageNum) {
             // Update tabs
@@ -3765,9 +3877,9 @@ def _generate_tag_visualization_section(
             });
         }
         </script>
-        '''
+        """
 
-        return f'''
+        return f"""
         <section id="tag-visualization" class="tag-visualization collapsible">
             <h2 class="section-header"><span class="icon icon-eye"></span>Tag Structure Visualization</h2>
             <div class="section-content">
@@ -3777,11 +3889,11 @@ def _generate_tag_visualization_section(
                 </p>
 
                 <div class="tag-viz-tabs" style="display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem;">
-                    {''.join(tab_buttons)}
+                    {"".join(tab_buttons)}
                 </div>
 
                 <div class="tag-viz-container" style="position: relative;">
-                    {''.join(page_panels)}
+                    {"".join(page_panels)}
                 </div>
 
                 {legend_html}
@@ -3822,7 +3934,7 @@ def _generate_tag_visualization_section(
                 cursor: zoom-in;
             }}
         </style>
-        '''
+        """
 
     except ImportError as e:
         logger.warning(f"Tag visualization dependencies not available: {e}")
@@ -3881,7 +3993,9 @@ def _generate_interactive_preview_section(
         assets_rel_path = None
 
         if external_assets:
-            output_path_obj = PathLib(output_path) if not isinstance(output_path, PathLib) else output_path
+            output_path_obj = (
+                PathLib(output_path) if not isinstance(output_path, PathLib) else output_path
+            )
             # Create assets folder: report.html → report_assets/
             assets_base_dir = output_path_obj.parent / f"{output_path_obj.stem}_assets"
             thumbnails_dir = assets_base_dir / "thumbnails"
@@ -3911,6 +4025,7 @@ def _generate_interactive_preview_section(
             # Collect page data
             pages_data = []
             import fitz
+
             dpi = 150
             zoom = dpi / 72
 
@@ -3948,8 +4063,12 @@ def _generate_interactive_preview_section(
                     thumb_src = f"{assets_rel_path}/thumbnails/{thumb_filename}"
                 else:
                     # Embed as base64 (default behavior)
-                    image_src = f"data:image/png;base64,{base64.b64encode(image_bytes).decode('utf-8')}"
-                    thumb_src = f"data:image/png;base64,{base64.b64encode(thumb_bytes).decode('utf-8')}"
+                    image_src = (
+                        f"data:image/png;base64,{base64.b64encode(image_bytes).decode('utf-8')}"
+                    )
+                    thumb_src = (
+                        f"data:image/png;base64,{base64.b64encode(thumb_bytes).decode('utf-8')}"
+                    )
 
                 # Convert tags to JSON-serializable format
                 tags_json = []
@@ -3973,15 +4092,17 @@ def _generate_interactive_preview_section(
 
                     tags_json.append(tag_data)
 
-                pages_data.append({
-                    "page_num": page_num,
-                    "page_width": page_width,
-                    "page_height": page_height,
-                    "image_src": image_src,
-                    "thumb_src": thumb_src,
-                    "tags": tags_json,
-                    "tag_count": len(tags_json),
-                })
+                pages_data.append(
+                    {
+                        "page_num": page_num,
+                        "page_width": page_width,
+                        "page_height": page_height,
+                        "image_src": image_src,
+                        "thumb_src": thumb_src,
+                        "tags": tags_json,
+                        "tag_count": len(tags_json),
+                    }
+                )
 
         if not pages_data:
             return ""
@@ -4012,12 +4133,12 @@ def _generate_interactive_preview_section(
             prev_btn_html = (
                 '<button class="preview-nav-btn prev-btn" data-action="prev-page" disabled aria-label="Previous page">'
                 '<span class="material-icons">chevron_left</span>'
-                '</button>'
+                "</button>"
             )
             next_btn_html = (
                 '<button class="preview-nav-btn next-btn" data-action="next-page" aria-label="Next page">'
                 '<span class="material-icons">chevron_right</span>'
-                '</button>'
+                "</button>"
             )
 
         # Page tabs with thumbnails (all rendered, visibility controlled by JS)
@@ -4036,14 +4157,14 @@ def _generate_interactive_preview_section(
                 f'<img class="page-thumb" src="{thumb_src_value}" alt="Page {page_num_display} preview">'
                 f'<span class="page-badge">{page_num_display}</span>'
                 f'<span class="tag-count"><span class="material-icons">sell</span>{tag_count}</span>'
-                f'</button>'
+                f"</button>"
             )
 
         # Combine into structured HTML
         page_tabs_html = f'''
             {prev_btn_html}
             <div class="page-tabs-window" data-max-visible="{max_visible_thumbs}">
-                {''.join(page_tabs)}
+                {"".join(page_tabs)}
             </div>
             {next_btn_html}
         '''
@@ -4060,12 +4181,12 @@ def _generate_interactive_preview_section(
         # Hint about more pages
         more_pages_hint = ""
         if not showing_all and total_pages > len(pages_to_render):
-            more_pages_hint = f'''
+            more_pages_hint = f"""
                 <div class="preview-hint" style="margin-top: 1rem; padding: 0.75rem 1rem; background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 6px; font-size: 0.875rem; color: #0369a1;">
                     <strong>💡 Tip:</strong> Showing {len(pages_to_render)} of {total_pages} pages.
                     To include more pages, use <code>--interactive-pages {total_pages}</code> or <code>--interactive-pages 0</code> for all pages.
                 </div>
-            '''
+            """
 
         # Prepare JSON data for JavaScript (must be done outside the f-string)
         # Uses pre-computed src values (either file paths or data URIs)
@@ -4077,7 +4198,7 @@ def _generate_interactive_preview_section(
                 "pageWidth": pd["page_width"],
                 "pageHeight": pd["page_height"],
                 "pageNum": pd["page_num"] + 1,  # 1-indexed for display
-                "dpi": dpi
+                "dpi": dpi,
             }
             for pd in pages_data
         ]
@@ -4107,7 +4228,7 @@ def _generate_interactive_preview_section(
                 </div>
 
                 <div class="preview-pages-wrapper">
-                    {''.join(page_containers)}
+                    {"".join(page_containers)}
                 </div>
 
                 <div class="preview-keyboard-hints" style="margin-top: 1rem; font-size: 0.875rem; color: #6b7280;">
@@ -4628,6 +4749,7 @@ def _generate_interactive_preview_section(
     except Exception as e:
         logger.warning(f"Failed to generate interactive preview: {e}")
         import traceback
+
         traceback.print_exc()
         return ""
 
@@ -4650,6 +4772,7 @@ def _generate_content_audit_section(
     # Create no-op run_step if not provided
     if run_step is None:
         from contextlib import nullcontext
+
         def run_step(idx):
             return nullcontext()
 
@@ -4689,7 +4812,9 @@ def _generate_content_audit_section(
                     # Apply limit (0 = unlimited)
                     images_to_classify = result.images
                     if max_classification > 0 and len(result.images) > max_classification:
-                        logger.info(f"Limiting classification to first {max_classification} of {len(result.images)} images")
+                        logger.info(
+                            f"Limiting classification to first {max_classification} of {len(result.images)} images"
+                        )
                         images_to_classify = result.images[:max_classification]
                     else:
                         logger.info(f"Classifying {len(result.images)} images…")
@@ -4711,13 +4836,18 @@ def _generate_content_audit_section(
                     # Get document title for context
                     try:
                         import pikepdf
+
                         with pikepdf.open(pdf_path) as pdf:
                             doc_title = str(pdf.docinfo.get("/Title", "")) or None
                     except Exception:
                         doc_title = None
 
-                    images_for_alt = result.images[:max_alt_text] if max_alt_text > 0 else result.images
-                    logger.info(f"Generating AI alt-text suggestions for {len(images_for_alt)} images…")
+                    images_for_alt = (
+                        result.images[:max_alt_text] if max_alt_text > 0 else result.images
+                    )
+                    logger.info(
+                        f"Generating AI alt-text suggestions for {len(images_for_alt)} images…"
+                    )
                     auditor.generate_alt_text_suggestions(
                         images_for_alt,
                         ai_provider=ai_provider,
@@ -4774,19 +4904,29 @@ def _generate_content_audit_section(
                         <a href="{pdf_file_url}#page={page_num}" target="_blank" title="Open page {page_num} in PDF">
                             Page {page_num} <span class="external-link-icon">↗</span>
                         </a>
-                        <span style="color: var(--text-secondary); font-weight: normal; margin-left: 1rem;">({len(page_images)} image{'s' if len(page_images) != 1 else ''})</span>
+                        <span style="color: var(--text-secondary); font-weight: normal; margin-left: 1rem;">({len(page_images)} image{"s" if len(page_images) != 1 else ""})</span>
                     </td>
                 </tr>
                 ''')
 
                 for img in page_images:
-                    status_icon = "✓" if img.status == "pass" else "✗" if img.status == "fail" else "○"
+                    status_icon = (
+                        "✓" if img.status == "pass" else "✗" if img.status == "fail" else "○"
+                    )
                     status_class = f"status-{img.status}"
 
                     # Determine alt text status for filtering
-                    alt_status = "decorative" if img.is_decorative else ("available" if img.has_alt_text else "missing")
+                    alt_status = (
+                        "decorative"
+                        if img.is_decorative
+                        else ("available" if img.has_alt_text else "missing")
+                    )
 
-                    alt_display = _escape_html(img.alt_text[:50]) if img.alt_text else '<span class="missing">Missing</span>'
+                    alt_display = (
+                        _escape_html(img.alt_text[:50])
+                        if img.alt_text
+                        else '<span class="missing">Missing</span>'
+                    )
                     if img.is_decorative:
                         alt_display = '<span class="decorative">Decorative</span>'
 
@@ -4799,7 +4939,11 @@ def _generate_content_audit_section(
                             if img.lightbox_base64
                             else thumb_src
                         )
-                        alt_text = _escape_html(img.alt_text) if img.alt_text else f"Image on page {img.display_page}"
+                        alt_text = (
+                            _escape_html(img.alt_text)
+                            if img.alt_text
+                            else f"Image on page {img.display_page}"
+                        )
                         thumbnail_html = f'''<img src="{thumb_src}" alt="Preview" class="image-thumbnail lightbox-trigger"
                             data-lightbox-src="{lightbox_src}"
                             data-lightbox-caption="Page {img.display_page} · {int(img.width)}×{int(img.height)} · {alt_text}"
@@ -4827,7 +4971,9 @@ def _generate_content_audit_section(
                         }
                         color = category_colors.get(img.image_category, "#9ca3af")
                         display_name = img.category_display_name
-                        confidence_pct = f"{img.category_confidence:.0%}" if img.category_confidence else ""
+                        confidence_pct = (
+                            f"{img.category_confidence:.0%}" if img.category_confidence else ""
+                        )
                         warning_icon = " ⚠️" if img.category_needs_warning else ""
                         conf_level = img.confidence_level
 
@@ -4888,14 +5034,20 @@ def _generate_content_audit_section(
                 cat = img.image_category or "unknown"
                 category_counts[cat] = category_counts.get(cat, 0) + 1
 
-            category_summary = ", ".join(
-                f"{count} {cat.replace('_', ' ')}" for cat, count in sorted(category_counts.items()) if cat != "unknown"
-            ) if any(img.image_category for img in result.images) else ""
+            category_summary = (
+                ", ".join(
+                    f"{count} {cat.replace('_', ' ')}"
+                    for cat, count in sorted(category_counts.items())
+                    if cat != "unknown"
+                )
+                if any(img.image_category for img in result.images)
+                else ""
+            )
 
             # Guidance panel
             guidance_html = ""
             if any(img.image_category for img in result.images):
-                guidance_html = '''
+                guidance_html = """
                 <details class="guidance-panel" style="margin-top: 1rem; padding: 1rem; background: #fefce8; border-radius: 8px; border: 1px solid #fde047;">
                     <summary style="cursor: pointer; font-weight: 500; color: #854d0e;">📚 Alt-Text Writing Guidance by Category</summary>
                     <div style="margin-top: 1rem; display: grid; gap: 0.75rem;">
@@ -4908,15 +5060,15 @@ def _generate_content_audit_section(
                         <div><strong style="color: #10b981;">🏷️ Logo/Icon:</strong> Use the organization/brand name (e.g., "Acme Corp logo").</div>
                         <div><strong style="color: #6b7280;">✨ Decorative:</strong> Mark as artifact (no alt text needed).</div>
                     </div>
-                </details>'''
+                </details>"""
 
             # Filter controls
-            filter_html = f'''
+            filter_html = f"""
             <div class="image-filters">
                 <label>
                     Category:
                     <select id="filter-category" onchange="filterImageTable()">
-                        {''.join(category_options)}
+                        {"".join(category_options)}
                     </select>
                 </label>
                 <label>
@@ -4940,7 +5092,7 @@ def _generate_content_audit_section(
                 <span class="filter-count" id="filter-count" role="status" aria-live="polite">Showing all {len(result.images[:50])} images</span>
                 <button type="button" class="filter-reset" onclick="resetImageFilters()" title="Reset all filters">Reset</button>
             </div>
-            '''
+            """
 
             sections.append(f"""
             <div id="audit-images" class="audit-subsection">
@@ -4953,7 +5105,7 @@ def _generate_content_audit_section(
                 {filter_html}
                 <table class="audit-table image-audit-table">
                     <thead><tr><th>Preview</th><th>Size</th><th>Category</th><th>Alt Text</th><th>Status</th></tr></thead>
-                    <tbody>{''.join(image_rows)}</tbody>
+                    <tbody>{"".join(image_rows)}</tbody>
                 </table>
                 {guidance_html}
             </div>
@@ -4971,7 +5123,7 @@ def _generate_content_audit_section(
                     <td>{tbl.display_page}</td>
                     <td>{tbl.size_str}</td>
                     <td>{headers_display}</td>
-                    <td>{tbl.scope_type or '-'}</td>
+                    <td>{tbl.scope_type or "-"}</td>
                     <td><span class="status-icon">{status_icon}</span></td>
                 </tr>
                 """)
@@ -4984,7 +5136,7 @@ def _generate_content_audit_section(
                 </p>
                 <table class="audit-table">
                     <thead><tr><th>Page</th><th>Size</th><th>Headers</th><th>Scope</th><th>Status</th></tr></thead>
-                    <tbody>{''.join(table_rows)}</tbody>
+                    <tbody>{"".join(table_rows)}</tbody>
                 </table>
             </div>
             """)
@@ -4995,7 +5147,9 @@ def _generate_content_audit_section(
             for fld in result.forms[:20]:
                 status_icon = "✓" if fld.status == "pass" else "✗" if fld.status == "fail" else "⚠"
                 status_class = f"status-{fld.status}"
-                label_display = _escape_html(fld.accessible_name[:40]) if fld.accessible_name else "❌ Missing"
+                label_display = (
+                    _escape_html(fld.accessible_name[:40]) if fld.accessible_name else "❌ Missing"
+                )
                 form_rows.append(f"""
                 <tr class="{status_class}">
                     <td>{fld.display_page}</td>
@@ -5014,7 +5168,7 @@ def _generate_content_audit_section(
                 </p>
                 <table class="audit-table">
                     <thead><tr><th>Page</th><th>Type</th><th>Label</th><th>Tooltip</th><th>Status</th></tr></thead>
-                    <tbody>{''.join(form_rows)}</tbody>
+                    <tbody>{"".join(form_rows)}</tbody>
                 </table>
             </div>
             """)
@@ -5026,11 +5180,13 @@ def _generate_content_audit_section(
             pdf_file_url = _escape_html(str(pdf_path))
 
             for link in result.links[:20]:
-                status_icon = "✓" if link.status == "pass" else "✗" if link.status == "fail" else "⚠"
+                status_icon = (
+                    "✓" if link.status == "pass" else "✗" if link.status == "fail" else "⚠"
+                )
                 status_class = f"status-{link.status}"
 
                 # Make page number a clickable link to PDF page
-                page_num = getattr(link, 'page_num', None)
+                page_num = getattr(link, "page_num", None)
                 if page_num is not None:
                     page_link = f'<a href="{pdf_file_url}#page={page_num}" target="_blank" class="page-link" title="Open page {page_num} in PDF">{link.display_page}</a>'
                 else:
@@ -5042,14 +5198,15 @@ def _generate_content_audit_section(
                 elif link.destination:
                     # Use destination as fallback display when link text is missing/garbage
                     dest = link.destination
-                    if dest.startswith('mailto:'):
+                    if dest.startswith("mailto:"):
                         # Extract email address for display
-                        email = dest[7:].split('?')[0]  # Remove query params
+                        email = dest[7:].split("?")[0]  # Remove query params
                         text_display = f'<span class="url-fallback" title="Email (link text missing)">{_escape_html(email)}</span>'
-                    elif dest.startswith(('http://', 'https://')):
+                    elif dest.startswith(("http://", "https://")):
                         # Extract domain for display
                         try:
                             from urllib.parse import urlparse
+
                             parsed = urlparse(dest)
                             domain = parsed.netloc
                             text_display = f'<span class="url-fallback" title="URL (link text missing)">{_escape_html(domain)}</span>'
@@ -5065,8 +5222,14 @@ def _generate_content_audit_section(
                 dest_html = ""
                 if link.destination:
                     dest_escaped = _escape_html(link.destination)
-                    dest_truncated = link.destination[:60] + "…" if len(link.destination) > 60 else link.destination
-                    if link.destination_type == "uri" and link.destination.startswith(("http://", "https://")):
+                    dest_truncated = (
+                        link.destination[:60] + "…"
+                        if len(link.destination) > 60
+                        else link.destination
+                    )
+                    if link.destination_type == "uri" and link.destination.startswith(
+                        ("http://", "https://")
+                    ):
                         # External link - make clickable
                         dest_html = f'<a href="{dest_escaped}" target="_blank" rel="noopener noreferrer" class="link-url" title="{dest_escaped}">{_escape_html(dest_truncated)}</a>'
                     elif link.is_internal:
@@ -5076,10 +5239,10 @@ def _generate_content_audit_section(
                         dest_html = f'<span class="link-url" title="{dest_escaped}">{_escape_html(dest_truncated)}</span>'
 
                 # Build combined cell with text and destination stacked
-                combined_cell = f'''<td class="link-combined-cell">
+                combined_cell = f"""<td class="link-combined-cell">
                     <span class="link-text">{text_display}</span>
                     {dest_html}
-                </td>'''
+                </td>"""
 
                 link_rows.append(f"""
                 <tr class="{status_class}">
@@ -5099,7 +5262,7 @@ def _generate_content_audit_section(
                 </p>
                 <table class="audit-table link-audit-table">
                     <thead><tr><th>Page</th><th>Link</th><th>Type</th><th>Status</th></tr></thead>
-                    <tbody>{''.join(link_rows)}</tbody>
+                    <tbody>{"".join(link_rows)}</tbody>
                 </table>
             </div>
             """)
@@ -5149,7 +5312,7 @@ def _generate_content_audit_section(
                 </p>
                 <table class="audit-table list-audit-table">
                     <thead><tr><th>Page</th><th>Items</th><th>Structure</th><th>Issues</th><th>Status</th></tr></thead>
-                    <tbody>{''.join(list_rows)}</tbody>
+                    <tbody>{"".join(list_rows)}</tbody>
                 </table>
             </div>
             """)
@@ -5161,7 +5324,7 @@ def _generate_content_audit_section(
         <section id="content-audit" class="content-audit collapsible">
             <h2 class="section-header"><span class="icon icon-search"></span>Content Audit</h2>
             <div class="section-content">
-                {''.join(sections)}
+                {"".join(sections)}
             </div>
         </section>
         """
@@ -5208,13 +5371,14 @@ def _generate_remediation_section(
             task_cards = []
             for task in tasks:
                 wcag_badges = " ".join(
-                    f'<span class="wcag-badge">{crit}</span>'
-                    for crit in task.wcag_criteria[:3]
+                    f'<span class="wcag-badge">{crit}</span>' for crit in task.wcag_criteria[:3]
                 )
 
                 steps_html = ""
                 if task.steps:
-                    steps_list = "".join(f"<li>{_escape_html(step)}</li>" for step in task.steps[:6])
+                    steps_list = "".join(
+                        f"<li>{_escape_html(step)}</li>" for step in task.steps[:6]
+                    )
                     steps_html = f"""
                     <details class="task-steps">
                         <summary>Step-by-step instructions</summary>
@@ -5236,15 +5400,15 @@ def _generate_remediation_section(
                         </div>
                         <div class="task-wcag">{wcag_badges}</div>
                         {steps_html}
-                        {f'<p class="task-note"><span class="icon icon-tip"></span>{_escape_html(task.notes)}</p>' if task.notes else ''}
+                        {f'<p class="task-note"><span class="icon icon-tip"></span>{_escape_html(task.notes)}</p>' if task.notes else ""}
                     </div>
                 </div>
                 """)
 
             priority_sections.append(f"""
             <div class="priority-group {priority.name.lower()}">
-                <h3>{priority.icon} {priority.label} ({len(tasks)} task{'s' if len(tasks) != 1 else ''})</h3>
-                {''.join(task_cards)}
+                <h3>{priority.icon} {priority.label} ({len(tasks)} task{"s" if len(tasks) != 1 else ""})</h3>
+                {"".join(task_cards)}
             </div>
             """)
 
@@ -5270,7 +5434,7 @@ def _generate_remediation_section(
             <h2 class="section-header"><span class="icon icon-tool"></span>Remediation Roadmap</h2>
             <div class="section-content">
                 {summary}
-                {''.join(priority_sections)}
+                {"".join(priority_sections)}
             </div>
         </section>
         """
@@ -6894,17 +7058,21 @@ def _generate_simple_section(result: PDFFullResult) -> str:
     if meta.form_field_count > 0:
         additional_info.append(f"<dt>Form Fields</dt><dd>{meta.form_field_count}</dd>")
     if meta.has_xfa:
-        additional_info.append('<dt>XFA Forms</dt><dd><span style="color: var(--color-warn);">Yes (accessibility barrier)</span></dd>')
+        additional_info.append(
+            '<dt>XFA Forms</dt><dd><span style="color: var(--color-warn);">Yes (accessibility barrier)</span></dd>'
+        )
     if meta.has_xmp:
         additional_info.append("<dt>XMP Metadata</dt><dd>Yes</dd>")
     if meta.language_display_name:
-        additional_info.append(f"<dt>Language</dt><dd>{_escape_html(meta.language)} ({_escape_html(meta.language_display_name)})</dd>")
+        additional_info.append(
+            f"<dt>Language</dt><dd>{_escape_html(meta.language)} ({_escape_html(meta.language_display_name)})</dd>"
+        )
 
     additional_info_html = ""
     if additional_info:
         additional_info_html = f"""
         <dl class="simple-meta">
-            {''.join(additional_info)}
+            {"".join(additional_info)}
         </dl>
         """
 
@@ -6934,10 +7102,14 @@ def _generate_simple_section(result: PDFFullResult) -> str:
                     <span class="summary-count">{simple.failed}</span>
                     <span class="summary-label">Failed</span>
                 </div>
-                {f'''<div class="summary-item warnings">
+                {
+        f'''<div class="summary-item warnings">
                     <span class="summary-count">{simple.warnings}</span>
                     <span class="summary-label">Warnings</span>
-                </div>''' if simple.warnings > 0 else ''}
+                </div>'''
+        if simple.warnings > 0
+        else ""
+    }
             </div>
             {additional_info_html}
             <table>
@@ -6951,7 +7123,7 @@ def _generate_simple_section(result: PDFFullResult) -> str:
                     </tr>
                 </thead>
                 <tbody>
-                    {''.join(check_rows)}
+                    {"".join(check_rows)}
                 </tbody>
             </table>
         </section>

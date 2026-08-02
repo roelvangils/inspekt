@@ -21,6 +21,7 @@ from inspekt.services.a11y_report import (
 
 # ── Fixtures ──────────────────────────────────────────
 
+
 @pytest.fixture
 def axe_engine_results():
     """Minimal axe-core engine results with violations and passes."""
@@ -48,18 +49,37 @@ def axe_engine_results():
                     "description": "Elements must have sufficient color contrast",
                     "helpUrl": "https://dequeuniversity.com/rules/axe/4.10/color-contrast",
                     "nodes": [
-                        {"target": [".text"], "html": "<p>low contrast</p>", "failureSummary": "Ratio 2.5:1"},
-                        {"target": [".link"], "html": "<a>link</a>", "failureSummary": "Ratio 3.1:1"},
+                        {
+                            "target": [".text"],
+                            "html": "<p>low contrast</p>",
+                            "failureSummary": "Ratio 2.5:1",
+                        },
+                        {
+                            "target": [".link"],
+                            "html": "<a>link</a>",
+                            "failureSummary": "Ratio 3.1:1",
+                        },
                     ],
                     "nodeCount": 2,
                     "tags": ["wcag2aa", "wcag143"],
                 },
             ],
             "passes": [
-                {"id": "html-has-lang", "description": "html has lang", "nodes": [{}], "nodeCount": 1},
+                {
+                    "id": "html-has-lang",
+                    "description": "html has lang",
+                    "nodes": [{}],
+                    "nodeCount": 1,
+                },
             ],
             "incomplete": [
-                {"id": "aria-allowed-attr", "description": "Check aria", "nodes": [{}], "nodeCount": 1, "tags": ["wcag2a", "wcag412"]},
+                {
+                    "id": "aria-allowed-attr",
+                    "description": "Check aria",
+                    "nodes": [{}],
+                    "nodeCount": 1,
+                    "tags": ["wcag2a", "wcag412"],
+                },
             ],
         }
     }
@@ -71,8 +91,20 @@ def multi_engine_results(axe_engine_results):
     results = dict(axe_engine_results)
     results["eac"] = {
         "issues": [
-            {"ruleId": "img_alt_valid", "level": "violation", "message": "Image alt is empty", "snippet": "<img>", "path": {"dom": "html > body > main > img"}},
-            {"ruleId": "img_alt_valid", "level": "violation", "message": "Image alt is empty", "snippet": "<img>", "path": {"dom": "html > body > aside > img"}},
+            {
+                "ruleId": "img_alt_valid",
+                "level": "violation",
+                "message": "Image alt is empty",
+                "snippet": "<img>",
+                "path": {"dom": "html > body > main > img"},
+            },
+            {
+                "ruleId": "img_alt_valid",
+                "level": "violation",
+                "message": "Image alt is empty",
+                "snippet": "<img>",
+                "path": {"dom": "html > body > aside > img"},
+            },
             {"ruleId": "aria_role_valid", "level": "pass", "message": "ARIA role is valid"},
         ],
     }
@@ -94,16 +126,28 @@ def consolidated_multi():
     """Consolidated results for multiple engines with disagreements."""
     return {
         "1.1.1": {
-            "axe_status": "violation", "axe_count": 1, "axe_impact": "critical",
-            "eac_status": "violation", "eac_count": 2, "eac_impact": "violation",
+            "axe_status": "violation",
+            "axe_count": 1,
+            "axe_impact": "critical",
+            "eac_status": "violation",
+            "eac_count": 2,
+            "eac_impact": "violation",
         },
         "1.4.3": {
-            "axe_status": "violation", "axe_count": 2, "axe_impact": "serious",
-            "eac_status": "pass", "eac_count": 0, "eac_impact": "",
+            "axe_status": "violation",
+            "axe_count": 2,
+            "axe_impact": "serious",
+            "eac_status": "pass",
+            "eac_count": 0,
+            "eac_impact": "",
         },
         "3.1.1": {
-            "axe_status": "pass", "axe_count": 0, "axe_impact": "",
-            "eac_status": "pass", "eac_count": 0, "eac_impact": "",
+            "axe_status": "pass",
+            "axe_count": 0,
+            "axe_impact": "",
+            "eac_status": "pass",
+            "eac_count": 0,
+            "eac_impact": "",
         },
     }
 
@@ -114,6 +158,7 @@ def versions():
 
 
 # ── _extract_engine_rule_details Tests ────────────────
+
 
 class TestExtractEngineRuleDetails:
     """Tests for _extract_engine_rule_details()."""
@@ -155,7 +200,13 @@ class TestExtractEngineRuleDetails:
         results = {
             "eac": {
                 "issues": [
-                    {"ruleId": "img_alt", "level": "violation", "message": "Missing alt", "snippet": "<img>", "path": "/html/body/img"},
+                    {
+                        "ruleId": "img_alt",
+                        "level": "violation",
+                        "message": "Missing alt",
+                        "snippet": "<img>",
+                        "path": "/html/body/img",
+                    },
                 ],
             }
         }
@@ -178,19 +229,25 @@ class TestExtractEngineRuleDetails:
 
     def test_node_cap_at_10(self):
         """Nodes should be capped at 10 per rule."""
-        violations = [{
-            "id": "test-rule",
-            "impact": "minor",
-            "description": "test",
-            "nodes": [{"target": [f"el-{i}"], "html": f"<div>{i}</div>", "failureSummary": ""} for i in range(20)],
-            "nodeCount": 20,
-        }]
+        violations = [
+            {
+                "id": "test-rule",
+                "impact": "minor",
+                "description": "test",
+                "nodes": [
+                    {"target": [f"el-{i}"], "html": f"<div>{i}</div>", "failureSummary": ""}
+                    for i in range(20)
+                ],
+                "nodeCount": 20,
+            }
+        ]
         results = {"axe": {"violations": violations, "passes": [], "incomplete": []}}
         details = _extract_engine_rule_details(results, ["axe"])
         assert len(details["axe"]["violations"][0]["nodes"]) == 10
 
 
 # ── _build_enriched_report_data Tests ────────────────
+
 
 class TestBuildEnrichedReportData:
     """Tests for _build_enriched_report_data()."""
@@ -304,7 +361,9 @@ class TestBuildEnrichedReportData:
         assert "recommendations" in data
         assert "total" in data["recommendations"]
 
-    def test_recommendations_excluded_by_default(self, axe_engine_results, consolidated_single, versions):
+    def test_recommendations_excluded_by_default(
+        self, axe_engine_results, consolidated_single, versions
+    ):
         data = _build_enriched_report_data(
             url="https://example.com",
             level="21aa",
@@ -335,6 +394,7 @@ class TestBuildEnrichedReportData:
 
 
 # ── HTML Report Generator Tests ──────────────────────
+
 
 class TestGenerateA11yReportHtml:
     """Tests for generate_a11y_report_html()."""
@@ -385,7 +445,13 @@ class TestGenerateA11yReportHtml:
                             "count": 1,
                             "description": "Images must have alternate text",
                             "help_url": "https://dequeuniversity.com/rules/axe/4.10/image-alt",
-                            "nodes": [{"selector": "img.hero", "html": "<img>", "failure_summary": "No alt"}],
+                            "nodes": [
+                                {
+                                    "selector": "img.hero",
+                                    "html": "<img>",
+                                    "failure_summary": "No alt",
+                                }
+                            ],
                         }
                     ],
                     "passes": [],
@@ -453,15 +519,39 @@ class TestGenerateA11yReportHtml:
         data = self._make_enriched_data(
             execution_order=["axe", "eac"],
             engines={
-                "axe": {"name": "Axe-core", "abbr": "AXE", "version": "4.10.2", "violations": 1, "passes": 0, "incomplete": 0, "error": None},
-                "eac": {"name": "Equal Access", "abbr": "EAC", "version": "3.1.0", "violations": 0, "passes": 1, "incomplete": 0, "error": None},
+                "axe": {
+                    "name": "Axe-core",
+                    "abbr": "AXE",
+                    "version": "4.10.2",
+                    "violations": 1,
+                    "passes": 0,
+                    "incomplete": 0,
+                    "error": None,
+                },
+                "eac": {
+                    "name": "Equal Access",
+                    "abbr": "EAC",
+                    "version": "3.1.0",
+                    "violations": 0,
+                    "passes": 1,
+                    "incomplete": 0,
+                    "error": None,
+                },
             },
             analysis={
                 "total_criteria_with_issues": 1,
                 "agreement_percentage": 50,
                 "total_criteria_evaluated": 2,
                 "full_agreement_count": 1,
-                "disagreements": [{"sc": "1.1.1", "description": "Non-text Content", "conformance_level": "A", "failing_engines": [{"engine": "axe", "abbr": "AXE", "count": 1}], "passing_engines": [{"engine": "eac", "abbr": "EAC"}]}],
+                "disagreements": [
+                    {
+                        "sc": "1.1.1",
+                        "description": "Non-text Content",
+                        "conformance_level": "A",
+                        "failing_engines": [{"engine": "axe", "abbr": "AXE", "count": 1}],
+                        "passing_engines": [{"engine": "eac", "abbr": "EAC"}],
+                    }
+                ],
                 "disparities": [],
             },
         )
@@ -473,8 +563,24 @@ class TestGenerateA11yReportHtml:
         data = self._make_enriched_data(
             execution_order=["axe", "eac"],
             engines={
-                "axe": {"name": "Axe-core", "abbr": "AXE", "version": "4.10.2", "violations": 1, "passes": 0, "incomplete": 0, "error": None},
-                "eac": {"name": "Equal Access", "abbr": "EAC", "version": "3.1.0", "violations": 1, "passes": 0, "incomplete": 0, "error": None},
+                "axe": {
+                    "name": "Axe-core",
+                    "abbr": "AXE",
+                    "version": "4.10.2",
+                    "violations": 1,
+                    "passes": 0,
+                    "incomplete": 0,
+                    "error": None,
+                },
+                "eac": {
+                    "name": "Equal Access",
+                    "abbr": "EAC",
+                    "version": "3.1.0",
+                    "violations": 1,
+                    "passes": 0,
+                    "incomplete": 0,
+                    "error": None,
+                },
             },
         )
         html = generate_a11y_report_html(data)
@@ -498,7 +604,12 @@ class TestGenerateA11yReportHtml:
                 "total": 2,
                 "by_sc": {
                     "1.1.1": [
-                        {"engine": "axe", "rule_id": "image-alt", "level": "incomplete", "message": "Check alt text"},
+                        {
+                            "engine": "axe",
+                            "rule_id": "image-alt",
+                            "level": "incomplete",
+                            "message": "Check alt text",
+                        },
                     ],
                 },
             }
@@ -510,7 +621,15 @@ class TestGenerateA11yReportHtml:
     def test_engine_error_card(self):
         data = self._make_enriched_data(
             engines={
-                "axe": {"name": "Axe-core", "abbr": "AXE", "version": "4.10.2", "violations": 0, "passes": 0, "incomplete": 0, "error": "Timeout"},
+                "axe": {
+                    "name": "Axe-core",
+                    "abbr": "AXE",
+                    "version": "4.10.2",
+                    "violations": 0,
+                    "passes": 0,
+                    "incomplete": 0,
+                    "error": "Timeout",
+                },
             },
             engine_details={"axe": {"error": "Timeout"}},
         )
@@ -524,6 +643,7 @@ class TestGenerateA11yReportHtml:
 
 
 # ── Helper Function Tests ────────────────────────────
+
 
 class TestHelperFunctions:
     """Tests for utility functions in a11y_report.py."""

@@ -52,13 +52,13 @@ if TYPE_CHECKING:
 
 # Event types for progress tracking
 EventType = Literal[
-    "prescan",      # Document pre-scan completed, timing estimates available
-    "step_start",   # Main step started
+    "prescan",  # Document pre-scan completed, timing estimates available
+    "step_start",  # Main step started
     "step_progress",  # Progress within a step (percentage)
-    "substep",      # Substep started within a main step
-    "step_end",     # Main step completed
-    "complete",     # All processing complete
-    "error",        # Error occurred
+    "substep",  # Substep started within a main step
+    "step_end",  # Main step completed
+    "complete",  # All processing complete
+    "error",  # Error occurred
 ]
 
 
@@ -84,8 +84,8 @@ class ProgressEvent:
 
     # Progress tracking
     progress_percent: int | None = None  # 0-100 for step progress
-    current: int | None = None           # Current item (e.g., page 3)
-    total: int | None = None             # Total items (e.g., of 50 pages)
+    current: int | None = None  # Current item (e.g., page 3)
+    total: int | None = None  # Total items (e.g., of 50 pages)
 
     # Pre-scan data (only for prescan event)
     prescan_result: dict | None = None
@@ -158,11 +158,13 @@ class StructuredProgressEmitter:
             prescan: Result from prescan_pdf()
             timing: Result from estimate_timing()
         """
-        self._emit(ProgressEvent(
-            event_type="prescan",
-            prescan_result=prescan.to_dict(),
-            timing_estimate=timing.to_dict(),
-        ))
+        self._emit(
+            ProgressEvent(
+                event_type="prescan",
+                prescan_result=prescan.to_dict(),
+                timing_estimate=timing.to_dict(),
+            )
+        )
 
     @contextmanager
     def step(
@@ -189,28 +191,34 @@ class StructuredProgressEmitter:
         self._current_step = step_id
         self._step_start_times[step_id] = time.time()
 
-        self._emit(ProgressEvent(
-            event_type="step_start",
-            step_id=step_id,
-            label=label,
-            note=note,
-        ))
+        self._emit(
+            ProgressEvent(
+                event_type="step_start",
+                step_id=step_id,
+                label=label,
+                note=note,
+            )
+        )
 
         try:
             yield
             # Emit step end
             step_duration_ms = int((time.time() - self._step_start_times[step_id]) * 1000)
-            self._emit(ProgressEvent(
-                event_type="step_end",
-                step_id=step_id,
-                note=f"Completed in {step_duration_ms}ms" if step_duration_ms > 100 else None,
-            ))
+            self._emit(
+                ProgressEvent(
+                    event_type="step_end",
+                    step_id=step_id,
+                    note=f"Completed in {step_duration_ms}ms" if step_duration_ms > 100 else None,
+                )
+            )
         except Exception as e:
-            self._emit(ProgressEvent(
-                event_type="error",
-                step_id=step_id,
-                error_message=str(e),
-            ))
+            self._emit(
+                ProgressEvent(
+                    event_type="error",
+                    step_id=step_id,
+                    error_message=str(e),
+                )
+            )
             raise
         finally:
             self._current_step = None
@@ -224,12 +232,14 @@ class StructuredProgressEmitter:
         """
         self._current_step = step_id
         self._step_start_times[step_id] = time.time()
-        self._emit(ProgressEvent(
-            event_type="step_start",
-            step_id=step_id,
-            label=label,
-            note=note,
-        ))
+        self._emit(
+            ProgressEvent(
+                event_type="step_start",
+                step_id=step_id,
+                label=label,
+                note=note,
+            )
+        )
 
     def step_end(self, step_id: str, note: str | None = None) -> None:
         """Manually emit a step end event."""
@@ -238,11 +248,13 @@ class StructuredProgressEmitter:
             step_duration_ms = int((time.time() - start_time) * 1000)
             if note is None and step_duration_ms > 100:
                 note = f"Completed in {step_duration_ms}ms"
-        self._emit(ProgressEvent(
-            event_type="step_end",
-            step_id=step_id,
-            note=note,
-        ))
+        self._emit(
+            ProgressEvent(
+                event_type="step_end",
+                step_id=step_id,
+                note=note,
+            )
+        )
         if self._current_step == step_id:
             self._current_step = None
 
@@ -267,14 +279,16 @@ class StructuredProgressEmitter:
             current: Current item number (e.g., 3)
             total: Total items (e.g., 50)
         """
-        self._emit(ProgressEvent(
-            event_type="substep",
-            step_id=step_id,
-            substep_id=substep_id,
-            label=label,
-            current=current,
-            total=total,
-        ))
+        self._emit(
+            ProgressEvent(
+                event_type="substep",
+                step_id=step_id,
+                substep_id=substep_id,
+                label=label,
+                current=current,
+                total=total,
+            )
+        )
 
     def progress(
         self,
@@ -290,12 +304,14 @@ class StructuredProgressEmitter:
             percent: Progress percentage (0-100)
             label: Optional label update
         """
-        self._emit(ProgressEvent(
-            event_type="step_progress",
-            step_id=step_id,
-            progress_percent=min(100, max(0, percent)),
-            label=label,
-        ))
+        self._emit(
+            ProgressEvent(
+                event_type="step_progress",
+                step_id=step_id,
+                progress_percent=min(100, max(0, percent)),
+                label=label,
+            )
+        )
 
     def emit_complete(self, note: str | None = None) -> None:
         """
@@ -306,11 +322,13 @@ class StructuredProgressEmitter:
         actual vs estimated time.
         """
         total_time = self._get_timestamp_ms()
-        self._emit(ProgressEvent(
-            event_type="complete",
-            total_time_ms=total_time,
-            note=note,
-        ))
+        self._emit(
+            ProgressEvent(
+                event_type="complete",
+                total_time_ms=total_time,
+                note=note,
+            )
+        )
 
     def emit_error(
         self,
@@ -324,11 +342,13 @@ class StructuredProgressEmitter:
             message: Error description
             step_id: Associated step (if any)
         """
-        self._emit(ProgressEvent(
-            event_type="error",
-            step_id=step_id or self._current_step,
-            error_message=message,
-        ))
+        self._emit(
+            ProgressEvent(
+                event_type="error",
+                step_id=step_id or self._current_step,
+                error_message=message,
+            )
+        )
 
 
 # Global emitter instance for convenience

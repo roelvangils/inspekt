@@ -70,9 +70,9 @@ class HtmlcsEngine(AccessibilityEngine):
         "2a": "WCAG2A",
         "2aa": "WCAG2AA",
         "2aaa": "WCAG2AAA",
-        "21a": "WCAG2A",      # Falls back to 2.0 A (includes some 2.1)
-        "21aa": "WCAG2AA",    # Falls back to 2.0 AA (includes some 2.1)
-        "22aa": "WCAG2AA",    # Falls back to 2.1 AA (no 2.2 support)
+        "21a": "WCAG2A",  # Falls back to 2.0 A (includes some 2.1)
+        "21aa": "WCAG2AA",  # Falls back to 2.0 AA (includes some 2.1)
+        "22aa": "WCAG2AA",  # Falls back to 2.1 AA (no 2.2 support)
     }
 
     def build_config(
@@ -120,9 +120,9 @@ class HtmlcsEngine(AccessibilityEngine):
     # HTMLCS message types to impact mapping
     # Type 1 = Error, Type 2 = Warning, Type 3 = Notice
     TYPE_TO_IMPACT: ClassVar[dict[int, ImpactLevel]] = {
-        1: ImpactLevel.CRITICAL,   # Error
-        2: ImpactLevel.MODERATE,   # Warning
-        3: ImpactLevel.MINOR,      # Notice
+        1: ImpactLevel.CRITICAL,  # Error
+        2: ImpactLevel.MODERATE,  # Warning
+        3: ImpactLevel.MINOR,  # Notice
     }
 
     def normalize_results(self, raw_results: dict) -> AuditResult:

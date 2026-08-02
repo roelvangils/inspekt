@@ -891,13 +891,33 @@ PATTERN_COMMENTS: list[tuple[str, str, str]] = [
     (r"^column-gap$", r"^(\d+(?:\.\d+)?)(rem|px|em)$", "{0}{1} horizontal gap"),
     (r"^row-gap$", r"^(\d+(?:\.\d+)?)(rem|px|em)$", "{0}{1} vertical gap"),
     # Grid auto rows/columns
-    (r"^grid-auto-rows$", r"^minmax\((\d+(?:\.\d+)?)(px|rem),\s*(auto|1fr|max-content)\)$", "Rows min {0}{1}, grow to {2}"),
-    (r"^grid-auto-columns$", r"^minmax\((\d+(?:\.\d+)?)(px|rem),\s*(auto|1fr|max-content)\)$", "Columns min {0}{1}, grow to {2}"),
+    (
+        r"^grid-auto-rows$",
+        r"^minmax\((\d+(?:\.\d+)?)(px|rem),\s*(auto|1fr|max-content)\)$",
+        "Rows min {0}{1}, grow to {2}",
+    ),
+    (
+        r"^grid-auto-columns$",
+        r"^minmax\((\d+(?:\.\d+)?)(px|rem),\s*(auto|1fr|max-content)\)$",
+        "Columns min {0}{1}, grow to {2}",
+    ),
     # Grid template columns
     (r"^grid-template-columns$", r"repeat\((\d+),\s*1fr\)", "{0} equal columns"),
-    (r"^grid-template-columns$", r"repeat\(auto-fill,\s*minmax\((\d+(?:\.\d+)?)(px|rem),\s*1fr\)\)", "Auto-fill grid, min {0}{1} per column"),
-    (r"^grid-template-columns$", r"repeat\(auto-fit,\s*minmax\((\d+(?:\.\d+)?)(px|rem),\s*1fr\)\)", "Auto-fit grid, min {0}{1} per column (collapses empty)"),
-    (r"^grid-template-columns$", r"^minmax\((\d+(?:\.\d+)?)(px|rem),\s*(\d+(?:\.\d+)?)(px|rem)\)\s+1fr$", "{0}{1}\u2013{2}{3} sidebar + flexible main"),
+    (
+        r"^grid-template-columns$",
+        r"repeat\(auto-fill,\s*minmax\((\d+(?:\.\d+)?)(px|rem),\s*1fr\)\)",
+        "Auto-fill grid, min {0}{1} per column",
+    ),
+    (
+        r"^grid-template-columns$",
+        r"repeat\(auto-fit,\s*minmax\((\d+(?:\.\d+)?)(px|rem),\s*1fr\)\)",
+        "Auto-fit grid, min {0}{1} per column (collapses empty)",
+    ),
+    (
+        r"^grid-template-columns$",
+        r"^minmax\((\d+(?:\.\d+)?)(px|rem),\s*(\d+(?:\.\d+)?)(px|rem)\)\s+1fr$",
+        "{0}{1}\u2013{2}{3} sidebar + flexible main",
+    ),
     (r"^grid-template-columns$", r"^(\d+(?:\.\d+)?)(px|rem)\s+1fr$", "{0}{1} fixed + flexible"),
     (r"^grid-column$", r"^span\s+(\d+)$", "Span {0} columns"),
     (r"^grid-row$", r"^span\s+(\d+)$", "Span {0} rows"),
@@ -931,10 +951,22 @@ PATTERN_COMMENTS: list[tuple[str, str, str]] = [
     (r"^aspect-ratio$", r"^(\d+)\s*/\s*(\d+)$", "{0}:{1} aspect ratio"),
     (r"^aspect-ratio$", r"^(\d+(?:\.\d+)?)$", "{0}:1 aspect ratio"),
     # Scroll offsets (for sticky headers)
-    (r"^scroll-margin-top$", r"^(\d+(?:\.\d+)?)(px|rem|em)$", "{0}{1} scroll offset (e.g. for sticky header)"),
-    (r"^scroll-padding-top$", r"^(\d+(?:\.\d+)?)(px|rem|em)$", "{0}{1} scroll snap offset (e.g. for sticky header)"),
+    (
+        r"^scroll-margin-top$",
+        r"^(\d+(?:\.\d+)?)(px|rem|em)$",
+        "{0}{1} scroll offset (e.g. for sticky header)",
+    ),
+    (
+        r"^scroll-padding-top$",
+        r"^(\d+(?:\.\d+)?)(px|rem|em)$",
+        "{0}{1} scroll snap offset (e.g. for sticky header)",
+    ),
     # Animation range (scroll-driven)
-    (r"^animation-range$", r"^entry\s+(\d+)%\s+exit\s+(\d+)%$", "Animate between {0}% entered and {1}% exited"),
+    (
+        r"^animation-range$",
+        r"^entry\s+(\d+)%\s+exit\s+(\d+)%$",
+        "Animate between {0}% entered and {1}% exited",
+    ),
     # Max/min dimensions
     (r"^max-height$", r"^(\d+(?:\.\d+)?)(vh)$", "Max {0}% of viewport height"),
     (r"^max-width$", r"^(\d+(?:\.\d+)?)(vw)$", "Max {0}% of viewport width"),
@@ -1284,8 +1316,9 @@ def _extract_first_font_family(value: str) -> str:
     """Extract the first font family name from a CSS font-family value."""
     first = value.split(",")[0].strip()
     # Strip quotes
-    if (first.startswith('"') and first.endswith('"')) or \
-       (first.startswith("'") and first.endswith("'")):
+    if (first.startswith('"') and first.endswith('"')) or (
+        first.startswith("'") and first.endswith("'")
+    ):
         first = first[1:-1]
     return first
 
@@ -1304,6 +1337,7 @@ def _describe_font_family(_prop: str, value: str) -> str | None:
 
     # Check Google Fonts
     from inspekt.data import load_google_fonts
+
     fonts = load_google_fonts()
     original = fonts.get(name_lower)
     if original:
@@ -1414,22 +1448,26 @@ SPECIAL_HANDLERS: dict[str, Callable[[str, str], str | None]] = {
 # COMPILED PATTERNS CACHE
 # =============================================================================
 
+
 @lru_cache(maxsize=1)
 def _get_compiled_patterns() -> list[tuple[Pattern, Pattern, str]]:
     """Compile all pattern regexes for faster matching."""
     compiled = []
     for prop_pattern, value_pattern, template in PATTERN_COMMENTS:
-        compiled.append((
-            re.compile(prop_pattern, re.IGNORECASE),
-            re.compile(value_pattern, re.IGNORECASE),
-            template,
-        ))
+        compiled.append(
+            (
+                re.compile(prop_pattern, re.IGNORECASE),
+                re.compile(value_pattern, re.IGNORECASE),
+                template,
+            )
+        )
     return compiled
 
 
 # =============================================================================
 # PUBLIC API
 # =============================================================================
+
 
 def get_property_comment(prop: str, value: str) -> str | None:
     """
@@ -1589,10 +1627,7 @@ SELECTOR_COMMENTS: list[tuple[str, str]] = [
 @lru_cache(maxsize=1)
 def _get_compiled_selector_patterns() -> list[tuple[Pattern, str]]:
     """Compile all selector pattern regexes for faster matching."""
-    return [
-        (re.compile(pattern, re.IGNORECASE), comment)
-        for pattern, comment in SELECTOR_COMMENTS
-    ]
+    return [(re.compile(pattern, re.IGNORECASE), comment) for pattern, comment in SELECTOR_COMMENTS]
 
 
 def get_selector_comment(selector: str) -> str | None:

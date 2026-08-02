@@ -55,11 +55,19 @@ def start(bridge_port, cache_ttl):
     client = BridgeClient(port=bridge_port)
     if not client.is_alive():
         from inspekt.app.cli.table import _style_with_inline_code
+
         click.echo(
-            _style_with_inline_code(f"Warning: Bridge server is not running on port {bridge_port}.", base_fg="yellow"),
+            _style_with_inline_code(
+                f"Warning: Bridge server is not running on port {bridge_port}.", base_fg="yellow"
+            ),
             err=True,
         )
-        click.echo(_style_with_inline_code("Start it with: `inspekt start --bridge-only`", base_fg="yellow"), err=True)
+        click.echo(
+            _style_with_inline_code(
+                "Start it with: `inspekt start --bridge-only`", base_fg="yellow"
+            ),
+            err=True,
+        )
         click.echo("MCP server will start but tools will fail until bridge is running.\n", err=True)
 
     # Import and run MCP server
@@ -67,6 +75,7 @@ def start(bridge_port, cache_ttl):
     import logging
 
     from inspekt.app.mcp.server import InspektMCPServer
+
     logging.basicConfig(
         level=logging.INFO,
         format="%(levelname)s: %(message)s",
@@ -88,6 +97,7 @@ def start(bridge_port, cache_ttl):
         sys.exit(0)
     except Exception as e:
         import traceback
+
         click.echo(f"Error running MCP server: {e}", err=True)
         click.echo("\nFull traceback:", err=True)
         traceback.print_exc()
@@ -120,35 +130,43 @@ def info(output_json):
         # JSON output with full details
         tools_json = []
         for tool in builtin_tools + plugin_tools:
-            tools_json.append({
-                "name": tool.name,
-                "description": tool.description,
-                "category": tool.category,
-                "parameters": format_params_summary(tool.input_schema),
-                "input_schema": tool.input_schema,
-                "is_plugin": tool.is_plugin,
-            })
+            tools_json.append(
+                {
+                    "name": tool.name,
+                    "description": tool.description,
+                    "category": tool.category,
+                    "parameters": format_params_summary(tool.input_schema),
+                    "input_schema": tool.input_schema,
+                    "is_plugin": tool.is_plugin,
+                }
+            )
 
         resources_json = []
         for resource in resources:
-            resources_json.append({
-                "uri": resource.uri,
-                "name": resource.name,
-                "description": resource.description,
-                "mime_type": resource.mime_type,
-            })
+            resources_json.append(
+                {
+                    "uri": resource.uri,
+                    "name": resource.name,
+                    "description": resource.description,
+                    "mime_type": resource.mime_type,
+                }
+            )
 
         from inspekt.app.cli.table import print_json
+
         total_tools = len(builtin_tools) + len(plugin_tools)
-        print_json({
-            "tools": tools_json,
-            "resources": resources_json,
-            "summary": {
-                "builtin_tools": len(builtin_tools),
-                "plugin_tools": len(plugin_tools),
-                "resources": len(resources),
-            }
-        }, summary=f"{total_tools} MCP tools")
+        print_json(
+            {
+                "tools": tools_json,
+                "resources": resources_json,
+                "summary": {
+                    "builtin_tools": len(builtin_tools),
+                    "plugin_tools": len(plugin_tools),
+                    "resources": len(resources),
+                },
+            },
+            summary=f"{total_tools} MCP tools",
+        )
     else:
         # Human-readable output
         click.echo("Inspekt MCP Server - Available Tools and Resources\n")
@@ -196,10 +214,13 @@ def info(output_json):
 
         # VM terminal: offer a "Data ready to copy" toast
         from inspekt.app.cli.table import emit_copyable_data
+
         tool_rows = []
         for tool in builtin_tools + plugin_tools:
             desc = (tool.description or "").split(". ")[0]
-            tool_rows.append([tool.name, tool.category, desc, format_params_summary(tool.input_schema)])
+            tool_rows.append(
+                [tool.name, tool.category, desc, format_params_summary(tool.input_schema)]
+            )
         tools_json = [
             {
                 "name": t.name,
@@ -217,9 +238,15 @@ def info(output_json):
         emit_copyable_data(
             headers=["Name", "Category", "Description", "Parameters"],
             rows=tool_rows,
-            json_data={"tools": tools_json, "resources": resources_json,
-                       "summary": {"builtin_tools": builtin_count, "plugin_tools": plugin_count,
-                                   "resources": len(resources)}},
+            json_data={
+                "tools": tools_json,
+                "resources": resources_json,
+                "summary": {
+                    "builtin_tools": builtin_count,
+                    "plugin_tools": plugin_count,
+                    "resources": len(resources),
+                },
+            },
             summary=f"{total_tools} MCP tool{'s' if total_tools != 1 else ''}",
         )
 
@@ -267,6 +294,7 @@ def describe(tool_name, output_json):
             "parameters": params,
         }
         from inspekt.app.cli.table import print_json
+
         print_json(output, summary=f"MCP tool: {tool.name}")
     else:
         # Human-readable output
@@ -304,7 +332,9 @@ def describe(tool_name, output_json):
                 if param["description"]:
                     click.echo(f"    {param['description']}")
                 if param.get("allowed_values"):
-                    click.echo(f"    Allowed: {', '.join(repr(v) for v in param['allowed_values'])}")
+                    click.echo(
+                        f"    Allowed: {', '.join(repr(v) for v in param['allowed_values'])}"
+                    )
                 if param.get("default") is not None:
                     click.echo(f"    Default: {param['default']}")
         click.echo()
@@ -349,6 +379,7 @@ def describe(tool_name, output_json):
 
         # VM terminal: offer a "Data ready to copy" toast
         from inspekt.app.cli.table import emit_copyable_data
+
         param_rows = [
             [
                 p["name"],
@@ -391,8 +422,14 @@ def test():
     click.echo("1. Checking bridge server…")
     if not client.is_alive():
         from inspekt.app.cli.table import _style_with_inline_code
+
         click.echo("   ✗ Bridge server is NOT running", err=True)
-        click.echo(_style_with_inline_code("   Start it with: `inspekt start --bridge-only`", base_fg="red"), err=True)
+        click.echo(
+            _style_with_inline_code(
+                "   Start it with: `inspekt start --bridge-only`", base_fg="red"
+            ),
+            err=True,
+        )
         sys.exit(1)
     else:
         click.echo("   ✓ Bridge server is running")
@@ -401,7 +438,7 @@ def test():
     try:
         # Get userscript/extension version
         version = client.get_userscript_version()
-        if version and version != 'unknown':
+        if version and version != "unknown":
             click.echo(f"   Extension/userscript version: {version}")
         else:
             click.echo("   Extension/userscript version: unknown")

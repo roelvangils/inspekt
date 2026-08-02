@@ -27,10 +27,10 @@ if TYPE_CHECKING:
 
 def _verbose_log(message: str, data: Any = None) -> None:
     """Log verbose output if INSPEKT_VERBOSE is set."""
-    if os.environ.get('INSPEKT_VERBOSE') != '1':
+    if os.environ.get("INSPEKT_VERBOSE") != "1":
         return
 
-    timestamp = time.strftime('%H:%M:%S')
+    timestamp = time.strftime("%H:%M:%S")
     if data is not None:
         click.echo(f"[{timestamp}] {message}: {data}", err=True)
     else:
@@ -143,7 +143,10 @@ class BridgeExecutor:
         Raises:
             SystemExit: If execution fails after retries
         """
-        _verbose_log("Starting execution", {"timeout": timeout, "retry_on_timeout": retry_on_timeout, "instance": instance})
+        _verbose_log(
+            "Starting execution",
+            {"timeout": timeout, "retry_on_timeout": retry_on_timeout, "instance": instance},
+        )
         start_time = time.time()
 
         self.ensure_server_running()
@@ -154,11 +157,21 @@ class BridgeExecutor:
             click.echo(err=True)
             click.secho("No browser connection found.", fg="red", bold=True, err=True)
             click.echo(err=True)
-            click.echo("  * Ensure that the latest version of the Inspekt extension is installed", err=True)
+            click.echo(
+                "  * Ensure that the latest version of the Inspekt extension is installed", err=True
+            )
             click.echo("    and enabled in Firefox or Chrome.", err=True)
-            click.echo("  * Make sure that a JavaScript dialog is not blocking access to the page.", err=True)
-            click.echo("  * In some cases, you may need to disable CSP. You can do this by clicking", err=True)
-            click.echo("    the toggle in the Inspekt UI that appears when you click the icon in", err=True)
+            click.echo(
+                "  * Make sure that a JavaScript dialog is not blocking access to the page.",
+                err=True,
+            )
+            click.echo(
+                "  * In some cases, you may need to disable CSP. You can do this by clicking",
+                err=True,
+            )
+            click.echo(
+                "    the toggle in the Inspekt UI that appears when you click the icon in", err=True
+            )
             click.echo("    your toolbar.", err=True)
             click.echo()
             sys.exit(1)
@@ -179,19 +192,24 @@ class BridgeExecutor:
             try:
                 _verbose_log(f"Sending code to browser (attempt {attempt + 1}/{retries})")
                 exec_start = time.time()
-                result = self.client.execute(code, timeout=timeout, _fast_poll=fast_poll, instance=instance)
+                result = self.client.execute(
+                    code, timeout=timeout, _fast_poll=fast_poll, instance=instance
+                )
                 _verbose_log("Execution completed", f"{time.time() - exec_start:.3f}s")
 
                 # Check if this is a domain permission error (fallback for edge cases)
                 if not result.get("ok"):
                     error_msg = result.get("error", "").lower()
                     # Check for various forms of domain authorization errors
-                    is_domain_error = any(phrase in error_msg for phrase in [
-                        "domain not authorized",
-                        "not allowed to access this domain",
-                        "not authorized",
-                        "domain is not in the allowed list"
-                    ])
+                    is_domain_error = any(
+                        phrase in error_msg
+                        for phrase in [
+                            "domain not authorized",
+                            "not allowed to access this domain",
+                            "not authorized",
+                            "domain is not in the allowed list",
+                        ]
+                    )
 
                     if is_domain_error:
                         # Extract domain from URL
@@ -201,10 +219,14 @@ class BridgeExecutor:
                         if domain and self._prompt_add_domain(domain):
                             # User agreed to add domain, retry execution
                             # Sync confirmation already handled in _prompt_add_domain
-                            result = self.client.execute(code, timeout=timeout, _fast_poll=fast_poll, instance=instance)
+                            result = self.client.execute(
+                                code, timeout=timeout, _fast_poll=fast_poll, instance=instance
+                            )
 
                 _verbose_log("Total execution time", f"{time.time() - start_time:.3f}s")
-                _verbose_log("Result status", {"ok": result.get("ok"), "has_error": "error" in result})
+                _verbose_log(
+                    "Result status", {"ok": result.get("ok"), "has_error": "error" in result}
+                )
                 return result
 
             except TimeoutError as e:
@@ -236,8 +258,8 @@ class BridgeExecutor:
             parsed = urlparse(url)
             hostname = parsed.netloc or parsed.hostname
             # Remove port if present
-            if hostname and ':' in hostname:
-                hostname = hostname.split(':')[0]
+            if hostname and ":" in hostname:
+                hostname = hostname.split(":")[0]
             return hostname
         except Exception:
             return None
@@ -291,6 +313,7 @@ class BridgeExecutor:
         """
         # In isolated mode, skip all domain checks and prompts
         from inspekt.config import is_isolated_mode
+
         if is_isolated_mode():
             _verbose_log("Isolated mode active, skipping domain check")
             return True
@@ -332,13 +355,10 @@ class BridgeExecutor:
 
             # Prompt user
             response = click.prompt(
-                'Would you like to add it now? [Y/n]',
-                type=str,
-                default="Y",
-                show_default=False
+                "Would you like to add it now? [Y/n]", type=str, default="Y", show_default=False
             )
 
-            if response.lower() in ('n', 'no'):
+            if response.lower() in ("n", "no"):
                 click.echo("\nDomain not added. You can add it later with:", err=True)
                 click.echo(f"  inspekt domain add {normalized}", err=True)
                 click.echo("", err=True)
@@ -365,9 +385,12 @@ class BridgeExecutor:
                 sync_response = requests.post(
                     f"http://{self.host}:{self.port}/domains/sync",
                     json={"domains": domains},
-                    timeout=10.0  # Wait for browser confirmation
+                    timeout=10.0,  # Wait for browser confirmation
                 )
-                _verbose_log("Sync response", f"status={sync_response.status_code}, time={time.time() - sync_start:.3f}s")
+                _verbose_log(
+                    "Sync response",
+                    f"status={sync_response.status_code}, time={time.time() - sync_start:.3f}s",
+                )
                 if sync_response.status_code == 200:
                     data = sync_response.json()
                     browsers_synced = data.get("browsers_synced", 0)
@@ -416,7 +439,12 @@ class BridgeExecutor:
             click.echo(f"Error reading file {filepath}: {e}", err=True)
             sys.exit(1)
 
-        return self.execute(code, timeout=timeout, retry_on_timeout=retry_on_timeout, skip_domain_check=skip_domain_check)
+        return self.execute(
+            code,
+            timeout=timeout,
+            retry_on_timeout=retry_on_timeout,
+            skip_domain_check=skip_domain_check,
+        )
 
     def execute_with_script(
         self,
@@ -452,7 +480,12 @@ class BridgeExecutor:
             click.echo(f"Error: {e}", err=True)
             sys.exit(1)
 
-        return self.execute(code, timeout=timeout, retry_on_timeout=retry_on_timeout, skip_domain_check=skip_domain_check)
+        return self.execute(
+            code,
+            timeout=timeout,
+            retry_on_timeout=retry_on_timeout,
+            skip_domain_check=skip_domain_check,
+        )
 
     def check_result_ok(self, result: dict[str, Any]) -> None:
         """
@@ -491,16 +524,16 @@ class BridgeExecutor:
             True if cleared successfully, False otherwise
         """
         # Try socket transport first if client supports it
-        if hasattr(self.client, '_use_socket') and self.client._use_socket:
+        if hasattr(self.client, "_use_socket") and self.client._use_socket:
             try:
                 from inspekt.transport import Request
+
                 transport = self.client._get_socket_transport()
                 if not transport.is_connected():
                     transport.connect()
 
                 response = transport.send(
-                    Request(method="console_clear", params={"timeout": timeout}),
-                    timeout=timeout
+                    Request(method="console_clear", params={"timeout": timeout}), timeout=timeout
                 )
                 return response.success
             except Exception:
@@ -508,6 +541,7 @@ class BridgeExecutor:
 
         # HTTP fallback
         import requests
+
         try:
             response = requests.post(
                 f"http://{self.host}:{self.port}/console/clear",
@@ -530,16 +564,16 @@ class BridgeExecutor:
             Dict with console logs data, or empty dict on error
         """
         # Try socket transport first if client supports it
-        if hasattr(self.client, '_use_socket') and self.client._use_socket:
+        if hasattr(self.client, "_use_socket") and self.client._use_socket:
             try:
                 from inspekt.transport import Request
+
                 transport = self.client._get_socket_transport()
                 if not transport.is_connected():
                     transport.connect()
 
                 response = transport.send(
-                    Request(method="console_logs", params={"timeout": timeout}),
-                    timeout=timeout
+                    Request(method="console_logs", params={"timeout": timeout}), timeout=timeout
                 )
                 if response.success:
                     return response.data
@@ -548,6 +582,7 @@ class BridgeExecutor:
 
         # HTTP fallback
         import requests
+
         try:
             response = requests.get(
                 f"http://{self.host}:{self.port}/console/logs",
@@ -582,7 +617,5 @@ def get_executor(
     """
     global _default_executor
     if _default_executor is None:
-        _default_executor = BridgeExecutor(
-            host=host, port=port, max_retries=max_retries
-        )
+        _default_executor = BridgeExecutor(host=host, port=port, max_retries=max_retries)
     return _default_executor

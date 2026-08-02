@@ -130,7 +130,9 @@ async def take_screenshot(params: TakeScreenshotParams) -> TakeScreenshotRespons
                     "style": params.redact_style or "bar",
                     "scope": params.selector if params.target == "node" else None,
                 }
-                redact_code = redact_script.replace("OPTIONS_PLACEHOLDER", json.dumps(redact_options))
+                redact_code = redact_script.replace(
+                    "OPTIONS_PLACEHOLDER", json.dumps(redact_options)
+                )
                 await asyncio.to_thread(executor.execute, redact_code, 10.0)
             except FileNotFoundError:
                 pass  # Redaction script not available, continue without it
@@ -167,7 +169,9 @@ async def take_screenshot(params: TakeScreenshotParams) -> TakeScreenshotRespons
             # If we got ok=True but no actual data, something went wrong
             # (e.g., element picker was cancelled or timed out)
             if not data_url:
-                error_msg = data.get("error") or data.get("message") or "No screenshot data returned"
+                error_msg = (
+                    data.get("error") or data.get("message") or "No screenshot data returned"
+                )
                 return TakeScreenshotResponse(
                     success=False,
                     data=None,

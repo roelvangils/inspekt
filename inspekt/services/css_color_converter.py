@@ -112,7 +112,7 @@ def add_cross_ref_comments(css_content: str, cross_ref_values: dict[str, str]) -
         value_part = after_colon.split(";")[0].strip()
         # Strip any existing comment from the value part
         if "/*" in value_part:
-            value_part = value_part[:value_part.index("/*")].strip()
+            value_part = value_part[: value_part.index("/*")].strip()
 
         # Skip if values look the same (no useful cross-ref)
         if value_part == computed:
@@ -335,7 +335,9 @@ def hex_to_oklch(hex_color: str) -> tuple[float, float, float] | None:
         return None
 
 
-def rgb_to_oklch(r: int, g: int, b: int, a: float = 1.0) -> tuple[float, float, float, float] | None:
+def rgb_to_oklch(
+    r: int, g: int, b: int, a: float = 1.0
+) -> tuple[float, float, float, float] | None:
     """
     Convert RGB(A) values to oklch.
 
@@ -538,12 +540,12 @@ def format_color_comment(hex_color: str) -> str:
 # Captures an optional alpha suffix (e.g. ", 50% opaque" or ", fully transparent")
 # so it can be preserved when stripping the color description for repeated names.
 _COLOR_WITH_DESC_RE = re.compile(
-    r'(?P<before>/\*\s*)'
+    r"(?P<before>/\*\s*)"
     r'(?P<prefix>Color:\s*"(?P<name>[^"]+)")'
-    r'\s*\([^)]*?'                            # (Description...
-    r'(?P<alpha>,\s*(?:\d+%\s*opaque|fully\s*transparent))?'  # optional alpha
-    r'\)'                                     # )
-    r'(?P<after>\s*(?:,.*)?\s*\*/)'
+    r"\s*\([^)]*?"  # (Description...
+    r"(?P<alpha>,\s*(?:\d+%\s*opaque|fully\s*transparent))?"  # optional alpha
+    r"\)"  # )
+    r"(?P<after>\s*(?:,.*)?\s*\*/)"
 )
 
 # Matches ANY color comment (with or without description) to extract the name:
@@ -551,7 +553,9 @@ _COLOR_WITH_DESC_RE = re.compile(
 #   /* Color: "Some Name" */
 #   /* Color: "Some Name", Invisible text */
 #   /* Color: Black */  (unquoted, when name == description)
-_COLOR_ANY_RE = re.compile(r'/\*\s*Color:\s*(?:"(?P<name>[^"]+)"|(?P<bare_name>[^"*,()]+?))\s*[,*(/]')
+_COLOR_ANY_RE = re.compile(
+    r'/\*\s*Color:\s*(?:"(?P<name>[^"]+)"|(?P<bare_name>[^"*,()]+?))\s*[,*(/]'
+)
 
 
 def dedup_color_descriptions(css_content: str) -> str:
@@ -583,7 +587,7 @@ def dedup_color_descriptions(css_content: str) -> str:
     result: list[str] = []
 
     # Extract the full Color comment text from a line
-    _color_comment_re = re.compile(r'/\*\s*(Color:[^*]*?)\s*\*/')
+    _color_comment_re = re.compile(r"/\*\s*(Color:[^*]*?)\s*\*/")
 
     for line in lines:
         # Extract the color name on this line (if any)
@@ -606,7 +610,7 @@ def dedup_color_descriptions(css_content: str) -> str:
             if current_name == prev_name and current_full_comment == prev_full_comment:
                 # Replace the entire color comment with /* Same color */
                 line = re.sub(
-                    r'/\*\s*Color:[^*]*\*/',
+                    r"/\*\s*Color:[^*]*\*/",
                     "/* Same color */",
                     line,
                 )
@@ -619,8 +623,10 @@ def dedup_color_descriptions(css_content: str) -> str:
                         if alpha:
                             # Keep alpha as parenthesized suffix: Color: "Red" (50% opaque)
                             alpha_text = alpha.lstrip(", ")
-                            return f'{match.group("before")}{match.group("prefix")} ({alpha_text}){match.group("after")}'
-                        return f'{match.group("before")}{match.group("prefix")}{match.group("after")}'
+                            return f"{match.group('before')}{match.group('prefix')} ({alpha_text}){match.group('after')}"
+                        return (
+                            f"{match.group('before')}{match.group('prefix')}{match.group('after')}"
+                        )
 
                     line = _COLOR_WITH_DESC_RE.sub(_strip_desc, line)
 
@@ -660,7 +666,9 @@ def add_color_name_comments(css_content: str) -> str:
     # Patterns for CSS colors — capture optional trailing gradient stop position
     # so the comment is placed AFTER the stop, not between color and stop.
     # e.g. "#ff000080 50%" → "#ff000080 50% /* Red (50% opaque) */"
-    _gradient_stop_suffix = r"(\s+\d+(?:\.\d+)?(?:%|px|em|rem|vw|vh)?(?:\s+\d+(?:\.\d+)?(?:%|px|em|rem|vw|vh)?)?)?"
+    _gradient_stop_suffix = (
+        r"(\s+\d+(?:\.\d+)?(?:%|px|em|rem|vw|vh)?(?:\s+\d+(?:\.\d+)?(?:%|px|em|rem|vw|vh)?)?)?"
+    )
     hex_pattern = r"#([0-9a-fA-F]{3,8})\b" + _gradient_stop_suffix
     rgb_pattern = (
         r"rgba?\(\s*(\d+)\s*[,\s]\s*(\d+)\s*[,\s]\s*(\d+)(?:\s*[,/]\s*([\d.]+%?))?\s*\)"
@@ -809,7 +817,7 @@ def add_heuristic_comments(css_content: str) -> str:
             # Extract existing comment
             comment_start = stripped.index("/*")
             comment_end = stripped.index("*/") + 2
-            existing_comment = stripped[comment_start + 2:comment_end - 2].strip()
+            existing_comment = stripped[comment_start + 2 : comment_end - 2].strip()
             # Remove comment from content for parsing
             content = stripped[:comment_start].strip()
             if not content.endswith(";"):

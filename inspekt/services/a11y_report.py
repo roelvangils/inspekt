@@ -58,9 +58,7 @@ def generate_a11y_report_html(data: dict) -> str:
     if data.get("recommendations"):
         nav_links.append(("recommendations", "Recommendations"))
 
-    nav_items = "\n".join(
-        f'        <a href="#{id_}">{label}</a>' for id_, label in nav_links
-    )
+    nav_items = "\n".join(f'        <a href="#{id_}">{label}</a>' for id_, label in nav_links)
 
     level_display = _format_level(level)
 
@@ -134,7 +132,11 @@ def _format_level(level: str) -> str:
 
 def _impact_class(impact: str) -> str:
     """Return CSS class for impact level."""
-    return f"impact-{impact}" if impact in ("critical", "serious", "moderate", "minor") else "impact-unknown"
+    return (
+        f"impact-{impact}"
+        if impact in ("critical", "serious", "moderate", "minor")
+        else "impact-unknown"
+    )
 
 
 def _status_class(status: str) -> str:
@@ -186,7 +188,9 @@ def _render_summary(data: dict) -> str:
             for level_name in ("critical", "serious", "moderate", "minor"):
                 count = impact_summary.get(level_name, 0)
                 if count > 0:
-                    parts.append(f'<span class="impact-badge {_impact_class(level_name)}">{count} {level_name}</span>')
+                    parts.append(
+                        f'<span class="impact-badge {_impact_class(level_name)}">{count} {level_name}</span>'
+                    )
             if parts:
                 impact_html = f'<div class="impact-breakdown">{"".join(parts)}</div>'
 
@@ -218,7 +222,7 @@ def _render_summary(data: dict) -> str:
 
         gauge_class = "gauge-high" if pct >= 90 else ("gauge-medium" if pct >= 70 else "gauge-low")
 
-        agreement_html = f'''
+        agreement_html = f"""
         <div class="agreement-section">
             <h3>Engine Agreement</h3>
             <div class="agreement-gauge {gauge_class}">
@@ -226,16 +230,16 @@ def _render_summary(data: dict) -> str:
                 <span class="gauge-label">{pct}%</span>
             </div>
             <p class="agreement-detail">{full} of {total} criteria with full agreement &middot; {issues} criteria with issues</p>
-        </div>'''
+        </div>"""
 
-    return f'''
+    return f"""
     <section id="summary" aria-labelledby="summary-heading">
         <h2 id="summary-heading">Summary</h2>
         <div class="engine-cards">
 {cards_html}
         </div>
 {agreement_html}
-    </section>'''
+    </section>"""
 
 
 def _render_wcag_table(data: dict) -> str:
@@ -245,11 +249,11 @@ def _render_wcag_table(data: dict) -> str:
     engines = data.get("engines", {})
 
     if not consolidated:
-        return '''
+        return """
     <section id="wcag-table" aria-labelledby="wcag-heading">
         <h2 id="wcag-heading">WCAG Criteria</h2>
         <p>No criteria to display.</p>
-    </section>'''
+    </section>"""
 
     # Sort SCs
     def sc_sort_key(sc):
@@ -262,7 +266,7 @@ def _render_wcag_table(data: dict) -> str:
     engine_headers = ""
     for eng in engine_list:
         abbr = _esc(engines.get(eng, {}).get("abbr", eng.upper()))
-        engine_headers += f'<th data-sortable>{abbr}</th>'
+        engine_headers += f"<th data-sortable>{abbr}</th>"
 
     # Build rows
     rows = []
@@ -284,7 +288,9 @@ def _render_wcag_table(data: dict) -> str:
                 has_issue = True
                 label = f"{count}" if count else status
                 title = f"{impact}: {count} issue(s)" if impact else f"{count} issue(s)"
-                cells.append(f'<td class="{_status_class(status)}" title="{_esc(title)}" data-sort-value="{count}">{label}</td>')
+                cells.append(
+                    f'<td class="{_status_class(status)}" title="{_esc(title)}" data-sort-value="{count}">{label}</td>'
+                )
             else:
                 cells.append('<td class="status-pass" data-sort-value="0">Pass</td>')
 
@@ -293,25 +299,27 @@ def _render_wcag_table(data: dict) -> str:
 
         row_class = "row-pass" if not has_issue else ""
         cells_html = "".join(cells)
-        rows.append(f'<tr class="{row_class}" data-has-issue="{str(has_issue).lower()}">'
-                     f'<td class="sc-number">{_esc(sc)}</td>'
-                     f'<td class="sc-level">{conf_level}</td>'
-                     f'<td class="sc-desc">{desc}</td>'
-                     f'{cells_html}</tr>')
+        rows.append(
+            f'<tr class="{row_class}" data-has-issue="{str(has_issue).lower()}">'
+            f'<td class="sc-number">{_esc(sc)}</td>'
+            f'<td class="sc-level">{conf_level}</td>'
+            f'<td class="sc-desc">{desc}</td>'
+            f"{cells_html}</tr>"
+        )
 
     rows_html = "\n            ".join(rows)
 
     filter_html = ""
     if has_passes:
-        filter_html = '''
+        filter_html = """
         <div class="table-controls">
             <label class="filter-toggle">
                 <input type="checkbox" id="filter-passes" checked>
                 <span>Hide passing criteria</span>
             </label>
-        </div>'''
+        </div>"""
 
-    return f'''
+    return f"""
     <section id="wcag-table" aria-labelledby="wcag-heading">
         <h2 id="wcag-heading">WCAG Criteria</h2>
 {filter_html}
@@ -330,7 +338,7 @@ def _render_wcag_table(data: dict) -> str:
                 </tbody>
             </table>
         </div>
-    </section>'''
+    </section>"""
 
 
 def _render_disagreements(data: dict) -> str:
@@ -339,11 +347,11 @@ def _render_disagreements(data: dict) -> str:
     disagreements = analysis.get("disagreements", [])
 
     if not disagreements:
-        return '''
+        return """
     <section id="disagreements" aria-labelledby="disagreements-heading">
         <h2 id="disagreements-heading">Disagreements</h2>
         <p class="empty-state">No disagreements — all engines agree on every criterion.</p>
-    </section>'''
+    </section>"""
 
     rows = []
     for item in disagreements:
@@ -352,23 +360,20 @@ def _render_disagreements(data: dict) -> str:
         conf_level = _esc(item.get("conformance_level", ""))
 
         failing = ", ".join(
-            f'{_esc(e["abbr"])} ({e["count"]})'
-            for e in item.get("failing_engines", [])
+            f"{_esc(e['abbr'])} ({e['count']})" for e in item.get("failing_engines", [])
         )
-        passing = ", ".join(
-            _esc(e["abbr"]) for e in item.get("passing_engines", [])
-        )
+        passing = ", ".join(_esc(e["abbr"]) for e in item.get("passing_engines", []))
 
         rows.append(
             f'<tr><td class="sc-number">{sc}</td><td>{conf_level}</td>'
-            f'<td>{desc}</td>'
+            f"<td>{desc}</td>"
             f'<td class="text-fail">{failing}</td>'
             f'<td class="text-pass">{passing}</td></tr>'
         )
 
     rows_html = "\n            ".join(rows)
 
-    return f'''
+    return f"""
     <section id="disagreements" aria-labelledby="disagreements-heading">
         <h2 id="disagreements-heading">Disagreements</h2>
         <p class="section-desc">Criteria where some engines find issues and others pass.</p>
@@ -388,7 +393,7 @@ def _render_disagreements(data: dict) -> str:
                 </tbody>
             </table>
         </div>
-    </section>'''
+    </section>"""
 
 
 def _render_disparities(data: dict) -> str:
@@ -399,11 +404,11 @@ def _render_disparities(data: dict) -> str:
     engines = data.get("engines", {})
 
     if not disparities:
-        return '''
+        return """
     <section id="disparities" aria-labelledby="disparities-heading">
         <h2 id="disparities-heading">Disparities</h2>
         <p class="empty-state">No significant count disparities between engines.</p>
-    </section>'''
+    </section>"""
 
     rows = []
     for item in disparities:
@@ -422,14 +427,14 @@ def _render_disparities(data: dict) -> str:
 
         rows.append(
             f'<tr><td class="sc-number">{sc}</td><td>{conf_level}</td>'
-            f'<td>{desc}</td>'
-            f'<td>{_esc(counts_str)}</td>'
-            f'<td>{ratio}x</td></tr>'
+            f"<td>{desc}</td>"
+            f"<td>{_esc(counts_str)}</td>"
+            f"<td>{ratio}x</td></tr>"
         )
 
     rows_html = "\n            ".join(rows)
 
-    return f'''
+    return f"""
     <section id="disparities" aria-labelledby="disparities-heading">
         <h2 id="disparities-heading">Disparities</h2>
         <p class="section-desc">Criteria where all engines find issues but counts differ by 2x or more.</p>
@@ -449,7 +454,7 @@ def _render_disparities(data: dict) -> str:
                 </tbody>
             </table>
         </div>
-    </section>'''
+    </section>"""
 
 
 def _render_engine_details(data: dict) -> str:
@@ -484,7 +489,7 @@ def _render_engine_details(data: dict) -> str:
             tabs.append(
                 f'<button role="tab" id="{tab_id}" aria-selected="{selected}" '
                 f'aria-controls="{panel_id}" tabindex="{tabindex}" class="tab{active}">'
-                f'{name} ({abbr})</button>'
+                f"{name} ({abbr})</button>"
             )
             panels.append(
                 f'<div role="tabpanel" id="{panel_id}" aria-labelledby="{tab_id}" '
@@ -507,7 +512,7 @@ def _render_engine_details(data: dict) -> str:
         tabs.append(
             f'<button role="tab" id="{tab_id}" aria-selected="{selected}" '
             f'aria-controls="{panel_id}" tabindex="{tabindex}" class="tab{active}">'
-            f'{_esc(tab_label)}</button>'
+            f"{_esc(tab_label)}</button>"
         )
 
         # Build panel content
@@ -523,7 +528,11 @@ def _render_engine_details(data: dict) -> str:
                 help_url = v.get("help_url", "")
                 nodes = v.get("nodes", [])
 
-                rule_link = f'<a href="{_esc(help_url)}" target="_blank" rel="noopener">{rule_id}</a>' if help_url else rule_id
+                rule_link = (
+                    f'<a href="{_esc(help_url)}" target="_blank" rel="noopener">{rule_id}</a>'
+                    if help_url
+                    else rule_id
+                )
 
                 # Node details (expandable)
                 nodes_html = ""
@@ -536,32 +545,36 @@ def _render_engine_details(data: dict) -> str:
 
                         node_parts = []
                         if selector:
-                            node_parts.append(f'<div class="node-selector"><code>{selector}</code></div>')
+                            node_parts.append(
+                                f'<div class="node-selector"><code>{selector}</code></div>'
+                            )
                         if node_html:
-                            node_parts.append(f'<div class="node-html"><pre><code>{node_html}</code></pre></div>')
+                            node_parts.append(
+                                f'<div class="node-html"><pre><code>{node_html}</code></pre></div>'
+                            )
                         if failure:
                             node_parts.append(f'<div class="node-failure">{failure}</div>')
 
                         node_items.append(f'<li class="node-item">{"".join(node_parts)}</li>')
 
                     nodes_list = "\n".join(node_items)
-                    nodes_html = f'''
+                    nodes_html = f"""
                         <details class="node-details">
                             <summary>{len(nodes)} affected element{"s" if len(nodes) != 1 else ""}</summary>
                             <ul class="node-list">{nodes_list}</ul>
-                        </details>'''
+                        </details>"""
 
                 rule_rows.append(
-                    f'<tr>'
+                    f"<tr>"
                     f'<td class="rule-id">{rule_link}</td>'
                     f'<td><span class="impact-badge {_impact_class(impact)}">{impact}</span></td>'
                     f'<td class="count-cell">{count}</td>'
-                    f'<td>{desc}{nodes_html}</td>'
-                    f'</tr>'
+                    f"<td>{desc}{nodes_html}</td>"
+                    f"</tr>"
                 )
 
             rules_html = "\n".join(rule_rows)
-            panel_content = f'''
+            panel_content = f"""
                 <div class="table-scroll">
                     <table class="data-table rule-table">
                         <thead>
@@ -576,7 +589,7 @@ def _render_engine_details(data: dict) -> str:
                     {rules_html}
                         </tbody>
                     </table>
-                </div>'''
+                </div>"""
 
         panels.append(
             f'<div role="tabpanel" id="{panel_id}" aria-labelledby="{tab_id}" '
@@ -586,7 +599,7 @@ def _render_engine_details(data: dict) -> str:
     tabs_html = "\n        ".join(tabs)
     panels_html = "\n    ".join(panels)
 
-    return f'''
+    return f"""
     <section id="engine-details" aria-labelledby="engine-details-heading">
         <h2 id="engine-details-heading">Engine Details</h2>
         <div class="tabs-container">
@@ -595,7 +608,7 @@ def _render_engine_details(data: dict) -> str:
             </div>
     {panels_html}
         </div>
-    </section>'''
+    </section>"""
 
 
 def _render_recommendations(data: dict) -> str:
@@ -620,11 +633,11 @@ def _render_recommendations(data: dict) -> str:
 
             item_rows.append(
                 f'<tr><td>{engine}</td><td class="rule-id">{rule_id}</td>'
-                f'<td>{level}</td><td>{message}</td></tr>'
+                f"<td>{level}</td><td>{message}</td></tr>"
             )
 
         items_html = "\n".join(item_rows)
-        groups.append(f'''
+        groups.append(f"""
             <details class="rec-group">
                 <summary>SC {sc_display} ({len(items)} item{"s" if len(items) != 1 else ""})</summary>
                 <table class="data-table rec-table">
@@ -633,21 +646,21 @@ def _render_recommendations(data: dict) -> str:
                     </thead>
                     <tbody>{items_html}</tbody>
                 </table>
-            </details>''')
+            </details>""")
 
     groups_html = "\n".join(groups)
 
-    return f'''
+    return f"""
     <section id="recommendations" aria-labelledby="recommendations-heading">
         <h2 id="recommendations-heading">Recommendations</h2>
         <p class="section-desc">{recs.get("total", 0)} items requiring manual review or consideration.</p>
 {groups_html}
-    </section>'''
+    </section>"""
 
 
 def _get_report_css() -> str:
     """Return the complete CSS for the report."""
-    return '''
+    return """
 /* ===== Reset & Variables ===== */
 *, *::before, *::after { box-sizing: border-box; }
 
@@ -1183,12 +1196,12 @@ h2 {
     .engine-cards { grid-template-columns: 1fr; }
     .report-nav { padding: 0 16px; }
 }
-'''
+"""
 
 
 def _get_report_js() -> str:
     """Return the complete JavaScript for the report."""
-    return '''
+    return """
 // Theme toggle
 (function() {
     var toggle = document.getElementById('theme-toggle');
@@ -1356,4 +1369,4 @@ def _get_report_js() -> str:
         });
     });
 })();
-'''
+"""

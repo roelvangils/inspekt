@@ -18,6 +18,7 @@ from inspekt.services.ffmpeg_utils import ensure_ffmpeg, get_ffmpeg_path
 
 class VideoEncoderError(Exception):
     """Error during video encoding."""
+
     pass
 
 
@@ -126,7 +127,9 @@ class VideoEncoder:
                     timeout=300,  # 5 minute timeout to prevent indefinite hangs
                 )
         except subprocess.TimeoutExpired:
-            raise VideoEncoderError(f"ffmpeg encoding timed out after 5 minutes (frames: {frame_count})")
+            raise VideoEncoderError(
+                f"ffmpeg encoding timed out after 5 minutes (frames: {frame_count})"
+            )
         except subprocess.CalledProcessError as e:
             error_msg = e.stderr if e.stderr else str(e)
             raise VideoEncoderError(f"ffmpeg encoding failed: {error_msg}")
@@ -168,14 +171,22 @@ class VideoEncoder:
         return [
             str(ffmpeg_path),
             "-y",  # Overwrite output
-            "-framerate", str(self.fps),
-            "-i", str(input_path),
-            "-vf", ",".join(filters),
-            "-c:v", "libx264",
-            "-preset", self.preset,
-            "-crf", str(self.crf),
-            "-pix_fmt", "yuv420p",  # Compatibility with most players
-            "-movflags", "+faststart",  # Enable streaming
+            "-framerate",
+            str(self.fps),
+            "-i",
+            str(input_path),
+            "-vf",
+            ",".join(filters),
+            "-c:v",
+            "libx264",
+            "-preset",
+            self.preset,
+            "-crf",
+            str(self.crf),
+            "-pix_fmt",
+            "yuv420p",  # Compatibility with most players
+            "-movflags",
+            "+faststart",  # Enable streaming
             str(output_path),
         ]
 
@@ -198,13 +209,20 @@ class VideoEncoder:
         return [
             str(ffmpeg_path),
             "-y",  # Overwrite output
-            "-framerate", str(self.fps),
-            "-i", str(input_path),
-            "-vf", ",".join(filters),
-            "-c:v", "libvpx-vp9",
-            "-crf", str(self.crf),
-            "-b:v", "0",  # Use CRF mode
-            "-pix_fmt", "yuv420p",
+            "-framerate",
+            str(self.fps),
+            "-i",
+            str(input_path),
+            "-vf",
+            ",".join(filters),
+            "-c:v",
+            "libvpx-vp9",
+            "-crf",
+            str(self.crf),
+            "-b:v",
+            "0",  # Use CRF mode
+            "-pix_fmt",
+            "yuv420p",
             str(output_path),
         ]
 
@@ -298,7 +316,7 @@ class VideoEncoder:
                 # FFmpeg concat demuxer requires the last file to be listed again
                 # without duration to properly handle the final frame
                 if frames:
-                    last_frame = temp_dir / f"frame_{len(frames)-1:05d}.jpg"
+                    last_frame = temp_dir / f"frame_{len(frames) - 1:05d}.jpg"
                     f.write(f"file '{last_frame}'\n")
 
             # Build video filter chain
@@ -313,29 +331,46 @@ class VideoEncoder:
                 cmd = [
                     str(ffmpeg_path),
                     "-y",
-                    "-f", "concat",
-                    "-safe", "0",
-                    "-i", str(concat_file),
-                    "-vf", filter_str,
-                    "-c:v", "libx264",
-                    "-preset", self.preset,
-                    "-crf", str(self.crf),
-                    "-pix_fmt", "yuv420p",
-                    "-movflags", "+faststart",
+                    "-f",
+                    "concat",
+                    "-safe",
+                    "0",
+                    "-i",
+                    str(concat_file),
+                    "-vf",
+                    filter_str,
+                    "-c:v",
+                    "libx264",
+                    "-preset",
+                    self.preset,
+                    "-crf",
+                    str(self.crf),
+                    "-pix_fmt",
+                    "yuv420p",
+                    "-movflags",
+                    "+faststart",
                     str(output_path),
                 ]
             else:
                 cmd = [
                     str(ffmpeg_path),
                     "-y",
-                    "-f", "concat",
-                    "-safe", "0",
-                    "-i", str(concat_file),
-                    "-vf", filter_str,
-                    "-c:v", "libvpx-vp9",
-                    "-crf", str(self.crf),
-                    "-b:v", "0",
-                    "-pix_fmt", "yuv420p",
+                    "-f",
+                    "concat",
+                    "-safe",
+                    "0",
+                    "-i",
+                    str(concat_file),
+                    "-vf",
+                    filter_str,
+                    "-c:v",
+                    "libvpx-vp9",
+                    "-crf",
+                    str(self.crf),
+                    "-b:v",
+                    "0",
+                    "-pix_fmt",
+                    "yuv420p",
                     str(output_path),
                 ]
 
@@ -349,7 +384,9 @@ class VideoEncoder:
                     timeout=300,
                 )
             except subprocess.TimeoutExpired:
-                raise VideoEncoderError(f"ffmpeg encoding timed out after 5 minutes (frames: {len(frames)})")
+                raise VideoEncoderError(
+                    f"ffmpeg encoding timed out after 5 minutes (frames: {len(frames)})"
+                )
             except subprocess.CalledProcessError as e:
                 error_msg = e.stderr if e.stderr else str(e)
                 raise VideoEncoderError(f"ffmpeg encoding failed: {error_msg}")
@@ -435,7 +472,7 @@ def show_encoding_progress(current: int, total: int):
     bar = "█" * filled + "░" * (bar_width - filled)
 
     # Use carriage return to update in place
-    click.echo(f"\r[{bar}] {current}/{total} frames ({pct*100:.0f}%)", nl=False)
+    click.echo(f"\r[{bar}] {current}/{total} frames ({pct * 100:.0f}%)", nl=False)
 
     if current >= total:
         click.echo()  # Newline when done

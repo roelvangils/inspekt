@@ -41,16 +41,16 @@ from inspekt.client import BridgeClient
 
 # Selectors for Inspekt UI elements that should be excluded from a11y scans
 INSPEKT_UI_SELECTORS = [
-    '[data-inspekt-badge]',
-    '[data-inspekt-axe-popover]',
-    '[data-inspekt-ibm-popover]',
-    '.inspekt-axe-popover',
-    '.inspekt-ibm-popover',
-    '#inspekt-badge-styles',
-    '#inspekt-axe-popover-styles',
-    '#inspekt-axe-popover-additional-styles',
-    '#inspekt-ibm-popover-styles',
-    '#inspekt-ibm-badge-styles',
+    "[data-inspekt-badge]",
+    "[data-inspekt-axe-popover]",
+    "[data-inspekt-ibm-popover]",
+    ".inspekt-axe-popover",
+    ".inspekt-ibm-popover",
+    "#inspekt-badge-styles",
+    "#inspekt-axe-popover-styles",
+    "#inspekt-axe-popover-additional-styles",
+    "#inspekt-ibm-popover-styles",
+    "#inspekt-ibm-badge-styles",
 ]
 
 
@@ -95,7 +95,9 @@ def _is_engine_loaded(client, engine: str) -> bool:
     Returns:
         True if engine is already loaded, False otherwise
     """
-    check_code = f"window.__inspektIsEngineLoaded__ ? window.__inspektIsEngineLoaded__('{engine}') : false"
+    check_code = (
+        f"window.__inspektIsEngineLoaded__ ? window.__inspektIsEngineLoaded__('{engine}') : false"
+    )
     try:
         result = client.execute(check_code, timeout=2.0)
         return result.get("ok") and result.get("result")
@@ -114,7 +116,9 @@ def _mark_engine_loaded(client, engine: str) -> bool:
     Returns:
         True if successfully marked, False otherwise
     """
-    mark_code = f"window.__inspektMarkEngineLoaded__ && window.__inspektMarkEngineLoaded__('{engine}')"
+    mark_code = (
+        f"window.__inspektMarkEngineLoaded__ && window.__inspektMarkEngineLoaded__('{engine}')"
+    )
     try:
         result = client.execute(mark_code, timeout=2.0)
         return result.get("ok")
@@ -122,7 +126,7 @@ def _mark_engine_loaded(client, engine: str) -> bool:
         return False
 
 
-def _filter_inspekt_ui_violations(violations: list, selector_key: str = 'selector') -> list:
+def _filter_inspekt_ui_violations(violations: list, selector_key: str = "selector") -> list:
     """
     Remove violations that occur within Inspekt's own UI elements.
 
@@ -137,17 +141,16 @@ def _filter_inspekt_ui_violations(violations: list, selector_key: str = 'selecto
     """
     filtered = []
     for v in violations:
-        selector = v.get(selector_key, '')
+        selector = v.get(selector_key, "")
         # Handle both string and list selectors
         if isinstance(selector, list):
-            selector = ' '.join(str(s) for s in selector)
+            selector = " ".join(str(s) for s in selector)
         else:
             selector = str(selector)
 
         # Check if this violation is within Inspekt UI
         is_inspekt_ui = any(
-            ui_sel.replace('[', '').replace(']', '').replace('.', '').replace('#', '')
-            in selector
+            ui_sel.replace("[", "").replace("]", "").replace(".", "").replace("#", "") in selector
             for ui_sel in INSPEKT_UI_SELECTORS
         )
 
@@ -229,17 +232,15 @@ def _validate_and_normalize_engines(engines: str | tuple[str, ...] | None) -> li
 
         if engine_lower not in AVAILABLE_ENGINES:
             available = ", ".join(sorted(AVAILABLE_ENGINES.keys()))
-            raise click.UsageError(
-                f"Unknown engine '{engine}'. Available: {available}"
-            )
+            raise click.UsageError(f"Unknown engine '{engine}'. Available: {available}")
 
         if engine_lower in seen:
             click.echo(
                 click.style(
                     f"Warning: Engine '{engine}' specified multiple times, using first occurrence",
-                    fg="yellow"
+                    fg="yellow",
                 ),
-                err=True
+                err=True,
             )
             continue
 
@@ -266,7 +267,7 @@ def _parse_rule_ids(rule_options: tuple[str, ...]) -> list[str]:
     rule_ids = []
     for item in rule_options:
         # Split on commas and strip whitespace
-        parts = [r.strip() for r in item.split(',') if r.strip()]
+        parts = [r.strip() for r in item.split(",") if r.strip()]
         rule_ids.extend(parts)
     return rule_ids
 
@@ -277,7 +278,7 @@ def _build_axe_config(
     include_passes: bool,
     include_incomplete: bool,
     disable_rules: list[str] | None = None,
-    enable_rules: list[str] | None = None
+    enable_rules: list[str] | None = None,
 ) -> dict:
     """
     Build axe-core configuration object from CLI arguments.
@@ -307,10 +308,7 @@ def _build_axe_config(
 
     # If enable_rules is specified, run ONLY those rules (ignore level/tags)
     if enable_rules:
-        config["runOnly"] = {
-            "type": "rule",
-            "values": enable_rules
-        }
+        config["runOnly"] = {"type": "rule", "values": enable_rules}
         return config
 
     # Otherwise, use WCAG level-based tags
@@ -331,10 +329,7 @@ def _build_axe_config(
         additional_tags = [tag.strip() for tag in tags.split(",")]
         axe_tags.extend(additional_tags)
 
-    config["runOnly"] = {
-        "type": "tag",
-        "values": axe_tags
-    }
+    config["runOnly"] = {"type": "tag", "values": axe_tags}
 
     # Disable specific rules if requested
     if disable_rules:
@@ -375,12 +370,14 @@ def _parse_selectors(selector_list: tuple[str, ...]) -> list[str]:
     selectors = []
     for item in selector_list:
         # Split on commas and strip whitespace
-        parts = [s.strip() for s in item.split(',') if s.strip()]
+        parts = [s.strip() for s in item.split(",") if s.strip()]
         selectors.extend(parts)
     return selectors
 
 
-def _validate_selectors(client: BridgeClient, selectors: list[str], timeout: float) -> dict[str, dict]:
+def _validate_selectors(
+    client: BridgeClient, selectors: list[str], timeout: float
+) -> dict[str, dict]:
     """
     Validate CSS selectors by testing them in the browser.
 
@@ -421,7 +418,13 @@ def _validate_selectors(client: BridgeClient, selectors: list[str], timeout: flo
     return result.get("result", {})
 
 
-def _build_axe_context(client: BridgeClient, scoped: str | None, exclude_selectors: list[str], timeout: float, require_panel_selection: bool = False) -> tuple[str, str | None]:
+def _build_axe_context(
+    client: BridgeClient,
+    scoped: str | None,
+    exclude_selectors: list[str],
+    timeout: float,
+    require_panel_selection: bool = False,
+) -> tuple[str, str | None]:
     """
     Build the axe context parameter based on scoped and exclude options.
 
@@ -485,7 +488,10 @@ def _build_axe_context(client: BridgeClient, scoped: str | None, exclude_selecto
 
         data = result.get("result", {})
         if not data.get("ok"):
-            click.echo("Error: No element inspected. Use the Chrome DevTools inspector or Inspekt panel to select an element first.", err=True)
+            click.echo(
+                "Error: No element inspected. Use the Chrome DevTools inspector or Inspekt panel to select an element first.",
+                err=True,
+            )
             sys.exit(1)
 
         selector = data.get("selector", "unknown")
@@ -496,7 +502,7 @@ def _build_axe_context(client: BridgeClient, scoped: str | None, exclude_selecto
         if require_panel_selection and selection_source != "panel":
             source_label = {
                 "devtools": "Chrome DevTools inspector",
-                "unknown": "unknown method"
+                "unknown": "unknown method",
             }.get(selection_source, selection_source)
 
             click.echo("Error: Element must be selected using Inspekt panel picker.", err=True)
@@ -511,7 +517,10 @@ def _build_axe_context(client: BridgeClient, scoped: str | None, exclude_selecto
 
         # Show selection source confirmation if panel selection was required
         if require_panel_selection:
-            click.echo(click.style(success("Element selected via Inspekt panel picker"), fg="green"), err=True)
+            click.echo(
+                click.style(success("Element selected via Inspekt panel picker"), fg="green"),
+                err=True,
+            )
 
         # Display scoped element with separator lines
         click.echo("Scoping to inspected element:", err=True)
@@ -522,12 +531,13 @@ def _build_axe_context(client: BridgeClient, scoped: str | None, exclude_selecto
 
         # Build context with inspected element
         if exclude_selectors:
-            context_expr = json.dumps({
-                "include": "window.__INSPEKT_INSPECTED_ELEMENT__",
-                "exclude": exclude_selectors
-            })
+            context_expr = json.dumps(
+                {"include": "window.__INSPEKT_INSPECTED_ELEMENT__", "exclude": exclude_selectors}
+            )
             # Replace the quoted window reference with actual reference
-            context_expr = context_expr.replace('"window.__INSPEKT_INSPECTED_ELEMENT__"', 'window.__INSPEKT_INSPECTED_ELEMENT__')
+            context_expr = context_expr.replace(
+                '"window.__INSPEKT_INSPECTED_ELEMENT__"', "window.__INSPEKT_INSPECTED_ELEMENT__"
+            )
         else:
             context_expr = "window.__INSPEKT_INSPECTED_ELEMENT__"
 
@@ -536,7 +546,7 @@ def _build_axe_context(client: BridgeClient, scoped: str | None, exclude_selecto
     # Handle scoped with CSS selectors
     elif scoped:
         # Parse comma-separated selectors
-        scoped_selectors = [s.strip() for s in scoped.split(',') if s.strip()]
+        scoped_selectors = [s.strip() for s in scoped.split(",") if s.strip()]
 
         # Validate scoped selectors
         validation = _validate_selectors(client, scoped_selectors, timeout)
@@ -553,17 +563,18 @@ def _build_axe_context(client: BridgeClient, scoped: str | None, exclude_selecto
         # Warn about selectors that match no elements
         empty = [sel for sel, info in validation.items() if info.get("count") == 0]
         if empty:
-            click.echo(click.style("Warning:", fg="yellow") + " Some --scoped selectors match no elements:", err=True)
+            click.echo(
+                click.style("Warning:", fg="yellow")
+                + " Some --scoped selectors match no elements:",
+                err=True,
+            )
             for sel in empty:
                 click.echo(f"  - '{sel}'", err=True)
             click.echo("", err=True)
 
         # Build context
         if exclude_selectors:
-            context_expr = json.dumps({
-                "include": scoped_selectors,
-                "exclude": exclude_selectors
-            })
+            context_expr = json.dumps({"include": scoped_selectors, "exclude": exclude_selectors})
         else:
             # Single selector can be a string, multiple must be array
             if len(scoped_selectors) == 1:
@@ -572,13 +583,13 @@ def _build_axe_context(client: BridgeClient, scoped: str | None, exclude_selecto
                 context_expr = json.dumps(scoped_selectors)
 
         # Display scoped selectors with separator lines
-        selector_preview = ', '.join(scoped_selectors[:3])
+        selector_preview = ", ".join(scoped_selectors[:3])
         if len(scoped_selectors) > 3:
-            selector_preview += f' (+{len(scoped_selectors) - 3} more)'
+            selector_preview += f" (+{len(scoped_selectors) - 3} more)"
 
         click.echo("Scoping to:", err=True)
         click.echo(_separator_line(), err=True)
-        click.echo(click.style(selector_preview, fg='cyan'), err=True)
+        click.echo(click.style(selector_preview, fg="cyan"), err=True)
         click.echo(_separator_line(), err=True)
         click.echo("", err=True)
 
@@ -587,13 +598,13 @@ def _build_axe_context(client: BridgeClient, scoped: str | None, exclude_selecto
         context_expr = json.dumps({"exclude": exclude_selectors})
 
         # Display excluded selectors with separator lines
-        selector_preview = ', '.join(exclude_selectors[:3])
+        selector_preview = ", ".join(exclude_selectors[:3])
         if len(exclude_selectors) > 3:
-            selector_preview += f' (+{len(exclude_selectors) - 3} more)'
+            selector_preview += f" (+{len(exclude_selectors) - 3} more)"
 
         click.echo("Excluding:", err=True)
         click.echo(_separator_line(), err=True)
-        click.echo(click.style(selector_preview, fg='cyan'), err=True)
+        click.echo(click.style(selector_preview, fg="cyan"), err=True)
         click.echo(_separator_line(), err=True)
         click.echo("", err=True)
 
@@ -609,12 +620,7 @@ def _build_axe_context(client: BridgeClient, scoped: str | None, exclude_selecto
 
 def _get_impact_color(impact: str) -> str:
     """Get color for impact level."""
-    colors = {
-        "critical": "red",
-        "serious": "yellow",
-        "moderate": "blue",
-        "minor": "bright_black"
-    }
+    colors = {"critical": "red", "serious": "yellow", "moderate": "blue", "minor": "bright_black"}
     return colors.get(impact, "white")
 
 
@@ -670,6 +676,7 @@ def _list_available_rules(client: BridgeClient, timeout: float, output_json: boo
         if output_json:
             # Output as JSON
             from inspekt.app.cli.table import print_json
+
             print_json(
                 {"rules": rules, "stats": stats, "axeVersion": data.get("axeVersion")},
                 summary=f"{len(rules)} axe rules",
@@ -683,7 +690,7 @@ def _list_available_rules(client: BridgeClient, timeout: float, output_json: boo
             "wcag21aa": [],
             "wcag22aa": [],
             "best-practice": [],
-            "other": []
+            "other": [],
         }
 
         for rule in rules:
@@ -741,31 +748,54 @@ def _list_available_rules(client: BridgeClient, timeout: float, output_json: boo
             table.print_header()
             for row in rows:
                 rule_id, description = row
-                table.print_row(
-                    [rule_id, description],
-                    colors=["green", None]
-                )
+                table.print_row([rule_id, description], colors=["green", None])
             table.print_footer()
 
             # Show level flag hint
             if level_flag:
                 from inspekt.app.cli.table import _style_with_inline_code
-                hint = f"  Use: `inspekt axe --level {level_flag}`" if level_flag != "best-practice" else "  Use: `inspekt axe --tags best-practice`"
+
+                hint = (
+                    f"  Use: `inspekt axe --level {level_flag}`"
+                    if level_flag != "best-practice"
+                    else "  Use: `inspekt axe --tags best-practice`"
+                )
                 click.echo(_style_with_inline_code(hint, base_fg="bright_black"))
 
             click.echo()
             total_shown += len(group_rules)
 
         # Summary
-        click.echo(click.style(f"Total: {total_shown} rules (axe-core v{data.get('axeVersion', 'unknown')})", fg="bright_black"))
+        click.echo(
+            click.style(
+                f"Total: {total_shown} rules (axe-core v{data.get('axeVersion', 'unknown')})",
+                fg="bright_black",
+            )
+        )
         click.echo()
 
         # Show usage hints
         from inspekt.app.cli.table import _style_with_inline_code
+
         click.echo(click.style("Usage Examples:", bold=True))
-        click.echo(_style_with_inline_code("  `inspekt axe --rule color-contrast`        ", base_fg="white") + click.style("# Check single rule", fg="bright_black"))
-        click.echo(_style_with_inline_code("  `inspekt axe --enable-rule color-contrast` ", base_fg="white") + click.style("# Check only this rule", fg="bright_black"))
-        click.echo(_style_with_inline_code("  `inspekt axe --disable-rule label`         ", base_fg="white") + click.style("# Exclude specific rule", fg="bright_black"))
+        click.echo(
+            _style_with_inline_code(
+                "  `inspekt axe --rule color-contrast`        ", base_fg="white"
+            )
+            + click.style("# Check single rule", fg="bright_black")
+        )
+        click.echo(
+            _style_with_inline_code(
+                "  `inspekt axe --enable-rule color-contrast` ", base_fg="white"
+            )
+            + click.style("# Check only this rule", fg="bright_black")
+        )
+        click.echo(
+            _style_with_inline_code(
+                "  `inspekt axe --disable-rule label`         ", base_fg="white"
+            )
+            + click.style("# Exclude specific rule", fg="bright_black")
+        )
         click.echo()
 
     except (ConnectionError, TimeoutError, RuntimeError) as e:
@@ -792,9 +822,7 @@ def _auto_select_element(selector: str, rule_id: str) -> bool:
 
         # Call the inspection API
         response = requests.post(
-            'http://127.0.0.1:8765/api/inspection/inspect',
-            json={'selector': selector},
-            timeout=5
+            "http://127.0.0.1:8765/api/inspection/inspect", json={"selector": selector}, timeout=5
         )
 
         if response.ok:
@@ -806,11 +834,15 @@ def _auto_select_element(selector: str, rule_id: str) -> bool:
     return False
 
 
-def _format_detailed_violation_output(violations: list[dict], url: str, rule_id: str, no_select: bool = False) -> None:
+def _format_detailed_violation_output(
+    violations: list[dict], url: str, rule_id: str, no_select: bool = False
+) -> None:
     """Format violations with detailed information for single-rule checks."""
     if not violations:
         click.echo()
-        click.echo(click.style(success(f"No violations found for rule: {rule_id}"), fg="green", bold=True))
+        click.echo(
+            click.style(success(f"No violations found for rule: {rule_id}"), fg="green", bold=True)
+        )
         click.echo()
         click.echo(f"Tested: {url}")
         return
@@ -821,10 +853,15 @@ def _format_detailed_violation_output(violations: list[dict], url: str, rule_id:
     # Header
     click.echo()
     click.echo(click.style(f"Rule: {violation.get('id', 'unknown')}", fg="cyan", bold=True))
-    click.echo(click.style(f"Impact: {violation.get('impact', 'unknown')}", fg=_get_impact_color(violation.get('impact', 'unknown'))))
+    click.echo(
+        click.style(
+            f"Impact: {violation.get('impact', 'unknown')}",
+            fg=_get_impact_color(violation.get("impact", "unknown")),
+        )
+    )
     click.echo(f"Help: {violation.get('help', '')}")
 
-    help_url = violation.get('helpUrl', '')
+    help_url = violation.get("helpUrl", "")
     if help_url:
         click.echo(f"Documentation: {click.style(help_url, fg='blue', underline=True)}")
 
@@ -833,7 +870,7 @@ def _format_detailed_violation_output(violations: list[dict], url: str, rule_id:
     click.echo()
 
     # Nodes (individual violations)
-    nodes = violation.get('nodes', [])
+    nodes = violation.get("nodes", [])
     node_count = len(nodes)
 
     if node_count == 0:
@@ -851,22 +888,22 @@ def _format_detailed_violation_output(violations: list[dict], url: str, rule_id:
             click.echo()
 
         # Node number and impact
-        impact = node.get('impact', 'unknown')
+        impact = node.get("impact", "unknown")
         impact_color = _get_impact_color(impact)
         click.echo(click.style(f"{i}. ", bold=True) + click.style(f"[{impact}]", fg=impact_color))
         click.echo()
 
         # Target (CSS selector)
-        target = node.get('target', [])
+        target = node.get("target", [])
         if target:
             # Format target as a CSS selector path
-            target_str = ' > '.join(str(t) for t in target)
+            target_str = " > ".join(str(t) for t in target)
             click.echo(click.style("   Selector:", bold=True))
             click.echo(f"   {click.style(target_str, fg='yellow')}")
             click.echo()
 
         # HTML snippet
-        html = node.get('html', '')
+        html = node.get("html", "")
         if html:
             click.echo(click.style("   HTML:", bold=True))
             # Truncate very long HTML snippets
@@ -876,37 +913,48 @@ def _format_detailed_violation_output(violations: list[dict], url: str, rule_id:
             click.echo()
 
         # Failure summary
-        failure_summary = node.get('failureSummary', '')
+        failure_summary = node.get("failureSummary", "")
         if failure_summary:
             click.echo(click.style("   Issue:", bold=True))
             # Format failure summary with indentation
-            lines = failure_summary.split('\n')
+            lines = failure_summary.split("\n")
             for line in lines:
                 if line.strip():
                     click.echo(f"   {line.strip()}")
             click.echo()
 
     # Auto-select element if single violation and not disabled
-    if not no_select and node_count == 1 and nodes[0].get('target'):
-        target = nodes[0].get('target', [])
+    if not no_select and node_count == 1 and nodes[0].get("target"):
+        target = nodes[0].get("target", [])
         if target:
             # Convert target array to CSS selector
             # Axe returns selectors as array, join with descendant combinator
-            selector = ' '.join(str(t) for t in target)
+            selector = " ".join(str(t) for t in target)
 
             if _auto_select_element(selector, rule_id):
                 click.echo()
-                click.echo(click.style(success("Element auto-selected and highlighted in browser"), fg="green"))
+                click.echo(
+                    click.style(
+                        success("Element auto-selected and highlighted in browser"), fg="green"
+                    )
+                )
                 click.echo(f"  Selector: {click.style(selector, fg='yellow')}")
                 from inspekt.app.cli.table import _style_with_inline_code
-                click.echo(_style_with_inline_code("  Run `inspekt inspected` to view full element details", base_fg="white"))
+
+                click.echo(
+                    _style_with_inline_code(
+                        "  Run `inspekt inspected` to view full element details", base_fg="white"
+                    )
+                )
 
     # Footer
     click.echo()
     click.echo(f"Tested: {url}")
 
 
-def _format_table_output(violations: list[dict], url: str, summary: dict, compact: bool = False) -> None:
+def _format_table_output(
+    violations: list[dict], url: str, summary: dict, compact: bool = False
+) -> None:
     """Format violations as a table.
 
     Args:
@@ -917,7 +965,9 @@ def _format_table_output(violations: list[dict], url: str, summary: dict, compac
     """
     if not violations:
         click.echo()
-        click.echo(click.style(success("No accessibility violations found!"), fg="green", bold=True))
+        click.echo(
+            click.style(success("No accessibility violations found!"), fg="green", bold=True)
+        )
         if not compact:
             click.echo(f"Tested: {url}")
             click.echo(f"Passes: {summary.get('passCount', 0)}")
@@ -946,7 +996,7 @@ def _format_table_output(violations: list[dict], url: str, summary: dict, compac
         row_colors.append([None, _get_impact_color(impact), None, None])
 
     # Create table with auto-width and title
-    violation_count = summary.get('violationCount', len(violations))
+    violation_count = summary.get("violationCount", len(violations))
     title = f"Accessibility Violations ({violation_count})"
     icon = get_icon("Accessibility")
     table = Table(headers, alignments=alignments, title=title, icon=icon)
@@ -964,6 +1014,7 @@ def _format_table_output(violations: list[dict], url: str, summary: dict, compac
 
     # VM terminal: offer a "Data ready to copy" toast
     from inspekt.app.cli.table import emit_copyable_data
+
     emit_copyable_data(
         headers=headers,
         rows=rows,
@@ -977,7 +1028,9 @@ def _format_table_output(violations: list[dict], url: str, summary: dict, compac
 
     click.echo()
     violation_word = "violation" if violation_count == 1 else "violations"
-    click.echo(click.style(f"Summary: Found {violation_count} {violation_word} on {url}", bold=True))
+    click.echo(
+        click.style(f"Summary: Found {violation_count} {violation_word} on {url}", bold=True)
+    )
 
     # Format counts: use "—" (em dash, dark gray) for 0, otherwise show number
     def format_count(count):
@@ -990,8 +1043,10 @@ def _format_table_output(violations: list[dict], url: str, summary: dict, compac
     click.echo(f"  Moderate:   {format_count(summary.get('moderateCount', 0))}")
     click.echo(f"  Minor:      {format_count(summary.get('minorCount', 0))}")
     click.echo(f"  Passes:     {summary.get('passCount', 0)}")
-    if summary.get('incompleteCount', 0) > 0:
-        click.echo(f"  Incomplete: {summary.get('incompleteCount', 0)} (use --include-incomplete to see details)")
+    if summary.get("incompleteCount", 0) > 0:
+        click.echo(
+            f"  Incomplete: {summary.get('incompleteCount', 0)} (use --include-incomplete to see details)"
+        )
 
 
 @click.command()
@@ -999,30 +1054,13 @@ def _format_table_output(violations: list[dict], url: str, summary: dict, compac
     "--threshold",
     type=float,
     default=0.5,
-    help="Minimum confidence (0-1) to consider autocomplete required (default: 0.5)"
+    help="Minimum confidence (0-1) to consider autocomplete required (default: 0.5)",
 )
+@click.option("--include-hidden", is_flag=True, help="Include hidden input fields in analysis")
+@click.option("--include-disabled", is_flag=True, help="Include disabled input fields in analysis")
+@click.option("--json", "-j", "output_json", is_flag=True, help="Output results as JSON")
 @click.option(
-    "--include-hidden",
-    is_flag=True,
-    help="Include hidden input fields in analysis"
-)
-@click.option(
-    "--include-disabled",
-    is_flag=True,
-    help="Include disabled input fields in analysis"
-)
-@click.option(
-    "--json",
-    "-j",
-    "output_json",
-    is_flag=True,
-    help="Output results as JSON"
-)
-@click.option(
-    "--timeout",
-    type=float,
-    default=30.0,
-    help="Execution timeout in seconds (default: 30)"
+    "--timeout", type=float, default=30.0, help="Execution timeout in seconds (default: 30)"
 )
 def autocomplete(threshold, include_hidden, include_disabled, output_json, timeout):
     """
@@ -1066,16 +1104,19 @@ def autocomplete(threshold, include_hidden, include_disabled, output_json, timeo
         service = get_autocomplete_service()
 
         # Run the autocomplete check
-        result = asyncio.run(service.check_autocomplete(
-            bridge_executor=client,
-            confidence_threshold=threshold,
-            include_hidden=include_hidden,
-            include_disabled=include_disabled
-        ))
+        result = asyncio.run(
+            service.check_autocomplete(
+                bridge_executor=client,
+                confidence_threshold=threshold,
+                include_hidden=include_hidden,
+                include_disabled=include_disabled,
+            )
+        )
 
         if output_json:
             # JSON output
             from inspekt.app.cli.table import print_json
+
             analyzed = result.get("summary", {}).get("analyzed", 0)
             print_json(result, summary=f"autocomplete check ({analyzed} fields)")
             return
@@ -1098,40 +1139,44 @@ def autocomplete(threshold, include_hidden, include_disabled, output_json, timeo
         click.echo(f"  Has autocomplete:     {summary.get('hasAutocomplete', 0)}")
         click.echo(f"  Correct autocomplete: {summary.get('hasCorrectAutocomplete', 0)}")
 
-        violations = summary.get('violations', 0)
-        warnings = summary.get('warnings', 0)
+        violations = summary.get("violations", 0)
+        warnings = summary.get("warnings", 0)
 
         # Format counts: use "None" for 0
         violations_text = violations if violations > 0 else "None"
         warnings_text = "None" if warnings == 0 else str(warnings)
 
         if violations > 0:
-            click.echo(f"  {click.style('✗ Violations:', fg='red', bold=True)}         {violations_text}")
+            click.echo(
+                f"  {click.style('✗ Violations:', fg='red', bold=True)}         {violations_text}"
+            )
         else:
             click.echo(f"  {click.style('✓ Violations:', fg='green')}         {violations_text}")
 
         if warnings > 0:
-            click.echo(f"  {click.style('⚠ Warnings:', fg='yellow', bold=True)}           {warnings_text}")
+            click.echo(
+                f"  {click.style('⚠ Warnings:', fg='yellow', bold=True)}           {warnings_text}"
+            )
         else:
             click.echo(f"  {click.style('✓ Warnings:', fg='green')}           {warnings_text}")
 
         click.echo()
 
         # Group fields by status
-        violation_fields = [f for f in fields if f.get('level') == 'violation']
-        warning_fields = [f for f in fields if f.get('level') == 'warning']
-        pass_fields = [f for f in fields if f.get('level') == 'pass']
+        violation_fields = [f for f in fields if f.get("level") == "violation"]
+        warning_fields = [f for f in fields if f.get("level") == "warning"]
+        pass_fields = [f for f in fields if f.get("level") == "pass"]
 
         # Show violations
         if violation_fields:
             click.echo(click.style("❌ WCAG 2.1 SC 1.3.5 Violations:", bold=True, fg="red"))
             click.echo()
             for field in violation_fields:
-                selector = field.get('selector', 'unknown')
-                predicted = field.get('predictedAutocomplete', 'none')
-                confidence = field.get('confidence', 0)
-                label = field.get('label') or 'None'
-                message = field.get('message', '')
+                selector = field.get("selector", "unknown")
+                predicted = field.get("predictedAutocomplete", "none")
+                confidence = field.get("confidence", 0)
+                label = field.get("label") or "None"
+                message = field.get("message", "")
 
                 click.echo(f"  Field:     {selector}")
                 click.echo(f"  Label:     {label}")
@@ -1144,27 +1189,34 @@ def autocomplete(threshold, include_hidden, include_disabled, output_json, timeo
             click.echo(click.style("⚠️  Warnings:", bold=True, fg="yellow"))
             click.echo()
             for field in warning_fields:
-                selector = field.get('selector', 'unknown')
-                predicted = field.get('predictedAutocomplete', 'none')
-                confidence = field.get('confidence', 0)
-                message = field.get('message', '')
+                selector = field.get("selector", "unknown")
+                predicted = field.get("predictedAutocomplete", "none")
+                confidence = field.get("confidence", 0)
+                message = field.get("message", "")
 
                 click.echo(f"  {click.style('Field:', fg='bright_black')} {selector}")
-                click.echo(f"  {click.style('Predicted:', fg='cyan')} {predicted} (confidence: {confidence:.0%})")
+                click.echo(
+                    f"  {click.style('Predicted:', fg='cyan')} {predicted} (confidence: {confidence:.0%})"
+                )
                 click.echo(f"  {click.style('Note:', fg='yellow')} {message}")
                 click.echo()
 
         # Show passing fields with details
         if pass_fields:
-            correct_fields = [f for f in pass_fields if f.get('status') == 'correct']
+            correct_fields = [f for f in pass_fields if f.get("status") == "correct"]
             if correct_fields:
-                click.echo(click.style(f"✅ {len(correct_fields)} field(s) have correct autocomplete attributes:", fg="green"))
+                click.echo(
+                    click.style(
+                        f"✅ {len(correct_fields)} field(s) have correct autocomplete attributes:",
+                        fg="green",
+                    )
+                )
                 click.echo()
                 for field in correct_fields:
-                    selector = field.get('selector', 'unknown')
-                    current = field.get('currentAutocomplete', 'none')
-                    label = field.get('label') or 'None'
-                    confidence = field.get('confidence', 0)
+                    selector = field.get("selector", "unknown")
+                    current = field.get("currentAutocomplete", "none")
+                    label = field.get("label") or "None"
+                    confidence = field.get("confidence", 0)
 
                     click.echo(f"  Field:        {selector}")
                     click.echo(f"  Label:        {label}")
@@ -1174,15 +1226,29 @@ def autocomplete(threshold, include_hidden, include_disabled, output_json, timeo
         # Footer with WCAG info
         click.echo(click.style("─" * 60, fg="bright_black"))
         if violations == 0:
-            click.echo(click.style(success("Page is compliant with WCAG 2.1 SC 1.3.5"), fg="green", bold=True))
+            click.echo(
+                click.style(
+                    success("Page is compliant with WCAG 2.1 SC 1.3.5"), fg="green", bold=True
+                )
+            )
         else:
-            click.echo(click.style(error(f"Found {violations} WCAG 2.1 SC 1.3.5 violation(s)"), fg="red", bold=True))
+            click.echo(
+                click.style(
+                    error(f"Found {violations} WCAG 2.1 SC 1.3.5 violation(s)"), fg="red", bold=True
+                )
+            )
 
-        click.echo(click.style(f"Confidence threshold: {threshold} | Multi-language: EN, DE, NL, FR", fg="bright_black"))
+        click.echo(
+            click.style(
+                f"Confidence threshold: {threshold} | Multi-language: EN, DE, NL, FR",
+                fg="bright_black",
+            )
+        )
         click.echo()
 
         # VM terminal: offer a "Data ready to copy" toast
         from inspekt.app.cli.table import emit_copyable_data
+
         ac_rows = [
             [
                 f.get("selector", ""),
@@ -1265,7 +1331,7 @@ def _get_ibm_level_color(level: str) -> str:
         "recommendation": "blue",
         "potentialrecommendation": "cyan",
         "manual": "bright_black",
-        "pass": "green"
+        "pass": "green",
     }
     return colors.get(level, "white")
 
@@ -1278,7 +1344,7 @@ def _format_ibm_level(level: str) -> str:
         "recommendation": "Recommendation",
         "potentialrecommendation": "Potential",
         "manual": "Manual",
-        "pass": "Pass"
+        "pass": "Pass",
     }
     return names.get(level, level)
 
@@ -1300,7 +1366,7 @@ def _format_ibm_table_output(issues, summary, url, compact=False):
             rule_groups[rule_id] = {
                 "level": issue.get("level", "violation"),
                 "message": issue.get("message", "")[:60],
-                "count": 0
+                "count": 0,
             }
         rule_groups[rule_id]["count"] += 1
 
@@ -1336,6 +1402,7 @@ def _format_ibm_table_output(issues, summary, url, compact=False):
 
     # VM terminal: offer a "Data ready to copy" toast
     from inspekt.app.cli.table import emit_copyable_data
+
     emit_copyable_data(
         headers=headers,
         rows=rows,
@@ -1367,64 +1434,46 @@ def _format_ibm_table_output(issues, summary, url, compact=False):
     "--level",
     type=click.Choice(["2a", "2aa", "2aaa", "21a", "21aa", "22aa"], case_sensitive=False),
     default="21aa",
-    help="WCAG conformance level to test (default: 21aa)"
+    help="WCAG conformance level to test (default: 21aa)",
 )
+@click.option("--rule", type=str, help="Check specific accessibility rule by ID")
 @click.option(
-    "--rule",
-    type=str,
-    help="Check specific accessibility rule by ID"
+    "--list-rules", is_flag=True, help="List all available IBM Equal Access rules and exit"
 )
-@click.option(
-    "--list-rules",
-    is_flag=True,
-    help="List all available IBM Equal Access rules and exit"
-)
-@click.option(
-    "--include-passes",
-    is_flag=True,
-    help="Include passing checks in output"
-)
-@click.option(
-    "--include-recommendations",
-    is_flag=True,
-    help="Include recommendations in output"
-)
-@click.option(
-    "--json",
-    "-j",
-    "output_json",
-    is_flag=True,
-    help="Output full results as JSON"
-)
-@click.option(
-    "--timeout",
-    type=float,
-    default=30.0,
-    help="Timeout in seconds (default: 30)"
-)
+@click.option("--include-passes", is_flag=True, help="Include passing checks in output")
+@click.option("--include-recommendations", is_flag=True, help="Include recommendations in output")
+@click.option("--json", "-j", "output_json", is_flag=True, help="Output full results as JSON")
+@click.option("--timeout", type=float, default=30.0, help="Timeout in seconds (default: 30)")
 @click.option(
     "--scoped",
     type=str,
-    help="Scope tests to specific elements. Use 'inspected' for the currently inspected element, or provide CSS selectors"
+    help="Scope tests to specific elements. Use 'inspected' for the currently inspected element, or provide CSS selectors",
 )
-@click.option(
-    "--exclude",
-    type=str,
-    multiple=True,
-    help="Exclude elements from testing"
-)
+@click.option("--exclude", type=str, multiple=True, help="Exclude elements from testing")
 @click.option(
     "--show-badges/--no-show-badges",
     default=None,
-    help="Show numbered severity badges on elements with issues"
+    help="Show numbered severity badges on elements with issues",
 )
 @click.option(
     "--interactive",
     is_flag=True,
     default=False,
-    help="Make badges clickable with detailed popover information"
+    help="Make badges clickable with detailed popover information",
 )
-def ibm(level, rule, list_rules, include_passes, include_recommendations, output_json, timeout, scoped, exclude, show_badges, interactive):
+def ibm(
+    level,
+    rule,
+    list_rules,
+    include_passes,
+    include_recommendations,
+    output_json,
+    timeout,
+    scoped,
+    exclude,
+    show_badges,
+    interactive,
+):
     """
     Run IBM Equal Access accessibility audit on the current page.
 
@@ -1454,6 +1503,7 @@ def ibm(level, rule, list_rules, include_passes, include_recommendations, output
     """
     # Create bridge client
     from inspekt.client import BridgeClient
+
     client = BridgeClient()
 
     # Handle --list-rules
@@ -1488,6 +1538,7 @@ def ibm(level, rule, list_rules, include_passes, include_recommendations, output
             data = result.get("result", {})
             if output_json:
                 from inspekt.app.cli.table import print_json
+
                 print_json(data, summary=f"{len(data.get('rules', []))} IBM rules")
             else:
                 rules = data.get("rules", [])
@@ -1498,15 +1549,15 @@ def ibm(level, rule, list_rules, include_passes, include_recommendations, output
 
                 for rule_data in rules:
                     click.echo(f"  {click.style(rule_data['id'], fg='cyan')}")
-                    if rule_data.get('description'):
+                    if rule_data.get("description"):
                         click.echo(f"    {rule_data['description'][:80]}")
-                    if rule_data.get('wcag'):
-                        wcag_str = ', '.join(rule_data['wcag'])
-                        click.echo(click.style(f"    WCAG: {wcag_str}", fg='bright_black'))
+                    if rule_data.get("wcag"):
+                        wcag_str = ", ".join(rule_data["wcag"])
+                        click.echo(click.style(f"    WCAG: {wcag_str}", fg="bright_black"))
                     click.echo()
 
                 click.echo(click.style("Statistics:", bold=True))
-                for key, value in stats.get('byLevel', {}).items():
+                for key, value in stats.get("byLevel", {}).items():
                     click.echo(f"  {key}: {value}")
 
         except Exception as e:
@@ -1527,6 +1578,7 @@ def ibm(level, rule, list_rules, include_passes, include_recommendations, output
     # Determine if badges should be shown
     if show_badges is None:
         from inspekt.config import load_config
+
         config_data = load_config()
         show_badges = config_data.get("ibm", {}).get("show-badges", True)
 
@@ -1545,8 +1597,12 @@ def ibm(level, rule, list_rules, include_passes, include_recommendations, output
         sys.exit(1)
 
     script_path = Path(__file__).parent.parent.parent / "scripts" / "run_ibm.js"
-    popover_core_path = Path(__file__).parent.parent.parent / "scripts" / "shared-popover" / "popover-core.js"
-    popover_content_path = Path(__file__).parent.parent.parent / "scripts" / "shared-popover" / "popover-content.js"
+    popover_core_path = (
+        Path(__file__).parent.parent.parent / "scripts" / "shared-popover" / "popover-core.js"
+    )
+    popover_content_path = (
+        Path(__file__).parent.parent.parent / "scripts" / "shared-popover" / "popover-content.js"
+    )
 
     if not script_path.exists():
         click.echo(f"Error: Script not found: {script_path}", err=True)
@@ -1597,7 +1653,9 @@ def ibm(level, rule, list_rules, include_passes, include_recommendations, output
             sys.exit(1)
 
         # Show warnings
-        warnings = ["Traditional accessibility checkers identify only about 20–50% of WCAG issues and may produce false positives. You cannot rely on these results to claim WCAG compliance."]
+        warnings = [
+            "Traditional accessibility checkers identify only about 20–50% of WCAG issues and may produce false positives. You cannot rely on these results to claim WCAG compliance."
+        ]
         click.echo(click.style("WARNING", fg="yellow", bold=True), err=True)
         print_wrapped(warnings[0], err=True)
         click.echo("", err=True)
@@ -1636,6 +1694,7 @@ def ibm(level, rule, list_rules, include_passes, include_recommendations, output
 
         if output_json:
             from datetime import datetime
+
             output = {
                 "url": url,
                 "title": page_title,
@@ -1649,6 +1708,7 @@ def ibm(level, rule, list_rules, include_passes, include_recommendations, output
                 "summary": summary,
             }
             from inspekt.app.cli.table import print_json
+
             print_json(output, summary=f"{len(issues)} IBM issues")
         else:
             _format_ibm_table_output(issues, summary, url)
@@ -1657,7 +1717,11 @@ def ibm(level, rule, list_rules, include_passes, include_recommendations, output
             badge_stats = audit_result.get("badgeStats")
             if badge_stats and badge_stats.get("badgesCreated", 0) > 0:
                 click.echo()
-                click.echo(click.style(f"Created {badge_stats['badgesCreated']} badges on page", fg="bright_black"))
+                click.echo(
+                    click.style(
+                        f"Created {badge_stats['badgesCreated']} badges on page", fg="bright_black"
+                    )
+                )
 
     except (ConnectionError, TimeoutError, RuntimeError) as e:
         click.echo(f"Error: {e}", err=True)
@@ -2065,14 +2129,8 @@ def _build_enriched_report_data(
 
     for sc in sorted_scs:
         data = consolidated[sc]
-        engine_fails = {
-            eng: data.get(f"{eng}_status") not in ("pass",)
-            for eng in engine_list
-        }
-        engine_counts = {
-            eng: data.get(f"{eng}_count", 0)
-            for eng in engine_list
-        }
+        engine_fails = {eng: data.get(f"{eng}_status") not in ("pass",) for eng in engine_list}
+        engine_counts = {eng: data.get(f"{eng}_count", 0) for eng in engine_list}
         failing_engines = [eng for eng, fails in engine_fails.items() if fails]
         passing_engines = [eng for eng, fails in engine_fails.items() if not fails]
 
@@ -2081,19 +2139,25 @@ def _build_enriched_report_data(
 
         # Disagreements
         if failing_engines and passing_engines:
-            disagreements.append({
-                "sc": sc,
-                "description": WCAG_SC_DESCRIPTIONS.get(sc, ""),
-                "conformance_level": WCAG_SC_LEVELS.get(sc, {}).get("level", ""),
-                "failing_engines": [
-                    {"engine": eng, "abbr": AVAILABLE_ENGINES[eng]["abbr"], "count": engine_counts[eng]}
-                    for eng in failing_engines
-                ],
-                "passing_engines": [
-                    {"engine": eng, "abbr": AVAILABLE_ENGINES[eng]["abbr"]}
-                    for eng in passing_engines
-                ],
-            })
+            disagreements.append(
+                {
+                    "sc": sc,
+                    "description": WCAG_SC_DESCRIPTIONS.get(sc, ""),
+                    "conformance_level": WCAG_SC_LEVELS.get(sc, {}).get("level", ""),
+                    "failing_engines": [
+                        {
+                            "engine": eng,
+                            "abbr": AVAILABLE_ENGINES[eng]["abbr"],
+                            "count": engine_counts[eng],
+                        }
+                        for eng in failing_engines
+                    ],
+                    "passing_engines": [
+                        {"engine": eng, "abbr": AVAILABLE_ENGINES[eng]["abbr"]}
+                        for eng in passing_engines
+                    ],
+                }
+            )
 
         # Disparities
         if len(failing_engines) >= 2:
@@ -2101,13 +2165,15 @@ def _build_enriched_report_data(
             if len(counts) >= 2:
                 min_c, max_c = min(counts), max(counts)
                 if min_c > 0 and max_c / min_c >= 2:
-                    disparities.append({
-                        "sc": sc,
-                        "description": WCAG_SC_DESCRIPTIONS.get(sc, ""),
-                        "conformance_level": WCAG_SC_LEVELS.get(sc, {}).get("level", ""),
-                        "counts": {eng: engine_counts[eng] for eng in engine_list},
-                        "ratio": round(max_c / min_c, 1),
-                    })
+                    disparities.append(
+                        {
+                            "sc": sc,
+                            "description": WCAG_SC_DESCRIPTIONS.get(sc, ""),
+                            "conformance_level": WCAG_SC_LEVELS.get(sc, {}).get("level", ""),
+                            "counts": {eng: engine_counts[eng] for eng in engine_list},
+                            "ratio": round(max_c / min_c, 1),
+                        }
+                    )
 
     # Engine correlation
     correlation = _calculate_engine_correlation(consolidated, engine_list)
@@ -2187,12 +2253,14 @@ def _build_enriched_report_data(
             sc = rec["sc"] or "unknown"
             if sc not in recommendations_by_sc:
                 recommendations_by_sc[sc] = []
-            recommendations_by_sc[sc].append({
-                "engine": rec["engine"],
-                "rule_id": rec["rule_id"],
-                "level": rec["level"],
-                "message": rec["message"],
-            })
+            recommendations_by_sc[sc].append(
+                {
+                    "engine": rec["engine"],
+                    "rule_id": rec["rule_id"],
+                    "level": rec["level"],
+                    "message": rec["message"],
+                }
+            )
         output["recommendations"] = {
             "total": len(recommendations),
             "by_sc": recommendations_by_sc,
@@ -2223,82 +2291,80 @@ def _get_contextual_tips(
 
     # Priority 1: Visualization tips (when issues found and not using badges)
     if issue_count > 0 and not show_badges:
-        example = f"`inspekt a11y {engine_name} --show-badges --interactive`" if is_single_engine else "`inspekt a11y --show-badges --interactive`"
-        tips.append((
-            "--show-badges --interactive",
-            "Visualize issues on page with clickable fix suggestions",
-            example
-        ))
+        example = (
+            f"`inspekt a11y {engine_name} --show-badges --interactive`"
+            if is_single_engine
+            else "`inspekt a11y --show-badges --interactive`"
+        )
+        tips.append(
+            (
+                "--show-badges --interactive",
+                "Visualize issues on page with clickable fix suggestions",
+                example,
+            )
+        )
 
     # Priority 2: Verbose tip (when not already verbose)
     if not verbose:
-        example = f"`inspekt a11y {engine_name} --verbose`" if is_single_engine else "`inspekt a11y --verbose`"
-        tips.append((
-            "--verbose",
-            "Show detailed per-rule breakdown with element counts",
-            example
-        ))
+        example = (
+            f"`inspekt a11y {engine_name} --verbose`"
+            if is_single_engine
+            else "`inspekt a11y --verbose`"
+        )
+        tips.append(("--verbose", "Show detailed per-rule breakdown with element counts", example))
 
     # Priority 2b: JSON export tip (when already using verbose)
     if verbose:
-        tips.append((
-            "--json -o report.json",
-            "Create a comprehensive (multi-engine) report",
-            None
-        ))
+        tips.append(("--json -o report.json", "Create a comprehensive (multi-engine) report", None))
 
     # Priority 2c: Recommendations tip (when not already using recommendations)
     if not include_recommendations:
-        tips.append((
-            "--include-recommendations",
-            "Include best practices and items that need manual review",
-            None
-        ))
+        tips.append(
+            (
+                "--include-recommendations",
+                "Include best practices and items that need manual review",
+                None,
+            )
+        )
 
     # Priority 3: Scope tip (when many issues found)
     if issue_count > 10:
-        tips.append((
-            "--scoped inspected",
-            "Focus testing on the element you're inspecting in DevTools",
-            None
-        ))
+        tips.append(
+            (
+                "--scoped inspected",
+                "Focus testing on the element you're inspecting in DevTools",
+                None,
+            )
+        )
 
     # Priority 4: Level tips
     if issue_count == 0 and level != "22aa":
-        tips.append((
-            "--level 22aa",
-            "Test against stricter WCAG 2.2 AA criteria",
-            None
-        ))
+        tips.append(("--level 22aa", "Test against stricter WCAG 2.2 AA criteria", None))
     elif issue_count > 10 and level not in ("2a", "21a"):
-        tips.append((
-            "--level 2a",
-            "Focus on Level A (most critical) issues first",
-            None
-        ))
+        tips.append(("--level 2a", "Focus on Level A (most critical) issues first", None))
 
     # Priority 5: Engine tips
     if is_single_engine:
         other_engines = [e for e in ["axe", "eac", "hcs", "sia"] if e != engine_name]
-        tips.append((
-            f"inspekt a11y {' '.join(other_engines[:2])}",
-            "Try other engines for different perspectives on accessibility issues",
-            None
-        ))
+        tips.append(
+            (
+                f"inspekt a11y {' '.join(other_engines[:2])}",
+                "Try other engines for different perspectives on accessibility issues",
+                None,
+            )
+        )
     else:
-        tips.append((
-            "inspekt a11y <engine>",
-            "Run a single engine for faster results",
-            "`inspekt a11y --info` to list engines"
-        ))
+        tips.append(
+            (
+                "inspekt a11y <engine>",
+                "Run a single engine for faster results",
+                "`inspekt a11y --info` to list engines",
+            )
+        )
 
     # Priority 6: Show passes tip (when no issues and not already showing passes)
     if issue_count == 0 and not show_passes:
-        tips.append((
-            "--show-passes",
-            "See which WCAG criteria are explicitly passing",
-            None
-        ))
+        tips.append(("--show-passes", "See which WCAG criteria are explicitly passing", None))
 
     # Return max 3 tips
     return tips[:3]
@@ -2310,10 +2376,11 @@ def _extract_wcag_from_axe_tags(tags: list[str]) -> list[str]:
     Axe uses tags like 'wcag111' for 1.1.1, 'wcag143' for 1.4.3, etc.
     """
     import re
+
     wcag_scs = []
     for tag in tags:
         # Match patterns like wcag111, wcag143, wcag2411, etc.
-        match = re.match(r'^wcag(\d)(\d)(\d+)$', tag)
+        match = re.match(r"^wcag(\d)(\d)(\d+)$", tag)
         if match:
             p, g, sc = match.groups()
             wcag_scs.append(f"{p}.{g}.{sc}")
@@ -2326,10 +2393,11 @@ def _extract_wcag_from_ibm(wcag_list: list[str]) -> list[str]:
     IBM returns WCAG SCs directly like ['1.1.1', '4.1.2'] or sometimes ['ARIA'].
     """
     import re
+
     wcag_scs = []
     for item in wcag_list:
         # Only include numeric SC (skip 'ARIA', etc.)
-        if re.match(r'^\d+\.\d+\.\d+$', item):
+        if re.match(r"^\d+\.\d+\.\d+$", item):
             wcag_scs.append(item)
     return wcag_scs
 
@@ -2341,10 +2409,11 @@ def _extract_wcag_from_htmlcs_code(code: str) -> list[str]:
     where '1_3_1' is the SC (1.3.1).
     """
     import re
+
     wcag_scs = []
 
     # Look for pattern like '1_3_1' in the code (SC with underscores)
-    match = re.search(r'\.(\d+)_(\d+)_(\d+)\.', code)
+    match = re.search(r"\.(\d+)_(\d+)_(\d+)\.", code)
     if match:
         p, g, sc = match.groups()
         wcag_scs.append(f"{p}.{g}.{sc}")
@@ -2358,12 +2427,13 @@ def _extract_wcag_from_sia(requirements: list) -> list[str]:
     Alfa uses requirements like 'wcag:1.1.1' or 'wcag:2.4.4'.
     """
     import re
+
     wcag_scs = []
 
     for req in requirements:
         if isinstance(req, str):
             # Format: 'wcag:1.1.1' or 'wcag21:1.4.11'
-            match = re.search(r'wcag\d*:(\d+\.\d+\.\d+)', req)
+            match = re.search(r"wcag\d*:(\d+\.\d+\.\d+)", req)
             if match:
                 wcag_scs.append(match.group(1))
 
@@ -2374,10 +2444,18 @@ def _get_tool_versions() -> dict[str, str]:
     """Load tool versions from version JSON files."""
     versions = {"axe": "unknown", "eac": "unknown", "hcs": "unknown", "sia": "unknown"}
 
-    axe_version_path = Path(__file__).parent.parent.parent / "scripts" / "vendor" / "axe-core.version.json"
-    ibm_version_path = Path(__file__).parent.parent.parent / "scripts" / "vendor" / "ace.version.json"
-    htmlcs_version_path = Path(__file__).parent.parent.parent / "scripts" / "vendor" / "htmlcs.version.json"
-    sia_version_path = Path(__file__).parent.parent.parent / "scripts" / "vendor" / "sia.version.json"
+    axe_version_path = (
+        Path(__file__).parent.parent.parent / "scripts" / "vendor" / "axe-core.version.json"
+    )
+    ibm_version_path = (
+        Path(__file__).parent.parent.parent / "scripts" / "vendor" / "ace.version.json"
+    )
+    htmlcs_version_path = (
+        Path(__file__).parent.parent.parent / "scripts" / "vendor" / "htmlcs.version.json"
+    )
+    sia_version_path = (
+        Path(__file__).parent.parent.parent / "scripts" / "vendor" / "sia.version.json"
+    )
 
     try:
         if axe_version_path.exists():
@@ -2466,8 +2544,7 @@ def _get_engine_release_dates(versions: dict[str, str]) -> dict[str, str]:
     # Load fallback dates from engines.json
     metadata = load_engine_metadata()
     fallback_dates = {
-        engine_id: info.get("latest_update", "unknown")
-        for engine_id, info in metadata.items()
+        engine_id: info.get("latest_update", "unknown") for engine_id, info in metadata.items()
     }
 
     cache_path = _get_release_date_cache_path()
@@ -2533,7 +2610,9 @@ def _get_engine_release_dates(versions: dict[str, str]) -> dict[str, str]:
     return result
 
 
-def _run_axe_audit(client, level: str, timeout: float, include_recommendations: bool = False) -> dict:
+def _run_axe_audit(
+    client, level: str, timeout: float, include_recommendations: bool = False
+) -> dict:
     """Run Axe audit and return results."""
     axe_lib_path = Path(__file__).parent.parent.parent / "scripts" / "vendor" / "axe-core.min.js"
     script_path = Path(__file__).parent.parent.parent / "scripts" / "run_axe.js"
@@ -2561,14 +2640,14 @@ def _run_axe_audit(client, level: str, timeout: float, include_recommendations: 
         audit_script = audit_script.replace("__AXE_CONFIG__", json.dumps(config))
 
         # Check if axe is already loaded (skip injection if so)
-        if not _is_engine_loaded(client, 'axe'):
+        if not _is_engine_loaded(client, "axe"):
             # Inject library
             axe_lib_wrapped = f"(function() {{ {axe_lib} return typeof axe !== 'undefined'; }})()"
             result = client.execute(axe_lib_wrapped, timeout=15.0)
             if not result.get("ok") or not result.get("result"):
                 return {"error": "Failed to load axe-core", "violations": [], "passes": []}
             # Mark engine as loaded
-            _mark_engine_loaded(client, 'axe')
+            _mark_engine_loaded(client, "axe")
 
         # Run audit
         result = client.execute(audit_script, timeout=timeout)
@@ -2589,7 +2668,9 @@ def _run_axe_audit(client, level: str, timeout: float, include_recommendations: 
         return {"error": str(e), "violations": [], "passes": []}
 
 
-def _run_ibm_audit(client, level: str, timeout: float, include_recommendations: bool = False) -> dict:
+def _run_ibm_audit(
+    client, level: str, timeout: float, include_recommendations: bool = False
+) -> dict:
     """Run IBM Equal Access audit and return results."""
     ace_lib_path = Path(__file__).parent.parent.parent / "scripts" / "vendor" / "ace.min.js"
     script_path = Path(__file__).parent.parent.parent / "scripts" / "run_ibm.js"
@@ -2614,14 +2695,14 @@ def _run_ibm_audit(client, level: str, timeout: float, include_recommendations: 
         audit_script = audit_script.replace("__IBM_CONFIG__", json.dumps(config))
 
         # Check if ace is already loaded (skip injection if so)
-        if not _is_engine_loaded(client, 'ace'):
+        if not _is_engine_loaded(client, "ace"):
             # Inject library
             ace_lib_wrapped = f"(function() {{ {ace_lib}; window.ace = ace; return typeof window.ace !== 'undefined'; }})()"
             result = client.execute(ace_lib_wrapped, timeout=15.0)
             if not result.get("ok") or not result.get("result"):
                 return {"error": "Failed to load IBM Equal Access", "issues": [], "summary": {}}
             # Mark engine as loaded
-            _mark_engine_loaded(client, 'ace')
+            _mark_engine_loaded(client, "ace")
 
         # Run audit
         result = client.execute(audit_script, timeout=timeout)
@@ -2636,7 +2717,7 @@ def _run_ibm_audit(client, level: str, timeout: float, include_recommendations: 
 
         # Filter out violations from Inspekt's own UI elements
         issues = audit_result.get("issues", [])
-        issues = _filter_inspekt_ui_violations(issues, selector_key='path')
+        issues = _filter_inspekt_ui_violations(issues, selector_key="path")
 
         return {
             "issues": issues,
@@ -2647,7 +2728,9 @@ def _run_ibm_audit(client, level: str, timeout: float, include_recommendations: 
         return {"error": str(e), "issues": [], "summary": {}}
 
 
-def _run_htmlcs_audit(client, level: str, timeout: float, include_recommendations: bool = False) -> dict:
+def _run_htmlcs_audit(
+    client, level: str, timeout: float, include_recommendations: bool = False
+) -> dict:
     """Run HTML_CodeSniffer audit and return results."""
     htmlcs_lib_path = Path(__file__).parent.parent.parent / "scripts" / "vendor" / "htmlcs.min.js"
     script_path = Path(__file__).parent.parent.parent / "scripts" / "run_htmlcs.js"
@@ -2685,14 +2768,16 @@ def _run_htmlcs_audit(client, level: str, timeout: float, include_recommendation
         audit_script = audit_script.replace("__HTMLCS_CONFIG__", json.dumps(config))
 
         # Check if htmlcs is already loaded (skip injection if so)
-        if not _is_engine_loaded(client, 'htmlcs'):
+        if not _is_engine_loaded(client, "htmlcs"):
             # Inject library
-            htmlcs_lib_wrapped = f"(function() {{ {htmlcs_lib}; return typeof HTMLCS !== 'undefined'; }})()"
+            htmlcs_lib_wrapped = (
+                f"(function() {{ {htmlcs_lib}; return typeof HTMLCS !== 'undefined'; }})()"
+            )
             result = client.execute(htmlcs_lib_wrapped, timeout=15.0)
             if not result.get("ok") or not result.get("result"):
                 return {"error": "Failed to load HTML_CodeSniffer", "messages": [], "summary": {}}
             # Mark engine as loaded
-            _mark_engine_loaded(client, 'htmlcs')
+            _mark_engine_loaded(client, "htmlcs")
 
         # Run audit
         result = client.execute(audit_script, timeout=timeout)
@@ -2705,7 +2790,7 @@ def _run_htmlcs_audit(client, level: str, timeout: float, include_recommendation
 
         # Filter out violations from Inspekt's own UI elements
         messages = data.get("messages", [])
-        messages = _filter_inspekt_ui_violations(messages, selector_key='selector')
+        messages = _filter_inspekt_ui_violations(messages, selector_key="selector")
 
         return {
             "messages": messages,
@@ -2716,7 +2801,9 @@ def _run_htmlcs_audit(client, level: str, timeout: float, include_recommendation
         return {"error": str(e), "messages": [], "summary": {}}
 
 
-def _run_sia_audit(client, level: str, timeout: float, include_recommendations: bool = False) -> dict:
+def _run_sia_audit(
+    client, level: str, timeout: float, include_recommendations: bool = False
+) -> dict:
     """Run Alfa audit and return results."""
     sia_lib_path = Path(__file__).parent.parent.parent / "scripts" / "vendor" / "sia.min.js"
     script_path = Path(__file__).parent.parent.parent / "scripts" / "run_sia.js"
@@ -2766,14 +2853,14 @@ def _run_sia_audit(client, level: str, timeout: float, include_recommendations: 
         audit_script = audit_script.replace("__SIA_CONFIG__", json.dumps(config))
 
         # Check if sia is already loaded (skip injection if so)
-        if not _is_engine_loaded(client, 'sia'):
+        if not _is_engine_loaded(client, "sia"):
             # Inject library - Alfa uses 'var Alfa=' so we need to explicitly export to window
             sia_lib_wrapped = f"(function() {{ {sia_lib}; window.Alfa = Alfa; return typeof window.Alfa !== 'undefined'; }})()"
             result = client.execute(sia_lib_wrapped, timeout=30.0)
             if not result.get("ok") or not result.get("result"):
                 return {"error": "Failed to load Alfa", "outcomes": [], "summary": {}}
             # Mark engine as loaded
-            _mark_engine_loaded(client, 'sia')
+            _mark_engine_loaded(client, "sia")
 
         # Run audit
         result = client.execute(audit_script, timeout=timeout)
@@ -2789,7 +2876,7 @@ def _run_sia_audit(client, level: str, timeout: float, include_recommendations: 
 
         # Filter out violations from Inspekt's own UI elements
         outcomes = data.get("outcomes", [])
-        outcomes = _filter_inspekt_ui_violations(outcomes, selector_key='target')
+        outcomes = _filter_inspekt_ui_violations(outcomes, selector_key="target")
 
         return {
             "outcomes": outcomes,
@@ -2801,7 +2888,15 @@ def _run_sia_audit(client, level: str, timeout: float, include_recommendations: 
         return {"error": str(e), "outcomes": [], "summary": {}}
 
 
-def _inject_badges_into_page(client, engine_list: list, level: str, timeout: float, interactive: bool, dev_css: bool, include_recommendations: bool = False):
+def _inject_badges_into_page(
+    client,
+    engine_list: list,
+    level: str,
+    timeout: float,
+    interactive: bool,
+    dev_css: bool,
+    include_recommendations: bool = False,
+):
     """Inject accessibility badges into the current page.
 
     Called after the main CLI audit output is complete. Runs the unified audit script
@@ -2830,10 +2925,16 @@ def _inject_badges_into_page(client, engine_list: list, level: str, timeout: flo
     a11y_script_path = scripts_dir / "run_a11y.js"
 
     # Check shared files exist
-    for path, name in [(popover_core_path, "popover-core"), (popover_content_path, "popover-content"),
-                       (a11y_script_path, "run_a11y")]:
+    for path, name in [
+        (popover_core_path, "popover-core"),
+        (popover_content_path, "popover-content"),
+        (a11y_script_path, "run_a11y"),
+    ]:
         if not path.exists():
-            click.echo(click.style(f"Warning: Could not inject badges ({name} not found)", fg="yellow"), err=True)
+            click.echo(
+                click.style(f"Warning: Could not inject badges ({name} not found)", fg="yellow"),
+                err=True,
+            )
             return
 
     # Build list of engine libraries to load
@@ -2843,7 +2944,12 @@ def _inject_badges_into_page(client, engine_list: list, level: str, timeout: flo
             lib_file, lib_name = ENGINE_LIBS[engine_id]
             lib_path = vendor_dir / lib_file
             if not lib_path.exists():
-                click.echo(click.style(f"Warning: Could not inject badges ({lib_name} not found)", fg="yellow"), err=True)
+                click.echo(
+                    click.style(
+                        f"Warning: Could not inject badges ({lib_name} not found)", fg="yellow"
+                    ),
+                    err=True,
+                )
                 return
             engine_libs_to_load.append((engine_id, lib_path, lib_name))
 
@@ -2883,7 +2989,12 @@ def _inject_badges_into_page(client, engine_list: list, level: str, timeout: flo
             config["ibmGuidelines"] = _get_ibm_guidelines(level)
             if include_recommendations:
                 # Add recommendation levels for IBM
-                config["ibmReportLevels"] = ["violation", "potentialviolation", "recommendation", "potentialrecommendation"]
+                config["ibmReportLevels"] = [
+                    "violation",
+                    "potentialviolation",
+                    "recommendation",
+                    "potentialrecommendation",
+                ]
         if "hcs" in engine_list:
             config["hcsStandard"] = _get_hcs_standard(level)
             if include_recommendations:
@@ -2899,9 +3010,13 @@ def _inject_badges_into_page(client, engine_list: list, level: str, timeout: flo
         # Inject engine libraries dynamically
         ENGINE_WRAPPERS = {
             "axe": lambda lib: f"(function() {{ {lib} return typeof axe !== 'undefined'; }})()",
-            "eac": lambda lib: f"(function() {{ {lib}; window.ace = ace; return typeof window.ace !== 'undefined'; }})()",
+            "eac": lambda lib: (
+                f"(function() {{ {lib}; window.ace = ace; return typeof window.ace !== 'undefined'; }})()"
+            ),
             "hcs": lambda lib: f"(function() {{ {lib}; return typeof HTMLCS !== 'undefined'; }})()",
-            "sia": lambda lib: f"(function() {{ {lib}; window.Alfa = Alfa; return typeof window.Alfa !== 'undefined'; }})()",
+            "sia": lambda lib: (
+                f"(function() {{ {lib}; window.Alfa = Alfa; return typeof window.Alfa !== 'undefined'; }})()"
+            ),
         }
 
         for engine_id, _lib_path, lib_name in engine_libs_to_load:
@@ -2909,7 +3024,9 @@ def _inject_badges_into_page(client, engine_list: list, level: str, timeout: flo
             wrapped = ENGINE_WRAPPERS[engine_id](lib_content)
             result = client.execute(wrapped, timeout=15.0)
             if not result.get("ok") or not result.get("result"):
-                click.echo(click.style(f"  Warning: Failed to load {lib_name}", fg="yellow"), err=True)
+                click.echo(
+                    click.style(f"  Warning: Failed to load {lib_name}", fg="yellow"), err=True
+                )
                 return
 
         # Inject popover core
@@ -2921,19 +3038,31 @@ def _inject_badges_into_page(client, engine_list: list, level: str, timeout: flo
         # Inject popover content
         result = client.execute(popover_content, timeout=5.0)
         if not result.get("ok"):
-            click.echo(click.style("  Warning: Failed to load popover content", fg="yellow"), err=True)
+            click.echo(
+                click.style("  Warning: Failed to load popover content", fg="yellow"), err=True
+            )
             return
 
         # Run unified audit (creates badges)
         result = client.execute(a11y_script, timeout=timeout)
 
         if not result.get("ok"):
-            click.echo(click.style(f"  Warning: Badge injection failed - {result.get('error')}", fg="yellow"), err=True)
+            click.echo(
+                click.style(
+                    f"  Warning: Badge injection failed - {result.get('error')}", fg="yellow"
+                ),
+                err=True,
+            )
             return
 
         data = result.get("result", {})
         if not data.get("ok"):
-            click.echo(click.style(f"  Warning: Badge injection failed - {data.get('error')}", fg="yellow"), err=True)
+            click.echo(
+                click.style(
+                    f"  Warning: Badge injection failed - {data.get('error')}", fg="yellow"
+                ),
+                err=True,
+            )
             return
 
         audit_result = data.get("result", {})
@@ -2941,22 +3070,60 @@ def _inject_badges_into_page(client, engine_list: list, level: str, timeout: flo
 
         if badge_stats:
             badges_created = badge_stats.get("badgesCreated", 0)
-            click.echo(click.style(f"  Created {badges_created} clickable {pluralize(badges_created, 'badge')}", fg="green"), err=True)
+            click.echo(
+                click.style(
+                    f"  Created {badges_created} clickable {pluralize(badges_created, 'badge')}",
+                    fg="green",
+                ),
+                err=True,
+            )
 
             if interactive:
-                click.echo(click.style("  Click any badge to see details. Use arrow keys to navigate.", fg="bright_black"), err=True)
+                click.echo(
+                    click.style(
+                        "  Click any badge to see details. Use arrow keys to navigate.",
+                        fg="bright_black",
+                    ),
+                    err=True,
+                )
         else:
-            click.echo(click.style("  No badges created (no elements with violations found)", fg="bright_black"), err=True)
+            click.echo(
+                click.style(
+                    "  No badges created (no elements with violations found)", fg="bright_black"
+                ),
+                err=True,
+            )
             # Show Alfa-specific note if it's the only engine
             if engine_list == ["sia"]:
-                click.echo(click.style("  Note: Alfa's bundled format doesn't provide element references.", fg="bright_black"), err=True)
-                click.echo(click.style("  Use `inspekt a11y axe sia` to see Alfa issues in combined badges.", fg="bright_black"), err=True)
+                click.echo(
+                    click.style(
+                        "  Note: Alfa's bundled format doesn't provide element references.",
+                        fg="bright_black",
+                    ),
+                    err=True,
+                )
+                click.echo(
+                    click.style(
+                        "  Use `inspekt a11y axe sia` to see Alfa issues in combined badges.",
+                        fg="bright_black",
+                    ),
+                    err=True,
+                )
 
     except Exception as e:
         click.echo(click.style(f"  Warning: Badge injection failed - {e}", fg="yellow"), err=True)
 
 
-def _run_unified_a11y_with_badges(client, engine_list: list, level: str, timeout: float, interactive: bool, dev_css: bool, url: str, versions: dict):
+def _run_unified_a11y_with_badges(
+    client,
+    engine_list: list,
+    level: str,
+    timeout: float,
+    interactive: bool,
+    dev_css: bool,
+    url: str,
+    versions: dict,
+):
     """Run unified a11y audit with badges injected into the page.
 
     Note: This function is now deprecated. Use the main a11y() command with --show-badges
@@ -2981,8 +3148,11 @@ def _run_unified_a11y_with_badges(client, engine_list: list, level: str, timeout
     a11y_script_path = scripts_dir / "run_a11y.js"
 
     # Check shared files exist
-    for path, name in [(popover_core_path, "popover-core"), (popover_content_path, "popover-content"),
-                       (a11y_script_path, "run_a11y")]:
+    for path, name in [
+        (popover_core_path, "popover-core"),
+        (popover_content_path, "popover-content"),
+        (a11y_script_path, "run_a11y"),
+    ]:
         if not path.exists():
             click.echo(click.style(f"Error: {name} not found at {path}", fg="red"), err=True)
             return
@@ -2994,7 +3164,9 @@ def _run_unified_a11y_with_badges(client, engine_list: list, level: str, timeout
             lib_file, lib_name = ENGINE_LIBS[engine_id]
             lib_path = vendor_dir / lib_file
             if not lib_path.exists():
-                click.echo(click.style(f"Error: {lib_name} not found at {lib_path}", fg="red"), err=True)
+                click.echo(
+                    click.style(f"Error: {lib_name} not found at {lib_path}", fg="red"), err=True
+                )
                 return
             engine_libs_to_load.append((engine_id, lib_path, lib_name))
 
@@ -3004,7 +3176,7 @@ def _run_unified_a11y_with_badges(client, engine_list: list, level: str, timeout
     click.echo(err=True)
 
     # Show engines being used
-    engine_names = [AVAILABLE_ENGINES[e]['name'] for e in engine_list if e in AVAILABLE_ENGINES]
+    engine_names = [AVAILABLE_ENGINES[e]["name"] for e in engine_list if e in AVAILABLE_ENGINES]
     click.echo(f"Engines: {', '.join(engine_names)}", err=True)
     click.echo(err=True)
 
@@ -3053,9 +3225,13 @@ def _run_unified_a11y_with_badges(client, engine_list: list, level: str, timeout
         # Each wrapper ensures the library is globally accessible
         ENGINE_WRAPPERS = {
             "axe": lambda lib: f"(function() {{ {lib} return typeof axe !== 'undefined'; }})()",
-            "eac": lambda lib: f"(function() {{ {lib}; window.ace = ace; return typeof window.ace !== 'undefined'; }})()",
+            "eac": lambda lib: (
+                f"(function() {{ {lib}; window.ace = ace; return typeof window.ace !== 'undefined'; }})()"
+            ),
             "hcs": lambda lib: f"(function() {{ {lib}; return typeof HTMLCS !== 'undefined'; }})()",
-            "sia": lambda lib: f"(function() {{ {lib}; window.Alfa = Alfa; return typeof window.Alfa !== 'undefined'; }})()",
+            "sia": lambda lib: (
+                f"(function() {{ {lib}; window.Alfa = Alfa; return typeof window.Alfa !== 'undefined'; }})()"
+            ),
         }
 
         for engine_id, _lib_path, lib_name in engine_libs_to_load:
@@ -3116,7 +3292,9 @@ def _run_unified_a11y_with_badges(client, engine_list: list, level: str, timeout
         click.echo()
 
         if badge_stats:
-            click.echo(click.style(f"Badges created: {badge_stats.get('badgesCreated', 0)}", bold=True))
+            click.echo(
+                click.style(f"Badges created: {badge_stats.get('badgesCreated', 0)}", bold=True)
+            )
 
             # Show per-engine breakdown if multiple engines
             if len(engine_list) > 1:
@@ -3125,13 +3303,20 @@ def _run_unified_a11y_with_badges(client, engine_list: list, level: str, timeout
                     if engine_id in per_engine:
                         engine_name = AVAILABLE_ENGINES.get(engine_id, {}).get("name", engine_id)
                         click.echo(f"  {engine_name} only: {per_engine[engine_id]}")
-                combined = badge_stats.get("withMultipleSources", badge_stats.get("withBothSources", 0))
+                combined = badge_stats.get(
+                    "withMultipleSources", badge_stats.get("withBothSources", 0)
+                )
                 if combined > 0:
                     click.echo(f"  Multiple engines: {combined}")
 
             if interactive:
                 click.echo()
-                click.echo(click.style("Click any badge to see details. Use arrow keys to navigate.", fg="bright_black"))
+                click.echo(
+                    click.style(
+                        "Click any badge to see details. Use arrow keys to navigate.",
+                        fg="bright_black",
+                    )
+                )
         else:
             click.echo(click.style("No issues found - no badges created.", fg="green"))
 
@@ -3215,13 +3400,19 @@ def _consolidate_by_wcag(axe_results: dict, ibm_results: dict) -> dict:
                     "ibm_level": None,
                 }
             # Set to worst status
-            if consolidated[sc]["axe_status"] == "pass" or \
-               (consolidated[sc]["axe_status"] == "incomplete" and impact in ["critical", "serious"]):
+            if consolidated[sc]["axe_status"] == "pass" or (
+                consolidated[sc]["axe_status"] == "incomplete" and impact in ["critical", "serious"]
+            ):
                 consolidated[sc]["axe_status"] = "violation"
             consolidated[sc]["axe_count"] += count
-            if consolidated[sc]["axe_impact"] is None or \
-               ["minor", "moderate", "serious", "critical"].index(impact) > \
-               ["minor", "moderate", "serious", "critical"].index(consolidated[sc]["axe_impact"] or "minor"):
+            if consolidated[sc]["axe_impact"] is None or [
+                "minor",
+                "moderate",
+                "serious",
+                "critical",
+            ].index(impact) > ["minor", "moderate", "serious", "critical"].index(
+                consolidated[sc]["axe_impact"] or "minor"
+            ):
                 consolidated[sc]["axe_impact"] = impact
 
     # Process Axe incomplete
@@ -3275,8 +3466,14 @@ def _consolidate_by_wcag(axe_results: dict, ibm_results: dict) -> dict:
                 continue  # Don't override with pass
 
             # Set to worst status
-            level_priority = {"pass": 0, "manual": 1, "recommendation": 2,
-                            "potentialrecommendation": 2, "potentialviolation": 3, "violation": 4}
+            level_priority = {
+                "pass": 0,
+                "manual": 1,
+                "recommendation": 2,
+                "potentialrecommendation": 2,
+                "potentialviolation": 3,
+                "violation": 4,
+            }
             current_priority = level_priority.get(consolidated[sc]["ibm_status"], 0)
             new_priority = level_priority.get(level, 0)
 
@@ -3295,7 +3492,7 @@ def _run_engines_in_order(
     timeout: float,
     versions: dict[str, str],
     quiet: bool = False,
-    include_recommendations: bool = False
+    include_recommendations: bool = False,
 ) -> dict[str, dict]:
     """
     Run accessibility engines in specified order.
@@ -3330,7 +3527,7 @@ def _run_engines_in_order(
         reports_potential = metadata.get("reports_potential_violations", False)
 
         # Build styled engine name (bright yellow) with provider
-        styled_name = click.style(engine_info['name'], fg="bright_yellow")
+        styled_name = click.style(engine_info["name"], fg="bright_yellow")
         name_with_provider = f"{styled_name} by {provider}"
 
         # Use simpler format for single engine
@@ -3360,7 +3557,7 @@ def _run_engines_in_order(
             if not quiet:
                 indent = "  " if is_single else "      "
                 if engine_result.get("error"):
-                    error_msg = engine_result['error']
+                    error_msg = engine_result["error"]
                     # Provide more user-friendly messages for known Alfa errors
                     if engine == "sia" and "withoutFragment" in error_msg:
                         msg = warn_icon("Skipped (internal library error on this page)")
@@ -3383,11 +3580,17 @@ def _run_engines_in_order(
                         if include_recommendations:
                             rec_count = _count_recommendations(engine_result, engine)
                             if rec_count > 0:
-                                msg = alert(f"Found {v_count}{potential_qualifier} {pluralize(v_count, 'violation')} (and {rec_count} {pluralize(rec_count, 'recommendation')})")
+                                msg = alert(
+                                    f"Found {v_count}{potential_qualifier} {pluralize(v_count, 'violation')} (and {rec_count} {pluralize(rec_count, 'recommendation')})"
+                                )
                             else:
-                                msg = alert(f"Found {v_count}{potential_qualifier} {pluralize(v_count, 'violation')}")
+                                msg = alert(
+                                    f"Found {v_count}{potential_qualifier} {pluralize(v_count, 'violation')}"
+                                )
                         else:
-                            msg = alert(f"Found {v_count}{potential_qualifier} {pluralize(v_count, 'violation')}")
+                            msg = alert(
+                                f"Found {v_count}{potential_qualifier} {pluralize(v_count, 'violation')}"
+                            )
                         click.echo(click.style(f"{indent}{msg}", fg="yellow"), err=True)
                 # Time elapsed with stopwatch icon
                 time_msg = stopwatch(f"Took {elapsed:.1f} seconds")
@@ -3487,14 +3690,11 @@ def _calculate_engine_correlation(consolidated: dict, engine_list: list[str]) ->
         "total_scs": total,
         "full_agreement": full_agreement,
         "disagreement": total - full_agreement,
-        "agreement_percentage": round(full_agreement / total * 100) if total > 0 else 0
+        "agreement_percentage": round(full_agreement / total * 100) if total > 0 else 0,
     }
 
 
-def _consolidate_by_wcag_multi(
-    engine_results: dict[str, dict],
-    engine_list: list[str]
-) -> dict:
+def _consolidate_by_wcag_multi(engine_results: dict[str, dict], engine_list: list[str]) -> dict:
     """
     Consolidate results from multiple engines by WCAG Success Criterion.
 
@@ -3530,15 +3730,20 @@ def _consolidate_by_wcag_multi(
 
                 for sc in wcag_scs:
                     ensure_sc_entry(sc)
-                    if consolidated[sc][f"{engine}_status"] == "pass" or \
-                       (consolidated[sc][f"{engine}_status"] == "incomplete" and impact in ["critical", "serious"]):
+                    if consolidated[sc][f"{engine}_status"] == "pass" or (
+                        consolidated[sc][f"{engine}_status"] == "incomplete"
+                        and impact in ["critical", "serious"]
+                    ):
                         consolidated[sc][f"{engine}_status"] = "violation"
                     consolidated[sc][f"{engine}_count"] += count
                     # Track worst impact
                     impact_order = ["minor", "moderate", "serious", "critical"]
                     current_impact = consolidated[sc][f"{engine}_impact"]
-                    if current_impact is None or \
-                       (impact in impact_order and impact_order.index(impact) > impact_order.index(current_impact or "minor")):
+                    if current_impact is None or (
+                        impact in impact_order
+                        and impact_order.index(impact)
+                        > impact_order.index(current_impact or "minor")
+                    ):
                         consolidated[sc][f"{engine}_impact"] = impact
 
             # Process Axe incomplete
@@ -3578,8 +3783,12 @@ def _consolidate_by_wcag_multi(
 
                     # Set to worst status
                     level_priority = {
-                        "pass": 0, "manual": 1, "recommendation": 2,
-                        "potentialrecommendation": 2, "potentialviolation": 3, "violation": 4
+                        "pass": 0,
+                        "manual": 1,
+                        "recommendation": 2,
+                        "potentialrecommendation": 2,
+                        "potentialviolation": 3,
+                        "violation": 4,
                     }
                     current_priority = level_priority.get(consolidated[sc][f"{engine}_status"], 0)
                     new_priority = level_priority.get(level, 0)
@@ -3641,10 +3850,7 @@ def _consolidate_by_wcag_multi(
 
 
 def _print_pivoted_results_table(
-    consolidated: dict,
-    engine_list: list[str],
-    sorted_scs: list[str],
-    issues_count: int
+    consolidated: dict, engine_list: list[str], sorted_scs: list[str], issues_count: int
 ) -> None:
     """
     Print results in pivoted table format (one row per engine per WCAG SC).
@@ -3736,10 +3942,12 @@ def _get_combined_status_info(status: str, count: int, tool: str) -> tuple[str, 
             "potentialviolation": "yellow",
             "recommendation": "blue",
             "potentialrecommendation": "cyan",
-            "manual": "bright_black"
+            "manual": "bright_black",
         }
         color = colors.get(status, "white")
-        label = "fail" if status == "violation" else "review" if "potential" in status else status[:6]
+        label = (
+            "fail" if status == "violation" else "review" if "potential" in status else status[:6]
+        )
         return (f"{label} ({count})", color)
 
 
@@ -3768,13 +3976,15 @@ def _collect_recommendations(engine_results: dict, engine_list: list[str]) -> li
                     # Use IBM rule mapping to get WCAG SCs
                     wcag_scs = IBM_RULE_TO_WCAG.get(rule_id, [])
                     sc = wcag_scs[0] if wcag_scs else ""
-                    recommendations.append({
-                        "engine": engine,
-                        "sc": sc,
-                        "message": issue.get("message", ""),
-                        "rule_id": rule_id,
-                        "level": level,
-                    })
+                    recommendations.append(
+                        {
+                            "engine": engine,
+                            "sc": sc,
+                            "message": issue.get("message", ""),
+                            "rule_id": rule_id,
+                            "level": level,
+                        }
+                    )
 
         elif engine == "hcs":
             for msg in result.get("messages", []):
@@ -3782,39 +3992,45 @@ def _collect_recommendations(engine_results: dict, engine_list: list[str]) -> li
                     code = msg.get("code", "")
                     wcag_scs = _extract_wcag_from_htmlcs_code(code)
                     sc = wcag_scs[0] if wcag_scs else ""
-                    recommendations.append({
-                        "engine": engine,
-                        "sc": sc,
-                        "message": msg.get("message", ""),
-                        "rule_id": code,
-                        "level": "notice",
-                    })
+                    recommendations.append(
+                        {
+                            "engine": engine,
+                            "sc": sc,
+                            "message": msg.get("message", ""),
+                            "rule_id": code,
+                            "level": "notice",
+                        }
+                    )
 
         elif engine == "sia":
             for item in result.get("cantTell", []):
                 requirements = item.get("requirements", [])
                 wcag_scs = _extract_wcag_from_sia(requirements)
                 sc = wcag_scs[0] if wcag_scs else ""
-                recommendations.append({
-                    "engine": engine,
-                    "sc": sc,
-                    "message": item.get("message", ""),
-                    "rule_id": item.get("rule", ""),
-                    "level": "cantTell",
-                })
+                recommendations.append(
+                    {
+                        "engine": engine,
+                        "sc": sc,
+                        "message": item.get("message", ""),
+                        "rule_id": item.get("rule", ""),
+                        "level": "cantTell",
+                    }
+                )
 
         elif engine == "axe":
             for item in result.get("incomplete", []):
                 tags = item.get("tags", [])
                 wcag_scs = _extract_wcag_from_axe_tags(tags)
                 sc = wcag_scs[0] if wcag_scs else ""
-                recommendations.append({
-                    "engine": engine,
-                    "sc": sc,
-                    "message": item.get("description", ""),
-                    "rule_id": item.get("id", ""),
-                    "level": "incomplete",
-                })
+                recommendations.append(
+                    {
+                        "engine": engine,
+                        "sc": sc,
+                        "message": item.get("description", ""),
+                        "rule_id": item.get("id", ""),
+                        "level": "incomplete",
+                    }
+                )
 
     return recommendations
 
@@ -3914,12 +4130,19 @@ def _extract_engine_rule_details(engine_results: dict, engine_list: list[str]) -
             details[engine] = {"error": result["error"]}
             continue
 
-        engine_detail: dict = {"violations": [], "passes": [], "incomplete": [], "impact_summary": {}}
+        engine_detail: dict = {
+            "violations": [],
+            "passes": [],
+            "incomplete": [],
+            "impact_summary": {},
+        }
 
         if engine == "axe":
             violations = result.get("violations", [])
             impact_order = {"critical": 0, "serious": 1, "moderate": 2, "minor": 3}
-            violations = sorted(violations, key=lambda v: impact_order.get(v.get("impact", "minor"), 4))
+            violations = sorted(
+                violations, key=lambda v: impact_order.get(v.get("impact", "minor"), 4)
+            )
 
             impact_counts = {"critical": 0, "serious": 0, "moderate": 0, "minor": 0}
             for v in violations:
@@ -3931,38 +4154,48 @@ def _extract_engine_rule_details(engine_results: dict, engine_list: list[str]) -
 
                 node_details = []
                 for node in nodes[:10]:  # Cap at 10 nodes per rule
-                    node_details.append({
-                        "selector": ", ".join(node.get("target", [])) if isinstance(node.get("target"), list) else str(node.get("target", "")),
-                        "html": node.get("html", ""),
-                        "failure_summary": node.get("failureSummary", ""),
-                    })
+                    node_details.append(
+                        {
+                            "selector": ", ".join(node.get("target", []))
+                            if isinstance(node.get("target"), list)
+                            else str(node.get("target", "")),
+                            "html": node.get("html", ""),
+                            "failure_summary": node.get("failureSummary", ""),
+                        }
+                    )
 
-                engine_detail["violations"].append({
-                    "rule_id": rule_id,
-                    "impact": impact,
-                    "count": count,
-                    "description": v.get("description", ""),
-                    "help_url": v.get("helpUrl", ""),
-                    "nodes": node_details,
-                })
+                engine_detail["violations"].append(
+                    {
+                        "rule_id": rule_id,
+                        "impact": impact,
+                        "count": count,
+                        "description": v.get("description", ""),
+                        "help_url": v.get("helpUrl", ""),
+                        "nodes": node_details,
+                    }
+                )
 
             engine_detail["impact_summary"] = impact_counts
 
             # Passes
             for p in result.get("passes", []):
-                engine_detail["passes"].append({
-                    "rule_id": p.get("id", "unknown"),
-                    "count": p.get("nodeCount", len(p.get("nodes", []))),
-                    "description": p.get("description", ""),
-                })
+                engine_detail["passes"].append(
+                    {
+                        "rule_id": p.get("id", "unknown"),
+                        "count": p.get("nodeCount", len(p.get("nodes", []))),
+                        "description": p.get("description", ""),
+                    }
+                )
 
             # Incomplete
             for inc in result.get("incomplete", []):
-                engine_detail["incomplete"].append({
-                    "rule_id": inc.get("id", "unknown"),
-                    "count": inc.get("nodeCount", len(inc.get("nodes", []))),
-                    "description": inc.get("description", ""),
-                })
+                engine_detail["incomplete"].append(
+                    {
+                        "rule_id": inc.get("id", "unknown"),
+                        "count": inc.get("nodeCount", len(inc.get("nodes", []))),
+                        "description": inc.get("description", ""),
+                    }
+                )
 
         elif engine == "eac":
             issues = result.get("issues", [])
@@ -3973,7 +4206,11 @@ def _extract_engine_rule_details(engine_results: dict, engine_list: list[str]) -
             for issue in violations:
                 rule_id = issue.get("ruleId", "unknown")
                 if rule_id not in rule_groups:
-                    rule_groups[rule_id] = {"count": 0, "message": issue.get("message", ""), "nodes": []}
+                    rule_groups[rule_id] = {
+                        "count": 0,
+                        "message": issue.get("message", ""),
+                        "nodes": [],
+                    }
                 rule_groups[rule_id]["count"] += 1
                 if len(rule_groups[rule_id]["nodes"]) < 10:
                     # path can be a dict {"dom": "…"} or a plain string
@@ -3983,21 +4220,25 @@ def _extract_engine_rule_details(engine_results: dict, engine_list: list[str]) -
                     else:
                         dom_path = str(path) if path else ""
                     selector = ", ".join(dom_path.split(" > ")[-3:]) if dom_path else ""
-                    rule_groups[rule_id]["nodes"].append({
-                        "selector": selector,
-                        "html": issue.get("snippet", ""),
-                        "failure_summary": issue.get("message", ""),
-                    })
+                    rule_groups[rule_id]["nodes"].append(
+                        {
+                            "selector": selector,
+                            "html": issue.get("snippet", ""),
+                            "failure_summary": issue.get("message", ""),
+                        }
+                    )
 
             for rule_id, data in sorted(rule_groups.items()):
-                engine_detail["violations"].append({
-                    "rule_id": rule_id,
-                    "impact": "violation",
-                    "count": data["count"],
-                    "description": data["message"],
-                    "help_url": "",
-                    "nodes": data["nodes"],
-                })
+                engine_detail["violations"].append(
+                    {
+                        "rule_id": rule_id,
+                        "impact": "violation",
+                        "count": data["count"],
+                        "description": data["message"],
+                        "help_url": "",
+                        "nodes": data["nodes"],
+                    }
+                )
 
             # Passes and recommendations as passes
             passes = [i for i in issues if i.get("level") == "pass"]
@@ -4020,21 +4261,25 @@ def _extract_engine_rule_details(engine_results: dict, engine_list: list[str]) -
                     code_groups[code] = {"count": 0, "message": msg.get("message", ""), "nodes": []}
                 code_groups[code]["count"] += 1
                 if len(code_groups[code]["nodes"]) < 10:
-                    code_groups[code]["nodes"].append({
-                        "selector": msg.get("selector", ""),
-                        "html": msg.get("context", ""),
-                        "failure_summary": msg.get("message", ""),
-                    })
+                    code_groups[code]["nodes"].append(
+                        {
+                            "selector": msg.get("selector", ""),
+                            "html": msg.get("context", ""),
+                            "failure_summary": msg.get("message", ""),
+                        }
+                    )
 
             for code, data in sorted(code_groups.items()):
-                engine_detail["violations"].append({
-                    "rule_id": code,
-                    "impact": "error",
-                    "count": data["count"],
-                    "description": data["message"],
-                    "help_url": "",
-                    "nodes": data["nodes"],
-                })
+                engine_detail["violations"].append(
+                    {
+                        "rule_id": code,
+                        "impact": "error",
+                        "count": data["count"],
+                        "description": data["message"],
+                        "help_url": "",
+                        "nodes": data["nodes"],
+                    }
+                )
 
             # Warnings as incomplete
             warnings = [m for m in messages if m.get("type") == 2]
@@ -4043,7 +4288,9 @@ def _extract_engine_rule_details(engine_results: dict, engine_list: list[str]) -
                 wcode = w.get("code", "unknown")
                 warn_groups[wcode] = warn_groups.get(wcode, 0) + 1
             for wcode, cnt in sorted(warn_groups.items()):
-                engine_detail["incomplete"].append({"rule_id": wcode, "count": cnt, "description": ""})
+                engine_detail["incomplete"].append(
+                    {"rule_id": wcode, "count": cnt, "description": ""}
+                )
 
         elif engine == "sia":
             outcomes = result.get("outcomes", [])
@@ -4060,21 +4307,27 @@ def _extract_engine_rule_details(engine_results: dict, engine_list: list[str]) -
                 rule_groups_sia[rule_id]["count"] += 1
                 if len(rule_groups_sia[rule_id]["nodes"]) < 10:
                     target = outcome.get("target", "")
-                    rule_groups_sia[rule_id]["nodes"].append({
-                        "selector": target if isinstance(target, str) else str(target),
-                        "html": "",
-                        "failure_summary": outcome.get("message", ""),
-                    })
+                    rule_groups_sia[rule_id]["nodes"].append(
+                        {
+                            "selector": target if isinstance(target, str) else str(target),
+                            "html": "",
+                            "failure_summary": outcome.get("message", ""),
+                        }
+                    )
 
             for rule_id, data in sorted(rule_groups_sia.items()):
-                engine_detail["violations"].append({
-                    "rule_id": rule_id,
-                    "impact": "serious",
-                    "count": data["count"],
-                    "description": data["title"],
-                    "help_url": f"https://alfa.siteimprove.com/rules/{rule_id}" if rule_id.startswith("sia-") else "",
-                    "nodes": data["nodes"],
-                })
+                engine_detail["violations"].append(
+                    {
+                        "rule_id": rule_id,
+                        "impact": "serious",
+                        "count": data["count"],
+                        "description": data["title"],
+                        "help_url": f"https://alfa.siteimprove.com/rules/{rule_id}"
+                        if rule_id.startswith("sia-")
+                        else "",
+                        "nodes": data["nodes"],
+                    }
+                )
 
             # Passed outcomes
             passed = [o for o in outcomes if o.get("outcome") == "passed"]
@@ -4084,7 +4337,9 @@ def _extract_engine_rule_details(engine_results: dict, engine_list: list[str]) -
                 rid = rule_url.split("/")[-1] if "/" in rule_url else rule_url
                 pass_groups_sia[rid] = pass_groups_sia.get(rid, 0) + 1
             for rid, cnt in sorted(pass_groups_sia.items()):
-                engine_detail["passes"].append({"rule_id": rid, "count": cnt, "description": o.get("title", "")})
+                engine_detail["passes"].append(
+                    {"rule_id": rid, "count": cnt, "description": o.get("title", "")}
+                )
 
             # cantTell as incomplete
             cant_tell = result.get("cantTell", [])
@@ -4094,7 +4349,9 @@ def _extract_engine_rule_details(engine_results: dict, engine_list: list[str]) -
                 rid = rule_url.split("/")[-1] if "/" in rule_url else rule_url
                 ct_groups[rid] = ct_groups.get(rid, 0) + 1
             for rid, cnt in sorted(ct_groups.items()):
-                engine_detail["incomplete"].append({"rule_id": rid, "count": cnt, "description": ""})
+                engine_detail["incomplete"].append(
+                    {"rule_id": rid, "count": cnt, "description": ""}
+                )
 
         details[engine] = engine_detail
 
@@ -4126,7 +4383,9 @@ def _print_engine_rule_tables(engine_results: dict, engine_list: list[str]) -> N
 
             # Sort by impact
             impact_order = {"critical": 0, "serious": 1, "moderate": 2, "minor": 3}
-            violations = sorted(violations, key=lambda v: impact_order.get(v.get("impact", "minor"), 4))
+            violations = sorted(
+                violations, key=lambda v: impact_order.get(v.get("impact", "minor"), 4)
+            )
 
             # Build rows
             headers = ["Rule", "Impact", "Count", "Description"]
@@ -4158,7 +4417,9 @@ def _print_engine_rule_tables(engine_results: dict, engine_list: list[str]) -> N
             table.print_footer()
 
             # Impact summary
-            _print_impact_counts(impact_counts, result.get("passes", []), result.get("incomplete", []))
+            _print_impact_counts(
+                impact_counts, result.get("passes", []), result.get("incomplete", [])
+            )
 
         elif engine == "eac":
             issues = result.get("issues", [])
@@ -4278,6 +4539,7 @@ def _print_engine_rule_tables(engine_results: dict, engine_list: list[str]) -> N
 
 def _print_impact_counts(impact_counts: dict, passes: list, incomplete: list) -> None:
     """Print impact summary counts for axe-style engines."""
+
     def format_count(count):
         if count == 0:
             return click.style("\u2014", fg="bright_black")
@@ -4317,7 +4579,9 @@ def _show_engine_list():
         try:
             engine = get_engine(engine_id)
             is_installed = engine.is_installed()
-            update_available, current_version, latest_version, release_date = engine.is_update_available()
+            update_available, current_version, latest_version, release_date = (
+                engine.is_update_available()
+            )
 
             # Format latest version with date
             if latest_version and release_date:
@@ -4350,24 +4614,30 @@ def _show_engine_list():
             status = "error"
             status_color = "red"
 
-        rows.append([
-            engine_id,
-            info["official_name"],
-            info["provider"],
-            latest_display,
-            installed_display,
-            status
-        ])
-        row_colors.append([
-            "cyan",  # ID
-            None,    # Name
-            None,    # Provider
-            None,    # Latest Version
-            None,    # Installed
-            status_color
-        ])
+        rows.append(
+            [
+                engine_id,
+                info["official_name"],
+                info["provider"],
+                latest_display,
+                installed_display,
+                status,
+            ]
+        )
+        row_colors.append(
+            [
+                "cyan",  # ID
+                None,  # Name
+                None,  # Provider
+                None,  # Latest Version
+                None,  # Installed
+                status_color,
+            ]
+        )
 
-    table = Table(headers, alignments=alignments, title="Available Accessibility Engines", icon="\uf085")
+    table = Table(
+        headers, alignments=alignments, title="Available Accessibility Engines", icon="\uf085"
+    )
     table.set_data(rows)
     table.print_header()
     for row_data, colors in zip(rows, row_colors, strict=False):
@@ -4377,7 +4647,9 @@ def _show_engine_list():
     # Show update tip if updates are available
     if has_updates:
         tip_icon = get_indicator("tip") or ""
-        formatted = format_icon_message("To update engines, run `inspekt restart --update`", icon=f"{tip_icon} ")
+        formatted = format_icon_message(
+            "To update engines, run `inspekt restart --update`", icon=f"{tip_icon} "
+        )
         styled = _style_with_inline_code(formatted, base_fg="yellow", bold=False)
         click.echo(styled)
 
@@ -4502,7 +4774,11 @@ def _print_engine_rules_table(engine_id: str) -> None:
             description = description[: desc_width - 1] + "…"
         description = description.ljust(desc_width)
 
-        act_indicator = click.style("✓", fg="green") if rule.get("act_rule") else click.style("—", fg=border_color)
+        act_indicator = (
+            click.style("✓", fg="green")
+            if rule.get("act_rule")
+            else click.style("—", fg=border_color)
+        )
 
         row = f"  {border} {rule_id} {border} {description} {border}  {act_indicator} {border}"
         click.echo(row)
@@ -4526,157 +4802,156 @@ def _print_engine_rules_table(engine_id: str) -> None:
     "engines",
     type=str,
     default=None,
-    help="Engines to run, comma-separated (default: axe,eac,hcs). Available: axe, eac, hcs, sia"
+    help="Engines to run, comma-separated (default: axe,eac,hcs). Available: axe, eac, hcs, sia",
 )
-@click.option(
-    "--list-engines",
-    is_flag=True,
-    help="List available accessibility engines and exit"
-)
+@click.option("--list-engines", is_flag=True, help="List available accessibility engines and exit")
 @click.option(
     "--level",
     type=click.Choice(["2a", "2aa", "2aaa", "21a", "21aa", "22aa"], case_sensitive=False),
     default="21aa",
-    help="WCAG conformance level to test (default: 21aa)"
+    help="WCAG conformance level to test (default: 21aa)",
 )
 @click.option(
     "--format",
     "output_format",
     type=click.Choice(["json", "html"], case_sensitive=False),
     default=None,
-    help="Output format: json (machine-readable) or html (interactive report)"
+    help="Output format: json (machine-readable) or html (interactive report)",
 )
 @click.option(
-    "--json",
-    "-j",
-    "json_flag",
-    is_flag=True,
-    help="Output as JSON (shortcut for --format json)"
+    "--json", "-j", "json_flag", is_flag=True, help="Output as JSON (shortcut for --format json)"
 )
 @click.option(
-    "--timeout",
-    type=float,
-    default=60.0,
-    help="Timeout in seconds for each engine (default: 60)"
+    "--timeout", type=float, default=60.0, help="Timeout in seconds for each engine (default: 60)"
 )
-@click.option(
-    "--show-passes",
-    is_flag=True,
-    help="Include WCAG criteria where all engines pass"
-)
+@click.option("--show-passes", is_flag=True, help="Include WCAG criteria where all engines pass")
 @click.option(
     "--include-recommendations",
     is_flag=True,
-    help="Include recommendations and best practices from all engines"
+    help="Include recommendations and best practices from all engines",
 )
 @click.option(
     "--show-badges",
     is_flag=True,
-    help="Show unified badges on elements with issues (run in browser)"
+    help="Show unified badges on elements with issues (run in browser)",
 )
 @click.option(
     "--interactive",
     is_flag=True,
-    help="Make badges clickable with detailed popover information (requires --show-badges)"
+    help="Make badges clickable with detailed popover information (requires --show-badges)",
 )
 @click.option(
-    "--dev-css",
-    is_flag=True,
-    hidden=True,
-    help="Load CSS from local server for development"
+    "--dev-css", is_flag=True, hidden=True, help="Load CSS from local server for development"
 )
 @click.option(
-    "--all-disagreements",
-    is_flag=True,
-    help="Show all disagreements instead of limiting to 10"
+    "--all-disagreements", is_flag=True, help="Show all disagreements instead of limiting to 10"
 )
 @click.option(
     "--info",
     is_flag=True,
-    help="Show engine metadata, version info, and complete rule listing with ACT alignment"
+    help="Show engine metadata, version info, and complete rule listing with ACT alignment",
 )
 @click.option(
-    "--verbose",
-    "-v",
-    is_flag=True,
-    help="Show detailed rule-level tables for each engine"
+    "--verbose", "-v", is_flag=True, help="Show detailed rule-level tables for each engine"
 )
 @click.option(
     "--scoped",
     type=str,
-    help="Scope tests to specific elements. Use 'inspected' for the currently inspected element, or provide CSS selectors (comma-separated)"
+    help="Scope tests to specific elements. Use 'inspected' for the currently inspected element, or provide CSS selectors (comma-separated)",
 )
 @click.option(
     "--exclude",
     type=str,
     multiple=True,
-    help="Exclude elements from testing. Can be comma-separated selectors or multiple --exclude flags"
+    help="Exclude elements from testing. Can be comma-separated selectors or multiple --exclude flags",
 )
 @click.option(
-    "--rule",
-    type=str,
-    help="Test a single axe-core rule by ID (only works with axe engine)"
+    "--rule", type=str, help="Test a single axe-core rule by ID (only works with axe engine)"
 )
 @click.option(
     "--disable-rule",
     type=str,
     multiple=True,
     metavar="RULE_ID",
-    help="Disable specific rules by ID (axe engine only). Supports comma-separated values."
+    help="Disable specific rules by ID (axe engine only). Supports comma-separated values.",
 )
 @click.option(
     "--enable-rule",
     type=str,
     multiple=True,
     metavar="RULE_ID",
-    help="Run ONLY these rules (axe engine only). Supports comma-separated values."
+    help="Run ONLY these rules (axe engine only). Supports comma-separated values.",
 )
 @click.option(
     "--persistent",
     is_flag=True,
-    help="Monitor and re-run audit on each page navigation (press Ctrl+C to stop)"
+    help="Monitor and re-run audit on each page navigation (press Ctrl+C to stop)",
 )
 @click.option(
     "--no-compliance-warning",
     is_flag=True,
-    help="Suppress the warning about automated checker limitations"
+    help="Suppress the warning about automated checker limitations",
 )
 @click.option(
     "--summary-only",
     is_flag=True,
-    help="Show only summary, agreement, and disagreements (skip detailed WCAG table)"
+    help="Show only summary, agreement, and disagreements (skip detailed WCAG table)",
 )
 @click.option(
     "--output",
     "-o",
     "output_file",
     type=click.Path(),
-    help="Save output to file (requires --format)"
+    help="Save output to file (requires --format)",
 )
-@click.option(
-    "--no-open",
-    is_flag=True,
-    help="Don't auto-open the HTML report in the browser"
-)
+@click.option("--no-open", is_flag=True, help="Don't auto-open the HTML report in the browser")
 @click.option(
     "--headless",
     is_flag=True,
     default=False,
-    help="Run audit in headless Chrome (no browser extension required)"
+    help="Run audit in headless Chrome (no browser extension required)",
 )
 @click.option(
     "--mirror-session",
     is_flag=True,
     default=False,
-    help="Mirror cookies/storage from live browser for authenticated pages (implies --headless)"
+    help="Mirror cookies/storage from live browser for authenticated pages (implies --headless)",
 )
 @click.option(
     "--url",
     "headless_url",
     default=None,
-    help="URL to audit in headless mode (required with --headless unless --mirror-session)"
+    help="URL to audit in headless mode (required with --headless unless --mirror-session)",
 )
-def a11y(engines, list_engines, level, output_format, json_flag, timeout, show_passes, include_recommendations, show_badges, interactive, dev_css, all_disagreements, info, verbose, scoped, exclude, rule, disable_rule, enable_rule, persistent, no_compliance_warning, summary_only, output_file, no_open, headless, mirror_session, headless_url):
+def a11y(
+    engines,
+    list_engines,
+    level,
+    output_format,
+    json_flag,
+    timeout,
+    show_passes,
+    include_recommendations,
+    show_badges,
+    interactive,
+    dev_css,
+    all_disagreements,
+    info,
+    verbose,
+    scoped,
+    exclude,
+    rule,
+    disable_rule,
+    enable_rule,
+    persistent,
+    no_compliance_warning,
+    summary_only,
+    output_file,
+    no_open,
+    headless,
+    mirror_session,
+    headless_url,
+):
     """
     Run combined accessibility audit with selected engines.
 
@@ -4730,7 +5005,9 @@ def a11y(engines, list_engines, level, output_format, json_flag, timeout, show_p
     if info:
         engine_list_parsed = _validate_and_normalize_engines(engines) if engines else []
         if len(engine_list_parsed) != 1:
-            raise click.UsageError("--info requires exactly one engine (e.g., 'inspekt a11y -e axe --info')")
+            raise click.UsageError(
+                "--info requires exactly one engine (e.g., 'inspekt a11y -e axe --info')"
+            )
 
         engine_id = engine_list_parsed[0]
         _show_engine_info(engine_id)
@@ -4756,7 +5033,9 @@ def a11y(engines, list_engines, level, output_format, json_flag, timeout, show_p
 
     if axe_specific_options and "axe" not in engine_list:
         opts_str = ", ".join(axe_specific_options)
-        click.echo(click.style(f"Warning: {opts_str} only work with the axe engine", fg="yellow"), err=True)
+        click.echo(
+            click.style(f"Warning: {opts_str} only work with the axe engine", fg="yellow"), err=True
+        )
 
     # Validate mutually exclusive options
     if enable_rule and disable_rule:
@@ -4770,7 +5049,12 @@ def a11y(engines, list_engines, level, output_format, json_flag, timeout, show_p
 
     # Persistent mode not yet implemented for multi-engine
     if persistent:
-        click.echo(click.style("Note: --persistent is not yet fully implemented for multi-engine mode", fg="yellow"), err=True)
+        click.echo(
+            click.style(
+                "Note: --persistent is not yet fully implemented for multi-engine mode", fg="yellow"
+            ),
+            err=True,
+        )
 
     # ========== HEADLESS MODE ==========
     if headless or mirror_session:
@@ -4789,13 +5073,24 @@ def a11y(engines, list_engines, level, output_format, json_flag, timeout, show_p
 
         # Some features not available in headless mode
         if show_badges:
-            click.echo(click.style("Note: --show-badges not available in headless mode (no visual display)", fg="yellow"), err=True)
+            click.echo(
+                click.style(
+                    "Note: --show-badges not available in headless mode (no visual display)",
+                    fg="yellow",
+                ),
+                err=True,
+            )
         if interactive:
-            click.echo(click.style("Note: --interactive not available in headless mode", fg="yellow"), err=True)
+            click.echo(
+                click.style("Note: --interactive not available in headless mode", fg="yellow"),
+                err=True,
+            )
 
         # Currently only axe is supported in headless mode
         if engine_list != ["axe"]:
-            raise click.UsageError("Headless mode currently only supports axe engine. Use: inspekt a11y axe --headless")
+            raise click.UsageError(
+                "Headless mode currently only supports axe engine. Use: inspekt a11y axe --headless"
+            )
 
         async def run_headless_audit():
             """Run axe-core audit in headless Chrome."""
@@ -4803,7 +5098,9 @@ def a11y(engines, list_engines, level, output_format, json_flag, timeout, show_p
 
             if not output_format:
                 if mirror_session:
-                    click.echo(click.style("  Headless mode with session mirroring", fg="blue"), err=True)
+                    click.echo(
+                        click.style("  Headless mode with session mirroring", fg="blue"), err=True
+                    )
                 else:
                     click.echo(click.style("  Headless mode", fg="blue"), err=True)
 
@@ -4843,6 +5140,7 @@ def a11y(engines, list_engines, level, output_format, json_flag, timeout, show_p
 
                     # Replace placeholder and execute
                     import json as json_module
+
                     code = axe_script.replace("OPTIONS_PLACEHOLDER", json_module.dumps(axe_options))
 
                     if not output_format:
@@ -4894,7 +5192,7 @@ def a11y(engines, list_engines, level, output_format, json_flag, timeout, show_p
                     "violations": len(violations),
                     "passes": len(passes),
                     "incomplete": len(incomplete),
-                }
+                },
             }
             json_str = json.dumps(output_data, indent=2)
             if output_file:
@@ -4902,6 +5200,7 @@ def a11y(engines, list_engines, level, output_format, json_flag, timeout, show_p
                 click.echo(f"Results saved to {output_file}", err=True)
             else:
                 from inspekt.app.cli.table import print_json
+
                 print_json(output_data, summary=f"a11y audit ({len(violations)} violations)")
         else:
             # Print summary
@@ -4916,11 +5215,17 @@ def a11y(engines, list_engines, level, output_format, json_flag, timeout, show_p
                 click.echo(click.style("Violations:", bold=True, fg="red"), err=True)
                 for v in violations:
                     impact = v.get("impact", "unknown")
-                    impact_color = {"critical": "red", "serious": "yellow", "moderate": "cyan", "minor": "white"}.get(impact, "white")
+                    impact_color = {
+                        "critical": "red",
+                        "serious": "yellow",
+                        "moderate": "cyan",
+                        "minor": "white",
+                    }.get(impact, "white")
                     from inspekt.app.cli.sitemap import wrap_styled_line
+
                     for line in wrap_styled_line(
                         prefix=f"  [{click.style(impact, fg=impact_color)}] {v.get('id')}: ",
-                        text=v.get('description', ''),
+                        text=v.get("description", ""),
                     ):
                         click.echo(line, err=True)
                     click.echo(f"    Affected: {len(v.get('nodes', []))} element(s)", err=True)
@@ -4950,18 +5255,39 @@ def a11y(engines, list_engines, level, output_format, json_flag, timeout, show_p
 
         # Only show "Engines:" line for multiple engines
         if not is_single_engine:
-            engine_names = [f"{AVAILABLE_ENGINES[e]['name']} ({AVAILABLE_ENGINES[e]['abbr']})" for e in engine_list]
+            engine_names = [
+                f"{AVAILABLE_ENGINES[e]['name']} ({AVAILABLE_ENGINES[e]['abbr']})"
+                for e in engine_list
+            ]
             click.echo(f"Engines: {', '.join(engine_names)}", err=True)
             # Warn about slow engines
-            slow_engines = [AVAILABLE_ENGINES[e]['name'] for e in engine_list if AVAILABLE_ENGINES[e].get('performance') == 'slow']
+            slow_engines = [
+                AVAILABLE_ENGINES[e]["name"]
+                for e in engine_list
+                if AVAILABLE_ENGINES[e].get("performance") == "slow"
+            ]
             if slow_engines:
                 engines_str = ", ".join(slow_engines)
-                click.echo(click.style(f"Note: {engines_str} may take longer to complete on complex pages.", fg="bright_black"), err=True)
+                click.echo(
+                    click.style(
+                        f"Note: {engines_str} may take longer to complete on complex pages.",
+                        fg="bright_black",
+                    ),
+                    err=True,
+                )
             click.echo(err=True)
 
     # Run engines in order
     total_start = time.time()
-    engine_results = _run_engines_in_order(client, engine_list, level, timeout, versions, quiet=bool(output_format), include_recommendations=include_recommendations)
+    engine_results = _run_engines_in_order(
+        client,
+        engine_list,
+        level,
+        timeout,
+        versions,
+        quiet=bool(output_format),
+        include_recommendations=include_recommendations,
+    )
     total_elapsed = time.time() - total_start
 
     if not output_format:
@@ -4973,8 +5299,11 @@ def a11y(engines, list_engines, level, output_format, json_flag, timeout, show_p
 
         # Show warning about automated checker limitations (unless disabled via CLI or config)
         from inspekt.config import get_a11y_config
+
         a11y_config = get_a11y_config()
-        show_warning = a11y_config.get("show-compliance-warning", True) and not no_compliance_warning
+        show_warning = (
+            a11y_config.get("show-compliance-warning", True) and not no_compliance_warning
+        )
 
         if show_warning:
             click.echo(click.style("WARNING", fg="yellow", bold=True), err=True)
@@ -4992,10 +5321,7 @@ def a11y(engines, list_engines, level, output_format, json_flag, timeout, show_p
 
     # Filter by WCAG conformance level
     # This ensures only SCs matching the requested level are shown
-    consolidated = {
-        sc: data for sc, data in consolidated.items()
-        if _sc_matches_level(sc, level)
-    }
+    consolidated = {sc: data for sc, data in consolidated.items() if _sc_matches_level(sc, level)}
 
     # URL was already retrieved at the start
 
@@ -5027,16 +5353,18 @@ def a11y(engines, list_engines, level, output_format, json_flag, timeout, show_p
             if output_file:
                 output_path = Path(output_file)
                 output_path.parent.mkdir(parents=True, exist_ok=True)
-                with open(output_path, 'w', encoding='utf-8') as f:
+                with open(output_path, "w", encoding="utf-8") as f:
                     f.write(json_str)
                 click.echo(success(f"Report saved to: {output_path}"), err=True)
             else:
                 from inspekt.app.cli.table import print_json
+
                 print_json(enriched, summary="a11y report")
             return
 
         if output_format == "html":
             from inspekt.services.a11y_report import generate_a11y_report_html
+
             html_content = generate_a11y_report_html(enriched)
 
             if output_file:
@@ -5044,6 +5372,7 @@ def a11y(engines, list_engines, level, output_format, json_flag, timeout, show_p
             else:
                 from datetime import datetime
                 from urllib.parse import urlparse
+
                 domain = urlparse(url).netloc.replace(".", "_")
                 timestamp_str = datetime.now().strftime("%Y%m%d_%H%M%S")
                 path = Path.cwd() / f"inspekt_a11y_{domain}_{timestamp_str}.html"
@@ -5054,19 +5383,25 @@ def a11y(engines, list_engines, level, output_format, json_flag, timeout, show_p
 
             if not no_open:
                 import webbrowser
+
                 webbrowser.open(f"file://{path.resolve()}")
             return
 
     # Filter results - show SCs where any engine found issues
     if not show_passes:
         consolidated = {
-            sc: data for sc, data in consolidated.items()
+            sc: data
+            for sc, data in consolidated.items()
             if any(data.get(f"{eng}_status") != "pass" for eng in engine_list)
         }
 
     if not consolidated:
         engine_word = "any engine" if len(engine_list) > 1 else engine_list[0]
-        click.echo(click.style(success(f"No accessibility issues found by {engine_word}!"), fg="green", bold=True))
+        click.echo(
+            click.style(
+                success(f"No accessibility issues found by {engine_word}!"), fg="green", bold=True
+            )
+        )
         click.echo(f"Tested: {url}")
         # Show contextual tips even when no issues found
         if not output_format:
@@ -5094,20 +5429,14 @@ def a11y(engines, list_engines, level, output_format, json_flag, timeout, show_p
     # Analyze results for disagreements and disparities
     issues_count = 0
     disagreements = []  # SCs where some engines fail and others pass
-    disparities = []    # SCs where all fail but counts differ significantly
+    disparities = []  # SCs where all fail but counts differ significantly
 
     for sc in sorted_scs:
         data = consolidated[sc]
 
         # Check which engines fail
-        engine_fails = {
-            eng: data.get(f"{eng}_status") not in ("pass",)
-            for eng in engine_list
-        }
-        engine_counts = {
-            eng: data.get(f"{eng}_count", 0)
-            for eng in engine_list
-        }
+        engine_fails = {eng: data.get(f"{eng}_status") not in ("pass",) for eng in engine_list}
+        engine_counts = {eng: data.get(f"{eng}_count", 0) for eng in engine_list}
 
         failing_engines = [eng for eng, fails in engine_fails.items() if fails]
         passing_engines = [eng for eng, fails in engine_fails.items() if not fails]
@@ -5118,12 +5447,14 @@ def a11y(engines, list_engines, level, output_format, json_flag, timeout, show_p
 
         # Track disagreements (some fail, others pass)
         if failing_engines and passing_engines:
-            disagreements.append({
-                "sc": sc,
-                "failing_engines": failing_engines,
-                "passing_engines": passing_engines,
-                "counts": {eng: engine_counts[eng] for eng in failing_engines}
-            })
+            disagreements.append(
+                {
+                    "sc": sc,
+                    "failing_engines": failing_engines,
+                    "passing_engines": passing_engines,
+                    "counts": {eng: engine_counts[eng] for eng in failing_engines},
+                }
+            )
 
         # Track disparities (all fail but counts differ by 2x or more)
         if len(failing_engines) >= 2:
@@ -5131,13 +5462,15 @@ def a11y(engines, list_engines, level, output_format, json_flag, timeout, show_p
             if len(counts) >= 2:
                 min_c, max_c = min(counts), max(counts)
                 if min_c > 0 and max_c / min_c >= 2:
-                    disparities.append({
-                        "sc": sc,
-                        "counts": engine_counts,
-                        "min_count": min_c,
-                        "max_count": max_c,
-                        "ratio": max_c / min_c
-                    })
+                    disparities.append(
+                        {
+                            "sc": sc,
+                            "counts": engine_counts,
+                            "min_count": min_c,
+                            "max_count": max_c,
+                            "ratio": max_c / min_c,
+                        }
+                    )
 
     # Build and print pivoted table (one row per engine per WCAG SC)
     if not summary_only:
@@ -5145,7 +5478,12 @@ def a11y(engines, list_engines, level, output_format, json_flag, timeout, show_p
 
     # VM terminal: offer a "Data ready to copy" toast
     from inspekt.app.cli.table import emit_copyable_data
-    a11y_headers = ["WCAG SC"] + [f"{eng} status" for eng in engine_list] + [f"{eng} count" for eng in engine_list]
+
+    a11y_headers = (
+        ["WCAG SC"]
+        + [f"{eng} status" for eng in engine_list]
+        + [f"{eng} count" for eng in engine_list]
+    )
     a11y_rows = []
     for sc in sorted_scs:
         d = consolidated[sc]
@@ -5173,7 +5511,12 @@ def a11y(engines, list_engines, level, output_format, json_flag, timeout, show_p
     # Summary - simpler for single engine
     click.echo()
     if is_single_engine:
-        click.echo(click.style(f"Summary: {issues_count} WCAG {pluralize(issues_count, 'criterion', 'criteria')} with issues", bold=True))
+        click.echo(
+            click.style(
+                f"Summary: {issues_count} WCAG {pluralize(issues_count, 'criterion', 'criteria')} with issues",
+                bold=True,
+            )
+        )
     else:
         click.echo(click.style(f"Summary: {issues_count} WCAG criteria with issues", bold=True))
         for engine in engine_list:
@@ -5186,7 +5529,9 @@ def a11y(engines, list_engines, level, output_format, json_flag, timeout, show_p
                 # Show both rules and element count for Alfa
                 v_count = _count_violations(engine_result, engine)
                 elem_count = _count_alfa_elements(engine_result)
-                click.echo(f"  {engine_name}: {v_count} {pluralize(v_count, 'rule')} ({elem_count} {pluralize(elem_count, 'element')})")
+                click.echo(
+                    f"  {engine_name}: {v_count} {pluralize(v_count, 'rule')} ({elem_count} {pluralize(elem_count, 'element')})"
+                )
             else:
                 v_count = _count_violations(engine_result, engine)
                 click.echo(f"  {engine_name}: {v_count} {pluralize(v_count, 'violation')}")
@@ -5212,18 +5557,22 @@ def a11y(engines, list_engines, level, output_format, json_flag, timeout, show_p
         icon_str = f"{icon} " if icon else ""
 
         click.echo()
-        click.echo(click.style(
-            f"{icon_str}Engine agreement: {agreement_pct}% "
-            f"({correlation['full_agreement']}/{correlation['total_scs']} criteria)",
-            fg=color
-        ))
+        click.echo(
+            click.style(
+                f"{icon_str}Engine agreement: {agreement_pct}% "
+                f"({correlation['full_agreement']}/{correlation['total_scs']} criteria)",
+                fg=color,
+            )
+        )
 
         if disagreement_count > 0:
-            click.echo(click.style(
-                f"  {disagreement_count} {pluralize(disagreement_count, 'criterion', 'criteria')} "
-                f"with mixed results (see Disagreements below)",
-                fg="bright_black"
-            ))
+            click.echo(
+                click.style(
+                    f"  {disagreement_count} {pluralize(disagreement_count, 'criterion', 'criteria')} "
+                    f"with mixed results (see Disagreements below)",
+                    fg="bright_black",
+                )
+            )
 
     # Show disagreements
     if disagreements:
@@ -5251,12 +5600,16 @@ def a11y(engines, list_engines, level, output_format, json_flag, timeout, show_p
             failing_str = ", ".join(failing_parts)
 
             # Format passing engines (use uppercase abbreviations)
-            passing_str = ", ".join(AVAILABLE_ENGINES[eng]["abbr"] for eng in item["passing_engines"])
+            passing_str = ", ".join(
+                AVAILABLE_ENGINES[eng]["abbr"] for eng in item["passing_engines"]
+            )
 
             rows.append([sc, sc_level, desc, failing_str, passing_str])
             row_colors.append(["yellow", None, None, "red", "green"])
 
-        table = Table(headers, alignments=alignments, title="Disagreements", icon=get_status_icon("warning"))
+        table = Table(
+            headers, alignments=alignments, title="Disagreements", icon=get_status_icon("warning")
+        )
         table.set_data(rows)
         table.print_header()
         for row_data, colors in zip(rows, row_colors, strict=False):
@@ -5265,7 +5618,12 @@ def a11y(engines, list_engines, level, output_format, json_flag, timeout, show_p
 
         remaining = len(disagreements) - len(display_disagreements)
         if remaining > 0:
-            click.echo(_style_with_inline_code(f"  …and {remaining} more (use `--all-disagreements` to show all)", base_fg="bright_black"))
+            click.echo(
+                _style_with_inline_code(
+                    f"  …and {remaining} more (use `--all-disagreements` to show all)",
+                    base_fg="bright_black",
+                )
+            )
 
     # Show disparities
     if disparities:
@@ -5295,7 +5653,9 @@ def a11y(engines, list_engines, level, output_format, json_flag, timeout, show_p
             rows.append([sc, sc_level, desc, counts_str])
             row_colors.append(["cyan", None, None, "cyan"])
 
-        table = Table(headers, alignments=alignments, title="Disparities", icon=get_status_icon("review"))
+        table = Table(
+            headers, alignments=alignments, title="Disparities", icon=get_status_icon("review")
+        )
         table.set_data(rows)
         table.print_header()
         for row_data, colors in zip(rows, row_colors, strict=False):
@@ -5304,7 +5664,12 @@ def a11y(engines, list_engines, level, output_format, json_flag, timeout, show_p
 
         remaining = len(disparities) - len(display_disparities)
         if remaining > 0:
-            click.echo(_style_with_inline_code(f"  …and {remaining} more (use `--all-disagreements` to show all)", base_fg="bright_black"))
+            click.echo(
+                _style_with_inline_code(
+                    f"  …and {remaining} more (use `--all-disagreements` to show all)",
+                    base_fg="bright_black",
+                )
+            )
 
     # Show recommendations section (when --include-recommendations is used)
     if include_recommendations:
@@ -5327,7 +5692,9 @@ def a11y(engines, list_engines, level, output_format, json_flag, timeout, show_p
 
     # Inject badges after showing all CLI output (if requested)
     if show_badges and issues_count > 0:
-        _inject_badges_into_page(client, engine_list, level, timeout, interactive, dev_css, include_recommendations)
+        _inject_badges_into_page(
+            client, engine_list, level, timeout, interactive, dev_css, include_recommendations
+        )
 
 
 @click.command(name="a11y-reset")
@@ -5366,7 +5733,7 @@ def a11y_reset():
     result = executor.execute(
         "window.__inspektResetAll__ ? window.__inspektResetAll__() : { ok: false, error: 'Tracker not loaded' }",
         timeout=5.0,
-        skip_domain_check=True
+        skip_domain_check=True,
     )
 
     if not result.get("ok"):

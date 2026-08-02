@@ -58,8 +58,9 @@ class TestSchemaConsistency:
         """Every tool has response_schema_class (except plugins)."""
         for tool in BUILTIN_TOOLS:
             if not tool.is_plugin:
-                assert tool.response_schema_class is not None, \
+                assert tool.response_schema_class is not None, (
                     f"{tool.name} missing response_schema_class"
+                )
 
     def test_all_categories_in_category_order(self):
         """All tool categories appear in CATEGORY_ORDER."""
@@ -115,9 +116,23 @@ class TestDescriptions:
 
     def test_descriptions_mention_purpose(self):
         """Descriptions should mention what the tool does."""
-        action_words = ["extract", "get", "set", "click", "type", "navigate",
-                       "reload", "execute", "take", "check", "run", "clear",
-                       "capture", "go", "return"]  # Added more action words
+        action_words = [
+            "extract",
+            "get",
+            "set",
+            "click",
+            "type",
+            "navigate",
+            "reload",
+            "execute",
+            "take",
+            "check",
+            "run",
+            "clear",
+            "capture",
+            "go",
+            "return",
+        ]  # Added more action words
         for tool in BUILTIN_TOOLS:
             desc_lower = tool.description.lower()
             has_action = any(word in desc_lower for word in action_words)
@@ -160,8 +175,7 @@ class TestResponseSchemas:
         for tool in BUILTIN_TOOLS:
             if tool.response_schema_class:
                 fields = tool.response_schema_class.model_fields
-                assert "success" in fields, \
-                    f"{tool.name} response missing 'success' field"
+                assert "success" in fields, f"{tool.name} response missing 'success' field"
 
     def test_response_schemas_are_serializable(self):
         """All response schemas can be serialized to JSON."""

@@ -74,7 +74,8 @@ async def execute_javascript(
                         "success": False,
                         "result": None,
                         "console_output": None,
-                        "error": error_message or "Browser tab not responding. Try clicking on the tab or refreshing the page.",
+                        "error": error_message
+                        or "Browser tab not responding. Try clicking on the tab or refreshing the page.",
                     }
                 elif error == "no_browser_connected":
                     return {
@@ -133,7 +134,11 @@ async def execute_javascript(
                 logger.warning(f"JavaScript execution failed: {error}")
 
                 # Check for CSP errors
-                if error and ("CSP_BLOCKED" in error or "EvalError" in error or "Content Security Policy" in error):
+                if error and (
+                    "CSP_BLOCKED" in error
+                    or "EvalError" in error
+                    or "Content Security Policy" in error
+                ):
                     return {
                         "success": False,
                         "result": None,
@@ -144,11 +149,14 @@ async def execute_javascript(
                 # Check for domain authorization errors
                 if error:
                     error_lower = error.lower()
-                    if any(phrase in error_lower for phrase in [
-                        "not allowed to access this domain",
-                        "domain not authorized",
-                        "not authorized"
-                    ]):
+                    if any(
+                        phrase in error_lower
+                        for phrase in [
+                            "not allowed to access this domain",
+                            "domain not authorized",
+                            "not authorized",
+                        ]
+                    ):
                         url = result_data.get("url", "")
                         return {
                             "success": False,

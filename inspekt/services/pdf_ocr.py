@@ -200,8 +200,7 @@ class PDFOCRService:
         """
         if not is_pytesseract_available():
             raise ImportError(
-                "pytesseract is required for OCR. "
-                "Install it with: pip install pytesseract"
+                "pytesseract is required for OCR. Install it with: pip install pytesseract"
             )
 
         if not is_tesseract_available():
@@ -290,8 +289,8 @@ def _normalize_text(text: str) -> str:
     - Remove special characters that OCR often misreads
     """
     text = text.lower()
-    text = re.sub(r'\s+', ' ', text)  # Collapse whitespace
-    text = re.sub(r'[^\w\s]', '', text)  # Remove punctuation
+    text = re.sub(r"\s+", " ", text)  # Collapse whitespace
+    text = re.sub(r"[^\w\s]", "", text)  # Remove punctuation
     return text.strip()
 
 
@@ -382,50 +381,60 @@ def generate_character_diff(
             equal_chars += len(pdf_segment)
             # Only include context if it's short or at boundaries
             if len(pdf_segment) <= 50 or len(diffs) < 3 or len(diffs) >= max_segments - 3:
-                diffs.append(TextDiff(
-                    diff_type="equal",
-                    pdf_segment=pdf_segment[:100],
-                    ocr_segment=ocr_segment[:100],
-                    position=position,
-                ))
+                diffs.append(
+                    TextDiff(
+                        diff_type="equal",
+                        pdf_segment=pdf_segment[:100],
+                        ocr_segment=ocr_segment[:100],
+                        position=position,
+                    )
+                )
             elif diffs and diffs[-1].diff_type == "equal":
                 # Merge consecutive equal segments
                 pass
             else:
                 # Add ellipsis placeholder for long unchanged sections
-                diffs.append(TextDiff(
-                    diff_type="equal",
-                    pdf_segment="…",
-                    ocr_segment="…",
-                    position=position,
-                ))
+                diffs.append(
+                    TextDiff(
+                        diff_type="equal",
+                        pdf_segment="…",
+                        ocr_segment="…",
+                        position=position,
+                    )
+                )
 
         elif tag == "replace":
             replacements += 1
-            diffs.append(TextDiff(
-                diff_type="replace",
-                pdf_segment=pdf_segment[:200],
-                ocr_segment=ocr_segment[:200],
-                position=position,
-            ))
+            diffs.append(
+                TextDiff(
+                    diff_type="replace",
+                    pdf_segment=pdf_segment[:200],
+                    ocr_segment=ocr_segment[:200],
+                    position=position,
+                )
+            )
 
         elif tag == "delete":
             deletions += 1
-            diffs.append(TextDiff(
-                diff_type="delete",
-                pdf_segment=pdf_segment[:200],
-                ocr_segment="",
-                position=position,
-            ))
+            diffs.append(
+                TextDiff(
+                    diff_type="delete",
+                    pdf_segment=pdf_segment[:200],
+                    ocr_segment="",
+                    position=position,
+                )
+            )
 
         elif tag == "insert":
             insertions += 1
-            diffs.append(TextDiff(
-                diff_type="insert",
-                pdf_segment="",
-                ocr_segment=ocr_segment[:200],
-                position=position,
-            ))
+            diffs.append(
+                TextDiff(
+                    diff_type="insert",
+                    pdf_segment="",
+                    ocr_segment=ocr_segment[:200],
+                    position=position,
+                )
+            )
 
         position += len(pdf_segment)
 
@@ -586,6 +595,7 @@ def _render_page_thumbnail(
         img.save(output, format="PNG", optimize=True)
 
         import base64
+
         return base64.b64encode(output.getvalue()).decode("ascii")
     except Exception as e:
         logger.warning(f"Failed to render thumbnail for page {page_num}: {e}")
@@ -738,9 +748,7 @@ def analyze_text_discrepancy(
             comparisons.sort(key=lambda c: c.page_num)
 
             # Calculate statistics
-            pages_with_discrepancy = sum(
-                1 for c in comparisons if c.has_significant_discrepancy
-            )
+            pages_with_discrepancy = sum(1 for c in comparisons if c.has_significant_discrepancy)
             image_only_pages = sum(1 for c in comparisons if c.is_image_only)
 
             if comparisons:

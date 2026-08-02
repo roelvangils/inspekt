@@ -9,7 +9,6 @@ Note: Uses Performance API which has limitations:
 - Buffer limit of ~150-250 entries
 """
 
-
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 
@@ -21,6 +20,7 @@ router = APIRouter()
 
 class NetworkEntry(BaseModel):
     """A single network request entry."""
+
     index: int
     url: str
     name: str
@@ -40,6 +40,7 @@ class NetworkEntry(BaseModel):
 
 class NetworkSummary(BaseModel):
     """Summary statistics for network requests."""
+
     totalRequests: int
     totalTransferSize: int
     totalDecodedSize: int
@@ -54,6 +55,7 @@ class NetworkSummary(BaseModel):
 
 class NetworkResponse(BaseModel):
     """Response model for network requests."""
+
     ok: bool = True
     url: str
     timestamp: str
@@ -75,7 +77,9 @@ def _get_network_data():
         result = client.execute(code, timeout=30.0)
 
         if not result.get("ok"):
-            raise HTTPException(status_code=500, detail=result.get("error", "Failed to get network data"))
+            raise HTTPException(
+                status_code=500, detail=result.get("error", "Failed to get network data")
+            )
 
         data = result.get("result", {})
 
@@ -96,7 +100,9 @@ def _get_network_data():
 
 @router.get("/", response_model=NetworkResponse)
 def get_network_requests(
-    type: str | None = Query(None, description="Filter by resource type (script, stylesheet, fetch, image, font, etc.)"),
+    type: str | None = Query(
+        None, description="Filter by resource type (script, stylesheet, fetch, image, font, etc.)"
+    ),
     external_only: bool = Query(False, description="Only return external requests"),
     sort: str = Query("start", description="Sort by: start, time, size, name, type"),
     limit: int | None = Query(None, description="Limit number of results"),
@@ -196,7 +202,9 @@ def get_stylesheet_requests(
 
     Filters network requests to show only stylesheet (.css) resources.
     """
-    return get_network_requests(type="stylesheet", external_only=external_only, sort=sort, limit=limit)
+    return get_network_requests(
+        type="stylesheet", external_only=external_only, sort=sort, limit=limit
+    )
 
 
 @router.get("/fetch")
@@ -269,21 +277,14 @@ def _get_har_data():
     import requests as http_requests
 
     try:
-        response = http_requests.get(
-            "http://127.0.0.1:8765/network/har",
-            timeout=20.0
-        )
+        response = http_requests.get("http://127.0.0.1:8765/network/har", timeout=20.0)
         return response.json()
     except http_requests.exceptions.ConnectionError:
         raise HTTPException(
-            status_code=503,
-            detail="Bridge server not running. Start it with: inspekt start"
+            status_code=503, detail="Bridge server not running. Start it with: inspekt start"
         )
     except http_requests.exceptions.Timeout:
-        raise HTTPException(
-            status_code=504,
-            detail="HAR request timed out. Is DevTools open?"
-        )
+        raise HTTPException(status_code=504, detail="HAR request timed out. Is DevTools open?")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -334,8 +335,7 @@ def get_har_data(
 
     if not data.get("ok", False):
         raise HTTPException(
-            status_code=503,
-            detail=data.get("error", "Failed to get HAR data. Is DevTools open?")
+            status_code=503, detail=data.get("error", "Failed to get HAR data. Is DevTools open?")
         )
 
     # If raw HAR requested, return as-is
@@ -366,7 +366,9 @@ def get_har_data(
     # Sort entries
     sort_keys = {
         "start": lambda e: e.get("startedDateTime", ""),
-        "time": lambda e: -(e.get("timing", {}).get("total", 0) if isinstance(e.get("timing"), dict) else 0),
+        "time": lambda e: (
+            -(e.get("timing", {}).get("total", 0) if isinstance(e.get("timing"), dict) else 0)
+        ),
         "size": lambda e: -e.get("transferSize", 0),
         "name": lambda e: e.get("name", "").lower(),
         "type": lambda e: e.get("type", ""),

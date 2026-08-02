@@ -20,6 +20,7 @@ from inspekt.services import http_client
 
 class TTSError(Exception):
     """Exception raised for TTS-related errors."""
+
     pass
 
 
@@ -170,9 +171,7 @@ def speak_text(
 
             # Write to temp file (won't be auto-deleted, ffplay needs it)
             with tempfile.NamedTemporaryFile(
-                suffix=".mp3",
-                delete=False,
-                prefix="inspekt_tts_"
+                suffix=".mp3", delete=False, prefix="inspekt_tts_"
             ) as temp_file:
                 for chunk in audio_chunks:
                     temp_file.write(chunk)
@@ -328,7 +327,7 @@ def generate_audio(
         if not audio_chunks:
             raise TTSError("No audio data received from ElevenLabs")
 
-        return b''.join(audio_chunks)
+        return b"".join(audio_chunks)
 
     except requests.exceptions.Timeout:
         raise TTSError("ElevenLabs API request timed out")
@@ -396,6 +395,7 @@ def speak_text_async(
     Returns:
         The background thread running the TTS.
     """
+
     def run_tts():
         try:
             speak_text(text, voice_name, on_start=on_start, on_error=on_error)
@@ -417,6 +417,7 @@ def list_available_voices() -> dict[str, dict[str, Any]]:
         Dictionary of voice names to their configurations.
     """
     from inspekt.config import get_tts_config
+
     tts_config = get_tts_config()
     return tts_config.get("voices", {})
 

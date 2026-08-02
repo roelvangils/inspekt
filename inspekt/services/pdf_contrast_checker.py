@@ -23,8 +23,8 @@ logger = logging.getLogger(__name__)
 
 # WCAG 2.1 contrast requirements
 NORMAL_TEXT_MIN_CONTRAST = 4.5  # AA for normal text
-LARGE_TEXT_MIN_CONTRAST = 3.0   # AA for large text (18pt+ or 14pt bold)
-LARGE_TEXT_PIXEL_HEIGHT = 24    # Approximate pixel height for 18pt at 96dpi
+LARGE_TEXT_MIN_CONTRAST = 3.0  # AA for large text (18pt+ or 14pt bold)
+LARGE_TEXT_PIXEL_HEIGHT = 24  # Approximate pixel height for 18pt at 96dpi
 
 
 @dataclass
@@ -114,6 +114,7 @@ def _calculate_relative_luminance(color: tuple[int, int, int]) -> float:
     Based on WCAG 2.1 definition:
     https://www.w3.org/TR/WCAG21/#dfn-relative-luminance
     """
+
     def channel_luminance(c: int) -> float:
         srgb = c / 255.0
         if srgb <= 0.04045:
@@ -121,7 +122,11 @@ def _calculate_relative_luminance(color: tuple[int, int, int]) -> float:
         return ((srgb + 0.055) / 1.055) ** 2.4
 
     r, g, b = color
-    return 0.2126 * channel_luminance(r) + 0.7152 * channel_luminance(g) + 0.0722 * channel_luminance(b)
+    return (
+        0.2126 * channel_luminance(r)
+        + 0.7152 * channel_luminance(g)
+        + 0.0722 * channel_luminance(b)
+    )
 
 
 def calculate_contrast_ratio(fg: tuple[int, int, int], bg: tuple[int, int, int]) -> float:
@@ -250,6 +255,7 @@ class PDFContrastChecker:
         """Open PDF file."""
         try:
             import fitz
+
             self._fitz_doc = fitz.open(self.pdf_path)
         except ImportError:
             raise RuntimeError("PyMuPDF required for contrast checking: pip install pymupdf")
@@ -267,6 +273,7 @@ class PDFContrastChecker:
         """Check if pytesseract is available and configured."""
         try:
             import pytesseract
+
             pytesseract.get_tesseract_version()
             return True
         except Exception:
@@ -355,16 +362,18 @@ class PDFContrastChecker:
                 # Check if failing
                 if ratio < required_ratio:
                     result.failing_regions += 1
-                    result.issues.append(ContrastIssue(
-                        page=page_num,
-                        bbox=bbox,
-                        text_sample=text[:50],
-                        foreground_color=fg_color,
-                        background_color=bg_color,
-                        contrast_ratio=ratio,
-                        is_large_text=is_large,
-                        required_ratio=required_ratio,
-                    ))
+                    result.issues.append(
+                        ContrastIssue(
+                            page=page_num,
+                            bbox=bbox,
+                            text_sample=text[:50],
+                            foreground_color=fg_color,
+                            background_color=bg_color,
+                            contrast_ratio=ratio,
+                            is_large_text=is_large,
+                            required_ratio=required_ratio,
+                        )
+                    )
                 else:
                     result.passing_regions += 1
 
@@ -430,6 +439,7 @@ def check_tesseract_available() -> bool:
     """Check if Tesseract OCR is available."""
     try:
         import pytesseract
+
         pytesseract.get_tesseract_version()
         return True
     except Exception:

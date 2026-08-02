@@ -26,7 +26,15 @@ class ImageCache:
     """Manages image downloading and caching."""
 
     # Valid image extensions to preserve
-    VALID_EXTENSIONS: ClassVar[set[str]] = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg", ".avif"}
+    VALID_EXTENSIONS: ClassVar[set[str]] = {
+        ".jpg",
+        ".jpeg",
+        ".png",
+        ".gif",
+        ".webp",
+        ".svg",
+        ".avif",
+    }
 
     def __init__(self, cache_dir: Path | None = None):
         """

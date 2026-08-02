@@ -39,9 +39,7 @@ class CookieInfo(BaseModel):
     secure: bool = Field(..., description="Secure flag")
     httpOnly: bool = Field(..., description="HttpOnly flag")
     sameSite: str | None = Field(default=None, description="SameSite attribute")
-    expires: str | None = Field(
-        default=None, description="Expiration date (ISO 8601)"
-    )
+    expires: str | None = Field(default=None, description="Expiration date (ISO 8601)")
     session: bool = Field(..., description="Whether it's a session cookie")
     size: int = Field(..., description="Cookie size in bytes")
     party: str | None = Field(default=None, description="First-party or third-party")
@@ -51,9 +49,7 @@ class GetCookiesResponse(BaseModel):
     """Response from get_cookies command."""
 
     success: bool = Field(..., description="Whether operation succeeded")
-    cookies: list[CookieInfo] = Field(
-        ..., description="List of cookies for current page"
-    )
+    cookies: list[CookieInfo] = Field(..., description="List of cookies for current page")
     count: int = Field(..., description="Total number of cookies")
 
 

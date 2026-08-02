@@ -17,7 +17,7 @@ from bs4 import BeautifulSoup, Comment, Tag
 
 def strip_empty_comments(html: str) -> str:
     """Remove empty or whitespace-only HTML comments (<!-- -->, <!---->)."""
-    return re.sub(r'<!--\s*-->', '', html)
+    return re.sub(r"<!--\s*-->", "", html)
 
 
 def is_prettier_installed() -> bool:
@@ -47,10 +47,7 @@ def install_prettier_via_npm() -> bool:
     click.echo("\n📦 Installing prettier via npm…")
     try:
         subprocess.run(
-            ["npm", "install", "-g", "prettier"],
-            check=True,
-            capture_output=True,
-            text=True
+            ["npm", "install", "-g", "prettier"], check=True, capture_output=True, text=True
         )
         click.echo("✓ prettier installed successfully")
         return True
@@ -87,15 +84,19 @@ def format_html_with_prettier(html_content: str, indent: int = 2) -> str | None:
         result = subprocess.run(
             [
                 "prettier",
-                "--stdin-filepath", "index.html",
-                "--print-width", "80",
-                "--tab-width", str(indent),
-                "--html-whitespace-sensitivity", "ignore",
+                "--stdin-filepath",
+                "index.html",
+                "--print-width",
+                "80",
+                "--tab-width",
+                str(indent),
+                "--html-whitespace-sensitivity",
+                "ignore",
             ],
             input=html_content,
             capture_output=True,
             text=True,
-            check=True
+            check=True,
         )
         return result.stdout
     except subprocess.CalledProcessError as e:
@@ -113,11 +114,13 @@ def _truncate_url(url: str, max_segments: int = 3) -> str:
         return url
     if not parsed.scheme or not parsed.netloc:
         return url
-    parts = [p for p in parsed.path.split('/') if p]
+    parts = [p for p in parsed.path.split("/") if p]
     if len(parts) <= max_segments:
         return url
-    shortened_path = '/' + parts[0] + '/…/' + parts[-1]
-    return urlunparse((parsed.scheme, parsed.netloc, shortened_path, '', parsed.query, parsed.fragment))
+    shortened_path = "/" + parts[0] + "/…/" + parts[-1]
+    return urlunparse(
+        (parsed.scheme, parsed.netloc, shortened_path, "", parsed.query, parsed.fragment)
+    )
 
 
 def _is_hash_like(s: str) -> bool:
@@ -136,35 +139,55 @@ def _replace_hashes_in_url(url: str) -> str:
         return url
     if not parsed.path:
         return url
-    parts = parsed.path.split('/')
+    parts = parsed.path.split("/")
     new_parts = []
     for part in parts:
         # Split off file extension
-        if '.' in part and not part.startswith('.'):
-            name, ext = part.rsplit('.', 1)
+        if "." in part and not part.startswith("."):
+            name, ext = part.rsplit(".", 1)
             if _is_hash_like(name):
-                new_parts.append(f'[STRING].{ext}')
+                new_parts.append(f"[STRING].{ext}")
                 continue
         if _is_hash_like(part):
-            new_parts.append('[STRING]')
+            new_parts.append("[STRING]")
             continue
         new_parts.append(part)
-    new_path = '/'.join(new_parts)
-    return urlunparse((parsed.scheme, parsed.netloc, new_path, '', parsed.query, parsed.fragment))
+    new_path = "/".join(new_parts)
+    return urlunparse((parsed.scheme, parsed.netloc, new_path, "", parsed.query, parsed.fragment))
 
 
 _EVENT_ATTRS = {
-    'onclick', 'ondblclick', 'onmousedown', 'onmouseup', 'onmouseover',
-    'onmouseout', 'onmousemove', 'onmouseenter', 'onmouseleave',
-    'onkeydown', 'onkeyup', 'onkeypress', 'onfocus', 'onblur',
-    'onchange', 'oninput', 'onsubmit', 'onreset', 'onload', 'onerror',
-    'onscroll', 'onresize', 'ontouchstart', 'ontouchend', 'ontouchmove',
+    "onclick",
+    "ondblclick",
+    "onmousedown",
+    "onmouseup",
+    "onmouseover",
+    "onmouseout",
+    "onmousemove",
+    "onmouseenter",
+    "onmouseleave",
+    "onkeydown",
+    "onkeyup",
+    "onkeypress",
+    "onfocus",
+    "onblur",
+    "onchange",
+    "oninput",
+    "onsubmit",
+    "onreset",
+    "onload",
+    "onerror",
+    "onscroll",
+    "onresize",
+    "ontouchstart",
+    "ontouchend",
+    "ontouchmove",
 }
 
-_URL_ATTRS = {'href', 'src', 'action', 'poster', 'formaction', 'cite'}
+_URL_ATTRS = {"href", "src", "action", "poster", "formaction", "cite"}
 
 # src/poster are simplified to filename only; href keeps path for navigation context
-_FILENAME_ONLY_ATTRS = {'src', 'poster'}
+_FILENAME_ONLY_ATTRS = {"src", "poster"}
 
 _MAX_ATTR_LEN = 30  # Truncate long id/for/name/aria-* values
 
@@ -178,8 +201,8 @@ def _get_tag_skeleton(tag) -> str:
     children = [c for c in tag.children if isinstance(c, Tag)]
     if not children:
         return tag.name
-    child_skeletons = '+'.join(_get_tag_skeleton(c) for c in children)
-    return f'{tag.name}>{child_skeletons}'
+    child_skeletons = "+".join(_get_tag_skeleton(c) for c in children)
+    return f"{tag.name}>{child_skeletons}"
 
 
 def _collapse_repeated_siblings(soup) -> None:
@@ -205,8 +228,8 @@ def _collapse_repeated_siblings(soup) -> None:
 
             if i - run_start >= 3:
                 tag_name = children[run_start].name
-                to_remove = children[run_start + 2:i]
-                comment = Comment(f' … and {len(to_remove)} more <{tag_name}> ')
+                to_remove = children[run_start + 2 : i]
+                comment = Comment(f" … and {len(to_remove)} more <{tag_name}> ")
                 to_remove[0].insert_before(comment)
                 for el in to_remove:
                     el.decompose()
@@ -219,14 +242,14 @@ def _unwrap_purposeless_wrappers(soup) -> None:
     """
     for _ in range(10):  # Max iterations to prevent infinite loops
         found = False
-        for tag in soup.find_all(['div', 'span']):
+        for tag in soup.find_all(["div", "span"]):
             if tag.attrs:  # Has meaningful attributes (id, aria-*, etc.)
                 continue
             element_children = [c for c in tag.children if isinstance(c, Tag)]
             # Only unwrap if there's exactly one child element and no significant text
             if len(element_children) != 1:
                 continue
-            non_element_text = ''.join(
+            non_element_text = "".join(
                 str(c).strip() for c in tag.children if not isinstance(c, Tag)
             )
             if non_element_text:  # Has text content alongside the child — div provides grouping
@@ -252,7 +275,7 @@ def compact_html(html_content: str) -> str:
     8. Remove purposeless wrapper <div>/<span> elements
     9. Collapse 3+ repeated siblings into <!-- … and N more -->
     """
-    soup = BeautifulSoup(html_content, 'html.parser')
+    soup = BeautifulSoup(html_content, "html.parser")
 
     for tag in soup.find_all(True):
         attrs_to_delete = []
@@ -261,58 +284,58 @@ def compact_html(html_content: str) -> str:
             attr_val = tag[attr_name]
             # Normalize list attributes (class, etc.) to string
             if isinstance(attr_val, list):
-                attr_val = ' '.join(attr_val)
+                attr_val = " ".join(attr_val)
 
             # Remove class, style, data-* attributes
-            if attr_name == 'class' or attr_name == 'style' or attr_name.startswith('data-'):
+            if attr_name == "class" or attr_name == "style" or attr_name.startswith("data-"):
                 attrs_to_delete.append(attr_name)
                 continue
 
             # Replace event handlers with [JAVASCRIPT]
             if attr_name.lower() in _EVENT_ATTRS:
-                tag[attr_name] = '[JAVASCRIPT]'
+                tag[attr_name] = "[JAVASCRIPT]"
                 continue
 
             # Replace integrity hashes
-            if attr_name == 'integrity':
-                tag[attr_name] = '[HASH]'
+            if attr_name == "integrity":
+                tag[attr_name] = "[HASH]"
                 continue
 
             # Replace nonces
-            if attr_name == 'nonce':
-                tag[attr_name] = '[NONCE]'
+            if attr_name == "nonce":
+                tag[attr_name] = "[NONCE]"
                 continue
 
             # Handle srcset (multiple URLs with descriptors)
-            if attr_name == 'srcset':
-                entries = [e.strip() for e in attr_val.split(',') if e.strip()]
+            if attr_name == "srcset":
+                entries = [e.strip() for e in attr_val.split(",") if e.strip()]
                 new_entries = []
                 for entry in entries:
                     parts = entry.split()
                     if parts:
                         url = _replace_hashes_in_url(parts[0])
                         url = _truncate_url(url)
-                        descriptor = ' '.join(parts[1:]) if len(parts) > 1 else ''
-                        new_entries.append(f'{url} {descriptor}'.strip())
-                tag[attr_name] = ', '.join(new_entries)
+                        descriptor = " ".join(parts[1:]) if len(parts) > 1 else ""
+                        new_entries.append(f"{url} {descriptor}".strip())
+                tag[attr_name] = ", ".join(new_entries)
                 continue
 
             # Shorten URLs and replace hashes in URL attributes
             if attr_name.lower() in _URL_ATTRS and isinstance(attr_val, str):
-                if attr_val.startswith('data:'):
+                if attr_val.startswith("data:"):
                     # Base64 data URI → keep MIME type, replace data
-                    semi = attr_val.find(';')
+                    semi = attr_val.find(";")
                     if semi > 0:
-                        tag[attr_name] = attr_val[:semi + 1] + 'base64,[DATA]'
+                        tag[attr_name] = attr_val[: semi + 1] + "base64,[DATA]"
                     else:
-                        tag[attr_name] = '[DATA]'
+                        tag[attr_name] = "[DATA]"
                     continue
                 attr_val = _replace_hashes_in_url(attr_val)
                 # src/poster: simplify to filename only; href: keep path for context
                 if attr_name.lower() in _FILENAME_ONLY_ATTRS:
                     try:
                         path = urlparse(attr_val).path
-                        filename = path.rsplit('/', 1)[-1] if '/' in path else path
+                        filename = path.rsplit("/", 1)[-1] if "/" in path else path
                         if filename:
                             attr_val = filename
                     except Exception:
@@ -323,37 +346,37 @@ def compact_html(html_content: str) -> str:
                 continue
 
             # Truncate long id, for, name, aria-* values
-            if attr_name in ('id', 'for', 'name') or attr_name.startswith('aria-'):
+            if attr_name in ("id", "for", "name") or attr_name.startswith("aria-"):
                 if isinstance(attr_val, str) and len(attr_val) > _MAX_ATTR_LEN:
-                    tag[attr_name] = attr_val[:_MAX_ATTR_LEN] + '…'
+                    tag[attr_name] = attr_val[:_MAX_ATTR_LEN] + "…"
                 continue
 
         for attr_name in attrs_to_delete:
             del tag[attr_name]
 
         # Collapse inline <script>/<style> content — keep the tag, replace body with /* … */
-        if tag.name in ('script', 'style') and not tag.get('src'):
+        if tag.name in ("script", "style") and not tag.get("src"):
             if tag.string and tag.string.strip():
-                tag.string = '/* … */'
+                tag.string = "/* … */"
 
         # SVG: replace path d="" with [PATH DATA]
-        if tag.name == 'path' and tag.get('d'):
-            tag['d'] = '[PATH DATA]'
+        if tag.name == "path" and tag.get("d"):
+            tag["d"] = "[PATH DATA]"
 
         # SVG: replace polygon/polyline points with [POINTS]
-        if tag.name in ('polygon', 'polyline') and tag.get('points'):
-            tag['points'] = '[POINTS]'
+        if tag.name in ("polygon", "polyline") and tag.get("points"):
+            tag["points"] = "[POINTS]"
 
     # Truncate long text nodes
     for element in soup.find_all(string=True):
-        if element.parent.name in ('script', 'style'):
+        if element.parent.name in ("script", "style"):
             continue
         text = str(element).strip()
         if not text:
             continue
         words = text.split()
         if len(words) > 20:
-            element.replace_with('…')
+            element.replace_with("…")
 
     # Structural cleanup (runs after content cleanup for accurate analysis)
     _unwrap_purposeless_wrappers(soup)
@@ -389,7 +412,7 @@ def process_html(
 
     # Remove all comments if requested
     if remove_comments:
-        result = re.sub(r'<!--[\s\S]*?-->', '', result)
+        result = re.sub(r"<!--[\s\S]*?-->", "", result)
 
     # Apply compact (before prettier)
     if compact:

@@ -26,12 +26,9 @@ class TestCheckerAgreement:
 
         comparison = compare_pdf(accessible_pdf)
 
-        assert comparison.all_agree, (
-            f"Checkers disagree on {accessible_pdf.name}:\n"
-            + "\n".join(
-                f"  - {d.check_id}: basic={d.basic_status}, simple={d.simple_status}"
-                for d in comparison.disagreements
-            )
+        assert comparison.all_agree, f"Checkers disagree on {accessible_pdf.name}:\n" + "\n".join(
+            f"  - {d.check_id}: basic={d.basic_status}, simple={d.simple_status}"
+            for d in comparison.disagreements
         )
 
     def test_untagged_pdf_agreement(self, untagged_pdf):
@@ -40,12 +37,9 @@ class TestCheckerAgreement:
 
         comparison = compare_pdf(untagged_pdf)
 
-        assert comparison.all_agree, (
-            f"Checkers disagree on {untagged_pdf.name}:\n"
-            + "\n".join(
-                f"  - {d.check_id}: basic={d.basic_status}, simple={d.simple_status}"
-                for d in comparison.disagreements
-            )
+        assert comparison.all_agree, f"Checkers disagree on {untagged_pdf.name}:\n" + "\n".join(
+            f"  - {d.check_id}: basic={d.basic_status}, simple={d.simple_status}"
+            for d in comparison.disagreements
         )
 
     def test_no_title_pdf_agreement(self, no_title_pdf):
@@ -54,12 +48,9 @@ class TestCheckerAgreement:
 
         comparison = compare_pdf(no_title_pdf)
 
-        assert comparison.all_agree, (
-            f"Checkers disagree on {no_title_pdf.name}:\n"
-            + "\n".join(
-                f"  - {d.check_id}: basic={d.basic_status}, simple={d.simple_status}"
-                for d in comparison.disagreements
-            )
+        assert comparison.all_agree, f"Checkers disagree on {no_title_pdf.name}:\n" + "\n".join(
+            f"  - {d.check_id}: basic={d.basic_status}, simple={d.simple_status}"
+            for d in comparison.disagreements
         )
 
     def test_no_language_pdf_agreement(self, no_language_pdf):
@@ -68,12 +59,9 @@ class TestCheckerAgreement:
 
         comparison = compare_pdf(no_language_pdf)
 
-        assert comparison.all_agree, (
-            f"Checkers disagree on {no_language_pdf.name}:\n"
-            + "\n".join(
-                f"  - {d.check_id}: basic={d.basic_status}, simple={d.simple_status}"
-                for d in comparison.disagreements
-            )
+        assert comparison.all_agree, f"Checkers disagree on {no_language_pdf.name}:\n" + "\n".join(
+            f"  - {d.check_id}: basic={d.basic_status}, simple={d.simple_status}"
+            for d in comparison.disagreements
         )
 
     def test_long_no_bookmarks_pdf_agreement(self, long_no_bookmarks_pdf):
@@ -166,7 +154,9 @@ class TestComparisonResult:
         assert len(comparison.comparisons) == len(COMMON_CHECK_IDS)
 
         # Properties should be consistent
-        assert comparison.agreement_count + comparison.disagreement_count == len(comparison.comparisons)
+        assert comparison.agreement_count + comparison.disagreement_count == len(
+            comparison.comparisons
+        )
         assert comparison.all_agree == (comparison.disagreement_count == 0)
 
     def test_file_path_preserved(self, accessible_pdf):

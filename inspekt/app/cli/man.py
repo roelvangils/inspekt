@@ -86,9 +86,7 @@ def _install_one(src: Path, root: Path) -> Path:
 def _is_on_manpath(root: Path) -> bool:
     """Best-effort check: is `root` discoverable by `man`?"""
     try:
-        out = subprocess.check_output(
-            ["manpath"], text=True, stderr=subprocess.DEVNULL
-        )
+        out = subprocess.check_output(["manpath"], text=True, stderr=subprocess.DEVNULL)
         return str(root) in out.split(":")
     except (FileNotFoundError, subprocess.CalledProcessError):
         manpath_env = os.environ.get("MANPATH", "")
@@ -230,9 +228,7 @@ def man_install(user_scope: bool):
         try:
             installed.append(_install_one(src, root))
         except PermissionError:
-            print_error(
-                f"Permission denied writing to {root}. Try sudo, or `--user`."
-            )
+            print_error(f"Permission denied writing to {root}. Try sudo, or `--user`.")
             sys.exit(1)
 
     click.secho(
@@ -241,8 +237,7 @@ def man_install(user_scope: bool):
     )
     if not _is_on_manpath(root):
         print_hint(
-            f"{root} is not on your MANPATH. Add it with: "
-            f"`export MANPATH=\"{root}:$MANPATH\"`"
+            f'{root} is not on your MANPATH. Add it with: `export MANPATH="{root}:$MANPATH"`'
         )
     click.echo("Try: `man inspekt`")
 
@@ -344,8 +339,7 @@ def man_rebuild():
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(src, target)
             click.secho(
-                f"{get_status_icon('pass')} Wrote personalized "
-                f"inspekt-plugins(7) to {target}",
+                f"{get_status_icon('pass')} Wrote personalized inspekt-plugins(7) to {target}",
                 fg="green",
             )
             return
@@ -399,14 +393,12 @@ def man_status():
     )
 
     if shipped:
-        shipped_status = (
-            f"{format_status_icon('pass')} "
-            + click.style(f"{len(shipped)} pages", fg="green")
+        shipped_status = f"{format_status_icon('pass')} " + click.style(
+            f"{len(shipped)} pages", fg="green"
         )
     else:
-        shipped_status = (
-            f"{format_status_icon('warning')} "
-            + click.style("none (not built)", fg="yellow")
+        shipped_status = f"{format_status_icon('warning')} " + click.style(
+            "none (not built)", fg="yellow"
         )
 
     user_status = _scope_status(user_pages, user_root)
@@ -426,24 +418,17 @@ def man_status():
 
     if not user_pages and not sys_pages and shipped:
         click.echo()
-        click.echo(
-            "  Install with: " + click.style("inspekt man install", fg="cyan")
-        )
+        click.echo("  Install with: " + click.style("inspekt man install", fg="cyan"))
     elif user_pages or sys_pages:
         click.echo()
-        click.echo(
-            f"  {get_status_icon('info')} Try: "
-            + click.style("man inspekt", fg="cyan")
-        )
+        click.echo(f"  {get_status_icon('info')} Try: " + click.style("man inspekt", fg="cyan"))
 
 
 def _scope_status(pages: list[Path], root: Path) -> str:
     from inspekt.app.cli.table import format_status_icon
 
     if not pages:
-        return f"{format_status_icon('warning')} " + click.style(
-            "not installed", fg="yellow"
-        )
+        return f"{format_status_icon('warning')} " + click.style("not installed", fg="yellow")
     on_path = _is_on_manpath(root)
     extra = "" if on_path else " (not on MANPATH)"
     return f"{format_status_icon('pass')} " + click.style(

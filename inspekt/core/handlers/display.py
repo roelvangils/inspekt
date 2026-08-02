@@ -61,6 +61,7 @@ def _vm_request(method: str, path: str, data: dict | None = None) -> dict:
 def _get_executor():
     """Get the bridge executor for regular browser communication."""
     from inspekt.services.bridge_executor import BridgeExecutor
+
     return BridgeExecutor()
 
 
@@ -166,19 +167,27 @@ async def set_zoom(params: ZoomSetParams) -> ZoomResponse:
     elif params.level is not None:
         target_factor = params.level / 100.0
         if target_factor < 0.25 or target_factor > 5.0:
-            return _make_zoom_response(False, zoom=current_zoom, error="Zoom level must be between 25% and 500%")
+            return _make_zoom_response(
+                False, zoom=current_zoom, error="Zoom level must be between 25% and 500%"
+            )
     else:
-        return _make_zoom_response(False, zoom=current_zoom, error="Provide a zoom level or action (in/out/reset)")
+        return _make_zoom_response(
+            False, zoom=current_zoom, error="Provide a zoom level or action (in/out/reset)"
+        )
 
     # Apply zoom
     if _is_vm():
         result = await asyncio.to_thread(_vm_request, "POST", "/zoom", {"level": target_factor})
         if result.get("ok"):
             return _make_zoom_response(
-                True, zoom=target_factor, previous_zoom=current_zoom,
+                True,
+                zoom=target_factor,
+                previous_zoom=current_zoom,
                 message=f"Zoom: {round(current_zoom * 100)}% → {round(target_factor * 100)}%",
             )
-        return _make_zoom_response(False, zoom=current_zoom, error=result.get("error", "Failed to set zoom"))
+        return _make_zoom_response(
+            False, zoom=current_zoom, error=result.get("error", "Failed to set zoom")
+        )
 
     # Regular browser: use extension bridge
     executor = _get_executor()
@@ -189,11 +198,17 @@ async def set_zoom(params: ZoomSetParams) -> ZoomResponse:
             data = result.get("result", {})
             if isinstance(data, dict) and data.get("ok"):
                 return _make_zoom_response(
-                    True, zoom=target_factor, previous_zoom=current_zoom,
+                    True,
+                    zoom=target_factor,
+                    previous_zoom=current_zoom,
                     message=f"Zoom: {round(current_zoom * 100)}% → {round(target_factor * 100)}%",
                 )
-            return _make_zoom_response(False, zoom=current_zoom, error=data.get("error", "Extension did not respond"))
-        return _make_zoom_response(False, zoom=current_zoom, error=result.get("error", "Bridge execution failed"))
+            return _make_zoom_response(
+                False, zoom=current_zoom, error=data.get("error", "Extension did not respond")
+            )
+        return _make_zoom_response(
+            False, zoom=current_zoom, error=result.get("error", "Bridge execution failed")
+        )
     except Exception as e:
         return _make_zoom_response(False, zoom=current_zoom, error=str(e))
 
@@ -271,24 +286,33 @@ async def set_viewport(params: ViewportSetParams) -> ViewportResponse:
         )
         if result.get("ok"):
             return _make_viewport_response(
-                True, width=target_width, height=h,
-                previous_width=prev_w, previous_height=prev_h,
+                True,
+                width=target_width,
+                height=h,
+                previous_width=prev_w,
+                previous_height=prev_h,
                 message=f"Viewport: {prev_w}×{prev_h} → {target_width}×{h}",
             )
         return _make_viewport_response(
-            False, width=prev_w or 0, height=prev_h or 0,
+            False,
+            width=prev_w or 0,
+            height=prev_h or 0,
             error=result.get("error", "Failed to resize"),
         )
 
     # Regular browser: AppleScript on macOS
     import platform
+
     if platform.system() != "Darwin":
         return _make_viewport_response(
-            False, width=prev_w or 0, height=prev_h or 0,
+            False,
+            width=prev_w or 0,
+            height=prev_h or 0,
             error="Viewport resize requires macOS (uses AppleScript). On other platforms, use the Inspekt VM.",
         )
 
     from inspekt.services.applescript_utils import resize_browser_window
+
     # auto_height on macOS: keep current height
     h = target_height or (prev_h if prev_h else 900)
     ok = await asyncio.to_thread(resize_browser_window, target_width, h)
@@ -300,11 +324,16 @@ async def set_viewport(params: ViewportSetParams) -> ViewportResponse:
         actual_w = actual.width if actual.success else target_width
         actual_h = actual.height if actual.success else h
         return _make_viewport_response(
-            True, width=actual_w, height=actual_h,
-            previous_width=prev_w, previous_height=prev_h,
+            True,
+            width=actual_w,
+            height=actual_h,
+            previous_width=prev_w,
+            previous_height=prev_h,
             message=f"Viewport: {prev_w}×{prev_h} → {actual_w}×{actual_h}",
         )
     return _make_viewport_response(
-        False, width=prev_w or 0, height=prev_h or 0,
+        False,
+        width=prev_w or 0,
+        height=prev_h or 0,
         error="AppleScript window resize failed. Is the browser running and in focus?",
     )

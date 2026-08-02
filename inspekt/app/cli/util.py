@@ -57,12 +57,12 @@ def open_in_tab(url: str) -> bool:
     """
     import os
 
-    in_control_panel = os.environ.get('INSPEKT_TERMINAL') == 'control-panel'
+    in_control_panel = os.environ.get("INSPEKT_TERMINAL") == "control-panel"
 
     if in_control_panel:
         # Format: OSC 1337 ; opentab=<url> BEL — mirrors the download verb.
-        print(f'\033]1337;opentab={url}\007', end='')
-        print(f'↗ {url}')
+        print(f"\033]1337;opentab={url}\007", end="")
+        print(f"↗ {url}")
         return True
 
     click.echo(url)
@@ -88,21 +88,22 @@ def _handle_vm_download(path: Path) -> bool:
     """
     import os
 
-    in_control_panel = os.environ.get('INSPEKT_TERMINAL') == 'control-panel'
+    in_control_panel = os.environ.get("INSPEKT_TERMINAL") == "control-panel"
 
     if in_control_panel:
         # VM + control panel: emit escape sequence for download
         # Format: OSC 1337 ; download=<path> BEL
         # The control panel's xterm.js terminal intercepts this sequence
         # and triggers a file download via the control server's /download endpoint
-        print(f'\033]1337;download={path}\007', end='')
-        print(f'↓ {path.name}')  # User feedback showing download icon
+        print(f"\033]1337;download={path}\007", end="")
+        print(f"↓ {path.name}")  # User feedback showing download icon
     else:
         # VM but not in control panel (e.g., docker exec)
         # OSC 1337 won't work - inform user how to download
-        click.echo(f'📁 {path}')
+        click.echo(f"📁 {path}")
         from inspekt.app.cli.table import print_hint
-        print_hint('Use the control panel terminal (port 6080) for automatic downloads.')
+
+        print_hint("Use the control panel terminal (port 6080) for automatic downloads.")
     return True
 
 
@@ -176,18 +177,18 @@ def reveal_or_download(path: str | Path) -> bool:
     system = platform.system()
 
     try:
-        if system == 'Darwin':
+        if system == "Darwin":
             # macOS: open -R reveals the file in Finder with the file selected
-            subprocess.run(['open', '-R', str(path)], check=True)
-        elif system == 'Windows':
+            subprocess.run(["open", "-R", str(path)], check=True)
+        elif system == "Windows":
             # Windows: explorer /select,<path> reveals file in Explorer
             # Note: Path must be joined with /select, (no space)
             # Note: explorer.exe returns exit code 1 even on success, so don't use check=True
-            subprocess.run(['explorer', f'/select,{path}'])
+            subprocess.run(["explorer", f"/select,{path}"])
         else:
             # Linux: open the containing directory (can't select specific file easily)
             # Use xdg-open to open parent directory in default file manager
-            subprocess.run(['xdg-open', str(path.parent)], check=True)
+            subprocess.run(["xdg-open", str(path.parent)], check=True)
         return True
     except (subprocess.SubprocessError, FileNotFoundError):
         # Fallback: just open the parent directory
@@ -304,6 +305,7 @@ def copy_text_to_clipboard(text: str) -> bool:
     # Skip xclip entirely — X11 clipboard semantics cause xclip to block
     # indefinitely (it stays alive to serve paste requests as selection owner).
     from inspekt.config import is_isolated_mode
+
     if is_isolated_mode():
         if os.environ.get("INSPEKT_TERMINAL") == "control-panel":
             _vm_clipboard_relay(text)
@@ -442,7 +444,13 @@ def repl():
 
     if not client.is_alive():
         from inspekt.app.cli.table import _style_with_inline_code
-        click.echo(_style_with_inline_code("Error: Bridge server is not running. Start it with `inspekt start`.", base_fg="red"), err=True)
+
+        click.echo(
+            _style_with_inline_code(
+                "Error: Bridge server is not running. Start it with `inspekt start`.", base_fg="red"
+            ),
+            err=True,
+        )
         sys.exit(1)
 
     click.echo("Inspekt REPL - Type JavaScript code, 'exit' to quit")
@@ -527,8 +535,12 @@ def userscript():
 @click.option("--list", "list_only", is_flag=True, help="Only list files without downloading")
 @click.option("--json", "-j", "output_json", is_flag=True, help="Output as JSON (requires --list)")
 @click.option("-t", "--timeout", type=float, default=30.0, help="Timeout in seconds (default: 30)")
-@click.option("--open", "open_after", is_flag=True, help="Open downloaded file in default application")
-@click.option("--reveal", "reveal_after", is_flag=True, help="Reveal downloaded file in file explorer")
+@click.option(
+    "--open", "open_after", is_flag=True, help="Open downloaded file in default application"
+)
+@click.option(
+    "--reveal", "reveal_after", is_flag=True, help="Reveal downloaded file in file explorer"
+)
 def download(output, list_only, output_json, timeout, open_after, reveal_after):
     """
     Find and download files from the current page.
@@ -550,7 +562,13 @@ def download(output, list_only, output_json, timeout, open_after, reveal_after):
 
     if not client.is_alive():
         from inspekt.app.cli.table import _style_with_inline_code
-        click.echo(_style_with_inline_code("Error: Bridge server is not running. Start it with `inspekt start`.", base_fg="red"), err=True)
+
+        click.echo(
+            _style_with_inline_code(
+                "Error: Bridge server is not running. Start it with `inspekt start`.", base_fg="red"
+            ),
+            err=True,
+        )
         sys.exit(1)
 
     # Execute the find_downloads script
@@ -656,12 +674,9 @@ def download(output, list_only, output_json, timeout, open_after, reveal_after):
         if list_only:
             if output_json:
                 # Build JSON output
-                json_output = {
-                    "total": total_files,
-                    "url": page_url,
-                    "files": files_by_category
-                }
+                json_output = {"total": total_files, "url": page_url, "files": files_by_category}
                 from inspekt.app.cli.table import print_json
+
                 print_json(json_output, summary=f"{total_files} files")
             else:
                 click.echo(f"\nFound {total_files} downloadable files:\n")
@@ -761,10 +776,15 @@ def download(output, list_only, output_json, timeout, open_after, reveal_after):
 
         # In VM, route downloads through mitmproxy (inspekt user has no direct outbound access)
         from inspekt.config import is_isolated_mode
-        _download_kwargs = dict(
-            proxies={"http": "http://localhost:8080", "https": "http://localhost:8080"},
-            verify=False,
-        ) if is_isolated_mode() else {}
+
+        _download_kwargs = (
+            dict(
+                proxies={"http": "http://localhost:8080", "https": "http://localhost:8080"},
+                verify=False,
+            )
+            if is_isolated_mode()
+            else {}
+        )
 
         # Download files
         success_count = 0
@@ -835,7 +855,13 @@ def md_link(output_json):
 
     if not client.is_alive():
         from inspekt.app.cli.table import _style_with_inline_code
-        click.echo(_style_with_inline_code("Error: Bridge server is not running. Start it with `inspekt start`.", base_fg="red"), err=True)
+
+        click.echo(
+            _style_with_inline_code(
+                "Error: Bridge server is not running. Start it with `inspekt start`.", base_fg="red"
+            ),
+            err=True,
+        )
         sys.exit(1)
 
     # Get current page URL and title
@@ -877,12 +903,13 @@ def md_link(output_json):
 
             if output_json:
                 from inspekt.app.cli.table import print_json
+
                 output_data = {
                     "url": url,
                     "title": cleaned_title,
                     "raw_title": raw_title,
                     "website_name": website_name,
-                    "markdown": md_link_str
+                    "markdown": md_link_str,
                 }
                 print_json(output_data, summary="markdown link")
             else:

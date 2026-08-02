@@ -154,9 +154,9 @@ DEFAULT_CONFIG: dict[str, Any] = {
         "skip-threshold": 5,  # Seconds before showing skip prompt
     },
     "video": {
-        "fps": 10,           # Frame rate for video recording (5-30)
-        "quality": 80,       # JPEG quality for frames (50-100)
-        "format": "mp4",     # Output format (mp4 or webm)
+        "fps": 10,  # Frame rate for video recording (5-30)
+        "quality": 80,  # JPEG quality for frames (50-100)
+        "format": "mp4",  # Output format (mp4 or webm)
     },
     "record": {
         "max-actions-per-second": 15,  # Rate limit to prevent runaway recordings
@@ -779,6 +779,7 @@ def get_html_selection_config() -> dict[str, Any]:
     theme = str(theme) if theme else "monokai"
     try:
         from pygments.styles import get_style_by_name
+
         get_style_by_name(theme)
     except Exception:
         # Invalid theme, fall back to monokai
@@ -857,15 +858,9 @@ def get_paths_config() -> dict[str, Path]:
         return path
 
     return {
-        "recordings": resolve_path(
-            paths_config.get("recordings", "."), "."
-        ),
-        "screenshots": resolve_path(
-            paths_config.get("screenshots", "."), "."
-        ),
-        "downloads": resolve_path(
-            paths_config.get("downloads", "~/Downloads"), "~/Downloads"
-        ),
+        "recordings": resolve_path(paths_config.get("recordings", "."), "."),
+        "screenshots": resolve_path(paths_config.get("screenshots", "."), "."),
+        "downloads": resolve_path(paths_config.get("downloads", "~/Downloads"), "~/Downloads"),
     }
 
 

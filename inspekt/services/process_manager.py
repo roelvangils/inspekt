@@ -111,14 +111,10 @@ class ProcessManager:
 
             # Start output streaming tasks
             if proc.stdout:
-                task = asyncio.create_task(
-                    self._stream_pipe(managed, proc.stdout, is_stderr=False)
-                )
+                task = asyncio.create_task(self._stream_pipe(managed, proc.stdout, is_stderr=False))
                 managed._stream_tasks.append(task)
             if proc.stderr:
-                task = asyncio.create_task(
-                    self._stream_pipe(managed, proc.stderr, is_stderr=True)
-                )
+                task = asyncio.create_task(self._stream_pipe(managed, proc.stderr, is_stderr=True))
                 managed._stream_tasks.append(task)
 
         except Exception as e:
@@ -159,14 +155,10 @@ class ProcessManager:
 
             # Start output streaming tasks
             if proc.stdout:
-                task = asyncio.create_task(
-                    self._stream_pipe(managed, proc.stdout, is_stderr=False)
-                )
+                task = asyncio.create_task(self._stream_pipe(managed, proc.stdout, is_stderr=False))
                 managed._stream_tasks.append(task)
             if proc.stderr:
-                task = asyncio.create_task(
-                    self._stream_pipe(managed, proc.stderr, is_stderr=True)
-                )
+                task = asyncio.create_task(self._stream_pipe(managed, proc.stderr, is_stderr=True))
                 managed._stream_tasks.append(task)
 
         except Exception as e:
@@ -174,9 +166,7 @@ class ProcessManager:
 
         return managed
 
-    async def start_docs(
-        self, host: str, port: int, project_root: str
-    ) -> ManagedProcess:
+    async def start_docs(self, host: str, port: int, project_root: str) -> ManagedProcess:
         """Start MkDocs server as an async subprocess."""
         import importlib.util
         import os
@@ -190,17 +180,13 @@ class ProcessManager:
 
         # Pre-flight check: is mkdocs installed?
         if importlib.util.find_spec("mkdocs") is None:
-            managed.error_message = (
-                "mkdocs not installed. Run: pip install mkdocs mkdocs-material"
-            )
+            managed.error_message = "mkdocs not installed. Run: pip install mkdocs mkdocs-material"
             return managed
 
         # Pre-flight check: does mkdocs.yml exist?
         mkdocs_config = os.path.join(project_root, "mkdocs.yml")
         if not os.path.exists(mkdocs_config):
-            managed.error_message = (
-                "mkdocs.yml not found - docs not available in this installation"
-            )
+            managed.error_message = "mkdocs.yml not found - docs not available in this installation"
             return managed
 
         # Pre-flight check: is port already in use?
@@ -226,14 +212,10 @@ class ProcessManager:
 
             # Start output streaming tasks
             if proc.stdout:
-                task = asyncio.create_task(
-                    self._stream_pipe(managed, proc.stdout, is_stderr=False)
-                )
+                task = asyncio.create_task(self._stream_pipe(managed, proc.stdout, is_stderr=False))
                 managed._stream_tasks.append(task)
             if proc.stderr:
-                task = asyncio.create_task(
-                    self._stream_pipe(managed, proc.stderr, is_stderr=True)
-                )
+                task = asyncio.create_task(self._stream_pipe(managed, proc.stderr, is_stderr=True))
                 managed._stream_tasks.append(task)
 
         except Exception as e:
@@ -288,9 +270,7 @@ class ProcessManager:
             # Check if process died
             if managed.process and managed.process.returncode is not None:
                 managed.healthy = False
-                managed.error_message = (
-                    f"Process exited with code {managed.process.returncode}"
-                )
+                managed.error_message = f"Process exited with code {managed.process.returncode}"
                 return False
 
             # Check if port is open
@@ -403,9 +383,7 @@ class ProcessManager:
                         managed.healthy = False
                         prefix = click.style(server_type.prefix, fg="red", bold=True)
                         code = managed.process.returncode
-                        click.echo(
-                            f"{prefix} {error(f'Server crashed (exit code {code})')}"
-                        )
+                        click.echo(f"{prefix} {error(f'Server crashed (exit code {code})')}")
                         managed.error_message = f"Crashed with exit code {code}"
 
             try:

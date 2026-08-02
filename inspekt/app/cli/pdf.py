@@ -136,11 +136,13 @@ def _print_basic_results(result: PDFBasicResult, verbose: bool = False) -> None:
     if result.skipped > 0:
         summary_parts.append(click.style(f"{result.skipped} skipped", fg="bright_black"))
 
-    table.print_summary([
-        f"{len(result.checks)} checks",
-        "",
-        ", ".join(summary_parts),
-    ])
+    table.print_summary(
+        [
+            f"{len(result.checks)} checks",
+            "",
+            ", ".join(summary_parts),
+        ]
+    )
     table.print_footer()
 
     # Print file info below the table
@@ -222,11 +224,13 @@ def _print_simple_results(result: SimplePDFResult, verbose: bool = False) -> Non
     if result.skipped > 0:
         summary_parts.append(click.style(f"{result.skipped} skipped", fg="bright_black"))
 
-    table.print_summary([
-        f"{len(result.checks)} checks",
-        "",
-        ", ".join(summary_parts),
-    ])
+    table.print_summary(
+        [
+            f"{len(result.checks)} checks",
+            "",
+            ", ".join(summary_parts),
+        ]
+    )
     table.print_footer()
 
     # Print file info below the table
@@ -302,7 +306,9 @@ def _print_verapdf_results(result: VeraPDFResult, verbose: bool = False) -> None
         status_text = click.style(f"PDF/{result.profile.upper()} Compliant", fg="green", bold=True)
     else:
         status_icon = format_status_icon("fail")
-        status_text = click.style(f"PDF/{result.profile.upper()} Non-Compliant", fg="red", bold=True)
+        status_text = click.style(
+            f"PDF/{result.profile.upper()} Non-Compliant", fg="red", bold=True
+        )
 
     click.echo(f"  {status_icon} {status_text}")
     click.echo(f"  Rules: {result.passed_rules} passed, {result.failed_rules} failed")
@@ -464,6 +470,7 @@ def _output_json(result: PDFFullResult) -> None:
         }
 
     from inspekt.app.cli.table import print_json
+
     print_json(output, summary="PDF a11y audit")
 
 
@@ -492,49 +499,143 @@ def pdf():
 @pdf.command("check")
 @click.argument("files", nargs=-1, required=True)
 @click.option(
-    "--engine", "-e",
+    "--engine",
+    "-e",
     type=click.Choice(["basic", "simple", "vera", "all"]),
     default="basic",
     help="Which checking engine to use (default: basic)",
 )
 @click.option(
-    "--profile", "-p",
+    "--profile",
+    "-p",
     type=click.Choice(["ua1", "ua2", "wtpdf"]),
     default="ua1",
     help="veraPDF validation profile (default: ua1)",
 )
 @click.option("--json", "-j", "json_output", is_flag=True, help="Output results as JSON")
 @click.option("--output", "-o", "output_path", type=click.Path(), help="Save HTML report to file")
-@click.option("--json-output", "json_output_path", type=click.Path(), help="Export report data as JSON (for later regeneration)")
-@click.option("--json-only", "json_only", is_flag=True, help="Generate JSON data only, no HTML report")
-@click.option("--pdfi", "pdfi_output_path", type=click.Path(), help="Export as self-contained .pdfi package (includes PDF, report, and preview images)")
-@click.option("--open", "open_report", is_flag=True, help="Open HTML report in browser after generation")
+@click.option(
+    "--json-output",
+    "json_output_path",
+    type=click.Path(),
+    help="Export report data as JSON (for later regeneration)",
+)
+@click.option(
+    "--json-only", "json_only", is_flag=True, help="Generate JSON data only, no HTML report"
+)
+@click.option(
+    "--pdfi",
+    "pdfi_output_path",
+    type=click.Path(),
+    help="Export as self-contained .pdfi package (includes PDF, report, and preview images)",
+)
+@click.option(
+    "--open", "open_report", is_flag=True, help="Open HTML report in browser after generation"
+)
 @click.option("--verbose", "-v", is_flag=True, help="Show detailed output")
 @click.option("--pull-vera", is_flag=True, help="Pull the veraPDF Docker image before running")
 @click.option("--no-cover", is_flag=True, help="Disable cover page preview in HTML report")
 @click.option("--no-screenshots", is_flag=True, help="Disable issue screenshots in HTML report")
 @click.option("--no-ocr", is_flag=True, help="Disable OCR text layer comparison in HTML report")
-@click.option("--ocr-all-pages", is_flag=True, help="Analyze ALL pages for text layer comparison (disables smart sampling, may be slow)")
+@click.option(
+    "--ocr-all-pages",
+    is_flag=True,
+    help="Analyze ALL pages for text layer comparison (disables smart sampling, may be slow)",
+)
 @click.option("--ocr-lang", default="eng", help="Tesseract language code for OCR (default: eng)")
 @click.option("--no-score", is_flag=True, help="Disable accessibility score in HTML report")
-@click.option("--no-structure", is_flag=True, help="Disable structure tree visualization in HTML report")
-@click.option("--no-content-audit", is_flag=True, help="Disable content audits (images, tables, forms, links) in HTML report")
+@click.option(
+    "--no-structure", is_flag=True, help="Disable structure tree visualization in HTML report"
+)
+@click.option(
+    "--no-content-audit",
+    is_flag=True,
+    help="Disable content audits (images, tables, forms, links) in HTML report",
+)
 @click.option("--no-remediation", is_flag=True, help="Disable remediation roadmap in HTML report")
-@click.option("--wcag-level", type=click.Choice(["A", "AA", "AAA"]), default=None, help="Filter report by WCAG conformance level")
-@click.option("--no-image-classification", is_flag=True, help="Disable local AI image categorization (photograph, chart, text-as-image, etc.)")
-@click.option("--max-image-classification", type=int, default=100, help="Maximum images for classification (default: 100, 0=unlimited)")
-@click.option("--generate-alt-text", is_flag=True, help="Generate AI alt-text suggestions for images missing alt text (requires API key)")
-@click.option("--max-alt-text", type=int, default=10, help="Maximum images for AI alt-text generation (default: 10, 0=unlimited)")
-@click.option("--ai-provider", type=click.Choice(["thoth", "anthropic", "openai"]), default=None, help="AI provider for vision analysis (default: thoth)")
-@click.option("--show-tags", is_flag=True, help="[Deprecated] Static tag overlay images. Use Interactive Preview instead (enabled by default)")
-@click.option("--tag-pages", type=str, default=None, help="[Deprecated] Pages for static tag visualization (e.g., '1,2,3' or '1-5')")
-@click.option("--no-contrast", is_flag=True, help="Disable color contrast analysis (enabled by default)")
-@click.option("--contrast-pages", type=str, default=None, help="Specific pages for contrast analysis (e.g., '1,2,3' or '1-5')")
-@click.option("--contrast-dpi", type=int, default=200, help="Render resolution for contrast check (default: 200, higher=slower but more accurate)")
-@click.option("--contrast-max-pages", type=int, default=5, help="Max pages for contrast analysis (default: 5, 0=all)")
-@click.option("--contrast-max-issues", type=int, default=5, help="Max unique color issues per page (default: 5)")
-@click.option("--no-interactive", is_flag=True, help="Disable interactive HTML preview with clickable tag regions")
-@click.option("--interactive-pages", type=int, default=5, help="Number of pages for interactive preview (default: 5, 0=all)")
+@click.option(
+    "--wcag-level",
+    type=click.Choice(["A", "AA", "AAA"]),
+    default=None,
+    help="Filter report by WCAG conformance level",
+)
+@click.option(
+    "--no-image-classification",
+    is_flag=True,
+    help="Disable local AI image categorization (photograph, chart, text-as-image, etc.)",
+)
+@click.option(
+    "--max-image-classification",
+    type=int,
+    default=100,
+    help="Maximum images for classification (default: 100, 0=unlimited)",
+)
+@click.option(
+    "--generate-alt-text",
+    is_flag=True,
+    help="Generate AI alt-text suggestions for images missing alt text (requires API key)",
+)
+@click.option(
+    "--max-alt-text",
+    type=int,
+    default=10,
+    help="Maximum images for AI alt-text generation (default: 10, 0=unlimited)",
+)
+@click.option(
+    "--ai-provider",
+    type=click.Choice(["thoth", "anthropic", "openai"]),
+    default=None,
+    help="AI provider for vision analysis (default: thoth)",
+)
+@click.option(
+    "--show-tags",
+    is_flag=True,
+    help="[Deprecated] Static tag overlay images. Use Interactive Preview instead (enabled by default)",
+)
+@click.option(
+    "--tag-pages",
+    type=str,
+    default=None,
+    help="[Deprecated] Pages for static tag visualization (e.g., '1,2,3' or '1-5')",
+)
+@click.option(
+    "--no-contrast", is_flag=True, help="Disable color contrast analysis (enabled by default)"
+)
+@click.option(
+    "--contrast-pages",
+    type=str,
+    default=None,
+    help="Specific pages for contrast analysis (e.g., '1,2,3' or '1-5')",
+)
+@click.option(
+    "--contrast-dpi",
+    type=int,
+    default=200,
+    help="Render resolution for contrast check (default: 200, higher=slower but more accurate)",
+)
+@click.option(
+    "--contrast-max-pages",
+    type=int,
+    default=5,
+    help="Max pages for contrast analysis (default: 5, 0=all)",
+)
+@click.option(
+    "--contrast-max-issues",
+    type=int,
+    default=5,
+    help="Max unique color issues per page (default: 5)",
+)
+@click.option(
+    "--no-interactive",
+    is_flag=True,
+    help="Disable interactive HTML preview with clickable tag regions",
+)
+@click.option(
+    "--interactive-pages",
+    type=int,
+    default=5,
+    help="Number of pages for interactive preview (default: 5, 0=all)",
+)
 @click.option(
     "--embed-base64",
     is_flag=True,
@@ -548,7 +649,46 @@ def pdf():
     help="Emit JSON progress events to stderr (for desktop app integration)",
 )
 @click.pass_context
-def check(ctx, files: tuple[str, ...], engine: str, profile: str, json_output: bool, output_path: str | None, json_output_path: str | None, json_only: bool, pdfi_output_path: str | None, open_report: bool, verbose: bool, pull_vera: bool, no_cover: bool, no_screenshots: bool, no_ocr: bool, ocr_all_pages: bool, ocr_lang: str, no_score: bool, no_structure: bool, no_content_audit: bool, no_remediation: bool, wcag_level: str | None, no_image_classification: bool, max_image_classification: int, generate_alt_text: bool, max_alt_text: int, ai_provider: str | None, show_tags: bool, tag_pages: str | None, no_contrast: bool, contrast_pages: str | None, contrast_dpi: int, contrast_max_pages: int, contrast_max_issues: int, no_interactive: bool, interactive_pages: int, embed_base64: bool, structured_progress: bool):
+def check(
+    ctx,
+    files: tuple[str, ...],
+    engine: str,
+    profile: str,
+    json_output: bool,
+    output_path: str | None,
+    json_output_path: str | None,
+    json_only: bool,
+    pdfi_output_path: str | None,
+    open_report: bool,
+    verbose: bool,
+    pull_vera: bool,
+    no_cover: bool,
+    no_screenshots: bool,
+    no_ocr: bool,
+    ocr_all_pages: bool,
+    ocr_lang: str,
+    no_score: bool,
+    no_structure: bool,
+    no_content_audit: bool,
+    no_remediation: bool,
+    wcag_level: str | None,
+    no_image_classification: bool,
+    max_image_classification: int,
+    generate_alt_text: bool,
+    max_alt_text: int,
+    ai_provider: str | None,
+    show_tags: bool,
+    tag_pages: str | None,
+    no_contrast: bool,
+    contrast_pages: str | None,
+    contrast_dpi: int,
+    contrast_max_pages: int,
+    contrast_max_issues: int,
+    no_interactive: bool,
+    interactive_pages: int,
+    embed_base64: bool,
+    structured_progress: bool,
+):
     """Check PDF files for accessibility issues.
 
     Runs accessibility checks on one or more PDF files. Supports glob patterns
@@ -580,6 +720,7 @@ def check(ctx, files: tuple[str, ...], engine: str, profile: str, json_output: b
     emitter = None
     if structured_progress:
         from inspekt.services.structured_progress import StructuredProgressEmitter
+
         emitter = StructuredProgressEmitter()
 
     # Expand glob patterns
@@ -609,6 +750,7 @@ def check(ctx, files: tuple[str, ...], engine: str, profile: str, json_output: b
 
     if engine in ("simple", "all"):
         from inspekt.services.simple_pdf_checker import SimplePDFChecker
+
         simple_checker = SimplePDFChecker()
 
     if engine in ("vera", "all"):
@@ -676,7 +818,9 @@ def check(ctx, files: tuple[str, ...], engine: str, profile: str, json_output: b
                 "max_ocr_pages": prescan.page_count if ocr_all_pages else 10,
                 "max_contrast_pages": contrast_max_pages,
                 "max_classify_images": max_image_classification,
-                "max_preview_pages": interactive_pages if interactive_pages > 0 else prescan.page_count,
+                "max_preview_pages": interactive_pages
+                if interactive_pages > 0
+                else prescan.page_count,
             }
             timing = estimate_timing(prescan, timing_config)
             emitter.emit_prescan(prescan, timing)
@@ -729,7 +873,12 @@ def check(ctx, files: tuple[str, ...], engine: str, profile: str, json_output: b
                     elif not json_output:
                         print_warning(f"veraPDF failed for {file_path.name}: {e}")
 
-            results.append((file_path, PDFFullResult(basic=basic_result, verapdf=vera_result, simple=simple_result)))
+            results.append(
+                (
+                    file_path,
+                    PDFFullResult(basic=basic_result, verapdf=vera_result, simple=simple_result),
+                )
+            )
 
         except ImportError as e:
             print_error(str(e))
@@ -787,7 +936,9 @@ def check(ctx, files: tuple[str, ...], engine: str, profile: str, json_output: b
 
         # Tag visualization options (Phase 2) - DEPRECATED
         if show_tags:
-            print_warning("--show-tags is deprecated. Interactive Preview (enabled by default) provides a better experience.")
+            print_warning(
+                "--show-tags is deprecated. Interactive Preview (enabled by default) provides a better experience."
+            )
             config_overrides["show-tags"] = True
         if tag_pages:
             config_overrides["tag-pages"] = tag_pages
@@ -817,7 +968,7 @@ def check(ctx, files: tuple[str, ...], engine: str, profile: str, json_output: b
         if len(results) == 1:
             report_path = Path(output_path)
             if not report_path.suffix:
-                report_path = report_path.with_suffix('.html')
+                report_path = report_path.with_suffix(".html")
 
             file_path, result = results[0]
             generate_pdf_report(
@@ -836,7 +987,9 @@ def check(ctx, files: tuple[str, ...], engine: str, profile: str, json_output: b
             base_path = Path(output_path)
             for file_path, result in results:
                 report_name = file_path.stem + "_accessibility_report.html"
-                report_path = base_path.parent / report_name if base_path.suffix else base_path / report_name
+                report_path = (
+                    base_path.parent / report_name if base_path.suffix else base_path / report_name
+                )
                 report_path.parent.mkdir(parents=True, exist_ok=True)
                 generate_pdf_report(
                     result,
@@ -851,7 +1004,9 @@ def check(ctx, files: tuple[str, ...], engine: str, profile: str, json_output: b
 
             if open_report and results:
                 # Open the first report
-                first_report = base_path.parent / (results[0][0].stem + "_accessibility_report.html")
+                first_report = base_path.parent / (
+                    results[0][0].stem + "_accessibility_report.html"
+                )
                 OutputHandler.open_file(first_report)
 
         # Skip terminal output if generating report
@@ -887,10 +1042,10 @@ def check(ctx, files: tuple[str, ...], engine: str, profile: str, json_output: b
             if json_output_path:
                 json_path = Path(json_output_path)
                 if not json_path.suffix:
-                    json_path = json_path.with_suffix('.json')
+                    json_path = json_path.with_suffix(".json")
             else:
                 # json_only mode - auto-generate path
-                json_path = file_path.with_suffix('.json')
+                json_path = file_path.with_suffix(".json")
 
             # Generate report data
             if emitter:
@@ -945,8 +1100,8 @@ def check(ctx, files: tuple[str, ...], engine: str, profile: str, json_output: b
         for file_path, result in results:
             # Determine PDFI output path
             pdfi_path = Path(pdfi_output_path)
-            if not pdfi_path.suffix or pdfi_path.suffix.lower() != '.pdfi':
-                pdfi_path = pdfi_path.with_suffix('.pdfi')
+            if not pdfi_path.suffix or pdfi_path.suffix.lower() != ".pdfi":
+                pdfi_path = pdfi_path.with_suffix(".pdfi")
 
             # Generate report data
             if emitter:
@@ -1005,24 +1160,33 @@ def check(ctx, files: tuple[str, ...], engine: str, profile: str, json_output: b
             # Multiple files - output as array
             all_output = []
             for file_path, result in results:
-                all_output.append({
-                    "file": str(file_path),
-                    "results": json.loads(json.dumps({
-                        "basic": {
-                            "metadata": {
-                                "file_path": str(result.basic.metadata.file_path),
-                                "file_size": result.basic.metadata.file_size,
-                                "page_count": result.basic.metadata.page_count,
-                            },
-                            "summary": {
-                                "passed": result.basic.passed,
-                                "failed": result.basic.failed,
-                            },
-                        },
-                    })),
-                })
+                all_output.append(
+                    {
+                        "file": str(file_path),
+                        "results": json.loads(
+                            json.dumps(
+                                {
+                                    "basic": {
+                                        "metadata": {
+                                            "file_path": str(result.basic.metadata.file_path),
+                                            "file_size": result.basic.metadata.file_size,
+                                            "page_count": result.basic.metadata.page_count,
+                                        },
+                                        "summary": {
+                                            "passed": result.basic.passed,
+                                            "failed": result.basic.failed,
+                                        },
+                                    },
+                                }
+                            )
+                        ),
+                    }
+                )
             from inspekt.app.cli.table import print_json
-            print_json(all_output, summary=f"{len(results)} PDF file{'s' if len(results) != 1 else ''}")
+
+            print_json(
+                all_output, summary=f"{len(results)} PDF file{'s' if len(results) != 1 else ''}"
+            )
     else:
         for file_path, result in results:
             if len(results) > 1:
@@ -1047,15 +1211,33 @@ def check(ctx, files: tuple[str, ...], engine: str, profile: str, json_output: b
         click.echo()
         tips = []
         if engine == "basic":
-            tips.append(("--engine simple", "Run 11 checks based on simplA11yPDFCrawler", "`inspekt pdf check doc.pdf --engine simple`"))
-            tips.append(("--engine vera", "Run full PDF/UA validation with veraPDF", "`inspekt pdf check doc.pdf --engine vera`"))
+            tips.append(
+                (
+                    "--engine simple",
+                    "Run 11 checks based on simplA11yPDFCrawler",
+                    "`inspekt pdf check doc.pdf --engine simple`",
+                )
+            )
+            tips.append(
+                (
+                    "--engine vera",
+                    "Run full PDF/UA validation with veraPDF",
+                    "`inspekt pdf check doc.pdf --engine vera`",
+                )
+            )
         elif engine == "simple":
             tips.append(("--engine vera", "Run full PDF/UA validation with veraPDF", None))
         if engine != "all":
             tips.append(("--engine all", "Run all engines (basic, simple, vera)", None))
         tips.append(("--json", "Output results as JSON for automation", None))
         if not output_path:
-            tips.append(("--output report", "Generate HTML report", "`inspekt pdf check doc.pdf -o report --open`"))
+            tips.append(
+                (
+                    "--output report",
+                    "Generate HTML report",
+                    "`inspekt pdf check doc.pdf -o report --open`",
+                )
+            )
         if not verbose:
             tips.append(("--verbose", "Show detailed metadata and violation contexts", None))
 
@@ -1086,7 +1268,9 @@ def check(ctx, files: tuple[str, ...], engine: str, profile: str, json_output: b
 @pdf.command("render")
 @click.argument("json_file", type=click.Path(exists=True))
 @click.option("--output", "-o", "output_path", type=click.Path(), help="Output HTML file path")
-@click.option("--open", "open_report", is_flag=True, help="Open HTML report in browser after generation")
+@click.option(
+    "--open", "open_report", is_flag=True, help="Open HTML report in browser after generation"
+)
 def render(json_file: str, output_path: str | None, open_report: bool):
     """Render an HTML report from a saved JSON file.
 
@@ -1116,9 +1300,9 @@ def render(json_file: str, output_path: str | None, open_report: bool):
     if output_path:
         html_path = Path(output_path)
         if not html_path.suffix:
-            html_path = html_path.with_suffix('.html')
+            html_path = html_path.with_suffix(".html")
     else:
-        html_path = json_path.with_suffix('.html')
+        html_path = json_path.with_suffix(".html")
 
     try:
         with print_checkbox_step("Load JSON report data"):
@@ -1215,7 +1399,9 @@ def viewer(serve: bool, port: int):
             click.echo("\nServer stopped.")
         except OSError as e:
             if "Address already in use" in str(e):
-                print_error(f"Port {port} is already in use. Try --port with a different port number.")
+                print_error(
+                    f"Port {port} is already in use. Try --port with a different port number."
+                )
             else:
                 print_error(f"Failed to start server: {e}")
             sys.exit(1)

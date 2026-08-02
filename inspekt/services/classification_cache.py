@@ -214,7 +214,9 @@ class ClassificationCache:
 
             # Verify size matches (in case of hash collision)
             if cached.file_size != len(image_bytes):
-                logger.debug(f"Size mismatch for bytes hash {image_hash[:8]}..., invalidating cache")
+                logger.debug(
+                    f"Size mismatch for bytes hash {image_hash[:8]}..., invalidating cache"
+                )
                 cache_path.unlink(missing_ok=True)
                 return None
 
@@ -306,7 +308,9 @@ class ClassificationCache:
 
             # Check cache version - invalidate if format changed
             if cached.cache_version != CURRENT_CACHE_VERSION:
-                logger.debug(f"Cache version mismatch for {file_path.name} (v{cached.cache_version} != v{CURRENT_CACHE_VERSION}), invalidating")
+                logger.debug(
+                    f"Cache version mismatch for {file_path.name} (v{cached.cache_version} != v{CURRENT_CACHE_VERSION}), invalidating"
+                )
                 cache_path.unlink(missing_ok=True)
                 return None
 

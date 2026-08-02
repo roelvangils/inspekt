@@ -99,15 +99,9 @@ def _build_sr_script(config: dict) -> str:
     known_bugs = _get_known_bugs()
 
     # Replace placeholders with actual data
-    script = script.replace(
-        "__SR_ANNOUNCEMENTS__", json.dumps(announcements, ensure_ascii=False)
-    )
-    script = script.replace(
-        "__SR_VERBOSITY__", json.dumps(verbosity, ensure_ascii=False)
-    )
-    script = script.replace(
-        "__SR_KNOWN_BUGS__", json.dumps(known_bugs, ensure_ascii=False)
-    )
+    script = script.replace("__SR_ANNOUNCEMENTS__", json.dumps(announcements, ensure_ascii=False))
+    script = script.replace("__SR_VERBOSITY__", json.dumps(verbosity, ensure_ascii=False))
+    script = script.replace("__SR_KNOWN_BUGS__", json.dumps(known_bugs, ensure_ascii=False))
     script = script.replace("__SR_CONFIG__", json.dumps(config, ensure_ascii=False))
 
     return script
@@ -149,9 +143,7 @@ async def sr_walk(params: SRWalkParams) -> SRWalkResponse:
             )
 
         # Parse announcements
-        announcements = [
-            SRElementAnnouncement(**a) for a in data.get("announcements", [])
-        ]
+        announcements = [SRElementAnnouncement(**a) for a in data.get("announcements", [])]
 
         # Parse summary
         summary_data = data.get("summary", {})

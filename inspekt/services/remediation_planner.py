@@ -152,9 +152,7 @@ class RemediationPlan:
         """Total number of tasks."""
         return len(self.tasks)
 
-    def get_tasks_by_priority(
-        self, priority: RemediationPriority
-    ) -> list[RemediationTask]:
+    def get_tasks_by_priority(self, priority: RemediationPriority) -> list[RemediationTask]:
         """Get tasks for a specific priority level."""
         return [t for t in self.tasks if t.priority == priority]
 
@@ -481,15 +479,17 @@ def generate_remediation_plan(
         for check in result.simple.checks:
             if check.status in ("fail", "warn") and check.check_id not in REMEDIATION_TEMPLATES:
                 # Generic task for checks without templates
-                tasks.append(RemediationTask(
-                    task_id=next_task_id(),
-                    priority=_severity_to_priority(check.severity),
-                    category="General",
-                    title=f"Fix: {check.name}",
-                    description=check.message,
-                    wcag_criteria=[check.wcag_sc] if check.wcag_sc else [],
-                    effort=EffortLevel.MODERATE,
-                ))
+                tasks.append(
+                    RemediationTask(
+                        task_id=next_task_id(),
+                        priority=_severity_to_priority(check.severity),
+                        category="General",
+                        title=f"Fix: {check.name}",
+                        description=check.message,
+                        wcag_criteria=[check.wcag_sc] if check.wcag_sc else [],
+                        effort=EffortLevel.MODERATE,
+                    )
+                )
 
     # Process veraPDF violations if available
     if result.verapdf:
@@ -512,162 +512,178 @@ def generate_remediation_plan(
 
             pages = sorted(set(v.page_number + 1 for v in violations if v.page_number is not None))
 
-            tasks.append(RemediationTask(
-                task_id=next_task_id(),
-                priority=_severity_to_priority(violations[0].severity),
-                category=category,
-                title=f"Fix: {rule_id}",
-                description=violations[0].description,
-                affected_pages=pages,
-                affected_count=len(violations),
-                wcag_criteria=wcag_ids,
-                effort=EffortLevel.MODERATE,
-                notes=mapping.remediation_hint if mapping else None,
-            ))
+            tasks.append(
+                RemediationTask(
+                    task_id=next_task_id(),
+                    priority=_severity_to_priority(violations[0].severity),
+                    category=category,
+                    title=f"Fix: {rule_id}",
+                    description=violations[0].description,
+                    affected_pages=pages,
+                    affected_count=len(violations),
+                    wcag_criteria=wcag_ids,
+                    effort=EffortLevel.MODERATE,
+                    notes=mapping.remediation_hint if mapping else None,
+                )
+            )
 
     # Process content audit results if available
     if content_audit:
         # Images without alt text
         if content_audit.images_without_alt > 0:
-            pages = sorted(set(
-                img.page + 1 for img in content_audit.images
-                if not img.has_alt_text and not img.is_decorative
-            ))
+            pages = sorted(
+                set(
+                    img.page + 1
+                    for img in content_audit.images
+                    if not img.has_alt_text and not img.is_decorative
+                )
+            )
             template = REMEDIATION_TEMPLATES["alt_text"]
-            tasks.append(RemediationTask(
-                task_id=next_task_id(),
-                priority=template["priority"],
-                category=template["category"],
-                title=f"Add alt text to {content_audit.images_without_alt} image(s)",
-                description="Images are missing alternative text descriptions",
-                affected_pages=pages,
-                affected_count=content_audit.images_without_alt,
-                tools=template["tools"],
-                steps=template["steps"],
-                wcag_criteria=template["wcag_criteria"],
-                effort=EffortLevel.MODERATE,
-            ))
+            tasks.append(
+                RemediationTask(
+                    task_id=next_task_id(),
+                    priority=template["priority"],
+                    category=template["category"],
+                    title=f"Add alt text to {content_audit.images_without_alt} image(s)",
+                    description="Images are missing alternative text descriptions",
+                    affected_pages=pages,
+                    affected_count=content_audit.images_without_alt,
+                    tools=template["tools"],
+                    steps=template["steps"],
+                    wcag_criteria=template["wcag_criteria"],
+                    effort=EffortLevel.MODERATE,
+                )
+            )
 
         # Tables without headers
         if content_audit.tables_without_headers > 0:
-            pages = sorted(set(
-                tbl.page + 1 for tbl in content_audit.tables
-                if not tbl.has_headers
-            ))
+            pages = sorted(set(tbl.page + 1 for tbl in content_audit.tables if not tbl.has_headers))
             template = REMEDIATION_TEMPLATES["table_headers"]
-            tasks.append(RemediationTask(
-                task_id=next_task_id(),
-                priority=template["priority"],
-                category=template["category"],
-                title=f"Add headers to {content_audit.tables_without_headers} table(s)",
-                description="Tables are missing header cell markup",
-                affected_pages=pages,
-                affected_count=content_audit.tables_without_headers,
-                tools=template["tools"],
-                steps=template["steps"],
-                wcag_criteria=template["wcag_criteria"],
-                effort=EffortLevel.MODERATE,
-            ))
+            tasks.append(
+                RemediationTask(
+                    task_id=next_task_id(),
+                    priority=template["priority"],
+                    category=template["category"],
+                    title=f"Add headers to {content_audit.tables_without_headers} table(s)",
+                    description="Tables are missing header cell markup",
+                    affected_pages=pages,
+                    affected_count=content_audit.tables_without_headers,
+                    tools=template["tools"],
+                    steps=template["steps"],
+                    wcag_criteria=template["wcag_criteria"],
+                    effort=EffortLevel.MODERATE,
+                )
+            )
 
         # Form fields without labels
         if content_audit.fields_without_labels > 0:
-            pages = sorted(set(
-                f.page + 1 for f in content_audit.forms
-                if not f.has_tooltip and not f.has_label
-            ))
+            pages = sorted(
+                set(
+                    f.page + 1 for f in content_audit.forms if not f.has_tooltip and not f.has_label
+                )
+            )
             template = REMEDIATION_TEMPLATES["form_labels"]
-            tasks.append(RemediationTask(
-                task_id=next_task_id(),
-                priority=template["priority"],
-                category=template["category"],
-                title=f"Add labels to {content_audit.fields_without_labels} form field(s)",
-                description="Form fields are missing accessible labels/tooltips",
-                affected_pages=pages,
-                affected_count=content_audit.fields_without_labels,
-                tools=template["tools"],
-                steps=template["steps"],
-                wcag_criteria=template["wcag_criteria"],
-                effort=EffortLevel.MODERATE,
-            ))
+            tasks.append(
+                RemediationTask(
+                    task_id=next_task_id(),
+                    priority=template["priority"],
+                    category=template["category"],
+                    title=f"Add labels to {content_audit.fields_without_labels} form field(s)",
+                    description="Form fields are missing accessible labels/tooltips",
+                    affected_pages=pages,
+                    affected_count=content_audit.fields_without_labels,
+                    tools=template["tools"],
+                    steps=template["steps"],
+                    wcag_criteria=template["wcag_criteria"],
+                    effort=EffortLevel.MODERATE,
+                )
+            )
 
         # Non-descriptive links
         if content_audit.links_non_descriptive > 0:
-            pages = sorted(set(
-                link.page + 1 for link in content_audit.links
-                if not link.is_descriptive
-            ))
+            pages = sorted(
+                set(link.page + 1 for link in content_audit.links if not link.is_descriptive)
+            )
             template = REMEDIATION_TEMPLATES["link_text"]
-            tasks.append(RemediationTask(
-                task_id=next_task_id(),
-                priority=template["priority"],
-                category=template["category"],
-                title=f"Improve {content_audit.links_non_descriptive} link text(s)",
-                description="Links have non-descriptive text like 'click here' or 'read more'",
-                affected_pages=pages,
-                affected_count=content_audit.links_non_descriptive,
-                tools=template["tools"],
-                steps=template["steps"],
-                wcag_criteria=template["wcag_criteria"],
-                effort=EffortLevel.MODERATE,
-            ))
+            tasks.append(
+                RemediationTask(
+                    task_id=next_task_id(),
+                    priority=template["priority"],
+                    category=template["category"],
+                    title=f"Improve {content_audit.links_non_descriptive} link text(s)",
+                    description="Links have non-descriptive text like 'click here' or 'read more'",
+                    affected_pages=pages,
+                    affected_count=content_audit.links_non_descriptive,
+                    tools=template["tools"],
+                    steps=template["steps"],
+                    wcag_criteria=template["wcag_criteria"],
+                    effort=EffortLevel.MODERATE,
+                )
+            )
 
         # Lists with structure issues
         if content_audit.lists_with_issues > 0:
-            pages = sorted(set(
-                lst.page + 1 for lst in content_audit.lists
-                if lst.status != "pass"
-            ))
+            pages = sorted(set(lst.page + 1 for lst in content_audit.lists if lst.status != "pass"))
             template = REMEDIATION_TEMPLATES["list_structure"]
-            tasks.append(RemediationTask(
-                task_id=next_task_id(),
-                priority=template["priority"],
-                category=template["category"],
-                title=f"Fix structure of {content_audit.lists_with_issues} list(s)",
-                description="Lists have improper L/LI/Lbl/LBody structure",
-                affected_pages=pages,
-                affected_count=content_audit.lists_with_issues,
-                tools=template["tools"],
-                steps=template["steps"],
-                wcag_criteria=template["wcag_criteria"],
-                effort=template["effort"],
-            ))
+            tasks.append(
+                RemediationTask(
+                    task_id=next_task_id(),
+                    priority=template["priority"],
+                    category=template["category"],
+                    title=f"Fix structure of {content_audit.lists_with_issues} list(s)",
+                    description="Lists have improper L/LI/Lbl/LBody structure",
+                    affected_pages=pages,
+                    affected_count=content_audit.lists_with_issues,
+                    tools=template["tools"],
+                    steps=template["steps"],
+                    wcag_criteria=template["wcag_criteria"],
+                    effort=template["effort"],
+                )
+            )
 
         # Annotations without descriptions
         if content_audit.annotations_without_description > 0:
-            pages = sorted(set(
-                ann.page + 1 for ann in content_audit.annotations
-                if ann.status in ("fail", "warn")
-            ))
+            pages = sorted(
+                set(
+                    ann.page + 1
+                    for ann in content_audit.annotations
+                    if ann.status in ("fail", "warn")
+                )
+            )
             template = REMEDIATION_TEMPLATES["annotation_accessibility"]
-            tasks.append(RemediationTask(
-                task_id=next_task_id(),
-                priority=template["priority"],
-                category=template["category"],
-                title=f"Add descriptions to {content_audit.annotations_without_description} annotation(s)",
-                description="Annotations (notes, highlights, stamps, etc.) are missing accessible descriptions",
-                affected_pages=pages,
-                affected_count=content_audit.annotations_without_description,
-                tools=template["tools"],
-                steps=template["steps"],
-                wcag_criteria=template["wcag_criteria"],
-                effort=template["effort"],
-            ))
+            tasks.append(
+                RemediationTask(
+                    task_id=next_task_id(),
+                    priority=template["priority"],
+                    category=template["category"],
+                    title=f"Add descriptions to {content_audit.annotations_without_description} annotation(s)",
+                    description="Annotations (notes, highlights, stamps, etc.) are missing accessible descriptions",
+                    affected_pages=pages,
+                    affected_count=content_audit.annotations_without_description,
+                    tools=template["tools"],
+                    steps=template["steps"],
+                    wcag_criteria=template["wcag_criteria"],
+                    effort=template["effort"],
+                )
+            )
 
     # Process structure validation results if available
     if structure and structure.validation:
         if not structure.validation.heading_order_valid:
             template = REMEDIATION_TEMPLATES["heading_order"]
-            tasks.append(RemediationTask(
-                task_id=next_task_id(),
-                priority=template["priority"],
-                category=template["category"],
-                title=template["title"],
-                description="Heading levels are skipped or out of order",
-                tools=template["tools"],
-                steps=template["steps"],
-                wcag_criteria=template["wcag_criteria"],
-                effort=template["effort"],
-            ))
+            tasks.append(
+                RemediationTask(
+                    task_id=next_task_id(),
+                    priority=template["priority"],
+                    category=template["category"],
+                    title=template["title"],
+                    description="Heading levels are skipped or out of order",
+                    tools=template["tools"],
+                    steps=template["steps"],
+                    wcag_criteria=template["wcag_criteria"],
+                    effort=template["effort"],
+                )
+            )
 
     # Sort tasks by priority
     tasks.sort(key=lambda t: t.priority.value)

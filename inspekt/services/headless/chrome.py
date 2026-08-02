@@ -219,7 +219,13 @@ class HeadlessChrome:
                 return path
 
         # Check PATH
-        for name in ["google-chrome", "google-chrome-stable", "chromium", "chromium-browser", "chrome"]:
+        for name in [
+            "google-chrome",
+            "google-chrome-stable",
+            "chromium",
+            "chromium-browser",
+            "chrome",
+        ]:
             which_path = shutil.which(name)
             if which_path:
                 return Path(which_path)

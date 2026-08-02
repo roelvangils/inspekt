@@ -246,9 +246,7 @@ class AccessibilityScore:
     def get_top_issues(self, limit: int = 5) -> list[tuple[ScoreCategory, int]]:
         """Get categories with most issues, sorted by issue count."""
         categories_with_issues = [
-            (cat, cs.issues_count)
-            for cat, cs in self.category_scores.items()
-            if cs.has_issues
+            (cat, cs.issues_count) for cat, cs in self.category_scores.items() if cs.has_issues
         ]
         return sorted(categories_with_issues, key=lambda x: x[1], reverse=True)[:limit]
 
@@ -339,13 +337,14 @@ def calculate_accessibility_score(result: PDFFullResult) -> AccessibilityScore:
                         # Track affected items for display
                         category_affected[ScoreCategory.ALT_TEXT] = (
                             figures_missing,
-                            "images missing alt text"
+                            "images missing alt text",
                         )
 
                         # Apply scaled deduction: each missing alt text adds severity
                         # Use logarithmic scaling to prevent extreme deductions
                         # 1 missing = 1x, 10 missing = 2x, 100 missing = 3x
                         import math
+
                         scale_factor = 1 + math.log10(max(1, figures_missing))
                         # Also consider percentage missing (worse if ALL are missing)
                         percentage_missing = figures_missing / figures_total

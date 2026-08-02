@@ -20,7 +20,6 @@ except ImportError:
     ImageFont = None  # type: ignore
 
 
-
 def is_pillow_installed() -> bool:
     """Check if Pillow is available."""
     return _PILLOW_AVAILABLE

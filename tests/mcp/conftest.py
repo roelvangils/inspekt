@@ -48,7 +48,7 @@ def mock_bridge_executor():
         instance.has_active_browser_connection.return_value = True
         instance.execute.return_value = {
             "ok": True,
-            "result": {"url": "https://example.com", "title": "Example"}
+            "result": {"url": "https://example.com", "title": "Example"},
         }
         MockExecutor.return_value = instance
         yield instance

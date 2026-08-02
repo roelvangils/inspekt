@@ -67,7 +67,9 @@ class WaitRequest(BaseModel):
 
 
 # Helper Functions
-def _send_text_api(text: str, selector: str | None, delay_ms: int, clear: bool = True) -> dict[str, Any]:
+def _send_text_api(
+    text: str, selector: str | None, delay_ms: int, clear: bool = True
+) -> dict[str, Any]:
     """Helper function to send text to browser via API."""
     client = get_bridge_client()
 

@@ -235,23 +235,23 @@ def _parse_xmp_metadata(pdf) -> dict | None:
         # These patterns handle various XMP formats and namespaces
 
         # xmp:CreatorTool
-        match = re.search(r'<xmp:CreatorTool[^>]*>([^<]+)</xmp:CreatorTool>', xmp_text)
+        match = re.search(r"<xmp:CreatorTool[^>]*>([^<]+)</xmp:CreatorTool>", xmp_text)
         if match:
             result["creator_tool"] = match.group(1).strip()
 
         # xmp:MetadataDate
-        match = re.search(r'<xmp:MetadataDate[^>]*>([^<]+)</xmp:MetadataDate>', xmp_text)
+        match = re.search(r"<xmp:MetadataDate[^>]*>([^<]+)</xmp:MetadataDate>", xmp_text)
         if match:
             result["metadata_date"] = match.group(1).strip()
 
         # pdf:Producer
-        match = re.search(r'<pdf:Producer[^>]*>([^<]+)</pdf:Producer>', xmp_text)
+        match = re.search(r"<pdf:Producer[^>]*>([^<]+)</pdf:Producer>", xmp_text)
         if match:
             result["producer"] = match.group(1).strip()
 
         # PDF/A conformance (pdfaid:part and pdfaid:conformance)
-        part_match = re.search(r'<pdfaid:part[^>]*>([^<]+)</pdfaid:part>', xmp_text)
-        conf_match = re.search(r'<pdfaid:conformance[^>]*>([^<]+)</pdfaid:conformance>', xmp_text)
+        part_match = re.search(r"<pdfaid:part[^>]*>([^<]+)</pdfaid:part>", xmp_text)
+        conf_match = re.search(r"<pdfaid:conformance[^>]*>([^<]+)</pdfaid:conformance>", xmp_text)
         if part_match:
             pdfa_level = f"PDF/A-{part_match.group(1).strip()}"
             if conf_match:
@@ -259,22 +259,32 @@ def _parse_xmp_metadata(pdf) -> dict | None:
             result["pdfa_conformance"] = pdfa_level
 
         # PDF/UA conformance (pdfuaid:part)
-        match = re.search(r'<pdfuaid:part[^>]*>([^<]+)</pdfuaid:part>', xmp_text)
+        match = re.search(r"<pdfuaid:part[^>]*>([^<]+)</pdfuaid:part>", xmp_text)
         if match:
             result["pdfua_conformance"] = f"PDF/UA-{match.group(1).strip()}"
 
         # dc:title (Dublin Core)
-        match = re.search(r'<dc:title[^>]*>.*?<rdf:li[^>]*>([^<]+)</rdf:li>.*?</dc:title>', xmp_text, re.DOTALL)
+        match = re.search(
+            r"<dc:title[^>]*>.*?<rdf:li[^>]*>([^<]+)</rdf:li>.*?</dc:title>", xmp_text, re.DOTALL
+        )
         if match:
             result["dc_title"] = match.group(1).strip()
 
         # dc:creator (Dublin Core author)
-        match = re.search(r'<dc:creator[^>]*>.*?<rdf:li[^>]*>([^<]+)</rdf:li>.*?</dc:creator>', xmp_text, re.DOTALL)
+        match = re.search(
+            r"<dc:creator[^>]*>.*?<rdf:li[^>]*>([^<]+)</rdf:li>.*?</dc:creator>",
+            xmp_text,
+            re.DOTALL,
+        )
         if match:
             result["dc_creator"] = match.group(1).strip()
 
         # dc:description
-        match = re.search(r'<dc:description[^>]*>.*?<rdf:li[^>]*>([^<]+)</rdf:li>.*?</dc:description>', xmp_text, re.DOTALL)
+        match = re.search(
+            r"<dc:description[^>]*>.*?<rdf:li[^>]*>([^<]+)</rdf:li>.*?</dc:description>",
+            xmp_text,
+            re.DOTALL,
+        )
         if match:
             result["dc_description"] = match.group(1).strip()
 
@@ -302,8 +312,15 @@ def _extract_custom_metadata(info) -> dict | None:
 
     # Standard docinfo fields to exclude
     standard_fields = {
-        "/Title", "/Author", "/Subject", "/Keywords",
-        "/Creator", "/Producer", "/CreationDate", "/ModDate", "/Trapped"
+        "/Title",
+        "/Author",
+        "/Subject",
+        "/Keywords",
+        "/Creator",
+        "/Producer",
+        "/CreationDate",
+        "/ModDate",
+        "/Trapped",
     }
 
     custom = {}
@@ -562,6 +579,7 @@ def format_date_human_readable(iso_date: str | None) -> str:
         # Remove leading zero from day (e.g., "March 05" -> "March 5")
         # and from hour (e.g., "06:41 PM" -> "6:41 PM")
         import re
+
         formatted = re.sub(r"(\w+) 0(\d),", r"\1 \2,", formatted)
         formatted = re.sub(r"at 0(\d):", r"at \1:", formatted)
 
@@ -864,7 +882,7 @@ class PDFBasicChecker:
             return self._make_result(
                 "title",
                 "pass",
-                f"Document title is set and displayed: \"{title[:50]}{'…' if len(title) > 50 else ''}\"",
+                f'Document title is set and displayed: "{title[:50]}{"…" if len(title) > 50 else ""}"',
                 {"title": title, "display_doc_title": True},
             )
         elif has_title and not display_doc_title:
@@ -904,14 +922,14 @@ class PDFBasicChecker:
                 return self._make_result(
                     "language",
                     "pass",
-                    f"Document language is defined: \"{lang}\"",
+                    f'Document language is defined: "{lang}"',
                     {"language": lang},
                 )
             else:
                 return self._make_result(
                     "language",
                     "warn",
-                    f"Document language is set but may not be a valid BCP 47 tag: \"{lang}\"",
+                    f'Document language is set but may not be a valid BCP 47 tag: "{lang}"',
                     {"language": lang},
                 )
         else:
@@ -947,7 +965,11 @@ class PDFBasicChecker:
                 "protected",
                 "pass",
                 "Document is encrypted but allows text extraction for accessibility",
-                {"encrypted": True, "allows_extraction": allows_extraction, "allows_accessibility": allows_accessibility},
+                {
+                    "encrypted": True,
+                    "allows_extraction": allows_extraction,
+                    "allows_accessibility": allows_accessibility,
+                },
             )
         else:
             return self._make_result(
@@ -985,14 +1007,24 @@ class PDFBasicChecker:
                     "bookmarks",
                     "pass",
                     f"Document has bookmarks ({bookmark_count} found) - not required for {page_count} pages",
-                    {"has_bookmarks": True, "bookmark_count": bookmark_count, "page_count": page_count, "required": False},
+                    {
+                        "has_bookmarks": True,
+                        "bookmark_count": bookmark_count,
+                        "page_count": page_count,
+                        "required": False,
+                    },
                 )
             else:
                 return self._make_result(
                     "bookmarks",
                     "skip",
                     f"Document has {page_count} pages (bookmarks recommended for {threshold}+ pages)",
-                    {"has_bookmarks": False, "bookmark_count": 0, "page_count": page_count, "required": False},
+                    {
+                        "has_bookmarks": False,
+                        "bookmark_count": 0,
+                        "page_count": page_count,
+                        "required": False,
+                    },
                 )
         else:
             # 20+ pages - bookmarks are required
@@ -1001,14 +1033,24 @@ class PDFBasicChecker:
                     "bookmarks",
                     "pass",
                     f"Document has navigation bookmarks ({bookmark_count} found)",
-                    {"has_bookmarks": True, "bookmark_count": bookmark_count, "page_count": page_count, "required": True},
+                    {
+                        "has_bookmarks": True,
+                        "bookmark_count": bookmark_count,
+                        "page_count": page_count,
+                        "required": True,
+                    },
                 )
             else:
                 return self._make_result(
                     "bookmarks",
                     "fail",
                     f"Document has {page_count} pages but no bookmarks for navigation",
-                    {"has_bookmarks": False, "bookmark_count": 0, "page_count": page_count, "required": True},
+                    {
+                        "has_bookmarks": False,
+                        "bookmark_count": 0,
+                        "page_count": page_count,
+                        "required": True,
+                    },
                 )
 
     def _check_scanned(self, pdf: pikepdf.Pdf) -> PDFCheckResult:
@@ -1042,7 +1084,8 @@ class PDFBasicChecker:
                     if isinstance(contents, pikepdf.Array):
                         content_stream = b"".join(
                             pikepdf.Object.parse(obj).read_bytes()
-                            if hasattr(obj, "read_bytes") else b""
+                            if hasattr(obj, "read_bytes")
+                            else b""
                             for obj in contents
                         )
                     elif hasattr(contents, "read_bytes"):
@@ -1085,14 +1128,22 @@ class PDFBasicChecker:
                 "scanned",
                 "fail",
                 f"Document appears to be scanned/image-only ({image_only_pages}/{pages_checked} sampled pages have no text)",
-                {"image_only_pages": image_only_pages, "pages_checked": pages_checked, "is_scanned": True},
+                {
+                    "image_only_pages": image_only_pages,
+                    "pages_checked": pages_checked,
+                    "is_scanned": True,
+                },
             )
         else:
             return self._make_result(
                 "scanned",
                 "pass",
                 "Document contains text content (not a scanned image)",
-                {"image_only_pages": image_only_pages, "pages_checked": pages_checked, "is_scanned": False},
+                {
+                    "image_only_pages": image_only_pages,
+                    "pages_checked": pages_checked,
+                    "is_scanned": False,
+                },
             )
 
     def _check_figure_alt_text(self, pdf: pikepdf.Pdf) -> PDFCheckResult:
@@ -1179,7 +1230,11 @@ class PDFBasicChecker:
                 "figure_alt_text",
                 "pass",
                 f"All {figures_total} Figure tag{'s' if figures_total != 1 else ''} have alternative text",
-                {"figures_total": figures_total, "figures_missing_alt": 0, "figures_with_alt": figures_with_alt},
+                {
+                    "figures_total": figures_total,
+                    "figures_missing_alt": 0,
+                    "figures_with_alt": figures_with_alt,
+                },
             )
         else:
             percentage_missing = (figures_missing_alt / figures_total) * 100
@@ -1375,7 +1430,9 @@ class VeraPDFChecker:
             raise FileNotFoundError(f"PDF file not found: {file_path}")
 
         if profile not in self.VALID_PROFILES:
-            raise ValueError(f"Invalid profile '{profile}'. Valid profiles: {', '.join(self.VALID_PROFILES)}")
+            raise ValueError(
+                f"Invalid profile '{profile}'. Valid profiles: {', '.join(self.VALID_PROFILES)}"
+            )
 
         # Try native veraPDF first (preferred, especially on Apple Silicon)
         if not force_docker and self.is_native_available():
@@ -1417,8 +1474,10 @@ class VeraPDFChecker:
         """Run veraPDF using native installation."""
         cmd = [
             "verapdf",
-            "-f", profile,
-            "--format", "json",
+            "-f",
+            profile,
+            "--format",
+            "json",
             str(file_path),
         ]
 
@@ -1445,11 +1504,16 @@ class VeraPDFChecker:
         file_name = file_path.name
 
         cmd = [
-            "docker", "run", "--rm",
-            "-v", f"{file_dir}:/data:ro",
+            "docker",
+            "run",
+            "--rm",
+            "-v",
+            f"{file_dir}:/data:ro",
             self.DOCKER_IMAGE,
-            "-f", profile,
-            "--format", "json",
+            "-f",
+            profile,
+            "--format",
+            "json",
             f"/data/{file_name}",
         ]
 
@@ -1584,7 +1648,10 @@ class VeraPDFChecker:
                 # Extract violations from ruleSummaries
                 if "ruleSummaries" in details:
                     for rule_summary in details["ruleSummaries"]:
-                        if rule_summary.get("status") == "failed" or rule_summary.get("ruleStatus") == "FAILED":
+                        if (
+                            rule_summary.get("status") == "failed"
+                            or rule_summary.get("ruleStatus") == "FAILED"
+                        ):
                             spec = rule_summary.get("specification", "")
                             clause = rule_summary.get("clause", "")
                             test_num = rule_summary.get("testNumber", 0)
@@ -1616,15 +1683,15 @@ class VeraPDFChecker:
 
                                         # Extract page number from location path
                                         # Format: root/document[0]/pages[3]/... (0-indexed)
-                                        page_match = re.search(r'pages\[(\d+)\]', location)
+                                        page_match = re.search(r"pages\[(\d+)\]", location)
                                         if page_match:
                                             page_number = int(page_match.group(1))
 
                                         # Extract bounding box coordinates
                                         # Format: boundingBox[x1,y1,x2,y2]
                                         bbox_match = re.search(
-                                            r'boundingBox\[([\d.]+),([\d.]+),([\d.]+),([\d.]+)\]',
-                                            location
+                                            r"boundingBox\[([\d.]+),([\d.]+),([\d.]+),([\d.]+)\]",
+                                            location,
                                         )
                                         if bbox_match:
                                             bbox = (
@@ -1708,6 +1775,7 @@ def check_pdf(
     simple_result = None
     if engine in ("simple", "all"):
         from inspekt.services.simple_pdf_checker import SimplePDFChecker
+
         simple_checker = SimplePDFChecker()
         simple_result = simple_checker.check(file_path)
 

@@ -547,7 +547,11 @@ def check_warnings(data: dict) -> list[ValidationIssue]:
     first_step = steps[0] if steps else {}
     metadata = data.get("metadata", {})
     has_start_url = metadata.get("start_url") if isinstance(metadata, dict) else None
-    if isinstance(first_step, dict) and first_step.get("action") != "navigate" and not has_start_url:
+    if (
+        isinstance(first_step, dict)
+        and first_step.get("action") != "navigate"
+        and not has_start_url
+    ):
         issues.append(
             ValidationIssue(
                 severity=Severity.WARNING,
@@ -773,17 +777,20 @@ def display_validation_results(result: ValidationResult, filepath: Path) -> None
         if issue.tip:
             click.echo()
             from inspekt.app.cli.table import print_hint
+
             print_hint(issue.tip)
 
     # Show warnings
     for issue in result.warnings:
         click.echo()
         from inspekt.app.cli.table import _style_with_inline_code
+
         click.secho("⚠ ", fg="yellow", nl=False)
         click.echo(_style_with_inline_code(issue.message, base_fg="white"))
 
         if issue.tip:
             from inspekt.app.cli.table import print_hint
+
             print_hint(issue.tip)
 
     # Summary

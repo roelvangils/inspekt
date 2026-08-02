@@ -173,6 +173,7 @@ class CustomGroup(click.Group):
 
             # Import the module and get the command
             import importlib
+
             module = importlib.import_module(f"inspekt.app.cli.{module_path}")
             cmd = getattr(module, attr)
 
@@ -214,9 +215,14 @@ class CustomGroup(click.Group):
             return
 
         from inspekt.app.cli import _no_tips_callback
+
         opt = click.Option(
-            ['--no-tips'], is_flag=True, is_eager=True, expose_value=False,
-            callback=_no_tips_callback, hidden=True,
+            ["--no-tips"],
+            is_flag=True,
+            is_eager=True,
+            expose_value=False,
+            callback=_no_tips_callback,
+            hidden=True,
         )
         cmd.params.append(opt)
 
@@ -240,9 +246,7 @@ class CustomGroup(click.Group):
                 all_commands = self.list_commands(ctx)
 
                 # Find close matches (cutoff 0.4 = 40% similarity)
-                suggestions = difflib.get_close_matches(
-                    cmd_name, all_commands, n=3, cutoff=0.4
-                )
+                suggestions = difflib.get_close_matches(cmd_name, all_commands, n=3, cutoff=0.4)
 
                 if suggestions:
                     suggestion_text = ", ".join(f"'{s}'" for s in suggestions)

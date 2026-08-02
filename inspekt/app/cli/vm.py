@@ -24,6 +24,7 @@ NOVNC_PORT = 6080
 CONTROL_PORT = 8888
 VM_PORTS = [6080, 6081, 8767, 8768, 8889, 8890, 9222]  # All ports the VM uses
 
+
 # Path to vm directory
 def get_vm_dir() -> Path:
     """Get the path to the vm/ directory (at the repo root)."""
@@ -58,10 +59,7 @@ def _is_dev_environment() -> bool:
 
 def _is_docker_running() -> bool:
     """Check if Docker daemon is running."""
-    result = subprocess.run(
-        ["docker", "info"],
-        capture_output=True
-    )
+    result = subprocess.run(["docker", "info"], capture_output=True)
     return result.returncode == 0
 
 
@@ -76,7 +74,10 @@ def _ensure_docker_running() -> bool:
         return True
 
     if os.environ.get("INSPEKT_NO_AUTOSTART_DOCKER") == "1" or not sys.stdout.isatty():
-        click.echo("Error: Docker daemon not reachable. Start Docker Desktop or OrbStack and retry.", err=True)
+        click.echo(
+            "Error: Docker daemon not reachable. Start Docker Desktop or OrbStack and retry.",
+            err=True,
+        )
         return False
 
     if platform.system() != "Darwin":
@@ -91,7 +92,10 @@ def _ensure_docker_running() -> bool:
             break
 
     if not launched:
-        click.echo("Error: Docker daemon not reachable and no Docker app found (OrbStack or Docker Desktop).", err=True)
+        click.echo(
+            "Error: Docker daemon not reachable and no Docker app found (OrbStack or Docker Desktop).",
+            err=True,
+        )
         click.echo("Install one (https://orbstack.dev or https://docker.com) and retry.", err=True)
         return False
 
@@ -113,9 +117,7 @@ def _ensure_docker_running() -> bool:
 def _is_container_running() -> bool:
     """Check if the VM container is running."""
     result = subprocess.run(
-        ["docker", "ps", "-q", "-f", f"name={CONTAINER_NAME}"],
-        capture_output=True,
-        text=True
+        ["docker", "ps", "-q", "-f", f"name={CONTAINER_NAME}"], capture_output=True, text=True
     )
     return bool(result.stdout.strip())
 
@@ -123,20 +125,14 @@ def _is_container_running() -> bool:
 def _container_exists() -> bool:
     """Check if the VM container exists (running or stopped)."""
     result = subprocess.run(
-        ["docker", "ps", "-aq", "-f", f"name={CONTAINER_NAME}"],
-        capture_output=True,
-        text=True
+        ["docker", "ps", "-aq", "-f", f"name={CONTAINER_NAME}"], capture_output=True, text=True
     )
     return bool(result.stdout.strip())
 
 
 def _image_exists() -> bool:
     """Check if the VM image exists."""
-    result = subprocess.run(
-        ["docker", "images", "-q", IMAGE_NAME],
-        capture_output=True,
-        text=True
-    )
+    result = subprocess.run(["docker", "images", "-q", IMAGE_NAME], capture_output=True, text=True)
     return bool(result.stdout.strip())
 
 
@@ -150,7 +146,7 @@ def _get_all_vm_containers() -> list[str]:
     result = subprocess.run(
         ["docker", "ps", "-aq", "--filter", f"ancestor={IMAGE_NAME}"],
         capture_output=True,
-        text=True
+        text=True,
     )
     containers = set(result.stdout.strip().split()) if result.stdout.strip() else set()
 
@@ -158,7 +154,7 @@ def _get_all_vm_containers() -> list[str]:
     result = subprocess.run(
         ["docker", "ps", "-aq", "--filter", f"name={CONTAINER_NAME}"],
         capture_output=True,
-        text=True
+        text=True,
     )
     if result.stdout.strip():
         containers.update(result.stdout.strip().split())
@@ -185,11 +181,7 @@ def _check_port_in_use(port: int) -> tuple[bool, str | None]:
 
     # Port is in use - try to identify the process (platform-specific)
     try:
-        result = subprocess.run(
-            ["lsof", "-i", f":{port}", "-t"],
-            capture_output=True,
-            text=True
-        )
+        result = subprocess.run(["lsof", "-i", f":{port}", "-t"], capture_output=True, text=True)
         if result.stdout.strip():
             pids = result.stdout.strip().split()
             return True, f"PIDs: {', '.join(pids)}"
@@ -294,7 +286,7 @@ def _build_image(vm_dir: Path) -> bool:
     result = subprocess.run(
         ["docker", "build", "-t", IMAGE_NAME, "-f", str(dockerfile_path), "."],
         cwd=project_root,
-        capture_output=False  # Show build output
+        capture_output=False,  # Show build output
     )
 
     return result.returncode == 0
@@ -313,12 +305,17 @@ def _start_container(dev_mode: bool = False, vm_dir: Path | None = None) -> bool
         click.echo("  • Starting container…")
 
     cmd = [
-        "docker", "run", "-d",
-        "--name", CONTAINER_NAME,
-        "--network", "host",
+        "docker",
+        "run",
+        "-d",
+        "--name",
+        CONTAINER_NAME,
+        "--network",
+        "host",
         "--shm-size=2g",
         # Security: drop all capabilities, then add only what's needed
-        "--security-opt", "no-new-privileges:true",
+        "--security-opt",
+        "no-new-privileges:true",
         "--cap-drop=ALL",
         "--cap-add=SETUID",
         "--cap-add=SETGID",
@@ -326,12 +323,14 @@ def _start_container(dev_mode: bool = False, vm_dir: Path | None = None) -> bool
         "--cap-add=DAC_OVERRIDE",
         "--cap-add=FOWNER",
         "--cap-add=KILL",
-        "--cap-add=NET_ADMIN",        # iptables for user network restrictions
-        "--cap-add=NET_RAW",         # Required by iptables
-        "--cap-add=NET_BIND_SERVICE", # Bind to privileged ports (API on 80, HTTPS)
+        "--cap-add=NET_ADMIN",  # iptables for user network restrictions
+        "--cap-add=NET_RAW",  # Required by iptables
+        "--cap-add=NET_BIND_SERVICE",  # Bind to privileged ports (API on 80, HTTPS)
         # Persist data directory (plugins, caches) across container restarts
-        "-v", "inspekt-vm-data:/root/.config/inspekt",
-        "-v", "inspekt-vm-sitemaps:/var/cache/inspekt/sitemaps",
+        "-v",
+        "inspekt-vm-data:/root/.config/inspekt",
+        "-v",
+        "inspekt-vm-sitemaps:/var/cache/inspekt/sitemaps",
     ]
 
     # Add volume mounts for development mode
@@ -359,28 +358,39 @@ def _start_container(dev_mode: bool = False, vm_dir: Path | None = None) -> bool
         # files are SHADOWED by symlinks created in entrypoint.sh's dev-mode
         # block, which point into these directory mounts. See
         # vm/entrypoint.sh `--- DEV-MODE LIVE-RELOAD SYMLINKS ---`.
-        cmd.extend([
-            # Whole vm/ tree — covers control-panel.html, vendor/, servers/.
-            # Existing per-subdir mounts below (vm/css, vm/js, vm/fonts,
-            # vm/icons) keep their dedicated paths because supervisord +
-            # noVNC reference them directly; this parent mount is only
-            # used for the symlink targets.
-            "-v", f"{vm_dir}:/host/vm-source:ro",
-            # The other dir mounts that already worked fine — keep them.
-            "-v", f"{vm_dir}/css:/usr/share/novnc/css:ro",
-            "-v", f"{vm_dir}/js:/usr/share/novnc/js:ro",
-            "-v", f"{vm_dir}/fonts:/usr/share/novnc/fonts:ro",
-            "-v", f"{vm_dir}/icons:/usr/share/novnc/icons:ro",
-            # Shared popover modules — already directory mounts, fine.
-            "-v", f"{project_root}/inspekt/scripts/shared-popover:/usr/share/novnc/scripts/shared-popover:ro",
-            "-v", f"{project_root}/inspekt/scripts/axe-popover:/usr/share/novnc/scripts/axe-popover:ro",
-            "-v", f"{project_root}/inspekt/scripts/unified-popover:/usr/share/novnc/scripts/unified-popover:ro",
-            # inspekt-config.yaml — read once at startup then copied to the
-            # inspekt user's home (see entrypoint.sh). Even if the bind
-            # mount desyncs later, the copy already happened. Low risk
-            # leaving as a single-file mount.
-            "-v", f"{vm_dir}/inspekt-config.yaml:/root/.config/inspekt.yaml:ro",
-        ])
+        cmd.extend(
+            [
+                # Whole vm/ tree — covers control-panel.html, vendor/, servers/.
+                # Existing per-subdir mounts below (vm/css, vm/js, vm/fonts,
+                # vm/icons) keep their dedicated paths because supervisord +
+                # noVNC reference them directly; this parent mount is only
+                # used for the symlink targets.
+                "-v",
+                f"{vm_dir}:/host/vm-source:ro",
+                # The other dir mounts that already worked fine — keep them.
+                "-v",
+                f"{vm_dir}/css:/usr/share/novnc/css:ro",
+                "-v",
+                f"{vm_dir}/js:/usr/share/novnc/js:ro",
+                "-v",
+                f"{vm_dir}/fonts:/usr/share/novnc/fonts:ro",
+                "-v",
+                f"{vm_dir}/icons:/usr/share/novnc/icons:ro",
+                # Shared popover modules — already directory mounts, fine.
+                "-v",
+                f"{project_root}/inspekt/scripts/shared-popover:/usr/share/novnc/scripts/shared-popover:ro",
+                "-v",
+                f"{project_root}/inspekt/scripts/axe-popover:/usr/share/novnc/scripts/axe-popover:ro",
+                "-v",
+                f"{project_root}/inspekt/scripts/unified-popover:/usr/share/novnc/scripts/unified-popover:ro",
+                # inspekt-config.yaml — read once at startup then copied to the
+                # inspekt user's home (see entrypoint.sh). Even if the bind
+                # mount desyncs later, the copy already happened. Low risk
+                # leaving as a single-file mount.
+                "-v",
+                f"{vm_dir}/inspekt-config.yaml:/root/.config/inspekt.yaml:ro",
+            ]
+        )
 
         # Mount inspekt source for Python code changes
         inspekt_src = project_root / "inspekt"
@@ -399,7 +409,9 @@ def _start_container(dev_mode: bool = False, vm_dir: Path | None = None) -> bool
         click.echo("    • vm/css → /usr/share/novnc/css/")
         click.echo("    • vm/js → /usr/share/novnc/js/")
         click.echo("    • vm/fonts → /usr/share/novnc/fonts/")
-        click.echo("    • inspekt/scripts/{shared,axe,unified}-popover → /usr/share/novnc/scripts/...")
+        click.echo(
+            "    • inspekt/scripts/{shared,axe,unified}-popover → /usr/share/novnc/scripts/..."
+        )
         click.echo("    • inspekt-config.yaml → /root/.config/inspekt.yaml  (read-once, low risk)")
         click.echo("    • inspekt-vm-data → /root/.config/inspekt/  (persistent)")
         click.echo("    • inspekt-vm-data → /root/.config/inspekt/ (persistent)")
@@ -421,19 +433,13 @@ def _start_container(dev_mode: bool = False, vm_dir: Path | None = None) -> bool
 
 def _stop_container() -> bool:
     """Stop the VM container."""
-    result = subprocess.run(
-        ["docker", "stop", CONTAINER_NAME],
-        capture_output=True
-    )
+    result = subprocess.run(["docker", "stop", CONTAINER_NAME], capture_output=True)
     return result.returncode == 0
 
 
 def _remove_container() -> bool:
     """Remove the VM container."""
-    result = subprocess.run(
-        ["docker", "rm", CONTAINER_NAME],
-        capture_output=True
-    )
+    result = subprocess.run(["docker", "rm", CONTAINER_NAME], capture_output=True)
     return result.returncode == 0
 
 
@@ -534,7 +540,10 @@ def start(rebuild, no_open, dev, no_dev):
     vm_dir = get_vm_dir()
     if not vm_dir:
         click.echo("Error: Could not find vm directory", err=True)
-        click.echo("\nMake sure you're in the Inspekt project directory or have it installed properly.", err=True)
+        click.echo(
+            "\nMake sure you're in the Inspekt project directory or have it installed properly.",
+            err=True,
+        )
         sys.exit(1)
 
     # Auto-detect dev environment
@@ -716,7 +725,10 @@ def open_panel():
     if not _is_container_running():
         click.echo("Error: VM is not running", err=True)
         from inspekt.app.cli.table import _style_with_inline_code
-        click.echo(_style_with_inline_code("\nStart it with: `inspekt vm start`", base_fg="red"), err=True)
+
+        click.echo(
+            _style_with_inline_code("\nStart it with: `inspekt vm start`", base_fg="red"), err=True
+        )
         sys.exit(1)
 
     url = f"http://localhost:{NOVNC_PORT}/control.html"
@@ -748,10 +760,13 @@ def status(output_json):
             "docker_running": docker_running,
             "image_exists": image_exists,
             "container_running": container_running,
-            "control_panel_url": f"http://localhost:{NOVNC_PORT}/control.html" if container_running else None,
+            "control_panel_url": f"http://localhost:{NOVNC_PORT}/control.html"
+            if container_running
+            else None,
             "vnc_url": f"http://localhost:{NOVNC_PORT}/vnc.html" if container_running else None,
         }
         from inspekt.app.cli.table import print_json
+
         print_json(data, summary="VM status")
         return
 
@@ -768,7 +783,9 @@ def status(output_json):
 
     # Image status
     if image_exists:
-        image_status = f"{format_status_icon('pass')} " + click.style(f"Built ({IMAGE_NAME})", fg="green")
+        image_status = f"{format_status_icon('pass')} " + click.style(
+            f"Built ({IMAGE_NAME})", fg="green"
+        )
     else:
         image_status = f"{format_status_icon('warning')} " + click.style("Not built", fg="yellow")
 
@@ -810,6 +827,7 @@ def status(output_json):
 
         # VM terminal: offer a "Data ready to copy" toast
         from inspekt.app.cli.table import emit_copyable_data
+
         emit_copyable_data(
             headers=["Component", "Status"],
             rows=data + urls_data,
@@ -865,7 +883,10 @@ def shell():
     if not _is_container_running():
         click.echo("Error: VM is not running", err=True)
         from inspekt.app.cli.table import _style_with_inline_code
-        click.echo(_style_with_inline_code("\nStart it with: `inspekt vm start`", base_fg="red"), err=True)
+
+        click.echo(
+            _style_with_inline_code("\nStart it with: `inspekt vm start`", base_fg="red"), err=True
+        )
         sys.exit(1)
 
     click.echo("Opening shell in VM container…")
@@ -901,9 +922,15 @@ def cleanup(force):
     for container_id in containers:
         # Get container info
         result = subprocess.run(
-            ["docker", "inspect", "--format", "{{.Name}} ({{.Image}}) - {{.State.Status}}", container_id],
+            [
+                "docker",
+                "inspect",
+                "--format",
+                "{{.Name}} ({{.Image}}) - {{.State.Status}}",
+                container_id,
+            ],
             capture_output=True,
-            text=True
+            text=True,
         )
         if result.stdout.strip():
             click.echo(f"  • {result.stdout.strip()}")

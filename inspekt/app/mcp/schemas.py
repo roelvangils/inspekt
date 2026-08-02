@@ -17,7 +17,9 @@ from pydantic import BaseModel, Field
 class NavigateToUrlParams(BaseModel):
     """Parameters for navigate_to_url tool."""
 
-    url: str = Field(..., description="The URL to navigate to (must start with http:// or https://)")
+    url: str = Field(
+        ..., description="The URL to navigate to (must start with http:// or https://)"
+    )
     wait_for: str | None = Field(
         default=None,
         description="Wait condition: 'load' (DOMContentLoaded), 'networkidle' (no network activity)",
@@ -32,7 +34,9 @@ class NavigateResponse(BaseModel):
     """Response from navigation tools."""
 
     success: bool = Field(..., description="Whether the navigation succeeded")
-    url: str = Field(..., description="The final URL after navigation (may differ due to redirects)")
+    url: str = Field(
+        ..., description="The final URL after navigation (may differ due to redirects)"
+    )
     title: str = Field(..., description="Page title")
     message: str | None = Field(default=None, description="Success or error message")
 
@@ -150,9 +154,7 @@ class ExtractArticleResponse(BaseModel):
 class ClickElementParams(BaseModel):
     """Parameters for click_element tool."""
 
-    selector: str = Field(
-        ..., description="CSS selector or '$0' for DevTools-inspected element"
-    )
+    selector: str = Field(..., description="CSS selector or '$0' for DevTools-inspected element")
     click_type: Literal["single", "double", "right"] | None = Field(
         default="single", description="Type of click: single, double, or right-click"
     )
@@ -174,9 +176,7 @@ class TypeTextParams(BaseModel):
     typing_speed: Literal["instant", "fast", "normal", "slow"] | None = Field(
         default="normal", description="Typing speed simulation"
     )
-    submit: bool | None = Field(
-        default=False, description="Press Enter after typing (submit form)"
-    )
+    submit: bool | None = Field(default=False, description="Press Enter after typing (submit form)")
 
 
 class TypeTextResponse(BaseModel):
@@ -208,17 +208,15 @@ class TakeScreenshotParams(BaseModel):
     """Parameters for take_screenshot tool."""
 
     target: Literal["viewport", "page", "element"] | None = Field(
-        default="viewport", description="Screenshot target: viewport (visible area), page (full page), or element"
+        default="viewport",
+        description="Screenshot target: viewport (visible area), page (full page), or element",
     )
     selector: str | None = Field(
-        default=None, description="CSS selector for element screenshot (required if target='element')"
+        default=None,
+        description="CSS selector for element screenshot (required if target='element')",
     )
-    format: Literal["png", "jpeg"] | None = Field(
-        default="png", description="Image format"
-    )
-    quality: int | None = Field(
-        default=90, description="JPEG quality (1-100, ignored for PNG)"
-    )
+    format: Literal["png", "jpeg"] | None = Field(default="png", description="Image format")
+    quality: int | None = Field(default=90, description="JPEG quality (1-100, ignored for PNG)")
     output_path: str | None = Field(
         default=None,
         description="Path to save screenshot file. If not provided, saves to a temp file in /tmp/inspekt/screenshots/.",
@@ -304,7 +302,9 @@ class SetCookieParams(BaseModel):
 
     name: str = Field(..., description="Cookie name")
     value: str = Field(..., description="Cookie value")
-    domain: str | None = Field(default=None, description="Cookie domain (defaults to current domain)")
+    domain: str | None = Field(
+        default=None, description="Cookie domain (defaults to current domain)"
+    )
     path: str | None = Field(default="/", description="Cookie path")
     secure: bool | None = Field(default=False, description="Secure flag")
     httpOnly: bool | None = Field(default=False, description="HttpOnly flag")
@@ -375,11 +375,10 @@ class GetNetworkRequestsParams(BaseModel):
         default=False, description="Only return requests to external domains"
     )
     sort_by: Literal["start", "time", "size", "name", "type"] | None = Field(
-        default="start", description="Sort field: start (chronological), time (slowest first), size (largest first), name, type"
+        default="start",
+        description="Sort field: start (chronological), time (slowest first), size (largest first), name, type",
     )
-    limit: int | None = Field(
-        default=None, description="Maximum number of entries to return"
-    )
+    limit: int | None = Field(default=None, description="Maximum number of entries to return")
 
 
 class NetworkTimingInfo(BaseModel):
@@ -401,7 +400,9 @@ class NetworkEntry(BaseModel):
     name: str = Field(..., description="Resource filename")
     domain: str = Field(..., description="Domain the resource was loaded from")
     path: str = Field(..., description="URL path")
-    type: str = Field(..., description="Resource type (script, stylesheet, fetch, image, font, etc.)")
+    type: str = Field(
+        ..., description="Resource type (script, stylesheet, fetch, image, font, etc.)"
+    )
     initiatorType: str = Field(..., description="Original initiator type from Performance API")
     external: bool = Field(..., description="Whether the resource is from an external domain")
     transferSize: int = Field(..., description="Transfer size in bytes")
@@ -452,9 +453,7 @@ class GetHARParams(BaseModel):
     sort_by: Literal["start", "time", "size", "name", "type", "status"] | None = Field(
         default="start", description="Sort field"
     )
-    limit: int | None = Field(
-        default=None, description="Maximum number of entries to return"
-    )
+    limit: int | None = Field(default=None, description="Maximum number of entries to return")
 
 
 class GetHARResponse(BaseModel):
@@ -464,8 +463,12 @@ class GetHARResponse(BaseModel):
     source: str = Field(default="devtools", description="Data source (devtools)")
     url: str = Field(..., description="Page URL")
     timestamp: str = Field(..., description="Timestamp of the capture (ISO 8601)")
-    entries: list[dict[str, Any]] = Field(..., description="List of HAR entries with status codes and headers")
-    summary: dict[str, Any] = Field(..., description="Summary statistics including status breakdown")
+    entries: list[dict[str, Any]] = Field(
+        ..., description="List of HAR entries with status codes and headers"
+    )
+    summary: dict[str, Any] = Field(
+        ..., description="Summary statistics including status breakdown"
+    )
     message: str | None = Field(default=None, description="Success or error message")
 
 
@@ -521,27 +524,21 @@ class RunAxeParams(BaseModel):
 
     level: Literal["2a", "2aa", "2aaa", "21a", "21aa", "22aa"] | None = Field(
         default="21aa",
-        description="WCAG conformance level: 2a, 2aa (WCAG 2.0), 21a, 21aa (WCAG 2.1), 22aa (WCAG 2.2)"
+        description="WCAG conformance level: 2a, 2aa (WCAG 2.0), 21a, 21aa (WCAG 2.1), 22aa (WCAG 2.2)",
     )
     rule: str | None = Field(
         default=None,
-        description="Check specific rule by ID (e.g., 'color-contrast', 'link-name'). Mutually exclusive with level."
+        description="Check specific rule by ID (e.g., 'color-contrast', 'link-name'). Mutually exclusive with level.",
     )
     selector: str | None = Field(
-        default=None,
-        description="CSS selector to scope tests to specific element(s)"
+        default=None, description="CSS selector to scope tests to specific element(s)"
     )
     exclude: list[str] | None = Field(
-        default=None,
-        description="CSS selectors to exclude from testing"
+        default=None, description="CSS selectors to exclude from testing"
     )
-    include_passes: bool = Field(
-        default=False,
-        description="Include passing checks in results"
-    )
+    include_passes: bool = Field(default=False, description="Include passing checks in results")
     include_incomplete: bool = Field(
-        default=False,
-        description="Include incomplete checks requiring manual review"
+        default=False, description="Include incomplete checks requiring manual review"
     )
 
 
@@ -583,9 +580,15 @@ class RunAxeResponse(BaseModel):
 
     success: bool = Field(..., description="Whether the audit completed successfully")
     url: str = Field(default="", description="Page URL that was tested")
-    violations: list[AxeViolation] = Field(default=[], description="List of accessibility violations")
-    passes: list[dict[str, Any]] = Field(default=[], description="Passing checks (if include_passes=True)")
-    incomplete: list[dict[str, Any]] = Field(default=[], description="Incomplete checks (if include_incomplete=True)")
+    violations: list[AxeViolation] = Field(
+        default=[], description="List of accessibility violations"
+    )
+    passes: list[dict[str, Any]] = Field(
+        default=[], description="Passing checks (if include_passes=True)"
+    )
+    incomplete: list[dict[str, Any]] = Field(
+        default=[], description="Incomplete checks (if include_incomplete=True)"
+    )
     summary: AxeSummary | None = Field(default=None, description="Summary statistics")
     axe_version: str | None = Field(default=None, description="Axe-core version used")
     message: str | None = Field(default=None, description="Success or error message")
@@ -600,8 +603,7 @@ class PluginExecuteParams(BaseModel):
     """Parameters for plugin execution tools."""
 
     capture_console: bool = Field(
-        default=True,
-        description="Capture console.log/error/warn output during execution"
+        default=True, description="Capture console.log/error/warn output during execution"
     )
 
 
@@ -619,10 +621,11 @@ class PluginExecuteResponse(BaseModel):
     success: bool = Field(..., description="Whether execution succeeded")
     plugin_name: str = Field(..., description="Name of the executed plugin")
     plugin_id: str = Field(..., description="ID of the executed plugin")
-    result: Any = Field(default=None, description="Return value from the plugin (if returns_data=True)")
+    result: Any = Field(
+        default=None, description="Return value from the plugin (if returns_data=True)"
+    )
     console_output: list[ConsoleEntry] = Field(
-        default=[],
-        description="Captured console messages during execution"
+        default=[], description="Captured console messages during execution"
     )
     execution_time_ms: int = Field(..., description="Execution time in milliseconds")
     message: str | None = Field(default=None, description="Success or error message")
@@ -653,7 +656,9 @@ class ZoomResponse(BaseModel):
     zoom: float = Field(..., description="Current zoom factor (e.g., 1.5 for 150%)")
     percentage: int = Field(..., description="Current zoom as percentage (e.g., 150)")
     wcag_note: str | None = Field(default=None, description="WCAG guidance for the zoom level")
-    previous_zoom: float | None = Field(default=None, description="Previous zoom factor (set operations only)")
+    previous_zoom: float | None = Field(
+        default=None, description="Previous zoom factor (set operations only)"
+    )
     message: str | None = Field(default=None, description="Success or error message")
 
 
@@ -679,6 +684,10 @@ class ViewportResponse(BaseModel):
     success: bool = Field(..., description="Whether the operation succeeded")
     width: int = Field(..., description="Current viewport width in pixels")
     height: int = Field(..., description="Current viewport height in pixels")
-    previous_width: int | None = Field(default=None, description="Previous width (set operations only)")
-    previous_height: int | None = Field(default=None, description="Previous height (set operations only)")
+    previous_width: int | None = Field(
+        default=None, description="Previous width (set operations only)"
+    )
+    previous_height: int | None = Field(
+        default=None, description="Previous height (set operations only)"
+    )
     message: str | None = Field(default=None, description="Success or error message")

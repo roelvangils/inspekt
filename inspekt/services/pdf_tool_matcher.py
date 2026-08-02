@@ -84,11 +84,11 @@ def _load_icon(tool_id: str) -> str:
             return svg
 
     # Ultimate fallback - inline default SVG
-    return '''<svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    return """<svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
         <rect width="24" height="24" rx="4" fill="#6B7280"/>
         <path d="M7 4h8l4 4v12H7V4z" fill="none" stroke="white" stroke-width="1.5"/>
         <path d="M14 4v4h4" fill="none" stroke="white" stroke-width="1.5"/>
-    </svg>'''
+    </svg>"""
 
 
 def _normalize_string(s: str) -> str:
@@ -106,18 +106,18 @@ def _normalize_string(s: str) -> str:
     result = s.lower()
 
     # Remove version patterns like "2024", "15.0", "(19.2)", "v2.0"
-    result = re.sub(r'\b\d+(\.\d+)*\b', '', result)
-    result = re.sub(r'\([\d.]+\)', '', result)
-    result = re.sub(r'\bv\d+(\.\d+)*\b', '', result)
+    result = re.sub(r"\b\d+(\.\d+)*\b", "", result)
+    result = re.sub(r"\([\d.]+\)", "", result)
+    result = re.sub(r"\bv\d+(\.\d+)*\b", "", result)
 
     # Remove common platform suffixes
-    result = re.sub(r'\b(macintosh|mac|windows|linux|win|x64|x86)\b', '', result)
+    result = re.sub(r"\b(macintosh|mac|windows|linux|win|x64|x86)\b", "", result)
 
     # Remove common filler words
-    result = re.sub(r'\b(version|build|release|pro|professional)\b', '', result)
+    result = re.sub(r"\b(version|build|release|pro|professional)\b", "", result)
 
     # Normalize whitespace
-    result = ' '.join(result.split())
+    result = " ".join(result.split())
 
     return result.strip()
 

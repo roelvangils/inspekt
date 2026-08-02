@@ -117,9 +117,7 @@ class SiaEngine(AccessibilityEngine):
                     if dep_name.startswith("@siteimprove/alfa-"):
                         pkg[section][dep_name] = ver
 
-            package_json_path.write_text(
-                json.dumps(pkg, indent=2) + "\n", encoding="utf-8"
-            )
+            package_json_path.write_text(json.dumps(pkg, indent=2) + "\n", encoding="utf-8")
 
             # Install updated packages
             subprocess.run(
@@ -131,16 +129,18 @@ class SiaEngine(AccessibilityEngine):
             )
 
             # Bundle with esbuild (delete=False: esbuild writes to this path)
-            with tempfile.NamedTemporaryFile(
-                mode="wb", delete=False, suffix=".js"
-            ) as temp_file:
+            with tempfile.NamedTemporaryFile(mode="wb", delete=False, suffix=".js") as temp_file:
                 temp_path = Path(temp_file.name)
 
             subprocess.run(
                 [
-                    "npx", "esbuild", "alfa-entry.mjs",
-                    "--bundle", "--minify",
-                    "--format=iife", "--global-name=Alfa",
+                    "npx",
+                    "esbuild",
+                    "alfa-entry.mjs",
+                    "--bundle",
+                    "--minify",
+                    "--format=iife",
+                    "--global-name=Alfa",
                     f"--outfile={temp_path}",
                 ],
                 cwd=str(project_root),
@@ -171,6 +171,7 @@ class SiaEngine(AccessibilityEngine):
             shutil.copy2(source_path, self.lib_path)
 
             import hashlib
+
             sha256_hash = hashlib.sha256()
             with open(self.lib_path, "rb") as f:
                 for block in iter(lambda: f.read(4096), b""):
@@ -300,16 +301,20 @@ class SiaEngine(AccessibilityEngine):
                     )
                 )
             elif outcome_type == "passed":
-                passes.append({
-                    "rule_id": rule_id,
-                    "target": outcome.get("target"),
-                })
+                passes.append(
+                    {
+                        "rule_id": rule_id,
+                        "target": outcome.get("target"),
+                    }
+                )
             elif outcome_type == "cantTell":
-                incomplete.append({
-                    "rule_id": rule_id,
-                    "target": outcome.get("target"),
-                    "message": outcome.get("message", "Requires manual review"),
-                })
+                incomplete.append(
+                    {
+                        "rule_id": rule_id,
+                        "target": outcome.get("target"),
+                        "message": outcome.get("message", "Requires manual review"),
+                    }
+                )
             elif outcome_type == "inapplicable":
                 inapplicable.append(rule_id)
 

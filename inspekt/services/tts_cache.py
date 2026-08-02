@@ -103,14 +103,14 @@ class TTSCache:
         """Normalize text for comparison (lowercase, collapse whitespace)."""
         # Lowercase and collapse whitespace
         normalized = text.lower()
-        normalized = re.sub(r'\s+', ' ', normalized).strip()
+        normalized = re.sub(r"\s+", " ", normalized).strip()
         return normalized
 
     def _tokenize(self, text: str) -> set[str]:
         """Tokenize text into words for similarity comparison."""
         normalized = self._normalize_text(text)
         # Split on whitespace and punctuation, keep only alphanumeric tokens
-        tokens = re.findall(r'\b\w+\b', normalized)
+        tokens = re.findall(r"\b\w+\b", normalized)
         return set(tokens)
 
     def calculate_similarity(self, text1: str, text2: str) -> float:
@@ -132,9 +132,7 @@ class TTSCache:
 
         return intersection / union if union > 0 else 0.0
 
-    def get_cached_audio(
-        self, text: str, voice_name: str
-    ) -> dict | None:
+    def get_cached_audio(self, text: str, voice_name: str) -> dict | None:
         """
         Retrieve cached audio if text is similar enough.
 
@@ -258,9 +256,7 @@ class TTSCache:
         finally:
             conn.close()
 
-    def store_audio(
-        self, text: str, voice_name: str, audio_bytes: bytes
-    ) -> str:
+    def store_audio(self, text: str, voice_name: str, audio_bytes: bytes) -> str:
         """
         Store generated audio in cache.
 
@@ -427,9 +423,7 @@ class TTSCache:
                         pass
 
             if voice_name:
-                cursor.execute(
-                    "DELETE FROM tts_cache WHERE voice_name = ?", (voice_name,)
-                )
+                cursor.execute("DELETE FROM tts_cache WHERE voice_name = ?", (voice_name,))
             else:
                 cursor.execute("DELETE FROM tts_cache")
 
