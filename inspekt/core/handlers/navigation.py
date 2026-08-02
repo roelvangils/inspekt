@@ -19,6 +19,7 @@ from inspekt.core.schemas.navigation import (
 )
 
 if TYPE_CHECKING:
+    from inspekt.core.schemas.navigation import SitemapParams, SitemapResponse
     from inspekt.services.bridge_executor import BridgeExecutor
 
 logger = logging.getLogger(__name__)

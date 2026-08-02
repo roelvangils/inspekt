@@ -24,6 +24,7 @@ from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from inspekt.services.pdf_checker import PDFEnhancedMetadata, PDFFullResult
+    from inspekt.services.pdf_report_assets import PDFReportAssets
     from inspekt.services.pdf_contrast_checker import ContrastAnalysisResult
     from inspekt.services.pdf_issue_visualizer import VisualizationResult
     from inspekt.services.pdf_ocr import TextDiscrepancyResult
@@ -4852,11 +4853,14 @@ def _generate_content_audit_section(
                     ai_suggestion_html = ""
                     if img.ai_suggested_alt and not img.has_alt_text:
                         escaped_suggestion = _escape_html(img.ai_suggested_alt)
+                        # Escaped outside the f-string: backslashes in f-string
+                        # expressions are a SyntaxError on Python 3.11
+                        js_escaped_suggestion = escaped_suggestion.replace("'", "\\'")
                         ai_suggestion_html = f'''
                         <div class="ai-suggestion" style="margin-top: 0.5rem; padding: 0.5rem; background: #f0f9ff; border-left: 3px solid #3b82f6; border-radius: 0 4px 4px 0; font-size: 0.85rem;">
                             <span style="color: #3b82f6; font-weight: 500;">✨ AI Suggestion:</span>
                             <span class="suggestion-text" style="color: #1e40af;">"{escaped_suggestion}"</span>
-                            <button class="copy-suggestion" onclick="navigator.clipboard.writeText('{escaped_suggestion.replace("'", "\\'")}'); this.textContent='✓ Copied!'; setTimeout(() => this.textContent='📋', 1500);" style="margin-left: 0.5rem; padding: 2px 6px; border: 1px solid #93c5fd; border-radius: 3px; background: white; cursor: pointer; font-size: 0.75rem;" title="Copy to clipboard">📋</button>
+                            <button class="copy-suggestion" onclick="navigator.clipboard.writeText('{js_escaped_suggestion}'); this.textContent='✓ Copied!'; setTimeout(() => this.textContent='📋', 1500);" style="margin-left: 0.5rem; padding: 2px 6px; border: 1px solid #93c5fd; border-radius: 3px; background: white; cursor: pointer; font-size: 0.75rem;" title="Copy to clipboard">📋</button>
                         </div>'''
 
                     alt_cell_content = alt_display + ai_suggestion_html

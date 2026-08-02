@@ -39,6 +39,8 @@ from inspekt.core.schemas.ai import (
 )
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from inspekt.services.bridge_executor import BridgeExecutor
     from inspekt.services.script_loader import ScriptLoader
 

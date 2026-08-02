@@ -17,7 +17,7 @@ import yaml
 from inspekt.app.cli.icons import success, error, get_platform_icon
 from inspekt.client import BridgeClient
 from inspekt.config import get_audio_config, get_video_config
-from inspekt.domain.recording import Recording
+from inspekt.domain.recording import Recording, RecordingStep
 from inspekt.services.applescript_utils import activate_browser_tab
 from inspekt.services.audio import CLIAudio
 from inspekt.services.formatting_utils import format_filesize
@@ -3411,7 +3411,7 @@ def replay(
                 click.echo(format_system_message("captured initial video frame"))
 
     # Track previous step for detecting redundant activate actions in native mode
-    previous_step: RecordedStep | None = None
+    previous_step: RecordingStep | None = None
 
     for i, step in enumerate(steps_to_run):
         actual_index = start_idx + i
@@ -3754,7 +3754,7 @@ def replay(
                 # Side-effect scroll: show dimmed icon (with platform icon in native mode)
                 summary = format_step_for_display(
                     step_dict, actual_index + 1, step_timestamp,
-                    reserve_suffix_width=12, native_mode=native_mode, dimmed_icon=True,
+                    reserve_suffix_width=12, native_mode=native, dimmed_icon=True,
                     show_milliseconds=show_milliseconds
                 )
             elif is_merged_action:

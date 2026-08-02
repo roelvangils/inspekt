@@ -1691,7 +1691,7 @@ def _display_neighbors(result, origin: str):
             lang = _lang_suffix(sibling)
             if sibling is node:
                 for line in wrap_styled_line(
-                    prefix=f"  {click.style("► ", fg='green')}",
+                    prefix=f"  {click.style('► ', fg='green')}",
                     text=click.style(_node_display_name(sibling), fg="white", bold=True),
                     suffix=lang + click.style("  \u2190 you are here", fg="green"),
                     cont_prefix="    ",

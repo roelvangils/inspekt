@@ -1,6 +1,7 @@
 """Record browser interactions to a YAML file for later replay."""
 
 import json
+import os
 import re
 import signal
 import sys
@@ -2318,7 +2319,8 @@ def record(
         pass  # Visual script is optional for recording
     except Exception as e:
         # Visual script is optional - if injection fails (connection timeout, etc.), continue without audio
-        debug_log(f"Visual script injection failed: {e}")
+        if os.environ.get("INSPEKT_DEBUG") == "1":
+            click.echo(f"  [DEBUG] Visual script injection failed: {e}", err=True)
         visual_script = None  # Prevent later attempts to play sounds
 
     # Configuration for the browser script
