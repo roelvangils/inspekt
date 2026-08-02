@@ -239,10 +239,6 @@ def generate_gallery_html(
         dimensions = f"{img.width}×{img.height}" if img.width and img.height else "Unknown"
         file_size_str = _format_file_size(img.file_size)
 
-        # Alt text display (truncate if too long)
-        alt_display = img.alt[:50] + "…" if len(img.alt) > 50 else img.alt
-        alt_escaped = _escape_html(alt_display)
-
         # Base64 encode SVG content for code preview (avoids HTML escaping issues)
         svg_data_attr = ""
         if img.svg_content:

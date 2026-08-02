@@ -1517,19 +1517,11 @@ def ibm(level, rule, list_rules, include_passes, include_recommendations, output
     # Build config
     config = _build_ibm_config(level, include_passes, include_recommendations)
 
-    # Parse exclude selectors
-    exclude_selectors = _parse_selectors(exclude)
-
     # Build context
-    context_expr = "document"
-    context_warning = None
-
     if scoped:
         if scoped.lower() == "inspected":
-            context_expr = "window.__INSPEKT_INSPECTED_ELEMENT__ || document"
             config["__context"] = "inspected"
         else:
-            context_expr = f"'{scoped}'"
             config["__context"] = scoped
 
     # Determine if badges should be shown
@@ -2016,11 +2008,8 @@ def _sc_matches_level(sc: str, level: str) -> bool:
     # Level AAA includes A, AA, and AAA criteria
     if req_level == "A" and sc_level != "A":
         return False
-    if req_level == "AA" and sc_level == "AAA":
-        return False
     # AAA includes all levels
-
-    return True
+    return not (req_level == "AA" and sc_level == "AAA")
 
 
 def _build_enriched_report_data(
@@ -2873,7 +2862,7 @@ def _inject_badges_into_page(client, engine_list: list, level: str, timeout: flo
 
         # Load engine libraries
         engine_libs = {}
-        for engine_id, lib_path, lib_name in engine_libs_to_load:
+        for engine_id, lib_path, _lib_name in engine_libs_to_load:
             with builtin_open(lib_path) as f:
                 engine_libs[engine_id] = f.read()
 
@@ -2915,7 +2904,7 @@ def _inject_badges_into_page(client, engine_list: list, level: str, timeout: flo
             "sia": lambda lib: f"(function() {{ {lib}; window.Alfa = Alfa; return typeof window.Alfa !== 'undefined'; }})()",
         }
 
-        for engine_id, lib_path, lib_name in engine_libs_to_load:
+        for engine_id, _lib_path, lib_name in engine_libs_to_load:
             lib_content = engine_libs[engine_id]
             wrapped = ENGINE_WRAPPERS[engine_id](lib_content)
             result = client.execute(wrapped, timeout=15.0)
@@ -3030,7 +3019,7 @@ def _run_unified_a11y_with_badges(client, engine_list: list, level: str, timeout
 
         # Load engine libraries
         engine_libs = {}
-        for engine_id, lib_path, lib_name in engine_libs_to_load:
+        for engine_id, lib_path, _lib_name in engine_libs_to_load:
             with builtin_open(lib_path) as f:
                 engine_libs[engine_id] = f.read()
 
@@ -3069,7 +3058,7 @@ def _run_unified_a11y_with_badges(client, engine_list: list, level: str, timeout
             "sia": lambda lib: f"(function() {{ {lib}; window.Alfa = Alfa; return typeof window.Alfa !== 'undefined'; }})()",
         }
 
-        for engine_id, lib_path, lib_name in engine_libs_to_load:
+        for engine_id, _lib_path, lib_name in engine_libs_to_load:
             current_step += 1
             click.echo(f"  {current_step}/{total_steps} Injecting {lib_name}…", err=True)
             lib_content = engine_libs[engine_id]

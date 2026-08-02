@@ -44,7 +44,7 @@ class TestOCRAvailability:
             from inspekt.services.pdf_ocr import is_tesseract_available
 
             # Need to call the function after patching
-            result = is_tesseract_available()
+            is_tesseract_available()
             # The result depends on whether tesseract is actually installed
 
 
@@ -254,7 +254,7 @@ class TestAnalyzeTextDiscrepancy:
                 from inspekt.services.pdf_ocr import analyze_text_discrepancy
 
                 # Need to reimport after patching
-                result = analyze_text_discrepancy("/some/path.pdf")
+                analyze_text_discrepancy("/some/path.pdf")
 
                 # Should indicate unavailability
                 # (Note: actual behavior depends on import order)

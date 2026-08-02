@@ -394,4 +394,4 @@ class TestResponseStructure:
         for cls in response_classes:
             field = cls.model_fields["success"]
             # The annotation should be bool
-            assert field.annotation == bool, f"{cls.__name__}.success not bool"
+            assert field.annotation is bool, f"{cls.__name__}.success not bool"

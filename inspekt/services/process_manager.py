@@ -70,6 +70,7 @@ class ProcessManager:
         self.shutdown_requested = False
         self.shutdown_event = asyncio.Event()
         self._prompt_active = False
+        self._prompt_task: asyncio.Future | None = None
 
     def _is_port_in_use(self, host: str, port: int) -> bool:
         """Check if a port is already in use."""
@@ -321,8 +322,9 @@ class ProcessManager:
                 return
 
             self.shutdown_requested = True
-            # Schedule the prompt in the event loop
-            asyncio.ensure_future(self._prompt_shutdown())
+            # Schedule the prompt in the event loop (keep a reference so the
+            # task isn't garbage collected before it runs)
+            self._prompt_task = asyncio.ensure_future(self._prompt_shutdown())
 
         # Handle SIGINT (Ctrl+C) and SIGTERM
         for sig in (signal.SIGINT, signal.SIGTERM):

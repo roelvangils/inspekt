@@ -21,6 +21,28 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from inspekt import __version__
+from inspekt.app.api.routers import (
+    accessibility,
+    browser,
+    commands,
+    cookies,
+    display,
+    domains,
+    execution,
+    extraction,
+    inspection,
+    interaction,
+    navigation,
+    network,
+    persistence,
+    plugins,
+    robots,
+    selection,
+    storage,
+)
+from inspekt.app.api.routers import (
+    sitemap as sitemap_router,
+)
 
 # Set up Jinja2 templates
 templates_dir = Path(__file__).parent
@@ -209,30 +231,7 @@ async def status_dashboard(request: Request):
         )
 
 
-# Import and register routers
-from inspekt.app.api.routers import (
-    accessibility,
-    browser,
-    commands,
-    cookies,
-    display,
-    domains,
-    execution,
-    extraction,
-    inspection,
-    interaction,
-    navigation,
-    network,
-    persistence,
-    plugins,
-    robots,
-    selection,
-    storage,
-)
-from inspekt.app.api.routers import (
-    sitemap as sitemap_router,
-)
-
+# Register routers
 app.include_router(navigation.router, prefix="/api/navigation", tags=["Navigation"])
 app.include_router(execution.router, prefix="/api/execution", tags=["Execution"])
 app.include_router(extraction.router, prefix="/api/extraction", tags=["Extraction"])

@@ -49,6 +49,7 @@ class CDPClient:
         self._pending: dict[int, asyncio.Future] = {}
         self._event_handlers: dict[str, list[Callable]] = {}
         self._receive_task: asyncio.Task | None = None
+        self._handler_tasks: set[asyncio.Task] = set()
         self._closed = False
 
     async def connect(self, websocket_url: str) -> None:
@@ -203,9 +204,12 @@ class CDPClient:
                     for handler in handlers:
                         try:
                             result = handler(params)
-                            # Support async handlers
+                            # Support async handlers (hold a reference so the
+                            # task isn't garbage collected mid-flight)
                             if asyncio.iscoroutine(result):
-                                asyncio.create_task(result)
+                                task = asyncio.create_task(result)
+                                self._handler_tasks.add(task)
+                                task.add_done_callback(self._handler_tasks.discard)
                         except Exception:
                             pass  # Don't let handler errors break the loop
 

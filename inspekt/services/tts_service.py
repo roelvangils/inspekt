@@ -169,14 +169,13 @@ def speak_text(
                 raise TTSError(error_msg)
 
             # Write to temp file (won't be auto-deleted, ffplay needs it)
-            temp_file = tempfile.NamedTemporaryFile(
+            with tempfile.NamedTemporaryFile(
                 suffix=".mp3",
                 delete=False,
                 prefix="inspekt_tts_"
-            )
-            for chunk in audio_chunks:
-                temp_file.write(chunk)
-            temp_file.close()
+            ) as temp_file:
+                for chunk in audio_chunks:
+                    temp_file.write(chunk)
 
             # Play via detached process (survives parent termination)
             # Use shell to handle cleanup: play file, then delete it

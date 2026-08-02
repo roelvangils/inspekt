@@ -259,7 +259,7 @@ class TestTypeScriptGeneration:
 
     def test_script_includes_delay_parameter(self, runner, mock_executor_for_typing):
         """Test that the script includes the delay parameter."""
-        result = runner.invoke(cli, ["type", "test", "--speed", "10"])
+        runner.invoke(cli, ["type", "test", "--speed", "10"])
 
         call_args = mock_executor_for_typing.execute.call_args[0][0]
         # Should have delay of 100ms (1000/10)

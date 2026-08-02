@@ -477,7 +477,6 @@ def _categorize_verapdf_violation(violation: VeraPDFViolation) -> ScoreCategory:
     This maps ISO 14289-1 (PDF/UA) clauses to our score categories.
     """
     clause = violation.clause.lower() if violation.clause else ""
-    rule_id = violation.rule_id.lower() if violation.rule_id else ""
     description = violation.description.lower() if violation.description else ""
 
     # Structure and tagging

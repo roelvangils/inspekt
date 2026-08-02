@@ -12,6 +12,7 @@ import subprocess
 import tempfile
 from datetime import datetime
 from pathlib import Path
+from typing import ClassVar
 
 from .base import (
     AccessibilityEngine,
@@ -129,12 +130,11 @@ class SiaEngine(AccessibilityEngine):
                 check=True,
             )
 
-            # Bundle with esbuild
-            temp_file = tempfile.NamedTemporaryFile(
+            # Bundle with esbuild (delete=False: esbuild writes to this path)
+            with tempfile.NamedTemporaryFile(
                 mode="wb", delete=False, suffix=".js"
-            )
-            temp_file.close()
-            temp_path = Path(temp_file.name)
+            ) as temp_file:
+                temp_path = Path(temp_file.name)
 
             subprocess.run(
                 [
@@ -197,7 +197,7 @@ class SiaEngine(AccessibilityEngine):
 
     # WCAG level mapping for Alfa rule filtering
     # Alfa rules are tagged with WCAG success criteria
-    LEVEL_MAPPING = {
+    LEVEL_MAPPING: ClassVar[dict[str, str]] = {
         "2a": "WCAG2.0:A",
         "2aa": "WCAG2.0:AA",
         "2aaa": "WCAG2.0:AAA",
@@ -262,7 +262,7 @@ class SiaEngine(AccessibilityEngine):
 
     # Map Alfa outcome types to impact levels
     # Alfa uses ACT-Rules outcomes: passed, failed, cantTell, inapplicable
-    OUTCOME_TO_IMPACT = {
+    OUTCOME_TO_IMPACT: ClassVar[dict[str, ImpactLevel]] = {
         "failed": ImpactLevel.SERIOUS,
         "cantTell": ImpactLevel.MODERATE,
     }

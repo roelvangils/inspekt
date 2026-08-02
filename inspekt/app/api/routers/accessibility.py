@@ -282,7 +282,7 @@ async def run_autocomplete_check(request: AutocompleteRequest):
         if page_info.get("ok"):
             try:
                 page_data = json.loads(page_info.get("result", "{}"))
-            except:
+            except Exception:
                 pass
 
         return {

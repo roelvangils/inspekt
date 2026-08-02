@@ -384,9 +384,6 @@ def log_expression(expression, timeout):
 
     executor = BridgeExecutor()
 
-    # Get timestamp before execution to filter console logs
-    before_ts = datetime.now().astimezone().isoformat()
-
     # Wrap expression in console.log()
     code = f"console.log({expression})"
 

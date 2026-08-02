@@ -323,7 +323,7 @@ def _format_issues_list(issues: list, issue_type: str) -> str:
 
             instances_html = f'''
             <div class="issue-instances">
-                <details{"" if len(instances) == 1 else ""}>
+                <details>
                     <summary>{len(instances)} instance{"s" if len(instances) != 1 else ""}</summary>
                     <ul class="instance-list">
                         {"".join(instance_items)}

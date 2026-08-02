@@ -452,7 +452,7 @@ def _wait_for_vm(timeout: int = 30) -> bool:
 
             if result == 0:
                 return True
-        except:
+        except Exception:
             pass
 
         time.sleep(0.5)
@@ -538,9 +538,7 @@ def start(rebuild, no_open, dev, no_dev):
         sys.exit(1)
 
     # Auto-detect dev environment
-    auto_dev = False
     if not dev and not no_dev and _is_dev_environment():
-        auto_dev = True
         dev = True
         click.echo("  • Dev environment detected (mounting local source)")
 
@@ -669,9 +667,7 @@ def restart(rebuild, dev, no_dev):
         sys.exit(1)
 
     # Auto-detect dev environment
-    auto_dev = False
     if not dev and not no_dev and _is_dev_environment():
-        auto_dev = True
         dev = True
         click.echo("  • Dev environment detected (mounting local source)")
 

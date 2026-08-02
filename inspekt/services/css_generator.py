@@ -70,7 +70,6 @@ def _generate_element_css(
     # Add children (nested)
     for child in children:
         child_styles = child.get("styles", {})
-        child_children = child.get("children", [])
 
         # Only include children that have styles or styled descendants
         if child_styles or _has_styled_children(child):

@@ -47,7 +47,7 @@ class TestBridgeExecutorInitialization:
 
         # Access client property
         with patch("inspekt.services.bridge_executor.BridgeClient") as mock_client_class:
-            client = executor.client
+            _ = executor.client  # access triggers lazy initialization
             mock_client_class.assert_called_once_with(host="127.0.0.1", port=8765)
             assert executor._client is not None
 

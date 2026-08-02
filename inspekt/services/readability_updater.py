@@ -182,9 +182,8 @@ class ReadabilityUpdater:
                 response = http_client.get(self.raw_github_url, timeout=30.0)
             response.raise_for_status()
 
-            temp_file = tempfile.NamedTemporaryFile(mode="wb", delete=False, suffix=".js")
-            temp_file.write(response.content)
-            temp_file.close()
+            with tempfile.NamedTemporaryFile(mode="wb", delete=False, suffix=".js") as temp_file:
+                temp_file.write(response.content)
 
             return Path(temp_file.name)
         except requests.RequestException:
@@ -289,10 +288,8 @@ class ReadabilityUpdater:
             # Basic sanity check: file should contain Readability function
             if "function Readability" not in content:
                 return False
-            if len(content) < 50000:  # Readability.js is ~100KB
-                return False
-
-            return True
+            # Readability.js is ~100KB
+            return len(content) >= 50000
         except OSError:
             return False
 

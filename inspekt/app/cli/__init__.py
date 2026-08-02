@@ -581,7 +581,7 @@ cli.add_lazy_command("suggest", "suggest", "suggest")
 # When INSPEKT_RESTRICTED=1 (set by terminal-server.py in the VM),
 # remove commands that are dangerous in a shared/sandboxed terminal.
 
-import os as _os
+import os as _os  # noqa: E402 -- deliberate: keeps the VM-restricted block self-contained at the end of module assembly
 
 if _os.environ.get('INSPEKT_RESTRICTED') == '1':
     _RESTRICTED_COMMANDS = {

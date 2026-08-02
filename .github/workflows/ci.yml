@@ -28,7 +28,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install ruff
+          pip install "ruff>=0.16,<0.17"  # keep in lockstep with pyproject dev extra and pre-commit rev
 
       - name: Run ruff linter
         run: ruff check inspekt/ tests/

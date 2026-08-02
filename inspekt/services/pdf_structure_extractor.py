@@ -467,16 +467,6 @@ class PDFStructureExtractor:
                 type_val = str(item.get("/Type", "")).lstrip("/")
                 if type_val == "MCR":
                     # Marked content reference - get page
-                    page_num = parent_page
-                    if "/Pg" in item:
-                        try:
-                            page_ref = item["/Pg"]
-                            for i, page in enumerate(self._pdf.pages):
-                                if page.obj == page_ref:
-                                    page_num = i
-                                    break
-                        except Exception:
-                            pass
                     return None  # MCRs don't create structure nodes
                 elif type_val == "OBJR":
                     # Object reference (annotation, form field)

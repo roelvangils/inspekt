@@ -5,6 +5,7 @@ IBM Equal Access accessibility engine implementation.
 from __future__ import annotations
 
 import json
+from typing import ClassVar
 
 from .base import (
     AccessibilityEngine,
@@ -64,7 +65,7 @@ class IbmEngine(AccessibilityEngine):
     # =========================================================================
 
     # WCAG level to IBM guideline mapping
-    LEVEL_MAPPING = {
+    LEVEL_MAPPING: ClassVar[dict[str, list[str]]] = {
         "2a": ["WCAG_2_0"],
         "2aa": ["WCAG_2_0"],
         "2aaa": ["WCAG_2_0"],
@@ -115,7 +116,7 @@ class IbmEngine(AccessibilityEngine):
     # =========================================================================
 
     # IBM level to impact mapping
-    LEVEL_TO_IMPACT = {
+    LEVEL_TO_IMPACT: ClassVar[dict[str, ImpactLevel]] = {
         "violation": ImpactLevel.CRITICAL,
         "potentialviolation": ImpactLevel.SERIOUS,
         "recommendation": ImpactLevel.MODERATE,

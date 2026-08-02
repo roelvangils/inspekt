@@ -13,14 +13,14 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar
 
 
 class ActionMatcher:
     """Intelligent action matcher that finds elements without AI."""
 
     # Legacy common actions - kept for reference, now loaded from JSON
-    COMMON_ACTIONS_LEGACY = {
+    COMMON_ACTIONS_LEGACY: ClassVar[dict[str, dict[str, list[str]]]] = {
         "home": {
             "href_patterns": ["/", "/home", "/index", "/homepage"],
             "texts": ["home", "homepage", "main page"],
@@ -85,7 +85,7 @@ class ActionMatcher:
     }
 
     # Synonyms for better matching
-    SYNONYMS = {
+    SYNONYMS: ClassVar[dict[str, list[str]]] = {
         "home": ["homepage", "main", "index", "start"],
         "login": ["signin", "sign in", "log in", "authenticate"],
         "logout": ["signout", "sign out", "log out"],

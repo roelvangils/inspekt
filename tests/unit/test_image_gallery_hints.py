@@ -301,7 +301,7 @@ class TestHeuristic20ClickInstructions:
         assert any("interaction instructions" in h for h in hints)
 
     def test_no_false_positive(self):
-        img = _make_image(accessible_name="A French press coffee maker")
+        _img = _make_image(accessible_name="A French press coffee maker")
         # "press" as a noun in context — the regex is word-boundary so this WILL match.
         # This is acceptable: better to over-flag than miss real issues.
         # We don't test for no-fire here since "press" is a valid match.

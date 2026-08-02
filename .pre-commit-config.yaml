@@ -2,7 +2,8 @@
 # Kept intentionally minimal: ruff mirrors the CI lint/format gates.
 repos:
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.14.14
+    # Keep in lockstep with the ruff pin in pyproject [dev] and ci.yml
+    rev: v0.16.1
     hooks:
       - id: ruff
         args: [--fix]

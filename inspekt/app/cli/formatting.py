@@ -557,7 +557,6 @@ def format_step_for_display(
     elif action == "scroll":
         scroll = step.get("scroll", {})
         delta_y = scroll.get("deltaY", 0)
-        target_y = scroll.get("y", 0)
 
         # Determine scroll direction
         if delta_y > 0:

@@ -13,6 +13,8 @@ from inspekt.core.schemas.navigation import (
     NavigateParams,
     NavigateResponse,
     ReloadParams,
+    SitemapParams,
+    SitemapResponse,
 )
 
 # === Navigate to URL ===
@@ -205,8 +207,6 @@ page_down = CommandDefinition(
 )
 
 # ── Sitemap ──────────────────────────────────────────────────────────
-
-from inspekt.core.schemas.navigation import SitemapParams, SitemapResponse
 
 get_sitemap = CommandDefinition(
     id="get_sitemap",

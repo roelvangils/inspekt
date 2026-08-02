@@ -172,7 +172,7 @@ class TTSCache:
 
             row = cursor.fetchone()
             if row:
-                cache_id, cached_text, audio_path, audio_size, created_at, hit_count = row
+                cache_id, cached_text, audio_path, _audio_size, created_at, hit_count = row
 
                 # Check if cache is fresh
                 if now - created_at <= ttl_seconds:

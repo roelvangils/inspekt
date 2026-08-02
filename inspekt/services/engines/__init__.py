@@ -6,10 +6,15 @@ Provides discovery and access to built-in accessibility testing engines.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from .base import AccessibilityEngine
+# Re-export base classes for convenience (base has no circular dependencies;
+# only the concrete engine modules are lazy-loaded to avoid import cycles)
+from .base import (
+    AccessibilityEngine,
+    AuditResult,
+    EngineInfo,
+    ImpactLevel,
+    NormalizedViolation,
+)
 
 # Registry of built-in engines (populated on first access)
 _ENGINES: dict[str, type[AccessibilityEngine]] | None = None
@@ -80,15 +85,6 @@ def register_engine(engine_id: str, engine_class: type[AccessibilityEngine]) -> 
     engines = _get_engines()
     engines[engine_id.lower()] = engine_class
 
-
-# Re-export base classes for convenience
-from .base import (
-    AccessibilityEngine,
-    AuditResult,
-    EngineInfo,
-    ImpactLevel,
-    NormalizedViolation,
-)
 
 __all__ = [
     "AccessibilityEngine",

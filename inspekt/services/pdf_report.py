@@ -22,6 +22,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from inspekt.services.pdf_tool_matcher import get_creator_info
+
 if TYPE_CHECKING:
     from inspekt.services.pdf_checker import PDFFullResult
     from inspekt.services.pdf_contrast_checker import ContrastAnalysisResult
@@ -298,10 +300,6 @@ def _get_page_size_icon_svg(width_pts: float, height_pts: float, size: int = 32)
 # =============================================================================
 # Creator/Producer Icons (using pdf_tool_matcher service)
 # =============================================================================
-
-# Import the get_creator_info function from pdf_tool_matcher
-from inspekt.services.pdf_tool_matcher import get_creator_info
-
 
 def _get_creator_icon(creator: str | None, producer: str | None) -> tuple[str, str | None]:
     """
@@ -736,10 +734,10 @@ def generate_pdf_report(
     executive_summary_section = _generate_executive_summary_section(result, config)
 
     # Generate new sections
-    cover_section = ""
+    _cover_section = ""
     if config.get("show-cover-page", True) and assets:
         with run_step(0):  # Generate cover preview
-            cover_section = _generate_cover_section(pdf_path, assets, config)
+            _cover_section = _generate_cover_section(pdf_path, assets, config)
 
     issue_screenshots_section = ""
     if config.get("show-issue-screenshots", True) and result.verapdf and assets:
@@ -3862,7 +3860,7 @@ def _generate_interactive_preview_section(
         import json
         from pathlib import Path as PathLib
 
-        from inspekt.services.pdf_tag_visualizer import TAG_COLORS, PDFTagVisualizer
+        from inspekt.services.pdf_tag_visualizer import PDFTagVisualizer
 
         # Load PDF tag reference data for educational callouts
         tag_reference_path = PathLib(__file__).parent.parent / "data" / "pdf_tags.json"
@@ -4052,7 +4050,7 @@ def _generate_interactive_preview_section(
 
         # Build page containers (hidden except first)
         page_containers = []
-        for i, pd in enumerate(pages_data):
+        for i, _pd in enumerate(pages_data):
             hidden_class = "" if i == 0 else "hidden"
             page_containers.append(
                 f'<div class="preview-page-container {hidden_class}" data-page-index="{i}" '
@@ -4062,7 +4060,6 @@ def _generate_interactive_preview_section(
         # Hint about more pages
         more_pages_hint = ""
         if not showing_all and total_pages > len(pages_to_render):
-            remaining = total_pages - len(pages_to_render)
             more_pages_hint = f'''
                 <div class="preview-hint" style="margin-top: 1rem; padding: 0.75rem 1rem; background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 6px; font-size: 0.875rem; color: #0369a1;">
                     <strong>💡 Tip:</strong> Showing {len(pages_to_render)} of {total_pages} pages.

@@ -193,7 +193,7 @@ def _parse_robots_txt(content: str, robots_url: str) -> dict[str, Any]:
 
 def _parse_with_protego(content: str, robots_url: str) -> dict[str, Any]:
     """Parse robots.txt using protego (RFC 9309 compliant)."""
-    rp = Protego.parse(content)
+    Protego.parse(content)  # parse for validation; groups are extracted manually below
 
     # Extract groups (user-agents with their rules)
     groups = []

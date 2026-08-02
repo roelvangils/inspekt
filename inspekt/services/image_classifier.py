@@ -18,7 +18,7 @@ import base64
 import io
 import logging
 from dataclasses import dataclass
-from enum import Enum, StrEnum
+from enum import StrEnum
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -201,8 +201,11 @@ class ImageClassifier:
             return self._clip_available
 
         try:
-            import torch
-            from transformers import CLIPModel, CLIPProcessor
+            import torch  # noqa: F401 -- availability probe only
+            from transformers import (  # noqa: F401 -- availability probe only
+                CLIPModel,
+                CLIPProcessor,
+            )
 
             self._clip_available = True
             logger.debug("CLIP dependencies available")

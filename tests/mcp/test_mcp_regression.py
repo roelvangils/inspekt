@@ -193,7 +193,7 @@ class TestResponseConsistency:
                 fields = tool.response_schema_class.model_fields
                 if "success" in fields:
                     field = fields["success"]
-                    assert field.annotation == bool, \
+                    assert field.annotation is bool, \
                         f"{tool.name} response success is not bool"
 
     def test_error_responses_have_message(self):

@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import difflib
 import json
-from typing import Any
+from typing import Any, ClassVar
 
 import click
 
@@ -97,7 +97,7 @@ class CustomGroup(click.Group):
     """
 
     # Options that need helpful hints when missing arguments
-    _rule_options_hints = {
+    _rule_options_hints: ClassVar[dict[str, str]] = {
         "--enable-rule": (
             "Option '--enable-rule' requires a rule ID.\n\n"
             "Examples:\n"

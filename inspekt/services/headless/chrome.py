@@ -14,6 +14,7 @@ import socket
 import subprocess
 import tempfile
 from pathlib import Path
+from typing import ClassVar
 
 import httpx
 
@@ -54,7 +55,7 @@ class HeadlessChrome:
     """
 
     # Chrome binary search paths by platform
-    CHROME_PATHS = {
+    CHROME_PATHS: ClassVar[dict[str, list[str]]] = {
         "Darwin": [  # macOS
             "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
             "/Applications/Chromium.app/Contents/MacOS/Chromium",

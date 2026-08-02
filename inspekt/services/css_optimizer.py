@@ -864,7 +864,7 @@ def _process_css_block(lines: list[str], start_idx: int, column_format: str) -> 
         if ":" in stripped:
             # Collect the full property (may span multiple lines)
             prop_lines, i = _collect_full_property(lines, i)
-            full_prop = " ".join(l.strip() for l in prop_lines)
+            full_prop = " ".join(line.strip() for line in prop_lines)
 
             # Check if this is a simple single-line property we can format
             parsed = _parse_property_line(full_prop)

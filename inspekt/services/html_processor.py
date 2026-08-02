@@ -46,7 +46,7 @@ def install_prettier_via_npm() -> bool:
 
     click.echo("\n📦 Installing prettier via npm…")
     try:
-        result = subprocess.run(
+        subprocess.run(
             ["npm", "install", "-g", "prettier"],
             check=True,
             capture_output=True,

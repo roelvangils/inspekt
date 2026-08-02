@@ -486,7 +486,7 @@ def _group_duplicate_titles(children: list[tuple]) -> list:
     """
     # Count titles among leaf nodes (nodes with entries and no children)
     title_counts = Counter()
-    for name, child in children:
+    for _name, child in children:
         if child.has_entry and not child.children and child.entry.title:
             title_counts[child.entry.title] += 1
 
@@ -730,7 +730,8 @@ def _gum_via_script(lines: list[str], line_to_url: dict, count: int) -> str | No
             return None
 
         if os.path.exists(result_path):
-            selected_line = open(result_path).read().strip().replace("\r", "")
+            with open(result_path) as f:
+                selected_line = f.read().strip().replace("\r", "")
             os.unlink(result_path)
             return line_to_url.get(selected_line)
 
@@ -1846,7 +1847,7 @@ def _display_sitemap(result, flat: bool, filter_path: str, from_cache: bool = Fa
         from inspekt.services.sitemap_service import detect_languages
         langs = detect_languages(result.entries)
         if langs:
-            lang_str = ", ".join(f"`{l}`" for l in sorted(langs))
+            lang_str = ", ".join(f"`{lang}`" for lang in sorted(langs))
             print_hint(f"Languages detected: {lang_str}. Use `--lang nl` to filter by language")
 
     if not filter_path and result.total_urls > 50:

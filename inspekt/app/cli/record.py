@@ -1,5 +1,6 @@
 """Record browser interactions to a YAML file for later replay."""
 
+import base64
 import json
 import os
 import re
@@ -196,7 +197,7 @@ def set_vm_terminal_hidden(hidden: bool) -> None:
             headers={'Content-Type': 'application/json'},
             method='POST'
         )
-        with urllib.request.urlopen(req, timeout=2) as resp:
+        with urllib.request.urlopen(req, timeout=2):
             pass  # We don't need the response
 
         # Also focus Chrome when hiding terminal (recording starting)
@@ -1128,7 +1129,7 @@ def tidy_recording(
     # Generate new comments
     new_comments = {}
     if not skip_comments:
-        for i, step in enumerate(new_steps):
+        for i, _step in enumerate(new_steps):
             step_num = i + 1
             existing_comment = original_comments.get(i, "")
             existing_desc = _extract_comment_description(existing_comment) if existing_comment else ""
@@ -1260,9 +1261,6 @@ def tidy_recording(
             f.write(output)
 
     return report
-
-
-import base64
 
 
 def process_upload_files(recording: Recording, filepath: Path) -> None:
@@ -3841,7 +3839,7 @@ def list_recordings(limit: int | None, output_json: bool):
                 # Convert to local time
                 local_dt = parsed.astimezone()
                 return local_dt.strftime("%y/%m/%d %H:%M")
-            except:
+            except Exception:
                 return dt[:14] if len(dt) >= 14 else dt
         return "N/A"
 
@@ -4571,7 +4569,6 @@ def record_tutorial(speak: bool):
     time.sleep(0.5)
 
     # Show the failure step display (use step_num + 1 for display)
-    failure_step = sample_steps.get("failure", {"action": "failure"})
     click.echo(f"  {click.style('✗', fg='red')}    00:00  {click.style('failure', fg='red')}   → Element not found: #missing-button")
 
     if speak:

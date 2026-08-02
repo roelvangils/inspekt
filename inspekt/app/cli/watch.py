@@ -188,7 +188,6 @@ def all():
                             # Focus change - show accessible name
                             accessible_name = event.get("accessibleName", "")
                             element = event.get("element", "")
-                            role = event.get("role", "")
 
                             if accessible_name and accessible_name != element:
                                 click.echo(f"→ Focus: {accessible_name} {element}")
@@ -458,7 +457,7 @@ def control():
         # Make sure to restore terminal
         try:
             termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
-        except:
+        except Exception:
             pass
         click.echo(f"\nError: {e}", err=True)
         sys.exit(1)

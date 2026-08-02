@@ -113,7 +113,7 @@ class TestPDFReportAssets:
         """Test saving a custom asset."""
         image_bytes = b"CUSTOM_DATA"
 
-        relative_path = assets_manager.save_custom(
+        assets_manager.save_custom(
             name="my-custom-image",
             image_bytes=image_bytes,
         )

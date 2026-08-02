@@ -61,7 +61,8 @@ dev = [
     "mypy>=1.7.0",
     "types-requests>=2.31.0",
     # Linting and formatting
-    "ruff>=0.1.6",
+    # Keep in lockstep with .pre-commit-config.yaml rev and ci.yml pin
+    "ruff>=0.16,<0.17",
     # Pre-commit hooks
     "pre-commit>=3.5.0",
     # Async file I/O (for Phase 2)

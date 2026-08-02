@@ -517,7 +517,6 @@ class PDFTagVisualizer:
 
             # Fallback: estimate from page dimensions
             # This is a rough approximation when precise bbox isn't available
-            page_rect = page.rect
             return None  # Return None if we can't find the exact bbox
 
         except Exception as e:
@@ -754,9 +753,6 @@ class PDFTagVisualizer:
                 cx1, cy1, _ = centroids[i]
                 cx2, cy2, _ = centroids[i + 1]
 
-                # Calculate distance
-                distance = math.sqrt((cx2 - cx1) ** 2 + (cy2 - cy1) ** 2)
-
                 # Detect potential issues
                 is_issue = False
 
@@ -795,7 +791,7 @@ class PDFTagVisualizer:
 
         # Draw numbered circles at centroids
         circle_radius = 12 * zoom
-        for i, (cx, cy, tag) in enumerate(centroids):
+        for i, (cx, cy, _tag) in enumerate(centroids):
             # Circle background
             is_issue_element = any(
                 issue["from_order"] == i + 1 or issue["to_order"] == i + 1

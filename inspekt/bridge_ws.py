@@ -1256,7 +1256,7 @@ async def websocket_handler(request):
                 cancelled_count += 1
 
         active_connections.discard(ws)
-        removed_instance = cleanup_instance_for_ws(ws)  # Clean up instance tracking
+        cleanup_instance_for_ws(ws)  # Clean up instance tracking
         browser_info.pop(ws, None)
         connection_times.pop(ws, None)  # Clean up connection time tracking
         last_activity_per_connection.pop(ws, None)  # Clean up activity tracking
@@ -2249,7 +2249,7 @@ async def handle_http_domain_sync(request):
                 task.cancel()
 
             # Count successful syncs
-            for request_id, event, ws in events:
+            for request_id, _event, _ws in events:
                 result = completed_requests.get(request_id, {})
                 response = result.get("response", {})
                 if response.get("ok"):
@@ -3834,8 +3834,11 @@ async def main(enable_socket: bool = True, socket_path_override: str | None = No
 
     print("Ready for connections!")
 
-    # Start background cleanup task
-    asyncio.create_task(cleanup_watchdog())
+    # Start background cleanup task (keep a reference so it isn't garbage collected)
+    background_tasks = set()
+    cleanup_task = asyncio.create_task(cleanup_watchdog())
+    background_tasks.add(cleanup_task)
+    cleanup_task.add_done_callback(background_tasks.discard)
 
     # Keep running until interrupted
     try:

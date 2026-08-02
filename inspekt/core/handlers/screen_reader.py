@@ -187,35 +187,12 @@ async def sr_announce(params: SRAnnounceParams) -> SRAnnounceResponse:
     """
     executor = get_executor()
 
-    # Build a minimal walk that targets a single element
-    selector = params.selector or "document.activeElement"
-
-    # Use inline JS for single-element announcement (faster than full walk)
-    announcements = _get_announcements()
-    verbosity = _get_verbosity()
-
     config = {
         "mode": "walk",
         "screenReader": params.screen_reader,
         "verbosity": params.verbosity,
         "maxElements": 1,
     }
-
-    # For a single element, we scope the walk using a wrapper
-    if params.selector:
-        # Wrap to scope walk to this element
-        inner_config = json.dumps(config, ensure_ascii=False)
-        scope_wrapper = f"""
-        (function() {{
-            const target = document.querySelector({json.dumps(params.selector)});
-            if (!target) return {{ ok: false, error: 'Element not found: {params.selector}' }};
-
-            // Temporarily mark the target for scoped walk
-            const originalScript = arguments.callee;
-            // Just use full walk and filter
-            return null;  // Fall through to full walk
-        }})()
-        """
 
     # Use full walk and extract the matching element
     script = _build_sr_script(config)

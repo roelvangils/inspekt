@@ -174,7 +174,7 @@ def _format_json_cookie_value(name: str, parsed_value, indent: int = 0) -> list[
         # Calculate max key length for alignment
         max_key_len = max(len(str(k)) for k in parsed_value) if parsed_value else 0
 
-        for i, (key, val) in enumerate(parsed_value.items()):
+        for _i, (key, val) in enumerate(parsed_value.items()):
             # Format the value
             if isinstance(val, (dict, list)):
                 # Nested JSON - show on next line
@@ -321,7 +321,6 @@ def _execute_cookie_action(action, cookie_name="", cookie_value="", options=None
         cookies_data = response.get("cookies", {})
         count = response.get("count", 0)
         api_used = response.get("apiUsed", "unknown")
-        origin = response.get("origin", "")
         hostname = response.get("hostname", "")
 
         if output_json:

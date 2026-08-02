@@ -292,7 +292,6 @@ def man_rebuild():
 
     try:
         from scripts.build_man import (  # type: ignore
-            Page,
             _build_plugins_page,
             convert_to_roff,
             render_markdown,

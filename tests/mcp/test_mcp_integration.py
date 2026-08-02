@@ -178,13 +178,13 @@ class TestResponseSchemas:
                     # Add required fields with dummy values
                     if field.is_required():
                         field_type = field.annotation
-                        if field_type == str:
+                        if field_type is str:
                             kwargs[name] = "test"
-                        elif field_type == int:
+                        elif field_type is int:
                             kwargs[name] = 0
-                        elif field_type == list:
+                        elif field_type is list:
                             kwargs[name] = []
-                        elif field_type == dict:
+                        elif field_type is dict:
                             kwargs[name] = {}
 
                 try:

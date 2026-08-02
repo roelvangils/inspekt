@@ -130,7 +130,7 @@ def optimize_png(file_path: Path, level: int = 3, strip: bool = True) -> int | N
         if strip:
             args.append("--strip=all")  # Strip all metadata
 
-        result = subprocess.run(
+        subprocess.run(
             args,
             check=True,
             capture_output=True,

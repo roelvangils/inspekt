@@ -142,7 +142,7 @@ def tunnel(ctx, port: int, host: str | None, secret: str | None, remote_port: in
         info = _get_tunnel_info(host)
         if info and info.get("secret"):
             secret = info["secret"]
-            bore_port = info.get("port", BORE_SERVER_PORT)
+            _bore_port = info.get("port", BORE_SERVER_PORT)
         else:
             if host == "localhost":
                 print_error("Could not connect to VM control server at localhost:8888")
@@ -152,7 +152,7 @@ def tunnel(ctx, port: int, host: str | None, secret: str | None, remote_port: in
                 print_hint("Use --secret to provide the tunnel secret manually")
             sys.exit(1)
     else:
-        bore_port = BORE_SERVER_PORT
+        _bore_port = BORE_SERVER_PORT
 
     # Step 4: Build bore command
     # bore's --to expects just the hostname; it defaults to port 7835

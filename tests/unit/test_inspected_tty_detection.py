@@ -55,7 +55,7 @@ class TestTextCommandTTYDetection:
         assert "Text Preview" not in result.output
         assert "Text Content" not in result.output
         # Output should be relatively short (just the content)
-        lines = [l for l in result.output.split("\n") if l.strip()]
+        lines = [line for line in result.output.split("\n") if line.strip()]
         # Raw text output is much shorter than decorated output
         assert len(lines) < 5
 

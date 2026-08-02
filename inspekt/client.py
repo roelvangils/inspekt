@@ -594,7 +594,6 @@ class BridgeClient(SocketClientMixin):
         # Poll for result (server does long polling, so we don't need to poll frequently)
         _verbose_log("Starting to poll for result")
         start_time = time.time()
-        poll_interval = 1.0  # Server does long polling, so 1s between polls is fine
         csp_checked = False
         poll_count = 0
 
@@ -640,7 +639,7 @@ class BridgeClient(SocketClientMixin):
                             _verbose_log("CSP bypass auto-enabled, refreshing page and retrying…")
                             # Reload the page to apply CSP bypass
                             try:
-                                reload_response = self._session.post(
+                                self._session.post(
                                     f"{self.base_url}/execute",
                                     json={"code": "location.reload()"},
                                     timeout=5.0,

@@ -216,9 +216,8 @@ def _process_tts_chunks(
     from inspekt.services.tts_service import TTSError, generate_audio, play_audio_bytes, speak_text
 
     speak_icon = get_icon("speak") or "\U0001F50A"
-    cached_icon = get_icon("cached") or "⚡"
     all_audio_bytes: list[bytes] = []
-    tts_cache = TTSCache()
+    _tts_cache = TTSCache()  # instantiated for its side effects (cache dir setup)
 
     click.echo()
     click.echo(f"{speak_icon} Processing {len(chunks)} chunks…", err=True)
@@ -429,7 +428,6 @@ def describe(language, debug, force_refresh, output_json):
         # Try cache first (unless force refresh or debug mode)
         content_cache = ContentCache()
         cached_result = None
-        from_cache = False
         cache_timestamp = None
         cache_similarity = None
 
@@ -438,7 +436,6 @@ def describe(language, debug, force_refresh, output_json):
             cached_result = content_cache.get_cached_content(current_url, "describe", fingerprint, target_lang or "auto")
 
             if cached_result:
-                from_cache = True
                 cache_similarity = cached_result["similarity"]
                 age_seconds = cached_result["age_seconds"]
                 cache_timestamp = time.time() - age_seconds
@@ -2492,7 +2489,7 @@ def index(no_cache, output, headless, mirror_session, headless_url):
             from urllib.parse import urlparse
 
             from inspekt.services.content_cache import ContentCache
-            content_cache = ContentCache()
+            _content_cache = ContentCache()  # instantiated for its side effects (cache dir setup)
             parsed = urlparse(current_url)
             domain = parsed.netloc
             path = parsed.path.strip("/").replace("/", "_") or "index"

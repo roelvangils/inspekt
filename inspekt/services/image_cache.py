@@ -13,7 +13,7 @@ from __future__ import annotations
 import hashlib
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar
 from urllib.parse import urlparse
 
 from inspekt.services import http_client
@@ -26,7 +26,7 @@ class ImageCache:
     """Manages image downloading and caching."""
 
     # Valid image extensions to preserve
-    VALID_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg", ".avif"}
+    VALID_EXTENSIONS: ClassVar[set[str]] = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg", ".avif"}
 
     def __init__(self, cache_dir: Path | None = None):
         """

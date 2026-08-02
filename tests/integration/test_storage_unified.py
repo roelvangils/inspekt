@@ -557,7 +557,7 @@ class TestScriptPlaceholders:
 
     def test_action_placeholder_replacement(self, runner, mock_executor, mock_script_loader):
         """Test ACTION_PLACEHOLDER is replaced correctly."""
-        result = runner.invoke(cli, ["storage", "list"])
+        runner.invoke(cli, ["storage", "list"])
 
         code = mock_executor.execute.call_args[0][0]
         assert "ACTION_PLACEHOLDER" not in code
@@ -565,7 +565,7 @@ class TestScriptPlaceholders:
 
     def test_types_placeholder_replacement(self, runner, mock_executor, mock_script_loader):
         """Test TYPES_PLACEHOLDER is replaced with JSON array."""
-        result = runner.invoke(cli, ["storage", "list", "--cookies"])
+        runner.invoke(cli, ["storage", "list", "--cookies"])
 
         code = mock_executor.execute.call_args[0][0]
         assert "TYPES_PLACEHOLDER" not in code
@@ -582,7 +582,7 @@ class TestScriptPlaceholders:
             },
         }
 
-        result = runner.invoke(cli, ["storage", "get", "test_key", "--local"])
+        runner.invoke(cli, ["storage", "get", "test_key", "--local"])
 
         code = mock_executor.execute.call_args[0][0]
         assert "KEY_PLACEHOLDER" not in code
@@ -595,7 +595,7 @@ class TestScriptPlaceholders:
             "result": {"ok": True, "storage": {"localStorage": {"ok": True}}},
         }
 
-        result = runner.invoke(cli, ["storage", "set", "key", "test_value", "--local"])
+        runner.invoke(cli, ["storage", "set", "key", "test_value", "--local"])
 
         code = mock_executor.execute.call_args[0][0]
         assert "VALUE_PLACEHOLDER" not in code
@@ -608,7 +608,7 @@ class TestScriptPlaceholders:
             "result": {"ok": True, "storage": {"cookies": {"ok": True}}},
         }
 
-        result = runner.invoke(
+        runner.invoke(
             cli,
             ["storage", "set", "cookie", "value", "--cookies", "--secure", "--max-age", "3600"],
         )

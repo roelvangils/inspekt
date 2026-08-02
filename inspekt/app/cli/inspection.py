@@ -1771,7 +1771,7 @@ def focused(ctx, output_json):
 @click.option("--raw", is_flag=True, help="Output raw content without formatting (auto-enabled when piped)")
 @click.option("--copy", is_flag=True, help="Copy output to clipboard")
 @click.option("--json", "-j", "output_json", is_flag=True, help="Output as JSON")
-def text(raw, copy, output_json):
+def text(raw, copy, output_json):  # noqa: F811 -- separate click command (focused group) reusing the name
     """
     Get the text content of the focused element.
 
@@ -1846,7 +1846,7 @@ def text(raw, copy, output_json):
 @click.option("--raw", is_flag=True, help="Output raw content without formatting (auto-enabled when piped)")
 @click.option("--copy", is_flag=True, help="Copy output to clipboard")
 @click.option("--json", "-j", "output_json", is_flag=True, help="Output as JSON")
-def markdown(raw, copy, output_json):
+def markdown(raw, copy, output_json):  # noqa: F811 -- separate click command (focused group) reusing the name
     """
     Get the focused element as Markdown (converted from HTML).
 
@@ -1989,7 +1989,7 @@ def markdown(raw, copy, output_json):
     help="Round CSS pixel values to nearest whole pixel (when using --include-css). Enabled by default.",
 )
 @html_output_options
-def html(file_path, open_after, reveal_after, include_css, bundled, all_properties, include_defaults, optimize_css,
+def html(file_path, open_after, reveal_after, include_css, bundled, all_properties, include_defaults, optimize_css,  # noqa: F811 -- separate click command (focused group) reusing the name
          remove_comments, oklch, alphabetize, rounding, raw, copy, output_json, pretty, compact, colors, theme, indent):
     """
     Get the HTML of the focused element.
@@ -2400,7 +2400,7 @@ def html(file_path, open_after, reveal_after, include_css, bundled, all_properti
     is_flag=True,
     help="Show original authored CSS values (e.g., clamp(), var(), rem) instead of browser-computed values.",
 )
-def css(file_path, open_after, reveal_after, raw, copy, output_json, all_properties, include_defaults, optimize, oklch, alphabetize, rounding, heuristic_comments, two_columns, three_columns, compact, authored):
+def css(file_path, open_after, reveal_after, raw, copy, output_json, all_properties, include_defaults, optimize, oklch, alphabetize, rounding, heuristic_comments, two_columns, three_columns, compact, authored):  # noqa: F811 -- separate click command (focused group) reusing the name
     """
     Extract computed CSS styles as nested CSS from the focused element.
 
@@ -2920,12 +2920,6 @@ def screenshot_node(selector, output, margin, margin_color, disable_compression,
                     grid_width, grid_height = img.size
             except Exception:
                 grid_width, grid_height = 0, 0
-
-            # Generate filename suffix for compare mode
-            if len(states) == 1:
-                compare_suffix = f"_{states[0]}"
-            else:
-                compare_suffix = "_states"
 
             # Set up variables for the common processing pipeline below
             # The compare mode will fall through to the same processing as regular mode

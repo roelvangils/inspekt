@@ -179,7 +179,7 @@ class PDFToolMatcher:
         """Initialize the matcher with tools data."""
         self._tools = _load_tools_data()
 
-    @lru_cache(maxsize=256)
+    @lru_cache(maxsize=256)  # noqa: B019 -- safe: PDFToolMatcher is a process-lifetime singleton (see get_matcher)
     def match(
         self,
         creator: str | None,

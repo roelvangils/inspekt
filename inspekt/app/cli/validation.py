@@ -394,7 +394,7 @@ def validate_logic(data: dict, recording_dir: Path) -> list[ValidationIssue]:
 def validate_timestamps(steps: list) -> list[ValidationIssue]:
     """Check timestamp consistency across steps."""
     issues = []
-    prev_timestamp = -1
+    _prev_timestamp = -1
 
     # Debounced actions (hover, scroll) use the START time, not when they're recorded.
     # This means they can appear "out of order" in the event queue but with earlier
@@ -423,7 +423,7 @@ def validate_timestamps(steps: list) -> list[ValidationIssue]:
         # Debounced actions are expected to have earlier timestamps
         action = step.get("action", "")
         if action not in DEBOUNCED_ACTIONS:
-            prev_timestamp = timestamp
+            _prev_timestamp = timestamp
 
     return issues
 

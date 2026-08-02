@@ -5,6 +5,7 @@ Axe-core accessibility engine implementation.
 from __future__ import annotations
 
 import json
+from typing import ClassVar
 
 from .base import (
     AccessibilityEngine,
@@ -64,7 +65,7 @@ class AxeEngine(AccessibilityEngine):
     # =========================================================================
 
     # WCAG level to axe tags mapping
-    LEVEL_MAPPING = {
+    LEVEL_MAPPING: ClassVar[dict[str, list[str]]] = {
         "2a": ["wcag2a"],
         "2aa": ["wcag2a", "wcag2aa"],
         "2aaa": ["wcag2a", "wcag2aa", "wcag2aaa"],
@@ -134,7 +135,7 @@ class AxeEngine(AccessibilityEngine):
     # =========================================================================
 
     # Impact level mapping
-    IMPACT_MAPPING = {
+    IMPACT_MAPPING: ClassVar[dict[str, ImpactLevel]] = {
         "critical": ImpactLevel.CRITICAL,
         "serious": ImpactLevel.SERIOUS,
         "moderate": ImpactLevel.MODERATE,

@@ -22,6 +22,7 @@ from inspekt.domain.recording import Recording, RecordingStep
 from inspekt.services.applescript_utils import activate_browser_tab
 from inspekt.services.audio import CLIAudio
 from inspekt.services.formatting_utils import format_filesize
+from inspekt.shared.dialog_styles import DIALOG_STYLES
 
 from .formatting import (
     format_assertion_result,
@@ -33,21 +34,17 @@ from .formatting import (
     format_step_header,
     format_system_message,
 )
-from .recording_utils import load_external_file_content
+from .recording_utils import (
+    TerminalEchoSuppressor,
+    complete_recording_files,
+    find_most_recent_recording,
+    load_external_file_content,
+)
 from .table import Table, _style_with_inline_code, print_error, print_hint, print_warning, wrap_text
 
 # Bridge server constants
 BRIDGE_HTTP_HOST = "127.0.0.1"
 BRIDGE_HTTP_PORT = 8765
-
-# Import shared utilities from recording_utils (moved there to avoid circular imports)
-from inspekt.shared.dialog_styles import DIALOG_STYLES
-
-from .recording_utils import (
-    TerminalEchoSuppressor,
-    complete_recording_files,
-    find_most_recent_recording,
-)
 
 # Save built-in open before it gets shadowed
 _builtin_open = open
@@ -1375,7 +1372,6 @@ def _generate_assertion_description(expect) -> str | None:
     if expect.unchecked:
         parts.append(f"unchecked: {expect.unchecked}")
     if expect.value_equals is not None:
-        selector = expect.value or "target"
         parts.append(f"value equals: {expect.value_equals}")
     if expect.count is not None and expect.count_equals is not None:
         parts.append(f"count({expect.count}) = {expect.count_equals}")
@@ -1397,7 +1393,7 @@ def check_inspekt_expectations(command: str, expect: dict, cmd_result: dict) -> 
     # For console commands, check if output is empty
     if "console" in command and expect.get("empty"):
         # Check if there are any log entries (non-empty, non-header output)
-        lines = [l for l in stdout.strip().split("\n") if l.strip() and not l.startswith("Console")]
+        lines = [line for line in stdout.strip().split("\n") if line.strip() and not line.startswith("Console")]
         if lines:
             failures.append(f"Expected no console messages, but found: {len(lines)} message(s)")
 
@@ -2792,7 +2788,7 @@ def replay(
                     click.echo(format_system_message(f"Page {action}ed"))
 
                 # Wait for page to be fully loaded after navigation/reload
-                for attempt in range(30):  # Max 15 seconds
+                for _attempt in range(30):  # Max 15 seconds
                     time.sleep(0.5)
                     ready_result = client.execute("document.readyState", timeout=3.0)
                     if ready_result.get("ok") and ready_result.get("result") == "complete":
@@ -3175,12 +3171,12 @@ def replay(
 
     # Measure viewport height BEFORE any debugger attachment
     # This is needed to detect the automation banner height for video cropping
-    pre_debugger_viewport_height = 0
+    _pre_debugger_viewport_height = 0
     if video_recording_enabled and not dry_run and client:
         try:
             viewport_result = client.execute("({ height: window.innerHeight })", timeout=2.0)
             if viewport_result.get("ok") and viewport_result.get("result"):
-                pre_debugger_viewport_height = viewport_result["result"].get("height", 0)
+                _pre_debugger_viewport_height = viewport_result["result"].get("height", 0)
         except Exception:
             pass
 
@@ -4008,13 +4004,11 @@ def replay(
                 # Inner try to catch navigation timeouts specifically
                 try:
                     exec_result = client.execute(code, timeout=action_timeout)
-                    navigation_timeout = False
                 except Exception as nav_exc:
                     # Check if this is a timeout on an action that might navigate
                     if might_navigate and "timeout" in str(nav_exc).lower():
                         # Navigation causes page unload before response can be sent
                         # Treat timeout as successful navigation
-                        navigation_timeout = True
                         exec_result = {"ok": True, "result": {"ok": True, "navigated": is_navigate_action, "mayNavigate": not is_navigate_action}}
                         if verbose:
                             click.echo(format_system_message("Response lost (navigation in progress)"))
@@ -4327,7 +4321,6 @@ def replay(
                             # Decode base64 video data
                             import base64
                             video_bytes = base64.b64decode(video_data["data"])
-                            video_duration = video_data.get("duration", 0)
 
                             save_elapsed = int((datetime.now() - result.start_time).total_seconds() * 1000)
 

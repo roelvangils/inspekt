@@ -448,7 +448,8 @@ def _generate_text_layer_analysis(pdf_path: Path, config: dict) -> TextLayerAnal
             accessible_percentage = int((pc.pdf_char_count / pc.ocr_char_count) * 100)
             accessible_percentage = min(100, max(0, accessible_percentage))  # Clamp 0-100
         else:
-            accessible_percentage = 100 if pc.pdf_char_count == 0 else 100
+            # No OCR text detected: nothing visible is missing from the text layer
+            accessible_percentage = 100
 
         missing_char_count = max(0, pc.ocr_char_count - pc.pdf_char_count)
 

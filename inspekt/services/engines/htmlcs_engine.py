@@ -5,6 +5,7 @@ HTML_CodeSniffer accessibility engine implementation.
 from __future__ import annotations
 
 import json
+from typing import ClassVar
 
 from .base import (
     AccessibilityEngine,
@@ -65,7 +66,7 @@ class HtmlcsEngine(AccessibilityEngine):
 
     # WCAG level to HTMLCS standard mapping
     # Note: HTMLCS supports WCAG 2.1 but not 2.2 yet
-    LEVEL_MAPPING = {
+    LEVEL_MAPPING: ClassVar[dict[str, str]] = {
         "2a": "WCAG2A",
         "2aa": "WCAG2AA",
         "2aaa": "WCAG2AAA",
@@ -118,7 +119,7 @@ class HtmlcsEngine(AccessibilityEngine):
 
     # HTMLCS message types to impact mapping
     # Type 1 = Error, Type 2 = Warning, Type 3 = Notice
-    TYPE_TO_IMPACT = {
+    TYPE_TO_IMPACT: ClassVar[dict[int, ImpactLevel]] = {
         1: ImpactLevel.CRITICAL,   # Error
         2: ImpactLevel.MODERATE,   # Warning
         3: ImpactLevel.MINOR,      # Notice

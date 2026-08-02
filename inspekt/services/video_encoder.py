@@ -116,9 +116,9 @@ class VideoEncoder:
         # Run ffmpeg with timeout to prevent hangs
         try:
             if progress_callback:
-                result = self._run_with_progress(cmd, frame_count, progress_callback)
+                self._run_with_progress(cmd, frame_count, progress_callback)
             else:
-                result = subprocess.run(
+                subprocess.run(
                     cmd,
                     capture_output=True,
                     text=True,
@@ -267,7 +267,7 @@ class VideoEncoder:
             if progress_callback:
                 progress_callback(0, len(frames))
 
-            for i, (timestamp, image_bytes) in enumerate(frames):
+            for i, (_timestamp, image_bytes) in enumerate(frames):
                 frame_path = temp_dir / f"frame_{i:05d}.jpg"
                 frame_path.write_bytes(image_bytes)
 
@@ -341,7 +341,7 @@ class VideoEncoder:
 
             # Run ffmpeg
             try:
-                result = subprocess.run(
+                subprocess.run(
                     cmd,
                     capture_output=True,
                     text=True,

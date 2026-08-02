@@ -244,7 +244,7 @@ def storage_set(key, value, cookies, local, session, storage_type, max_age, expi
             options["sameSite"] = same_site
 
     # Execute action
-    result = _execute_unified_storage_action("set", types, key=key, value=value, options=options)
+    _execute_unified_storage_action("set", types, key=key, value=value, options=options)
 
     # Display success message
     storage_display = {
@@ -295,7 +295,7 @@ def storage_delete(key, cookies, local, session, storage_type):
     storage_type_name = types[0]
 
     # Execute action
-    result = _execute_unified_storage_action("delete", types, key=key)
+    _execute_unified_storage_action("delete", types, key=key)
 
     # Display success message
     storage_display = {

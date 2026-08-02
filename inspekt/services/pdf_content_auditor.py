@@ -1516,8 +1516,8 @@ class PDFContentAuditor:
             )
 
         # Process all fields
-        for idx, field in enumerate(fields):
-            audit = process_field(field, idx)
+        for idx, form_field in enumerate(fields):
+            audit = process_field(form_field, idx)
             if audit:
                 forms.append(audit)
 

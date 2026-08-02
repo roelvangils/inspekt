@@ -236,7 +236,7 @@ class AIIntegrationService:
                 try:
                     error_body = response.json()
                     click.echo(f"Error details: {error_body}", err=True)
-                except:
+                except Exception:
                     click.echo(f"Response text: {response.text[:200]}", err=True)
                 sys.exit(1)
 
@@ -333,7 +333,7 @@ class AIIntegrationService:
                 try:
                     error_body = response.json()
                     click.echo(f"Error details: {error_body}", err=True)
-                except:
+                except Exception:
                     click.echo(f"Response text: {response.text[:200]}", err=True)
                 return ""
 

@@ -120,11 +120,6 @@ EXACT_COMMENTS: dict[str, dict[str, str]] = {
         "end": "Align items to end",
         "stretch": "Stretch items",
     },
-    "place-items": {
-        "center": "Center both directions",
-        "start": "Start both directions",
-        "stretch": "Stretch both directions",
-    },
     # Grid
     "grid-column": {
         "span 2": "Span 2 columns",

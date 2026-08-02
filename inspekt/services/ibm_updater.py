@@ -148,10 +148,9 @@ class IbmUpdater:
             response = http_client.get(url, timeout=30.0)
             response.raise_for_status()
 
-            # Create temporary file
-            temp_file = tempfile.NamedTemporaryFile(mode='wb', delete=False, suffix='.js')
-            temp_file.write(response.content)
-            temp_file.close()
+            # Create temporary file (delete=False: file must outlive this scope)
+            with tempfile.NamedTemporaryFile(mode='wb', delete=False, suffix='.js') as temp_file:
+                temp_file.write(response.content)
 
             return Path(temp_file.name)
         except requests.RequestException:

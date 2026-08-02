@@ -123,7 +123,6 @@ def display_selection(response, content_type="text", show_tip=True, pretty=None,
     from inspekt.config import get_html_selection_config
 
     text = response.get("text", "")
-    length = response.get("length", 0)
 
     # Determine what to display based on content_type
     if content_type == "text":
