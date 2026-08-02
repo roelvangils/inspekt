@@ -50,7 +50,7 @@ def render_console_table(table_json: str) -> None:
             if not columns:
                 columns = list(dict.fromkeys(k for row in rows for k in (row.keys() if isinstance(row, dict) else [])))
             # Add index column and index value to each row
-            columns = ["#"] + columns
+            columns = ["#", *columns]
             rows = [{"#": i, **row} for i, row in enumerate(rows)]
 
         # Build row data for auto-width calculation

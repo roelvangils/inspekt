@@ -64,7 +64,7 @@ class VideoEncoder:
         frames_dir: Path,
         output_path: Path,
         frame_pattern: str = "frame_%05d.jpg",
-        progress_callback: Callable[[int, int], None] = None,
+        progress_callback: Callable[[int, int], None] | None = None,
     ) -> dict[str, Any]:
         """
         Encode frames from a directory into a video file.
@@ -233,7 +233,7 @@ class VideoEncoder:
         self,
         frames: list[tuple[float, bytes]],
         output_path: Path,
-        progress_callback: Callable[[int, int], None] = None,
+        progress_callback: Callable[[int, int], None] | None = None,
     ) -> dict[str, Any]:
         """
         Encode frames directly from memory (list of bytes).
@@ -386,8 +386,8 @@ def encode_replay_video(
     frames: list[tuple[float, bytes]],
     output_path: str | Path,
     fps: int = 10,
-    format: str = None,
-    progress_callback: Callable[[int, int], None] = None,
+    format: str | None = None,
+    progress_callback: Callable[[int, int], None] | None = None,
     crop_top: int = 0,
 ) -> dict[str, Any]:
     """

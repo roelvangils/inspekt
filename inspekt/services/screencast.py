@@ -59,9 +59,9 @@ class ScreencastCapture:
     def __init__(
         self,
         host: str = "127.0.0.1",
-        port: int = None,
-        fps: int = None,
-        quality: int = None,
+        port: int | None = None,
+        fps: int | None = None,
+        quality: int | None = None,
         format: str = "jpeg",
     ):
         """
@@ -266,7 +266,7 @@ class ScreencastCapture:
         """
         self._is_capturing = value
 
-    def save_frames_to_disk(self, output_dir: Path = None) -> Path:
+    def save_frames_to_disk(self, output_dir: Path | None = None) -> Path:
         """
         Save all frames to disk as individual image files.
 
@@ -288,7 +288,7 @@ class ScreencastCapture:
 
         ext = "jpg" if self.format == "jpeg" else self.format
 
-        for i, (timestamp, image_bytes) in enumerate(self._frames):
+        for i, (_timestamp, image_bytes) in enumerate(self._frames):
             frame_path = output_dir / f"frame_{i:05d}.{ext}"
             frame_path.write_bytes(image_bytes)
 
@@ -366,7 +366,7 @@ def capture_screencast(
     fps: int = 10,
     quality: int = 80,
     host: str = "127.0.0.1",
-    port: int = None,
+    port: int | None = None,
 ) -> list[tuple[float, bytes]]:
     """
     Capture screencast for a specified duration.

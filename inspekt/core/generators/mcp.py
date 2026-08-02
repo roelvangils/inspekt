@@ -8,15 +8,17 @@ from __future__ import annotations
 
 import importlib
 import logging
-from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
-from inspekt.core.commands.base import CommandDefinition
 from inspekt.core.registry import CommandRegistry
 from mcp import types
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from pydantic import BaseModel
+
+    from inspekt.core.commands.base import CommandDefinition
 
 logger = logging.getLogger(__name__)
 

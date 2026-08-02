@@ -237,7 +237,7 @@ class PDFStructureExtractor:
             struct_root = root["/StructTreeRoot"]
             if "/RoleMap" in struct_root:
                 role_map = struct_root["/RoleMap"]
-                for key in role_map.keys():
+                for key in role_map:
                     mapped = str(role_map[key])
                     # Remove leading slash
                     clean_key = key.lstrip("/")

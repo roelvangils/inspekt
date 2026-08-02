@@ -10,7 +10,6 @@ import asyncio
 import logging
 from typing import TYPE_CHECKING
 
-from inspekt.core.commands.base import EmptyParams
 from inspekt.core.schemas.extraction import (
     ExtractArticleResponse,
     ExtractLinksParams,
@@ -22,6 +21,7 @@ from inspekt.core.schemas.extraction import (
 )
 
 if TYPE_CHECKING:
+    from inspekt.core.commands.base import EmptyParams
     from inspekt.services.bridge_executor import BridgeExecutor
     from inspekt.services.script_loader import ScriptLoader
 

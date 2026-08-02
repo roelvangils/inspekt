@@ -2019,7 +2019,7 @@ class PDFContentAuditor:
                         cm_pattern = r'([\d.-]+)\s+([\d.-]+)\s+([\d.-]+)\s+([\d.-]+)\s+([\d.-]+)\s+([\d.-]+)\s+cm'
                         cm_match = re.search(cm_pattern, match)
                         if cm_match:
-                            a, b, c, d, e, f = [float(x) for x in cm_match.groups()]
+                            a, _b, _c, d, e, f = [float(x) for x in cm_match.groups()]
                             # a, d are scale factors; e, f are translation
                             # Approximate bounding box from transformation
                             width = abs(a) if abs(a) > 1 else 100
@@ -2121,7 +2121,7 @@ class PDFContentAuditor:
                         cm_pattern = r'([\d.-]+)\s+([\d.-]+)\s+([\d.-]+)\s+([\d.-]+)\s+([\d.-]+)\s+([\d.-]+)\s+cm'
                         cm_match = re.search(cm_pattern, content)
                         if cm_match:
-                            a, b, c, d, e, f = [float(x) for x in cm_match.groups()]
+                            a, _b, _c, d, e, f = [float(x) for x in cm_match.groups()]
                             width = abs(a) if abs(a) > 1 else 100
                             height = abs(d) if abs(d) > 1 else 100
                             bbox = (e, f - height, e + width, f)
@@ -2319,7 +2319,7 @@ class PDFContentAuditor:
                         continue
                     other_rect = fitz.Rect(other["rect"])
                     # Check if within 5px of current cluster
-                    expanded = cluster_rect + (-5, -5, 5, 5)
+                    expanded = (*cluster_rect, -5, -5, 5, 5)
                     if expanded.intersects(other_rect):
                         cluster_rect |= other_rect  # Union of rectangles
                         if other["fill"]:
@@ -2373,7 +2373,7 @@ class PDFContentAuditor:
             clip_rect = fitz.Rect(bbox)
 
             # Add small padding
-            clip_rect = clip_rect + (-2, -2, 2, 2)
+            clip_rect = (*clip_rect, -2, -2, 2, 2)
 
             # Render at 4x resolution for quality
             mat = fitz.Matrix(4, 4)

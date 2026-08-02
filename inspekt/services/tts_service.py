@@ -54,8 +54,8 @@ def _find_audio_player() -> tuple[str, list[str]] | None:
 def speak_text(
     text: str,
     voice_name: str | None = None,
-    on_start: callable = None,
-    on_error: callable = None,
+    on_start: callable | None = None,
+    on_error: callable | None = None,
     detached: bool = False,
 ) -> bool:
     """
@@ -194,7 +194,7 @@ def speak_text(
 
         else:
             # STREAMING MODE: Pipe directly to player for minimal latency
-            player_cmd = [player_path] + player_args
+            player_cmd = [player_path, *player_args]
             player_process = subprocess.Popen(
                 player_cmd,
                 stdin=subprocess.PIPE,
@@ -246,7 +246,7 @@ def speak_text(
 def generate_audio(
     text: str,
     voice_name: str | None = None,
-    on_progress: callable = None,
+    on_progress: callable | None = None,
 ) -> bytes:
     """
     Generate audio bytes from text using ElevenLabs API.
@@ -355,7 +355,7 @@ def play_audio_bytes(audio_bytes: bytes) -> bool:
         raise TTSError("No audio player found. Install ffmpeg (ffplay) or mpv.")
 
     player_path, player_args = player_info
-    player_cmd = [player_path] + player_args
+    player_cmd = [player_path, *player_args]
 
     try:
         player_process = subprocess.Popen(
@@ -380,9 +380,9 @@ def play_audio_bytes(audio_bytes: bytes) -> bool:
 def speak_text_async(
     text: str,
     voice_name: str | None = None,
-    on_start: callable = None,
-    on_complete: callable = None,
-    on_error: callable = None,
+    on_start: callable | None = None,
+    on_complete: callable | None = None,
+    on_error: callable | None = None,
 ) -> threading.Thread:
     """
     Convert text to speech asynchronously in a background thread.

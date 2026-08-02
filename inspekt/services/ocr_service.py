@@ -183,10 +183,7 @@ def _is_meaningful_text(
 
     # Numeric ratio check (filters "123456789" serial numbers)
     digit_count = sum(1 for c in text if c.isdigit())
-    if len(text) > 0 and (digit_count / len(text)) > max_numeric_ratio:
-        return False
-
-    return True
+    return not (len(text) > 0 and digit_count / len(text) > max_numeric_ratio)
 
 
 def _estimate_confidence(text: str, word_count: int) -> float:

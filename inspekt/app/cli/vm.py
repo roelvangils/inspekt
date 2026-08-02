@@ -300,7 +300,7 @@ def _build_image(vm_dir: Path) -> bool:
     return result.returncode == 0
 
 
-def _start_container(dev_mode: bool = False, vm_dir: Path = None) -> bool:
+def _start_container(dev_mode: bool = False, vm_dir: Path | None = None) -> bool:
     """Start the VM container.
 
     Args:

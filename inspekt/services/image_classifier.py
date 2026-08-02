@@ -18,7 +18,7 @@ import base64
 import io
 import logging
 from dataclasses import dataclass
-from enum import Enum
+from enum import Enum, StrEnum
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -27,7 +27,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class ImageCategory(str, Enum):
+class ImageCategory(StrEnum):
     """Categories for PDF images with accessibility implications."""
 
     PHOTOGRAPH = "photograph"
@@ -291,7 +291,7 @@ class ImageClassifier:
 
             # Get best prediction
             probs_list = probs[0].cpu().numpy().tolist()
-            scores = dict(zip(CLIP_CATEGORY_LABELS, probs_list))
+            scores = dict(zip(CLIP_CATEGORY_LABELS, probs_list, strict=False))
 
             best_label = max(scores, key=scores.get)
             best_score = scores[best_label]

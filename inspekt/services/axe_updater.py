@@ -245,10 +245,7 @@ class AxeUpdater:
 
             # Basic sanity check: file should contain axe-core copyright
             # and define window.axe or exports
-            if "axe" not in content or len(content) < 50000:
-                return False
-
-            return True
+            return not ("axe" not in content or len(content) < 50000)
         except OSError:
             return False
 

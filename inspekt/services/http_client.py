@@ -21,12 +21,14 @@ from __future__ import annotations
 import base64
 import json
 import os
-from collections.abc import Iterator
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import requests
 
 from inspekt.config import get_bridge_port
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 # Detect restricted mode once at import time
 _RESTRICTED = os.environ.get("INSPEKT_RESTRICTED") == "1"

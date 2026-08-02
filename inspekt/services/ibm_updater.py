@@ -258,10 +258,7 @@ class IbmUpdater:
 
             # Basic sanity check: file should contain ace namespace
             # and define the checker engine
-            if "ace" not in content.lower() or len(content) < 100000:
-                return False
-
-            return True
+            return not ("ace" not in content.lower() or len(content) < 100000)
         except OSError:
             return False
 

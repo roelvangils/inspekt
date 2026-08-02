@@ -323,7 +323,7 @@ def _render_tree(node, prefix: str = "", is_last: bool = True, filter_path: str 
         children = _filtered_children(node, filter_path)
         children = _group_duplicate_titles(children)
 
-        for i, (name, child_or_group) in enumerate(children):
+        for i, (_name, child_or_group) in enumerate(children):
             is_last_child = i == len(children) - 1
             if isinstance(child_or_group, TitleGroup):
                 _render_title_group(
@@ -378,7 +378,7 @@ def _render_tree(node, prefix: str = "", is_last: bool = True, filter_path: str 
     children = _filtered_children(node, filter_path)
     children = _group_duplicate_titles(children)
 
-    for i, (name, child_or_group) in enumerate(children):
+    for i, (_name, child_or_group) in enumerate(children):
         is_last_child = i == len(children) - 1
 
         if isinstance(child_or_group, TitleGroup):
@@ -418,7 +418,7 @@ def _render_title_group(group: TitleGroup, prefix: str, is_last: bool, lines: li
     members = sorted(group.members, key=lambda x: x[1].entry.lastmod or "", reverse=True)
     slugs = _distinguishing_slug(members)
 
-    for j, (name, node) in enumerate(members):
+    for j, (_name, node) in enumerate(members):
         is_last_member = j == len(members) - 1
         member_connector = f"{ELBOW}{DASH}{DASH} " if is_last_member else f"{TEE}{DASH}{DASH} "
 
@@ -565,7 +565,7 @@ def _detect_aliases(entries: list) -> set[str]:
     for e in entries:
         if e.etag:
             etag_groups.setdefault(e.etag, []).append(e)
-    for etag, group in etag_groups.items():
+    for _etag, group in etag_groups.items():
         if len(group) >= 2:
             for e in group[1:]:
                 alias_locs.add(e.loc)
@@ -580,7 +580,7 @@ def _distinguishing_slug(members: list[tuple[str, object]]) -> dict[str, str]:
     Returns dict mapping entry.loc to display slug (e.g., "/contact" or "/nl/page").
     """
     paths = {}
-    for name, node in members:
+    for _name, node in members:
         parsed = urlparse(node.entry.loc)
         paths[node.entry.loc] = parsed.path.rstrip("/") or "/"
 
@@ -1413,7 +1413,7 @@ def _display_where(result, origin: str, mode: str = "compact"):
     """
     from inspekt.services.sitemap_service import find_ancestors
 
-    tree, node, parent, current_path = _resolve_current_node(result, origin)
+    tree, _node, _parent, current_path = _resolve_current_node(result, origin)
     ancestors = find_ancestors(tree, current_path)
     max_width = shutil.get_terminal_size().columns - 2
 
@@ -1749,7 +1749,7 @@ def _collect_subtree_entries(node) -> list:
 
 def _display_from_here(result, origin: str, flat: bool, interactive: bool):
     """Show the subtree from the current page (--from-here)."""
-    tree, node, parent, current_path = _resolve_current_node(result, origin)
+    _tree, node, _parent, _current_path = _resolve_current_node(result, origin)
 
     subtree_entries = _collect_subtree_entries(node)
     if not subtree_entries:

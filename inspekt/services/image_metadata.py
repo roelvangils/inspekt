@@ -619,7 +619,7 @@ def format_metadata_display(metadata: dict[str, str]) -> str:
     # Track which keys we've displayed
     displayed_keys = set()
 
-    for section_name, fields in sections.items():
+    for _section_name, fields in sections.items():
         section_lines = []
         for key, display_name in fields:
             if key in metadata:

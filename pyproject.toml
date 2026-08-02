@@ -122,6 +122,13 @@ ignore = [
     "RUF002",  # Same, in docstrings
     "RUF003",  # Same, in comments
     "B904",    # raise-without-from in except — traceback chaining is cosmetic here; 160+ sites
+    # Style-preference SIM rules whose fixes would churn hundreds of lines
+    # (try/except→suppress, if/else→ternary, nested if/with collapsing)
+    # for no behavioral gain. Revisit per-file when refactoring anyway.
+    "SIM105",  # suppressible-exception
+    "SIM108",  # if-else-block-instead-of-if-exp
+    "SIM102",  # collapsible-if
+    "SIM117",  # multiple-with-statements
 ]
 
 [tool.ruff.lint.isort]

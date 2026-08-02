@@ -637,7 +637,7 @@ class SimplePDFChecker:
                     resources = page["/Resources"]
                     if "/XObject" in resources:
                         xobjects = resources["/XObject"]
-                        for key in xobjects.keys():
+                        for key in xobjects:
                             xobj = xobjects[key]
                             if "/Subtype" in xobj and str(xobj["/Subtype"]) == "/Image":
                                 has_images = True

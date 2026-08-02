@@ -172,7 +172,7 @@ def test_build_axe_context_exclude_only(mock_bridge_client):
         },
     }
 
-    context_expr, warning = _build_axe_context(
+    context_expr, _warning = _build_axe_context(
         mock_bridge_client, None, ["header", "footer"], timeout=5.0
     )
 
@@ -190,7 +190,7 @@ def test_build_axe_context_scoped_selector(mock_bridge_client):
         },
     }
 
-    context_expr, warning = _build_axe_context(
+    context_expr, _warning = _build_axe_context(
         mock_bridge_client, "main", [], timeout=5.0
     )
 
@@ -207,7 +207,7 @@ def test_build_axe_context_scoped_multiple_selectors(mock_bridge_client):
         },
     }
 
-    context_expr, warning = _build_axe_context(
+    context_expr, _warning = _build_axe_context(
         mock_bridge_client, "main,nav", [], timeout=5.0
     )
 
@@ -225,7 +225,7 @@ def test_build_axe_context_scoped_with_exclude(mock_bridge_client):
         },
     }
 
-    context_expr, warning = _build_axe_context(
+    context_expr, _warning = _build_axe_context(
         mock_bridge_client, "main", [".ad-banner"], timeout=5.0
     )
 
@@ -320,7 +320,7 @@ def test_build_axe_context_require_panel_selection_success(mock_bridge_client):
         },
     }
 
-    context_expr, warning = _build_axe_context(
+    context_expr, _warning = _build_axe_context(
         mock_bridge_client, "inspected", [], timeout=5.0, require_panel_selection=True
     )
 

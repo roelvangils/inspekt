@@ -39,12 +39,13 @@ from __future__ import annotations
 import json
 import sys
 import time
-from collections.abc import Generator
 from contextlib import contextmanager
 from dataclasses import asdict, dataclass
 from typing import TYPE_CHECKING, Literal
 
 if TYPE_CHECKING:
+    from collections.abc import Generator
+
     from inspekt.services.pdf_prescan import PDFPrescanResult
     from inspekt.services.progress_timing import TimingEstimate
 

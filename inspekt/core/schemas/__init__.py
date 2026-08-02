@@ -49,40 +49,40 @@ from inspekt.core.schemas.storage import (
 )
 
 __all__ = [
-    # Navigation
-    "NavigateParams",
-    "NavigateResponse",
-    "ReloadParams",
-    # Execution
-    "ExecuteJavaScriptParams",
-    "ExecuteJavaScriptResponse",
-    # Extraction
-    "ExtractLinksParams",
-    "ExtractLinksResponse",
-    "LinkInfo",
-    "ExtractOutlineResponse",
-    "OutlineItem",
-    "PageInfoResponse",
-    "ExtractArticleResponse",
+    "ClearConsoleLogsResponse",
     # Interaction
     "ClickElementParams",
     "ClickElementResponse",
-    "TypeTextParams",
-    "TypeTextResponse",
-    # Inspection
-    "GetPageInfoResponse",
-    "TakeScreenshotParams",
-    "TakeScreenshotResponse",
-    # Storage
-    "GetSelectedTextParams",
-    "GetSelectedTextResponse",
+    "ConsoleEntry",
     "CookieInfo",
-    "GetCookiesResponse",
-    "SetCookieParams",
-    "SetCookieResponse",
+    # Execution
+    "ExecuteJavaScriptParams",
+    "ExecuteJavaScriptResponse",
+    "ExtractArticleResponse",
+    # Extraction
+    "ExtractLinksParams",
+    "ExtractLinksResponse",
+    "ExtractOutlineResponse",
     # Debugging
     "GetConsoleLogsParams",
     "GetConsoleLogsResponse",
-    "ConsoleEntry",
-    "ClearConsoleLogsResponse",
+    "GetCookiesResponse",
+    # Inspection
+    "GetPageInfoResponse",
+    # Storage
+    "GetSelectedTextParams",
+    "GetSelectedTextResponse",
+    "LinkInfo",
+    # Navigation
+    "NavigateParams",
+    "NavigateResponse",
+    "OutlineItem",
+    "PageInfoResponse",
+    "ReloadParams",
+    "SetCookieParams",
+    "SetCookieResponse",
+    "TakeScreenshotParams",
+    "TakeScreenshotResponse",
+    "TypeTextParams",
+    "TypeTextResponse",
 ]

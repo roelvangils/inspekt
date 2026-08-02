@@ -721,12 +721,15 @@ def generate_pdf_report(
                 from contextlib import nullcontext
                 return nullcontext()
 
-        print_substep = lambda msg: None  # Substeps handled differently now
+        def print_substep(msg):
+            return None  # Substeps handled differently now
     else:
         # No-op when progress is disabled
         from contextlib import nullcontext
-        run_step = lambda idx: nullcontext()
-        print_substep = lambda msg: None
+        def run_step(idx):
+            return nullcontext()
+        def print_substep(msg):
+            return None
         checklist = None
 
     # Generate executive summary section (accessibility score)
@@ -3449,7 +3452,7 @@ def _get_structure_tree_js() -> str:
 def _generate_structure_tree_section(
     pdf_path: Path | str,
     config: dict,
-    progress_callback: callable = None,
+    progress_callback: callable | None = None,
 ) -> str:
     """Generate the structure tree visualization section.
 
@@ -4635,7 +4638,7 @@ def _generate_interactive_preview_section(
 def _generate_content_audit_section(
     pdf_path: Path | str,
     config: dict,
-    run_step: callable = None,
+    run_step: callable | None = None,
 ) -> str:
     """Generate the content audit section (images, tables, forms, links).
 
@@ -4650,7 +4653,8 @@ def _generate_content_audit_section(
     # Create no-op run_step if not provided
     if run_step is None:
         from contextlib import nullcontext
-        run_step = lambda idx: nullcontext()
+        def run_step(idx):
+            return nullcontext()
 
     try:
         from inspekt.services.pdf_content_auditor import PDFContentAuditor

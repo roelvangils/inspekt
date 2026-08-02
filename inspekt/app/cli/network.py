@@ -60,7 +60,7 @@ def _truncate(s: str, max_len: int) -> str:
     return s[: max_len - 3] + "…"
 
 
-def _display_table(entries: list, show_domain: bool = False, summary: dict = None):
+def _display_table(entries: list, show_domain: bool = False, summary: dict | None = None):
     """Display network entries in a formatted ASCII table with auto-width columns."""
     if not entries:
         click.echo("No network requests found.", err=True)
@@ -116,7 +116,7 @@ def _display_table(entries: list, show_domain: bool = False, summary: dict = Non
     table.set_data(rows)
     table.print_header()
 
-    for values, colors in zip(rows, row_colors):
+    for values, colors in zip(rows, row_colors, strict=False):
         table.print_row(values, colors)
 
     # Print summary row with totals
@@ -733,7 +733,7 @@ def _display_har_table(entries: list, show_domain: bool = False, show_status: bo
     table.set_data(rows)
     table.print_header()
 
-    for values, colors in zip(rows, row_colors):
+    for values, colors in zip(rows, row_colors, strict=False):
         table.print_row(values, colors)
 
     # Print summary row with totals

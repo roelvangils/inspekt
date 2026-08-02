@@ -21,7 +21,6 @@ from typing import TYPE_CHECKING
 
 from PIL import Image
 
-from inspekt.core.commands.base import EmptyParams
 from inspekt.core.schemas.ai import (
     AskParams,
     AskResponse,
@@ -41,6 +40,7 @@ from inspekt.core.schemas.ai import (
 if TYPE_CHECKING:
     from pathlib import Path
 
+    from inspekt.core.commands.base import EmptyParams
     from inspekt.services.bridge_executor import BridgeExecutor
     from inspekt.services.script_loader import ScriptLoader
 
@@ -949,7 +949,7 @@ def _optimize_screenshot_for_ai(data_url: str, max_size: int = 1024, quality: in
             logger.warning("Invalid data URL format, returning as-is")
             return data_url
 
-        header, base64_data = data_url.split(";base64,", 1)
+        _header, base64_data = data_url.split(";base64,", 1)
 
         # Decode base64
         image_bytes = base64.b64decode(base64_data)
@@ -1014,7 +1014,7 @@ def _optimize_screenshot_for_report(data_url: str) -> str:
             logger.warning("Invalid data URL format, returning as-is")
             return data_url
 
-        header, base64_data = data_url.split(";base64,", 1)
+        _header, base64_data = data_url.split(";base64,", 1)
 
         # Decode base64
         image_bytes = base64.b64decode(base64_data)

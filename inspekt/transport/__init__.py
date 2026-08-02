@@ -45,25 +45,25 @@ from .unix_socket import (
 )
 
 __all__ = [
-    # Base classes and types
-    "Transport",
-    "SyncTransport",
+    "ConnectionError",
     "Request",
     "Response",
-    "TransportError",
-    "ConnectionError",
-    "TimeoutError",
-    # Unix socket transport
-    "UnixSocketTransport",
+    "SyncTCPTransport",
+    "SyncTransport",
     "SyncUnixSocketTransport",
-    "get_socket_path",
     # TCP transport
     "TCPTransport",
-    "SyncTCPTransport",
+    "TimeoutError",
+    # Base classes and types
+    "Transport",
+    "TransportError",
+    # Unix socket transport
+    "UnixSocketTransport",
+    "get_default_transport",
+    "get_server_address",
+    "get_socket_path",
     "get_tcp_port",
     # Factory functions
     "get_transport",
-    "get_default_transport",
-    "get_server_address",
     "is_server_available",
 ]

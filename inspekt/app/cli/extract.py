@@ -218,7 +218,9 @@ def _process_tts_chunks(
             if is_first_chunk:
                 # First chunk: Use speak_text() for progressive streaming
                 # Start prefetching chunk 2 when audio begins playing
-                def start_prefetch():
+                # Bind next_chunk at definition time: on_start fires while audio
+                # plays, possibly after the loop has moved to the next chunk
+                def start_prefetch(next_chunk=next_chunk):
                     nonlocal prefetch_future
                     if next_chunk:
                         prefetch_future = executor.submit(generate_audio, next_chunk, voice_name)
@@ -1002,9 +1004,7 @@ def images(
             return False
         if min_height > 0 and height < min_height:
             return False
-        if max_height and height > max_height:
-            return False
-        return True
+        return not (max_height and height > max_height)
 
     filtered_images = [img for img in all_images if passes_dimension_filter(img)]
 
@@ -1507,7 +1507,7 @@ def images(
             # Inline thumbnails as data URIs and set full_src override per image.
             import base64
             import mimetypes
-            for gimg, r in zip(gallery_images, successful):
+            for gimg, r in zip(gallery_images, successful, strict=False):
                 thumb_path = r.get("thumb_path")
                 if thumb_path and thumb_path.exists():
                     thumb_bytes = thumb_path.read_bytes()

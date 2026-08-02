@@ -249,20 +249,20 @@ def load_google_fonts() -> dict[str, str]:
 
 
 __all__ = [
+    "get_act_aligned_count",
+    "get_engine_color",
+    "get_engine_display_name",
+    "get_engine_metadata",
+    "get_engine_provider",
+    "get_pdf_tool",
+    "get_rule_count",
+    "list_engine_ids",
+    "list_pdf_tool_ids",
     # Engine metadata
     "load_engine_metadata",
-    "get_engine_metadata",
-    "list_engine_ids",
-    "get_engine_display_name",
-    "get_engine_provider",
-    "get_engine_color",
     "load_engine_rules",
-    "get_rule_count",
-    "get_act_aligned_count",
-    # PDF tools
-    "load_pdf_tools",
-    "get_pdf_tool",
-    "list_pdf_tool_ids",
     # Google Fonts
     "load_google_fonts",
+    # PDF tools
+    "load_pdf_tools",
 ]

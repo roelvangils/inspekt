@@ -10,10 +10,11 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from inspekt.services.pdf_checker import VeraPDFViolation
     from inspekt.services.pdf_renderer import PDFRenderer
     from inspekt.services.pdf_report_assets import PDFReportAssets

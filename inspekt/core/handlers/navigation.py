@@ -11,7 +11,6 @@ import asyncio
 import logging
 from typing import TYPE_CHECKING
 
-from inspekt.core.commands.base import EmptyParams
 from inspekt.core.schemas.navigation import (
     NavigateParams,
     NavigateResponse,
@@ -19,6 +18,7 @@ from inspekt.core.schemas.navigation import (
 )
 
 if TYPE_CHECKING:
+    from inspekt.core.commands.base import EmptyParams
     from inspekt.core.schemas.navigation import SitemapParams, SitemapResponse
     from inspekt.services.bridge_executor import BridgeExecutor
 

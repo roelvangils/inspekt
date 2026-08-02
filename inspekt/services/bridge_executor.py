@@ -14,13 +14,15 @@ from __future__ import annotations
 import os
 import sys
 import time
-from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import click
 
 from inspekt.client import BridgeClient
 from inspekt.config import get_bridge_port
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def _verbose_log(message: str, data: Any = None) -> None:
@@ -41,7 +43,7 @@ class BridgeExecutor:
     def __init__(
         self,
         host: str = "127.0.0.1",
-        port: int = None,
+        port: int | None = None,
         max_retries: int = 3,
         retry_delay: float = 0.5,
     ):
@@ -114,7 +116,7 @@ class BridgeExecutor:
         retry_on_timeout: bool = False,
         skip_domain_check: bool = False,
         fast_poll: bool = False,
-        instance: str = None,
+        instance: str | None = None,
     ) -> dict[str, Any]:
         """
         Execute JavaScript code in browser with error handling and optional retries.
@@ -564,7 +566,7 @@ _default_executor: BridgeExecutor | None = None
 
 def get_executor(
     host: str = "127.0.0.1",
-    port: int = None,
+    port: int | None = None,
     max_retries: int = 3,
 ) -> BridgeExecutor:
     """

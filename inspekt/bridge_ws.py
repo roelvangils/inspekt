@@ -1272,7 +1272,7 @@ async def websocket_handler(request):
     return ws
 
 
-async def send_code_to_browser(code: str, browser_index: int = None) -> str:
+async def send_code_to_browser(code: str, browser_index: int | None = None) -> str:
     """Send code to browser for execution. Returns request_id.
 
     Args:
@@ -1287,7 +1287,7 @@ async def send_code_to_browser(code: str, browser_index: int = None) -> str:
 async def send_code_to_browser_with_id(
     code: str,
     request_id: str,
-    browser_index: int = None,
+    browser_index: int | None = None,
     target_ws: Any = None
 ) -> None:
     """Send code to browser for execution with a pre-generated request_id.
@@ -2238,7 +2238,7 @@ async def handle_http_domain_sync(request):
         # We don't need ALL browsers to respond, just confirmation from at least one
         try:
             # Wait for first response
-            done, pending_tasks = await asyncio.wait(
+            _done, pending_tasks = await asyncio.wait(
                 [asyncio.create_task(e.wait()) for _, e, _ in events],
                 timeout=10.0,
                 return_when=asyncio.FIRST_COMPLETED

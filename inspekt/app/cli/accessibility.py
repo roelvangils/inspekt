@@ -98,7 +98,7 @@ def _is_engine_loaded(client, engine: str) -> bool:
     check_code = f"window.__inspektIsEngineLoaded__ ? window.__inspektIsEngineLoaded__('{engine}') : false"
     try:
         result = client.execute(check_code, timeout=2.0)
-        return result.get("ok") and result.get("result") == True
+        return result.get("ok") and result.get("result")
     except Exception:
         return False
 
@@ -953,7 +953,7 @@ def _format_table_output(violations: list[dict], url: str, summary: dict, compac
     table.set_data(rows)
     table.print_header()
 
-    for row_data, colors in zip(rows, row_colors):
+    for row_data, colors in zip(rows, row_colors, strict=False):
         table.print_row(row_data, colors)
 
     # Summary row
@@ -1325,7 +1325,7 @@ def _format_ibm_table_output(issues, summary, url, compact=False):
     table.set_data(rows)
     table.print_header()
 
-    for row_data, colors in zip(rows, row_colors):
+    for row_data, colors in zip(rows, row_colors, strict=False):
         table.print_row(row_data, colors)
 
     # Summary row
@@ -3479,7 +3479,7 @@ def _calculate_engine_correlation(consolidated: dict, engine_list: list[str]) ->
     total = 0
     full_agreement = 0
 
-    for sc, data in consolidated.items():
+    for _sc, data in consolidated.items():
         statuses = []
         for eng in engine_list:
             status = data.get(f"{eng}_status", "pass")
@@ -3719,7 +3719,7 @@ def _print_pivoted_results_table(
     table.set_data(rows)
     table.print_header()
 
-    for idx, (row_data, colors) in enumerate(zip(rows, row_colors)):
+    for idx, (row_data, colors) in enumerate(zip(rows, row_colors, strict=False)):
         table.print_row(row_data, colors)
         # Add separator between SC groups for readability (multi-engine only)
         if idx in separator_after:
@@ -3899,7 +3899,7 @@ def _print_recommendations_section(engine_results: dict, engine_list: list[str])
     table = Table(headers, alignments=alignments, title=title, icon=icon)
     table.set_data(rows)
     table.print_header()
-    for row_data, colors in zip(rows, row_colors):
+    for row_data, colors in zip(rows, row_colors, strict=False):
         table.print_row(row_data, colors)
     table.print_footer()
 
@@ -4162,7 +4162,7 @@ def _print_engine_rule_tables(engine_results: dict, engine_list: list[str]) -> N
             table = Table(headers, alignments=alignments, title=title)
             table.set_data(rows)
             table.print_header()
-            for row_data, colors in zip(rows, row_colors):
+            for row_data, colors in zip(rows, row_colors, strict=False):
                 table.print_row(row_data, colors)
             summary_row = [f"{len(violations)} rules", "", str(total_count), ""]
             table.print_summary(summary_row)
@@ -4203,7 +4203,7 @@ def _print_engine_rule_tables(engine_results: dict, engine_list: list[str]) -> N
             table = Table(headers, alignments=alignments, title=title)
             table.set_data(rows)
             table.print_header()
-            for row_data, colors in zip(rows, row_colors):
+            for row_data, colors in zip(rows, row_colors, strict=False):
                 table.print_row(row_data, colors)
             summary_row = [f"{len(rule_groups)} rules", "", str(total_count), ""]
             table.print_summary(summary_row)
@@ -4241,7 +4241,7 @@ def _print_engine_rule_tables(engine_results: dict, engine_list: list[str]) -> N
             table = Table(headers, alignments=alignments, title=title)
             table.set_data(rows)
             table.print_header()
-            for row_data, colors in zip(rows, row_colors):
+            for row_data, colors in zip(rows, row_colors, strict=False):
                 table.print_row(row_data, colors)
             summary_row = [f"{len(code_groups)} rules", "", str(total_count), ""]
             table.print_summary(summary_row)
@@ -4280,7 +4280,7 @@ def _print_engine_rule_tables(engine_results: dict, engine_list: list[str]) -> N
             table = Table(headers, alignments=alignments, title=title)
             table.set_data(rows)
             table.print_header()
-            for row_data, colors in zip(rows, row_colors):
+            for row_data, colors in zip(rows, row_colors, strict=False):
                 table.print_row(row_data, colors)
             summary_row = [f"{len(rule_groups)} rules", "", str(total_count), ""]
             table.print_summary(summary_row)
@@ -4381,7 +4381,7 @@ def _show_engine_list():
     table = Table(headers, alignments=alignments, title="Available Accessibility Engines", icon="\uf085")
     table.set_data(rows)
     table.print_header()
-    for row_data, colors in zip(rows, row_colors):
+    for row_data, colors in zip(rows, row_colors, strict=False):
         table.print_row(row_data, colors)
     table.print_footer()
 
@@ -5014,7 +5014,7 @@ def a11y(engines, list_engines, level, output_format, json_flag, timeout, show_p
     def count_filtered_violations(engine: str) -> int:
         """Count violations for an engine from the level-filtered consolidated results."""
         count = 0
-        for sc, data in consolidated.items():
+        for _sc, data in consolidated.items():
             status = data.get(f"{engine}_status", "pass")
             sc_count = data.get(f"{engine}_count", 0)
             # Count violations and potential violations
@@ -5023,7 +5023,6 @@ def a11y(engines, list_engines, level, output_format, json_flag, timeout, show_p
         return count
 
     if output_format in ("json", "html"):
-        from pathlib import Path
         enriched = _build_enriched_report_data(
             url=url,
             level=level,
@@ -5271,7 +5270,7 @@ def a11y(engines, list_engines, level, output_format, json_flag, timeout, show_p
         table = Table(headers, alignments=alignments, title="Disagreements", icon=get_status_icon("warning"))
         table.set_data(rows)
         table.print_header()
-        for row_data, colors in zip(rows, row_colors):
+        for row_data, colors in zip(rows, row_colors, strict=False):
             table.print_row(row_data, colors)
         table.print_footer()
 
@@ -5310,7 +5309,7 @@ def a11y(engines, list_engines, level, output_format, json_flag, timeout, show_p
         table = Table(headers, alignments=alignments, title="Disparities", icon=get_status_icon("review"))
         table.set_data(rows)
         table.print_header()
-        for row_data, colors in zip(rows, row_colors):
+        for row_data, colors in zip(rows, row_colors, strict=False):
             table.print_row(row_data, colors)
         table.print_footer()
 

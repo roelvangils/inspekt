@@ -47,7 +47,7 @@ def _check_engine_updates():
         engine_display = f"{engine.engine_name}{provider_suffix}"
 
         try:
-            update_available, current, latest, release_date = engine.is_update_available()
+            update_available, current, latest, _release_date = engine.is_update_available()
 
             if not latest:
                 # Network error - show concise error status

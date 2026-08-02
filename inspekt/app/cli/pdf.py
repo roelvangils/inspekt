@@ -115,7 +115,7 @@ def _print_basic_results(result: PDFBasicResult, verbose: bool = False) -> None:
     table.set_data(rows)
     table.print_header()
 
-    for i, check in enumerate(result.checks):
+    for _i, check in enumerate(result.checks):
         status_str = _format_status(check.status)
 
         # Color the check name by severity if it failed
@@ -201,7 +201,7 @@ def _print_simple_results(result: SimplePDFResult, verbose: bool = False) -> Non
     table.set_data(rows)
     table.print_header()
 
-    for i, check in enumerate(result.checks):
+    for _i, check in enumerate(result.checks):
         status_str = _format_status(check.status)
 
         # Color the check name by severity if it failed
@@ -787,7 +787,6 @@ def check(ctx, files: tuple[str, ...], engine: str, profile: str, json_output: b
 
         # Tag visualization options (Phase 2) - DEPRECATED
         if show_tags:
-            from inspekt.app.cli.table import print_warning
             print_warning("--show-tags is deprecated. Interactive Preview (enabled by default) provides a better experience.")
             config_overrides["show-tags"] = True
         if tag_pages:

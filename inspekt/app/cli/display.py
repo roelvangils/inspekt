@@ -41,7 +41,7 @@ def _zoom_label(percentage: int) -> str | None:
 
 def _viewport_label(width: int) -> str | None:
     """Get a human-readable label for well-known viewport widths."""
-    for name, (w, _h, desc) in VIEWPORT_PRESETS.items():
+    for _name, (w, _h, desc) in VIEWPORT_PRESETS.items():
         if w == width:
             return desc
     return None

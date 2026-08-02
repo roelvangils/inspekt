@@ -648,7 +648,7 @@ def _describe_assertion(expect: dict) -> str:
     return ""
 
 
-def _describe_condition(skip_if: dict = None, wait_for: dict = None) -> str:
+def _describe_condition(skip_if: dict | None = None, wait_for: dict | None = None) -> str:
     """Generate condition context for step comment.
 
     Returns prefix/suffix for skip_if or wait_for conditions.
@@ -1706,7 +1706,6 @@ def get_recording_metadata(filepath: Path) -> dict | None:
         assertions = sum(1 for s in steps if s.get("expect"))
 
         # Get file modification time
-        import os
         from datetime import datetime
         mtime = os.path.getmtime(filepath)
         modified_at = datetime.fromtimestamp(mtime)
@@ -3083,7 +3082,6 @@ def record(
         INACTIVITY_STOP_SECONDS = 60
 
         # Debug mode - set INSPEKT_DEBUG=1 to enable
-        import os
         debug_mode = os.environ.get("INSPEKT_DEBUG") == "1"
 
         def debug_log(msg: str):

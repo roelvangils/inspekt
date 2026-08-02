@@ -7,14 +7,17 @@ Implements: get_console_logs, clear_console_logs
 from __future__ import annotations
 
 import logging
+from typing import TYPE_CHECKING
 
-from inspekt.core.commands.base import EmptyParams
 from inspekt.core.schemas.debugging import (
     ClearConsoleLogsResponse,
     ConsoleEntry,
     GetConsoleLogsParams,
     GetConsoleLogsResponse,
 )
+
+if TYPE_CHECKING:
+    from inspekt.core.commands.base import EmptyParams
 
 logger = logging.getLogger(__name__)
 

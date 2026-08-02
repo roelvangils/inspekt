@@ -351,7 +351,7 @@ class StateMirror:
         # Build injection script for localStorage
         storage_script_parts = []
 
-        for origin, data in state.local_storage.items():
+        for _origin, data in state.local_storage.items():
             if data:
                 escaped_data = json.dumps(data)
                 storage_script_parts.append(f"""
@@ -365,7 +365,7 @@ class StateMirror:
                     }}
                 """)
 
-        for origin, data in state.session_storage.items():
+        for _origin, data in state.session_storage.items():
             if data:
                 escaped_data = json.dumps(data)
                 storage_script_parts.append(f"""

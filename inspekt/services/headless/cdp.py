@@ -9,10 +9,12 @@ import asyncio
 import base64
 import json
 from collections.abc import Callable
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import websockets
-from websockets.client import WebSocketClientProtocol
+
+if TYPE_CHECKING:
+    from websockets.client import WebSocketClientProtocol
 
 
 class CDPError(Exception):

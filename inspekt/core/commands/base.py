@@ -7,13 +7,13 @@ CLI, API, and MCP interfaces are generated from these definitions.
 
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import Enum, StrEnum
 from typing import Any, Literal
 
 from pydantic import BaseModel
 
 
-class Category(str, Enum):
+class Category(StrEnum):
     """Command categories for organization and display."""
 
     NAVIGATION = "Navigation"

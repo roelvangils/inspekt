@@ -154,7 +154,7 @@ class TestCoordinateTransformation:
         pdf_bbox = (100.0, 100.0, 200.0, 200.0)  # Bottom-left corner box
 
         # Transform Y coordinates
-        x1, y1, x2, y2 = pdf_bbox
+        _x1, y1, _x2, y2 = pdf_bbox
         img_y1 = page_height - max(y1, y2)  # 792 - 200 = 592
         img_y2 = page_height - min(y1, y2)  # 792 - 100 = 692
 

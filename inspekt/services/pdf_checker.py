@@ -308,7 +308,7 @@ def _extract_custom_metadata(info) -> dict | None:
 
     custom = {}
     try:
-        for key in info.keys():
+        for key in info:
             key_str = str(key)
             if key_str not in standard_fields:
                 value = info.get(key)
@@ -1066,7 +1066,7 @@ class PDFBasicChecker:
                     resources = page["/Resources"]
                     if "/XObject" in resources:
                         xobjects = resources["/XObject"]
-                        for key in xobjects.keys():
+                        for key in xobjects:
                             xobj = xobjects[key]
                             if "/Subtype" in xobj and str(xobj["/Subtype"]) == "/Image":
                                 has_images = True

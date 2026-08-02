@@ -172,7 +172,7 @@ def _format_json_cookie_value(name: str, parsed_value, indent: int = 0) -> list[
 
     if isinstance(parsed_value, dict):
         # Calculate max key length for alignment
-        max_key_len = max(len(str(k)) for k in parsed_value.keys()) if parsed_value else 0
+        max_key_len = max(len(str(k)) for k in parsed_value) if parsed_value else 0
 
         for i, (key, val) in enumerate(parsed_value.items()):
             # Format the value

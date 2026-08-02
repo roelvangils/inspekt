@@ -113,7 +113,7 @@ class SocketClientMixin:
         except (TransportConnectionError, TransportTimeoutError):
             return None
 
-    def _socket_run(self, code: str, timeout: float = 10.0, browser_index: int = None, instance: str = None) -> dict[str, Any]:
+    def _socket_run(self, code: str, timeout: float = 10.0, browser_index: int | None = None, instance: str | None = None) -> dict[str, Any]:
         """Execute code via socket transport.
 
         Args:
@@ -204,7 +204,7 @@ class SocketClientMixin:
 class BridgeClient(SocketClientMixin):
     """Client for communicating with Inspekt server."""
 
-    def __init__(self, host: str = "127.0.0.1", port: int = None):
+    def __init__(self, host: str = "127.0.0.1", port: int | None = None):
         # Allow override via environment variable (for VM isolation)
         # INSPEKT_BRIDGE_URL takes precedence, then INSPEKT_BRIDGE_PORT,
         # then auto-detect based on environment (VM vs normal)
@@ -431,7 +431,7 @@ class BridgeClient(SocketClientMixin):
             return 0
         return status.get("connected_browsers", 0)
 
-    def execute(self, code: str, timeout: float = 10.0, _skip_domain_check: bool = False, browser_index: int = None, _fast_poll: bool = False, instance: str = None) -> dict[str, Any]:
+    def execute(self, code: str, timeout: float = 10.0, _skip_domain_check: bool = False, browser_index: int | None = None, _fast_poll: bool = False, instance: str | None = None) -> dict[str, Any]:
         """
         Execute JavaScript code in the browser and wait for result.
 
@@ -704,7 +704,7 @@ class BridgeClient(SocketClientMixin):
 
                                     if csp_result.status_code == 200:
                                         csp_data = csp_result.json()
-                                        if csp_data.get("status") == "completed" and csp_data.get("result") == True:
+                                        if csp_data.get("status") == "completed" and csp_data.get("result"):
                                             raise RuntimeError(
                                                 "Content Security Policy (CSP) is blocking Inspekt on this site.\n\n"
                                                 "This website has security restrictions that prevent WebSocket connections "

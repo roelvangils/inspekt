@@ -259,7 +259,9 @@ def _process_tts_chunks(
             if is_first_chunk:
                 # First chunk: Use speak_text() for progressive streaming
                 # Start prefetching chunk 2 when audio begins playing
-                def start_prefetch():
+                # Bind next_chunk at definition time: on_start fires while audio
+                # plays, possibly after the loop has moved to the next chunk
+                def start_prefetch(next_chunk=next_chunk):
                     nonlocal prefetch_future
                     if next_chunk:
                         prefetch_future = executor.submit(generate_audio, next_chunk, voice_name)

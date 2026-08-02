@@ -498,7 +498,7 @@ def _display_robots_txt(data: dict[str, Any], show_validation: bool = False):
         table.set_data(rows)
         table.print_header()
 
-        for idx, (row, colors) in enumerate(zip(rows, row_colors)):
+        for idx, (row, colors) in enumerate(zip(rows, row_colors, strict=False)):
             table.print_row(row, colors)
             if idx + 1 in separator_indices:
                 table.print_separator()
@@ -547,7 +547,7 @@ def _display_robots_txt(data: dict[str, Any], show_validation: bool = False):
             val_table.set_data(val_rows)
             val_table.print_header()
 
-            for row, colors in zip(val_rows, val_colors):
+            for row, colors in zip(val_rows, val_colors, strict=False):
                 val_table.print_row(row, colors)
 
             val_table.print_footer()

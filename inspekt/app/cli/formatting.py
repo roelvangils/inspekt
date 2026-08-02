@@ -469,10 +469,7 @@ def format_step_for_display(
                     "number": "Native Number Spinner",
                     "color": "Native Color Picker"
                 }
-                if input_type in native_control_names:
-                    display_name = native_control_names[input_type]
-                else:
-                    display_name = accessible_name
+                display_name = native_control_names.get(input_type, accessible_name)
             else:
                 display_name = accessible_name
 
@@ -810,7 +807,7 @@ def format_skipped_step_for_display(
     elif action == "keypress":
         key = step.get("key", "")
         modifiers = step.get("modifiers", [])
-        details = "+".join(modifiers + [key]) if modifiers else key
+        details = "+".join([*modifiers, key]) if modifiers else key
     elif action == "select":
         option_text = step.get("option_text", "") or step.get("value", "")
         details = f'"{option_text}"' if option_text else ""
@@ -918,7 +915,7 @@ def format_paused_step_for_display(
     elif action == "keypress":
         key = step.get("key", "")
         modifiers = step.get("modifiers", [])
-        details = "+".join(modifiers + [key]) if modifiers else key
+        details = "+".join([*modifiers, key]) if modifiers else key
     elif action == "select":
         option_text = step.get("option_text", "") or step.get("value", "")
         details = f'"{option_text}"' if option_text else ""

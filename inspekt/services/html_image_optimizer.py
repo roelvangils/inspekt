@@ -15,12 +15,15 @@ from __future__ import annotations
 import base64
 import io
 import re
-from collections.abc import Callable
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from PIL import Image
 
 from inspekt.services.image_optimizer import is_oxipng_installed, optimize_png_data
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 
 @dataclass

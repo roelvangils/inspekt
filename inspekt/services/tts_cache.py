@@ -214,7 +214,7 @@ class TTSCache:
             best_similarity = 0.0
 
             for row in rows:
-                cache_id, cached_text, audio_path, audio_size, created_at, hit_count = row
+                cache_id, cached_text, audio_path, _audio_size, created_at, hit_count = row
 
                 similarity = self.calculate_similarity(text, cached_text)
                 if similarity >= threshold and similarity > best_similarity:

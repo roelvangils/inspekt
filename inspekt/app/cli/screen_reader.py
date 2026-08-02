@@ -616,7 +616,7 @@ def _print_single_sr(result, screen_reader, show=None):
     data_rows = [r for r, is_detail in display_rows if not is_detail]
     table.set_data(data_rows)
     table.print_header()
-    for row, is_detail in display_rows:
+    for row, _is_detail in display_rows:
         table.print_row(row)
     table.print_footer()
 

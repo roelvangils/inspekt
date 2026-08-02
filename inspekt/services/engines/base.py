@@ -13,17 +13,19 @@ import shutil
 import tempfile
 import time
 from abc import ABC, abstractmethod
-from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import requests
 from packaging import version
 
 from inspekt.services import http_client
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 # Cache TTL for npm version checks (1 day)
 _VERSION_CACHE_TTL = 86400
@@ -436,10 +438,7 @@ class AccessibilityEngine(ABC):
 
             if self.validation_marker.lower() not in content.lower():
                 return False
-            if len(content) < self.min_file_size:
-                return False
-
-            return True
+            return not len(content) < self.min_file_size
         except OSError:
             return False
 

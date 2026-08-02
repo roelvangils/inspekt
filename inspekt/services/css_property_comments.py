@@ -22,9 +22,12 @@ from __future__ import annotations
 
 import random
 import re
-from collections.abc import Callable
 from functools import lru_cache
 from re import Pattern
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 # =============================================================================
 # EXACT MATCH COMMENTS

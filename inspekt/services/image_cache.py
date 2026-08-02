@@ -11,12 +11,15 @@ Provides:
 from __future__ import annotations
 
 import hashlib
-from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
+from typing import TYPE_CHECKING
 from urllib.parse import urlparse
 
 from inspekt.services import http_client
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 
 class ImageCache:

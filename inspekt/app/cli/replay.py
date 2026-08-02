@@ -795,7 +795,7 @@ class ReplayResult:
     def add_success(self, step_index: int, step: dict):
         self.passed_steps += 1
 
-    def add_failure(self, step_index: int, step: dict, error: str, assertion_failures: list[str] = None):
+    def add_failure(self, step_index: int, step: dict, error: str, assertion_failures: list[str] | None = None):
         self.failed_steps += 1
         failure = {
             "step": step_index + 1,
@@ -1235,7 +1235,7 @@ def run_inspekt_command(command: str) -> dict:
     try:
         # Split command into parts
         parts = command.split()
-        full_command = ["python", "-m", "inspekt"] + parts
+        full_command = ["python", "-m", "inspekt", *parts]
 
         result = subprocess.run(
             full_command,
@@ -4458,7 +4458,7 @@ def replay(
                 encode_result = encode_replay_video(
                     frames=frames,
                     output_path=str(resolved_video_path),
-                    fps=int(round(real_fps)),  # Use calculated FPS for correct playback
+                    fps=round(real_fps),  # Use calculated FPS for correct playback
                     format=output_format,
                     progress_callback=None,  # No progress output
                     crop_top=0,  # Action screenshots don't include banner, no cropping needed

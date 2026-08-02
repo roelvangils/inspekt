@@ -19,13 +19,15 @@ Example:
 from __future__ import annotations
 
 import functools
-from collections.abc import Callable
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from urllib.parse import quote
 
 import click
 
 from inspekt.app.cli.table import print_hint
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 
 def make_url_link(url: str, display_text: str | None = None) -> str:

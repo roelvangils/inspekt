@@ -3062,13 +3062,13 @@ def screenshot_node(selector, output, margin, margin_color, disable_compression,
                     # Use JavaScript to force pseudo-state via extension
                     force_code = f"""(async function() {{
                         const requestId = 'pseudo-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
-    
+
                         return new Promise((resolve) => {{
                             const timeout = setTimeout(() => {{
                                 window.removeEventListener('message', handler);
                                 resolve({{ ok: false, error: 'Pseudo-state request timed out' }});
                             }}, 10000);
-    
+
                             const handler = (event) => {{
                                 if (event.source !== window) return;
                                 const msg = event.data;
@@ -3080,7 +3080,7 @@ def screenshot_node(selector, output, margin, margin_color, disable_compression,
                                     resolve(msg.response);
                                 }}
                             }};
-    
+
                             window.addEventListener('message', handler);
                             window.postMessage({{
                                 type: 'INSPEKT_FORCE_PSEUDO_STATE',
@@ -3109,12 +3109,12 @@ def screenshot_node(selector, output, margin, margin_color, disable_compression,
                             const element = selector
                                 ? document.querySelector(selector)
                                 : window.__INSPEKT_INSPECTED_ELEMENT__;
-    
+
                             if (!element) return {{ ok: false, error: 'No element found' }};
-    
+
                             element.dataset.inspektPseudoState = state;
                             const stateRegex = new RegExp(':' + state + '(?![a-zA-Z-])', 'g');
-    
+
                             // Calculate CSS specificity (simplified: count IDs, classes, elements)
                             function getSpecificity(sel) {{
                                 const ids = (sel.match(/#[a-zA-Z][a-zA-Z0-9_-]*/g) || []).length;
@@ -3124,9 +3124,9 @@ def screenshot_node(selector, output, margin, margin_color, disable_compression,
                                 const elements = (sel.match(/^[a-zA-Z]+|\\s+[a-zA-Z]+/g) || []).length;
                                 return ids * 10000 + (classes + attrs + pseudoClasses) * 100 + elements;
                             }}
-    
+
                             const collectedRules = [];
-    
+
                             for (const sheet of document.styleSheets) {{
                                 try {{
                                     for (const rule of sheet.cssRules) {{
@@ -3155,18 +3155,18 @@ def screenshot_node(selector, output, margin, margin_color, disable_compression,
                                     }}
                                 }} catch (e) {{}}
                             }}
-    
+
                             // Sort by specificity (lowest first, so highest specificity rules come last and win)
                             collectedRules.sort((a, b) => a.specificity - b.specificity);
                             const injectedRules = collectedRules.map(r => r.css);
-    
+
                             if (injectedRules.length > 0) {{
                                 const style = document.createElement('style');
                                 style.id = 'inspekt-pseudo-state-override';
                                 style.textContent = injectedRules.join('\\n');
                                 document.head.appendChild(style);
                             }}
-    
+
                             return {{ ok: true, method: 'css-injection', rulesInjected: injectedRules.length }};
                         }})()"""
 
@@ -3209,13 +3209,13 @@ def screenshot_node(selector, output, margin, margin_color, disable_compression,
                             source: 'inspekt-page',
                             requestId: requestId
                         }, '*');
-    
+
                         // Clear CSS injection
                         const el = document.querySelector('[data-inspekt-pseudo-state]');
                         if (el) delete el.dataset.inspektPseudoState;
                         const style = document.getElementById('inspekt-pseudo-state-override');
                         if (style) style.remove();
-    
+
                         return { ok: true };
                     })()"""
                     executor.execute(clear_code, timeout=5.0)
