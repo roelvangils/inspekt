@@ -3685,42 +3685,13 @@ async def handle_http_proxy(request):
         )
 
 
-async def main(enable_socket: bool = True, socket_path_override: str | None = None):
-    """Start HTTP, WebSocket, and Unix socket servers.
+def create_app() -> web.Application:
+    """Build the aiohttp application with all HTTP/WS routes registered.
 
-    Args:
-        enable_socket: Whether to start the Unix socket server
-        socket_path_override: Optional explicit socket path
+    Kept separate from main() so tests can run the app on an ephemeral port
+    via aiohttp's TestServer without the socket server, script preloading,
+    watchdog, or fixed-port TCPSites.
     """
-    print("Inspekt WebSocket Server (aiohttp)")
-    print(f"WebSocket: ws://{HOST}:{PORT + 1}/ws")
-    print(f"HTTP API: http://{HOST}:{PORT}")
-
-    # Start Unix socket server
-    sock_server = None
-    if enable_socket:
-        sock_path = Path(socket_path_override) if socket_path_override else None
-        sock_server = await start_socket_server(sock_path)
-        if sock_server:
-            print(f"Socket: {socket_path}")
-        else:
-            print("Socket: disabled (failed to create)")
-    else:
-        print("Socket: disabled")
-
-    print("")
-
-    # Preload control.js into cache (async, no blocking!)
-    try:
-        await script_loader.preload_script_async("control.js")
-        cached_scripts = script_loader.get_cached_scripts()
-        print(f"✓ Preloaded {len(cached_scripts)} script(s): {', '.join(cached_scripts)}")
-    except FileNotFoundError as e:
-        print(f"✗ WARNING: {e}")
-        print("  Auto-refocus will not work until file is available")
-    print("")
-
-    # Setup aiohttp app with CORS middleware
     # Increase client_max_size to 100MB for large video uploads from MediaRecorder
     app = web.Application(middlewares=[cors_middleware], client_max_size=100 * 1024 * 1024)
 
@@ -3799,6 +3770,46 @@ async def main(enable_socket: bool = True, socket_path_override: str | None = No
 
     # WebSocket endpoint for browser
     app.router.add_get("/ws", websocket_handler)
+
+    return app
+
+
+async def main(enable_socket: bool = True, socket_path_override: str | None = None):
+    """Start HTTP, WebSocket, and Unix socket servers.
+
+    Args:
+        enable_socket: Whether to start the Unix socket server
+        socket_path_override: Optional explicit socket path
+    """
+    print("Inspekt WebSocket Server (aiohttp)")
+    print(f"WebSocket: ws://{HOST}:{PORT + 1}/ws")
+    print(f"HTTP API: http://{HOST}:{PORT}")
+
+    # Start Unix socket server
+    sock_server = None
+    if enable_socket:
+        sock_path = Path(socket_path_override) if socket_path_override else None
+        sock_server = await start_socket_server(sock_path)
+        if sock_server:
+            print(f"Socket: {socket_path}")
+        else:
+            print("Socket: disabled (failed to create)")
+    else:
+        print("Socket: disabled")
+
+    print("")
+
+    # Preload control.js into cache (async, no blocking!)
+    try:
+        await script_loader.preload_script_async("control.js")
+        cached_scripts = script_loader.get_cached_scripts()
+        print(f"✓ Preloaded {len(cached_scripts)} script(s): {', '.join(cached_scripts)}")
+    except FileNotFoundError as e:
+        print(f"✗ WARNING: {e}")
+        print("  Auto-refocus will not work until file is available")
+    print("")
+
+    app = create_app()
 
     # Start server
     runner = web.AppRunner(app)
