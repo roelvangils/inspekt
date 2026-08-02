@@ -1,0 +1,7 @@
+# Commits to skip in git blame (bulk mechanical reformatting).
+# Enable locally with:
+#   git config blame.ignoreRevsFile .git-blame-ignore-revs
+# GitHub's blame view picks this file up automatically.
+
+# 2026-08-02 ruff format sweep over 197 files
+3202b13c8d0bb7f459db48bd70dab6ce501ec8a2

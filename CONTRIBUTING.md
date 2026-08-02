@@ -186,6 +186,11 @@ Always complete the full testing checklist from the guide, including:
 
 We use **ruff** for linting and formatting.
 
+> **git blame tip:** bulk-reformat commits are listed in
+> `.git-blame-ignore-revs`. Run
+> `git config blame.ignoreRevsFile .git-blame-ignore-revs` once so
+> `git blame` skips them (GitHub's blame view does this automatically).
+
 ```bash
 # Format code
 make format
