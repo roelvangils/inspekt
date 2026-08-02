@@ -425,21 +425,34 @@ def wait(selector, timeout, visible, hidden, text):
 
 
 @click.command()
-@click.argument("keys")
+@click.argument("keys", nargs=-1, required=True)
 def press(keys):
     """
-    Press keyboard keys or shortcuts.
+    Send keyboard key presses to the browser.
 
-    Supports single keys, modifiers, and combinations.
+    Keys are pressed in order; sequences, modifiers, waits, and repeats
+    are supported.
 
+    \b
+    KEYS:
+        Tab Enter Escape Space F5 a …    single keys, pressed in order
+        Tab*3                            repeat a key
+    \b
+    MODIFIERS (combine with +):
+        Ctrl+A  Shift+Tab  Alt+F4  Cmd+C
+    \b
+    WAITS (pauses between keys):
+        Wait        0.5 second pause
+        Wait(3)     custom pause in seconds (max 60)
+
+    \b
     Examples:
         inspekt press Tab
-        inspekt press Enter
         inspekt press "Ctrl+A"
-        inspekt press Escape
-        inspekt press "Shift+Tab"
+        inspekt press Tab Tab Enter
+        inspekt press Tab "Wait(2)" Enter
     """
-    from inspekt.services.key_parser import parse_key_combo
+    from inspekt.services.key_parser import parse_key_sequence
 
     executor = BridgeExecutor()
     script_loader = ScriptLoader()
@@ -450,15 +463,27 @@ def press(keys):
         click.echo(f"Error: {e}", err=True)
         sys.exit(1)
 
-    parsed = parse_key_combo(keys)
-    code = script.replace("'KEYS_PLACEHOLDER'", json.dumps(parsed))
+    try:
+        sequence = parse_key_sequence(list(keys))
+    except ValueError as e:
+        click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
+
+    delay_config = {"delay": 0, "delayMin": 0, "delayMax": 0}
+    code = script.replace(
+        "KEY_SEQUENCE_PLACEHOLDER", json.dumps([s.to_dict() for s in sequence])
+    ).replace("DELAY_CONFIG_PLACEHOLDER", json.dumps(delay_config))
+
+    # Waits happen inside the browser, so the bridge timeout must cover them
+    total_wait = sum(s.wait_seconds or 0 for s in sequence if s.type == "wait")
+    timeout = 10.0 + total_wait
 
     try:
-        result = executor.execute(code)
+        result = executor.execute(code, timeout=timeout)
         if not result.get("ok"):
             click.echo(f"Error: {result.get('error')}", err=True)
             sys.exit(1)
-        click.echo(f"✓ Pressed: {keys}")
+        click.echo(f"✓ Pressed: {' '.join(keys)}")
     except (ConnectionError, TimeoutError, RuntimeError) as e:
         click.echo(f"Error: {e}", err=True)
         sys.exit(1)

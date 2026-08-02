@@ -81,11 +81,10 @@ Includes:
     params_schema=EmptyParams,
     response_schema=PageInfoResponse,
     handler="inspekt.core.handlers.extraction.extract_page_info",
-    cli_name="info",
-    cli_group="page",  # inspekt page info
+    cli_name="info meta",  # metadata subcommand of the info group
     api_path="/extraction/info",
     api_method="GET",
-    examples=["inspekt info"],
+    examples=["inspekt info meta"],
 )
 
 # === Extract Article ===

@@ -39,7 +39,7 @@ Useful for:
     params_schema=GetConsoleLogsParams,
     response_schema=GetConsoleLogsResponse,
     handler="inspekt.core.handlers.debugging.get_console_logs",
-    cli_name="console",
+    cli_name="console list",
     api_path="/debugging/console",
     api_method="GET",
     examples=[

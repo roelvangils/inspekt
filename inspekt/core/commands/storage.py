@@ -41,7 +41,7 @@ Works with any text selection, including:
     params_schema=GetSelectedTextParams,
     response_schema=GetSelectedTextResponse,
     handler="inspekt.core.handlers.storage.get_selected_text",
-    cli_name="selection",
+    cli_name="selection text",
     api_path="/storage/selection",
     api_method="GET",
     examples=[

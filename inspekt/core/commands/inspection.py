@@ -33,11 +33,10 @@ This is a fast, low-overhead command ideal for:
     params_schema=EmptyParams,
     response_schema=GetPageInfoResponse,
     handler="inspekt.core.handlers.inspection.get_page_info",
-    cli_name="info",
-    cli_group="page",  # inspekt page info
+    cli_name="info",  # bare `inspekt info` (default action of the info group)
     api_path="/inspection/info",
     api_method="GET",
-    examples=["inspekt page info"],
+    examples=["inspekt info"],
 )
 
 # === Take Screenshot ===
