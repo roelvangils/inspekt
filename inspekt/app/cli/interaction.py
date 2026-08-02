@@ -17,7 +17,6 @@ import sys
 
 import click
 
-from inspekt.app.cli.base import builtin_open
 from inspekt.config import get_typing_config
 from inspekt.services.bridge_executor import BridgeExecutor
 from inspekt.services.script_loader import ScriptLoader

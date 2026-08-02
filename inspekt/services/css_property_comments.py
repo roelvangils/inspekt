@@ -24,7 +24,7 @@ import random
 import re
 from collections.abc import Callable
 from functools import lru_cache
-from typing import Pattern
+from re import Pattern
 
 # =============================================================================
 # EXACT MATCH COMMENTS

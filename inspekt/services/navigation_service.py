@@ -1,7 +1,7 @@
 """Navigation service for browser control operations."""
 
 import json
-from typing import Any, Dict
+from typing import Any
 
 from inspekt.services.bridge_executor import get_executor
 

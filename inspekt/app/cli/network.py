@@ -16,12 +16,11 @@ or response bodies). For full HAR export, DevTools must be open.
 
 import json
 import sys
-from typing import Optional
 
 import click
 
 from inspekt.app.cli.icons import get_icon, get_section_icon
-from inspekt.app.cli.table import Table, format_size, format_status, format_time, get_type_color
+from inspekt.app.cli.table import Table, format_size, format_time, get_type_color
 from inspekt.services.bridge_executor import BridgeExecutor
 from inspekt.services.script_loader import ScriptLoader
 
@@ -609,7 +608,6 @@ def network_audio(ctx):
 
 def _get_har_data(executor: BridgeExecutor) -> dict:
     """Get HAR data from DevTools via bridge server."""
-    import json
 
     import requests
 

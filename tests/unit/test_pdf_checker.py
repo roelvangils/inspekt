@@ -6,8 +6,6 @@ Tests for PDFBasicChecker, SimplePDFChecker, and their agreement on common check
 
 from __future__ import annotations
 
-from pathlib import Path
-
 import pytest
 
 # Import fixtures from the PDF fixtures conftest

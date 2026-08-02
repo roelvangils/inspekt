@@ -8,7 +8,7 @@ Input/output models for extraction commands:
 - extract_article
 """
 
-from typing import Literal, Optional
+from typing import Literal
 
 from pydantic import BaseModel, Field
 

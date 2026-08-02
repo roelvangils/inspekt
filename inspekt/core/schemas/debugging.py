@@ -6,7 +6,7 @@ Input/output models for debugging commands:
 - clear_console_logs
 """
 
-from typing import Literal, Optional
+from typing import Literal
 
 from pydantic import BaseModel, Field
 

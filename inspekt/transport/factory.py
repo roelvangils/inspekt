@@ -6,8 +6,6 @@ transport based on platform and configuration.
 
 import os
 import platform
-from pathlib import Path
-from typing import Optional, Union
 
 from .base import SyncTransport, Transport
 from .tcp import SyncTCPTransport, TCPTransport, get_tcp_port

@@ -1,8 +1,7 @@
 """Navigation API endpoints."""
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, HTTPException
 
-from inspekt.app.api.dependencies import get_bridge_executor
 from inspekt.app.api.models import CommandResponse, NavigateRequest
 from inspekt.services.navigation_service import NavigationService
 

@@ -6,10 +6,6 @@ Tests for auditing images, tables, forms, and links in PDFs.
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock, patch
-
-import pytest
-
 
 class TestImageAudit:
     """Unit tests for ImageAudit dataclass."""

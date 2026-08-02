@@ -7,9 +7,8 @@ import signal
 import sys
 import time
 import uuid
-from datetime import UTC, datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Optional
 from urllib.parse import urlparse
 
 import click
@@ -25,7 +24,6 @@ from inspekt.client import BridgeClient
 from inspekt.config import get_audio_config, get_record_config
 from inspekt.domain.recording import (
     DownloadInfo,
-    ExpectInfo,
     FileInfo,
     RecordedOn,
     Recording,
@@ -3814,7 +3812,6 @@ def list_recordings(limit: int | None, output_json: bool):
 
     # Output
     if output_json:
-        import json
         output = []
         for r in recordings:
             output.append({
@@ -4087,8 +4084,6 @@ def edit_recording(recording_file: str | None):
         inspekt record edit                # Edit last modified recording
         inspekt record edit login-flow.yaml
     """
-    import os
-    import subprocess
 
     # Use last modified file if none specified
     if recording_file is None:

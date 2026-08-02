@@ -37,7 +37,7 @@ logger = logging.getLogger(__name__)
 
 # Re-export OCR availability functions from the global service
 # This maintains backward compatibility for existing imports
-from inspekt.services.ocr_service import (  # noqa: E402, F401
+from inspekt.services.ocr_service import (  # noqa: E402
     get_ocr_availability,
     is_pytesseract_available,
     is_tesseract_available,

@@ -55,7 +55,6 @@ def _speak_text(text: str, voice_name: str, audio_output: str | None = None) -> 
     from inspekt.services.text_splitter import (
         ELEVENLABS_CHAR_LIMIT,
         chunk_text_for_tts,
-        estimate_chunk_count,
         get_text_stats,
         truncate_at_sentence_boundary,
     )
@@ -63,7 +62,6 @@ def _speak_text(text: str, voice_name: str, audio_output: str | None = None) -> 
         TTSError,
         generate_audio,
         is_tts_available,
-        play_audio_bytes,
         speak_text,
     )
 
@@ -966,7 +964,6 @@ def images(
     # Guard against extracting from Inspekt's own pages (galleries, reports,
     # dashboard, …). The VM web root serves galleries at http://inspekt/images/
     # so re-extracting would nest galleries inside galleries.
-    from urllib.parse import urlparse
     page_host = urlparse(page_url).hostname if page_url else None
     if page_host == "inspekt":
         click.echo(

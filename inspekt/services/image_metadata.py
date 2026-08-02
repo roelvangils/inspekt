@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import io
 import json
-from datetime import UTC, datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -165,7 +165,6 @@ def get_timezone() -> str:
     try:
         # Python 3.9+ approach
         from datetime import datetime
-        from zoneinfo import ZoneInfo
 
         # Try to get the IANA timezone name
         local_tz = datetime.now().astimezone().tzinfo

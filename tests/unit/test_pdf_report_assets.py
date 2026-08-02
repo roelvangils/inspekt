@@ -6,8 +6,6 @@ Tests the asset directory management for PDF accessibility reports.
 
 from __future__ import annotations
 
-from pathlib import Path
-
 import pytest
 
 

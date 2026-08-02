@@ -5,8 +5,7 @@ Tests that decorations (tables, tips, headers) are automatically suppressed
 when stdout is piped or redirected.
 """
 import json
-import sys
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 from click.testing import CliRunner

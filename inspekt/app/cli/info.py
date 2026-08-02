@@ -20,12 +20,10 @@ from __future__ import annotations
 
 import json
 import sys
-from pathlib import Path
 from urllib.parse import urlparse
 
 import click
 
-from inspekt.app.cli.base import builtin_open
 from inspekt.app.cli.icons import get_icon
 from inspekt.app.cli.table import Table
 from inspekt.app.cli.url_builder import url_scheme

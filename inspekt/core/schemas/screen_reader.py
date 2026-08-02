@@ -7,7 +7,7 @@ Input/output models for screen reader simulation commands:
 - sr_announce: Announce a specific element
 """
 
-from typing import Literal, Optional
+from typing import Literal
 
 from pydantic import BaseModel, Field
 

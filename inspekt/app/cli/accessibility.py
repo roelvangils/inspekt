@@ -2050,7 +2050,7 @@ def _build_enriched_report_data(
     Returns:
         Enriched report data dict
     """
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     # Helper to count violations from filtered consolidated results
     def count_filtered_violations(engine: str) -> int:
@@ -4730,9 +4730,7 @@ def a11y(engines, list_engines, level, output_format, json_flag, timeout, show_p
         eac      Equal Access Checker (IBM) - comprehensive WCAG coverage
         hcs      HTML CodeSniffer (Squiz Labs) - WCAG 2.1 checker
     """
-    from inspekt.app.cli.table import Table, _style_with_inline_code, print_hint
-    from inspekt.data import get_engine_metadata, load_engine_metadata
-    from inspekt.services.engines import get_engine
+    from inspekt.app.cli.table import Table, _style_with_inline_code
 
     # Handle --list-engines flag
     if list_engines:

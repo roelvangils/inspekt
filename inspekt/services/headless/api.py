@@ -24,7 +24,7 @@ import json
 import os
 import time
 from dataclasses import dataclass
-from typing import Any, Optional
+from typing import Any
 from urllib.parse import parse_qs, urlparse
 
 from inspekt.services.headless import HeadlessChromePool, HeadlessContext

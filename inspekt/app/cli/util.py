@@ -204,7 +204,6 @@ def _vm_copyable_signal(text: str) -> None:
     Posts the raw (unformatted) text to the control server's /copyable endpoint,
     then emits an OSC escape sequence so the control panel can show a copy button.
     """
-    import json
     import sys
     import urllib.request
 
@@ -230,7 +229,6 @@ def _vm_data_signal(json_text: str | None, table_md: str | None, summary: str) -
     or ``table_md`` may be None — the frontend only renders the buttons
     for which a payload exists. Best-effort, silently no-ops on failure.
     """
-    import json
     import sys
     import urllib.request
 
@@ -261,7 +259,6 @@ def _vm_clipboard_relay(text: str) -> None:
     2. Short OSC escape sequence through the terminal to signal the control panel
        to fetch the text and call navigator.clipboard.writeText()
     """
-    import json
     import sys
     import urllib.request
 
@@ -439,7 +436,7 @@ def repl():
     Execute JavaScript interactively. Console output is shown automatically.
     Type 'exit' or press Ctrl+D to quit.
     """
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     client = BridgeClient()
 

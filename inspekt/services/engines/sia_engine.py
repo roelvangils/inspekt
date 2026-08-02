@@ -12,7 +12,6 @@ import subprocess
 import tempfile
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
 
 from .base import (
     AccessibilityEngine,

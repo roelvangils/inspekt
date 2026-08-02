@@ -17,7 +17,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Iterator
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -336,7 +336,6 @@ class PDFStructureExtractor:
         Returns:
             StructureNode representing this element, or None if extraction limit reached
         """
-        import pikepdf
 
         # Check if we've hit the extraction limit
         if self._node_counter >= self._max_nodes:

@@ -27,7 +27,6 @@ from __future__ import annotations
 
 import logging
 import platform
-from typing import Optional
 
 import aiohttp
 
@@ -119,17 +118,16 @@ async def _navigate_via_bridge(
     logger.info(f"Navigating to {url} (timeout={timeout}s, wait_for={wait_for})")
 
     try:
-        async with aiohttp.ClientSession() as session:
-            async with session.post(
-                f"http://127.0.0.1:{bridge_port}/navigate",
-                json={
-                    "url": url,
-                    "waitFor": wait_for,
-                    "timeout": timeout,
-                },
-                timeout=aiohttp.ClientTimeout(total=timeout + 5),
-            ) as response:
-                result = await response.json()
+        async with aiohttp.ClientSession() as session, session.post(
+            f"http://127.0.0.1:{bridge_port}/navigate",
+            json={
+                "url": url,
+                "waitFor": wait_for,
+                "timeout": timeout,
+            },
+            timeout=aiohttp.ClientTimeout(total=timeout + 5),
+        ) as response:
+            result = await response.json()
 
         if result.get("ok"):
             final_url = result.get("url", url)

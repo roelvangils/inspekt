@@ -10,8 +10,6 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from inspekt.client import BridgeClient
-
 
 @pytest.fixture
 def mock_client():

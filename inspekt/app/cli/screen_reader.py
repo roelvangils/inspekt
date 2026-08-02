@@ -8,12 +8,11 @@ Provides the `inspekt sr` command group with:
 """
 
 import asyncio
-import json
 import sys
 
 import click
 
-from inspekt.app.cli.icons import get_icon, get_indicator
+from inspekt.app.cli.icons import get_indicator
 
 # ── Shared options for enrichment flags ───────────────────────
 

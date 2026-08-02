@@ -16,8 +16,6 @@ from typing import TYPE_CHECKING
 from inspekt.services.pdf_report_data import (
     CURRENT_SCHEMA_VERSION,
     AccessibilityScoreData,
-    AssetManifest,
-    AssetReference,
     BasicChecksData,
     CategoryScoreData,
     CheckResultData,

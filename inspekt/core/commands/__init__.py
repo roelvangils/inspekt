@@ -37,7 +37,7 @@ from inspekt.core.commands.utilities import UTILITIES_COMMANDS
 from inspekt.core.commands.vm import VM_COMMANDS
 from inspekt.core.commands.watch import WATCH_COMMANDS
 
-__all__ = ["CommandDefinition", "Category", "register_all_commands"]
+__all__ = ["Category", "CommandDefinition", "register_all_commands"]
 
 # Track if commands have been registered (prevents duplicate registration)
 _commands_registered = False

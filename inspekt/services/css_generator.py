@@ -62,9 +62,7 @@ def _generate_element_css(
         # Add comments for browser-computed values (skip for authored properties)
         if prop in authored_props:
             lines.append(f"{prop_indent}{prop}: {value};")
-        elif prop in rounded_props:
-            lines.append(f"{prop_indent}{prop}: {value}; /* Browser-computed */")
-        elif prop in computed_props:
+        elif prop in rounded_props or prop in computed_props:
             lines.append(f"{prop_indent}{prop}: {value}; /* Browser-computed */")
         else:
             lines.append(f"{prop_indent}{prop}: {value};")

@@ -12,12 +12,9 @@ from __future__ import annotations
 
 import logging
 import os
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from inspekt.services.ai_providers.base import AIProvider, AIProviderError, AIResponse
-
-if TYPE_CHECKING:
-    pass
 
 logger = logging.getLogger(__name__)
 

@@ -414,7 +414,7 @@ def _describe_color_cached(hex6: str) -> str:
     if result is None:
         return "Unknown"
 
-    L, C, H = result  # noqa: N806 — uppercase matches OKLCH convention
+    L, C, H = result
 
     hue_name = _oklch_hue_name(H)
 
@@ -489,9 +489,7 @@ def _describe_color_cached(hex6: str) -> str:
         lightness_prefix = "Very dark"
     elif L < 0.35:
         lightness_prefix = "Dark"
-    elif L < 0.50:
-        lightness_prefix = ""
-    elif L < 0.65:
+    elif L < 0.50 or L < 0.65:
         lightness_prefix = ""
     elif L < 0.80:
         lightness_prefix = "Light"

@@ -471,7 +471,6 @@ def test():
     # Test MCP tool
     click.echo("\n5. Testing MCP tools…")
     try:
-        from inspekt.app.mcp import schemas
         from inspekt.app.mcp.tools import ToolProvider
         from inspekt.services.script_loader import ScriptLoader
 

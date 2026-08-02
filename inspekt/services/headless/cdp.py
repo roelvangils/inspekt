@@ -8,7 +8,8 @@ supporting both low-level command/response patterns and event subscriptions.
 import asyncio
 import base64
 import json
-from typing import Any, Callable, Optional
+from collections.abc import Callable
+from typing import Any
 
 import websockets
 from websockets.client import WebSocketClientProtocol

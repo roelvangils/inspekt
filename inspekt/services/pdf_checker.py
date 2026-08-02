@@ -22,10 +22,8 @@ Based on Luxembourg simplA11yPDFCrawler methodology and PDF/UA standards.
 from __future__ import annotations
 
 import json
-import os
 import re
 import subprocess
-import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
@@ -1553,7 +1551,7 @@ class VeraPDFChecker:
                     verapdf_version = release_details.get("version")
 
         # Process validation results
-        if "jobs" in data and data["jobs"]:
+        if data.get("jobs"):
             job = data["jobs"][0]
 
             # Get processing time

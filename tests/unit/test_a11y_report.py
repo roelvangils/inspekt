@@ -10,9 +10,6 @@ import json
 import pytest
 
 from inspekt.app.cli.accessibility import (
-    AVAILABLE_ENGINES,
-    WCAG_SC_DESCRIPTIONS,
-    WCAG_SC_LEVELS,
     _build_enriched_report_data,
     _extract_engine_rule_details,
 )

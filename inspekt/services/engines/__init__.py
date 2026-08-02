@@ -96,8 +96,8 @@ __all__ = [
     "EngineInfo",
     "ImpactLevel",
     "NormalizedViolation",
+    "get_all_engines",
     "get_engine",
     "list_engines",
-    "get_all_engines",
     "register_engine",
 ]

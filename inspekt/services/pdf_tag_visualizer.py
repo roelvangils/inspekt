@@ -16,7 +16,6 @@ import io
 import logging
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 logger = logging.getLogger(__name__)
 
@@ -574,7 +573,6 @@ class PDFTagVisualizer:
         if tags is None:
             tags = self.extract_page_tags(page_num)
 
-        import base64
 
         # Render the page
         import fitz

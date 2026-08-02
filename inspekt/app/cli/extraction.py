@@ -14,8 +14,6 @@ content extraction.
 
 from __future__ import annotations
 
-import base64
-import io
 import json
 import re
 import subprocess
@@ -25,8 +23,6 @@ from datetime import datetime
 from pathlib import Path
 
 import click
-import requests
-from PIL import Image
 
 from inspekt.app.cli.base import builtin_open, get_ai_language
 from inspekt.app.cli.icons import analyze as analyze_icon
@@ -41,10 +37,8 @@ from inspekt.config import get_do_config
 from inspekt.services.action_cache import ActionCache
 from inspekt.services.action_matcher import ActionMatcher
 from inspekt.services.ai_integration import get_ai_service
-from inspekt.services.bridge_executor import get_executor
 from inspekt.services.content_cache import ContentCache
 from inspekt.services.formatting_utils import format_filesize
-from inspekt.services.script_loader import ScriptLoader
 
 
 def _speak_text(text: str, voice_name: str, audio_output: str | None = None, force_refresh: bool = False) -> None:
@@ -76,7 +70,6 @@ def _speak_text(text: str, voice_name: str, audio_output: str | None = None, for
         generate_audio,
         is_tts_available,
         play_audio_bytes,
-        speak_text,
     )
 
     # Check if TTS is available

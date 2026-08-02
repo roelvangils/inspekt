@@ -19,7 +19,7 @@ from typing import TYPE_CHECKING
 
 import click
 
-from inspekt.app.cli.icons import get_icon, get_indicator
+from inspekt.app.cli.icons import get_indicator
 from inspekt.app.cli.inspection import _print_tips_section
 from inspekt.app.cli.output import pluralize
 from inspekt.app.cli.table import (
@@ -28,7 +28,6 @@ from inspekt.app.cli.table import (
     print_checkbox_step,
     print_error,
     print_hint,
-    print_step,
     print_success,
     print_warning,
 )
@@ -94,7 +93,6 @@ def _format_wcag(sc: str | None, level: str | None) -> str:
 
 def _print_basic_results(result: PDFBasicResult, verbose: bool = False) -> None:
     """Print basic check results in table format."""
-    from inspekt.app.cli.icons import get_indicator
 
     # Document info summary
     meta = result.metadata
@@ -181,7 +179,6 @@ def _print_basic_results(result: PDFBasicResult, verbose: bool = False) -> None:
 
 def _print_simple_results(result: SimplePDFResult, verbose: bool = False) -> None:
     """Print SimplePDFChecker results in table format."""
-    from inspekt.app.cli.icons import get_indicator
 
     # Document info summary
     meta = result.metadata
@@ -296,7 +293,6 @@ def _print_simple_results(result: SimplePDFResult, verbose: bool = False) -> Non
 
 def _print_verapdf_results(result: VeraPDFResult, verbose: bool = False) -> None:
     """Print veraPDF validation results in table format."""
-    from inspekt.app.cli.icons import get_indicator
 
     click.echo()
 
@@ -1194,7 +1190,6 @@ def viewer(serve: bool, port: int):
         # Serve on localhost
         import http.server
         import socketserver
-        import threading
         import webbrowser
 
         # Create a simple HTTP server

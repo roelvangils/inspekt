@@ -9,7 +9,6 @@ Note: Uses Performance API which has limitations:
 - Buffer limit of ~150-250 entries
 """
 
-from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel

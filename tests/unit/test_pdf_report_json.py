@@ -11,25 +11,15 @@ Tests cover:
 from __future__ import annotations
 
 import json
-import tempfile
-from datetime import datetime
-from pathlib import Path
-
-import pytest
 
 from inspekt.services.pdf_report_data import (
     CURRENT_SCHEMA_VERSION,
-    AccessibilityScoreData,
     AssetManifest,
     AssetReference,
-    BasicChecksData,
-    CheckResultData,
     ContrastAnalysisData,
     ContrastIssueData,
     # New v2.0 dataclasses
     CoverImageData,
-    DocumentMetadata,
-    InteractivePreviewData,
     IssueScreenshotData,
     PDFReportData,
     SimpleChecksData,

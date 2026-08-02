@@ -25,12 +25,6 @@ except ImportError:
 from datetime import UTC
 
 from inspekt.domain.models import (
-    ExecuteRequest,
-    HealthResponse,
-    Notification,
-    NotificationsResponse,
-    RunRequest,
-    RunResponse,
     parse_incoming_message,
 )
 from inspekt.services.script_loader import ScriptLoader
@@ -2172,7 +2166,7 @@ async def handle_http_domain_sync(request):
     regardless of which browser tab/window receives the retry request.
     """
     try:
-        from datetime import datetime, timezone
+        from datetime import datetime
 
         from inspekt.services.domain_service import get_domain_service
 

@@ -2,7 +2,7 @@
 Unit tests for the global OCR service.
 """
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 

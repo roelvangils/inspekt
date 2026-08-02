@@ -10,8 +10,8 @@ from inspekt.core.commands.base import Category, CommandDefinition
 from inspekt.core.registry import CommandRegistry, get_registry
 
 __all__ = [
-    "CommandDefinition",
     "Category",
+    "CommandDefinition",
     "CommandRegistry",
     "get_registry",
     "register_all_commands",

@@ -5,7 +5,6 @@ both the bridge server and API server together.
 """
 
 import asyncio
-import json
 import os
 import socket
 import subprocess

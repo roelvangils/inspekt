@@ -2,11 +2,7 @@
 Unit tests for Alfa accessibility engine.
 """
 
-import json
-from pathlib import Path
 from unittest.mock import patch
-
-import pytest
 
 from inspekt.services.engines.base import AuditResult, ImpactLevel, NormalizedViolation
 from inspekt.services.engines.sia_engine import SiaEngine

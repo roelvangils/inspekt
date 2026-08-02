@@ -7,7 +7,6 @@ This module provides commands for element inspection and screenshot capture:
 - screenshot: Capture element screenshots
 """
 
-import base64
 import json
 import shutil
 import sys
@@ -1510,7 +1509,7 @@ def css(file_path, open_after, reveal_after, raw, copy, output_json, all_propert
             return
 
         # Formatted display with syntax highlighting
-        from inspekt.app.cli.table import Table, print_hint
+        from inspekt.app.cli.table import Table
 
         # Build summary header
         elem_word = pluralize(element_count, "element")
@@ -2563,7 +2562,7 @@ def css(file_path, open_after, reveal_after, raw, copy, output_json, all_propert
             click.echo(css_content)
             return
 
-        from inspekt.app.cli.table import Table, print_hint
+        from inspekt.app.cli.table import Table
 
         elem_word = pluralize(element_count, "element")
 
@@ -2799,28 +2798,28 @@ def screenshot_node(selector, output, margin, margin_color, disable_compression,
             from inspekt.app.cli import icons
             from inspekt.services.image_grid import compose_state_grid, is_pillow_installed
             from inspekt.services.screenshot_utils import decode_data_url
-    
+
             if not is_pillow_installed():
                 click.echo("Error: Comparison screenshots require Pillow. Install with: pip install Pillow", err=True)
                 sys.exit(1)
-    
+
             # Load pseudo-state screenshot script
             try:
                 pseudo_script = loader.load_script_sync("screenshot_pseudo.js")
             except FileNotFoundError as e:
                 click.echo(f"Error: Pseudo-state script not found: {e}", err=True)
                 sys.exit(1)
-    
+
             # Build list of states: always include 'normal' first
             # If no states specified with --compare, just show normal
             if states:
                 state_list = ['normal'] + [s.lower() for s in states]
             else:
                 state_list = ['normal']
-    
+
             if not quiet and not json_output:
                 click.echo(icons.camera(f"Capturing {len(state_list)} states: {', '.join(state_list)}"))
-    
+
             # Check for inspected element first
             if not selector:
                 check_code = """(function() {
@@ -2835,20 +2834,20 @@ def screenshot_node(selector, output, margin, margin_color, disable_compression,
                     else:
                         click.echo("Error: No element is currently inspected. Use --selector or inspect an element first.", err=True)
                     sys.exit(1)
-    
+
             # Capture screenshots for each state
             screenshots = []
             tag_name = "element"
             used_fallback = False
             total_rules_injected = 0
-    
+
             for state in state_list:
                 if not quiet and not json_output:
                     if state == 'normal':
                         click.echo(icons.info("Capturing normal state…"))
                     else:
                         click.echo(icons.info(f"Forcing :{state} state…"))
-    
+
                 # Build options for this state
                 state_options = {
                     "selector": selector,
@@ -2862,22 +2861,22 @@ def screenshot_node(selector, output, margin, margin_color, disable_compression,
                     "keepZoom": keep_zoom,
                     "keepSelection": keep_selection,
                 }
-    
+
                 # Replace placeholders and execute
                 code = pseudo_script.replace("'STATE_PLACEHOLDER'", json.dumps(state))
                 code = code.replace("OPTIONS_PLACEHOLDER", json.dumps(state_options))
-    
+
                 result = executor.execute(code, timeout=30.0)
-    
+
                 if not result.get("ok"):
                     click.echo(f"Error executing script for {state} state: {result.get('error')}", err=True)
                     sys.exit(1)
-    
+
                 response = result.get("result", {})
                 if not response.get("ok"):
                     click.echo(f"Error capturing {state} state: {response.get('error')}", err=True)
                     sys.exit(1)
-    
+
                 # Track if fallback was used and how many rules were injected
                 if response.get("usedFallback"):
                     used_fallback = True
@@ -2901,17 +2900,17 @@ def screenshot_node(selector, output, margin, margin_color, disable_compression,
                     click.echo(click.style("\ue749  ", fg="blue") + f"Applied {total_rules_injected} CSS rules via injection (DevTools is open)")
                 else:
                     click.echo(click.style("\uf071  ", fg="yellow") + "No CSS rules found for pseudo-state (element may not have :focus/:hover styles)")
-    
+
             # Compose grid
             if not quiet and not json_output:
                 click.echo(icons.info("Composing comparison grid…"))
-    
+
             try:
                 final_image = compose_state_grid(screenshots, columns=2)
             except Exception as e:
                 click.echo(f"Error composing grid: {e}", err=True)
                 sys.exit(1)
-    
+
             # Get grid dimensions from composed image
             try:
                 import io
@@ -2921,13 +2920,13 @@ def screenshot_node(selector, output, margin, margin_color, disable_compression,
                     grid_width, grid_height = img.size
             except Exception:
                 grid_width, grid_height = 0, 0
-    
+
             # Generate filename suffix for compare mode
             if len(states) == 1:
                 compare_suffix = f"_{states[0]}"
             else:
                 compare_suffix = "_states"
-    
+
             # Set up variables for the common processing pipeline below
             # The compare mode will fall through to the same processing as regular mode
             compare_mode_image_data = final_image
@@ -2941,11 +2940,11 @@ def screenshot_node(selector, output, margin, margin_color, disable_compression,
                 "usedFallback": used_fallback,
             }
             # Fall through to common processing pipeline...
-    
+
         # ========== SCREENSHOT CAPTURE ==========
         # Compare mode already has the image data from grid composition
         # Regular mode needs to capture a screenshot
-    
+
         if compare:
             # Compare mode: use the composed grid image
             image_data = compare_mode_image_data
@@ -2956,17 +2955,17 @@ def screenshot_node(selector, output, margin, margin_color, disable_compression,
         else:
             # ========== REGULAR SCREENSHOT MODE ==========
             from inspekt.app.cli import icons
-    
+
             # Determine forced state (if any) for integration with normal flow
             forced_state = states[0].lower() if states else None
-    
+
             # Load unified screenshot script
             try:
                 script = loader.load_script_sync("screenshot_unified.js")
             except FileNotFoundError as e:
                 click.echo(f"Error: Screenshot script not found: {e}", err=True)
                 sys.exit(1)
-    
+
             # Build options
             options = {
                 "selector": selector,
@@ -2980,11 +2979,11 @@ def screenshot_node(selector, output, margin, margin_color, disable_compression,
                 "keepZoom": keep_zoom,
                 "keepSelection": keep_selection,
             }
-    
+
             # Replace placeholders
             code = script.replace("'MODE_PLACEHOLDER'", json.dumps("node"))
             code = code.replace("OPTIONS_PLACEHOLDER", json.dumps(options))
-    
+
             # Pre-flight check: verify element exists before any processing
             if not selector:
                 # Check if there's an inspected element (same logic as screenshot_unified.js)
@@ -3002,7 +3001,7 @@ def screenshot_node(selector, output, margin, margin_color, disable_compression,
                     else:
                         click.echo("Error: No element is currently inspected. Use --selector flag or inspect an element first.", err=True)
                     sys.exit(1)
-    
+
             # Apply redaction if requested (before capture)
             redacted_count = 0
             masked_emails_count = 0
@@ -3011,7 +3010,7 @@ def screenshot_node(selector, output, margin, margin_color, disable_compression,
             if redact:
                 try:
                     redact_script = loader.load_script_sync("screenshot_redact.js")
-    
+
                     # Build redact options - scope to target element for node screenshots
                     redact_options = {
                         "action": "apply",
@@ -3019,22 +3018,22 @@ def screenshot_node(selector, output, margin, margin_color, disable_compression,
                         "includePatterns": True,
                         "rootSelector": selector,  # Only scan within the target element
                     }
-    
+
                     # Add custom selectors if provided
                     if redact_selectors:
                         custom = [s.strip() for s in redact_selectors.split(",") if s.strip()]
                         redact_options["selectors"] = custom
-    
+
                     redact_code = redact_script.replace("OPTIONS_PLACEHOLDER", json.dumps(redact_options))
                     redact_result = executor.execute(redact_code, timeout=30.0)
-    
+
                     if redact_result.get("ok"):
                         redact_response = redact_result.get("result", {})
                         if redact_response.get("ok"):
                             redacted_count = redact_response.get("redactedCount", 0)
                             masked_emails_count = redact_response.get("maskedEmailsCount", 0)
                             redacted_elements = redact_response.get("elements", [])
-    
+
                             if not quiet and not json_output:
                                 messages = []
                                 if redacted_count > 0:
@@ -3046,14 +3045,14 @@ def screenshot_node(selector, output, margin, margin_color, disable_compression,
                                     click.echo(click.style("\uedaa  ", fg="blue") + f"Redacting: {', '.join(messages)}…")
                                 else:
                                     click.echo(icons.shield_check("No sensitive elements found to redact"))
-    
+
                 except FileNotFoundError:
                     if not quiet and not json_output:
                         click.echo("Warning: Redaction script not found, skipping redaction", err=True)
                 except Exception as e:
                     if not quiet and not json_output:
                         click.echo(f"Warning: Redaction failed: {e}", err=True)
-    
+
             # Force pseudo-state if requested (before capture)
             pseudo_state_applied = False
             pseudo_state_fallback = False
@@ -3092,7 +3091,7 @@ def screenshot_node(selector, output, margin, margin_color, disable_compression,
                             }}, '*');
                         }});
                     }})()"""
-    
+
                     force_result = executor.execute(force_code, timeout=15.0)
                     # Check CDP success - handle None values at each level
                     cdp_success = False
@@ -3170,7 +3169,7 @@ def screenshot_node(selector, output, margin, margin_color, disable_compression,
     
                             return {{ ok: true, method: 'css-injection', rulesInjected: injectedRules.length }};
                         }})()"""
-    
+
                         fallback_result = executor.execute(fallback_code, timeout=5.0)
                         # Check fallback success - handle None values at each level
                         fallback_success = False
@@ -3188,17 +3187,17 @@ def screenshot_node(selector, output, margin, margin_color, disable_compression,
                 except Exception as e:
                     if not quiet and not json_output:
                         click.echo(f"Warning: Could not force pseudo-state: {e}", err=True)
-    
+
                 # Show CSS injection status before capture
                 if pseudo_state_fallback and not quiet and not json_output:
                     # Note: CDP is unavailable because DevTools is open (required for inspected element)
                     # CSS injection is the expected method for this use case
                     if rules_count > 0:
                         click.echo(click.style("\ue749  ", fg="blue") + f"Applied {rules_count} CSS rules for :{forced_state} state")
-    
+
             # Execute the screenshot capture
             result = executor.execute(code, timeout=60.0)
-    
+
             # Clear pseudo-state after capture
             if forced_state and pseudo_state_applied:
                 try:
@@ -3222,7 +3221,7 @@ def screenshot_node(selector, output, margin, margin_color, disable_compression,
                     executor.execute(clear_code, timeout=5.0)
                 except Exception:
                     pass  # Silently ignore cleanup failures
-    
+
             # Restore redacted elements after capture (don't leave page blurred)
             if redact_script and redacted_count > 0:
                 try:
@@ -3231,20 +3230,20 @@ def screenshot_node(selector, output, margin, margin_color, disable_compression,
                     executor.execute(restore_code, timeout=10.0)
                 except Exception:
                     pass  # Silently ignore restore failures - screenshot already captured
-    
+
             if not result.get("ok"):
                 click.echo(f"Error: {result.get('error')}", err=True)
                 sys.exit(1)
-    
+
             response = result.get("result", {})
             if not response.get("ok"):
                 click.echo(f"Error: {response.get('error')}", err=True)
                 sys.exit(1)
-    
+
             # Get element tag name for display
             tag_name = response.get("tagName", "element").lower()
             scroll_dir = response.get("scrollDirection", "down") if response.get("scrolledIntoView") else None
-    
+
             # Display action log in logical order (unless quiet or json mode)
             if not quiet and not json_output:
                 # 1. Zoom reset (if zoom was adjusted)
@@ -3254,22 +3253,22 @@ def screenshot_node(selector, output, margin, margin_color, disable_compression,
                     # Use zoom-out icon if original > 1.0 (we're reducing), zoom-in icon if < 1.0 (we're increasing)
                     zoom_icon = "\uf532" if original_zoom > 1.0 else "\uf531"
                     click.echo(click.style(f"{zoom_icon}  ", fg="blue") + f"Resetting zoom level from {zoom_percent}% to 100%…")
-    
+
                 # 2. Selection cleared (if text was selected)
                 if response.get("selectionCleared"):
                     click.echo(click.style("\U000F09A9  ", fg="blue") + "Clearing text selection…")
-    
+
                 # 3. Scroll action (if element was scrolled into view)
                 if scroll_dir:
                     click.echo(icons.scroll_action(scroll_dir, f"Scrolling <{tag_name}> into view…"))
-    
+
                 # 4. Capture action
                 state_suffix = f" with :{forced_state} state" if forced_state else ""
                 if selector:
                     click.echo(click.style("\ueada  ", fg="blue") + f"Capturing element{state_suffix}: {selector}")
                 else:
                     click.echo(icons.camera(f"Capturing currently inspected element{state_suffix}…"))
-    
+
                 # 5. Restore feedback (zoom level and/or text selection)
                 zoom_restored = response.get("zoomWasReset")
                 selection_restored = response.get("selectionCleared")
@@ -3279,12 +3278,12 @@ def screenshot_node(selector, output, margin, margin_color, disable_compression,
                     click.echo(icons.info("Zoom level restored"))
                 elif selection_restored:
                     click.echo(icons.info("Text selection restored"))
-    
+
                 # 6. Restore scroll position (if we scrolled) - use opposite direction
                 if scroll_dir:
                     opposite_dir = {"up": "down", "down": "up", "left": "right", "right": "left"}.get(scroll_dir, "up")
                     click.echo(icons.scroll_action(opposite_dir, "Restoring scroll position…"))
-    
+
                 # 6. CDP fallback info (if used)
                 if response.get("usedCDPFallback"):
                     dims = response.get("elementDimensions", {})
@@ -3296,7 +3295,7 @@ def screenshot_node(selector, output, margin, margin_color, disable_compression,
                         f"Element ({width}×{height}) exceeds viewport ({vw}×{vh}). "
                         "Used full-page capture method and cropped image"
                     ))
-    
+
                 # 7. Large dimension warning
                 dims = response.get("elementDimensions", {})
                 if dims.get("width", 0) > 10000 or dims.get("height", 0) > 10000:
@@ -3304,10 +3303,10 @@ def screenshot_node(selector, output, margin, margin_color, disable_compression,
                         f"Large element captured: {dims.get('width')}×{dims.get('height')}. "
                         "Chrome has a maximum dimension limit of 16384"
                     ))
-    
+
             # Decode image data
             from inspekt.services.screenshot_utils import decode_data_url
-    
+
             try:
                 image_data = decode_data_url(response.get("dataUrl"))
             except ValueError as e:
@@ -3316,7 +3315,7 @@ def screenshot_node(selector, output, margin, margin_color, disable_compression,
                 else:
                     click.echo(f"Error: {e}", err=True)
                 sys.exit(1)
-    
+
         # Handle clipboard mode (no file saved)
         if clipboard:
             from inspekt.app.cli.icons import clipboard as clipboard_icon
@@ -3949,7 +3948,6 @@ def screenshot_viewport(output, margin, margin_color, disable_compression, enabl
     redact_script = None
 
     try:
-        from inspekt.app.cli import icons
 
         # Apply redaction before capture
         if redact:
@@ -4391,7 +4389,6 @@ def screenshot_page(output, margin, margin_color, disable_compression, enable_co
     redact_script = None
 
     try:
-        from inspekt.app.cli import icons
 
         # Apply redaction before capture
         if redact:

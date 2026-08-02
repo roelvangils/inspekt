@@ -557,7 +557,6 @@ def generate_pdfi_package(
     Returns:
         Path to the created .pdfi file
     """
-    import fitz  # PyMuPDF
 
     pdf_path = Path(pdf_path)
     output_path = Path(output_path)

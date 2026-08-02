@@ -17,7 +17,6 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
 from inspekt.app.api.dependencies import get_bridge_client
-from inspekt.app.api.models import CommandResponse
 from inspekt.services.script_loader import ScriptLoader
 
 router = APIRouter()

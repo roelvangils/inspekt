@@ -6,9 +6,8 @@ complexity of headless browser setup, state mirroring, and cleanup.
 """
 
 import asyncio
-import base64
 import json
-from typing import Any, Optional
+from typing import Any
 
 from inspekt.services.headless.cdp import CDPClient, CDPSession
 from inspekt.services.headless.chrome import HeadlessChrome

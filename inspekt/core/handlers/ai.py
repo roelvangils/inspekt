@@ -1055,8 +1055,6 @@ def _build_debug_data(
 
     Returns dict with prompt, parameters, and cURL command.
     """
-    import os
-    import shlex
 
     # Build API parameters
     api_params = {
@@ -1356,7 +1354,6 @@ def _run_scoped_audits(client, source: str = "inspected") -> dict:
     Returns consolidated audit results from axe, ibm, and hcs engines.
     Each engine is executed with the inspected element as the scope/context.
     """
-    import json
     from pathlib import Path
 
     results = {"axe": None, "ibm": None, "hcs": None}

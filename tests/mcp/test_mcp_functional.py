@@ -5,7 +5,7 @@ These test the actual tool implementations with mocked bridge.
 Run with: pytest tests/mcp/test_mcp_functional.py -v
 """
 
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 

@@ -13,8 +13,7 @@ from __future__ import annotations
 
 import sqlite3
 import time
-from datetime import UTC, datetime, timezone
-from pathlib import Path
+from datetime import UTC, datetime
 from typing import Any
 
 from inspekt.config import get_data_dir

@@ -22,12 +22,12 @@ import unicodedata
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 from urllib.parse import urlparse
 
 import requests
 
-from inspekt.config import get_data_dir, is_isolated_mode
+from inspekt.config import is_isolated_mode
 from inspekt.services import http_client
 
 logger = logging.getLogger(__name__)
@@ -768,7 +768,6 @@ def _parse_http_date(http_date: str) -> str:
     'Thu, 03 Apr 2026 12:00:00 GMT' → '2026-04-03T12:00:00+00:00'
     Returns empty string if unparseable.
     """
-    from datetime import datetime, timezone
     from email.utils import parsedate_to_datetime
 
     try:

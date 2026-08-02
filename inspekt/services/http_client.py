@@ -21,7 +21,8 @@ from __future__ import annotations
 import base64
 import json
 import os
-from typing import Any, Iterator
+from collections.abc import Iterator
+from typing import Any
 
 import requests
 

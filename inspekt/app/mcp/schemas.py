@@ -5,7 +5,7 @@ Pydantic models defining the input parameters and output structures
 for all MCP tools and resources.
 """
 
-from typing import Any, Literal, Optional
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 

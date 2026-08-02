@@ -262,7 +262,7 @@ def _display_enhanced_cookies(cookies: list):
 def _display_legacy_cookies(cookies_dict: dict):
     """Display legacy cookie data (simple name: value dict)."""
     # Calculate max name length for alignment
-    max_name_len = max(len(name) for name in cookies_dict.keys()) if cookies_dict else 0
+    max_name_len = max(len(name) for name in cookies_dict) if cookies_dict else 0
 
     for name, value in cookies_dict.items():
         # Try to parse as JSON

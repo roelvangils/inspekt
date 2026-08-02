@@ -4,12 +4,12 @@ Video encoder service using ffmpeg for assembling screencast frames into video f
 Supports MP4 (H.264) and WebM (VP9) output formats.
 """
 
-import os
 import shutil
 import subprocess
 import tempfile
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 import click
 
@@ -125,7 +125,7 @@ class VideoEncoder:
                     check=True,
                     timeout=300,  # 5 minute timeout to prevent indefinite hangs
                 )
-        except subprocess.TimeoutExpired as e:
+        except subprocess.TimeoutExpired:
             raise VideoEncoderError(f"ffmpeg encoding timed out after 5 minutes (frames: {frame_count})")
         except subprocess.CalledProcessError as e:
             error_msg = e.stderr if e.stderr else str(e)

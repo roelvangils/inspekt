@@ -21,7 +21,6 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from inspekt import __version__
-from inspekt.services.bridge_executor import get_executor
 
 # Set up Jinja2 templates
 templates_dir = Path(__file__).parent
@@ -83,7 +82,7 @@ async def track_requests(request: Request, call_next):
             total_api_failed += 1
 
         return response
-    except Exception as e:
+    except Exception:
         total_api_failed += 1
         raise
 

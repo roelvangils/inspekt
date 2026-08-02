@@ -15,8 +15,8 @@ from __future__ import annotations
 import base64
 import io
 import re
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable
 
 from PIL import Image
 

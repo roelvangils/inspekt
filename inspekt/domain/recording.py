@@ -1,7 +1,7 @@
 """Data models for browser interaction recordings."""
 
 from datetime import datetime
-from typing import Annotated, Literal, Optional, Union
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, BeforeValidator, Field
 

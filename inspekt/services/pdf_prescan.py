@@ -125,9 +125,7 @@ def prescan_pdf(pdf_path: Path, max_sample_pages: int = 5) -> PDFPrescanResult:
             mark_info = doc.catalog.get("MarkInfo")
             if mark_info:
                 # MarkInfo can be a direct dict or an indirect reference
-                if hasattr(mark_info, "get"):
-                    has_structure = bool(mark_info.get("Marked", False))
-                elif isinstance(mark_info, dict):
+                if hasattr(mark_info, "get") or isinstance(mark_info, dict):
                     has_structure = bool(mark_info.get("Marked", False))
         except Exception:
             # If we can't read it, assume no structure

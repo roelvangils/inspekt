@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import shutil
 import subprocess
-import sys
 import threading
 from typing import Any
 
@@ -153,7 +152,6 @@ def speak_text(
         if detached:
             # DETACHED MODE: Buffer all audio first, then play via temp file
             # This ensures audio completes even if parent process is killed
-            import os
             import tempfile
 
             # Collect all audio chunks

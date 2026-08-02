@@ -6,7 +6,7 @@ Input/output models for display commands:
 - get_viewport / set_viewport: Browser viewport dimensions
 """
 
-from typing import Literal, Optional
+from typing import Literal
 
 from pydantic import BaseModel, Field
 

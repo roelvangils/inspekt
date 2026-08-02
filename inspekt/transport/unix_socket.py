@@ -11,7 +11,6 @@ import os
 import socket
 import struct
 from pathlib import Path
-from typing import Optional
 
 from .base import (
     ConnectionError,

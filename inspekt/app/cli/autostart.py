@@ -4,7 +4,6 @@ Provides commands to enable/disable automatic startup of the bridge
 and API servers at login using a macOS LaunchAgent.
 """
 
-import os
 import platform
 import stat
 import subprocess

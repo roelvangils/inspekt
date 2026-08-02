@@ -6,7 +6,6 @@ finding the Chrome binary on different platforms, and graceful shutdown.
 """
 
 import asyncio
-import json
 import os
 import platform
 import shutil
@@ -15,7 +14,6 @@ import socket
 import subprocess
 import tempfile
 from pathlib import Path
-from typing import Optional
 
 import httpx
 

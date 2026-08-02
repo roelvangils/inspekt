@@ -11,7 +11,7 @@ overridden via environment variable INSPEKT_TRANSPORT.
 
 import os
 import time
-from typing import Any, Optional
+from typing import Any
 
 import requests
 
@@ -22,7 +22,6 @@ from inspekt.transport import (
     Request,
     SyncUnixSocketTransport,
     get_socket_path,
-    is_server_available,
 )
 from inspekt.transport import (
     TimeoutError as TransportTimeoutError,
@@ -255,7 +254,6 @@ class BridgeClient(SocketClientMixin):
 
         Returns True if domain was added and retry succeeded, False otherwise.
         """
-        import sys
 
         import click
 

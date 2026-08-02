@@ -10,11 +10,9 @@ This module provides the robots command for inspecting robots.txt files:
 
 from __future__ import annotations
 
-import json
 import re
 import sys
 from typing import Any
-from urllib.parse import urlparse
 
 import click
 import requests
@@ -22,7 +20,6 @@ import requests
 from inspekt.app.cli.icons import get_icon
 from inspekt.app.cli.table import Table, format_status_icon, print_json
 from inspekt.services import http_client
-from inspekt.services.bridge_executor import get_executor
 
 # Try to import protego for RFC 9309 compliance
 try:

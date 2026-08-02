@@ -8,7 +8,7 @@ This module defines Pydantic models for:
 All models use Pydantic v2 for automatic validation and serialization.
 """
 
-from typing import Any, Literal, Optional
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field, field_validator
 

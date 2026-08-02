@@ -7,8 +7,6 @@ against SimplePDFChecker (the oracle/ground truth).
 
 from __future__ import annotations
 
-from pathlib import Path
-
 import pytest
 
 # Import fixtures from the PDF fixtures conftest

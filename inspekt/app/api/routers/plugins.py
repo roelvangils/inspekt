@@ -6,12 +6,10 @@ This module provides HTTP API endpoints for managing custom JavaScript plugins
 Plugins are stored in SQLite and can be executed via CLI, API, or MCP tools.
 """
 
-import json
 from typing import Any
 
 import requests
 from fastapi import APIRouter, HTTPException
-from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 from inspekt.services.plugin_service import get_plugin_service

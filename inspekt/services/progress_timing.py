@@ -18,7 +18,6 @@ Usage:
 """
 
 from dataclasses import asdict, dataclass, field
-from typing import Literal
 
 from inspekt.services.pdf_prescan import PDFPrescanResult
 

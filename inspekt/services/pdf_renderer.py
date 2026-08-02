@@ -16,12 +16,7 @@ PyMuPDF is preferred over pdf2image because:
 from __future__ import annotations
 
 import logging
-from io import BytesIO
 from pathlib import Path
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    pass
 
 logger = logging.getLogger(__name__)
 

@@ -2,8 +2,6 @@
 
 from pathlib import Path
 
-import pytest
-
 from inspekt.services.image_gallery import GalleryImage, _compute_acc_hints
 
 

@@ -10,7 +10,6 @@ import hashlib
 import json
 import socket
 import struct
-from typing import Optional
 
 from .base import (
     ConnectionError,

@@ -8,7 +8,6 @@ This adapter abstracts file I/O to:
 """
 
 from pathlib import Path
-from typing import BinaryIO
 
 import aiofiles
 

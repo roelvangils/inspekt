@@ -3,7 +3,6 @@
 import subprocess
 from unittest.mock import Mock, patch
 
-import pytest
 import requests
 
 from inspekt.services.control_manager import (

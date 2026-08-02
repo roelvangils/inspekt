@@ -6,10 +6,10 @@ Generates MCP tool definitions and handlers from CommandDefinitions.
 
 from __future__ import annotations
 
-import asyncio
 import importlib
 import logging
-from typing import TYPE_CHECKING, Any, Callable
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Any
 
 from inspekt.core.commands.base import CommandDefinition
 from inspekt.core.registry import CommandRegistry

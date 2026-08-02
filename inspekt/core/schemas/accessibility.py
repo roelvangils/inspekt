@@ -4,7 +4,7 @@ Accessibility command schemas.
 Pydantic models for axe-core audits and autocomplete checks.
 """
 
-from typing import Any, Optional
+from typing import Any
 
 from pydantic import BaseModel, Field
 

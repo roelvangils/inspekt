@@ -16,7 +16,6 @@ import re
 import sqlite3
 import time
 from datetime import UTC
-from pathlib import Path
 from typing import Any
 from urllib.parse import unquote
 
@@ -679,7 +678,7 @@ class PluginService:
                 "unload_code": p["unload_code"],
             })
 
-        from datetime import datetime, timezone
+        from datetime import datetime
 
         export_data = {
             "version": "1.0",

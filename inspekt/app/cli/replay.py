@@ -9,7 +9,6 @@ import sys
 import time
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
 
 import click
 import requests
@@ -33,7 +32,6 @@ from .formatting import (
     format_step_for_display,
     format_step_header,
     format_system_message,
-    get_recordings_dir,
 )
 from .recording_utils import load_external_file_content
 from .table import Table, _style_with_inline_code, print_error, print_hint, print_warning, wrap_text
@@ -47,7 +45,6 @@ from inspekt.shared.dialog_styles import DIALOG_STYLES
 
 from .recording_utils import (
     TerminalEchoSuppressor,
-    clean_filename,
     complete_recording_files,
     find_most_recent_recording,
 )
@@ -653,7 +650,7 @@ def _try_native_keypress_with_detection(step, client, attempt: int = 1) -> dict:
 
         return native_result
 
-    except Exception as e:
+    except Exception:
         # If anything goes wrong with detection, fall back to normal execution
         return _execute_native_keypress(step)
 
@@ -957,7 +954,6 @@ def _interruptible_wait(seconds: float, action_name: str, elapsed_ms: int = 0, s
         True if user skipped, False if waited full duration
     """
     import select
-    import shutil
     import sys
 
     hourglass_icon = "\uf251"  #  nf-fa-hourglass_half
@@ -2236,9 +2232,7 @@ def replay(
     for i, s in enumerate(steps_to_run):
         # Count native steps
         step_native = getattr(s, 'native', None)
-        if step_native is True and s.action in keyboard_actions:
-            native_count += 1
-        elif step_native is None and native and s.action in keyboard_actions:
+        if (step_native is True and s.action in keyboard_actions) or (step_native is None and native and s.action in keyboard_actions):
             native_count += 1
 
         # Count skipped steps

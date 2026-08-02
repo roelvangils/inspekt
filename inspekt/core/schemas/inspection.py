@@ -6,7 +6,7 @@ Input/output models for inspection commands:
 - take_screenshot
 """
 
-from typing import Literal, Optional
+from typing import Literal
 
 from pydantic import BaseModel, Field
 

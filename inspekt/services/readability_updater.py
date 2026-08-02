@@ -12,9 +12,10 @@ import json
 import shutil
 import tempfile
 import time
+from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Callable, Optional
+from typing import Any
 
 import requests
 from packaging import version

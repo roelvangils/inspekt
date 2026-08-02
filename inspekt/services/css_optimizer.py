@@ -52,7 +52,7 @@ def alphabetize_css_properties(css_content: str) -> str:
             if brace_depth > 0 or "{" in line:
                 # Part of a nested rule
                 nested_blocks.append(line)
-            elif stripped.startswith("/*") and not ":" in stripped:
+            elif stripped.startswith("/*") and ":" not in stripped:
                 # Standalone comment, attach to next property
                 current_property.append(line)
             elif ":" in stripped and stripped.endswith(";"):
@@ -919,9 +919,7 @@ def _process_css_block(lines: list[str], start_idx: int, column_format: str) -> 
                 # Format multi-line property with block's column width
                 formatted_lines = _format_multiline_property(item_lines, block_indent, max_prop_len)
                 result.extend(formatted_lines)
-            elif item_type == "nested_start":
-                result.extend(item_lines)
-            elif item_type == "nested_content":
+            elif item_type == "nested_start" or item_type == "nested_content":
                 result.extend(item_lines)
             else:
                 # passthrough, section comments, etc.
@@ -930,10 +928,7 @@ def _process_css_block(lines: list[str], start_idx: int, column_format: str) -> 
         # Include the section boundary if present
         if section_end < len(block_items):
             item_type, item_lines, _ = block_items[section_end]
-            if item_type == "section":
-                result.extend(item_lines)
-                section_start = section_end + 1
-            elif item_type == "close":
+            if item_type == "section" or item_type == "close":
                 result.extend(item_lines)
                 section_start = section_end + 1
             else:

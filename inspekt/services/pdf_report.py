@@ -23,14 +23,10 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from inspekt.services.pdf_checker import PDFEnhancedMetadata, PDFFullResult
+    from inspekt.services.pdf_checker import PDFFullResult
     from inspekt.services.pdf_contrast_checker import ContrastAnalysisResult
-    from inspekt.services.pdf_issue_visualizer import VisualizationResult
-    from inspekt.services.pdf_ocr import TextDiscrepancyResult
     from inspekt.services.pdf_report_assets import PDFReportAssets
     from inspekt.services.pdf_report_data import PDFReportData
-    from inspekt.services.pdf_scoring import AccessibilityScore
-    from inspekt.services.simple_pdf_checker import SimplePDFResult
 
 logger = logging.getLogger(__name__)
 

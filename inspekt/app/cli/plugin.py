@@ -18,8 +18,7 @@ import json
 import shutil
 import subprocess
 import sys
-from datetime import UTC, datetime, timezone
-from pathlib import Path
+from datetime import UTC, datetime
 
 import click
 import requests

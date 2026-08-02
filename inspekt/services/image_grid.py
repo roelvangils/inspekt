@@ -7,7 +7,6 @@ Creates a labeled grid of screenshots showing an element in different CSS states
 from __future__ import annotations
 
 import io
-from typing import TYPE_CHECKING
 
 # Pillow is optional - check before importing
 _PILLOW_AVAILABLE = False
@@ -20,8 +19,6 @@ except ImportError:
     ImageDraw = None  # type: ignore
     ImageFont = None  # type: ignore
 
-if TYPE_CHECKING:
-    pass
 
 
 def is_pillow_installed() -> bool:

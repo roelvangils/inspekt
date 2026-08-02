@@ -9,7 +9,6 @@ to browser extension storage.
 
 from datetime import UTC
 
-import aiohttp
 import requests
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
@@ -269,7 +268,7 @@ def list_domains():
         ```
     """
     try:
-        from datetime import datetime, timezone
+        from datetime import datetime
 
         domain_service = get_domain_service()
 
@@ -561,7 +560,7 @@ def _sync_domains_to_browser():
         domains_list = domain_service.get_all_domains()
 
         # Convert to browser storage format
-        from datetime import datetime, timezone
+        from datetime import datetime
 
         domains = {}
         for item in domains_list:

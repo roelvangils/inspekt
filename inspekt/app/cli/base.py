@@ -16,7 +16,6 @@ from typing import Any
 
 import click
 
-from inspekt import config as inspekt_config
 from inspekt.services.ai_integration import get_ai_service
 
 # Save built-in functions before they get shadowed by Click commands

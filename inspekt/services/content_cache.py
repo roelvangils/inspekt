@@ -14,7 +14,6 @@ import hashlib
 import json
 import sqlite3
 import time
-from pathlib import Path
 from typing import Any
 
 from inspekt.config import get_data_dir, load_config

@@ -7,7 +7,7 @@ client-server communication, supporting both async and sync interfaces.
 import uuid
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Any, Optional
+from typing import Any
 
 
 class TransportError(Exception):

@@ -8,7 +8,6 @@ from inspekt.services.key_parser import (
     DEFAULT_WAIT_SECONDS,
     MAX_REPEAT_COUNT,
     MAX_WAIT_SECONDS,
-    KeySpec,
     expand_repeats,
     get_supported_keys,
     parse_key_sequence,

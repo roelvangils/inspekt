@@ -261,7 +261,7 @@ def _verify_vm_serving_correctly(timeout: int = 10) -> tuple[bool, str | None]:
                 return True, None
         except urllib.error.URLError:
             time.sleep(0.5)
-        except Exception as e:
+        except Exception:
             time.sleep(0.5)
 
     return False, "Timeout waiting for VM to respond"
@@ -393,7 +393,7 @@ def _start_container(dev_mode: bool = False, vm_dir: Path = None) -> bool:
         if extensions_src.exists():
             cmd.extend(["-v", f"{extensions_src}:/opt/inspekt/extensions:ro"])
 
-        click.echo("    Volume mounts (directory mounts only — single-file mounts");
+        click.echo("    Volume mounts (directory mounts only — single-file mounts")
         click.echo("    desync on atomic-rewrite; entrypoint.sh symlinks the targets):")
         click.echo("    • vm/ → /host/vm-source/  (source tree, symlinked into expected paths)")
         click.echo("    • vm/css → /usr/share/novnc/css/")
@@ -739,7 +739,6 @@ def status(output_json):
         inspekt vm status        # Human-readable output
         inspekt vm status --json # JSON output
     """
-    import json
 
     from inspekt.app.cli.icons import get_indicator
     from inspekt.app.cli.table import Table, format_status_icon

@@ -6,7 +6,6 @@ Commands for listing, aliasing, and identifying browser instances.
 
 from __future__ import annotations
 
-import os
 import sys
 
 import click

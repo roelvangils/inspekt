@@ -7,7 +7,7 @@ Input/output models for storage commands:
 - set_cookie
 """
 
-from typing import Literal, Optional
+from typing import Literal
 
 from pydantic import BaseModel, Field
 

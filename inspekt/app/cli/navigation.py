@@ -14,7 +14,6 @@ This module provides commands for browser navigation:
 """
 
 import json
-import sys
 
 import click
 

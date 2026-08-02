@@ -5,9 +5,10 @@ CommandDefinition is the single source of truth for all Inspekt commands.
 CLI, API, and MCP interfaces are generated from these definitions.
 """
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Callable, Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel
 

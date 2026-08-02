@@ -27,7 +27,7 @@ import json as _json
 import re
 import shutil
 from contextlib import contextmanager
-from typing import Any, Optional
+from typing import Any
 
 import click
 

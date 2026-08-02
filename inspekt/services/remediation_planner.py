@@ -20,7 +20,7 @@ from enum import Enum
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from inspekt.services.pdf_checker import PDFBasicResult, PDFFullResult, VeraPDFViolation
+    from inspekt.services.pdf_checker import PDFFullResult, VeraPDFViolation
     from inspekt.services.pdf_content_auditor import ContentAuditResult
     from inspekt.services.pdf_structure_extractor import StructureExtractionResult
 

@@ -36,7 +36,7 @@ def _format_date(iso_str: str) -> str:
     '2026-04-01'                   → '3d ago'
     '2025-10-20'                   → '1y, 5m ago'
     """
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     if not iso_str:
         return ""
@@ -631,7 +631,6 @@ def _interactive_picker(items: list[dict]) -> str | None:
 
 def _gum_picker(items: list[dict]) -> str | None:
     """Fuzzy search picker using gum filter."""
-    import subprocess
 
     # Sort by last modified date (most recent first)
     items = _sort_by_lastmod(items)
@@ -1128,7 +1127,6 @@ def sitemap(url, flat, filter_path, lang, open_target, interactive, where, neigh
                 parts.append(f"{already_checked_in_subset} unreachable")
             click.echo(f"  {', '.join(parts)} (of {len(entries_to_fetch)} total)", err=err)
 
-        import time as _time
 
         # Progress bar with throttle notification
         bar = click.progressbar(

@@ -6,9 +6,7 @@ Tests for the accessibility score calculation algorithm.
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock, patch
-
-import pytest
+from unittest.mock import MagicMock
 
 
 class TestAccessibilityScore:

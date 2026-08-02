@@ -15,8 +15,6 @@ from pydantic import ValidationError
 
 from inspekt.core.schemas.screen_reader import (
     SRAnnounceParams,
-    SRAnnounceResponse,
-    SRDifference,
     SRElementAnnouncement,
     SRWalkParams,
     SRWalkResponse,

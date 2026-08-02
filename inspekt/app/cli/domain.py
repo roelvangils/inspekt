@@ -13,7 +13,6 @@ The www. prefix is automatically stripped (github.com allows www.github.com).
 
 from __future__ import annotations
 
-import json
 import sys
 from datetime import UTC, datetime
 
@@ -139,7 +138,6 @@ def domain_list(output_json):
         inspekt domain list --json       # JSON format
     """
     try:
-        from datetime import timezone
 
         domain_service = get_domain_service()
 

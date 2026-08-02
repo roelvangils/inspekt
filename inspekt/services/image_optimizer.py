@@ -6,7 +6,6 @@ Provides PNG optimization using oxipng (a Rust-based PNG optimizer).
 
 import shutil
 import subprocess
-import sys
 import tempfile
 from pathlib import Path
 

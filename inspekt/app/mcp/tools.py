@@ -10,7 +10,6 @@ import base64
 import json
 import logging
 from pathlib import Path
-from typing import Any
 
 from inspekt.app.mcp import schemas
 from inspekt.config import get_bridge_port

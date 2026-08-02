@@ -9,7 +9,7 @@ This module provides commands for executing JavaScript code in the browser:
 from __future__ import annotations
 
 import sys
-from datetime import UTC, datetime, timezone
+from datetime import UTC, datetime
 
 import click
 import requests

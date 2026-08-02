@@ -1,6 +1,5 @@
 """Display API endpoints — zoom and viewport control."""
 
-from typing import Optional
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field

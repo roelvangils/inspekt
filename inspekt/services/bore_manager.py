@@ -17,7 +17,6 @@ import tarfile
 import tempfile
 import zipfile
 from pathlib import Path
-from typing import Optional
 
 import requests
 

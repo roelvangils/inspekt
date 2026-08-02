@@ -9,9 +9,9 @@ import asyncio
 import json
 import logging
 from datetime import datetime, timedelta
-from typing import Any, Optional
+from typing import Any
 
-from mcp.types import EmbeddedResource, ImageContent, Resource, TextContent
+from mcp.types import Resource
 
 from inspekt.services.bridge_executor import BridgeExecutor
 

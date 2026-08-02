@@ -27,7 +27,6 @@ from typing import Any, Literal
 from fastapi import APIRouter, HTTPException, Response
 from pydantic import BaseModel, Field
 
-from inspekt.app.api.dependencies import get_bridge_client
 from inspekt.app.api.models import CommandResponse
 from inspekt.services.bridge_executor import get_executor
 from inspekt.services.script_loader import ScriptLoader

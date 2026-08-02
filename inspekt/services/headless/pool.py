@@ -8,7 +8,6 @@ operations and repeated commands.
 
 import asyncio
 import time
-from typing import Optional
 
 from inspekt.services.headless.cdp import CDPClient, CDPSession
 from inspekt.services.headless.chrome import HeadlessChrome
@@ -268,7 +267,6 @@ class PooledHeadlessContext:
 
     async def __aenter__(self) -> "PooledHeadlessContext":
         """Set up using pooled Chrome instance."""
-        from inspekt.services.headless.state import BrowserState, StateMirror
 
         try:
             # Get Chrome from pool

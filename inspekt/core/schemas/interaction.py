@@ -6,7 +6,7 @@ Input/output models for interaction commands:
 - type_text
 """
 
-from typing import Literal, Optional
+from typing import Literal
 
 from pydantic import BaseModel, Field
 

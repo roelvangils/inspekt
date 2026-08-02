@@ -7,7 +7,7 @@ Input/output models for navigation commands:
 - get_sitemap
 """
 
-from typing import Literal, Optional
+from typing import Literal
 
 from pydantic import BaseModel, Field
 

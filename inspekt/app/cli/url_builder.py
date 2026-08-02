@@ -19,8 +19,9 @@ Example:
 from __future__ import annotations
 
 import functools
-from typing import Any, Callable
-from urllib.parse import quote, urlencode
+from collections.abc import Callable
+from typing import Any
+from urllib.parse import quote
 
 import click
 

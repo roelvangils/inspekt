@@ -6,10 +6,6 @@ Tests for extracting and validating PDF tag structure trees.
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock, patch
-
-import pytest
-
 
 class TestStructureNode:
     """Unit tests for StructureNode dataclass."""

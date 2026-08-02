@@ -8,8 +8,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
-
 
 class TestWCAGCriterion:
     """Unit tests for WCAGCriterion dataclass."""
@@ -182,7 +180,6 @@ class TestMappingDataFile:
 
     def test_mapping_file_exists(self):
         """Test that the mapping JSON file exists."""
-        from pathlib import Path
 
         mapping_file = Path(__file__).parent.parent.parent / "inspekt" / "data" / "pdfua_wcag_mapping.json"
         assert mapping_file.exists(), f"Mapping file not found: {mapping_file}"
@@ -190,7 +187,6 @@ class TestMappingDataFile:
     def test_mapping_file_is_valid_json(self):
         """Test that the mapping file contains valid JSON."""
         import json
-        from pathlib import Path
 
         mapping_file = Path(__file__).parent.parent.parent / "inspekt" / "data" / "pdfua_wcag_mapping.json"
 
@@ -204,7 +200,6 @@ class TestMappingDataFile:
     def test_mapping_entries_have_required_fields(self):
         """Test that mapping entries have required fields."""
         import json
-        from pathlib import Path
 
         mapping_file = Path(__file__).parent.parent.parent / "inspekt" / "data" / "pdfua_wcag_mapping.json"
 

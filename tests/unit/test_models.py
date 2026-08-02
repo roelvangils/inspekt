@@ -8,7 +8,6 @@ from inspekt.domain.models import (
     ExecuteRequest,
     ExecuteResult,
     HealthResponse,
-    NotificationsResponse,
     PingMessage,
     PongMessage,
     RefocusNotification,
