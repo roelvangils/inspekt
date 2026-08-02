@@ -1383,7 +1383,7 @@ def get_transport_config() -> dict[str, Any]:
     config = load_config()
     transport_config = config.get("transport", {})
 
-    # type: must be one of the valid transport types
+    # The "type" key must be one of the valid transport types
     # Environment variable takes precedence
     transport_type = os.environ.get("INSPEKT_TRANSPORT")
     if transport_type is None:
