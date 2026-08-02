@@ -6,7 +6,7 @@ Run with: pytest tests/mcp/test_mcp_functional.py -v
 """
 
 import pytest
-from unittest.mock import Mock
+from unittest.mock import AsyncMock, Mock, patch
 
 from inspekt.app.mcp import schemas
 
@@ -53,43 +53,49 @@ class TestToolExecution:
         assert result.url == "https://example.com/long-page"
 
     @pytest.mark.asyncio
-    async def test_execute_javascript_simple(self, tool_provider, mock_bridge_executor):
+    async def test_execute_javascript_simple(self, tool_provider):
         """execute_javascript returns result."""
-        mock_bridge_executor.execute.return_value = {
-            "ok": True,
-            "result": 2
-        }
-
-        params = schemas.ExecuteJavaScriptParams(code="1 + 1")
-        result = await tool_provider.execute_javascript(params)
+        # execute_javascript talks to the bridge over HTTP via the async
+        # execution service (imported inside the method) — patch it at source.
+        with patch(
+            "inspekt.services.execution.execute_javascript",
+            new=AsyncMock(return_value={"success": True, "result": 2}),
+        ):
+            params = schemas.ExecuteJavaScriptParams(code="1 + 1")
+            result = await tool_provider.execute_javascript(params)
 
         assert result.success is True
         assert result.result == 2
 
     @pytest.mark.asyncio
-    async def test_execute_javascript_object_result(self, tool_provider, mock_bridge_executor):
+    async def test_execute_javascript_object_result(self, tool_provider):
         """execute_javascript returns complex objects."""
-        mock_bridge_executor.execute.return_value = {
-            "ok": True,
-            "result": {"foo": "bar", "count": 42}
-        }
-
-        params = schemas.ExecuteJavaScriptParams(code="({foo: 'bar', count: 42})")
-        result = await tool_provider.execute_javascript(params)
+        with patch(
+            "inspekt.services.execution.execute_javascript",
+            new=AsyncMock(
+                return_value={"success": True, "result": {"foo": "bar", "count": 42}}
+            ),
+        ):
+            params = schemas.ExecuteJavaScriptParams(code="({foo: 'bar', count: 42})")
+            result = await tool_provider.execute_javascript(params)
 
         assert result.success is True
         assert result.result == {"foo": "bar", "count": 42}
 
     @pytest.mark.asyncio
-    async def test_execute_javascript_error(self, tool_provider, mock_bridge_executor):
+    async def test_execute_javascript_error(self, tool_provider):
         """execute_javascript handles errors."""
-        mock_bridge_executor.execute.return_value = {
-            "ok": False,
-            "error": "SyntaxError: Unexpected token"
-        }
-
-        params = schemas.ExecuteJavaScriptParams(code="invalid syntax {{{")
-        result = await tool_provider.execute_javascript(params)
+        with patch(
+            "inspekt.services.execution.execute_javascript",
+            new=AsyncMock(
+                return_value={
+                    "success": False,
+                    "error": "SyntaxError: Unexpected token",
+                }
+            ),
+        ):
+            params = schemas.ExecuteJavaScriptParams(code="invalid syntax {{{")
+            result = await tool_provider.execute_javascript(params)
 
         assert result.success is False
         assert "error" in result.error.lower() or "syntax" in result.error.lower()
@@ -201,18 +207,23 @@ class TestNavigationTools:
     """Tests for navigation tools."""
 
     @pytest.mark.asyncio
-    async def test_navigate_to_url(self, tool_provider, mock_bridge_executor):
+    async def test_navigate_to_url(self, tool_provider):
         """navigate_to_url navigates and returns new URL."""
-        mock_bridge_executor.execute.return_value = {
-            "ok": True,
-            "result": {
-                "url": "https://example.com/new-page",
-                "title": "New Page"
-            }
-        }
-
-        params = schemas.NavigateToUrlParams(url="https://example.com/new-page")
-        result = await tool_provider.navigate_to_url(params)
+        # navigate_to_url goes through the unified navigation service
+        # (imported inside the method) — patch it at source.
+        with patch(
+            "inspekt.services.navigation.navigate",
+            new=AsyncMock(
+                return_value={
+                    "success": True,
+                    "url": "https://example.com/new-page",
+                    "title": "New Page",
+                    "message": "Navigation successful",
+                }
+            ),
+        ):
+            params = schemas.NavigateToUrlParams(url="https://example.com/new-page")
+            result = await tool_provider.navigate_to_url(params)
 
         assert result.success is True
         assert result.url == "https://example.com/new-page"

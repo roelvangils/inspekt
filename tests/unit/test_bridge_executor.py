@@ -9,6 +9,16 @@ import pytest
 from inspekt.services.bridge_executor import BridgeExecutor, get_executor
 
 
+def make_connected_executor(**kwargs) -> BridgeExecutor:
+    """Executor with a mocked client that passes the server/browser/domain preflights."""
+    executor = BridgeExecutor(**kwargs)
+    executor._client = Mock()
+    executor._client.is_alive.return_value = True
+    executor._client.get_status.return_value = {"connected_browsers": 1}
+    executor._check_domain_and_prompt = Mock(return_value=True)
+    return executor
+
+
 class TestBridgeExecutorInitialization:
     """Test BridgeExecutor initialization."""
 
@@ -103,7 +113,7 @@ class TestServerStatusChecking:
         executor.ensure_server_running()
 
         mock_echo.assert_called_once_with(
-            "Error: Bridge server is not running. Start it with: inspekt server start",
+            "Error: Bridge server is not running. Start it with: inspekt start",
             err=True,
         )
         mock_exit.assert_called_once_with(1)
@@ -115,9 +125,7 @@ class TestCodeExecution:
     @patch("inspekt.services.bridge_executor.click.echo")
     def test_execute_success(self, mock_echo):
         """Test execute() with successful execution."""
-        executor = BridgeExecutor()
-        executor._client = Mock()
-        executor._client.is_alive.return_value = True
+        executor = make_connected_executor()
         executor._client.execute.return_value = {
             "ok": True,
             "result": "Hello World",
@@ -129,7 +137,7 @@ class TestCodeExecution:
         assert result["ok"] is True
         assert result["result"] == "Hello World"
         executor._client.execute.assert_called_once_with(
-            "console.log('test')", timeout=10.0
+            "console.log('test')", timeout=10.0, _fast_poll=False, instance=None
         )
         mock_echo.assert_not_called()
 
@@ -137,9 +145,7 @@ class TestCodeExecution:
     @patch("inspekt.services.bridge_executor.click.echo")
     def test_execute_with_timeout_and_retry_logic(self, mock_echo, mock_sleep):
         """Test execute() with timeout and retry logic."""
-        executor = BridgeExecutor(max_retries=3, retry_delay=0.5)
-        executor._client = Mock()
-        executor._client.is_alive.return_value = True
+        executor = make_connected_executor(max_retries=3, retry_delay=0.5)
 
         # First two attempts timeout, third succeeds
         executor._client.execute.side_effect = [
@@ -176,9 +182,7 @@ class TestCodeExecution:
         # Make sys.exit raise SystemExit to stop execution
         mock_exit.side_effect = SystemExit(1)
 
-        executor = BridgeExecutor(max_retries=2)
-        executor._client = Mock()
-        executor._client.is_alive.return_value = True
+        executor = make_connected_executor(max_retries=2)
         executor._client.execute.side_effect = TimeoutError("Browser not responding")
 
         with pytest.raises(SystemExit):
@@ -198,9 +202,7 @@ class TestCodeExecution:
         # Make sys.exit raise SystemExit to stop execution
         mock_exit.side_effect = SystemExit(1)
 
-        executor = BridgeExecutor()
-        executor._client = Mock()
-        executor._client.is_alive.return_value = True
+        executor = make_connected_executor()
         executor._client.execute.side_effect = ConnectionError("Connection failed")
 
         with pytest.raises(SystemExit):
@@ -217,9 +219,7 @@ class TestCodeExecution:
         # Make sys.exit raise SystemExit to stop execution
         mock_exit.side_effect = SystemExit(1)
 
-        executor = BridgeExecutor()
-        executor._client = Mock()
-        executor._client.is_alive.return_value = True
+        executor = make_connected_executor()
         executor._client.execute.side_effect = RuntimeError("Script execution failed")
 
         with pytest.raises(SystemExit):
@@ -232,9 +232,7 @@ class TestCodeExecution:
     @patch("inspekt.services.bridge_executor.click.echo")
     def test_execute_retry_on_timeout_false(self, mock_echo):
         """Test execute() with retry_on_timeout=False uses single attempt."""
-        executor = BridgeExecutor(max_retries=5)
-        executor._client = Mock()
-        executor._client.is_alive.return_value = True
+        executor = make_connected_executor(max_retries=5)
         executor._client.execute.return_value = {"ok": True, "result": "test"}
 
         result = executor.execute("test code", retry_on_timeout=False)
@@ -255,9 +253,7 @@ class TestFileExecution:
         mock_file.__enter__.return_value.read.return_value = "console.log('from file');"
         mock_open.return_value = mock_file
 
-        executor = BridgeExecutor()
-        executor._client = Mock()
-        executor._client.is_alive.return_value = True
+        executor = make_connected_executor()
         executor._client.execute.return_value = {"ok": True, "result": "success"}
 
         result = executor.execute_file("/path/to/test.js")
@@ -265,7 +261,7 @@ class TestFileExecution:
         assert result["ok"] is True
         mock_open.assert_called_once_with("/path/to/test.js", encoding="utf-8")
         executor._client.execute.assert_called_once_with(
-            "console.log('from file');", timeout=10.0
+            "console.log('from file');", timeout=10.0, _fast_poll=False, instance=None
         )
 
     @patch("inspekt.services.bridge_executor.sys.exit")
@@ -314,14 +310,14 @@ class TestFileExecution:
         mock_file.__enter__.return_value.read.return_value = "test code"
         mock_open.return_value = mock_file
 
-        executor = BridgeExecutor()
-        executor._client = Mock()
-        executor._client.is_alive.return_value = True
+        executor = make_connected_executor()
         executor._client.execute.return_value = {"ok": True}
 
         executor.execute_file("/path/test.js", timeout=20.0, retry_on_timeout=True)
 
-        executor._client.execute.assert_called_once_with("test code", timeout=20.0)
+        executor._client.execute.assert_called_once_with(
+            "test code", timeout=20.0, _fast_poll=False, instance=None
+        )
 
 
 class TestScriptExecutionWithTemplates:
@@ -335,9 +331,7 @@ class TestScriptExecutionWithTemplates:
         mock_loader.load_script_sync.return_value = "console.log('loaded script');"
         mock_loader_class.return_value = mock_loader
 
-        executor = BridgeExecutor()
-        executor._client = Mock()
-        executor._client.is_alive.return_value = True
+        executor = make_connected_executor()
         executor._client.execute.return_value = {"ok": True, "result": "executed"}
 
         result = executor.execute_with_script("test_script.js")
@@ -347,7 +341,7 @@ class TestScriptExecutionWithTemplates:
             "test_script.js", substitutions=None
         )
         executor._client.execute.assert_called_once_with(
-            "console.log('loaded script');", timeout=10.0
+            "console.log('loaded script');", timeout=10.0, _fast_poll=False, instance=None
         )
 
     @patch("inspekt.services.script_loader.ScriptLoader")
@@ -358,9 +352,7 @@ class TestScriptExecutionWithTemplates:
         mock_loader.load_script_sync.return_value = "const action = 'start';"
         mock_loader_class.return_value = mock_loader
 
-        executor = BridgeExecutor()
-        executor._client = Mock()
-        executor._client.is_alive.return_value = True
+        executor = make_connected_executor()
         executor._client.execute.return_value = {"ok": True}
 
         substitutions = {"ACTION": "start", "VALUE": "42"}
@@ -373,7 +365,7 @@ class TestScriptExecutionWithTemplates:
             "template.js", substitutions=substitutions
         )
         executor._client.execute.assert_called_once_with(
-            "const action = 'start';", timeout=15.0
+            "const action = 'start';", timeout=15.0, _fast_poll=False, instance=None
         )
 
     @patch("inspekt.services.script_loader.ScriptLoader")
@@ -412,9 +404,7 @@ class TestScriptExecutionWithTemplates:
         mock_loader.load_script_sync.return_value = "test code"
         mock_loader_class.return_value = mock_loader
 
-        executor = BridgeExecutor()
-        executor._client = Mock()
-        executor._client.is_alive.return_value = True
+        executor = make_connected_executor()
         executor._client.execute.return_value = {"ok": True}
 
         executor.execute_with_script("test.js", retry_on_timeout=True)
@@ -505,46 +495,6 @@ class TestStatusAndVersionChecking:
 
         assert status is None
         executor._client.get_status.assert_called_once()
-
-    def test_check_userscript_version_no_warning(self):
-        """Test check_userscript_version() when versions match."""
-        executor = BridgeExecutor()
-        executor._client = Mock()
-        executor._client.check_userscript_version.return_value = None
-
-        result = executor.check_userscript_version(show_warning=True)
-
-        assert result is None
-        executor._client.check_userscript_version.assert_called_once_with(
-            show_warning=True
-        )
-
-    def test_check_userscript_version_with_warning(self):
-        """Test check_userscript_version() when versions don't match."""
-        executor = BridgeExecutor()
-        executor._client = Mock()
-        warning_msg = "WARNING: Version mismatch!"
-        executor._client.check_userscript_version.return_value = warning_msg
-
-        result = executor.check_userscript_version(show_warning=True)
-
-        assert result == warning_msg
-        executor._client.check_userscript_version.assert_called_once_with(
-            show_warning=True
-        )
-
-    def test_check_userscript_version_show_warning_false(self):
-        """Test check_userscript_version() with show_warning=False."""
-        executor = BridgeExecutor()
-        executor._client = Mock()
-        executor._client.check_userscript_version.return_value = None
-
-        result = executor.check_userscript_version(show_warning=False)
-
-        assert result is None
-        executor._client.check_userscript_version.assert_called_once_with(
-            show_warning=False
-        )
 
 
 class TestSingletonPattern:

@@ -199,14 +199,14 @@ class TestPDFBasicChecker:
         assert tagged_check is not None
         assert tagged_check.status == "fail"
 
-    def test_check_has_6_checks(self, accessible_pdf):
-        """PDFBasicChecker should run 6 checks."""
+    def test_check_has_7_checks(self, accessible_pdf):
+        """PDFBasicChecker should run all 7 checks."""
         from inspekt.services.pdf_checker import PDFBasicChecker
 
         checker = PDFBasicChecker()
         result = checker.check(accessible_pdf)
 
-        assert len(result.checks) == 6
+        assert len(result.checks) == 7
 
 
 class TestCheckPdfFunction:
@@ -239,13 +239,14 @@ class TestCheckPdfFunction:
         # Check if veraPDF is available
         vera_checker = VeraPDFChecker()
         has_vera = vera_checker.is_native_available() or vera_checker.is_docker_available()
+        if not has_vera:
+            pytest.skip("veraPDF not available (no native binary or Docker image)")
 
         try:
             result = check_pdf(accessible_pdf, engine="all")
             assert result.basic is not None
             assert result.simple is not None
-            # verapdf may or may not be available
         except RuntimeError as e:
-            if "veraPDF is not available" in str(e):
-                pytest.skip("veraPDF not available")
+            if "veraPDF" in str(e):
+                pytest.skip(f"veraPDF unavailable at runtime: {e}")
             raise

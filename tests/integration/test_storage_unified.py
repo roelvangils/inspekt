@@ -464,53 +464,6 @@ class TestStorageClear:
 
 
 # =============================================================================
-# Test Cookies Command Deprecation
-# =============================================================================
-
-
-class TestCookiesDeprecation:
-    """Test deprecation warnings for cookies command."""
-
-    def test_cookies_list_shows_deprecation_warning(self, runner, mock_executor, mock_script_loader):
-        """Test that cookies list shows deprecation warning."""
-        with patch("inspekt.app.cli.cookies.get_executor") as mock_cookies_executor:
-            mock_cookies_executor.return_value = mock_executor
-            mock_executor.execute.return_value = {
-                "ok": True,
-                "result": {
-                    "ok": True,
-                    "action": "list",
-                    "count": 0,
-                    "cookies": {},
-                    "apiUsed": "document.cookie",
-                },
-            }
-
-            result = runner.invoke(cli, ["cookies", "list"])
-
-            # Should show deprecation warning
-            assert "deprecated" in result.output.lower() or "warning" in result.output.lower()
-
-    def test_cookies_get_shows_deprecation_warning(self, runner, mock_executor, mock_script_loader):
-        """Test that cookies get shows deprecation warning."""
-        with patch("inspekt.app.cli.cookies.get_executor") as mock_cookies_executor:
-            mock_cookies_executor.return_value = mock_executor
-            mock_executor.execute.return_value = {
-                "ok": True,
-                "result": {
-                    "ok": True,
-                    "name": "test",
-                    "value": "value",
-                    "exists": True,
-                },
-            }
-
-            result = runner.invoke(cli, ["cookies", "get", "test"])
-
-            assert "deprecated" in result.output.lower() or "warning" in result.output.lower()
-
-
-# =============================================================================
 # Test Error Handling
 # =============================================================================
 

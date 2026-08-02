@@ -13,7 +13,7 @@ class TestImports:
 
     def test_import_cli(self):
         """Test importing the CLI module."""
-        from inspekt import cli
+        from inspekt.app import cli
 
         assert hasattr(cli, "cli")
         assert callable(cli.cli)
@@ -74,21 +74,14 @@ class TestProjectStructure:
             assert script_path.exists(), f"Missing script: {script}"
             assert script_path.suffix == ".js"
 
-    def test_userscript_exists(self, project_root):
-        """Test that userscript file exists."""
-        userscript = project_root / "userscript_ws.js"
-        assert userscript.exists()
-        assert userscript.is_file()
-
     def test_documentation_exists(self, project_root):
         """Test that documentation files exist."""
         docs = [
             "README.md",
-            "SUMMARY.md",
-            "ARCHITECTURE.md",
-            "REFACTOR_PLAN.md",
+            "CHANGELOG.md",
+            "CLAUDE.md",
             "CONTRIBUTING.md",
-            "PROTOCOL.md",
+            "SECURITY.md",
         ]
 
         for doc in docs:
@@ -197,23 +190,26 @@ class TestCLI:
 
     def test_cli_command_group_exists(self):
         """Test that main CLI command group exists."""
-        from inspekt.cli import cli
+        from inspekt.app.cli import cli
 
         assert cli is not None
         assert hasattr(cli, "name")
 
     def test_cli_has_commands(self):
         """Test that CLI has expected commands."""
-        from inspekt.cli import cli
+        import click
 
-        # Get list of registered commands
-        commands = list(cli.commands.keys())
+        from inspekt.app.cli import cli
 
-        # Check for key commands
+        # The group lazy-loads commands, so cli.commands is empty until
+        # list_commands() resolves them.
+        commands = cli.list_commands(click.Context(cli))
+
         expected_commands = [
             "eval",
             "exec",
-            "server",
+            "start",
+            "status",
             "control",
             "links",  # Note: command is 'links' not 'extract-links'
         ]

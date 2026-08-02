@@ -132,9 +132,18 @@ class TestHTTPModels:
         resp = HealthResponse(
             ok=True,
             timestamp=1234567890.0,
+            server_version="1.0.0",
+            uptime_seconds=42.0,
+            host="127.0.0.1",
+            port=8765,
+            websocket_port=8766,
             connected_browsers=1,
             pending=0,
             completed=5,
+            total_processed=5,
+            total_succeeded=5,
+            total_failed=0,
+            last_activity=1234567890.0,
         )
         assert resp.ok is True
         assert resp.timestamp == 1234567890.0

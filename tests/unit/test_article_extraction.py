@@ -54,7 +54,7 @@ class TestArticleExtractionScript:
         """Test that script is wrapped in an IIFE."""
         assert extract_article_script.startswith("//")
         assert "(function()" in extract_article_script
-        assert extract_article_script.strip().endswith("();")
+        assert extract_article_script.strip().endswith("})()")
 
     def test_script_uses_var_declarations(self, extract_article_script):
         """Test that script uses var for compatibility."""

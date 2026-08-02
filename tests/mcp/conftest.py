@@ -12,16 +12,22 @@ from unittest.mock import Mock, AsyncMock, patch
 @pytest.fixture
 def reset_registry():
     """Reset CommandRegistry singleton before each test."""
+    import inspekt.core.commands as commands_module
     from inspekt.core.registry import CommandRegistry
 
-    # Save current instance
+    # Save current state — the singleton AND the registration guard flag.
+    # Restoring only the instance leaves _commands_registered=True, which
+    # makes later register_all_commands() calls no-op on an empty registry.
     old_instance = CommandRegistry._instance
+    old_registered = commands_module._commands_registered
 
     # Reset for test isolation
     CommandRegistry._instance = None
+    commands_module._commands_registered = False
 
     yield
 
+    commands_module._commands_registered = old_registered
     # Restore after test
     CommandRegistry._instance = old_instance
 

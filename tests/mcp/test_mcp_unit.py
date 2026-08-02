@@ -30,8 +30,8 @@ class TestMCPToolGeneration:
             tool = generate_mcp_tool(cmd, registry)
             assert tool.name, f"{cmd.id} missing name"
             assert tool.description, f"{cmd.id} missing description"
-            assert tool.inputSchema, f"{cmd.id} missing inputSchema"
-            assert tool.inputSchema.get("type") == "object", f"{cmd.id} schema type not 'object'"
+            assert tool.input_schema, f"{cmd.id} missing inputSchema"
+            assert tool.input_schema.get("type") == "object", f"{cmd.id} schema type not 'object'"
 
     def test_all_builtin_tools_have_unique_names(self):
         """No duplicate tool names allowed."""

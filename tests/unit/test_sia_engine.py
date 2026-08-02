@@ -5,6 +5,7 @@ Unit tests for Alfa accessibility engine.
 import json
 import pytest
 from pathlib import Path
+from unittest.mock import patch
 
 from inspekt.services.engines.sia_engine import SiaEngine
 from inspekt.services.engines.base import AuditResult, ImpactLevel, NormalizedViolation
@@ -263,13 +264,11 @@ class TestSiaEngineHelpers:
 
 
 class TestSiaEngineDownloadNotSupported:
-    """Test that Alfa engine requires custom bundling."""
+    """Test download_version's tool preflight."""
 
-    def test_download_raises_not_implemented(self):
+    def test_download_returns_none_without_bundling_tools(self):
         engine = SiaEngine()
 
-        with pytest.raises(NotImplementedError) as exc_info:
-            engine.download_version("0.108.2")
-
-        assert "custom bundling" in str(exc_info.value).lower()
-        assert "esbuild" in str(exc_info.value).lower()
+        # Bundling needs pnpm + npx; without them download_version bails out
+        with patch("inspekt.services.engines.sia_engine.shutil.which", return_value=None):
+            assert engine.download_version("0.108.2") is None

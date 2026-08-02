@@ -55,6 +55,8 @@ dev = [
     "pytest-cov>=4.1.0",
     "pytest-asyncio>=0.21.0",
     "playwright>=1.40.0",
+    "pikepdf>=9.0.0",     # PDF test fixtures (tests/fixtures/pdf/conftest.py)
+    "langcodes[data]>=3.4.0",  # language display names in pdf checker tests
     # Type checking
     "mypy>=1.7.0",
     "types-requests>=2.31.0",

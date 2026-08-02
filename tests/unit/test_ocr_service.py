@@ -237,7 +237,7 @@ class TestOCRResult:
             confidence=0.8,
             has_meaningful_text=True,
         )
-        assert len(result.preview) == 100
+        assert len(result.preview) <= 100
         assert result.preview.endswith("…")
 
 

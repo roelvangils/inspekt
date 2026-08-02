@@ -4,9 +4,7 @@ Unit tests for AIIntegrationService.
 Tests cover:
 - Service initialization
 - Language detection and extraction
-- Mods availability checking
 - Prompt loading and formatting
-- Mods calling
 - Debug prompt display
 - High-level AI functions (description, summary)
 - Singleton pattern
@@ -14,8 +12,6 @@ Tests cover:
 
 from __future__ import annotations
 
-import subprocess
-import sys
 from pathlib import Path
 from unittest import mock
 
@@ -63,12 +59,12 @@ def reset_singleton():
 
 
 def test_init_with_default_prompts_dir():
-    """Test initialization with default prompts_dir (project_root/prompts/)."""
+    """Test initialization with default prompts_dir (inspekt/data/prompts/)."""
     service = AIIntegrationService()
 
-    # Should resolve to project_root/prompts/
+    # Should resolve to inspekt/data/prompts/
     assert service.prompts_dir.name == "prompts"
-    assert service.prompts_dir.parent.name == "zen_bridge"
+    assert service.prompts_dir.parent.name == "data"
 
 
 def test_init_with_custom_prompts_dir(mock_prompts_dir):
@@ -228,71 +224,6 @@ def test_extract_page_language_with_whitespace_variations(service):
 
 
 # =============================================================================
-# Test Mods Availability Checking
-# =============================================================================
-
-
-def test_check_mods_available_success(service):
-    """Test check_mods_available when mods is installed."""
-    with mock.patch("subprocess.run") as mock_run:
-        mock_run.return_value = mock.Mock(returncode=0)
-
-        result = service.check_mods_available()
-
-        assert result is True
-        mock_run.assert_called_once_with(
-            ["mods", "--version"],
-            capture_output=True,
-            check=True,
-            timeout=5.0,
-        )
-
-
-def test_check_mods_available_not_found(service):
-    """Test check_mods_available when mods is not found."""
-    with mock.patch("subprocess.run", side_effect=FileNotFoundError):
-        result = service.check_mods_available()
-
-        assert result is False
-
-
-def test_check_mods_available_timeout(service):
-    """Test check_mods_available when command times out."""
-    with mock.patch("subprocess.run", side_effect=subprocess.TimeoutExpired("mods", 5.0)):
-        result = service.check_mods_available()
-
-        assert result is False
-
-
-def test_check_mods_available_called_process_error(service):
-    """Test check_mods_available when mods returns error."""
-    with mock.patch("subprocess.run", side_effect=subprocess.CalledProcessError(1, "mods")):
-        result = service.check_mods_available()
-
-        assert result is False
-
-
-def test_ensure_mods_available_success(service):
-    """Test ensure_mods_available when mods is installed."""
-    with mock.patch.object(service, "check_mods_available", return_value=True):
-        # Should not raise or exit
-        service.ensure_mods_available()
-
-
-def test_ensure_mods_available_failure(service):
-    """Test ensure_mods_available exits when mods is not available."""
-    with mock.patch.object(service, "check_mods_available", return_value=False):
-        with mock.patch("click.echo") as mock_echo:
-            with pytest.raises(SystemExit) as exc_info:
-                service.ensure_mods_available()
-
-            assert exc_info.value.code == 1
-            assert mock_echo.call_count == 2
-            assert "Error: 'mods' command not found" in mock_echo.call_args_list[0][0][0]
-            assert "https://github.com/charmbracelet/mods" in mock_echo.call_args_list[1][0][0]
-
-
-# =============================================================================
 # Test Prompt Loading
 # =============================================================================
 
@@ -413,86 +344,6 @@ def test_format_prompt_order(service):
 
 
 # =============================================================================
-# Test Mods Calling
-# =============================================================================
-
-
-def test_call_mods_success(service):
-    """Test successful mods call."""
-    mock_result = mock.Mock(stdout="AI response here", returncode=0)
-
-    with mock.patch("subprocess.run", return_value=mock_result) as mock_run:
-        result = service.call_mods("Test prompt")
-
-        assert result == "AI response here"
-        mock_run.assert_called_once_with(
-            ["mods"],
-            input="Test prompt",
-            text=True,
-            capture_output=True,
-            check=True,
-            timeout=60.0,
-        )
-
-
-def test_call_mods_with_timeout_parameter(service):
-    """Test call_mods with custom timeout."""
-    mock_result = mock.Mock(stdout="Response", returncode=0)
-
-    with mock.patch("subprocess.run", return_value=mock_result) as mock_run:
-        service.call_mods("Test", timeout=30.0)
-
-        assert mock_run.call_args[1]["timeout"] == 30.0
-
-
-def test_call_mods_timeout_expired(service):
-    """Test call_mods exits when timeout expires."""
-    with mock.patch("subprocess.run", side_effect=subprocess.TimeoutExpired("mods", 60.0)):
-        with mock.patch("click.echo") as mock_echo:
-            with pytest.raises(SystemExit) as exc_info:
-                service.call_mods("Test prompt", timeout=60.0)
-
-            assert exc_info.value.code == 1
-            assert "Error: mods timed out after 60.0 seconds" in mock_echo.call_args[0][0]
-
-
-def test_call_mods_called_process_error(service):
-    """Test call_mods exits on CalledProcessError."""
-    error = subprocess.CalledProcessError(1, "mods", stderr="Error details")
-
-    with mock.patch("subprocess.run", side_effect=error):
-        with mock.patch("click.echo") as mock_echo:
-            with pytest.raises(SystemExit) as exc_info:
-                service.call_mods("Test")
-
-            assert exc_info.value.code == 1
-            # Should echo error message and stderr
-            assert mock_echo.call_count == 2
-            assert "Error calling mods" in mock_echo.call_args_list[0][0][0]
-
-
-def test_call_mods_with_additional_args(service):
-    """Test call_mods with additional CLI arguments."""
-    mock_result = mock.Mock(stdout="Response", returncode=0)
-
-    with mock.patch("subprocess.run", return_value=mock_result) as mock_run:
-        service.call_mods("Test", additional_args=["--model", "gpt-4"])
-
-        expected_cmd = ["mods", "--model", "gpt-4"]
-        assert mock_run.call_args[0][0] == expected_cmd
-
-
-def test_call_mods_empty_additional_args(service):
-    """Test call_mods with empty additional_args list."""
-    mock_result = mock.Mock(stdout="Response", returncode=0)
-
-    with mock.patch("subprocess.run", return_value=mock_result) as mock_run:
-        service.call_mods("Test", additional_args=[])
-
-        assert mock_run.call_args[0][0] == ["mods"]
-
-
-# =============================================================================
 # Test Debug Prompt Display
 # =============================================================================
 
@@ -533,7 +384,7 @@ def test_generate_description_success(service):
     page_structure = "**Language:** en\n\nPage content"
 
     with mock.patch.object(service, "load_prompt", return_value="Base prompt"):
-        with mock.patch.object(service, "call_mods", return_value="Generated description"):
+        with mock.patch.object(service, "call_thoth_text", return_value="Generated description"):
             with mock.patch("click.echo"):
                 result = service.generate_description(page_structure)
 
@@ -546,7 +397,7 @@ def test_generate_description_with_language_override(service):
 
     with mock.patch.object(service, "load_prompt", return_value="Base"):
         with mock.patch.object(service, "format_prompt") as mock_format:
-            with mock.patch.object(service, "call_mods", return_value="Description"):
+            with mock.patch.object(service, "call_thoth_text", return_value="Description"):
                 with mock.patch("click.echo"):
                     service.generate_description(
                         page_structure,
@@ -564,7 +415,7 @@ def test_generate_description_with_debug_mode(service):
 
     with mock.patch.object(service, "load_prompt", return_value="Base"):
         with mock.patch.object(service, "show_debug_prompt") as mock_debug:
-            with mock.patch.object(service, "call_mods") as mock_call:
+            with mock.patch.object(service, "call_thoth_text") as mock_call:
                 result = service.generate_description(
                     page_structure,
                     debug=True
@@ -582,7 +433,7 @@ def test_generate_description_extracts_page_language(service):
     with mock.patch("inspekt.config.load_config", return_value={"ai-language": "auto"}):
         with mock.patch.object(service, "load_prompt", return_value="Base"):
             with mock.patch.object(service, "format_prompt") as mock_format:
-                with mock.patch.object(service, "call_mods", return_value="Desc"):
+                with mock.patch.object(service, "call_thoth_text", return_value="Desc"):
                     with mock.patch("click.echo"):
                         service.generate_description(page_structure)
 
@@ -597,7 +448,7 @@ def test_generate_description_formats_content_correctly(service):
 
     with mock.patch.object(service, "load_prompt", return_value="Base"):
         with mock.patch.object(service, "format_prompt") as mock_format:
-            with mock.patch.object(service, "call_mods", return_value="Desc"):
+            with mock.patch.object(service, "call_thoth_text", return_value="Desc"):
                 with mock.patch("click.echo"):
                     service.generate_description(page_structure)
 
@@ -620,7 +471,7 @@ def test_generate_summary_success(service):
     }
 
     with mock.patch.object(service, "load_prompt", return_value="Base prompt"):
-        with mock.patch.object(service, "call_mods", return_value="Generated summary"):
+        with mock.patch.object(service, "call_thoth_text", return_value="Generated summary"):
             with mock.patch("click.echo"):
                 result = service.generate_summary(article)
 
@@ -637,7 +488,7 @@ def test_generate_summary_with_language_override(service):
 
     with mock.patch.object(service, "load_prompt", return_value="Base"):
         with mock.patch.object(service, "format_prompt") as mock_format:
-            with mock.patch.object(service, "call_mods", return_value="Summary"):
+            with mock.patch.object(service, "call_thoth_text", return_value="Summary"):
                 with mock.patch("click.echo"):
                     service.generate_summary(
                         article,
@@ -657,7 +508,7 @@ def test_generate_summary_with_debug_mode(service):
 
     with mock.patch.object(service, "load_prompt", return_value="Base"):
         with mock.patch.object(service, "show_debug_prompt") as mock_debug:
-            with mock.patch.object(service, "call_mods") as mock_call:
+            with mock.patch.object(service, "call_thoth_text") as mock_call:
                 result = service.generate_summary(article, debug=True)
 
     assert result is None
@@ -676,7 +527,7 @@ def test_generate_summary_uses_article_language(service):
     with mock.patch("inspekt.config.load_config", return_value={"ai-language": "auto"}):
         with mock.patch.object(service, "load_prompt", return_value="Base"):
             with mock.patch.object(service, "format_prompt") as mock_format:
-                with mock.patch.object(service, "call_mods", return_value="Summary"):
+                with mock.patch.object(service, "call_thoth_text", return_value="Summary"):
                     with mock.patch("click.echo"):
                         service.generate_summary(article)
 
@@ -690,7 +541,7 @@ def test_generate_summary_handles_missing_fields(service):
 
     with mock.patch.object(service, "load_prompt", return_value="Base"):
         with mock.patch.object(service, "format_prompt") as mock_format:
-            with mock.patch.object(service, "call_mods", return_value="Summary"):
+            with mock.patch.object(service, "call_thoth_text", return_value="Summary"):
                 with mock.patch("click.echo"):
                     service.generate_summary(article)
 
@@ -708,7 +559,7 @@ def test_generate_summary_formats_content_with_title(service):
 
     with mock.patch.object(service, "load_prompt", return_value="Base"):
         with mock.patch.object(service, "format_prompt") as mock_format:
-            with mock.patch.object(service, "call_mods", return_value="Summary"):
+            with mock.patch.object(service, "call_thoth_text", return_value="Summary"):
                 with mock.patch("click.echo"):
                     service.generate_summary(article)
 
@@ -725,7 +576,7 @@ def test_generate_summary_displays_progress_message(service):
     }
 
     with mock.patch.object(service, "load_prompt", return_value="Base"):
-        with mock.patch.object(service, "call_mods", return_value="Summary"):
+        with mock.patch.object(service, "call_thoth_text", return_value="Summary"):
             with mock.patch("click.echo") as mock_echo:
                 service.generate_summary(article)
 

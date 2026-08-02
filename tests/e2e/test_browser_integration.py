@@ -230,9 +230,14 @@ def server(project_root: Path) -> dict[str, Any]:
     port = 8765
     ws_port = 8766
 
+    # A developer's live bridge on 8765 is indistinguishable from our own
+    # subprocess once wait_for_server succeeds — refuse to run against it.
+    if wait_for_server(host, port, timeout=0.5):
+        pytest.skip(f"Port {port} already in use (is a dev bridge running?)")
+
     # Start server process in background
     process = subprocess.Popen(
-        [sys.executable, "-m", "zen.bridge_ws"],
+        [sys.executable, "-m", "inspekt.bridge_ws"],
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         cwd=str(project_root),
@@ -276,19 +281,24 @@ def browser():
         Playwright browser instance
     """
     # Check if Chromium is installed
+    playwright = None
     try:
         playwright = sync_playwright().start()
         browser = playwright.chromium.launch(headless=True)
         print("\n[Test Setup] Browser launched")
-
-        yield browser
-
-        print("\n[Test Cleanup] Closing browser")
-        browser.close()
-        playwright.stop()
-
     except Exception as e:
+        # Stop playwright before skipping: .start() leaves an event loop
+        # running in the main thread, which breaks later pytest-asyncio tests.
+        if playwright is not None:
+            playwright.stop()
         pytest.skip(f"Failed to launch browser: {e}")
+        return
+
+    yield browser
+
+    print("\n[Test Cleanup] Closing browser")
+    browser.close()
+    playwright.stop()
 
 
 @pytest.fixture

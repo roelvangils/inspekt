@@ -251,7 +251,7 @@ class TestAnalyzeTextDiscrepancy:
     def test_analyze_returns_unavailable_when_no_pymupdf(self):
         """Test graceful degradation when PyMuPDF is not available."""
         with patch("inspekt.services.pdf_ocr.get_ocr_availability", return_value=(True, None)):
-            with patch("inspekt.services.pdf_ocr.is_pymupdf_available", return_value=False):
+            with patch("inspekt.services.pdf_renderer.is_pymupdf_available", return_value=False):
                 from inspekt.services.pdf_ocr import analyze_text_discrepancy
 
                 # Need to reimport after patching

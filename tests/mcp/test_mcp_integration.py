@@ -139,7 +139,7 @@ class TestErrorHandling:
         # Find a tool that requires params
         tool_with_required = None
         for tool in tools:
-            if tool.inputSchema.get("required"):
+            if tool.input_schema.get("required"):
                 tool_with_required = tool
                 break
 

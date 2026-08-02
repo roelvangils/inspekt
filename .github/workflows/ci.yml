@@ -128,7 +128,7 @@ jobs:
 
       - name: Test CLI imports
         run: |
-          python -c "from inspekt import cli; print('✓ CLI imported successfully')"
+          python -c "from inspekt.app import cli; print('✓ CLI imported successfully')"
           python -c "from inspekt.client import BridgeClient; print('✓ Client imported successfully')"
 
       - name: Test inspekt command exists

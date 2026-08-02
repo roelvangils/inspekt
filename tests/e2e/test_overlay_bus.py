@@ -84,10 +84,15 @@ def run_axe_template(project_root: Path) -> str:
 def chromium():
     """Module-scoped headless Chromium. Skipped if launch fails (e.g. on CI
     without browser binaries installed)."""
+    pw = None
     try:
         pw = sync_playwright().start()
         browser = pw.chromium.launch(headless=True)
     except Exception as e:
+        # Stop playwright before skipping: .start() leaves an event loop
+        # running in the main thread, which breaks later pytest-asyncio tests.
+        if pw is not None:
+            pw.stop()
         pytest.skip(f"Failed to launch Chromium: {e}")
         return  # unreachable, satisfies type checkers
 
