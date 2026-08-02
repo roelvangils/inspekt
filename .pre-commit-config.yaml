@@ -1,0 +1,19 @@
+# Referenced by `make pre-commit` and CONTRIBUTING.md.
+# Kept intentionally minimal: ruff mirrors the CI lint/format gates.
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.14.14
+    hooks:
+      - id: ruff
+        args: [--fix]
+      - id: ruff-format
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        args: [--maxkb=1024]
+        # Vendored a11y engines and VM vendor bundles legitimately exceed 1 MB
+        exclude: ^(inspekt/scripts/vendor/|vm/vendor/)
+      - id: end-of-file-fixer
+        exclude: ^(inspekt/scripts/vendor/|vm/vendor/|node_modules/)

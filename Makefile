@@ -67,15 +67,22 @@ help:
 	@echo "  make clean-man    Remove generated man-page intermediates"
 
 # Development setup
+# uv keeps this PEP 668-safe (bare pip fails on Homebrew Python) and creates
+# .venv on first run. Full bootstrap on a fresh machine: ./install.sh
 dev:
-	pip install -e ".[dev]"
+	@command -v uv >/dev/null 2>&1 || { echo "uv is required — install with 'brew install uv' or run ./install.sh"; exit 1; }
+	@[ -d .venv ] || uv venv --python 3.13
+	uv pip install -e ".[dev]"
 	@echo ""
 	@echo "[ok] Development environment ready!"
+	@echo "  Activate with 'source .venv/bin/activate'"
 	@echo "  Run 'make pre-commit' to install pre-commit hooks"
 	@echo "  Run 'make test' to run the test suite"
 
 install:
-	pip install -e .
+	@command -v uv >/dev/null 2>&1 || { echo "uv is required — install with 'brew install uv' or run ./install.sh"; exit 1; }
+	@[ -d .venv ] || uv venv --python 3.13
+	uv pip install -e .
 
 # Clean build artifacts
 clean:
