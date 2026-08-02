@@ -38,7 +38,13 @@
   "content_scripts": [
     {
       "matches": ["http://*/*", "https://*/*"],
-      "js": ["scrollbar-hider.js", "console-hooks.js"],
+      "js": [
+        "scrollbar-hider.js",
+        "console-hooks.js",
+        "overlay-bus-renderers.js",
+        "overlay-bus-inpage.js",
+        "overlay-bus.js"
+      ],
       "run_at": "document_start",
       "all_frames": false
     },
