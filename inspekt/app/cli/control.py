@@ -14,11 +14,11 @@ import time
 
 import click
 
-from inspekt.app.cli.icons import success, error, info, progress
+from inspekt.app.cli.icons import error, info, progress, success
 from inspekt.client import BridgeClient
 from inspekt.services.axe_updater import get_axe_updater
-from inspekt.services.ibm_updater import get_ibm_updater
 from inspekt.services.engines import get_all_engines
+from inspekt.services.ibm_updater import get_ibm_updater
 
 
 def _format_release_date(iso_date: str | None) -> str:
@@ -121,7 +121,7 @@ def _check_readability_updates():
         if not current:
             # Not installed - this shouldn't happen normally but handle it
             click.echo(f"  @mozilla/readability: {click.style('not installed', fg='yellow')}", err=True)
-            click.echo(f"    Run `inspekt update readability` to install", err=True)
+            click.echo("    Run `inspekt update readability` to install", err=True)
             return
 
         if not update_available:
@@ -131,7 +131,7 @@ def _check_readability_updates():
 
         # Update available - show without auto-updating
         click.echo(f"  @mozilla/readability: {click.style('update available', fg='cyan')} ({current} → {latest}{date_suffix})", err=True)
-        click.echo(f"    Run `inspekt update readability` to update", err=True)
+        click.echo("    Run `inspekt update readability` to update", err=True)
 
     except Exception:
         # Silently skip on errors
@@ -413,7 +413,7 @@ def _start_mkdocs_server(host="127.0.0.1", port=8008):
         if proc.poll() is not None:
             # Process has exited - something went wrong
             click.echo(f"  {error('MkDocs server exited unexpectedly')}", err=True)
-            click.echo(f"    Check that mkdocs is installed: pip install mkdocs mkdocs-material", err=True)
+            click.echo("    Check that mkdocs is installed: pip install mkdocs mkdocs-material", err=True)
             return False
 
         # Check if port is now open
@@ -613,25 +613,25 @@ def start(bridge_only, api_only, foreground, api_port, bridge_port, host, docs, 
         # Show docs first (most relevant when --docs is used)
         if docs:
             display_host = "localhost" if host == "127.0.0.1" else host
-            click.echo(f"Docs Server:")
+            click.echo("Docs Server:")
             click.echo(f"  {info(f'MkDocs:        http://{display_host}:{docs_port}')}")
             click.echo(f"  {info(f'Swagger UI:    http://{display_host}:{api_port}/docs')}")
             click.echo(f"  {info(f'ReDoc:         http://{display_host}:{api_port}/redoc')}")
 
         if start_bridge:
-            click.echo(f"Bridge Server:")
+            click.echo("Bridge Server:")
             click.echo(f"  {info(f'HTTP API:      http://127.0.0.1:{bridge_port}')}")
             click.echo(f"  {info(f'WebSocket:     ws://127.0.0.1:{bridge_port + 1}')}")
 
         if start_api:
             display_host = "localhost" if host == "127.0.0.1" else host
-            click.echo(f"\nAPI Server:")
+            click.echo("\nAPI Server:")
             click.echo(f"  {info(f'Status:        http://{display_host}:{api_port}/status')}")
             click.echo(f"  {info(f'Health:        http://{display_host}:{api_port}/health')}")
 
         click.echo(f"\nWeb-based status: http://localhost:{api_port}/status")
-        click.echo(f"View status: inspekt status")
-        click.echo(f"Stop servers: inspekt stop")
+        click.echo("View status: inspekt status")
+        click.echo("Stop servers: inspekt stop")
 
         # Show tip about --docs if not used
         if not docs:
@@ -805,16 +805,16 @@ def restart(foreground, api_port, bridge_port, host, docs, docs_port):
     click.echo(f"\n{success('All servers restarted successfully')}\n")
 
     display_host = "localhost" if host == "127.0.0.1" else host
-    click.echo(f"Bridge Server:")
+    click.echo("Bridge Server:")
     click.echo(f"  {info(f'HTTP API:      http://127.0.0.1:{bridge_port}')}")
     click.echo(f"  {info(f'WebSocket:     ws://127.0.0.1:{bridge_port + 1}')}")
 
-    click.echo(f"\nAPI Server:")
+    click.echo("\nAPI Server:")
     click.echo(f"  {info(f'Status:        http://{display_host}:{api_port}/status')}")
     click.echo(f"  {info(f'Health:        http://{display_host}:{api_port}/health')}")
 
     if docs:
-        click.echo(f"\nDocs Server:")
+        click.echo("\nDocs Server:")
         click.echo(f"  {info(f'MkDocs:        http://{display_host}:{docs_port}')}")
         click.echo(f"  {info(f'Swagger UI:    http://{display_host}:{api_port}/docs')}")
         click.echo(f"  {info(f'ReDoc:         http://{display_host}:{api_port}/redoc')}")
@@ -895,8 +895,8 @@ def status(ctx, output_json):
         print_json(output_data, summary="server status")
     else:
         # Human-readable output using Table formatting
-        from inspekt.app.cli.table import Table, format_status_icon
         from inspekt.app.cli.icons import get_icon
+        from inspekt.app.cli.table import Table, format_status_icon
 
         click.echo()  # Initial spacing
 

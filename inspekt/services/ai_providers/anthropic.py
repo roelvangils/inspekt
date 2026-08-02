@@ -141,7 +141,7 @@ class AnthropicProvider(AIProvider):
 
         except anthropic.APITimeoutError:
             raise AIProviderError(
-                f"API request timed out",
+                "API request timed out",
                 provider=self.name,
             )
         except anthropic.APIStatusError as e:
@@ -231,7 +231,7 @@ class AnthropicProvider(AIProvider):
 
         except anthropic.APITimeoutError:
             raise AIProviderError(
-                f"Vision API request timed out",
+                "Vision API request timed out",
                 provider=self.name,
             )
         except anthropic.APIStatusError as e:

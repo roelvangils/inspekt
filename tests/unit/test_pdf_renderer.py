@@ -7,9 +7,10 @@ PDF pages to images.
 
 from __future__ import annotations
 
-import pytest
 from pathlib import Path
 from unittest.mock import MagicMock, patch
+
+import pytest
 
 
 class TestPyMuPDFAvailability:
@@ -28,6 +29,7 @@ class TestPyMuPDFAvailability:
         with patch.dict("sys.modules", {"fitz": None}):
             # Force reimport to test unavailable path
             import importlib
+
             from inspekt.services import pdf_renderer
 
             importlib.reload(pdf_renderer)
@@ -166,7 +168,7 @@ class TestConvenienceFunctions:
 
     def test_render_pdf_cover_nonexistent_file(self):
         """Test render_pdf_cover with nonexistent file."""
-        from inspekt.services.pdf_renderer import render_pdf_cover, is_pymupdf_available
+        from inspekt.services.pdf_renderer import is_pymupdf_available, render_pdf_cover
 
         if not is_pymupdf_available():
             pytest.skip("PyMuPDF not installed")
@@ -176,7 +178,7 @@ class TestConvenienceFunctions:
 
     def test_render_pdf_page_nonexistent_file(self):
         """Test render_pdf_page with nonexistent file."""
-        from inspekt.services.pdf_renderer import render_pdf_page, is_pymupdf_available
+        from inspekt.services.pdf_renderer import is_pymupdf_available, render_pdf_page
 
         if not is_pymupdf_available():
             pytest.skip("PyMuPDF not installed")

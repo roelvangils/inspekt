@@ -15,8 +15,8 @@ from typing import Any
 
 import requests
 
-from inspekt.services import http_client
 from inspekt.config import get_tts_voice
+from inspekt.services import http_client
 
 
 class TTSError(Exception):
@@ -153,8 +153,8 @@ def speak_text(
         if detached:
             # DETACHED MODE: Buffer all audio first, then play via temp file
             # This ensures audio completes even if parent process is killed
-            import tempfile
             import os
+            import tempfile
 
             # Collect all audio chunks
             audio_chunks = []

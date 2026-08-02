@@ -64,9 +64,9 @@ class ComparisonResult:
 
 
 def _get_check_by_id(
-    checks: list["PDFCheckResult"] | list["SimplePDFCheckResult"],
+    checks: list[PDFCheckResult] | list[SimplePDFCheckResult],
     check_id: str,
-) -> "PDFCheckResult | SimplePDFCheckResult | None":
+) -> PDFCheckResult | SimplePDFCheckResult | None:
     """Get a check result by its ID."""
     for check in checks:
         if check.check_id == check_id:
@@ -75,8 +75,8 @@ def _get_check_by_id(
 
 
 def compare_checkers(
-    basic_result: "PDFBasicResult",
-    simple_result: "SimplePDFResult",
+    basic_result: PDFBasicResult,
+    simple_result: SimplePDFResult,
 ) -> ComparisonResult:
     """
     Compare results from PDFBasicChecker and SimplePDFChecker.

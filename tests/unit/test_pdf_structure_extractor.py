@@ -6,8 +6,9 @@ Tests for extracting and validating PDF tag structure trees.
 
 from __future__ import annotations
 
-import pytest
 from unittest.mock import MagicMock, patch
+
+import pytest
 
 
 class TestStructureNode:
@@ -221,8 +222,9 @@ class TestPDFStructureExtractor:
 
     def test_initialization(self):
         """Test PDFStructureExtractor initialization."""
-        from inspekt.services.pdf_structure_extractor import PDFStructureExtractor
         from pathlib import Path
+
+        from inspekt.services.pdf_structure_extractor import PDFStructureExtractor
 
         # Should initialize without opening file yet
         extractor = PDFStructureExtractor("test.pdf")

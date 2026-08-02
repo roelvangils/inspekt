@@ -22,7 +22,16 @@ import click
 from inspekt.app.cli.icons import get_icon, get_indicator
 from inspekt.app.cli.inspection import _print_tips_section
 from inspekt.app.cli.output import pluralize
-from inspekt.app.cli.table import Table, format_status_icon, print_checkbox_step, print_error, print_hint, print_step, print_success, print_warning
+from inspekt.app.cli.table import (
+    Table,
+    format_status_icon,
+    print_checkbox_step,
+    print_error,
+    print_hint,
+    print_step,
+    print_success,
+    print_warning,
+)
 
 if TYPE_CHECKING:
     from inspekt.services.pdf_checker import PDFBasicResult, PDFFullResult, VeraPDFResult
@@ -83,7 +92,7 @@ def _format_wcag(sc: str | None, level: str | None) -> str:
 # ============================================================================
 
 
-def _print_basic_results(result: "PDFBasicResult", verbose: bool = False) -> None:
+def _print_basic_results(result: PDFBasicResult, verbose: bool = False) -> None:
     """Print basic check results in table format."""
     from inspekt.app.cli.icons import get_indicator
 
@@ -170,7 +179,7 @@ def _print_basic_results(result: "PDFBasicResult", verbose: bool = False) -> Non
             click.echo(f"    Producer: {meta.producer}")
 
 
-def _print_simple_results(result: "SimplePDFResult", verbose: bool = False) -> None:
+def _print_simple_results(result: SimplePDFResult, verbose: bool = False) -> None:
     """Print SimplePDFChecker results in table format."""
     from inspekt.app.cli.icons import get_indicator
 
@@ -285,7 +294,7 @@ def _print_simple_results(result: "SimplePDFResult", verbose: bool = False) -> N
             click.echo("    XMP Metadata: Yes")
 
 
-def _print_verapdf_results(result: "VeraPDFResult", verbose: bool = False) -> None:
+def _print_verapdf_results(result: VeraPDFResult, verbose: bool = False) -> None:
     """Print veraPDF validation results in table format."""
     from inspekt.app.cli.icons import get_indicator
 
@@ -355,7 +364,7 @@ def _print_verapdf_results(result: "VeraPDFResult", verbose: bool = False) -> No
                     click.echo(f"      Context: {v.context}")
 
 
-def _output_json(result: "PDFFullResult") -> None:
+def _output_json(result: PDFFullResult) -> None:
     """Output results as JSON."""
     output = {
         "basic": {
@@ -569,7 +578,7 @@ def check(ctx, files: tuple[str, ...], engine: str, profile: str, json_output: b
         inspekt pdf check document.pdf --engine vera
         inspekt pdf check "reports/*.pdf" --json
     """
-    from inspekt.services.pdf_checker import PDFBasicChecker, VeraPDFChecker, PDFFullResult
+    from inspekt.services.pdf_checker import PDFBasicChecker, PDFFullResult, VeraPDFChecker
 
     # Initialize structured progress emitter if requested (for desktop app)
     emitter = None
@@ -619,7 +628,7 @@ def check(ctx, files: tuple[str, ...], engine: str, profile: str, json_output: b
                 if not vera_checker.is_image_available():
                     click.echo(f"Pulling veraPDF Docker image ({VeraPDFChecker.DOCKER_IMAGE})…")
                 elif pull_vera:
-                    click.echo(f"Updating veraPDF Docker image…")
+                    click.echo("Updating veraPDF Docker image…")
 
                 if not vera_checker.pull_image(quiet=json_output):
                     print_error("Failed to pull veraPDF Docker image")
@@ -741,8 +750,8 @@ def check(ctx, files: tuple[str, ...], engine: str, profile: str, json_output: b
 
     # Generate HTML report if requested
     if output_path and results:
-        from inspekt.services.pdf_report import generate_pdf_report
         from inspekt.app.cli.output import OutputHandler
+        from inspekt.services.pdf_report import generate_pdf_report
 
         # Build config overrides from CLI flags
         config_overrides = {}
@@ -1103,8 +1112,8 @@ def render(json_file: str, output_path: str | None, open_report: bool):
         inspekt pdf render report.json -o output.html     # Custom output path
         inspekt pdf render report.json --open             # Open in browser
     """
-    from inspekt.services.pdf_report_renderer import render_html_from_json
     from inspekt.app.cli.output import OutputHandler
+    from inspekt.services.pdf_report_renderer import render_html_from_json
 
     json_path = Path(json_file)
 

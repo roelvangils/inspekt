@@ -22,6 +22,8 @@ except ImportError:
     print("Install with: pip install aiohttp")
     exit(1)
 
+from datetime import UTC
+
 from inspekt.domain.models import (
     ExecuteRequest,
     HealthResponse,
@@ -248,8 +250,8 @@ def get_alias_for_instance(instance_id: str) -> str | None:
 
 
 # Socket server state
-socket_server: Optional[asyncio.Server] = None
-socket_path: Optional[Path] = None
+socket_server: asyncio.Server | None = None
+socket_path: Path | None = None
 
 
 # ============================================================================
@@ -271,7 +273,7 @@ class SocketProtocolHandler:
         self.reader = reader
         self.writer = writer
 
-    async def read_request(self) -> Optional[dict]:
+    async def read_request(self) -> dict | None:
         """Read a length-prefixed JSON request.
 
         Returns:
@@ -384,7 +386,7 @@ async def dispatch_socket_method(method: str, params: dict) -> dict:
                         total_requests_failed += 1
                         return {"success": False, "error": "result_not_ready"}
 
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     total_requests_failed += 1
                     return {"success": True, "data": {"status": "pending"}}
 
@@ -525,7 +527,7 @@ async def dispatch_socket_method(method: str, params: dict) -> dict:
             try:
                 timeout = params.get("timeout", 10.0)
                 await asyncio.wait_for(event.wait(), timeout=timeout)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 pending_requests.pop(request_id, None)
                 pending_events.pop(request_id, None)
                 total_requests_failed += 1
@@ -564,7 +566,7 @@ async def dispatch_socket_method(method: str, params: dict) -> dict:
             try:
                 timeout = params.get("timeout", 10.0)
                 await asyncio.wait_for(event.wait(), timeout=timeout)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 pending_requests.pop(request_id, None)
                 pending_events.pop(request_id, None)
                 total_requests_failed += 1
@@ -628,7 +630,7 @@ async def handle_socket_client(
             pass
 
 
-async def start_socket_server(socket_path_arg: Optional[Path] = None) -> Optional[asyncio.Server]:
+async def start_socket_server(socket_path_arg: Path | None = None) -> asyncio.Server | None:
     """Start the Unix socket server.
 
     Args:
@@ -1389,7 +1391,7 @@ async def handle_http_run(request):
             target_ws = resolve_instance(instance)
             if target_ws is None:
                 return web.json_response(
-                    {"ok": False, "error": f"instance_not_found", "message": f"No browser instance found for '{instance}'"},
+                    {"ok": False, "error": "instance_not_found", "message": f"No browser instance found for '{instance}'"},
                     status=404
                 )
 
@@ -1451,7 +1453,7 @@ async def handle_http_result(request):
                 pending_events.pop(request_id, None)
                 return web.json_response({"ok": False, "status": "pending"})
 
-        except asyncio.TimeoutError:
+        except TimeoutError:
             # Timeout waiting for result
             pending_events.pop(request_id, None)
 
@@ -1970,7 +1972,7 @@ async def handle_http_domain_add(request):
             await asyncio.wait_for(event.wait(), timeout=10.0)
             result = completed_requests.get(request_id, {})
             return web.json_response(result.get("response", {"ok": False, "error": "No response"}))
-        except asyncio.TimeoutError:
+        except TimeoutError:
             return web.json_response(
                 {"ok": False, "error": "Request timed out"},
                 status=504
@@ -2030,7 +2032,7 @@ async def handle_http_domain_remove(request):
             await asyncio.wait_for(event.wait(), timeout=10.0)
             result = completed_requests.get(request_id, {})
             return web.json_response(result.get("response", {"ok": False, "error": "No response"}))
-        except asyncio.TimeoutError:
+        except TimeoutError:
             return web.json_response(
                 {"ok": False, "error": "Request timed out"},
                 status=504
@@ -2080,7 +2082,7 @@ async def handle_http_domain_list(request):
             await asyncio.wait_for(event.wait(), timeout=10.0)
             result = completed_requests.get(request_id, {})
             return web.json_response(result.get("response", {"ok": False, "error": "No response"}))
-        except asyncio.TimeoutError:
+        except TimeoutError:
             return web.json_response(
                 {"ok": False, "error": "Request timed out"},
                 status=504
@@ -2146,7 +2148,7 @@ async def handle_http_domain_bypass(request):
             await asyncio.wait_for(event.wait(), timeout=10.0)
             result = completed_requests.get(request_id, {})
             return web.json_response(result.get("response", {"ok": False, "error": "No response"}))
-        except asyncio.TimeoutError:
+        except TimeoutError:
             return web.json_response(
                 {"ok": False, "error": "Request timed out"},
                 status=504
@@ -2170,8 +2172,9 @@ async def handle_http_domain_sync(request):
     regardless of which browser tab/window receives the retry request.
     """
     try:
-        from inspekt.services.domain_service import get_domain_service
         from datetime import datetime, timezone
+
+        from inspekt.services.domain_service import get_domain_service
 
         # Get domains from SQLite if not provided in request
         data = await request.json() if request.can_read_body and request.content_length else {}
@@ -2185,7 +2188,7 @@ async def handle_http_domain_sync(request):
             # Convert to browser storage format
             domains = {}
             for item in domains_list:
-                dt = datetime.fromtimestamp(item["added_at"], tz=timezone.utc)
+                dt = datetime.fromtimestamp(item["added_at"], tz=UTC)
                 iso_timestamp = dt.isoformat().replace("+00:00", "Z")
 
                 domains[item["domain"]] = {
@@ -2274,7 +2277,7 @@ async def handle_http_domain_sync(request):
                     "error": "No browser confirmed sync"
                 })
 
-        except asyncio.TimeoutError:
+        except TimeoutError:
             # Clean up all pending
             for request_id, _, _ in events:
                 pending_events.pop(request_id, None)
@@ -2324,7 +2327,7 @@ async def handle_http_navigate(request):
         # Send message to extension via WebSocket
         target_ws = get_active_connection()
         if target_ws is None:
-            print(f"[Bridge /navigate] No browser connected - user may be on a Chrome internal page")
+            print("[Bridge /navigate] No browser connected - user may be on a Chrome internal page")
             return web.json_response(
                 {"ok": False, "error": "No browser connected. If Chrome is open, make sure you're on a regular webpage (not chrome://, new tab, or extension pages where content scripts can't run)."},
                 status=503
@@ -2349,7 +2352,7 @@ async def handle_http_navigate(request):
 
         # Send to browser
         await target_ws.send_json(message)
-        print(f"[Bridge /navigate] Message sent, waiting for callback…")
+        print("[Bridge /navigate] Message sent, waiting for callback…")
 
         # Wait for response (with timeout - navigation can take longer)
         event = asyncio.Event()
@@ -2359,7 +2362,7 @@ async def handle_http_navigate(request):
             await asyncio.wait_for(event.wait(), timeout=float(timeout))
             result = completed_requests.get(request_id, {})
             return web.json_response(result.get("response", {"ok": False, "error": "No response"}))
-        except asyncio.TimeoutError:
+        except TimeoutError:
             return web.json_response(
                 {"ok": False, "error": f"Navigation timed out after {timeout}s"},
                 status=504
@@ -2470,7 +2473,7 @@ async def handle_http_csp_bypass_enable(request):
             await asyncio.wait_for(event.wait(), timeout=10.0)
             result = completed_requests.get(request_id, {})
             return web.json_response(result.get("response", {"ok": False, "error": "No response"}))
-        except asyncio.TimeoutError:
+        except TimeoutError:
             return web.json_response(
                 {"ok": False, "error": "Request timed out"},
                 status=504
@@ -2530,7 +2533,7 @@ async def handle_http_csp_bypass_disable(request):
             await asyncio.wait_for(event.wait(), timeout=10.0)
             result = completed_requests.get(request_id, {})
             return web.json_response(result.get("response", {"ok": False, "error": "No response"}))
-        except asyncio.TimeoutError:
+        except TimeoutError:
             return web.json_response(
                 {"ok": False, "error": "Request timed out"},
                 status=504
@@ -2597,7 +2600,7 @@ async def handle_http_csp_bypass_status(request):
             await asyncio.wait_for(event.wait(), timeout=10.0)
             result = completed_requests.get(request_id, {})
             return web.json_response(result.get("response", {"ok": False, "error": "No response"}))
-        except asyncio.TimeoutError:
+        except TimeoutError:
             return web.json_response(
                 {"ok": False, "error": "Request timed out"},
                 status=504
@@ -2657,7 +2660,7 @@ async def handle_http_csp_bypass_global(request):
             await asyncio.wait_for(event.wait(), timeout=10.0)
             result = completed_requests.get(request_id, {})
             return web.json_response(result.get("response", {"ok": False, "error": "No response"}))
-        except asyncio.TimeoutError:
+        except TimeoutError:
             return web.json_response(
                 {"ok": False, "error": "Request timed out"},
                 status=504
@@ -2706,7 +2709,7 @@ async def handle_http_csp_bypass_global_status(request):
             await asyncio.wait_for(event.wait(), timeout=10.0)
             result = completed_requests.get(request_id, {})
             return web.json_response(result.get("response", {"ok": False, "error": "No response"}))
-        except asyncio.TimeoutError:
+        except TimeoutError:
             return web.json_response(
                 {"ok": False, "error": "Request timed out"},
                 status=504
@@ -2781,7 +2784,7 @@ async def handle_http_get_har(request):
 
     try:
         await asyncio.wait_for(event.wait(), timeout=15.0)
-    except asyncio.TimeoutError:
+    except TimeoutError:
         pending_requests.pop(request_id, None)
         pending_events.pop(request_id, None)
         return web.json_response(
@@ -2840,7 +2843,7 @@ async def handle_http_get_console_logs(request):
 
     try:
         await asyncio.wait_for(event.wait(), timeout=10.0)
-    except asyncio.TimeoutError:
+    except TimeoutError:
         pending_requests.pop(request_id, None)
         pending_events.pop(request_id, None)
         return web.json_response(
@@ -2891,7 +2894,7 @@ async def handle_http_clear_console_logs(request):
 
     try:
         await asyncio.wait_for(event.wait(), timeout=10.0)
-    except asyncio.TimeoutError:
+    except TimeoutError:
         pending_requests.pop(request_id, None)
         pending_events.pop(request_id, None)
         return web.json_response(
@@ -2968,7 +2971,7 @@ async def handle_replay_mode_enable(request):
     try:
         await asyncio.wait_for(event.wait(), timeout=10.0)
         print("[Bridge] REPLAY_MODE_ENABLE response received")
-    except asyncio.TimeoutError:
+    except TimeoutError:
         print("[Bridge] REPLAY_MODE_ENABLE timed out!")
         pending_requests.pop(request_id, None)
         pending_events.pop(request_id, None)
@@ -3020,7 +3023,7 @@ async def handle_replay_mode_disable(request):
 
     try:
         await asyncio.wait_for(event.wait(), timeout=10.0)
-    except asyncio.TimeoutError:
+    except TimeoutError:
         pending_requests.pop(request_id, None)
         pending_events.pop(request_id, None)
         return web.json_response(
@@ -3071,7 +3074,7 @@ async def handle_replay_mode_status(request):
 
     try:
         await asyncio.wait_for(event.wait(), timeout=10.0)
-    except asyncio.TimeoutError:
+    except TimeoutError:
         pending_requests.pop(request_id, None)
         pending_events.pop(request_id, None)
         return web.json_response(
@@ -3198,7 +3201,7 @@ async def handle_screencast_start(request):
 
     print(f"[Bridge] Sending START_SCREENCAST to browser, requestId={request_id[:8]}…")
     await target_ws.send_json(message)
-    print(f"[Bridge] START_SCREENCAST sent, waiting for acknowledgment…")
+    print("[Bridge] START_SCREENCAST sent, waiting for acknowledgment…")
 
     # Wait for acknowledgment
     event = asyncio.Event()
@@ -3206,9 +3209,9 @@ async def handle_screencast_start(request):
 
     try:
         await asyncio.wait_for(event.wait(), timeout=10.0)
-        print(f"[Bridge] START_SCREENCAST acknowledgment received")
-    except asyncio.TimeoutError:
-        print(f"[Bridge] START_SCREENCAST timed out after 10s - no acknowledgment received")
+        print("[Bridge] START_SCREENCAST acknowledgment received")
+    except TimeoutError:
+        print("[Bridge] START_SCREENCAST timed out after 10s - no acknowledgment received")
         pending_requests.pop(request_id, None)
         pending_events.pop(request_id, None)
         return web.json_response(
@@ -3279,7 +3282,7 @@ async def handle_screencast_stop(request):
 
     try:
         await asyncio.wait_for(event.wait(), timeout=2.0)
-    except asyncio.TimeoutError:
+    except TimeoutError:
         # Stop anyway on timeout - browser may have disconnected
         print("[Bridge] Screencast stop acknowledgment timed out (browser may be disconnected)")
 
@@ -3676,7 +3679,7 @@ async def handle_http_proxy(request):
                         "url": final_url,
                     })
 
-    except asyncio.TimeoutError:
+    except TimeoutError:
         return web.json_response(
             {"ok": False, "error": "upstream timeout", "error_type": "timeout"},
             status=504,
@@ -3688,7 +3691,7 @@ async def handle_http_proxy(request):
         )
 
 
-async def main(enable_socket: bool = True, socket_path_override: Optional[str] = None):
+async def main(enable_socket: bool = True, socket_path_override: str | None = None):
     """Start HTTP, WebSocket, and Unix socket servers.
 
     Args:

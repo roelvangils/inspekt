@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import io
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -19,6 +19,7 @@ from inspekt.services.formatting_utils import format_filesize
 _PILLOW_AVAILABLE = False
 try:
     import warnings
+
     from PIL import Image
     from PIL.PngImagePlugin import PngInfo
 
@@ -163,8 +164,8 @@ def get_timezone() -> str:
     """
     try:
         # Python 3.9+ approach
-        from zoneinfo import ZoneInfo
         from datetime import datetime
+        from zoneinfo import ZoneInfo
 
         # Try to get the IANA timezone name
         local_tz = datetime.now().astimezone().tzinfo
@@ -247,7 +248,7 @@ def create_metadata(
     """
     # Core metadata (always included)
     metadata = {
-        METADATA_KEYS["timestamp"]: datetime.now(timezone.utc).isoformat(),
+        METADATA_KEYS["timestamp"]: datetime.now(UTC).isoformat(),
         METADATA_KEYS["tool"]: "inspekt",
         METADATA_KEYS["tool_version"]: get_inspekt_version(),
         METADATA_KEYS["target"]: target,

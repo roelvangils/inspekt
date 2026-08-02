@@ -15,12 +15,12 @@ from __future__ import annotations
 
 import json
 import sys
-from datetime import datetime
+from datetime import UTC, datetime
 
 import click
 import requests
 
-from inspekt.app.cli.icons import success, get_indicator
+from inspekt.app.cli.icons import get_indicator, success
 from inspekt.services.domain_service import get_domain_service, normalize_domain
 
 # Bridge server defaults (same as in bridge_ws.py and client.py)
@@ -72,7 +72,7 @@ def domain_add(domain_name):
             _sync_to_browser_silent()
 
         else:
-            click.echo(f"Error: Failed to add domain", err=True)
+            click.echo("Error: Failed to add domain", err=True)
             sys.exit(1)
 
     except Exception as e:
@@ -116,7 +116,7 @@ def domain_remove(domain_name):
                 click.echo(f"Domain not found: {stored_domain}")
 
         else:
-            click.echo(f"Error: Failed to remove domain", err=True)
+            click.echo("Error: Failed to remove domain", err=True)
             sys.exit(1)
 
     except Exception as e:
@@ -150,7 +150,7 @@ def domain_list(output_json):
         domains = {}
         for item in domains_list:
             # Convert Unix timestamp to ISO format
-            dt = datetime.fromtimestamp(item["added_at"], tz=timezone.utc)
+            dt = datetime.fromtimestamp(item["added_at"], tz=UTC)
             iso_timestamp = dt.isoformat().replace("+00:00", "Z")
 
             domains[item["domain"]] = {
@@ -590,7 +590,7 @@ def yolo(disable, status):
             # Auto-reload to apply all bypasses immediately
             _reload_browser_page()
         else:
-            click.echo(f"Error: Failed to enable yolo mode", err=True)
+            click.echo("Error: Failed to enable yolo mode", err=True)
             sys.exit(1)
 
     except Exception as e:

@@ -6,8 +6,9 @@ Tests for generating prioritized remediation tasks from PDF accessibility issues
 
 from __future__ import annotations
 
-import pytest
 from unittest.mock import MagicMock, patch
+
+import pytest
 
 
 class TestRemediationPriority:
@@ -76,7 +77,11 @@ class TestRemediationTask:
 
     def test_task_properties(self):
         """Test RemediationTask properties."""
-        from inspekt.services.remediation_planner import RemediationTask, RemediationPriority, EffortLevel
+        from inspekt.services.remediation_planner import (
+            EffortLevel,
+            RemediationPriority,
+            RemediationTask,
+        )
 
         task = RemediationTask(
             task_id="alt-text-1",
@@ -107,7 +112,11 @@ class TestRemediationTask:
 
     def test_pages_summary_truncation(self):
         """Test that pages_summary truncates long lists."""
-        from inspekt.services.remediation_planner import RemediationTask, RemediationPriority, EffortLevel
+        from inspekt.services.remediation_planner import (
+            EffortLevel,
+            RemediationPriority,
+            RemediationTask,
+        )
 
         # Many pages
         task = RemediationTask(
@@ -130,7 +139,11 @@ class TestRemediationTask:
 
     def test_pages_summary_all_pages(self):
         """Test pages_summary for no specific pages."""
-        from inspekt.services.remediation_planner import RemediationTask, RemediationPriority, EffortLevel
+        from inspekt.services.remediation_planner import (
+            EffortLevel,
+            RemediationPriority,
+            RemediationTask,
+        )
 
         task = RemediationTask(
             task_id="test-task",
@@ -154,10 +167,10 @@ class TestRemediationPlan:
     def test_plan_properties(self):
         """Test RemediationPlan aggregation properties."""
         from inspekt.services.remediation_planner import (
-            RemediationPlan,
-            RemediationTask,
-            RemediationPriority,
             EffortLevel,
+            RemediationPlan,
+            RemediationPriority,
+            RemediationTask,
         )
 
         tasks = [
@@ -214,10 +227,10 @@ class TestRemediationPlan:
     def test_get_tasks_by_priority(self):
         """Test filtering tasks by priority."""
         from inspekt.services.remediation_planner import (
-            RemediationPlan,
-            RemediationTask,
-            RemediationPriority,
             EffortLevel,
+            RemediationPlan,
+            RemediationPriority,
+            RemediationTask,
         )
 
         tasks = [
@@ -275,7 +288,7 @@ class TestGenerateRemediationPlan:
 
     def test_generates_plan_from_result(self):
         """Test that generate_remediation_plan returns a RemediationPlan."""
-        from inspekt.services.remediation_planner import generate_remediation_plan, RemediationPlan
+        from inspekt.services.remediation_planner import RemediationPlan, generate_remediation_plan
 
         # Create mock result with failures
         mock_checks = []
@@ -314,7 +327,7 @@ class TestGenerateRemediationPlan:
 
     def test_includes_verapdf_violations(self):
         """Test that veraPDF violations are included in plan."""
-        from inspekt.services.remediation_planner import generate_remediation_plan, RemediationPlan
+        from inspekt.services.remediation_planner import RemediationPlan, generate_remediation_plan
 
         # Create mock result with veraPDF violations
         mock_violation = MagicMock()

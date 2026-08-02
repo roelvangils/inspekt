@@ -1,7 +1,8 @@
 """Navigation service for browser control operations."""
 
 import json
-from typing import Dict, Any
+from typing import Any, Dict
+
 from inspekt.services.bridge_executor import get_executor
 
 
@@ -11,7 +12,7 @@ class NavigationService:
     def __init__(self):
         self.executor = get_executor()
 
-    def navigate_to_url(self, url: str, wait: bool = False, timeout: int = 30) -> Dict[str, Any]:
+    def navigate_to_url(self, url: str, wait: bool = False, timeout: int = 30) -> dict[str, Any]:
         """
         Navigate to a URL.
 
@@ -62,19 +63,19 @@ class NavigationService:
         result = self.executor.execute(nav_code, timeout=timeout + 5 if wait else 10.0)
         return result
 
-    def go_back(self) -> Dict[str, Any]:
+    def go_back(self) -> dict[str, Any]:
         """Go back to the previous page in browser history."""
         code = "window.history.back(), true)"
         result = self.executor.execute(code, timeout=10.0)
         return result
 
-    def go_forward(self) -> Dict[str, Any]:
+    def go_forward(self) -> dict[str, Any]:
         """Go forward to the next page in browser history."""
         code = "window.history.forward(), true)"
         result = self.executor.execute(code, timeout=10.0)
         return result
 
-    def reload_page(self, hard: bool = False) -> Dict[str, Any]:
+    def reload_page(self, hard: bool = False) -> dict[str, Any]:
         """
         Reload the current page.
 
@@ -92,25 +93,25 @@ class NavigationService:
         result = self.executor.execute(code, timeout=10.0)
         return result
 
-    def scroll_page_up(self) -> Dict[str, Any]:
+    def scroll_page_up(self) -> dict[str, Any]:
         """Scroll up one page (one viewport height)."""
         code = "window.scrollBy(0, -window.innerHeight), true)"
         result = self.executor.execute(code, timeout=10.0)
         return result
 
-    def scroll_page_down(self) -> Dict[str, Any]:
+    def scroll_page_down(self) -> dict[str, Any]:
         """Scroll down one page (one viewport height)."""
         code = "window.scrollBy(0, window.innerHeight), true)"
         result = self.executor.execute(code, timeout=10.0)
         return result
 
-    def scroll_to_top(self) -> Dict[str, Any]:
+    def scroll_to_top(self) -> dict[str, Any]:
         """Scroll to the top of the page."""
         code = "window.scrollTo(0, 0), true)"
         result = self.executor.execute(code, timeout=10.0)
         return result
 
-    def scroll_to_bottom(self) -> Dict[str, Any]:
+    def scroll_to_bottom(self) -> dict[str, Any]:
         """Scroll to the bottom of the page."""
         code = "window.scrollTo(0, document.body.scrollHeight), true)"
         result = self.executor.execute(code, timeout=10.0)

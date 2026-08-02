@@ -103,7 +103,7 @@ def complete_recording_files(ctx, param, incomplete):
     return sorted(matches, key=lambda x: -cwd.joinpath(x).stat().st_mtime)
 
 
-def find_most_recent_recording() -> Optional[Path]:
+def find_most_recent_recording() -> Path | None:
     """
     Find the most recently modified recording file in the current directory.
 

@@ -29,10 +29,10 @@ class ValidationIssue:
 
     severity: Severity
     message: str
-    tip: Optional[str] = None
-    step_num: Optional[int] = None
-    line_num: Optional[int] = None
-    context: Optional[str] = None  # Show problematic YAML snippet
+    tip: str | None = None
+    step_num: int | None = None
+    line_num: int | None = None
+    context: str | None = None  # Show problematic YAML snippet
 
 
 @dataclass
@@ -98,7 +98,7 @@ WARNING_TIME_GAP_SECONDS = 30  # Warn if gap between steps exceeds this
 WARNING_STEP_COUNT = 100  # Warn if recording has more than this many steps
 
 
-def get_yaml_context(content: str, line_num: Optional[int], context_lines: int = 2) -> str:
+def get_yaml_context(content: str, line_num: int | None, context_lines: int = 2) -> str:
     """Extract YAML context around a specific line number.
 
     Args:
@@ -145,7 +145,7 @@ def get_yaml_error_tip(error: yaml.YAMLError) -> str:
 # =============================================================================
 
 
-def validate_yaml_syntax(filepath: Path) -> tuple[list[ValidationIssue], Optional[str]]:
+def validate_yaml_syntax(filepath: Path) -> tuple[list[ValidationIssue], str | None]:
     """Check YAML syntax and provide helpful error context.
 
     Returns:
@@ -494,8 +494,8 @@ def validate_external_files(steps: list, recording_dir: Path) -> list[Validation
                             ValidationIssue(
                                 severity=Severity.WARNING,
                                 message=f"Step {i}: original download file not found: {external_path}",
-                                tip=f"Replay will trigger a new download and save it to during-replay/. "
-                                f"The original file is only needed for checksum comparisons.",
+                                tip="Replay will trigger a new download and save it to during-replay/. "
+                                "The original file is only needed for checksum comparisons.",
                                 step_num=i,
                             )
                         )
@@ -663,7 +663,7 @@ def validate_recording_file(filepath: Path) -> ValidationResult:
     is_flag=True,
     help="Output results as JSON for tooling integration",
 )
-def validate(recording_file: Optional[str], strict: bool, json_output: bool):
+def validate(recording_file: str | None, strict: bool, json_output: bool):
     """Validate a recording file before replay.
 
     Checks for YAML syntax errors, missing files, timestamp issues,

@@ -15,7 +15,7 @@ from pydantic import BaseModel, Field
 class GetSelectedTextParams(BaseModel):
     """Parameters for get_selected_text command."""
 
-    format: Optional[Literal["text", "html", "markdown"]] = Field(
+    format: Literal["text", "html", "markdown"] | None = Field(
         default="text", description="Output format for selected content"
     )
 
@@ -38,13 +38,13 @@ class CookieInfo(BaseModel):
     path: str = Field(..., description="Cookie path")
     secure: bool = Field(..., description="Secure flag")
     httpOnly: bool = Field(..., description="HttpOnly flag")
-    sameSite: Optional[str] = Field(default=None, description="SameSite attribute")
-    expires: Optional[str] = Field(
+    sameSite: str | None = Field(default=None, description="SameSite attribute")
+    expires: str | None = Field(
         default=None, description="Expiration date (ISO 8601)"
     )
     session: bool = Field(..., description="Whether it's a session cookie")
     size: int = Field(..., description="Cookie size in bytes")
-    party: Optional[str] = Field(default=None, description="First-party or third-party")
+    party: str | None = Field(default=None, description="First-party or third-party")
 
 
 class GetCookiesResponse(BaseModel):
@@ -62,16 +62,16 @@ class SetCookieParams(BaseModel):
 
     name: str = Field(..., description="Cookie name")
     value: str = Field(..., description="Cookie value")
-    domain: Optional[str] = Field(
+    domain: str | None = Field(
         default=None, description="Cookie domain (defaults to current domain)"
     )
-    path: Optional[str] = Field(default="/", description="Cookie path")
-    secure: Optional[bool] = Field(default=False, description="Secure flag")
-    httpOnly: Optional[bool] = Field(default=False, description="HttpOnly flag")
-    sameSite: Optional[Literal["Strict", "Lax", "None"]] = Field(
+    path: str | None = Field(default="/", description="Cookie path")
+    secure: bool | None = Field(default=False, description="Secure flag")
+    httpOnly: bool | None = Field(default=False, description="HttpOnly flag")
+    sameSite: Literal["Strict", "Lax", "None"] | None = Field(
         default="Lax", description="SameSite attribute"
     )
-    expires: Optional[str] = Field(
+    expires: str | None = Field(
         default=None,
         description="Expiration date (ISO 8601 format or seconds from now)",
     )
@@ -81,4 +81,4 @@ class SetCookieResponse(BaseModel):
     """Response from set_cookie command."""
 
     success: bool = Field(..., description="Whether cookie was set successfully")
-    message: Optional[str] = Field(default=None, description="Success or error message")
+    message: str | None = Field(default=None, description="Success or error message")

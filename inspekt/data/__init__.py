@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 # Cache for loaded metadata
-_METADATA_CACHE: Optional[dict[str, Any]] = None
+_METADATA_CACHE: dict[str, Any] | None = None
 
 
 def _get_data_path() -> Path:
@@ -162,7 +162,7 @@ def get_act_aligned_count(engine_id: str) -> int:
 # =============================================================================
 
 # Cache for PDF tools data
-_PDF_TOOLS_CACHE: Optional[dict[str, Any]] = None
+_PDF_TOOLS_CACHE: dict[str, Any] | None = None
 
 
 def load_pdf_tools() -> dict[str, dict[str, Any]]:
@@ -219,7 +219,7 @@ def list_pdf_tool_ids() -> list[str]:
 # =============================================================================
 
 # Cache: lowercase name -> original name for O(1) case-insensitive lookup
-_GOOGLE_FONTS_CACHE: Optional[dict[str, str]] = None
+_GOOGLE_FONTS_CACHE: dict[str, str] | None = None
 
 
 def load_google_fonts() -> dict[str, str]:

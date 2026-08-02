@@ -26,7 +26,8 @@ import sys
 
 import click
 
-from inspekt.app.cli.icons import success, warning as warn_icon
+from inspekt.app.cli.icons import success
+from inspekt.app.cli.icons import warning as warn_icon
 from inspekt.services.bridge_executor import get_executor
 from inspekt.services.script_loader import ScriptLoader
 

@@ -19,7 +19,6 @@ import click
 
 from inspekt import __version__
 
-
 SHIPPED_PACKAGE = "inspekt"
 SHIPPED_SUBDIR = "man"
 DEFAULT_USER_MAN = Path.home() / ".local" / "share" / "man"

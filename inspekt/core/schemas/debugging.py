@@ -14,11 +14,11 @@ from pydantic import BaseModel, Field
 class GetConsoleLogsParams(BaseModel):
     """Parameters for get_console_logs command."""
 
-    level: Optional[Literal["all", "error", "warn", "log", "info", "debug"]] = Field(
+    level: Literal["all", "error", "warn", "log", "info", "debug"] | None = Field(
         default="all",
         description="Filter by log level: all (default), error, warn, log, info, or debug",
     )
-    limit: Optional[int] = Field(
+    limit: int | None = Field(
         default=100, description="Maximum number of messages to return (default: 100)"
     )
 
@@ -44,11 +44,11 @@ class GetConsoleLogsResponse(BaseModel):
     hooked: bool = Field(
         default=False, description="Whether console hooks are active on the page"
     )
-    message: Optional[str] = Field(default=None, description="Success or error message")
+    message: str | None = Field(default=None, description="Success or error message")
 
 
 class ClearConsoleLogsResponse(BaseModel):
     """Response from clear_console_logs command."""
 
     success: bool = Field(..., description="Whether the operation succeeded")
-    message: Optional[str] = Field(default=None, description="Success or error message")
+    message: str | None = Field(default=None, description="Success or error message")

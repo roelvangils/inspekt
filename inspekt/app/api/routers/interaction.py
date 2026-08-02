@@ -93,7 +93,7 @@ def _send_text_api(text: str, selector: str | None, delay_ms: int, clear: bool =
     try:
         script = script_loader.load_script_sync("send_keys.js")
     except FileNotFoundError as e:
-        raise HTTPException(status_code=500, detail=f"Script not found: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Script not found: {e!s}")
 
     # Get typing configuration
     typing_config = get_typing_config()
@@ -140,7 +140,7 @@ def _perform_click_api(selector: str, click_type: str) -> dict[str, Any]:
     try:
         script = script_loader.load_script_sync("click_element.js")
     except FileNotFoundError as e:
-        raise HTTPException(status_code=500, detail=f"Script not found: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Script not found: {e!s}")
 
     # Replace placeholders with properly escaped values
     code = script.replace("'SELECTOR_PLACEHOLDER'", json.dumps(selector))
@@ -322,7 +322,7 @@ def wait_for_element(request: WaitRequest):
     try:
         script = script_loader.load_script_sync("wait_for.js")
     except FileNotFoundError as e:
-        raise HTTPException(status_code=500, detail=f"Script not found: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Script not found: {e!s}")
 
     # Replace placeholders with properly escaped values
     timeout_ms = request.timeout * 1000

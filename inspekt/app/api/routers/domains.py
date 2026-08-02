@@ -7,6 +7,8 @@ Domain management uses SQLite as the primary storage, with automatic sync
 to browser extension storage.
 """
 
+from datetime import UTC
+
 import aiohttp
 import requests
 from fastapi import APIRouter, HTTPException
@@ -170,7 +172,7 @@ def add_domain(request: DomainAddRequest):
         # Already well-formed (e.g. 503 from bridge proxy) — don't rewrap as 500
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Unexpected error: {e!s}")
 
 
 @router.delete("/remove", response_model=DomainRemoveResponse)
@@ -227,7 +229,7 @@ def remove_domain(request: DomainRemoveRequest):
         # Already well-formed (e.g. 503 from bridge proxy) — don't rewrap as 500
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Unexpected error: {e!s}")
 
 
 @router.get("/list", response_model=DomainListResponse)
@@ -278,7 +280,7 @@ def list_domains():
         domains = {}
         for item in domains_list:
             # Convert Unix timestamp to ISO format
-            dt = datetime.fromtimestamp(item["added_at"], tz=timezone.utc)
+            dt = datetime.fromtimestamp(item["added_at"], tz=UTC)
             iso_timestamp = dt.isoformat().replace("+00:00", "Z")
 
             domains[item["domain"]] = {
@@ -295,7 +297,7 @@ def list_domains():
         # Already well-formed (e.g. 503 from bridge proxy) — don't rewrap as 500
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Unexpected error: {e!s}")
 
 
 @router.post("/bypass", response_model=DomainBypassResponse)
@@ -383,7 +385,7 @@ def set_bypass(request: DomainBypassRequest):
         # Already well-formed (e.g. 503 from bridge proxy) — don't rewrap as 500
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Unexpected error: {e!s}")
 
 
 @router.post("/sync")
@@ -418,7 +420,7 @@ def sync_domains():
         return result
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Sync failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Sync failed: {e!s}")
 
 
 @router.post("/csp-global", response_model=CspGlobalResponse)
@@ -485,7 +487,7 @@ def toggle_global_csp(request: CspGlobalRequest):
         # Already well-formed (e.g. 503 from bridge proxy) — don't rewrap as 500
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Unexpected error: {e!s}")
 
 
 @router.get("/csp-global", response_model=CspGlobalResponse)
@@ -538,7 +540,7 @@ def get_global_csp_status():
         # Already well-formed (e.g. 503 from bridge proxy) — don't rewrap as 500
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Unexpected error: {e!s}")
 
 
 # ============================================================================
@@ -564,7 +566,7 @@ def _sync_domains_to_browser():
         domains = {}
         for item in domains_list:
             # Convert Unix timestamp to ISO format
-            dt = datetime.fromtimestamp(item["added_at"], tz=timezone.utc)
+            dt = datetime.fromtimestamp(item["added_at"], tz=UTC)
             iso_timestamp = dt.isoformat().replace("+00:00", "Z")
 
             domains[item["domain"]] = {

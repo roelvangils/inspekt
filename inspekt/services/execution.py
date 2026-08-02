@@ -111,7 +111,7 @@ async def execute_javascript(
             status = result_data.get("status")
 
             if status == "pending":
-                logger.warning(f"Request still pending after timeout")
+                logger.warning("Request still pending after timeout")
                 return {
                     "success": False,
                     "result": None,
@@ -138,7 +138,7 @@ async def execute_javascript(
                         "success": False,
                         "result": None,
                         "console_output": None,
-                        "error": f"Content Security Policy (CSP) blocks JavaScript execution on this page. Run `inspekt yolo` to bypass.",
+                        "error": "Content Security Policy (CSP) blocks JavaScript execution on this page. Run `inspekt yolo` to bypass.",
                     }
 
                 # Check for domain authorization errors
@@ -186,5 +186,5 @@ async def execute_javascript(
             "success": False,
             "result": None,
             "console_output": None,
-            "error": f"Error: {str(e)}",
+            "error": f"Error: {e!s}",
         }

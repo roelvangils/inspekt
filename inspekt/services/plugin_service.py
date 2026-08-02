@@ -15,6 +15,7 @@ import json
 import re
 import sqlite3
 import time
+from datetime import UTC
 from pathlib import Path
 from typing import Any
 from urllib.parse import unquote
@@ -682,7 +683,7 @@ class PluginService:
 
         export_data = {
             "version": "1.0",
-            "exported_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+            "exported_at": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
             "plugins": export_plugins,
         }
 
@@ -716,7 +717,7 @@ class PluginService:
             code = plugin_data.get("code")
 
             if not name or not code:
-                errors.append(f"Skipped plugin with missing name or code")
+                errors.append("Skipped plugin with missing name or code")
                 skipped += 1
                 continue
 

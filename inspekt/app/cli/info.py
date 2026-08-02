@@ -31,7 +31,6 @@ from inspekt.app.cli.table import Table
 from inspekt.app.cli.url_builder import url_scheme
 from inspekt.client import BridgeClient
 
-
 # =============================================================================
 # Helper Functions
 # =============================================================================

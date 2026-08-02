@@ -10,7 +10,7 @@ https://github.com/PhilippRecke/Autocomplete-Check
 import json
 import logging
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Any, Dict, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -28,19 +28,19 @@ class AutocompleteService:
         """Load JSON configuration files and JavaScript source"""
         try:
             # Load JSON configurations
-            with open(self.vendor_dir / "autocomplete-dict.json", "r", encoding="utf-8") as f:
+            with open(self.vendor_dir / "autocomplete-dict.json", encoding="utf-8") as f:
                 self.autocomplete_dict = json.load(f)
 
-            with open(self.vendor_dir / "autocomplete-values.json", "r", encoding="utf-8") as f:
+            with open(self.vendor_dir / "autocomplete-values.json", encoding="utf-8") as f:
                 self.autocomplete_values = json.load(f)
 
             with open(
-                self.vendor_dir / "matchingClassesInfluence.json", "r", encoding="utf-8"
+                self.vendor_dir / "matchingClassesInfluence.json", encoding="utf-8"
             ) as f:
                 self.matching_influence = json.load(f)
 
             # Load JavaScript source files
-            with open(self.vendor_dir / "matchingclasses.js", "r", encoding="utf-8") as f:
+            with open(self.vendor_dir / "matchingclasses.js", encoding="utf-8") as f:
                 matchingclasses_content = f.read()
                 # Remove duplicate variable declarations (they conflict with matching.js)
                 # Remove lines: let autocompleteDict = null; let matchingClassesInfluence = null; let getIdOfAcName = null;
@@ -53,7 +53,7 @@ class AutocompleteService:
                     matchingclasses_content = matchingclasses_content.replace(line, "")
                 self.matchingclasses_js = matchingclasses_content
 
-            with open(self.vendor_dir / "matching.js", "r", encoding="utf-8") as f:
+            with open(self.vendor_dir / "matching.js", encoding="utf-8") as f:
                 matching_content = f.read()
                 # Remove duplicate variable declaration (conflicts with wrapper)
                 matching_content = matching_content.replace("let classesInfluence = null;", "")
@@ -260,11 +260,11 @@ class AutocompleteService:
             "  }",
             "",
             "  // === Execute Check ===",
-            f"  const options = {{",
+            "  const options = {",
             f"    confidenceThreshold: {confidence_threshold},",
             f"    includeHidden: {str(include_hidden).lower()},",
             f"    includeDisabled: {str(include_disabled).lower()}",
-            f"  }};",
+            "  };",
             "",
             "  const result = checkAutocomplete(options);",
             "  return result;",
@@ -280,7 +280,7 @@ class AutocompleteService:
         confidence_threshold: float = 0.5,
         include_hidden: bool = False,
         include_disabled: bool = False,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Check autocomplete attributes on the current page.
 

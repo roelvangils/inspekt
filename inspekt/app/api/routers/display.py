@@ -1,8 +1,9 @@
 """Display API endpoints — zoom and viewport control."""
 
+from typing import Optional
+
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
-from typing import Optional
 
 router = APIRouter()
 
@@ -13,14 +14,14 @@ router = APIRouter()
 
 class ZoomSetRequest(BaseModel):
     """Request body for POST /zoom."""
-    level: Optional[int] = Field(default=None, description="Zoom percentage (25–500)")
-    action: Optional[str] = Field(default=None, description="Action: in, out, reset")
+    level: int | None = Field(default=None, description="Zoom percentage (25–500)")
+    action: str | None = Field(default=None, description="Action: in, out, reset")
 
 
 class ViewportSetRequest(BaseModel):
     """Request body for POST /viewport."""
     width: int = Field(..., description="Viewport width in pixels", ge=320, le=3840)
-    height: Optional[int] = Field(default=None, description="Viewport height in pixels", ge=240, le=2160)
+    height: int | None = Field(default=None, description="Viewport height in pixels", ge=240, le=2160)
     auto_height: bool = Field(default=False, description="Auto-fill display height (VM only)")
 
 

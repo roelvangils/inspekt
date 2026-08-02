@@ -163,14 +163,14 @@ def _fetch_robots_txt(robots_url: str) -> dict[str, Any]:
             "url": robots_url,
             "status": 0,
             "exists": False,
-            "error": f"Connection error: {str(e)}"
+            "error": f"Connection error: {e!s}"
         }
     except requests.RequestException as e:
         return {
             "url": robots_url,
             "status": 0,
             "exists": False,
-            "error": f"Request failed: {str(e)}"
+            "error": f"Request failed: {e!s}"
         }
 
 
@@ -480,7 +480,7 @@ def get_robots_txt(
     except ConnectionError as e:
         raise HTTPException(
             status_code=503,
-            detail=f"Could not connect to bridge server: {str(e)}"
+            detail=f"Could not connect to bridge server: {e!s}"
         )
     except TimeoutError:
         raise HTTPException(
@@ -490,7 +490,7 @@ def get_robots_txt(
     except Exception as e:
         raise HTTPException(
             status_code=500,
-            detail=f"Error getting current URL: {str(e)}"
+            detail=f"Error getting current URL: {e!s}"
         )
 
     # Construct robots.txt URL from origin
@@ -506,7 +506,7 @@ def get_robots_txt(
     except Exception as e:
         raise HTTPException(
             status_code=400,
-            detail=f"Error parsing URL: {str(e)}"
+            detail=f"Error parsing URL: {e!s}"
         )
 
     # Fetch robots.txt

@@ -10,7 +10,6 @@ from inspekt.core.commands.base import (
     SubcommandDefinition,
 )
 
-
 console = CommandDefinition(
     id="console",
     name="Console",

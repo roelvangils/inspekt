@@ -444,8 +444,9 @@ class TestHandlerDataLoading:
 
     def test_build_script_is_valid_js(self):
         """The built script should be syntactically valid JavaScript."""
-        from inspekt.core.handlers.screen_reader import _build_sr_script
         import subprocess
+
+        from inspekt.core.handlers.screen_reader import _build_sr_script
 
         config = {"mode": "state"}
         script = _build_sr_script(config)
@@ -524,6 +525,6 @@ class TestCommandRegistration:
         assert sr_walk.mcp_name == "screen_reader_walk"
 
     def test_sr_walk_category_is_accessibility(self):
-        from inspekt.core.commands.screen_reader import sr_walk
         from inspekt.core.commands.base import Category
+        from inspekt.core.commands.screen_reader import sr_walk
         assert sr_walk.category == Category.ACCESSIBILITY

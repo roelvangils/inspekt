@@ -290,7 +290,7 @@ class TestFileExecution:
         """Test execute_file() with IOError."""
         # Make sys.exit raise SystemExit to stop execution
         mock_exit.side_effect = SystemExit(1)
-        mock_open.side_effect = IOError("Permission denied")
+        mock_open.side_effect = OSError("Permission denied")
 
         executor = BridgeExecutor()
 

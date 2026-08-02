@@ -10,8 +10,8 @@ import asyncio
 import time
 from typing import Optional
 
-from inspekt.services.headless.chrome import HeadlessChrome
 from inspekt.services.headless.cdp import CDPClient, CDPSession
+from inspekt.services.headless.chrome import HeadlessChrome
 
 
 class HeadlessChromePool:
@@ -42,12 +42,12 @@ class HeadlessChromePool:
         await HeadlessChromePool.shutdown()
     """
 
-    _instance: Optional[HeadlessChrome] = None
-    _cdp_client: Optional[CDPClient] = None
+    _instance: HeadlessChrome | None = None
+    _cdp_client: CDPClient | None = None
     _last_used: float = 0
     _idle_timeout: float = 300.0  # 5 minutes
     _lock: asyncio.Lock = asyncio.Lock()
-    _cleanup_task: Optional[asyncio.Task] = None
+    _cleanup_task: asyncio.Task | None = None
     _use_count: int = 0
 
     @classmethod
@@ -247,11 +247,11 @@ class PooledHeadlessContext:
 
     def __init__(
         self,
-        url: Optional[str] = None,
+        url: str | None = None,
         mirror_session: bool = False,
-        viewport: Optional[tuple[int, int]] = None,
-        dpr: Optional[float] = None,
-        color_scheme: Optional[str] = None,
+        viewport: tuple[int, int] | None = None,
+        dpr: float | None = None,
+        color_scheme: str | None = None,
         timeout: float = 30.0,
     ):
         self._url = url
@@ -261,9 +261,9 @@ class PooledHeadlessContext:
         self._color_scheme = color_scheme
         self._timeout = timeout
 
-        self._chrome: Optional[HeadlessChrome] = None
-        self._cdp_client: Optional[CDPClient] = None
-        self._session: Optional[CDPSession] = None
+        self._chrome: HeadlessChrome | None = None
+        self._cdp_client: CDPClient | None = None
+        self._session: CDPSession | None = None
         self._current_url: str = ""
 
     async def __aenter__(self) -> "PooledHeadlessContext":

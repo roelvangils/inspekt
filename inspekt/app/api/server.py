@@ -10,16 +10,18 @@ Or use the CLI:
     inspekt api start
 """
 
-import time
 import logging
+import time
 from pathlib import Path
+
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, HTMLResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from inspekt.services.bridge_executor import get_executor
+
 from inspekt import __version__
+from inspekt.services.bridge_executor import get_executor
 
 # Set up Jinja2 templates
 templates_dir = Path(__file__).parent
@@ -94,7 +96,7 @@ async def connection_error_handler(request, exc):
         status_code=503,
         content={
             "ok": False,
-            "error": f"Bridge server connection error: {str(exc)}",
+            "error": f"Bridge server connection error: {exc!s}",
             "detail": "Is the bridge server running? Start it with: inspekt start",
         },
     )
@@ -104,14 +106,14 @@ async def connection_error_handler(request, exc):
 async def timeout_error_handler(request, exc):
     """Handle command timeout errors."""
     return JSONResponse(
-        status_code=504, content={"ok": False, "error": f"Command timeout: {str(exc)}"}
+        status_code=504, content={"ok": False, "error": f"Command timeout: {exc!s}"}
     )
 
 
 @app.exception_handler(RuntimeError)
 async def runtime_error_handler(request, exc):
     """Handle runtime errors from command execution."""
-    return JSONResponse(status_code=500, content={"ok": False, "error": f"Runtime error: {str(exc)}"})
+    return JSONResponse(status_code=500, content={"ok": False, "error": f"Runtime error: {exc!s}"})
 
 
 # Health check endpoint
@@ -210,23 +212,25 @@ async def status_dashboard(request: Request):
 
 # Import and register routers
 from inspekt.app.api.routers import (
-    navigation,
-    execution,
-    extraction,
-    interaction,
-    inspection,
-    selection,
-    cookies,
-    storage,
-    domains,
-    robots,
-    persistence,
     accessibility,
-    network,
-    plugins,
     browser,
     commands,
+    cookies,
     display,
+    domains,
+    execution,
+    extraction,
+    inspection,
+    interaction,
+    navigation,
+    network,
+    persistence,
+    plugins,
+    robots,
+    selection,
+    storage,
+)
+from inspekt.app.api.routers import (
     sitemap as sitemap_router,
 )
 

@@ -16,7 +16,6 @@ import click
 from inspekt.app.cli.icons import get_indicator, get_status_icon
 from inspekt.app.cli.table import Table, format_status_icon, print_hint
 
-
 # Constants
 LABEL = "com.inspekt.servers"
 INSPEKT_DIR = Path.home() / ".inspekt"

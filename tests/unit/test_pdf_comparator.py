@@ -7,8 +7,9 @@ against SimplePDFChecker (the oracle/ground truth).
 
 from __future__ import annotations
 
-import pytest
 from pathlib import Path
+
+import pytest
 
 # Import fixtures from the PDF fixtures conftest
 pytest_plugins = ["tests.fixtures.pdf.conftest"]
@@ -135,7 +136,7 @@ class TestValidateBasicChecker:
 
         is_valid, errors = validate_basic_checker(accessible_pdf)
 
-        assert is_valid, f"Basic checker validation failed:\n" + "\n".join(errors)
+        assert is_valid, "Basic checker validation failed:\n" + "\n".join(errors)
         assert len(errors) == 0
 
     def test_validate_all_fixtures(self, all_pdf_fixtures):

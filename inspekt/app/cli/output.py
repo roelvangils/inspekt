@@ -494,7 +494,7 @@ def _build_quote_state(text: str) -> list[bool]:
     return quote_state
 
 
-def _wrap_ansi_line_fast(line: str, max_width: int, ansi_pattern: 're.Pattern') -> list[str]:
+def _wrap_ansi_line_fast(line: str, max_width: int, ansi_pattern: re.Pattern) -> list[str]:
     """
     Fast line wrapping for very long lines (>2000 chars).
 
@@ -550,7 +550,7 @@ def _wrap_ansi_line_fast(line: str, max_width: int, ansi_pattern: 're.Pattern') 
 def _wrap_ansi_line(
     line: str,
     max_width: int,
-    ansi_pattern: 're.Pattern',
+    ansi_pattern: re.Pattern,
     plain_text: str | None = None,
 ) -> list[str]:
     """

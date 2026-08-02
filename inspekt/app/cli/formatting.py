@@ -6,7 +6,13 @@ from pathlib import Path
 
 import click
 
-from inspekt.app.cli.icons import get_action_icon, get_keypress_icon, get_native_control_icon, get_status_icon, get_step_mode_icon
+from inspekt.app.cli.icons import (
+    get_action_icon,
+    get_keypress_icon,
+    get_native_control_icon,
+    get_status_icon,
+    get_step_mode_icon,
+)
 from inspekt.services.formatting_utils import format_filesize
 
 

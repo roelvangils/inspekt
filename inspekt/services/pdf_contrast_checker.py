@@ -157,8 +157,8 @@ def _sample_dominant_color(
     Returns:
         RGB tuple of dominant color
     """
-    from collections import Counter
     import random
+    from collections import Counter
 
     x0, y0, x1, y1 = bbox
     x0, y0 = max(0, x0), max(0, y0)
@@ -247,7 +247,7 @@ class PDFContrastChecker:
         self.pdf_path = Path(pdf_path)
         self._fitz_doc = None
 
-    def __enter__(self) -> "PDFContrastChecker":
+    def __enter__(self) -> PDFContrastChecker:
         """Open PDF file."""
         try:
             import fitz
@@ -291,6 +291,7 @@ class PDFContrastChecker:
             PageContrastResult with detected issues
         """
         import time
+
         from PIL import Image
 
         start_time = time.time()

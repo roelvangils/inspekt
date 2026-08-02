@@ -15,7 +15,6 @@ import click
 
 from inspekt.app.cli.icons import get_icon, get_indicator
 
-
 # ── Shared options for enrichment flags ───────────────────────
 
 

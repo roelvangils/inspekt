@@ -18,7 +18,7 @@ import json
 import shutil
 import subprocess
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from pathlib import Path
 
 import click
@@ -137,7 +137,7 @@ def plugin_add(name, code, file_path, url, description, category, tags, mcp, ret
         # Get code from source
         warnings = []
         if file_path:
-            with open(file_path, "r", encoding="utf-8") as f:
+            with open(file_path, encoding="utf-8") as f:
                 code = f.read()
         elif url:
             code, warnings = parse_bookmarklet(url)
@@ -410,7 +410,7 @@ def plugin_unload(name_or_id, timeout, output_json, quiet):
         elif unload_mode == "custom":
             code_to_run = plugin_data.get("unload_code")
             if not code_to_run:
-                click.echo(f"Error: Plugin has custom unload mode but no unload code", err=True)
+                click.echo("Error: Plugin has custom unload mode but no unload code", err=True)
                 sys.exit(1)
             action = "unloaded"
         else:
@@ -598,7 +598,7 @@ def plugin_export(output, ids, open_after, reveal_after):
         result = plugin_service.export_plugins(plugin_ids)
 
         if not result.get("ok"):
-            click.echo(f"Error: Export failed", err=True)
+            click.echo("Error: Export failed", err=True)
             sys.exit(1)
 
         export_data = result["data"]
@@ -640,7 +640,7 @@ def plugin_import(file_path, replace, skip):
         inspekt plugin import plugins.json --replace
     """
     try:
-        with open(file_path, "r", encoding="utf-8") as f:
+        with open(file_path, encoding="utf-8") as f:
             data = json.load(f)
 
         plugin_service = get_plugin_service()
@@ -911,9 +911,9 @@ def _display_plugin_details(plugin: dict) -> None:
         if domains:
             click.echo(f"  Autorun: Yes (domains: {domains})")
         else:
-            click.echo(f"  Autorun: Yes (all pages)")
+            click.echo("  Autorun: Yes (all pages)")
     else:
-        click.echo(f"  Autorun: No")
+        click.echo("  Autorun: No")
 
     # Unload behavior
     unload_mode = plugin.get("unload_mode", "none")
@@ -927,7 +927,7 @@ def _display_plugin_details(plugin: dict) -> None:
     click.echo(f"  Run count: {plugin.get('run_count', 0)}")
 
     if plugin.get("last_run_at"):
-        dt = datetime.fromtimestamp(plugin["last_run_at"], tz=timezone.utc)
+        dt = datetime.fromtimestamp(plugin["last_run_at"], tz=UTC)
         click.echo(f"  Last run: {dt.astimezone().strftime('%Y-%m-%d %H:%M')}")
 
     if plugin.get("source_url"):

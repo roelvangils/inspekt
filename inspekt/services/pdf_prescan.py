@@ -12,7 +12,7 @@ Usage:
     print(f"Pages: {result.page_count}, Images: ~{result.estimated_image_count}")
 """
 
-from dataclasses import dataclass, asdict
+from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Literal
 

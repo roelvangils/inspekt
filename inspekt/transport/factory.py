@@ -19,10 +19,10 @@ from .unix_socket import (
 
 
 def get_transport(
-    session_id: Optional[str] = None,
-    transport_type: Optional[str] = None,
+    session_id: str | None = None,
+    transport_type: str | None = None,
     async_mode: bool = True,
-) -> Union[Transport, SyncTransport]:
+) -> Transport | SyncTransport:
     """Get the appropriate transport for the current platform.
 
     Auto-selects Unix socket on macOS/Linux and TCP on Windows,
@@ -65,7 +65,7 @@ def get_transport(
         raise ValueError(f"Unknown transport type: {transport_type}")
 
 
-def get_default_transport(async_mode: bool = True) -> Union[Transport, SyncTransport]:
+def get_default_transport(async_mode: bool = True) -> Transport | SyncTransport:
     """Get the default transport for the current platform.
 
     Convenience function that calls get_transport with default settings.
@@ -80,8 +80,8 @@ def get_default_transport(async_mode: bool = True) -> Union[Transport, SyncTrans
 
 
 def get_server_address(
-    session_id: Optional[str] = None,
-    transport_type: Optional[str] = None,
+    session_id: str | None = None,
+    transport_type: str | None = None,
 ) -> str:
     """Get the server address string for a given configuration.
 
@@ -113,8 +113,8 @@ def get_server_address(
 
 
 def is_server_available(
-    session_id: Optional[str] = None,
-    transport_type: Optional[str] = None,
+    session_id: str | None = None,
+    transport_type: str | None = None,
 ) -> bool:
     """Check if the server is potentially available.
 

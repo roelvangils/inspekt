@@ -12,32 +12,31 @@ from __future__ import annotations
 
 import json
 import tempfile
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
 
 import pytest
 
 from inspekt.services.pdf_report_data import (
-    PDFReportData,
-    DocumentMetadata,
+    CURRENT_SCHEMA_VERSION,
     AccessibilityScoreData,
-    BasicChecksData,
-    CheckResultData,
-    # New v2.0 dataclasses
-    CoverImageData,
-    ContrastAnalysisData,
-    ContrastIssueData,
-    IssueScreenshotData,
-    SimpleChecksData,
-    SimplePDFCheckData,
-    InteractivePreviewData,
     AssetManifest,
     AssetReference,
-    CURRENT_SCHEMA_VERSION,
-    migrate_schema,
+    BasicChecksData,
+    CheckResultData,
+    ContrastAnalysisData,
+    ContrastIssueData,
+    # New v2.0 dataclasses
+    CoverImageData,
+    DocumentMetadata,
+    InteractivePreviewData,
+    IssueScreenshotData,
+    PDFReportData,
+    SimpleChecksData,
+    SimplePDFCheckData,
     get_schema_version,
+    migrate_schema,
 )
-
 
 # =============================================================================
 # Schema Version Tests

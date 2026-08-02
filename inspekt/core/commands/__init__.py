@@ -10,32 +10,31 @@ This is the SINGLE SOURCE OF TRUTH for all command metadata.
 The CLI, API, MCP, and dashboard all read from this registry.
 """
 
-from inspekt.core.commands.base import Category, CommandDefinition
-
 # Import all command modules to register them
 # === Original modules (with unified handlers) ===
 from inspekt.core.commands.accessibility import ACCESSIBILITY_COMMANDS
 from inspekt.core.commands.ai import AI_COMMANDS
-from inspekt.core.commands.debugging import DEBUGGING_COMMANDS
-from inspekt.core.commands.execution import EXECUTION_COMMANDS
-from inspekt.core.commands.extraction import EXTRACTION_COMMANDS
-from inspekt.core.commands.inspection import INSPECTION_COMMANDS
-from inspekt.core.commands.interaction import INTERACTION_COMMANDS
-from inspekt.core.commands.navigation import NAVIGATION_COMMANDS
-from inspekt.core.commands.storage import STORAGE_COMMANDS
+from inspekt.core.commands.base import Category, CommandDefinition
 
 # === New modules (CLI-only metadata for dashboard visibility) ===
 from inspekt.core.commands.console import CONSOLE_COMMANDS
 from inspekt.core.commands.control import CONTROL_COMMANDS
+from inspekt.core.commands.debugging import DEBUGGING_COMMANDS
+from inspekt.core.commands.display import DISPLAY_COMMANDS
+from inspekt.core.commands.execution import EXECUTION_COMMANDS
+from inspekt.core.commands.extraction import EXTRACTION_COMMANDS
+from inspekt.core.commands.inspection import INSPECTION_COMMANDS
+from inspekt.core.commands.interaction import INTERACTION_COMMANDS
 from inspekt.core.commands.mcp_management import MCP_MANAGEMENT_COMMANDS
+from inspekt.core.commands.navigation import NAVIGATION_COMMANDS
 from inspekt.core.commands.network import NETWORK_COMMANDS
 from inspekt.core.commands.plugin import PLUGIN_COMMANDS
 from inspekt.core.commands.recording import RECORDING_COMMANDS
+from inspekt.core.commands.screen_reader import SCREEN_READER_COMMANDS
 from inspekt.core.commands.selection import SELECTION_COMMANDS
+from inspekt.core.commands.storage import STORAGE_COMMANDS
 from inspekt.core.commands.utilities import UTILITIES_COMMANDS
 from inspekt.core.commands.vm import VM_COMMANDS
-from inspekt.core.commands.screen_reader import SCREEN_READER_COMMANDS
-from inspekt.core.commands.display import DISPLAY_COMMANDS
 from inspekt.core.commands.watch import WATCH_COMMANDS
 
 __all__ = ["CommandDefinition", "Category", "register_all_commands"]

@@ -27,7 +27,7 @@ from dataclasses import dataclass
 from typing import Any, Optional
 from urllib.parse import parse_qs, urlparse
 
-from inspekt.services.headless import HeadlessContext, HeadlessChromePool
+from inspekt.services.headless import HeadlessChromePool, HeadlessContext
 
 
 @dataclass
@@ -35,9 +35,9 @@ class APIResponse:
     """Standard API response format."""
 
     ok: bool
-    data: Optional[Any] = None
-    error: Optional[str] = None
-    duration_ms: Optional[float] = None
+    data: Any | None = None
+    error: str | None = None
+    duration_ms: float | None = None
 
     def to_json(self) -> str:
         result = {"ok": self.ok}
@@ -76,7 +76,7 @@ class HeadlessAPIServer:
             self.port,
         )
 
-        print(f"Inspekt Headless API Server")
+        print("Inspekt Headless API Server")
         print(f"Listening on http://{self.host}:{self.port}")
         print()
         print("Endpoints:")
@@ -172,7 +172,7 @@ class HeadlessAPIServer:
         method: str,
         path: str,
         query: dict,
-        body: Optional[bytes],
+        body: bytes | None,
     ) -> APIResponse:
         """Route request to appropriate handler."""
         # Extract common parameters
@@ -233,8 +233,8 @@ class HeadlessAPIServer:
 
     async def _handle_screenshot(
         self,
-        url: Optional[str],
-        selector: Optional[str],
+        url: str | None,
+        selector: str | None,
         isolate: bool,
         format: str,
     ) -> APIResponse:
@@ -269,7 +269,7 @@ class HeadlessAPIServer:
 
     async def _handle_accessibility(
         self,
-        url: Optional[str],
+        url: str | None,
         level: str,
     ) -> APIResponse:
         """Run accessibility audit."""
@@ -316,7 +316,7 @@ class HeadlessAPIServer:
         except Exception as e:
             return APIResponse(ok=False, error=str(e))
 
-    async def _handle_index(self, url: Optional[str]) -> APIResponse:
+    async def _handle_index(self, url: str | None) -> APIResponse:
         """Index page content."""
         if not url:
             return APIResponse(ok=False, error="Missing required parameter: url")
@@ -350,8 +350,8 @@ class HeadlessAPIServer:
 
     async def _handle_execute(
         self,
-        url: Optional[str],
-        body: Optional[bytes],
+        url: str | None,
+        body: bytes | None,
     ) -> APIResponse:
         """Execute custom JavaScript."""
         if not url:

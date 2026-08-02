@@ -9,7 +9,7 @@ This module provides commands for executing JavaScript code in the browser:
 from __future__ import annotations
 
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 
 import click
 import requests
@@ -126,7 +126,7 @@ def eval(code, file, timeout, format, url, title, no_console):
 
     try:
         # Get timestamp before execution to filter console logs
-        before_ts = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+        before_ts = datetime.now(UTC).isoformat().replace("+00:00", "Z")
 
         if file:
             result = executor.execute_file(file, timeout=timeout)

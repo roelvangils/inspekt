@@ -19,7 +19,6 @@ import pytest
 
 from inspekt.services.ai_integration import AIIntegrationService, get_ai_service
 
-
 # =============================================================================
 # Fixtures
 # =============================================================================
@@ -259,7 +258,7 @@ def test_load_prompt_io_error(service, mock_prompts_dir):
     prompt_path = mock_prompts_dir / "error.prompt"
     prompt_path.write_text("content")
 
-    with mock.patch("builtins.open", side_effect=IOError("Permission denied")):
+    with mock.patch("builtins.open", side_effect=OSError("Permission denied")):
         with mock.patch("click.echo") as mock_echo:
             with pytest.raises(SystemExit) as exc_info:
                 service.load_prompt("error.prompt")

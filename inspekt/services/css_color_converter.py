@@ -776,7 +776,11 @@ def add_heuristic_comments(css_content: str) -> str:
         Input:  `color: #fff; /* White */`
         Output: `color: #fff; /* White, Invisible text */`
     """
-    from inspekt.services.css_property_comments import get_property_comment, get_selector_comment, merge_comments
+    from inspekt.services.css_property_comments import (
+        get_property_comment,
+        get_selector_comment,
+        merge_comments,
+    )
 
     def add_comment_to_line(line: str) -> str:
         """Add heuristic comment to a CSS property or selector line if applicable."""

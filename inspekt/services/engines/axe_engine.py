@@ -79,9 +79,9 @@ class AxeEngine(AccessibilityEngine):
         level: str = "22aa",
         include_passes: bool = False,
         include_incomplete: bool = False,
-        tags: Optional[str] = None,
-        disable_rules: Optional[list[str]] = None,
-        enable_rules: Optional[list[str]] = None,
+        tags: str | None = None,
+        disable_rules: list[str] | None = None,
+        enable_rules: list[str] | None = None,
         **kwargs,
     ) -> dict:
         """Build axe-core configuration."""

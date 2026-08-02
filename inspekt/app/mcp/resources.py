@@ -11,7 +11,7 @@ import logging
 from datetime import datetime, timedelta
 from typing import Any, Optional
 
-from mcp.types import Resource, TextContent, ImageContent, EmbeddedResource
+from mcp.types import EmbeddedResource, ImageContent, Resource, TextContent
 
 from inspekt.services.bridge_executor import BridgeExecutor
 
@@ -31,7 +31,7 @@ class ResourceCache:
         self.ttl_seconds = ttl_seconds
         self._cache: dict[str, tuple[Any, datetime]] = {}
 
-    def get(self, key: str) -> Optional[Any]:
+    def get(self, key: str) -> Any | None:
         """Get cached value if not expired."""
         if key in self._cache:
             value, timestamp = self._cache[key]
@@ -45,7 +45,7 @@ class ResourceCache:
         """Set cached value with current timestamp."""
         self._cache[key] = (value, datetime.now())
 
-    def invalidate(self, key: Optional[str] = None) -> None:
+    def invalidate(self, key: str | None = None) -> None:
         """Invalidate specific key or entire cache."""
         if key:
             self._cache.pop(key, None)
@@ -143,7 +143,7 @@ class ResourceProvider:
         elif uri_str == "inspekt-mcp://connection-status":
             content = await self._get_connection_status()
         else:
-            logger.error(f"No match found for URI: '{uri_str}' (repr: {repr(uri_str)})")
+            logger.error(f"No match found for URI: '{uri_str}' (repr: {uri_str!r})")
             raise ValueError(f"Unknown resource URI: {uri_str}")
 
         # Cache and return

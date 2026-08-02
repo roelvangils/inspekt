@@ -20,10 +20,9 @@ import click
 import requests
 
 from inspekt.app.cli.icons import get_icon
-from inspekt.services import http_client
 from inspekt.app.cli.table import Table, format_status_icon, print_json
+from inspekt.services import http_client
 from inspekt.services.bridge_executor import get_executor
-
 
 # Try to import protego for RFC 9309 compliance
 try:
@@ -53,8 +52,9 @@ def robots(output_json, validate, override_url):
         inspekt robots --validate
         inspekt robots --url https://example.com
     """
+    from inspekt.app.cli.table import print_error as _print_error
+    from inspekt.app.cli.table import print_hint as _print_hint
     from inspekt.services.browser_url import BrowserURLError, InternalURLError, resolve_origin
-    from inspekt.app.cli.table import print_error as _print_error, print_hint as _print_hint
 
     try:
         origin = resolve_origin(override_url)
@@ -187,14 +187,14 @@ def _fetch_robots_txt(robots_url: str) -> dict[str, Any]:
             "url": robots_url,
             "status": 0,
             "exists": False,
-            "error": f"Connection error: {str(e)}"
+            "error": f"Connection error: {e!s}"
         }
     except requests.RequestException as e:
         return {
             "url": robots_url,
             "status": 0,
             "exists": False,
-            "error": f"Request failed: {str(e)}"
+            "error": f"Request failed: {e!s}"
         }
 
 

@@ -148,7 +148,7 @@ def _proxy_request(method: str, url: str, **kwargs: Any) -> ProxyResponse:
     # Handle query params by appending to URL
     params = kwargs.get("params")
     if params:
-        from urllib.parse import urlencode, urlparse, urlunparse, parse_qs
+        from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 
         parsed = urlparse(url)
         existing = parse_qs(parsed.query)

@@ -228,7 +228,7 @@ class TestClassificationCache:
         cache_files = list(cache.cache_dir.glob("*.json"))
         assert len(cache_files) == 1
 
-        with open(cache_files[0], "r") as f:
+        with open(cache_files[0]) as f:
             data = json.load(f)
 
         # Set classified_at to 60 days ago
@@ -248,7 +248,7 @@ class TestClassificationCache:
 
         # Manually expire the cache entry
         cache_files = list(cache.cache_dir.glob("*.json"))
-        with open(cache_files[0], "r") as f:
+        with open(cache_files[0]) as f:
             data = json.load(f)
 
         old_date = datetime.now() - timedelta(days=60)
@@ -271,7 +271,7 @@ class TestClassificationCache:
 
         # Manually change the cache version to an old version
         cache_files = list(cache.cache_dir.glob("*.json"))
-        with open(cache_files[0], "r") as f:
+        with open(cache_files[0]) as f:
             data = json.load(f)
 
         data["cache_version"] = 0  # Old version

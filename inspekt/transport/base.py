@@ -4,10 +4,10 @@ This module defines the transport layer abstraction for Inspekt's
 client-server communication, supporting both async and sync interfaces.
 """
 
+import uuid
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Any, Optional
-import uuid
 
 
 class TransportError(Exception):
@@ -40,7 +40,7 @@ class Request:
 
     method: str
     params: dict[str, Any] = field(default_factory=dict)
-    request_id: Optional[str] = None
+    request_id: str | None = None
 
     def __post_init__(self) -> None:
         """Generate request_id if not provided."""
@@ -61,8 +61,8 @@ class Response:
 
     success: bool
     data: Any = None
-    error: Optional[str] = None
-    request_id: Optional[str] = None
+    error: str | None = None
+    request_id: str | None = None
 
 
 class Transport(ABC):

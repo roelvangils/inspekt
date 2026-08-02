@@ -131,7 +131,7 @@ class AIIntegrationService:
         try:
             with open(prompt_path, encoding="utf-8") as f:
                 return f.read().strip()
-        except IOError as e:
+        except OSError as e:
             click.echo(f"Error reading prompt file: {e}", err=True)
             sys.exit(1)
 

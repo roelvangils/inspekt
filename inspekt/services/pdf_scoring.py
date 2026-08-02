@@ -50,7 +50,7 @@ class AccessibilityGrade(Enum):
     F = "F"  # 0-59
 
     @classmethod
-    def from_score(cls, score: float) -> "AccessibilityGrade":
+    def from_score(cls, score: float) -> AccessibilityGrade:
         """Determine letter grade from numeric score."""
         if score >= 95:
             return cls.A_PLUS
@@ -253,7 +253,7 @@ class AccessibilityScore:
         return sorted(categories_with_issues, key=lambda x: x[1], reverse=True)[:limit]
 
 
-def calculate_accessibility_score(result: "PDFFullResult") -> AccessibilityScore:
+def calculate_accessibility_score(result: PDFFullResult) -> AccessibilityScore:
     """
     Calculate weighted accessibility score based on PDF check results.
 
@@ -470,7 +470,7 @@ def calculate_accessibility_score(result: "PDFFullResult") -> AccessibilityScore
     )
 
 
-def _categorize_verapdf_violation(violation: "VeraPDFViolation") -> ScoreCategory:
+def _categorize_verapdf_violation(violation: VeraPDFViolation) -> ScoreCategory:
     """
     Categorize a veraPDF violation based on its rule and clause.
 

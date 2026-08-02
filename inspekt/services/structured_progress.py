@@ -40,8 +40,8 @@ import json
 import sys
 import time
 from contextlib import contextmanager
-from dataclasses import dataclass, asdict, field
-from typing import TYPE_CHECKING, Literal, Generator
+from dataclasses import asdict, dataclass, field
+from typing import TYPE_CHECKING, Generator, Literal
 
 if TYPE_CHECKING:
     from inspekt.services.pdf_prescan import PDFPrescanResult
@@ -140,8 +140,8 @@ class StructuredProgressEmitter:
 
     def emit_prescan(
         self,
-        prescan: "PDFPrescanResult",
-        timing: "TimingEstimate",
+        prescan: PDFPrescanResult,
+        timing: TimingEstimate,
     ) -> None:
         """
         Emit pre-scan results and timing estimates.

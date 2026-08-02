@@ -86,7 +86,7 @@ async def click_element(params: ClickElementParams) -> ClickElementResponse:
             success=False,
             element_found=False,
             element_text=None,
-            message=f"Error: {str(e)}",
+            message=f"Error: {e!s}",
         )
 
 
@@ -171,5 +171,5 @@ async def type_text(params: TypeTextParams) -> TypeTextResponse:
         return TypeTextResponse(
             success=False,
             characters_typed=0,
-            message=f"Error: {str(e)}",
+            message=f"Error: {e!s}",
         )

@@ -38,7 +38,7 @@ logger = logging.getLogger(__name__)
 
 async def navigate(
     url: str,
-    wait_for: Optional[str] = None,
+    wait_for: str | None = None,
     timeout: int = 30,
     use_applescript_fallback: bool = True,
 ) -> dict:
@@ -99,7 +99,7 @@ async def navigate(
 
 async def _navigate_via_bridge(
     url: str,
-    wait_for: Optional[str],
+    wait_for: str | None,
     timeout: int,
 ) -> dict:
     """
@@ -173,5 +173,5 @@ async def _navigate_via_bridge(
             "success": False,
             "url": url,
             "title": "",
-            "message": f"Error: {str(e)}",
+            "message": f"Error: {e!s}",
         }

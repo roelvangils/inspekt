@@ -13,10 +13,10 @@ import shutil
 import tempfile
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Any, Optional
-from packaging import version
+from typing import Any, Dict, Optional
 
 import requests
+from packaging import version
 
 
 class AxeUpdater:
@@ -31,7 +31,7 @@ class AxeUpdater:
         self.npm_registry_url = "https://registry.npmjs.org/axe-core/latest"
         self.cdn_base_url = "https://cdn.jsdelivr.net/npm/axe-core@{version}/axe.min.js"
 
-    def get_current_version(self) -> Optional[str]:
+    def get_current_version(self) -> str | None:
         """
         Get the currently installed version of axe-core.
 
@@ -45,10 +45,10 @@ class AxeUpdater:
             with open(self.version_file) as f:
                 metadata = json.load(f)
             return metadata.get("version")
-        except (json.JSONDecodeError, IOError):
+        except (OSError, json.JSONDecodeError):
             return None
 
-    def check_latest_version(self, timeout: float = 5.0) -> Optional[Dict[str, Any]]:
+    def check_latest_version(self, timeout: float = 5.0) -> dict[str, Any] | None:
         """
         Check npm registry for the latest version of axe-core.
 
@@ -97,7 +97,7 @@ class AxeUpdater:
         except (requests.RequestException, json.JSONDecodeError, KeyError):
             return None
 
-    def is_update_available(self) -> tuple[bool, Optional[str], Optional[str], Optional[str]]:
+    def is_update_available(self) -> tuple[bool, str | None, str | None, str | None]:
         """
         Check if an update is available.
 
@@ -122,7 +122,7 @@ class AxeUpdater:
         except version.InvalidVersion:
             return False, current, latest, release_date
 
-    def download_version(self, ver: str) -> Optional[Path]:
+    def download_version(self, ver: str) -> Path | None:
         """
         Download a specific version of axe-core to a temporary file.
 
@@ -176,7 +176,7 @@ class AxeUpdater:
         try:
             shutil.copy2(self.axe_lib_path, self.backup_path)
             return True
-        except IOError:
+        except OSError:
             return False
 
     def restore_backup(self) -> bool:
@@ -192,7 +192,7 @@ class AxeUpdater:
         try:
             shutil.copy2(self.backup_path, self.axe_lib_path)
             return True
-        except IOError:
+        except OSError:
             return False
 
     def install_version(self, source_path: Path, ver: str) -> bool:
@@ -225,7 +225,7 @@ class AxeUpdater:
                 json.dump(metadata, f, indent=2)
 
             return True
-        except (IOError, json.JSONDecodeError):
+        except (OSError, json.JSONDecodeError):
             return False
 
     def test_installation(self) -> bool:
@@ -249,7 +249,7 @@ class AxeUpdater:
                 return False
 
             return True
-        except IOError:
+        except OSError:
             return False
 
     def update_to_latest(self, progress_callback=None) -> tuple[bool, str]:

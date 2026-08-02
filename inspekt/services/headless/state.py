@@ -60,7 +60,7 @@ class BrowserState:
     scroll_y: int = 0
 
     # Optional: inspected element selector (from DevTools)
-    inspected_selector: Optional[str] = None
+    inspected_selector: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         """Serialize state to dictionary for storage/transmission."""

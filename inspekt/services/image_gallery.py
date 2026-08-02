@@ -257,7 +257,7 @@ def generate_gallery_html(
             badges.append('<span class="gallery-badge badge-source" title="Originally a data URI">64</span>')
         if img.is_linked:
             badges.append(
-                f'<span class="gallery-badge badge-link" title="Wrapped in a link">↗</span>'
+                '<span class="gallery-badge badge-link" title="Wrapped in a link">↗</span>'
             )
         hints = _compute_acc_hints(img)
         if hints:

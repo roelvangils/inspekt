@@ -10,7 +10,6 @@ from inspekt.core.commands.base import (
     SubcommandDefinition,
 )
 
-
 selection = CommandDefinition(
     id="selection",
     name="Selection",

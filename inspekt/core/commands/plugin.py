@@ -10,7 +10,6 @@ from inspekt.core.commands.base import (
     SubcommandDefinition,
 )
 
-
 plugin = CommandDefinition(
     id="plugin",
     name="Plugins",

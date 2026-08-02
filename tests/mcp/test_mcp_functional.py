@@ -5,8 +5,9 @@ These test the actual tool implementations with mocked bridge.
 Run with: pytest tests/mcp/test_mcp_functional.py -v
 """
 
-import pytest
 from unittest.mock import AsyncMock, Mock, patch
+
+import pytest
 
 from inspekt.app.mcp import schemas
 

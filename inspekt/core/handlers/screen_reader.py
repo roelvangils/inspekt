@@ -241,7 +241,7 @@ async def sr_announce(params: SRAnnounceParams) -> SRAnnounceResponse:
         if not items:
             return SRAnnounceResponse(
                 success=False,
-                error=f"No element found"
+                error="No element found"
                 + (f" matching '{params.selector}'" if params.selector else ""),
             )
 

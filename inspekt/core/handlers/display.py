@@ -14,8 +14,8 @@ import asyncio
 import json
 import logging
 import os
-import urllib.request
 import urllib.error
+import urllib.request
 
 from inspekt.core.commands.base import EmptyParams
 from inspekt.core.schemas.display import (

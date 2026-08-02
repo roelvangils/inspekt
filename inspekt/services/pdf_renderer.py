@@ -74,7 +74,7 @@ class PDFRenderer:
 
         self._doc = fitz.open(str(self.pdf_path))
 
-    def __enter__(self) -> "PDFRenderer":
+    def __enter__(self) -> PDFRenderer:
         """Context manager entry."""
         return self
 

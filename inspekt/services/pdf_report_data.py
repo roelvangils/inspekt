@@ -11,12 +11,12 @@ can generate the same HTML report.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field, asdict
+import json
+from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
 from typing import Any
-import json
 
 
 class ReportEncoder(json.JSONEncoder):
@@ -317,7 +317,7 @@ class StructureNodeData:
     alt_text: str | None = None
     is_heading: bool = False
     has_issues: bool = False
-    children: list["StructureNodeData"] = field(default_factory=list)
+    children: list[StructureNodeData] = field(default_factory=list)
 
 
 @dataclass
@@ -621,13 +621,13 @@ class PDFReportData:
         return json.dumps(self.to_dict(), cls=ReportEncoder, indent=indent)
 
     @classmethod
-    def from_json(cls, json_str: str) -> "PDFReportData":
+    def from_json(cls, json_str: str) -> PDFReportData:
         """Deserialize from JSON string."""
         data = json.loads(json_str)
         return cls.from_dict(data)
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "PDFReportData":
+    def from_dict(cls, data: dict[str, Any]) -> PDFReportData:
         """Create from dictionary.
 
         Automatically migrates older schema versions to current format.

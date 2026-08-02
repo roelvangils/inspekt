@@ -7,8 +7,9 @@ It generates minimal PDF files with known characteristics for testing.
 
 from __future__ import annotations
 
-import pytest
 from pathlib import Path
+
+import pytest
 
 
 @pytest.fixture(scope="session")

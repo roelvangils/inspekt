@@ -203,5 +203,5 @@ async def take_screenshot(params: TakeScreenshotParams) -> TakeScreenshotRespons
             format=params.format or "png",
             width=0,
             height=0,
-            message=f"Error: {str(e)}",
+            message=f"Error: {e!s}",
         )

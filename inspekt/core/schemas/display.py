@@ -10,7 +10,6 @@ from typing import Literal, Optional
 
 from pydantic import BaseModel, Field
 
-
 # ============================================================================
 # Zoom Schemas
 # ============================================================================
@@ -31,7 +30,7 @@ ZOOM_WCAG_NOTES = {
 }
 
 
-def get_wcag_note(zoom_factor: float) -> Optional[str]:
+def get_wcag_note(zoom_factor: float) -> str | None:
     """Get WCAG guidance note for a zoom level, if any."""
     return ZOOM_WCAG_NOTES.get(zoom_factor)
 
@@ -55,11 +54,11 @@ def previous_zoom_step(current: float) -> float:
 class ZoomSetParams(BaseModel):
     """Parameters for set_zoom command."""
 
-    level: Optional[int] = Field(
+    level: int | None = Field(
         default=None,
         description="Zoom level as percentage (e.g., 150 for 150%). Range: 25–500.",
     )
-    action: Optional[Literal["in", "out", "reset"]] = Field(
+    action: Literal["in", "out", "reset"] | None = Field(
         default=None,
         description="Zoom action: 'in' (next step), 'out' (previous step), 'reset' (100%)",
     )
@@ -80,15 +79,15 @@ class ZoomResponse(BaseModel):
         default=100,
         description="Current zoom as percentage (e.g., 150)",
     )
-    wcag_note: Optional[str] = Field(
+    wcag_note: str | None = Field(
         default=None,
         description="WCAG guidance for the current zoom level, if applicable",
     )
-    previous_zoom: Optional[float] = Field(
+    previous_zoom: float | None = Field(
         default=None,
         description="Previous zoom factor before change (only for set operations)",
     )
-    message: Optional[str] = Field(
+    message: str | None = Field(
         default=None,
         description="Success or error message",
     )
@@ -116,7 +115,7 @@ class ViewportSetParams(BaseModel):
         ge=320,
         le=3840,
     )
-    height: Optional[int] = Field(
+    height: int | None = Field(
         default=None,
         description="Viewport height in pixels (min: 240, max: 2160). If omitted, only width changes.",
         ge=240,
@@ -143,15 +142,15 @@ class ViewportResponse(BaseModel):
         default=0,
         description="Current viewport height in pixels",
     )
-    previous_width: Optional[int] = Field(
+    previous_width: int | None = Field(
         default=None,
         description="Previous viewport width (only for set operations)",
     )
-    previous_height: Optional[int] = Field(
+    previous_height: int | None = Field(
         default=None,
         description="Previous viewport height (only for set operations)",
     )
-    message: Optional[str] = Field(
+    message: str | None = Field(
         default=None,
         description="Success or error message",
     )

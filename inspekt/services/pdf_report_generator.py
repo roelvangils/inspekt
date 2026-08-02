@@ -14,36 +14,36 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from inspekt.services.pdf_report_data import (
-    PDFReportData,
-    DocumentMetadata,
+    CURRENT_SCHEMA_VERSION,
     AccessibilityScoreData,
-    CategoryScoreData,
-    BasicChecksData,
-    CheckResultData,
-    ContentAuditData,
-    ImageAuditData,
-    TableAuditData,
-    FormFieldAuditData,
-    LinkAuditData,
-    TextLayerAnalysisData,
-    PageTextComparisonData,
-    StructureTreeData,
-    StructureNodeData,
-    RemediationRoadmapData,
-    RemediationTaskData,
-    VeraPDFResultsData,
-    VeraPDFViolationData,
-    # New in v2.0
-    CoverImageData,
-    ContrastAnalysisData,
-    ContrastIssueData,
-    IssueScreenshotData,
-    SimpleChecksData,
-    SimplePDFCheckData,
-    InteractivePreviewData,
     AssetManifest,
     AssetReference,
-    CURRENT_SCHEMA_VERSION,
+    BasicChecksData,
+    CategoryScoreData,
+    CheckResultData,
+    ContentAuditData,
+    ContrastAnalysisData,
+    ContrastIssueData,
+    # New in v2.0
+    CoverImageData,
+    DocumentMetadata,
+    FormFieldAuditData,
+    ImageAuditData,
+    InteractivePreviewData,
+    IssueScreenshotData,
+    LinkAuditData,
+    PageTextComparisonData,
+    PDFReportData,
+    RemediationRoadmapData,
+    RemediationTaskData,
+    SimpleChecksData,
+    SimplePDFCheckData,
+    StructureNodeData,
+    StructureTreeData,
+    TableAuditData,
+    TextLayerAnalysisData,
+    VeraPDFResultsData,
+    VeraPDFViolationData,
 )
 
 if TYPE_CHECKING:
@@ -54,7 +54,7 @@ logger = logging.getLogger(__name__)
 
 def generate_report_data(
     pdf_path: Path | str,
-    result: "PDFFullResult",
+    result: PDFFullResult,
     config: dict | None = None,
 ) -> PDFReportData:
     """
@@ -130,7 +130,7 @@ def generate_report_data(
     return report
 
 
-def _generate_metadata(pdf_path: Path, result: "PDFFullResult") -> DocumentMetadata:
+def _generate_metadata(pdf_path: Path, result: PDFFullResult) -> DocumentMetadata:
     """Generate document metadata section."""
     from inspekt.services.pdf_checker import extract_enhanced_metadata
 
@@ -177,7 +177,7 @@ def _generate_metadata(pdf_path: Path, result: "PDFFullResult") -> DocumentMetad
         )
 
 
-def _generate_score_data(result: "PDFFullResult") -> AccessibilityScoreData:
+def _generate_score_data(result: PDFFullResult) -> AccessibilityScoreData:
     """Generate accessibility score data."""
     from inspekt.services.pdf_scoring import calculate_accessibility_score
 
@@ -218,7 +218,7 @@ def _generate_score_data(result: "PDFFullResult") -> AccessibilityScoreData:
     )
 
 
-def _generate_basic_checks(result: "PDFFullResult") -> BasicChecksData:
+def _generate_basic_checks(result: PDFFullResult) -> BasicChecksData:
     """Generate basic checks data."""
     basic = result.basic
 
@@ -576,7 +576,7 @@ def _convert_structure_node(node, depth: int = 0) -> StructureNodeData | None:
 
 
 def _generate_remediation_roadmap(
-    result: "PDFFullResult",
+    result: PDFFullResult,
     pdf_path: Path,
 ) -> RemediationRoadmapData | None:
     """Generate remediation roadmap data."""
@@ -621,7 +621,7 @@ def _generate_remediation_roadmap(
         return None
 
 
-def _generate_verapdf_results(result: "PDFFullResult") -> VeraPDFResultsData | None:
+def _generate_verapdf_results(result: PDFFullResult) -> VeraPDFResultsData | None:
     """Generate veraPDF results data."""
     if not result.verapdf:
         return None
@@ -656,7 +656,7 @@ def _generate_verapdf_results(result: "PDFFullResult") -> VeraPDFResultsData | N
 # =============================================================================
 
 
-def _generate_simple_checks(result: "PDFFullResult") -> SimpleChecksData | None:
+def _generate_simple_checks(result: PDFFullResult) -> SimpleChecksData | None:
     """Generate Simple PDF Checker results data."""
     if not result.simple:
         return None
@@ -721,6 +721,7 @@ def _generate_cover_image(pdf_path: Path, config: dict) -> CoverImageData | None
         # Convert to base64 PNG
         import base64
         import io
+
         from PIL import Image
 
         img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
@@ -827,7 +828,7 @@ def _generate_contrast_analysis(pdf_path: Path, config: dict) -> ContrastAnalysi
 
 def _generate_issue_screenshots(
     pdf_path: Path,
-    result: "PDFFullResult",
+    result: PDFFullResult,
     config: dict,
 ) -> list[IssueScreenshotData]:
     """
@@ -839,9 +840,10 @@ def _generate_issue_screenshots(
         return []
 
     try:
-        import fitz  # PyMuPDF
         import base64
         import io
+
+        import fitz  # PyMuPDF
         from PIL import Image
 
         screenshots = []

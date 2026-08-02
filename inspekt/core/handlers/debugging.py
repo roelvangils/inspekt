@@ -97,7 +97,7 @@ async def get_console_logs(params: GetConsoleLogsParams) -> GetConsoleLogsRespon
             entries=[],
             count=0,
             hooked=False,
-            message=f"Error: {str(e)}",
+            message=f"Error: {e!s}",
         )
 
 
@@ -142,5 +142,5 @@ async def clear_console_logs(params: EmptyParams) -> ClearConsoleLogsResponse:
         logger.error(f"Clear console logs error: {e}")
         return ClearConsoleLogsResponse(
             success=False,
-            message=f"Error: {str(e)}",
+            message=f"Error: {e!s}",
         )

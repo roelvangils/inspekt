@@ -72,7 +72,7 @@ class SiaEngine(AccessibilityEngine):
     # Override version checking for custom bundle
     # =========================================================================
 
-    def check_latest_version(self, timeout: float = 5.0) -> Optional[dict]:
+    def check_latest_version(self, timeout: float = 5.0) -> dict | None:
         """
         Check npm registry for the latest version.
 
@@ -81,7 +81,7 @@ class SiaEngine(AccessibilityEngine):
         """
         return super().check_latest_version(timeout)
 
-    def download_version(self, ver: str) -> Optional[Path]:
+    def download_version(self, ver: str) -> Path | None:
         """
         Bundle Alfa from npm packages using esbuild.
 
@@ -189,7 +189,7 @@ class SiaEngine(AccessibilityEngine):
                 json.dump(metadata, f, indent=2)
 
             return True
-        except (IOError, OSError):
+        except OSError:
             return False
 
     # =========================================================================
@@ -237,7 +237,7 @@ class SiaEngine(AccessibilityEngine):
         try:
             with open(self.lib_path, encoding="utf-8") as f:
                 return f.read()
-        except IOError as e:
+        except OSError as e:
             raise RuntimeError(f"Failed to load Alfa library from {self.lib_path}: {e}")
 
     def load_execution_script(self, config: dict) -> str:
@@ -245,7 +245,7 @@ class SiaEngine(AccessibilityEngine):
         try:
             with open(self.script_path, encoding="utf-8") as f:
                 script = f.read()
-        except IOError as e:
+        except OSError as e:
             raise RuntimeError(f"Failed to load Alfa script from {self.script_path}: {e}")
 
         # Inject version into config for the script to use

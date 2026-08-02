@@ -1,8 +1,9 @@
 """Execution API endpoints for running JavaScript code."""
 
 from fastapi import APIRouter, HTTPException
-from inspekt.app.api.models import EvalRequest, CommandResponse
+
 from inspekt.app.api.dependencies import get_bridge_client
+from inspekt.app.api.models import CommandResponse, EvalRequest
 
 router = APIRouter()
 
@@ -49,8 +50,8 @@ def execute_javascript(request: EvalRequest):
         return result
 
     except ConnectionError as e:
-        raise HTTPException(status_code=503, detail=f"Bridge server connection error: {str(e)}")
+        raise HTTPException(status_code=503, detail=f"Bridge server connection error: {e!s}")
     except TimeoutError as e:
-        raise HTTPException(status_code=504, detail=f"Execution timeout: {str(e)}")
+        raise HTTPException(status_code=504, detail=f"Execution timeout: {e!s}")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Execution error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Execution error: {e!s}")

@@ -10,18 +10,17 @@ import json
 import pytest
 
 from inspekt.app.cli.accessibility import (
-    _build_enriched_report_data,
-    _extract_engine_rule_details,
     AVAILABLE_ENGINES,
     WCAG_SC_DESCRIPTIONS,
     WCAG_SC_LEVELS,
+    _build_enriched_report_data,
+    _extract_engine_rule_details,
 )
 from inspekt.services.a11y_report import (
-    generate_a11y_report_html,
-    _format_level,
     _esc,
+    _format_level,
+    generate_a11y_report_html,
 )
-
 
 # ── Fixtures ──────────────────────────────────────────
 

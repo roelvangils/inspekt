@@ -242,7 +242,7 @@ def render_html_from_json(json_path: Path | str, resolve_assets: bool = True) ->
     """
     json_path = Path(json_path)
 
-    with open(json_path, "r", encoding="utf-8") as f:
+    with open(json_path, encoding="utf-8") as f:
         data = json.load(f)
 
     # Resolve external asset references if an asset manifest exists

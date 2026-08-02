@@ -142,7 +142,7 @@ class PDFTagVisualizer:
         self._pdf = None
         self._fitz_doc = None
 
-    def __enter__(self) -> "PDFTagVisualizer":
+    def __enter__(self) -> PDFTagVisualizer:
         """Open PDF files."""
         import pikepdf
         self._pdf = pikepdf.open(self.pdf_path)
@@ -575,10 +575,10 @@ class PDFTagVisualizer:
             tags = self.extract_page_tags(page_num)
 
         import base64
-        from PIL import Image, ImageDraw, ImageFont
 
         # Render the page
         import fitz
+        from PIL import Image, ImageDraw, ImageFont
         page = self._fitz_doc[page_num]
         zoom = dpi / 72  # 72 is the default PDF resolution
         mat = fitz.Matrix(zoom, zoom)
@@ -716,9 +716,10 @@ class PDFTagVisualizer:
         if tags is None:
             tags = self.extract_page_tags(page_num)
 
-        from PIL import Image, ImageDraw, ImageFont
-        import fitz
         import math
+
+        import fitz
+        from PIL import Image, ImageDraw, ImageFont
 
         issues = []
 

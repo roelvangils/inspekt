@@ -6,8 +6,9 @@ Tests for auditing images, tables, forms, and links in PDFs.
 
 from __future__ import annotations
 
-import pytest
 from unittest.mock import MagicMock, patch
+
+import pytest
 
 
 class TestImageAudit:
@@ -233,10 +234,10 @@ class TestContentAuditResult:
         """Test ContentAuditResult aggregation properties."""
         from inspekt.services.pdf_content_auditor import (
             ContentAuditResult,
-            ImageAudit,
-            TableAudit,
             FormFieldAudit,
+            ImageAudit,
             LinkAudit,
+            TableAudit,
         )
 
         images = [
@@ -292,6 +293,7 @@ class TestNonDescriptivePatterns:
     def test_patterns_are_regex(self):
         """Test that patterns are valid regex strings."""
         import re
+
         from inspekt.services.pdf_content_auditor import NON_DESCRIPTIVE_PATTERNS
 
         for pattern in NON_DESCRIPTIVE_PATTERNS:
@@ -304,8 +306,9 @@ class TestPDFContentAuditor:
 
     def test_initialization(self):
         """Test PDFContentAuditor initialization."""
-        from inspekt.services.pdf_content_auditor import PDFContentAuditor
         from pathlib import Path
+
+        from inspekt.services.pdf_content_auditor import PDFContentAuditor
 
         # Should initialize
         auditor = PDFContentAuditor("test.pdf")

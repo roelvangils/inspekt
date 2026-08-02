@@ -499,7 +499,7 @@ Respond with ONLY the category name (e.g., "photograph"), nothing else."""
 
     def classify_from_file(
         self,
-        file_path: "Path | str",
+        file_path: Path | str,
         use_clip: bool = True,
         use_vision_ai: bool = False,
         ai_provider: str | None = None,
@@ -533,6 +533,7 @@ Respond with ONLY the category name (e.g., "photograph"), nothing else."""
             ClassificationResult
         """
         from pathlib import Path
+
         from PIL import Image
 
         path = Path(file_path)
@@ -695,7 +696,7 @@ Respond with ONLY the category name (e.g., "photograph"), nothing else."""
         )
 
     def _render_svg_to_png(
-        self, svg_path: "Path", target_size: int = 512
+        self, svg_path: Path, target_size: int = 512
     ) -> tuple[bytes | None, int, int]:
         """
         Render an SVG file to PNG bytes for classification.
@@ -730,8 +731,8 @@ Respond with ONLY the category name (e.g., "photograph"), nothing else."""
 
         # Try svglib + reportlab as fallback
         try:
-            from svglib.svglib import svg2rlg
             from reportlab.graphics import renderPM
+            from svglib.svglib import svg2rlg
 
             drawing = svg2rlg(str(svg_path))
             if drawing:

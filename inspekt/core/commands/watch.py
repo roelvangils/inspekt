@@ -10,7 +10,6 @@ from inspekt.core.commands.base import (
     SubcommandDefinition,
 )
 
-
 watch = CommandDefinition(
     id="watch",
     name="Watch",

@@ -9,7 +9,6 @@ Run with: pytest tests/unit/test_command_registry_sync.py -v
 
 import pytest
 
-
 # Commands intentionally excluded from validation
 # These are hidden aliases or internal commands that don't need registry entries
 EXCLUDED_COMMANDS = {
@@ -187,7 +186,7 @@ class TestCommandRegistrySync:
                     names[alias] = cmd.id
 
         if conflicts:
-            pytest.fail(f"CLI name conflicts:\n" + "\n".join(conflicts))
+            pytest.fail("CLI name conflicts:\n" + "\n".join(conflicts))
 
     def test_command_ids_are_unique(self):
         """All command IDs must be unique."""
@@ -226,7 +225,7 @@ class TestCommandRegistrySync:
 
         if invalid:
             pytest.fail(
-                f"Commands with invalid categories:\n"
+                "Commands with invalid categories:\n"
                 + "\n".join(invalid)
             )
 

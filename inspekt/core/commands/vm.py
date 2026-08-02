@@ -10,7 +10,6 @@ from inspekt.core.commands.base import (
     SubcommandDefinition,
 )
 
-
 vm = CommandDefinition(
     id="vm",
     name="Browser VM",

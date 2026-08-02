@@ -77,8 +77,8 @@ class PDFIssueVisualizer:
 
     def __init__(
         self,
-        renderer: "PDFRenderer",
-        assets: "PDFReportAssets",
+        renderer: PDFRenderer,
+        assets: PDFReportAssets,
         dpi: int = 150,
         max_issues_per_rule: int = 1,
     ):
@@ -98,7 +98,7 @@ class PDFIssueVisualizer:
 
     def visualize_issues(
         self,
-        violations: list["VeraPDFViolation"],
+        violations: list[VeraPDFViolation],
     ) -> VisualizationResult:
         """
         Create visualizations for a list of violations.
@@ -146,7 +146,7 @@ class PDFIssueVisualizer:
 
     def _create_visualization(
         self,
-        violation: "VeraPDFViolation",
+        violation: VeraPDFViolation,
         page_num: int,
     ) -> IssueVisualization:
         """
@@ -200,7 +200,7 @@ class PDFIssueVisualizer:
 
     def visualize_pages_with_issues(
         self,
-        violations: list["VeraPDFViolation"],
+        violations: list[VeraPDFViolation],
         max_pages: int = 5,
     ) -> list[tuple[int, str]]:
         """
@@ -243,8 +243,8 @@ class PDFIssueVisualizer:
 
 def visualize_pdf_issues(
     pdf_path: Path | str,
-    violations: list["VeraPDFViolation"],
-    assets: "PDFReportAssets",
+    violations: list[VeraPDFViolation],
+    assets: PDFReportAssets,
     config: dict | None = None,
 ) -> VisualizationResult | None:
     """
@@ -261,7 +261,7 @@ def visualize_pdf_issues(
     Returns:
         VisualizationResult, or None if rendering is unavailable
     """
-    from inspekt.services.pdf_renderer import is_pymupdf_available, PDFRenderer
+    from inspekt.services.pdf_renderer import PDFRenderer, is_pymupdf_available
 
     if not is_pymupdf_available():
         logger.info("PyMuPDF not available, skipping issue visualization")

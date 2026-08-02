@@ -5,6 +5,7 @@ local IPC between the Inspekt CLI/MCP server and the bridge server.
 """
 
 import asyncio
+import builtins
 import json
 import os
 import socket
@@ -22,7 +23,7 @@ from .base import (
 )
 
 
-def get_socket_path(session_id: Optional[str] = None) -> Path:
+def get_socket_path(session_id: str | None = None) -> Path:
     """Get the Unix socket path for a session.
 
     Uses XDG_RUNTIME_DIR if available (Linux standard), otherwise
@@ -63,8 +64,8 @@ class UnixSocketTransport(Transport):
 
     def __init__(
         self,
-        socket_path: Optional[Path] = None,
-        session_id: Optional[str] = None,
+        socket_path: Path | None = None,
+        session_id: str | None = None,
     ):
         """Initialize the Unix socket transport.
 
@@ -73,8 +74,8 @@ class UnixSocketTransport(Transport):
             session_id: Session identifier for socket path generation
         """
         self._socket_path = socket_path or get_socket_path(session_id)
-        self._reader: Optional[asyncio.StreamReader] = None
-        self._writer: Optional[asyncio.StreamWriter] = None
+        self._reader: asyncio.StreamReader | None = None
+        self._writer: asyncio.StreamWriter | None = None
         self._connected = False
 
     @property
@@ -175,7 +176,7 @@ class UnixSocketTransport(Transport):
                     error=response_json.get("error"),
                     request_id=response_json.get("id"),
                 )
-        except asyncio.TimeoutError:
+        except builtins.TimeoutError:
             raise TimeoutError(f"Request timed out after {timeout}s")
         except asyncio.IncompleteReadError:
             self._connected = False
@@ -190,8 +191,8 @@ class SyncUnixSocketTransport(SyncTransport):
 
     def __init__(
         self,
-        socket_path: Optional[Path] = None,
-        session_id: Optional[str] = None,
+        socket_path: Path | None = None,
+        session_id: str | None = None,
     ):
         """Initialize the synchronous Unix socket transport.
 
@@ -200,7 +201,7 @@ class SyncUnixSocketTransport(SyncTransport):
             session_id: Session identifier for socket path generation
         """
         self._socket_path = socket_path or get_socket_path(session_id)
-        self._socket: Optional[socket.socket] = None
+        self._socket: socket.socket | None = None
 
     @property
     def address(self) -> str:
@@ -291,7 +292,7 @@ class SyncUnixSocketTransport(SyncTransport):
                 error=response_json.get("error"),
                 request_id=response_json.get("id"),
             )
-        except socket.timeout:
+        except builtins.TimeoutError:
             raise TimeoutError(f"Request timed out after {timeout}s")
         except (BrokenPipeError, ConnectionResetError) as e:
             self._socket = None

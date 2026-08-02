@@ -15,7 +15,6 @@ from pathlib import Path
 
 import click
 
-
 # Docker image and container names
 IMAGE_NAME = "inspekt-browser-vm"
 CONTAINER_NAME = "inspekt-browser-vm"
@@ -243,8 +242,8 @@ def _verify_vm_serving_correctly(timeout: int = 10) -> tuple[bool, str | None]:
     Returns:
         (success, error_message)
     """
-    import urllib.request
     import urllib.error
+    import urllib.request
 
     url = f"http://localhost:{NOVNC_PORT}/control.html"
     start_time = time.time()
@@ -741,6 +740,7 @@ def status(output_json):
         inspekt vm status --json # JSON output
     """
     import json
+
     from inspekt.app.cli.icons import get_indicator
     from inspekt.app.cli.table import Table, format_status_icon
 
@@ -829,7 +829,7 @@ def status(output_json):
         )
     else:
         click.echo()
-        click.echo(f"  Start with: " + click.style("inspekt vm start", fg="cyan"))
+        click.echo("  Start with: " + click.style("inspekt vm start", fg="cyan"))
         sys.exit(1)
 
 
@@ -918,7 +918,7 @@ def cleanup(force):
     # Check for port conflicts to show user what will be freed
     port_conflicts = _check_ports_available()
     if port_conflicts:
-        click.echo(f"\nPorts currently in use:")
+        click.echo("\nPorts currently in use:")
         for port, desc in port_conflicts:
             click.echo(f"  • Port {port} ({desc})")
 

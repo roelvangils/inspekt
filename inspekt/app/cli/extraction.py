@@ -16,12 +16,12 @@ from __future__ import annotations
 
 import base64
 import io
-from datetime import datetime
 import json
 import re
 import subprocess
 import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import datetime
 from pathlib import Path
 
 import click
@@ -29,18 +29,21 @@ import requests
 from PIL import Image
 
 from inspekt.app.cli.base import builtin_open, get_ai_language
-from inspekt.app.cli.url_builder import url_scheme
+from inspekt.app.cli.icons import analyze as analyze_icon
+from inspekt.app.cli.icons import cached as cached_icon
+from inspekt.app.cli.icons import error, get_indicator, success
+from inspekt.app.cli.icons import generate as generate_icon
 from inspekt.app.cli.interaction import _focus_browser_if_requested, _send_text
-from inspekt.services.formatting_utils import format_filesize
-from inspekt.app.cli.icons import success, error, cached as cached_icon, get_indicator, analyze as analyze_icon, generate as generate_icon
 from inspekt.app.cli.table import print_wrapped
+from inspekt.app.cli.url_builder import url_scheme
 from inspekt.client import BridgeClient
 from inspekt.config import get_do_config
 from inspekt.services.action_cache import ActionCache
 from inspekt.services.action_matcher import ActionMatcher
-from inspekt.services.content_cache import ContentCache
 from inspekt.services.ai_integration import get_ai_service
 from inspekt.services.bridge_executor import get_executor
+from inspekt.services.content_cache import ContentCache
+from inspekt.services.formatting_utils import format_filesize
 from inspekt.services.script_loader import ScriptLoader
 
 
@@ -58,22 +61,23 @@ def _speak_text(text: str, voice_name: str, audio_output: str | None = None, for
         force_refresh: If True, bypass cache and regenerate audio.
     """
     import os
-    from inspekt.services.tts_service import (
-        speak_text,
-        generate_audio,
-        play_audio_bytes,
-        TTSError,
-        is_tts_available,
-    )
+
+    from inspekt.app.cli.icons import get_icon
+    from inspekt.config import get_tts_config
     from inspekt.services.text_splitter import (
         ELEVENLABS_CHAR_LIMIT,
         chunk_text_for_tts,
-        truncate_at_sentence_boundary,
         get_text_stats,
+        truncate_at_sentence_boundary,
     )
     from inspekt.services.tts_cache import TTSCache
-    from inspekt.config import get_tts_config
-    from inspekt.app.cli.icons import get_icon
+    from inspekt.services.tts_service import (
+        TTSError,
+        generate_audio,
+        is_tts_available,
+        play_audio_bytes,
+        speak_text,
+    )
 
     # Check if TTS is available
     available, error_msg = is_tts_available()
@@ -107,7 +111,7 @@ def _speak_text(text: str, voice_name: str, audio_output: str | None = None, for
         click.echo(f"ElevenLabs has a {ELEVENLABS_CHAR_LIMIT:,} character limit per request.", err=True)
         click.echo(err=True)
         click.echo("Options:", err=True)
-        click.echo(f"  1. Truncate at sentence boundary (one API request)", err=True)
+        click.echo("  1. Truncate at sentence boundary (one API request)", err=True)
         click.echo(f"  2. Split into {chunk_count} chunks (multiple requests, play sequentially)", err=True)
         click.echo("  3. Cancel", err=True)
         click.echo(err=True)
@@ -212,10 +216,11 @@ def _process_tts_chunks(
         detached: Whether to use detached playback mode.
         force_refresh: If True, bypass cache and regenerate audio.
     """
-    from concurrent.futures import ThreadPoolExecutor, Future
-    from inspekt.services.tts_service import speak_text, generate_audio, play_audio_bytes, TTSError
-    from inspekt.services.tts_cache import TTSCache
+    from concurrent.futures import Future, ThreadPoolExecutor
+
     from inspekt.app.cli.icons import get_icon
+    from inspekt.services.tts_cache import TTSCache
+    from inspekt.services.tts_service import TTSError, generate_audio, play_audio_bytes, speak_text
 
     speak_icon = get_icon("speak") or "\U0001F50A"
     cached_icon = get_icon("cached") or "⚡"
@@ -745,7 +750,7 @@ def _execute_element_action(client: BridgeClient, action_id: str, element: dict,
 })();
 """
             client.execute(press_script, timeout=5.0)
-            click.echo(f"  Submitted search")
+            click.echo("  Submitted search")
 
     else:
         # Default: regular click for non-links
@@ -1380,7 +1385,7 @@ def do(instruction, debug, no_execute, force_ai, no_cache, focus, verbose):
                     click.echo(raw_output, err=True)
                     sys.exit(1)
             else:
-                click.echo(f"Error: AI returned invalid JSON", err=True)
+                click.echo("Error: AI returned invalid JSON", err=True)
                 click.echo("Raw response:", err=True)
                 click.echo(raw_output, err=True)
                 sys.exit(1)
@@ -2133,6 +2138,7 @@ def summarize(format, language, debug, force_refresh, output_json, output, speak
         inspekt summarize --speak margot     # Read summary aloud with Margot voice
     """
     import time
+
     from inspekt.config import get_summarize_config
 
     client = BridgeClient()
@@ -2427,6 +2433,7 @@ def index(no_cache, output, headless, mirror_session, headless_url):
     # ========== HEADLESS MODE ==========
     if headless or mirror_session:
         import asyncio
+
         from inspekt.services.headless import HeadlessContext
 
         if mirror_session:
@@ -2487,8 +2494,9 @@ def index(no_cache, output, headless, mirror_session, headless_url):
             output_path.write_text(markdown_content)
             click.echo(f"Saved to: {output_path}", err=True)
         elif not no_cache:
-            from inspekt.services.content_cache import ContentCache
             from urllib.parse import urlparse
+
+            from inspekt.services.content_cache import ContentCache
             content_cache = ContentCache()
             parsed = urlparse(current_url)
             domain = parsed.netloc

@@ -27,7 +27,7 @@ class SRWalkParams(BaseModel):
         default=500,
         description="Maximum number of elements to walk",
     )
-    selector: Optional[str] = Field(
+    selector: str | None = Field(
         default=None,
         description="CSS selector to scope the walk to a subtree",
     )
@@ -57,59 +57,59 @@ class SRElementAnnouncement(BaseModel):
     index: int = Field(..., description="Position in reading order")
     selector: str = Field(..., description="CSS selector for the element")
     tag: str = Field(..., description="HTML tag name")
-    role: Optional[str] = Field(default="", description="ARIA role")
+    role: str | None = Field(default="", description="ARIA role")
     name: str = Field(..., description="Accessible name")
     language: str = Field(default="en", description="Detected language")
-    jaws: Optional[str] = Field(default=None, description="JAWS announcement")
-    nvda: Optional[str] = Field(default=None, description="NVDA announcement")
-    voiceover: Optional[str] = Field(
+    jaws: str | None = Field(default=None, description="JAWS announcement")
+    nvda: str | None = Field(default=None, description="NVDA announcement")
+    voiceover: str | None = Field(
         default=None, description="VoiceOver announcement"
     )
 
     # Secondary info
-    description: Optional[str] = Field(
+    description: str | None = Field(
         default=None, description="aria-describedby / aria-description content"
     )
-    tooltip: Optional[str] = Field(
+    tooltip: str | None = Field(
         default=None,
         description="title attribute (when not already used as accessible name)",
     )
     is_focusable: bool = Field(
         default=False, description="Whether element is keyboard-focusable"
     )
-    tab_index: Optional[int] = Field(
+    tab_index: int | None = Field(
         default=None, description="tabindex value (if explicitly set)"
     )
 
     # Table context (only for table cells)
-    table_column_header: Optional[str] = Field(
+    table_column_header: str | None = Field(
         default=None, description="Associated column header text"
     )
-    table_row_header: Optional[str] = Field(
+    table_row_header: str | None = Field(
         default=None, description="Associated row header text"
     )
 
     # Form context
-    value: Optional[str] = Field(
+    value: str | None = Field(
         default=None, description="Current input value"
     )
-    placeholder: Optional[str] = Field(
+    placeholder: str | None = Field(
         default=None, description="Placeholder text"
     )
 
     # Link context
-    href: Optional[str] = Field(
+    href: str | None = Field(
         default=None, description="Link destination URL"
     )
 
     # Secondary announcements (the "after pause" text per SR)
-    jaws_secondary: Optional[str] = Field(
+    jaws_secondary: str | None = Field(
         default=None, description="What JAWS says after a pause (description/tooltip)"
     )
-    nvda_secondary: Optional[str] = Field(
+    nvda_secondary: str | None = Field(
         default=None, description="What NVDA says after a pause"
     )
-    voiceover_secondary: Optional[str] = Field(
+    voiceover_secondary: str | None = Field(
         default=None, description="What VoiceOver says as help text"
     )
 
@@ -125,11 +125,11 @@ class SRDifference(BaseModel):
 
     index: int = Field(..., description="Position in reading order")
     selector: str = Field(..., description="CSS selector")
-    role: Optional[str] = Field(default="", description="ARIA role")
+    role: str | None = Field(default="", description="ARIA role")
     name: str = Field(..., description="Accessible name")
-    jaws: Optional[str] = Field(default=None, description="JAWS announcement")
-    nvda: Optional[str] = Field(default=None, description="NVDA announcement")
-    voiceover: Optional[str] = Field(
+    jaws: str | None = Field(default=None, description="JAWS announcement")
+    nvda: str | None = Field(default=None, description="NVDA announcement")
+    voiceover: str | None = Field(
         default=None, description="VoiceOver announcement"
     )
 
@@ -144,7 +144,7 @@ class SRWalkResponse(BaseModel):
     announcements: list[SRElementAnnouncement] = Field(
         default_factory=list, description="All element announcements"
     )
-    summary: Optional[SRWalkSummary] = Field(
+    summary: SRWalkSummary | None = Field(
         default=None, description="Summary statistics"
     )
     differences: list[SRDifference] = Field(
@@ -153,13 +153,13 @@ class SRWalkResponse(BaseModel):
     difference_count: int = Field(
         default=0, description="Number of elements with different announcements"
     )
-    error: Optional[str] = Field(default=None, description="Error message if failed")
+    error: str | None = Field(default=None, description="Error message if failed")
 
 
 class SRAnnounceParams(BaseModel):
     """Parameters for announcing a specific element."""
 
-    selector: Optional[str] = Field(
+    selector: str | None = Field(
         default=None,
         description="CSS selector of element to announce. Defaults to focused element.",
     )
@@ -177,12 +177,12 @@ class SRAnnounceResponse(BaseModel):
     """Response from single element announcement."""
 
     success: bool = Field(..., description="Whether the announcement succeeded")
-    selector: Optional[str] = Field(default=None, description="CSS selector used")
-    role: Optional[str] = Field(default=None, description="ARIA role")
-    name: Optional[str] = Field(default=None, description="Accessible name")
-    jaws: Optional[str] = Field(default=None, description="JAWS announcement")
-    nvda: Optional[str] = Field(default=None, description="NVDA announcement")
-    voiceover: Optional[str] = Field(
+    selector: str | None = Field(default=None, description="CSS selector used")
+    role: str | None = Field(default=None, description="ARIA role")
+    name: str | None = Field(default=None, description="Accessible name")
+    jaws: str | None = Field(default=None, description="JAWS announcement")
+    nvda: str | None = Field(default=None, description="NVDA announcement")
+    voiceover: str | None = Field(
         default=None, description="VoiceOver announcement"
     )
-    error: Optional[str] = Field(default=None, description="Error message if failed")
+    error: str | None = Field(default=None, description="Error message if failed")

@@ -12,14 +12,14 @@ if TYPE_CHECKING:
     from .base import AccessibilityEngine
 
 # Registry of built-in engines (populated on first access)
-_ENGINES: dict[str, type["AccessibilityEngine"]] | None = None
+_ENGINES: dict[str, type[AccessibilityEngine]] | None = None
 
 
-def _load_engines() -> dict[str, type["AccessibilityEngine"]]:
+def _load_engines() -> dict[str, type[AccessibilityEngine]]:
     """Load engine classes on first access to avoid circular imports."""
     from .axe_engine import AxeEngine
-    from .ibm_engine import IbmEngine
     from .htmlcs_engine import HtmlcsEngine
+    from .ibm_engine import IbmEngine
     from .sia_engine import SiaEngine
 
     return {
@@ -30,7 +30,7 @@ def _load_engines() -> dict[str, type["AccessibilityEngine"]]:
     }
 
 
-def _get_engines() -> dict[str, type["AccessibilityEngine"]]:
+def _get_engines() -> dict[str, type[AccessibilityEngine]]:
     """Get the engines registry, loading if needed."""
     global _ENGINES
     if _ENGINES is None:
@@ -38,7 +38,7 @@ def _get_engines() -> dict[str, type["AccessibilityEngine"]]:
     return _ENGINES
 
 
-def get_engine(engine_id: str) -> "AccessibilityEngine":
+def get_engine(engine_id: str) -> AccessibilityEngine:
     """
     Get an engine instance by ID.
 
@@ -64,12 +64,12 @@ def list_engines() -> list[str]:
     return list(_get_engines().keys())
 
 
-def get_all_engines() -> list["AccessibilityEngine"]:
+def get_all_engines() -> list[AccessibilityEngine]:
     """Get instances of all available engines."""
     return [engine_class() for engine_class in _get_engines().values()]
 
 
-def register_engine(engine_id: str, engine_class: type["AccessibilityEngine"]) -> None:
+def register_engine(engine_id: str, engine_class: type[AccessibilityEngine]) -> None:
     """
     Register a new engine (for future extensibility).
 

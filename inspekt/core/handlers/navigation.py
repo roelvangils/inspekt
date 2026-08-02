@@ -97,7 +97,7 @@ async def go_back(params: EmptyParams) -> NavigateResponse:
             success=False,
             url="",
             title="",
-            message=f"Error: {str(e)}",
+            message=f"Error: {e!s}",
         )
 
 
@@ -141,7 +141,7 @@ async def go_forward(params: EmptyParams) -> NavigateResponse:
             success=False,
             url="",
             title="",
-            message=f"Error: {str(e)}",
+            message=f"Error: {e!s}",
         )
 
 
@@ -186,7 +186,7 @@ async def reload_page(params: ReloadParams) -> NavigateResponse:
             success=False,
             url="",
             title="",
-            message=f"Error: {str(e)}",
+            message=f"Error: {e!s}",
         )
 
 
@@ -229,7 +229,7 @@ async def scroll_to_top(params: EmptyParams) -> NavigateResponse:
             success=False,
             url="",
             title="",
-            message=f"Error: {str(e)}",
+            message=f"Error: {e!s}",
         )
 
 
@@ -272,7 +272,7 @@ async def scroll_to_bottom(params: EmptyParams) -> NavigateResponse:
             success=False,
             url="",
             title="",
-            message=f"Error: {str(e)}",
+            message=f"Error: {e!s}",
         )
 
 
@@ -315,7 +315,7 @@ async def page_up(params: EmptyParams) -> NavigateResponse:
             success=False,
             url="",
             title="",
-            message=f"Error: {str(e)}",
+            message=f"Error: {e!s}",
         )
 
 
@@ -358,14 +358,14 @@ async def page_down(params: EmptyParams) -> NavigateResponse:
             success=False,
             url="",
             title="",
-            message=f"Error: {str(e)}",
+            message=f"Error: {e!s}",
         )
 
 
 # ── Sitemap handler ──────────────────────────────────────────────────
 
 
-async def get_sitemap(params: "SitemapParams") -> "SitemapResponse":
+async def get_sitemap(params: SitemapParams) -> SitemapResponse:
     """
     Fetch and return a site's sitemap with page titles.
 
@@ -376,6 +376,9 @@ async def get_sitemap(params: "SitemapParams") -> "SitemapResponse":
     from urllib.parse import urlparse
 
     from inspekt.core.schemas.navigation import SitemapEntryItem, SitemapResponse
+
+    # Determine origin
+    from inspekt.services.browser_url import BrowserURLError, InternalURLError, resolve_origin
     from inspekt.services.sitemap_service import (
         discover_sitemap,
         fetch_sitemap,
@@ -384,9 +387,6 @@ async def get_sitemap(params: "SitemapParams") -> "SitemapResponse":
         save_to_cache,
         strip_site_names_from_entries,
     )
-
-    # Determine origin
-    from inspekt.services.browser_url import BrowserURLError, InternalURLError, resolve_origin
 
     try:
         origin = await asyncio.to_thread(resolve_origin, params.url)

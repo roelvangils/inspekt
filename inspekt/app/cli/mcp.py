@@ -63,10 +63,10 @@ def start(bridge_port, cache_ttl):
         click.echo("MCP server will start but tools will fail until bridge is running.\n", err=True)
 
     # Import and run MCP server
-    from inspekt.app.mcp.server import InspektMCPServer
-
     # Enable logging for debugging
     import logging
+
+    from inspekt.app.mcp.server import InspektMCPServer
     logging.basicConfig(
         level=logging.INFO,
         format="%(levelname)s: %(message)s",
@@ -445,9 +445,10 @@ def test():
     # Test MCP resources
     click.echo("\n4. Testing MCP resources…")
     try:
+        import asyncio
+
         from inspekt.app.mcp.resources import ResourceProvider
         from inspekt.services.bridge_executor import BridgeExecutor
-        import asyncio
 
         async def test_resource():
             executor = BridgeExecutor()
@@ -470,8 +471,8 @@ def test():
     # Test MCP tool
     click.echo("\n5. Testing MCP tools…")
     try:
-        from inspekt.app.mcp.tools import ToolProvider
         from inspekt.app.mcp import schemas
+        from inspekt.app.mcp.tools import ToolProvider
         from inspekt.services.script_loader import ScriptLoader
 
         async def test_tool():

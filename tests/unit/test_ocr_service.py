@@ -326,11 +326,12 @@ class TestOCRServiceImageProcessing:
 
         clear_ocr_service_cache()
 
-        from inspekt.services.ocr_service import OCRResult, get_ocr_service
+        from io import BytesIO
 
         # We need a real image to test - create a simple white image
         from PIL import Image
-        from io import BytesIO
+
+        from inspekt.services.ocr_service import OCRResult, get_ocr_service
 
         img = Image.new("RGB", (100, 100), color="white")
         buffer = BytesIO()

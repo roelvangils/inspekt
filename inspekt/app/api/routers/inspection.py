@@ -103,7 +103,7 @@ def inspect_element(request: InspectRequest):
         try:
             details_code = script_loader.load_script_sync("get_inspected.js")
         except FileNotFoundError as e:
-            raise HTTPException(status_code=500, detail=f"Script not found: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"Script not found: {e!s}")
 
         details_result = client.execute(details_code, timeout=60.0)
 
@@ -150,7 +150,7 @@ def get_inspected_element():
     try:
         code = loader.load_script_sync("get_inspected.js")
     except FileNotFoundError as e:
-        raise HTTPException(status_code=500, detail=f"Script not found: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Script not found: {e!s}")
 
     try:
         result = client.execute(code, timeout=60.0)
@@ -204,7 +204,7 @@ def screenshot_element(request: ScreenshotRequest):
     try:
         script = loader.load_script_sync("screenshot_element.js")
     except FileNotFoundError as e:
-        raise HTTPException(status_code=500, detail=f"Script not found: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Script not found: {e!s}")
 
     # Replace selector placeholder with properly escaped value
     code = script.replace("SELECTOR_PLACEHOLDER", json.dumps(request.selector))

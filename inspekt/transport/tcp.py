@@ -5,6 +5,7 @@ that don't support Unix domain sockets (primarily Windows).
 """
 
 import asyncio
+import builtins
 import hashlib
 import json
 import socket
@@ -21,7 +22,7 @@ from .base import (
 )
 
 
-def get_tcp_port(session_id: Optional[str] = None) -> int:
+def get_tcp_port(session_id: str | None = None) -> int:
     """Calculate deterministic port from session ID.
 
     Uses SHA256 hash to generate a consistent port for the same session,
@@ -56,8 +57,8 @@ class TCPTransport(Transport):
     def __init__(
         self,
         host: str = "127.0.0.1",
-        port: Optional[int] = None,
-        session_id: Optional[str] = None,
+        port: int | None = None,
+        session_id: str | None = None,
     ):
         """Initialize the TCP transport.
 
@@ -68,8 +69,8 @@ class TCPTransport(Transport):
         """
         self._host = host
         self._port = port if port is not None else get_tcp_port(session_id)
-        self._reader: Optional[asyncio.StreamReader] = None
-        self._writer: Optional[asyncio.StreamWriter] = None
+        self._reader: asyncio.StreamReader | None = None
+        self._writer: asyncio.StreamWriter | None = None
         self._connected = False
 
     @property
@@ -169,7 +170,7 @@ class TCPTransport(Transport):
                     error=response_json.get("error"),
                     request_id=response_json.get("id"),
                 )
-        except asyncio.TimeoutError:
+        except builtins.TimeoutError:
             raise TimeoutError(f"Request timed out after {timeout}s")
         except asyncio.IncompleteReadError:
             self._connected = False
@@ -182,8 +183,8 @@ class SyncTCPTransport(SyncTransport):
     def __init__(
         self,
         host: str = "127.0.0.1",
-        port: Optional[int] = None,
-        session_id: Optional[str] = None,
+        port: int | None = None,
+        session_id: str | None = None,
     ):
         """Initialize the synchronous TCP transport.
 
@@ -194,7 +195,7 @@ class SyncTCPTransport(SyncTransport):
         """
         self._host = host
         self._port = port if port is not None else get_tcp_port(session_id)
-        self._socket: Optional[socket.socket] = None
+        self._socket: socket.socket | None = None
 
     @property
     def address(self) -> str:
@@ -287,7 +288,7 @@ class SyncTCPTransport(SyncTransport):
                 error=response_json.get("error"),
                 request_id=response_json.get("id"),
             )
-        except socket.timeout:
+        except builtins.TimeoutError:
             raise TimeoutError(f"Request timed out after {timeout}s")
         except (BrokenPipeError, ConnectionResetError) as e:
             self._socket = None

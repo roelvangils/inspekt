@@ -8,10 +8,10 @@ Commands for accessibility testing:
 
 from inspekt.core.commands.base import Category, CommandDefinition
 from inspekt.core.schemas.accessibility import (
-    AxeParams,
-    AxeResponse,
     AutocompleteParams,
     AutocompleteResponse,
+    AxeParams,
+    AxeResponse,
 )
 
 # === Run Axe Audit ===

@@ -57,7 +57,7 @@ class StructureNode:
     alt_text: str | None = None  # /Alt attribute
     actual_text: str | None = None  # /ActualText attribute
     language: str | None = None  # /Lang attribute
-    children: list["StructureNode"] = field(default_factory=list)
+    children: list[StructureNode] = field(default_factory=list)
     attributes: dict[str, Any] = field(default_factory=dict)
     page_number: int | None = None  # 0-indexed
     text_content: str | None = None  # Extracted text preview
@@ -214,7 +214,7 @@ class PDFStructureExtractor:
         self._max_nodes = max_nodes if max_nodes is not None else MAX_STRUCTURE_NODES
         self._extraction_truncated = False
 
-    def __enter__(self) -> "PDFStructureExtractor":
+    def __enter__(self) -> PDFStructureExtractor:
         """Open the PDF file."""
         import pikepdf
         self._pdf = pikepdf.open(self.pdf_path)
@@ -731,8 +731,8 @@ def get_structure_summary(result: StructureExtractionResult) -> str:
         return "Document is not tagged (no structure tree)"
 
     lines = [
-        f"Structure Tree Summary",
-        f"=" * 40,
+        "Structure Tree Summary",
+        "=" * 40,
         f"Total nodes: {result.statistics.total_nodes}",
     ]
 

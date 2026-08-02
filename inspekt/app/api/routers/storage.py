@@ -79,7 +79,7 @@ def _execute_unified_storage_action(
     try:
         script = loader.load_script_sync("storage_unified.js")
     except FileNotFoundError as e:
-        raise HTTPException(status_code=500, detail=f"Script not found: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Script not found: {e!s}")
 
     # Replace placeholders
     code = script.replace("ACTION_PLACEHOLDER", action)

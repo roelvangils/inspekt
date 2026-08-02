@@ -289,7 +289,7 @@ def completion_status():
 
     if not installed:
         click.echo()
-        click.echo(f"  To install, run: " + click.style("inspekt completion install", fg="cyan"))
+        click.echo("  To install, run: " + click.style("inspekt completion install", fg="cyan"))
 
 
 @cli.command()
@@ -363,7 +363,7 @@ def setup(install_completion: bool):
             click.echo(f"  Reload your shell or run: source {rc_file}")
         else:
             click.echo()
-            click.echo(f"  To enable tab completion, run:")
+            click.echo("  To enable tab completion, run:")
             click.secho("  inspekt completion install", fg="cyan")
 
     click.echo()
@@ -398,8 +398,8 @@ def config():
     import json
     from pathlib import Path
 
-    from inspekt.config import find_config_file, DEFAULT_CONFIG
     from inspekt.app.cli.output import OutputHandler
+    from inspekt.config import DEFAULT_CONFIG, find_config_file
 
     config_path = find_config_file()
 
@@ -582,6 +582,7 @@ cli.add_lazy_command("suggest", "suggest", "suggest")
 # remove commands that are dangerous in a shared/sandboxed terminal.
 
 import os as _os
+
 if _os.environ.get('INSPEKT_RESTRICTED') == '1':
     _RESTRICTED_COMMANDS = {
         'eval', 'exec', 'repl',    # Arbitrary JS execution

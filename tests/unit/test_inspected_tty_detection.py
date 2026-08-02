@@ -6,7 +6,7 @@ when stdout is piped or redirected.
 """
 import json
 import sys
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 from click.testing import CliRunner

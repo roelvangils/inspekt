@@ -103,7 +103,7 @@ class ScreenshotProcessor:
             with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
                 tmp_path = Path(tmp.name)
                 tmp.write(image_data)
-        except (IOError, OSError) as e:
+        except OSError as e:
             raise RuntimeError(f"Failed to create temp file: {e}")
 
         # Display "Received from Chrome" message

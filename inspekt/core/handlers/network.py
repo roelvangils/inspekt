@@ -134,7 +134,7 @@ async def get_network_requests(params: GetNetworkRequestsParams) -> GetNetworkRe
             timestamp="",
             entries=[],
             summary={},
-            message=f"Error: {str(e)}",
+            message=f"Error: {e!s}",
         )
 
 
@@ -246,5 +246,5 @@ async def get_har(params: GetHARParams) -> GetHARResponse:
             timestamp="",
             entries=[],
             summary={},
-            message=f"Error: {str(e)}",
+            message=f"Error: {e!s}",
         )

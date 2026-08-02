@@ -27,7 +27,7 @@ def mock_client():
 def extract_article_script():
     """Load the extract_article.js script."""
     script_path = Path(__file__).parent.parent.parent / "inspekt" / "scripts" / "extract_article.js"
-    with open(script_path, "r") as f:
+    with open(script_path) as f:
         return f.read()
 
 

@@ -5,14 +5,14 @@ Unit tests for the key parser module.
 import pytest
 
 from inspekt.services.key_parser import (
-    KeySpec,
-    parse_key_spec,
-    parse_key_sequence,
-    expand_repeats,
-    get_supported_keys,
-    MAX_WAIT_SECONDS,
     DEFAULT_WAIT_SECONDS,
     MAX_REPEAT_COUNT,
+    MAX_WAIT_SECONDS,
+    KeySpec,
+    expand_repeats,
+    get_supported_keys,
+    parse_key_sequence,
+    parse_key_spec,
 )
 
 

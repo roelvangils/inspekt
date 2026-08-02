@@ -11,10 +11,9 @@ import importlib
 import logging
 from typing import TYPE_CHECKING, Any, Callable
 
-from mcp import types
-
 from inspekt.core.commands.base import CommandDefinition
 from inspekt.core.registry import CommandRegistry
+from mcp import types
 
 if TYPE_CHECKING:
     from pydantic import BaseModel

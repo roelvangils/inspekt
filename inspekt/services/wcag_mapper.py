@@ -66,7 +66,7 @@ class WCAGMapping:
 class ViolationWithWCAG:
     """A veraPDF violation enriched with WCAG mapping."""
 
-    violation: "VeraPDFViolation"
+    violation: VeraPDFViolation
     mapping: WCAGMapping | None
     wcag_criteria: list[WCAGCriterion] = field(default_factory=list)
 
@@ -219,7 +219,7 @@ class WCAGMapper:
 
         return None
 
-    def map_violation(self, violation: "VeraPDFViolation") -> ViolationWithWCAG:
+    def map_violation(self, violation: VeraPDFViolation) -> ViolationWithWCAG:
         """
         Enrich a single violation with WCAG mapping.
 
@@ -239,7 +239,7 @@ class WCAGMapper:
         )
 
     def map_violations(
-        self, violations: list["VeraPDFViolation"]
+        self, violations: list[VeraPDFViolation]
     ) -> list[ViolationWithWCAG]:
         """
         Enrich a list of violations with WCAG mappings.
@@ -253,8 +253,8 @@ class WCAGMapper:
         return [self.map_violation(v) for v in violations]
 
     def get_wcag_summary(
-        self, violations: list["VeraPDFViolation"]
-    ) -> dict[str, list["VeraPDFViolation"]]:
+        self, violations: list[VeraPDFViolation]
+    ) -> dict[str, list[VeraPDFViolation]]:
         """
         Group violations by WCAG criterion.
 
@@ -264,7 +264,7 @@ class WCAGMapper:
         Returns:
             Dict mapping WCAG criterion IDs to lists of violations
         """
-        summary: dict[str, list["VeraPDFViolation"]] = {}
+        summary: dict[str, list[VeraPDFViolation]] = {}
 
         for violation in violations:
             mapping = self.get_mapping(violation.rule_id)
@@ -312,7 +312,7 @@ def get_wcag_mapper() -> WCAGMapper:
 
 
 def map_violations_to_wcag(
-    violations: list["VeraPDFViolation"],
+    violations: list[VeraPDFViolation],
 ) -> list[ViolationWithWCAG]:
     """
     Convenience function to map violations to WCAG criteria.
@@ -327,8 +327,8 @@ def map_violations_to_wcag(
 
 
 def get_wcag_summary(
-    violations: list["VeraPDFViolation"],
-) -> dict[str, list["VeraPDFViolation"]]:
+    violations: list[VeraPDFViolation],
+) -> dict[str, list[VeraPDFViolation]]:
     """
     Convenience function to group violations by WCAG criterion.
 

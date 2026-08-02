@@ -24,10 +24,10 @@ from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from inspekt.services.pdf_checker import PDFEnhancedMetadata, PDFFullResult
-    from inspekt.services.pdf_report_assets import PDFReportAssets
     from inspekt.services.pdf_contrast_checker import ContrastAnalysisResult
     from inspekt.services.pdf_issue_visualizer import VisualizationResult
     from inspekt.services.pdf_ocr import TextDiscrepancyResult
+    from inspekt.services.pdf_report_assets import PDFReportAssets
     from inspekt.services.pdf_report_data import PDFReportData
     from inspekt.services.pdf_scoring import AccessibilityScore
     from inspekt.services.simple_pdf_checker import SimplePDFResult
@@ -644,7 +644,7 @@ def _get_accessibility_structure_stats(pdf_path: Path | str, meta) -> dict:
 
 
 def generate_pdf_report(
-    result: "PDFFullResult",
+    result: PDFFullResult,
     output_path: Path | str | None = None,
     pdf_path: Path | str | None = None,
     config_overrides: dict[str, Any] | None = None,
@@ -773,8 +773,9 @@ def generate_pdf_report(
                 # Parse page range if specified
                 pages = None
                 if config.get("contrast-pages"):
-                    from inspekt.services.pdf_tag_visualizer import parse_page_range
                     import fitz
+
+                    from inspekt.services.pdf_tag_visualizer import parse_page_range
 
                     with fitz.open(pdf_path) as doc:
                         max_pages = len(doc)
@@ -2523,15 +2524,16 @@ def _get_report_css() -> str:
 
 
 def _generate_executive_summary_section(
-    result: "PDFFullResult",
+    result: PDFFullResult,
     config: dict,
 ) -> str:
     """Generate the executive summary section with accessibility score."""
     if not config.get("show-score", True):
         return ""
 
-    from inspekt.services.pdf_scoring import calculate_accessibility_score, ScoreCategory
     import base64
+
+    from inspekt.services.pdf_scoring import ScoreCategory, calculate_accessibility_score
 
     score = calculate_accessibility_score(result)
 
@@ -2649,11 +2651,11 @@ def _get_score_color(score: float) -> str:
 
 def _generate_cover_section(
     pdf_path: Path | str,
-    assets: "PDFReportAssets",
+    assets: PDFReportAssets,
     config: dict,
 ) -> str:
     """Generate the document cover preview for embedding in document info section."""
-    from inspekt.services.pdf_renderer import is_pymupdf_available, PDFRenderer
+    from inspekt.services.pdf_renderer import PDFRenderer, is_pymupdf_available
 
     if not is_pymupdf_available():
         return ""
@@ -2677,7 +2679,7 @@ def _generate_cover_section(
 
 def _generate_about_document_section(
     pdf_path: Path | str,
-    assets: "PDFReportAssets",
+    assets: PDFReportAssets,
     config: dict,
 ) -> str:
     """
@@ -3073,7 +3075,7 @@ def _generate_about_document_section(
 def _generate_issue_screenshots_section(
     pdf_path: Path | str,
     violations: list,
-    assets: "PDFReportAssets",
+    assets: PDFReportAssets,
     config: dict,
 ) -> str:
     """Generate the issue screenshots gallery section."""
@@ -3337,7 +3339,7 @@ def _generate_contrast_error_section(error_message: str) -> str:
 
 
 def _generate_contrast_section(
-    contrast_result: "ContrastAnalysisResult",
+    contrast_result: ContrastAnalysisResult,
     config: dict,
 ) -> str:
     """Generate the color contrast analysis section.
@@ -3478,7 +3480,7 @@ def _generate_structure_tree_section(
             report_progress(f"Truncated at {extractor._max_nodes:,} nodes (large document)")
 
         if not result.has_structure:
-            return f"""
+            return """
             <section id="structure" class="structure-tree collapsible">
                 <h2 class="section-header"><span class="icon icon-chart"></span>Structure Tree</h2>
                 <div class="section-content">
@@ -3662,7 +3664,11 @@ def _generate_tag_visualization_section(
         return ""
 
     try:
-        from inspekt.services.pdf_tag_visualizer import PDFTagVisualizer, parse_page_range, TAG_COLORS
+        from inspekt.services.pdf_tag_visualizer import (
+            TAG_COLORS,
+            PDFTagVisualizer,
+            parse_page_range,
+        )
 
         with PDFTagVisualizer(pdf_path) as visualizer:
             # Determine which pages to visualize
@@ -3853,11 +3859,11 @@ def _generate_interactive_preview_section(
         return ""
 
     try:
-        from pathlib import Path as PathLib
         import base64
         import json
+        from pathlib import Path as PathLib
 
-        from inspekt.services.pdf_tag_visualizer import PDFTagVisualizer, TAG_COLORS
+        from inspekt.services.pdf_tag_visualizer import TAG_COLORS, PDFTagVisualizer
 
         # Load PDF tag reference data for educational callouts
         tag_reference_path = PathLib(__file__).parent.parent / "data" / "pdf_tags.json"
@@ -4007,14 +4013,14 @@ def _generate_interactive_preview_section(
         next_btn_html = ""
         if total_preview_pages > 1:
             prev_btn_html = (
-                f'<button class="preview-nav-btn prev-btn" data-action="prev-page" disabled aria-label="Previous page">'
-                f'<span class="material-icons">chevron_left</span>'
-                f'</button>'
+                '<button class="preview-nav-btn prev-btn" data-action="prev-page" disabled aria-label="Previous page">'
+                '<span class="material-icons">chevron_left</span>'
+                '</button>'
             )
             next_btn_html = (
-                f'<button class="preview-nav-btn next-btn" data-action="next-page" aria-label="Next page">'
-                f'<span class="material-icons">chevron_right</span>'
-                f'</button>'
+                '<button class="preview-nav-btn next-btn" data-action="next-page" aria-label="Next page">'
+                '<span class="material-icons">chevron_right</span>'
+                '</button>'
             )
 
         # Page tabs with thumbnails (all rendered, visibility controlled by JS)
@@ -5169,7 +5175,7 @@ def _generate_content_audit_section(
 
 
 def _generate_remediation_section(
-    result: "PDFFullResult",
+    result: PDFFullResult,
     pdf_path: Path | str,
     config: dict,
 ) -> str:
@@ -5178,7 +5184,10 @@ def _generate_remediation_section(
         return ""
 
     try:
-        from inspekt.services.remediation_planner import generate_remediation_plan, RemediationPriority
+        from inspekt.services.remediation_planner import (
+            RemediationPriority,
+            generate_remediation_plan,
+        )
 
         plan = generate_remediation_plan(result)
 
@@ -6870,7 +6879,7 @@ def _get_interactive_js() -> str:
     """
 
 
-def _generate_simple_section(result: "PDFFullResult") -> str:
+def _generate_simple_section(result: PDFFullResult) -> str:
     """Generate the SimplePDFChecker results section for the HTML report."""
     if not result.simple:
         return ""
@@ -6959,9 +6968,9 @@ def _generate_simple_section(result: "PDFFullResult") -> str:
 
 def generate_report_data_from_result(
     pdf_path: Path | str,
-    result: "PDFFullResult",
+    result: PDFFullResult,
     config: dict | None = None,
-) -> "PDFReportData":
+) -> PDFReportData:
     """
     Generate structured report data from PDF check results.
 
@@ -6984,7 +6993,7 @@ def generate_report_data_from_result(
 
 def generate_json_report(
     pdf_path: Path | str,
-    result: "PDFFullResult",
+    result: PDFFullResult,
     output_path: Path | str | None = None,
     config: dict | None = None,
     indent: int = 2,
@@ -7021,7 +7030,7 @@ def generate_json_report(
 
 
 def render_html_from_data(
-    report_data: "PDFReportData",
+    report_data: PDFReportData,
     output_path: Path | str | None = None,
 ) -> str:
     """
@@ -7091,7 +7100,7 @@ def render_html_from_json_string(json_str: str) -> str:
 
 def generate_template_based_report(
     pdf_path: Path | str,
-    result: "PDFFullResult",
+    result: PDFFullResult,
     output_path: Path | str | None = None,
     json_output_path: Path | str | None = None,
     config: dict | None = None,
@@ -7122,7 +7131,7 @@ def generate_template_based_report(
         ... )
     """
     from inspekt.services.pdf_report_generator import generate_report_data
-    from inspekt.services.pdf_report_renderer import render_html_report, export_json_report
+    from inspekt.services.pdf_report_renderer import export_json_report, render_html_report
 
     # Generate structured data
     report_data = generate_report_data(pdf_path, result, config)

@@ -79,7 +79,7 @@ class IbmEngine(AccessibilityEngine):
         level: str = "22aa",
         include_passes: bool = False,
         include_incomplete: bool = False,
-        report_levels: Optional[list[str]] = None,
+        report_levels: list[str] | None = None,
         **kwargs,
     ) -> dict:
         """Build IBM Equal Access configuration."""

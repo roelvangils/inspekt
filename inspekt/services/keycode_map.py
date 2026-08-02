@@ -126,7 +126,7 @@ def get_key_code(key: str) -> int | None:
     return None
 
 
-def keyspec_to_applescript(spec: "KeySpec") -> str:
+def keyspec_to_applescript(spec: KeySpec) -> str:
     """
     Convert a KeySpec to an AppleScript command for System Events.
 

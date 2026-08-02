@@ -1,8 +1,9 @@
 """Shared dependencies for API endpoints."""
 
 from fastapi import HTTPException
-from inspekt.services.bridge_executor import get_executor
+
 from inspekt.client import BridgeClient
+from inspekt.services.bridge_executor import get_executor
 
 
 def get_bridge_executor():

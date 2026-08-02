@@ -85,7 +85,7 @@ class SimplePDFCheckResult:
 class SimplePDFResult:
     """Result of all SimplePDFChecker accessibility checks."""
 
-    metadata: "SimplePDFMetadata"
+    metadata: SimplePDFMetadata
     checks: list[SimplePDFCheckResult]
 
     @property
@@ -230,7 +230,7 @@ class SimplePDFChecker:
 
         return SimplePDFResult(metadata=metadata, checks=checks)
 
-    def _extract_metadata(self, pdf: "pikepdf.Pdf", file_path: Path) -> SimplePDFMetadata:
+    def _extract_metadata(self, pdf: pikepdf.Pdf, file_path: Path) -> SimplePDFMetadata:
         """Extract extended metadata from the PDF."""
         # Get document info dictionary
         info = pdf.docinfo if hasattr(pdf, "docinfo") else {}
@@ -328,7 +328,7 @@ class SimplePDFChecker:
     # Original checks (same as PDFBasicChecker for cross-validation)
     # ========================================================================
 
-    def _check_tagged(self, pdf: "pikepdf.Pdf") -> SimplePDFCheckResult:
+    def _check_tagged(self, pdf: pikepdf.Pdf) -> SimplePDFCheckResult:
         """
         Check if the PDF is tagged.
 
@@ -370,7 +370,7 @@ class SimplePDFChecker:
                 {"has_mark_info": has_mark_info, "is_marked": is_marked, "has_struct_tree": False},
             )
 
-    def _check_title(self, pdf: "pikepdf.Pdf") -> SimplePDFCheckResult:
+    def _check_title(self, pdf: pikepdf.Pdf) -> SimplePDFCheckResult:
         """
         Check if the document has a title and DisplayDocTitle is enabled.
 
@@ -421,7 +421,7 @@ class SimplePDFChecker:
                 {"title": None, "display_doc_title": False},
             )
 
-    def _check_language_validated(self, pdf: "pikepdf.Pdf") -> SimplePDFCheckResult:
+    def _check_language_validated(self, pdf: pikepdf.Pdf) -> SimplePDFCheckResult:
         """
         Check if the document language is defined with BCP-47 validation.
 
@@ -479,7 +479,7 @@ class SimplePDFChecker:
                 {"language": lang, "valid": False},
             )
 
-    def _check_protected_enhanced(self, pdf: "pikepdf.Pdf") -> SimplePDFCheckResult:
+    def _check_protected_enhanced(self, pdf: pikepdf.Pdf) -> SimplePDFCheckResult:
         """
         Check if the document blocks assistive technology access.
 
@@ -533,7 +533,7 @@ class SimplePDFChecker:
                 },
             )
 
-    def _check_bookmarks(self, pdf: "pikepdf.Pdf", page_count: int) -> SimplePDFCheckResult:
+    def _check_bookmarks(self, pdf: pikepdf.Pdf, page_count: int) -> SimplePDFCheckResult:
         """
         Check if the document has bookmarks (required for 20+ page documents).
 
@@ -587,7 +587,7 @@ class SimplePDFChecker:
                     {"has_bookmarks": False, "bookmark_count": 0, "page_count": page_count, "required": True},
                 )
 
-    def _check_scanned(self, pdf: "pikepdf.Pdf") -> SimplePDFCheckResult:
+    def _check_scanned(self, pdf: pikepdf.Pdf) -> SimplePDFCheckResult:
         """
         Check if the PDF is a scanned/image-only document.
 
@@ -670,7 +670,7 @@ class SimplePDFChecker:
     # New checks unique to SimplePDFChecker
     # ========================================================================
 
-    def _check_forms(self, pdf: "pikepdf.Pdf", metadata: SimplePDFMetadata) -> SimplePDFCheckResult:
+    def _check_forms(self, pdf: pikepdf.Pdf, metadata: SimplePDFMetadata) -> SimplePDFCheckResult:
         """
         Check if the PDF contains AcroForm fields.
 
@@ -709,7 +709,7 @@ class SimplePDFChecker:
                 {"has_forms": False, "field_count": 0},
             )
 
-    def _check_xfa(self, pdf: "pikepdf.Pdf", metadata: SimplePDFMetadata) -> SimplePDFCheckResult:
+    def _check_xfa(self, pdf: pikepdf.Pdf, metadata: SimplePDFMetadata) -> SimplePDFCheckResult:
         """
         Check if the PDF contains XFA dynamic forms.
 
@@ -743,7 +743,7 @@ class SimplePDFChecker:
                 {"has_xfa": False},
             )
 
-    def _check_xmp_metadata(self, pdf: "pikepdf.Pdf", metadata: SimplePDFMetadata) -> SimplePDFCheckResult:
+    def _check_xmp_metadata(self, pdf: pikepdf.Pdf, metadata: SimplePDFMetadata) -> SimplePDFCheckResult:
         """
         Check if the PDF contains XMP metadata.
 

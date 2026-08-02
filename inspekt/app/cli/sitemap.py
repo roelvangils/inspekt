@@ -14,14 +14,14 @@ import shutil
 import sys
 from collections import Counter
 from dataclasses import dataclass, field
+from datetime import UTC
 from urllib.parse import urlparse
 
 import click
 
 from inspekt.app.cli.icons import get_icon
-from inspekt.app.cli.table import Table, print_hint, print_warning, print_error, print_success
+from inspekt.app.cli.table import Table, print_error, print_hint, print_success, print_warning
 from inspekt.services.bridge_executor import get_executor
-
 
 # ============================================================================
 # Date formatting
@@ -52,7 +52,7 @@ def _format_date(iso_str: str) -> str:
             return iso_str[:10]  # Unparseable — show just the date part
 
         if dt.tzinfo is None:
-            dt = dt.replace(tzinfo=timezone.utc)
+            dt = dt.replace(tzinfo=UTC)
         humanize.deactivate()  # Ensure English
         return _shorten_relative_date(humanize.naturaltime(dt))
 
@@ -1368,7 +1368,11 @@ def _enrich_visible_nodes(ancestors, result, mode: str = "compact"):
     current node, then batch-fetches titles, strips site names, and saves
     cleaned titles to cache.
     """
-    from inspekt.services.sitemap_service import fetch_titles, save_to_cache, strip_site_names_from_entries
+    from inspekt.services.sitemap_service import (
+        fetch_titles,
+        save_to_cache,
+        strip_site_names_from_entries,
+    )
 
     # Collect all visible entries in one pass
     seen = set()

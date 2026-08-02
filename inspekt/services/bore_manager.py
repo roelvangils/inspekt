@@ -23,7 +23,6 @@ import requests
 
 from inspekt.config import get_data_dir
 
-
 # bore release metadata
 BORE_GITHUB_REPO = "ekzhang/bore"
 BORE_DEFAULT_VERSION = "0.5.2"
@@ -55,7 +54,7 @@ class BoreManager:
         """Check if bore binary exists and is executable."""
         return self.binary_path.exists() and self.binary_path.stat().st_mode & stat.S_IXUSR
 
-    def get_installed_version(self) -> Optional[str]:
+    def get_installed_version(self) -> str | None:
         """Get the installed bore version from metadata."""
         if not self._version_file.exists():
             return None
@@ -63,10 +62,10 @@ class BoreManager:
             with open(self._version_file) as f:
                 data = json.load(f)
             return data.get("version")
-        except (json.JSONDecodeError, IOError):
+        except (OSError, json.JSONDecodeError):
             return None
 
-    def install(self, version: Optional[str] = None) -> Path:
+    def install(self, version: str | None = None) -> Path:
         """
         Download and install the bore client binary.
 
@@ -120,7 +119,7 @@ class BoreManager:
         filename = f"bore-v{version}-{target}.{ext}"
         return f"https://github.com/{BORE_GITHUB_REPO}/releases/download/v{version}/{filename}"
 
-    def _get_latest_version(self) -> Optional[str]:
+    def _get_latest_version(self) -> str | None:
         """Fetch the latest bore version from GitHub API."""
         try:
             resp = requests.get(

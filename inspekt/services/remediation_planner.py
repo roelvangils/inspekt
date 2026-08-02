@@ -435,9 +435,9 @@ REMEDIATION_TEMPLATES = {
 
 
 def generate_remediation_plan(
-    result: "PDFFullResult",
-    structure: "StructureExtractionResult | None" = None,
-    content_audit: "ContentAuditResult | None" = None,
+    result: PDFFullResult,
+    structure: StructureExtractionResult | None = None,
+    content_audit: ContentAuditResult | None = None,
 ) -> RemediationPlan:
     """
     Generate a prioritized remediation plan from check results.
@@ -494,7 +494,7 @@ def generate_remediation_plan(
     # Process veraPDF violations if available
     if result.verapdf:
         # Group violations by rule for consolidated tasks
-        violations_by_rule: dict[str, list["VeraPDFViolation"]] = {}
+        violations_by_rule: dict[str, list[VeraPDFViolation]] = {}
         for v in result.verapdf.violations:
             if v.rule_id not in violations_by_rule:
                 violations_by_rule[v.rule_id] = []

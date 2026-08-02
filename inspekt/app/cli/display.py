@@ -12,7 +12,7 @@ import sys
 
 import click
 
-from inspekt.app.cli.icons import success, error, info, warning
+from inspekt.app.cli.icons import error, info, success, warning
 from inspekt.core.schemas.display import VIEWPORT_PRESETS
 
 

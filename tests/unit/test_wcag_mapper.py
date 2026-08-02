@@ -6,8 +6,9 @@ Tests for mapping PDF/UA-1 violations to WCAG 2.1 success criteria.
 
 from __future__ import annotations
 
-import pytest
 from pathlib import Path
+
+import pytest
 
 
 class TestWCAGCriterion:
@@ -49,7 +50,7 @@ class TestWCAGMapping:
 
     def test_wcag_mapping_properties(self):
         """Test WCAGMapping properties."""
-        from inspekt.services.wcag_mapper import WCAGMapping, WCAGCriterion
+        from inspekt.services.wcag_mapper import WCAGCriterion, WCAGMapping
 
         criteria = [
             WCAGCriterion(id="1.1.1", title="Non-text Content", level="A", principle="Perceivable"),
@@ -71,7 +72,7 @@ class TestWCAGMapping:
 
     def test_wcag_ids_property(self):
         """Test wcag_ids property."""
-        from inspekt.services.wcag_mapper import WCAGMapping, WCAGCriterion
+        from inspekt.services.wcag_mapper import WCAGCriterion, WCAGMapping
 
         criteria = [
             WCAGCriterion(id="1.1.1", title="Non-text Content", level="A", principle="Perceivable"),
@@ -131,8 +132,9 @@ class TestViolationWithWCAG:
 
     def test_violation_with_wcag_properties(self):
         """Test ViolationWithWCAG properties."""
-        from inspekt.services.wcag_mapper import ViolationWithWCAG, WCAGMapping, WCAGCriterion
         from unittest.mock import MagicMock
+
+        from inspekt.services.wcag_mapper import ViolationWithWCAG, WCAGCriterion, WCAGMapping
 
         violation = MagicMock()
         violation.rule_id = "ISO-32000-1-7.18.1"
@@ -158,8 +160,9 @@ class TestViolationWithWCAG:
 
     def test_violation_without_mapping(self):
         """Test ViolationWithWCAG without mapping."""
-        from inspekt.services.wcag_mapper import ViolationWithWCAG
         from unittest.mock import MagicMock
+
+        from inspekt.services.wcag_mapper import ViolationWithWCAG
 
         violation = MagicMock()
         violation.rule_id = "UNKNOWN"

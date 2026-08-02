@@ -13,17 +13,27 @@ from __future__ import annotations
 import json
 import sys
 import time
+from datetime import UTC
 from pathlib import Path
 
 import click
 
 from inspekt.app.cli.base import builtin_open
-from inspekt.app.cli.icons import get_icon, get_status_icon, success, error, warning as warn_icon, celebrate, stopwatch, alert, bug
+from inspekt.app.cli.icons import (
+    alert,
+    bug,
+    celebrate,
+    error,
+    get_icon,
+    get_status_icon,
+    stopwatch,
+    success,
+)
+from inspekt.app.cli.icons import warning as warn_icon
 from inspekt.app.cli.inspection import _print_tips_section
 from inspekt.app.cli.output import pluralize
 from inspekt.app.cli.table import Table, print_wrapped
 from inspekt.client import BridgeClient
-
 
 # ============================================================================
 # Engine Tracking - Prevent Re-injection and Exclude Inspekt UI
@@ -489,7 +499,7 @@ def _build_axe_context(client: BridgeClient, scoped: str | None, exclude_selecto
                 "unknown": "unknown method"
             }.get(selection_source, selection_source)
 
-            click.echo(f"Error: Element must be selected using Inspekt panel picker.", err=True)
+            click.echo("Error: Element must be selected using Inspekt panel picker.", err=True)
             click.echo(f"Current selection source: {source_label}", err=True)
             click.echo("", err=True)
             click.echo("To select via Inspekt panel:", err=True)
@@ -504,7 +514,7 @@ def _build_axe_context(client: BridgeClient, scoped: str | None, exclude_selecto
             click.echo(click.style(success("Element selected via Inspekt panel picker"), fg="green"), err=True)
 
         # Display scoped element with separator lines
-        click.echo(f"Scoping to inspected element:", err=True)
+        click.echo("Scoping to inspected element:", err=True)
         click.echo(_separator_line(), err=True)
         click.echo(f"{click.style(node_name, fg='cyan')} ({selector})", err=True)
         click.echo(_separator_line(), err=True)
@@ -566,7 +576,7 @@ def _build_axe_context(client: BridgeClient, scoped: str | None, exclude_selecto
         if len(scoped_selectors) > 3:
             selector_preview += f' (+{len(scoped_selectors) - 3} more)'
 
-        click.echo(f"Scoping to:", err=True)
+        click.echo("Scoping to:", err=True)
         click.echo(_separator_line(), err=True)
         click.echo(click.style(selector_preview, fg='cyan'), err=True)
         click.echo(_separator_line(), err=True)
@@ -581,7 +591,7 @@ def _build_axe_context(client: BridgeClient, scoped: str | None, exclude_selecto
         if len(exclude_selectors) > 3:
             selector_preview += f' (+{len(exclude_selectors) - 3} more)'
 
-        click.echo(f"Excluding:", err=True)
+        click.echo("Excluding:", err=True)
         click.echo(_separator_line(), err=True)
         click.echo(click.style(selector_preview, fg='cyan'), err=True)
         click.echo(_separator_line(), err=True)
@@ -1048,8 +1058,9 @@ def autocomplete(threshold, include_hidden, include_disabled, output_json, timeo
         inspekt autocomplete --json
     """
     try:
-        from inspekt.services.autocomplete_service import get_autocomplete_service
         import asyncio
+
+        from inspekt.services.autocomplete_service import get_autocomplete_service
 
         client = BridgeClient()
         service = get_autocomplete_service()
@@ -2163,7 +2174,7 @@ def _build_enriched_report_data(
     # Build output
     output: dict = {
         "url": url,
-        "timestamp": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+        "timestamp": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
         "level": level,
         "engines": engines_data,
         "execution_order": engine_list,
@@ -3320,7 +3331,7 @@ def _run_engines_in_order(
     is_single = total == 1
 
     # Import metadata lookup
-    from inspekt.data import get_engine_provider, get_engine_metadata
+    from inspekt.data import get_engine_metadata, get_engine_provider
 
     for idx, engine in enumerate(engine_list, 1):
         engine_info = AVAILABLE_ENGINES[engine]
@@ -4294,10 +4305,10 @@ def _print_impact_counts(impact_counts: dict, passes: list, incomplete: list) ->
 
 def _show_engine_list():
     """Display a table of available accessibility engines."""
-    from inspekt.app.cli.table import Table, format_icon_message, _style_with_inline_code
+    from inspekt.app.cli.icons import get_indicator
+    from inspekt.app.cli.table import Table, _style_with_inline_code, format_icon_message
     from inspekt.data import load_engine_metadata
     from inspekt.services.engines import get_engine
-    from inspekt.app.cli.icons import get_indicator
 
     metadata = load_engine_metadata()
 
@@ -4441,7 +4452,7 @@ def _show_engine_info(engine_id: str):
     click.echo()
     click.echo(f"  Installed Version: {current_version}")
     click.echo(f"  Latest Version:    {latest_version}")
-    click.echo(f"  Status:            " + click.style(status, fg=status_color))
+    click.echo("  Status:            " + click.style(status, fg=status_color))
     click.echo()
     click.echo(f"  {info['description']}")
     click.echo()
@@ -4719,8 +4730,8 @@ def a11y(engines, list_engines, level, output_format, json_flag, timeout, show_p
         eac      Equal Access Checker (IBM) - comprehensive WCAG coverage
         hcs      HTML CodeSniffer (Squiz Labs) - WCAG 2.1 checker
     """
-    from inspekt.app.cli.table import Table, print_hint, _style_with_inline_code
-    from inspekt.data import load_engine_metadata, get_engine_metadata
+    from inspekt.app.cli.table import Table, _style_with_inline_code, print_hint
+    from inspekt.data import get_engine_metadata, load_engine_metadata
     from inspekt.services.engines import get_engine
 
     # Handle --list-engines flag
@@ -4777,6 +4788,7 @@ def a11y(engines, list_engines, level, output_format, json_flag, timeout, show_p
     # ========== HEADLESS MODE ==========
     if headless or mirror_session:
         import asyncio
+
         from inspekt.services.headless import HeadlessContext
         from inspekt.services.script_loader import ScriptLoader
 
@@ -5044,8 +5056,8 @@ def a11y(engines, list_engines, level, output_format, json_flag, timeout, show_p
             if output_file:
                 path = Path(output_file)
             else:
-                from urllib.parse import urlparse
                 from datetime import datetime
+                from urllib.parse import urlparse
                 domain = urlparse(url).netloc.replace(".", "_")
                 timestamp_str = datetime.now().strftime("%Y%m%d_%H%M%S")
                 path = Path.cwd() / f"inspekt_a11y_{domain}_{timestamp_str}.html"

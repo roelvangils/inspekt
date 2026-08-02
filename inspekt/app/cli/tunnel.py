@@ -17,7 +17,6 @@ import requests
 
 from inspekt.app.cli.table import print_error, print_hint, print_success, print_warning
 
-
 # bore server defaults
 BORE_SERVER_PORT = 7835
 CONTROL_SERVER_PORT = 8888

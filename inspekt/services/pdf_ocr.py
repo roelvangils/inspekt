@@ -38,9 +38,9 @@ logger = logging.getLogger(__name__)
 # Re-export OCR availability functions from the global service
 # This maintains backward compatibility for existing imports
 from inspekt.services.ocr_service import (  # noqa: E402, F401
+    get_ocr_availability,
     is_pytesseract_available,
     is_tesseract_available,
-    get_ocr_availability,
 )
 
 
@@ -232,7 +232,7 @@ class PDFOCRService:
 
     def ocr_page(
         self,
-        renderer: "PDFRenderer",
+        renderer: PDFRenderer,
         page_num: int,
         dpi: int = 150,
     ) -> str:
@@ -556,7 +556,7 @@ def _select_pages_for_analysis(
 
 
 def _render_page_thumbnail(
-    renderer: "PDFRenderer",
+    renderer: PDFRenderer,
     page_num: int,
     max_size: int = 150,
 ) -> str | None:
@@ -593,7 +593,7 @@ def _render_page_thumbnail(
 
 
 def _render_page_images(
-    renderer: "PDFRenderer",
+    renderer: PDFRenderer,
     page_num: int,
     thumbnail_size: int = 150,
     lightbox_size: int = 800,
@@ -611,8 +611,9 @@ def _render_page_images(
         Tuple of (thumbnail_base64, lightbox_base64), either may be None on failure
     """
     try:
-        from PIL import Image
         import base64
+
+        from PIL import Image
 
         # Render at higher DPI for the lightbox version (150 DPI for better quality)
         png_bytes = renderer.render_page(page_num, dpi=150)
@@ -676,7 +677,7 @@ def analyze_text_discrepancy(
         )
 
     # Import here to avoid import errors when OCR is unavailable
-    from inspekt.services.pdf_renderer import is_pymupdf_available, PDFRenderer
+    from inspekt.services.pdf_renderer import PDFRenderer, is_pymupdf_available
 
     if not is_pymupdf_available():
         return TextDiscrepancyResult(

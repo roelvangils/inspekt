@@ -6,8 +6,9 @@ Tests the asset directory management for PDF accessibility reports.
 
 from __future__ import annotations
 
-import pytest
 from pathlib import Path
+
+import pytest
 
 
 class TestPDFReportAssets:
@@ -196,6 +197,7 @@ class TestImageToDataUri:
     def test_data_uri_is_valid_base64(self):
         """Test that the data URI contains valid base64."""
         import base64
+
         from inspekt.services.pdf_report_assets import PDFReportAssets
 
         original = b"test image data"

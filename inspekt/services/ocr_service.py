@@ -296,7 +296,7 @@ class OCRService:
         image = Image.open(BytesIO(image_bytes))
         return self.ocr_pil_image(image)
 
-    def ocr_pil_image(self, image: "PILImage.Image") -> OCRResult:
+    def ocr_pil_image(self, image: PILImage.Image) -> OCRResult:
         """
         Perform OCR on a PIL Image object.
 

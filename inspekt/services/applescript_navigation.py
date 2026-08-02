@@ -37,7 +37,7 @@ from typing import Optional
 logger = logging.getLogger(__name__)
 
 
-def get_active_browser() -> Optional[str]:
+def get_active_browser() -> str | None:
     """
     Get the most recently active browser from bridge status.
 
@@ -63,7 +63,7 @@ def get_active_browser() -> Optional[str]:
         return None
 
 
-def navigate_applescript(url: str, browser_name: Optional[str] = None) -> dict:
+def navigate_applescript(url: str, browser_name: str | None = None) -> dict:
     """
     Navigate to URL using AppleScript (macOS only).
 
@@ -226,7 +226,7 @@ def navigate_applescript(url: str, browser_name: Optional[str] = None) -> dict:
             "success": False,
             "url": url,
             "title": "",
-            "message": f"AppleScript error: {str(e)}",
+            "message": f"AppleScript error: {e!s}",
         }
 
 

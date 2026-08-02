@@ -150,10 +150,10 @@ class PDFOCRCache:
         self.min_confidence = min_confidence
 
         self._cache: dict[int, PageOCRResult] = {}
-        self._image_cache: dict[int, "Image.Image"] = {}
+        self._image_cache: dict[int, Image.Image] = {}
         self._fitz_doc = None
 
-    def __enter__(self) -> "PDFOCRCache":
+    def __enter__(self) -> PDFOCRCache:
         """Open PDF document."""
         try:
             import fitz
@@ -378,7 +378,7 @@ class PDFOCRCache:
         result = self._ensure_page_processed(page_num)
         return result.raw_text
 
-    def get_page_image(self, page_num: int) -> "Image.Image | None":
+    def get_page_image(self, page_num: int) -> Image.Image | None:
         """
         Get the rendered page image for color sampling.
 

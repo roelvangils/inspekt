@@ -14,7 +14,7 @@ from typing import Any
 
 import mcp.server.stdio
 import mcp.types as types
-from mcp.server.lowlevel import Server, NotificationOptions
+from mcp.server.lowlevel import NotificationOptions, Server
 from mcp.server.models import InitializationOptions
 
 from inspekt.app.mcp import schemas
@@ -78,6 +78,7 @@ class InspektMCPServer:
             PluginExecuteResponse with execution results
         """
         import time
+
         import requests as http_requests
 
         from inspekt.services.plugin_service import get_plugin_service
@@ -119,7 +120,7 @@ class InspektMCPServer:
                 plugin_name=plugin["name"],
                 plugin_id=plugin_id,
                 execution_time_ms=int((time.time() - start_time) * 1000),
-                message=f"Execution error: {str(e)}",
+                message=f"Execution error: {e!s}",
             )
 
         execution_time_ms = int((time.time() - start_time) * 1000)
@@ -180,6 +181,7 @@ class InspektMCPServer:
             PluginExecuteResponse with execution results
         """
         import time
+
         import requests as http_requests
 
         from inspekt.services.plugin_service import get_plugin_service
@@ -221,7 +223,7 @@ class InspektMCPServer:
                     plugin_name=plugin["name"],
                     plugin_id=plugin_id,
                     execution_time_ms=0,
-                    message=f"Plugin has custom unload mode but no unload code",
+                    message="Plugin has custom unload mode but no unload code",
                 )
             action = "unloaded"
         else:
@@ -256,7 +258,7 @@ class InspektMCPServer:
                 plugin_name=plugin["name"],
                 plugin_id=plugin_id,
                 execution_time_ms=int((time.time() - start_time) * 1000),
-                message=f"Execution error: {str(e)}",
+                message=f"Execution error: {e!s}",
             )
 
         execution_time_ms = int((time.time() - start_time) * 1000)
@@ -488,7 +490,7 @@ class InspektMCPServer:
                 logger.error(f"Error executing tool {name}: {e}", exc_info=True)
                 return [
                     types.TextContent(
-                        type="text", text=f"Error executing tool: {str(e)}"
+                        type="text", text=f"Error executing tool: {e!s}"
                     )
                 ]
 
@@ -517,10 +519,10 @@ class InspektMCPServer:
                 return content
             except ValueError as e:
                 logger.error(f"Invalid resource URI: {e}")
-                return f"Error: {str(e)}"
+                return f"Error: {e!s}"
             except Exception as e:
                 logger.error(f"Error reading resource {uri}: {e}", exc_info=True)
-                return f"Error reading resource: {str(e)}"
+                return f"Error reading resource: {e!s}"
 
     async def run_stdio(self) -> None:
         """Run server using stdio transport (for Claude Desktop)."""

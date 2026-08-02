@@ -39,7 +39,7 @@ class ReadabilityUpdater:
         self.raw_github_url = "https://raw.githubusercontent.com/mozilla/readability/main/Readability.js"
         self._cache_file = Path(__file__).parent.parent.parent / ".cache" / "readability_latest_version.json"
 
-    def get_current_version(self) -> Optional[str]:
+    def get_current_version(self) -> str | None:
         """
         Get the currently installed version of Readability.
 
@@ -53,10 +53,10 @@ class ReadabilityUpdater:
             with open(self.version_file) as f:
                 metadata = json.load(f)
             return metadata.get("version")
-        except (json.JSONDecodeError, IOError):
+        except (OSError, json.JSONDecodeError):
             return None
 
-    def check_latest_version(self, timeout: float = 5.0) -> Optional[dict[str, Any]]:
+    def check_latest_version(self, timeout: float = 5.0) -> dict[str, Any] | None:
         """
         Check npm registry for the latest version of Readability.
 
@@ -82,7 +82,7 @@ class ReadabilityUpdater:
                 # Check if cache is still valid (1 day TTL)
                 if time.time() - cached.get("_timestamp", 0) < _VERSION_CACHE_TTL:
                     return {k: v for k, v in cached.items() if not k.startswith("_")}
-            except (json.JSONDecodeError, IOError):
+            except (OSError, json.JSONDecodeError):
                 pass
 
         try:
@@ -117,14 +117,14 @@ class ReadabilityUpdater:
                 cache_data = {**result, "_timestamp": time.time()}
                 with open(self._cache_file, "w") as f:
                     json.dump(cache_data, f)
-            except IOError:
+            except OSError:
                 pass
 
             return result
         except (requests.RequestException, json.JSONDecodeError, KeyError):
             return None
 
-    def is_update_available(self) -> tuple[bool, Optional[str], Optional[str], Optional[str]]:
+    def is_update_available(self) -> tuple[bool, str | None, str | None, str | None]:
         """
         Check if an update is available.
 
@@ -157,7 +157,7 @@ class ReadabilityUpdater:
         """Check if Readability is installed and valid."""
         return self.lib_path.exists() and self.test_installation()
 
-    def download_version(self, ver: str) -> Optional[Path]:
+    def download_version(self, ver: str) -> Path | None:
         """
         Download a specific version of Readability to a temporary file.
 
@@ -216,7 +216,7 @@ class ReadabilityUpdater:
         try:
             shutil.copy2(self.lib_path, self.backup_path)
             return True
-        except IOError:
+        except OSError:
             return False
 
     def restore_backup(self) -> bool:
@@ -232,7 +232,7 @@ class ReadabilityUpdater:
         try:
             shutil.copy2(self.backup_path, self.lib_path)
             return True
-        except IOError:
+        except OSError:
             return False
 
     def install_version(self, source_path: Path, ver: str) -> bool:
@@ -266,7 +266,7 @@ class ReadabilityUpdater:
                 json.dump(metadata, f, indent=2)
 
             return True
-        except (IOError, json.JSONDecodeError):
+        except (OSError, json.JSONDecodeError):
             return False
 
     def test_installation(self) -> bool:
@@ -290,11 +290,11 @@ class ReadabilityUpdater:
                 return False
 
             return True
-        except IOError:
+        except OSError:
             return False
 
     def update_to_latest(
-        self, progress_callback: Optional[Callable[[str], None]] = None
+        self, progress_callback: Callable[[str], None] | None = None
     ) -> tuple[bool, str]:
         """
         Update Readability to the latest version.
@@ -351,7 +351,7 @@ class ReadabilityUpdater:
         return True, f"Updated to @mozilla/readability {latest}"
 
     def ensure_installed(
-        self, progress_callback: Optional[Callable[[str], None]] = None
+        self, progress_callback: Callable[[str], None] | None = None
     ) -> tuple[bool, str]:
         """Ensure the library is installed (download if missing)."""
         if self.lib_path.exists() and self.test_installation():

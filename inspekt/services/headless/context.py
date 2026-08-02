@@ -10,8 +10,8 @@ import base64
 import json
 from typing import Any, Optional
 
-from inspekt.services.headless.chrome import HeadlessChrome
 from inspekt.services.headless.cdp import CDPClient, CDPSession
+from inspekt.services.headless.chrome import HeadlessChrome
 from inspekt.services.headless.state import BrowserState, StateMirror
 
 
@@ -46,13 +46,13 @@ class HeadlessContext:
 
     def __init__(
         self,
-        url: Optional[str] = None,
+        url: str | None = None,
         mirror_session: bool = False,
-        viewport: Optional[tuple[int, int]] = None,
-        dpr: Optional[float] = None,
-        color_scheme: Optional[str] = None,
+        viewport: tuple[int, int] | None = None,
+        dpr: float | None = None,
+        color_scheme: str | None = None,
         timeout: float = 30.0,
-        bridge_client: Optional[Any] = None,
+        bridge_client: Any | None = None,
     ):
         """
         Initialize headless context configuration.
@@ -81,10 +81,10 @@ class HeadlessContext:
         self._bridge_client = bridge_client
 
         # Runtime state (set during __aenter__)
-        self._chrome: Optional[HeadlessChrome] = None
-        self._cdp_client: Optional[CDPClient] = None
-        self._session: Optional[CDPSession] = None
-        self._state: Optional[BrowserState] = None
+        self._chrome: HeadlessChrome | None = None
+        self._cdp_client: CDPClient | None = None
+        self._session: CDPSession | None = None
+        self._state: BrowserState | None = None
         self._current_url: str = ""
 
     async def __aenter__(self) -> "HeadlessContext":
@@ -180,7 +180,7 @@ class HeadlessContext:
         return self._session
 
     @property
-    def state(self) -> Optional[BrowserState]:
+    def state(self) -> BrowserState | None:
         """Browser state (if session mirroring was used)."""
         return self._state
 
@@ -210,11 +210,11 @@ class HeadlessContext:
 
     async def screenshot(
         self,
-        selector: Optional[str] = None,
+        selector: str | None = None,
         full_page: bool = False,
         isolate: bool = False,
         format: str = "png",
-        quality: Optional[int] = None,
+        quality: int | None = None,
         omit_background: bool = False,
     ) -> bytes:
         """
@@ -331,7 +331,7 @@ class HeadlessContext:
         await self._session.client.send("Network.enable")
 
         pending_requests = set()
-        idle_start: Optional[float] = None
+        idle_start: float | None = None
 
         def on_request_started(params):
             nonlocal idle_start
@@ -471,7 +471,7 @@ class HeadlessContext:
         selector: str,
         isolate: bool = False,
         format: str = "png",
-        quality: Optional[int] = None,
+        quality: int | None = None,
         omit_background: bool = False,
     ) -> bytes:
         """

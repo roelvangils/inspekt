@@ -4,8 +4,9 @@ import json
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
-from inspekt.app.api.models import AxeRequest, AutocompleteRequest, CommandResponse
+
 from inspekt.app.api.dependencies import get_bridge_client
+from inspekt.app.api.models import AutocompleteRequest, AxeRequest, CommandResponse
 from inspekt.services.autocomplete_service import get_autocomplete_service
 
 router = APIRouter()
@@ -174,11 +175,11 @@ def run_axe_audit(request: AxeRequest):
         }
 
     except ConnectionError as e:
-        raise HTTPException(status_code=503, detail=f"Bridge server connection error: {str(e)}")
+        raise HTTPException(status_code=503, detail=f"Bridge server connection error: {e!s}")
     except TimeoutError as e:
-        raise HTTPException(status_code=504, detail=f"Execution timeout: {str(e)}")
+        raise HTTPException(status_code=504, detail=f"Execution timeout: {e!s}")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Execution error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Execution error: {e!s}")
 
 
 @router.post("/autocomplete-check", response_model=CommandResponse)
@@ -292,8 +293,8 @@ async def run_autocomplete_check(request: AutocompleteRequest):
         }
 
     except ConnectionError as e:
-        raise HTTPException(status_code=503, detail=f"Bridge server connection error: {str(e)}")
+        raise HTTPException(status_code=503, detail=f"Bridge server connection error: {e!s}")
     except TimeoutError as e:
-        raise HTTPException(status_code=504, detail=f"Execution timeout: {str(e)}")
+        raise HTTPException(status_code=504, detail=f"Execution timeout: {e!s}")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Execution error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Execution error: {e!s}")

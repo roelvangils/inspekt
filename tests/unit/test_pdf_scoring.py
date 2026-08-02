@@ -6,8 +6,9 @@ Tests for the accessibility score calculation algorithm.
 
 from __future__ import annotations
 
-import pytest
 from unittest.mock import MagicMock, patch
+
+import pytest
 
 
 class TestAccessibilityScore:
@@ -15,7 +16,12 @@ class TestAccessibilityScore:
 
     def test_score_properties(self):
         """Test AccessibilityScore properties."""
-        from inspekt.services.pdf_scoring import AccessibilityScore, AccessibilityGrade, ScoreCategory, CategoryScore
+        from inspekt.services.pdf_scoring import (
+            AccessibilityGrade,
+            AccessibilityScore,
+            CategoryScore,
+            ScoreCategory,
+        )
 
         category_scores = {
             ScoreCategory.STRUCTURE: CategoryScore(
@@ -101,7 +107,7 @@ class TestScoreCalculation:
 
     def test_perfect_score_for_no_failures(self):
         """A PDF with no failures should get a perfect score."""
-        from inspekt.services.pdf_scoring import calculate_accessibility_score, AccessibilityGrade
+        from inspekt.services.pdf_scoring import AccessibilityGrade, calculate_accessibility_score
 
         # Create mock result with all passes
         mock_result = MagicMock()
@@ -120,7 +126,7 @@ class TestScoreCalculation:
 
     def test_low_score_for_many_failures(self):
         """A PDF with many critical failures should get a low score."""
-        from inspekt.services.pdf_scoring import calculate_accessibility_score, AccessibilityGrade
+        from inspekt.services.pdf_scoring import AccessibilityGrade, calculate_accessibility_score
 
         # Create mock checks with critical failures
         mock_checks = []

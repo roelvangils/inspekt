@@ -19,10 +19,20 @@ import click
 from inspekt.app.cli.base import builtin_open
 from inspekt.app.cli.icons import (
     analyze as analyze_icon,
+)
+from inspekt.app.cli.icons import (
     cached as cached_icon,
+)
+from inspekt.app.cli.icons import (
     get_icon,
+)
+from inspekt.app.cli.icons import (
     info as info_icon,
+)
+from inspekt.app.cli.icons import (
     progress as progress_icon,
+)
+from inspekt.app.cli.icons import (
     success as success_icon,
 )
 from inspekt.app.cli.url_builder import url_scheme
@@ -40,21 +50,22 @@ def _speak_text(text: str, voice_name: str, audio_output: str | None = None) -> 
         audio_output: Optional path to save audio as MP3 file instead of playing.
     """
     import os
-    from inspekt.services.tts_service import (
-        speak_text,
-        generate_audio,
-        play_audio_bytes,
-        TTSError,
-        is_tts_available,
-    )
+
+    from inspekt.config import get_tts_config
     from inspekt.services.text_splitter import (
         ELEVENLABS_CHAR_LIMIT,
         chunk_text_for_tts,
-        truncate_at_sentence_boundary,
         estimate_chunk_count,
         get_text_stats,
+        truncate_at_sentence_boundary,
     )
-    from inspekt.config import get_tts_config
+    from inspekt.services.tts_service import (
+        TTSError,
+        generate_audio,
+        is_tts_available,
+        play_audio_bytes,
+        speak_text,
+    )
 
     # Check if TTS is available
     available, error_msg = is_tts_available()
@@ -84,7 +95,7 @@ def _speak_text(text: str, voice_name: str, audio_output: str | None = None) -> 
         click.echo(f"ElevenLabs has a {ELEVENLABS_CHAR_LIMIT:,} character limit per request.", err=True)
         click.echo(err=True)
         click.echo("Options:", err=True)
-        click.echo(f"  1. Truncate at sentence boundary (one API request)", err=True)
+        click.echo("  1. Truncate at sentence boundary (one API request)", err=True)
         click.echo(f"  2. Split into {chunk_count} chunks (multiple requests, play sequentially)", err=True)
         click.echo("  3. Cancel", err=True)
         click.echo(err=True)
@@ -163,8 +174,9 @@ def _process_tts_chunks(
         audio_output: Optional path to save combined audio.
         detached: Whether to use detached playback mode.
     """
-    from concurrent.futures import ThreadPoolExecutor, Future
-    from inspekt.services.tts_service import speak_text, generate_audio, play_audio_bytes, TTSError
+    from concurrent.futures import Future, ThreadPoolExecutor
+
+    from inspekt.services.tts_service import TTSError, generate_audio, play_audio_bytes, speak_text
 
     speak_icon = get_icon("speak") or "\U0001F50A"
     all_audio_bytes: list[bytes] = []
@@ -1415,9 +1427,9 @@ def images(
                     if len(content) <= 10000:
                         # Pretty-print SVG with proper indentation
                         try:
-                            from bs4 import BeautifulSoup
                             import warnings
-                            from bs4 import XMLParsedAsHTMLWarning
+
+                            from bs4 import BeautifulSoup, XMLParsedAsHTMLWarning
                             warnings.filterwarnings("ignore", category=XMLParsedAsHTMLWarning)
                             # Try xml parser (requires lxml), fall back to html.parser
                             try:

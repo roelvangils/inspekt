@@ -3,8 +3,9 @@
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
-from inspekt.app.api.models import CommandResponse
+
 from inspekt.app.api.dependencies import get_bridge_client
+from inspekt.app.api.models import CommandResponse
 
 router = APIRouter()
 
@@ -112,11 +113,11 @@ def get_page_info():
         return result
 
     except ConnectionError as e:
-        raise HTTPException(status_code=503, detail=f"Bridge server connection error: {str(e)}")
+        raise HTTPException(status_code=503, detail=f"Bridge server connection error: {e!s}")
     except TimeoutError as e:
-        raise HTTPException(status_code=504, detail=f"Request timeout: {str(e)}")
+        raise HTTPException(status_code=504, detail=f"Request timeout: {e!s}")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error getting page info: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error getting page info: {e!s}")
 
 
 @router.get("/links")
@@ -162,11 +163,11 @@ def get_page_links(include_text: bool = True):
         return result
 
     except ConnectionError as e:
-        raise HTTPException(status_code=503, detail=f"Bridge server connection error: {str(e)}")
+        raise HTTPException(status_code=503, detail=f"Bridge server connection error: {e!s}")
     except TimeoutError as e:
-        raise HTTPException(status_code=504, detail=f"Request timeout: {str(e)}")
+        raise HTTPException(status_code=504, detail=f"Request timeout: {e!s}")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error extracting links: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error extracting links: {e!s}")
 
 
 @router.get("/outline")
@@ -248,8 +249,8 @@ def get_page_outline():
         }
 
     except ConnectionError as e:
-        raise HTTPException(status_code=503, detail=f"Bridge server connection error: {str(e)}")
+        raise HTTPException(status_code=503, detail=f"Bridge server connection error: {e!s}")
     except TimeoutError as e:
-        raise HTTPException(status_code=504, detail=f"Request timeout: {str(e)}")
+        raise HTTPException(status_code=504, detail=f"Request timeout: {e!s}")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error extracting outline: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error extracting outline: {e!s}")

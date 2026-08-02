@@ -103,7 +103,7 @@ async def extract_links(params: ExtractLinksParams) -> ExtractLinksResponse:
             success=False,
             links=[],
             count=0,
-            message=f"Error: {str(e)}",
+            message=f"Error: {e!s}",
         )
 
 
@@ -159,7 +159,7 @@ async def extract_outline(params: EmptyParams) -> ExtractOutlineResponse:
             success=False,
             outline=[],
             count=0,
-            message=f"Error: {str(e)}",
+            message=f"Error: {e!s}",
         )
 
 
@@ -215,7 +215,7 @@ async def extract_page_info(params: EmptyParams) -> PageInfoResponse:
             title="",
             viewport_width=0,
             viewport_height=0,
-            message=f"Error: {str(e)}",
+            message=f"Error: {e!s}",
         )
 
 
@@ -261,5 +261,5 @@ async def extract_article(params: EmptyParams) -> ExtractArticleResponse:
             success=False,
             content="",
             length=0,
-            message=f"Error: {str(e)}",
+            message=f"Error: {e!s}",
         )

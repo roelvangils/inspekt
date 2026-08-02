@@ -26,12 +26,10 @@ Example usage:
 import json as _json
 import re
 import shutil
+from contextlib import contextmanager
 from typing import Any, Optional
 
-from contextlib import contextmanager
-
 import click
-
 
 # Regex pattern for detecting numeric values (including formatted ones)
 NUMERIC_PATTERN = re.compile(
@@ -90,11 +88,11 @@ def rows_to_markdown(headers: list[str], rows: list[list[Any]]) -> str:
 
 def emit_copyable_data(
     *,
-    headers: Optional[list[str]] = None,
-    rows: Optional[list[list[Any]]] = None,
+    headers: list[str] | None = None,
+    rows: list[list[Any]] | None = None,
     json_data: Any = None,
     summary: str = "",
-    table_md: Optional[str] = None,
+    table_md: str | None = None,
 ) -> None:
     """Emit a ``Data ready to copy`` toast signal for the VM terminal.
 
@@ -112,7 +110,7 @@ def emit_copyable_data(
     if table_md is None and headers is not None and rows is not None:
         table_md = rows_to_markdown(headers, rows)
 
-    json_text: Optional[str] = None
+    json_text: str | None = None
     if json_data is not None:
         try:
             json_text = _json.dumps(json_data, indent=2, ensure_ascii=False, default=str)
@@ -166,11 +164,11 @@ class Table:
     def __init__(
         self,
         headers: list[str],
-        widths: Optional[list[int]] = None,
-        alignments: Optional[list[str]] = None,
+        widths: list[int] | None = None,
+        alignments: list[str] | None = None,
         border_color: int | str = 240,  # Dark gray (ANSI 256 color)
-        title: Optional[str] = None,
-        icon: Optional[str] = None,
+        title: str | None = None,
+        icon: str | None = None,
     ):
         """
         Initialize a new Table.
@@ -207,7 +205,7 @@ class Table:
     def calculate_widths(
         headers: list[str],
         rows: list[list[str]],
-        max_total_width: Optional[int] = None,
+        max_total_width: int | None = None,
     ) -> list[int]:
         """
         Calculate optimal column widths from headers and data.
@@ -333,9 +331,9 @@ class Table:
     def _format_row(
         self,
         columns: list[str],
-        colors: Optional[list[Optional[str]]] = None,
+        colors: list[str | None] | None = None,
         bold: bool = False,
-        row_bg: Optional[str] = None,
+        row_bg: str | None = None,
         highlight_marker: bool = False,
     ) -> str:
         """
@@ -476,8 +474,8 @@ class Table:
     def print_row(
         self,
         values: list[str],
-        colors: Optional[list[Optional[str]]] = None,
-        row_bg: Optional[int | str] = None,
+        colors: list[str | None] | None = None,
+        row_bg: int | str | None = None,
         highlight: bool = False,
     ) -> None:
         """
@@ -507,7 +505,7 @@ class Table:
     def print_summary(
         self,
         values: list[str],
-        colors: Optional[list[Optional[str]]] = None,
+        colors: list[str | None] | None = None,
     ) -> None:
         """
         Print a summary row with double-line separator above it.
@@ -574,7 +572,7 @@ def format_status(status: int) -> str:
         return str(status)
 
 
-def get_type_color(resource_type: str) -> Optional[str]:
+def get_type_color(resource_type: str) -> str | None:
     """Get the color for a resource type."""
     type_colors = {
         "script": "yellow",
@@ -632,9 +630,9 @@ def format_status_icon(
 
 def wrap_text(
     text: str,
-    width: Optional[int] = None,
+    width: int | None = None,
     indent: str = "",
-    subsequent_indent: Optional[str] = None,
+    subsequent_indent: str | None = None,
 ) -> str:
     """
     Wrap text to fit within terminal width, breaking at word boundaries.
@@ -682,10 +680,10 @@ def wrap_text(
 
 def print_wrapped(
     text: str,
-    width: Optional[int] = None,
+    width: int | None = None,
     indent: str = "",
-    subsequent_indent: Optional[str] = None,
-    fg: Optional[str] = None,
+    subsequent_indent: str | None = None,
+    fg: str | None = None,
     bold: bool = False,
     err: bool = False,
 ) -> None:
@@ -793,7 +791,7 @@ def _style_with_inline_code(text: str, base_fg: str, bold: bool = False) -> str:
 def format_icon_message(
     message: str,
     icon: str = "",
-    width: Optional[int] = None,
+    width: int | None = None,
 ) -> str:
     """
     Format a message with icon prefix and proper text wrapping.

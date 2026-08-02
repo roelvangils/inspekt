@@ -14,9 +14,9 @@ from typing import Any
 
 from inspekt.app.mcp import schemas
 from inspekt.config import get_bridge_port
+from inspekt.services.autocomplete_service import get_autocomplete_service
 from inspekt.services.bridge_executor import BridgeExecutor
 from inspekt.services.script_loader import ScriptLoader
-from inspekt.services.autocomplete_service import get_autocomplete_service
 
 logger = logging.getLogger(__name__)
 
@@ -102,7 +102,7 @@ class ToolProvider:
         except Exception as e:
             logger.error(f"Go back error: {e}")
             return schemas.NavigateResponse(
-                success=False, url="", title="", message=f"Error: {str(e)}"
+                success=False, url="", title="", message=f"Error: {e!s}"
             )
 
     async def reload_page(self, hard: bool = False) -> schemas.NavigateResponse:
@@ -142,7 +142,7 @@ class ToolProvider:
         except Exception as e:
             logger.error(f"Reload error: {e}")
             return schemas.NavigateResponse(
-                success=False, url="", title="", message=f"Error: {str(e)}"
+                success=False, url="", title="", message=f"Error: {e!s}"
             )
 
     # ========================================================================
@@ -384,7 +384,7 @@ class ToolProvider:
                 success=False,
                 element_found=False,
                 element_text=None,
-                message=f"Error: {str(e)}",
+                message=f"Error: {e!s}",
             )
 
     async def type_text(
@@ -465,7 +465,7 @@ class ToolProvider:
         except Exception as e:
             logger.error(f"Type text error: {e}")
             return schemas.TypeTextResponse(
-                success=False, characters_typed=0, message=f"Error: {str(e)}"
+                success=False, characters_typed=0, message=f"Error: {e!s}"
             )
 
     # ========================================================================
@@ -542,7 +542,7 @@ class ToolProvider:
                     self.script_loader.load_script_async("screenshot_unified.js"),
                     timeout=5.0
                 )
-            except (FileNotFoundError, asyncio.TimeoutError):
+            except (TimeoutError, FileNotFoundError):
                 return schemas.TakeScreenshotResponse(
                     success=False,
                     data=None,
@@ -574,7 +574,7 @@ class ToolProvider:
                     ),
                     timeout=timeout_seconds + 2  # Small buffer for thread overhead
                 )
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 return schemas.TakeScreenshotResponse(
                     success=False,
                     data=None,
@@ -590,7 +590,7 @@ class ToolProvider:
                     format=img_format,
                     width=0,
                     height=0,
-                    message=f"Bridge error: {str(e)}",
+                    message=f"Bridge error: {e!s}",
                 )
 
             if result.get("ok"):
@@ -673,7 +673,7 @@ class ToolProvider:
                 format=img_format,
                 width=0,
                 height=0,
-                message=f"Error: {str(e)}",
+                message=f"Error: {e!s}",
             )
 
     # ========================================================================
@@ -801,7 +801,7 @@ class ToolProvider:
 
         except Exception as e:
             logger.error(f"Set cookie error: {e}")
-            return schemas.SetCookieResponse(success=False, message=f"Error: {str(e)}")
+            return schemas.SetCookieResponse(success=False, message=f"Error: {e!s}")
 
     # ========================================================================
     # Accessibility Tools
@@ -854,7 +854,7 @@ class ToolProvider:
         except Exception as e:
             logger.error(f"Autocomplete check error: {e}")
             return schemas.CheckAutocompleteResponse(
-                success=False, message=f"Error: {str(e)}"
+                success=False, message=f"Error: {e!s}"
             )
 
     async def run_axe(
@@ -1019,7 +1019,7 @@ class ToolProvider:
             logger.error(f"Run axe error: {e}")
             return schemas.RunAxeResponse(
                 success=False,
-                message=f"Error: {str(e)}"
+                message=f"Error: {e!s}"
             )
 
     # ========================================================================
@@ -1124,7 +1124,7 @@ class ToolProvider:
                 timestamp="",
                 entries=[],
                 summary={},
-                message=f"Error: {str(e)}",
+                message=f"Error: {e!s}",
             )
 
     async def get_har(
@@ -1244,7 +1244,7 @@ class ToolProvider:
                 timestamp="",
                 entries=[],
                 summary={},
-                message=f"Error: {str(e)}",
+                message=f"Error: {e!s}",
             )
 
     # ========================================================================
@@ -1351,7 +1351,7 @@ class ToolProvider:
                 entries=[],
                 count=0,
                 hooked=False,
-                message=f"Error: {str(e)}",
+                message=f"Error: {e!s}",
             )
 
     async def clear_console_logs(self) -> schemas.ClearConsoleLogsResponse:
@@ -1405,7 +1405,7 @@ class ToolProvider:
             logger.error(f"Clear console logs error: {e}")
             return schemas.ClearConsoleLogsResponse(
                 success=False,
-                message=f"Error: {str(e)}",
+                message=f"Error: {e!s}",
             )
 
     # ========================================================================

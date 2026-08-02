@@ -5,8 +5,9 @@ These fixtures provide mocked dependencies for testing MCP tools
 without requiring a running bridge server or browser.
 """
 
+from unittest.mock import AsyncMock, Mock, patch
+
 import pytest
-from unittest.mock import Mock, AsyncMock, patch
 
 
 @pytest.fixture

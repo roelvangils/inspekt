@@ -10,8 +10,10 @@ Note: Uses Performance API which has limitations:
 """
 
 from typing import Optional
+
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
+
 from inspekt.app.api.dependencies import get_bridge_client
 from inspekt.services.script_loader import ScriptLoader
 
@@ -45,8 +47,8 @@ class NetworkSummary(BaseModel):
     byType: dict
     byDomain: dict
     averageDuration: int
-    slowestRequest: Optional[dict]
-    largestRequest: Optional[dict]
+    slowestRequest: dict | None
+    largestRequest: dict | None
     cachedRequests: int
     externalRequests: int
 
@@ -84,21 +86,21 @@ def _get_network_data():
         return data
 
     except ConnectionError as e:
-        raise HTTPException(status_code=503, detail=f"Bridge server connection error: {str(e)}")
+        raise HTTPException(status_code=503, detail=f"Bridge server connection error: {e!s}")
     except TimeoutError as e:
-        raise HTTPException(status_code=504, detail=f"Request timeout: {str(e)}")
+        raise HTTPException(status_code=504, detail=f"Request timeout: {e!s}")
     except Exception as e:
         if isinstance(e, HTTPException):
             raise
-        raise HTTPException(status_code=500, detail=f"Error getting network data: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error getting network data: {e!s}")
 
 
 @router.get("/", response_model=NetworkResponse)
 def get_network_requests(
-    type: Optional[str] = Query(None, description="Filter by resource type (script, stylesheet, fetch, image, font, etc.)"),
+    type: str | None = Query(None, description="Filter by resource type (script, stylesheet, fetch, image, font, etc.)"),
     external_only: bool = Query(False, description="Only return external requests"),
     sort: str = Query("start", description="Sort by: start, time, size, name, type"),
-    limit: Optional[int] = Query(None, description="Limit number of results"),
+    limit: int | None = Query(None, description="Limit number of results"),
 ):
     """
     Get all network requests from the current page.
@@ -174,7 +176,7 @@ def get_network_requests(
 def get_script_requests(
     external_only: bool = Query(False, description="Only return external requests"),
     sort: str = Query("start", description="Sort by: start, time, size, name"),
-    limit: Optional[int] = Query(None, description="Limit number of results"),
+    limit: int | None = Query(None, description="Limit number of results"),
 ):
     """
     Get only JavaScript resources.
@@ -188,7 +190,7 @@ def get_script_requests(
 def get_stylesheet_requests(
     external_only: bool = Query(False, description="Only return external requests"),
     sort: str = Query("start", description="Sort by: start, time, size, name"),
-    limit: Optional[int] = Query(None, description="Limit number of results"),
+    limit: int | None = Query(None, description="Limit number of results"),
 ):
     """
     Get only CSS resources.
@@ -202,7 +204,7 @@ def get_stylesheet_requests(
 def get_fetch_requests(
     external_only: bool = Query(False, description="Only return external requests"),
     sort: str = Query("start", description="Sort by: start, time, size, name"),
-    limit: Optional[int] = Query(None, description="Limit number of results"),
+    limit: int | None = Query(None, description="Limit number of results"),
 ):
     """
     Get only fetch/XHR requests.
@@ -216,7 +218,7 @@ def get_fetch_requests(
 def get_image_requests(
     external_only: bool = Query(False, description="Only return external requests"),
     sort: str = Query("start", description="Sort by: start, time, size, name"),
-    limit: Optional[int] = Query(None, description="Limit number of results"),
+    limit: int | None = Query(None, description="Limit number of results"),
 ):
     """
     Get only image resources.
@@ -230,7 +232,7 @@ def get_image_requests(
 def get_font_requests(
     external_only: bool = Query(False, description="Only return external requests"),
     sort: str = Query("start", description="Sort by: start, time, size, name"),
-    limit: Optional[int] = Query(None, description="Limit number of results"),
+    limit: int | None = Query(None, description="Limit number of results"),
 ):
     """
     Get only font resources.
@@ -289,11 +291,11 @@ def _get_har_data():
 
 @router.get("/har")
 def get_har_data(
-    type: Optional[str] = Query(None, description="Filter by resource type"),
+    type: str | None = Query(None, description="Filter by resource type"),
     external_only: bool = Query(False, description="Only return external requests"),
     errors_only: bool = Query(False, description="Only return failed requests (4xx/5xx)"),
     sort: str = Query("start", description="Sort by: start, time, size, name, type, status"),
-    limit: Optional[int] = Query(None, description="Limit number of results"),
+    limit: int | None = Query(None, description="Limit number of results"),
     raw: bool = Query(False, description="Return raw HAR format"),
 ):
     """

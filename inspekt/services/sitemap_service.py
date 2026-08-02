@@ -121,8 +121,8 @@ class TreeNode:
 
     name: str
     full_path: str = ""
-    entry: Optional[SitemapEntry] = None
-    children: dict[str, "TreeNode"] = field(default_factory=dict)
+    entry: SitemapEntry | None = None
+    children: dict[str, TreeNode] = field(default_factory=dict)
     entry_index: int = -1  # 1-based index for --open navigation
 
     @property
@@ -324,7 +324,7 @@ def fetch_sitemap(
     return result
 
 
-def _parse_url_element(url_elem: ET.Element) -> Optional[SitemapEntry]:
+def _parse_url_element(url_elem: ET.Element) -> SitemapEntry | None:
     """Parse a single <url> element into a SitemapEntry."""
     loc = url_elem.find(f"{NS}loc")
     if loc is None or not loc.text:
@@ -1279,7 +1279,7 @@ def merge_titles_from_stale_cache(result: SitemapResult) -> int:
     return transferred
 
 
-def load_from_cache(origin: str) -> Optional[SitemapResult]:
+def load_from_cache(origin: str) -> SitemapResult | None:
     """
     Load a sitemap result from cache if it exists and is fresh.
 
@@ -1345,7 +1345,7 @@ def load_from_cache(origin: str) -> Optional[SitemapResult]:
         return None
 
 
-def clear_cache(origin: Optional[str] = None) -> int:
+def clear_cache(origin: str | None = None) -> int:
     """
     Clear the sitemap cache.
 

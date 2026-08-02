@@ -21,7 +21,6 @@ import click
 from inspekt.app.cli.icons import success
 from inspekt.services.bridge_executor import get_executor
 
-
 # Save built-in functions before they get shadowed by Click commands
 _builtin_open = open
 _builtin_next = next

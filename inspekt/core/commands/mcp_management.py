@@ -10,7 +10,6 @@ from inspekt.core.commands.base import (
     SubcommandDefinition,
 )
 
-
 mcp = CommandDefinition(
     id="mcp",
     name="MCP Server",

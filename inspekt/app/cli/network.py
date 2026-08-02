@@ -21,7 +21,7 @@ from typing import Optional
 import click
 
 from inspekt.app.cli.icons import get_icon, get_section_icon
-from inspekt.app.cli.table import Table, format_size, format_time, format_status, get_type_color
+from inspekt.app.cli.table import Table, format_size, format_status, format_time, get_type_color
 from inspekt.services.bridge_executor import BridgeExecutor
 from inspekt.services.script_loader import ScriptLoader
 
@@ -171,14 +171,15 @@ def _display_summary(summary: dict):
         click.echo(f"{largest_prefix}Largest: {_truncate(large['name'], 40)} ({format_size(large['size'])})")
 
 
-def _try_har_silently(executor: BridgeExecutor) -> Optional[dict]:
+def _try_har_silently(executor: BridgeExecutor) -> dict | None:
     """Try to get HAR data without showing errors.
 
     Returns HAR data if DevTools is open and data is available,
     otherwise returns None.
     """
-    import requests
     import json as json_module
+
+    import requests
 
     try:
         response = requests.get(
@@ -262,12 +263,12 @@ def _emit_network_signal(
 
 
 def _run_network_command(
-    resource_type: Optional[str] = None,
+    resource_type: str | None = None,
     output_json: bool = False,
     sort_by: str = "start",
     show_domain: bool = False,
     only_external: bool = False,
-    limit: Optional[int] = None,
+    limit: int | None = None,
     force_basic: bool = False,
 ):
     """Common implementation for network commands."""
@@ -609,6 +610,7 @@ def network_audio(ctx):
 def _get_har_data(executor: BridgeExecutor) -> dict:
     """Get HAR data from DevTools via bridge server."""
     import json
+
     import requests
 
     try:
@@ -945,7 +947,7 @@ def network_har(output_json, sort_by, show_domain, only_external, only_errors, l
 
 # Export for programmatic use
 def get_network_requests(
-    resource_type: Optional[str] = None,
+    resource_type: str | None = None,
     only_external: bool = False,
 ) -> dict:
     """

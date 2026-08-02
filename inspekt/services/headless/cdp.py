@@ -17,7 +17,7 @@ from websockets.client import WebSocketClientProtocol
 class CDPError(Exception):
     """Error from CDP command execution."""
 
-    def __init__(self, code: int, message: str, data: Optional[dict] = None):
+    def __init__(self, code: int, message: str, data: dict | None = None):
         self.code = code
         self.message = message
         self.data = data
@@ -41,11 +41,11 @@ class CDPClient:
     """
 
     def __init__(self):
-        self._ws: Optional[WebSocketClientProtocol] = None
+        self._ws: WebSocketClientProtocol | None = None
         self._message_id = 0
         self._pending: dict[int, asyncio.Future] = {}
         self._event_handlers: dict[str, list[Callable]] = {}
-        self._receive_task: Optional[asyncio.Task] = None
+        self._receive_task: asyncio.Task | None = None
         self._closed = False
 
     async def connect(self, websocket_url: str) -> None:
@@ -66,7 +66,7 @@ class CDPClient:
         # Start receive loop
         self._receive_task = asyncio.create_task(self._receive_loop())
 
-    async def send(self, method: str, params: Optional[dict] = None, timeout: float = 30.0) -> dict:
+    async def send(self, method: str, params: dict | None = None, timeout: float = 30.0) -> dict:
         """
         Send CDP command and await response.
 
@@ -105,7 +105,7 @@ class CDPClient:
             result = await asyncio.wait_for(future, timeout=timeout)
             return result
 
-        except asyncio.TimeoutError:
+        except TimeoutError:
             self._pending.pop(msg_id, None)
             raise TimeoutError(f"CDP command {method} timed out after {timeout}s")
 
@@ -226,7 +226,7 @@ class CDPSession:
         screenshot = await session.screenshot()
     """
 
-    def __init__(self, client: CDPClient, target_id: Optional[str] = None):
+    def __init__(self, client: CDPClient, target_id: str | None = None):
         self.client = client
         self.target_id = target_id
 
@@ -314,8 +314,8 @@ class CDPSession:
     async def screenshot(
         self,
         format: str = "png",
-        quality: Optional[int] = None,
-        clip: Optional[dict] = None,
+        quality: int | None = None,
+        clip: dict | None = None,
         full_page: bool = False,
         omit_background: bool = False,
     ) -> bytes:
@@ -416,8 +416,8 @@ class CDPSession:
 
     async def emulate_media(
         self,
-        color_scheme: Optional[str] = None,
-        reduced_motion: Optional[str] = None,
+        color_scheme: str | None = None,
+        reduced_motion: str | None = None,
     ) -> None:
         """
         Emulate media features.
@@ -463,7 +463,7 @@ class CDPSession:
             },
         )
 
-    async def set_user_agent(self, user_agent: str, language: Optional[str] = None) -> None:
+    async def set_user_agent(self, user_agent: str, language: str | None = None) -> None:
         """
         Set user agent and language.
 

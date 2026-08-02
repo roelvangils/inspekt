@@ -15,7 +15,7 @@ from typing import Any
 
 import requests
 
-from inspekt.config import load_config, get_bridge_port
+from inspekt.config import get_bridge_port, load_config
 
 # Track temp directories for cleanup on exit (prevents leaks on Ctrl+C)
 _temp_dirs_to_cleanup: list[Path] = []

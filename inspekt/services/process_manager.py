@@ -45,10 +45,10 @@ class ManagedProcess:
     """Represents a managed server process."""
 
     server_type: ServerType
-    process: Optional[asyncio.subprocess.Process] = None
+    process: asyncio.subprocess.Process | None = None
     started: bool = False
     healthy: bool = False
-    error_message: Optional[str] = None
+    error_message: str | None = None
     host: str = "127.0.0.1"
     port: int = 0
     _stream_tasks: list = field(default_factory=list)
@@ -379,7 +379,7 @@ class ProcessManager:
                     try:
                         await asyncio.wait_for(managed.process.wait(), timeout=5.0)
                         click.echo(f"  {prefix} {success('stopped')}")
-                    except asyncio.TimeoutError:
+                    except TimeoutError:
                         # Force kill if still running
                         managed.process.kill()
                         await managed.process.wait()
@@ -409,5 +409,5 @@ class ProcessManager:
 
             try:
                 await asyncio.wait_for(self.shutdown_event.wait(), timeout=1.0)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 pass  # Continue monitoring

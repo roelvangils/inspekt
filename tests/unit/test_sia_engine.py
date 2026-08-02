@@ -3,12 +3,13 @@ Unit tests for Alfa accessibility engine.
 """
 
 import json
-import pytest
 from pathlib import Path
 from unittest.mock import patch
 
-from inspekt.services.engines.sia_engine import SiaEngine
+import pytest
+
 from inspekt.services.engines.base import AuditResult, ImpactLevel, NormalizedViolation
+from inspekt.services.engines.sia_engine import SiaEngine
 
 
 class TestSiaEngineProperties:

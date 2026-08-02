@@ -7,27 +7,28 @@ import signal
 import sys
 import time
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from pathlib import Path
 from typing import Optional
 from urllib.parse import urlparse
 
-
 import click
+import requests
 import yaml
 
 from inspekt.app.cli.formatting import style_primary_key, style_secondary_key
-from inspekt.app.cli.icons import success as success_icon, get_indicator, get_action_icon
+from inspekt.app.cli.icons import get_action_icon, get_indicator
+from inspekt.app.cli.icons import success as success_icon
 from inspekt.app.cli.interaction import _focus_browser_if_requested
+from inspekt.app.cli.output import OutputHandler
 from inspekt.client import BridgeClient
 from inspekt.config import get_audio_config, get_record_config
-from inspekt.services.audio import CLIAudio
 from inspekt.domain.recording import (
     DownloadInfo,
     ExpectInfo,
     FileInfo,
-    Recording,
     RecordedOn,
+    Recording,
     RecordingMetadata,
     RecordingStep,
     ScrollInfo,
@@ -36,6 +37,9 @@ from inspekt.domain.recording import (
     TargetInfo,
     ViewportInfo,
 )
+from inspekt.services.audio import CLIAudio
+from inspekt.shared.dialog_styles import DIALOG_STYLES
+
 from .formatting import (
     format_duration,
     format_elapsed,
@@ -45,12 +49,13 @@ from .formatting import (
     format_system_message,
     get_recordings_dir,
 )
+from .recording_utils import (
+    TerminalEchoSuppressor,
+    clean_filename,
+    complete_recording_files,
+    find_most_recent_recording,
+)
 from .table import Table
-from .recording_utils import clean_filename, find_most_recent_recording, complete_recording_files, TerminalEchoSuppressor
-from inspekt.app.cli.output import OutputHandler
-from inspekt.shared.dialog_styles import DIALOG_STYLES
-
-import requests
 
 
 class SubcommandAwareGroup(click.Group):
@@ -223,7 +228,7 @@ def _format_closed_shadow_warning(warnings: list) -> str:
 
 def _format_media_hint(media_elements: dict) -> str:
     """Format hint message for media elements."""
-    from inspekt.app.cli.table import wrap_text, _style_with_inline_code
+    from inspekt.app.cli.table import _style_with_inline_code, wrap_text
 
     audio_count = media_elements.get("audioCount", 0)
     video_count = media_elements.get("videoCount", 0)
@@ -243,7 +248,7 @@ def _format_media_hint(media_elements: dict) -> str:
 
 def _format_native_inputs_hint(native_inputs: dict) -> str:
     """Format hint message for native control inputs."""
-    from inspekt.app.cli.table import wrap_text, _style_with_inline_code
+    from inspekt.app.cli.table import _style_with_inline_code, wrap_text
 
     types = native_inputs.get("types", {})
     type_names = {
@@ -281,7 +286,7 @@ def _format_native_inputs_hint(native_inputs: dict) -> str:
 
 def _format_file_inputs_warning(file_inputs: dict) -> str:
     """Format warning message for file inputs."""
-    from inspekt.app.cli.table import wrap_text, _style_with_inline_code
+    from inspekt.app.cli.table import _style_with_inline_code, wrap_text
 
     count = file_inputs.get("count", 0)
     count_str = "a file input" if count == 1 else f"{count} file inputs"
@@ -310,7 +315,7 @@ def _format_js_dialogs_hint(js_dialogs: dict) -> str:
 
 def _format_fullscreen_hint(window_mode: dict) -> str:
     """Format hint message for fullscreen/kiosk mode recording."""
-    from inspekt.app.cli.table import wrap_text, _style_with_inline_code
+    from inspekt.app.cli.table import _style_with_inline_code, wrap_text
 
     mode = window_mode.get("mode", "fullscreen")
     if mode == "kiosk":
@@ -1042,11 +1047,11 @@ def tidy_recording(
         raise ValueError(f"Invalid YAML syntax: {e}")
 
     if not data or "steps" not in data:
-        raise ValueError(f"Invalid recording file: missing 'steps' section")
+        raise ValueError("Invalid recording file: missing 'steps' section")
 
     steps = data["steps"]
     if not steps:
-        raise ValueError(f"Invalid recording file: no steps found")
+        raise ValueError("Invalid recording file: no steps found")
 
     # Initialize report
     report = {
@@ -1502,7 +1507,7 @@ def check_sensitive_dialog_content(steps: list[RecordingStep]) -> list[str]:
     return warnings
 
 
-def handle_existing_recording_file(output_path: Path) -> Optional[tuple[Path, bool]]:
+def handle_existing_recording_file(output_path: Path) -> tuple[Path, bool] | None:
     """
     Handle the case where the recording output file already exists.
     Called BEFORE recording starts.
@@ -1689,7 +1694,7 @@ def save_recording_to_yaml(
         f.write('\n'.join(output_lines))
 
 
-def get_recording_metadata(filepath: Path) -> Optional[dict]:
+def get_recording_metadata(filepath: Path) -> dict | None:
     """Extract metadata from recording file without full parse."""
     try:
         with _builtin_open(filepath) as f:
@@ -1865,8 +1870,8 @@ def get_recording_metadata(filepath: Path) -> Optional[dict]:
 @click.pass_context
 def record(
     ctx,
-    filename: Optional[str],
-    output: Optional[str],
+    filename: str | None,
+    output: str | None,
     include_hover: bool,
     mask_passwords: bool,
     min_hover_duration: int,
@@ -1881,13 +1886,13 @@ def record(
     native: bool,
     typing_speed: str,
     capture_state: bool,
-    storage_keys: Optional[str],
+    storage_keys: str | None,
     checksum: bool,
     synthetic_dialogs: bool,
     match_viewport: bool,
     match_zoom_level: bool,
     force: bool,
-    target_viewport: Optional[str],
+    target_viewport: str | None,
     faithful: bool,
     no_milliseconds: bool,
 ):
@@ -2374,7 +2379,7 @@ def record(
 
         response = result.get("result", {})
         start_url = response.get("startUrl", "")
-        start_time = datetime.now(timezone.utc)
+        start_time = datetime.now(UTC)
         viewport = response.get("viewport", {"width": 1920, "height": 1080})
         initial_scroll = response.get("scroll", {"x": 0, "y": 0})
         zoom = response.get("zoom", 1.0)
@@ -2446,7 +2451,7 @@ def record(
                 pass  # Audio is optional
 
         # Display recording header
-        from inspekt.config import is_nerdfont_enabled, is_isolated_mode
+        from inspekt.config import is_isolated_mode, is_nerdfont_enabled
         record_icon = "\U000f044a " if is_nerdfont_enabled() else ""  # 󰑊 nf-md-record
         recording_label = click.style(f"{record_icon}Now recording", fg="red", bold=True)
         browser_active = click.style("(browser is now active)", fg="bright_black")
@@ -2580,13 +2585,13 @@ def record(
                     if js_duration and js_duration > 0:
                         duration_ms = js_duration
                     else:
-                        duration_ms = int((datetime.now(timezone.utc) - start_time).total_seconds() * 1000)
+                        duration_ms = int((datetime.now(UTC) - start_time).total_seconds() * 1000)
                 else:
-                    duration_ms = int((datetime.now(timezone.utc) - start_time).total_seconds() * 1000)
+                    duration_ms = int((datetime.now(UTC) - start_time).total_seconds() * 1000)
 
             except Exception as e:
                 click.echo(f"Warning: Error during stop: {e}", err=True)
-                duration_ms = int((datetime.now(timezone.utc) - start_time).total_seconds() * 1000)
+                duration_ms = int((datetime.now(UTC) - start_time).total_seconds() * 1000)
 
             # Build state info
             state_info = StateInfo(
@@ -2856,13 +2861,13 @@ def record(
                 should_open = open_after or edit_after
 
                 if should_open and replay:
-                    click.echo(f"\nOpening file, then starting replay…")
+                    click.echo("\nOpening file, then starting replay…")
                 elif should_open:
-                    click.echo(f"\nOpening file…")
+                    click.echo("\nOpening file…")
                 elif replay:
-                    click.echo(f"\nVerifying recording… " + success_icon(""))
+                    click.echo("\nVerifying recording… " + success_icon(""))
                 else:
-                    click.echo(f"\nWhat you can do next:")
+                    click.echo("\nWhat you can do next:")
                     click.echo(f"  Edit with `inspekt record edit {output_path.name}`")
                     click.echo(f"  Replay with `inspekt replay {output_path.name}`")
                     click.echo()
@@ -3112,7 +3117,7 @@ def record(
                     download_checksums = {}
                     last_activity_time = time.time()
                     inactivity_warning_shown = False
-                    start_time = datetime.now(timezone.utc)
+                    start_time = datetime.now(UTC)
 
                     # Re-inject recording script (must target the same browser tab)
                     retry_result = client.execute(start_code, timeout=10.0, browser_index=recording_browser_index)
@@ -3147,7 +3152,7 @@ def record(
             if inactive_seconds >= INACTIVITY_STOP_SECONDS:
                 # Auto-stop due to inactivity - custom format with stop icon
                 # Note: Inactivity messages show seconds only (no milliseconds)
-                elapsed_ms = int((datetime.now(timezone.utc) - start_time).total_seconds() * 1000)
+                elapsed_ms = int((datetime.now(UTC) - start_time).total_seconds() * 1000)
                 elapsed_str = format_elapsed(elapsed_ms, show_milliseconds=False)
                 prefix = click.style(f"----   {elapsed_str}", fg="bright_black")
                 stop_icon = get_indicator("stop") or ""
@@ -3162,7 +3167,7 @@ def record(
             if inactive_seconds >= INACTIVITY_WARNING_SECONDS and not inactivity_warning_shown:
                 # Custom format with hourglass icon, timestamp, and ellipsis
                 # Note: Inactivity messages show seconds only (no milliseconds)
-                elapsed_ms = int((datetime.now(timezone.utc) - start_time).total_seconds() * 1000)
+                elapsed_ms = int((datetime.now(UTC) - start_time).total_seconds() * 1000)
                 elapsed_str = format_elapsed(elapsed_ms, show_milliseconds=False)
                 prefix = click.style(f"----   {elapsed_str}", fg="bright_black")
                 hourglass = "\uf252"  # nf-fa-hourglass_end
@@ -3181,7 +3186,7 @@ def record(
 
                 # Reset error count on successful communication
                 if consecutive_errors > 0 and waiting_for_reconnect:
-                    elapsed_ms = int((datetime.now(timezone.utc) - start_time).total_seconds() * 1000)
+                    elapsed_ms = int((datetime.now(UTC) - start_time).total_seconds() * 1000)
                     click.echo(format_system_message(
                         "Reconnected",
                         icon="resume",
@@ -3238,7 +3243,7 @@ def record(
                             download_checksums = {}
                             last_activity_time = time.time()
                             inactivity_warning_shown = False
-                            start_time = datetime.now(timezone.utc)
+                            start_time = datetime.now(UTC)
 
                             # Re-inject recording script (must target the same browser tab)
                             retry_result = client.execute(start_code, timeout=10.0, browser_index=recording_browser_index)
@@ -3277,7 +3282,7 @@ def record(
                         if is_paused:
                             pause_start_time = time.time()
                             # Show pause message with timestamp
-                            elapsed_ms = int((datetime.now(timezone.utc) - start_time).total_seconds() * 1000)
+                            elapsed_ms = int((datetime.now(UTC) - start_time).total_seconds() * 1000)
                             elapsed_str = format_elapsed(elapsed_ms, show_milliseconds=show_milliseconds)
                             prefix = click.style(f"----   {elapsed_str}", fg="bright_black")
                             pause_icon = get_indicator("pause") or ""
@@ -3286,7 +3291,7 @@ def record(
                             click.echo(f"{prefix}   {icon_str}{msg}")
                         else:
                             # Calculate pause duration and elapsed time
-                            elapsed_ms = int((datetime.now(timezone.utc) - start_time).total_seconds() * 1000)
+                            elapsed_ms = int((datetime.now(UTC) - start_time).total_seconds() * 1000)
                             elapsed_str = format_elapsed(elapsed_ms, show_milliseconds=show_milliseconds)
                             pause_duration_sec = int(time.time() - pause_start_time) if pause_start_time else 0
                             pause_start_time = None
@@ -3307,7 +3312,7 @@ def record(
                     # Handle undo request (Ctrl+Shift+Z in browser)
                     if response.get("undoRequested"):
                         # Calculate elapsed time for timestamp
-                        elapsed_ms = int((datetime.now(timezone.utc) - start_time).total_seconds() * 1000)
+                        elapsed_ms = int((datetime.now(UTC) - start_time).total_seconds() * 1000)
                         elapsed_str = format_elapsed(elapsed_ms, show_milliseconds=show_milliseconds)
                         if all_steps:
                             undone_step = all_steps.pop()
@@ -3342,7 +3347,7 @@ def record(
                     # Handle redo request (Ctrl+Shift+Y in browser)
                     if response.get("redoRequested"):
                         # Calculate elapsed time for timestamp
-                        elapsed_ms = int((datetime.now(timezone.utc) - start_time).total_seconds() * 1000)
+                        elapsed_ms = int((datetime.now(UTC) - start_time).total_seconds() * 1000)
                         elapsed_str = format_elapsed(elapsed_ms, show_milliseconds=show_milliseconds)
                         if undo_stack:
                             redone_step = undo_stack.pop()
@@ -3384,7 +3389,7 @@ def record(
 
                         if new_url and new_url != last_known_url:
                             # Calculate elapsed time for the navigation event
-                            elapsed_ms = int((datetime.now(timezone.utc) - start_time).total_seconds() * 1000)
+                            elapsed_ms = int((datetime.now(UTC) - start_time).total_seconds() * 1000)
 
                             # Add navigation event
                             nav_step = RecordingStep(
@@ -3403,7 +3408,7 @@ def record(
                             last_known_url = new_url
 
                         # Resume recording on the new page (same tab, after navigation)
-                        elapsed_ms = int((datetime.now(timezone.utc) - start_time).total_seconds() * 1000)
+                        elapsed_ms = int((datetime.now(UTC) - start_time).total_seconds() * 1000)
 
                         # Re-inject visual script for stop sound (lost on navigation)
                         # Target the specific browser tab where recording started
@@ -3424,7 +3429,7 @@ def record(
                             debug_log("Recording resumed successfully")
                             resumed_url = new_url or last_known_url
                             # Calculate elapsed time for timestamp display
-                            elapsed_ms = int((datetime.now(timezone.utc) - start_time).total_seconds() * 1000)
+                            elapsed_ms = int((datetime.now(UTC) - start_time).total_seconds() * 1000)
                             click.echo(format_system_message(
                                 f"Recording resumed on {resumed_url}",
                                 icon="resume",
@@ -3438,7 +3443,7 @@ def record(
                         else:
                             # Failed to resume - might be on a restricted page
                             debug_log(f"Resume failed: {resume_result.get('error')}")
-                            elapsed_ms = int((datetime.now(timezone.utc) - start_time).total_seconds() * 1000)
+                            elapsed_ms = int((datetime.now(UTC) - start_time).total_seconds() * 1000)
                             click.echo(format_system_message(
                                 "Recording paused - waiting for supported page",
                                 elapsed_ms=elapsed_ms,
@@ -3485,7 +3490,7 @@ def record(
                         step_count += 1
 
                         # Calculate elapsed time from recording start
-                        elapsed_ms = int((datetime.now(timezone.utc) - start_time).total_seconds() * 1000)
+                        elapsed_ms = int((datetime.now(UTC) - start_time).total_seconds() * 1000)
 
                         # Update last known URL for navigate events
                         if event.get("action") == "navigate":
@@ -3609,7 +3614,7 @@ def record(
 @click.option("--no-normalize", is_flag=True, help="Skip key order normalization")
 @click.option("--no-clean", is_flag=True, help="Skip empty value removal")
 @click.option("--quiet", "-q", is_flag=True, help="Only show warnings and summary")
-def tidy(file: Optional[str], dry_run: bool, force: bool, no_comments: bool, no_normalize: bool, no_clean: bool, quiet: bool):
+def tidy(file: str | None, dry_run: bool, force: bool, no_comments: bool, no_normalize: bool, no_clean: bool, quiet: bool):
     """
     Tidy up a recording file.
 
@@ -3764,7 +3769,7 @@ def tidy(file: Optional[str], dry_run: bool, force: bool, no_comments: bool, no_
 @record.command("list")
 @click.option("--limit", "-n", type=int, default=None, help="Show only the last N recordings")
 @click.option("--json", "-j", "output_json", is_flag=True, help="Output as JSON")
-def list_recordings(limit: Optional[int], output_json: bool):
+def list_recordings(limit: int | None, output_json: bool):
     """
     List all saved recordings.
 
@@ -3827,8 +3832,9 @@ def list_recordings(limit: Optional[int], output_json: bool):
         return
 
     # Table output using Table class
-    from inspekt.app.cli.table import Table
     from datetime import datetime
+
+    from inspekt.app.cli.table import Table
 
     def format_datetime(dt) -> str:
         """Format datetime as YY/MM/DD HH:MM in local time."""
@@ -3923,7 +3929,7 @@ def list_recordings(limit: Optional[int], output_json: bool):
     # Show tip if no assertions exist
     if total_assertions == 0 and len(rows) > 0:
         click.echo()
-        from inspekt.app.cli.table import print_hint, _style_with_inline_code
+        from inspekt.app.cli.table import _style_with_inline_code, print_hint
         print_hint("Add assertions to your recordings to verify expected outcomes.")
         doc_link = click.style("http://localhost:8008/guide/recording-replay/#adding-assertions", fg="blue", underline=True)
         click.echo(f"  See {doc_link}")
@@ -3932,7 +3938,7 @@ def list_recordings(limit: Optional[int], output_json: bool):
 
 @record.command("info")
 @click.argument("recording_file", type=click.Path(exists=True), required=False, shell_complete=complete_recording_files)
-def show_recording(recording_file: Optional[str]):
+def show_recording(recording_file: str | None):
     """
     Show details of a recording file.
 
@@ -4031,7 +4037,7 @@ def show_recording(recording_file: Optional[str]):
 @record.command("delete")
 @click.argument("recording_file", type=click.Path(exists=True), required=False, shell_complete=complete_recording_files)
 @click.option("--force", "-f", is_flag=True, help="Skip confirmation")
-def delete_recording(recording_file: Optional[str], force: bool):
+def delete_recording(recording_file: str | None, force: bool):
     """
     Delete a recording file.
 
@@ -4070,7 +4076,7 @@ def delete_recording(recording_file: Optional[str], force: bool):
 
 @record.command("edit")
 @click.argument("recording_file", type=click.Path(exists=True), required=False, shell_complete=complete_recording_files)
-def edit_recording(recording_file: Optional[str]):
+def edit_recording(recording_file: str | None):
     """
     Open a recording file in your default editor.
 
@@ -4081,8 +4087,8 @@ def edit_recording(recording_file: Optional[str]):
         inspekt record edit                # Edit last modified recording
         inspekt record edit login-flow.yaml
     """
-    import subprocess
     import os
+    import subprocess
 
     # Use last modified file if none specified
     if recording_file is None:
@@ -4123,6 +4129,7 @@ def record_tutorial(speak: bool):
         inspekt record tutorial --speak   # Use text-to-speech
     """
     from typing import get_args
+
     from inspekt.domain.recording import ActionType
 
     client = BridgeClient()

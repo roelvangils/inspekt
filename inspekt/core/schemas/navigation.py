@@ -19,11 +19,11 @@ class NavigateParams(BaseModel):
         ...,
         description="The URL to navigate to (must start with http:// or https://)",
     )
-    wait_for: Optional[Literal["load", "networkidle"]] = Field(
+    wait_for: Literal["load", "networkidle"] | None = Field(
         default=None,
         description="Wait condition: 'load' (DOMContentLoaded), 'networkidle' (no network activity)",
     )
-    timeout: Optional[int] = Field(
+    timeout: int | None = Field(
         default=30,
         description="Navigation timeout in seconds",
     )
@@ -53,7 +53,7 @@ class NavigateResponse(BaseModel):
         default="",
         description="Page title",
     )
-    message: Optional[str] = Field(
+    message: str | None = Field(
         default=None,
         description="Success or error message",
     )
@@ -65,11 +65,11 @@ class NavigateResponse(BaseModel):
 class SitemapParams(BaseModel):
     """Parameters for get_sitemap command."""
 
-    url: Optional[str] = Field(
+    url: str | None = Field(
         default=None,
         description="Site URL or direct sitemap URL. If omitted, uses the current page's origin.",
     )
-    lang: Optional[str] = Field(
+    lang: str | None = Field(
         default=None,
         description="Filter by language code (e.g., 'nl', 'en', 'fr')",
     )
@@ -98,4 +98,4 @@ class SitemapResponse(BaseModel):
     total_urls: int = Field(default=0, description="Total number of URLs in sitemap")
     languages: list[str] = Field(default_factory=list, description="Detected language codes")
     entries: list[SitemapEntryItem] = Field(default_factory=list, description="Sitemap entries")
-    message: Optional[str] = Field(default=None, description="Status or error message")
+    message: str | None = Field(default=None, description="Status or error message")

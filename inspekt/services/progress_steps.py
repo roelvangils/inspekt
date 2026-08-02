@@ -16,9 +16,9 @@ Usage:
     label = get_step_label("ocr")  # "Analyze text layer (local OCR)"
 """
 
+import json
 from dataclasses import dataclass
 from typing import Optional
-import json
 
 
 @dataclass
@@ -134,7 +134,7 @@ def export_steps_json() -> str:
     )
 
 
-def match_step_from_message(message: str) -> Optional[str]:
+def match_step_from_message(message: str) -> str | None:
     """
     Try to match a CLI output message to a step ID.
 
@@ -183,7 +183,7 @@ class StepEmitter:
     def __init__(self, quiet: bool = False, json_mode: bool = False):
         self.quiet = quiet
         self.json_mode = json_mode
-        self._current_step: Optional[str] = None
+        self._current_step: str | None = None
 
     def step(self, step_id: str):
         """Return a context manager for a step."""
@@ -198,7 +198,7 @@ class StepEmitter:
                 print(json.dumps({"event": "step_start", "step_id": step_id, "label": label}))
             # For CLI, the actual output is handled by print_checkbox_step
 
-    def emit_end(self, step_id: str, note: Optional[str] = None):
+    def emit_end(self, step_id: str, note: str | None = None):
         """Emit step end (called by context manager)."""
         self._current_step = None
         if not self.quiet and self.json_mode:
@@ -211,7 +211,7 @@ class _StepContext:
     def __init__(self, emitter: StepEmitter, step_id: str):
         self.emitter = emitter
         self.step_id = step_id
-        self.note: Optional[str] = None
+        self.note: str | None = None
 
     def __enter__(self):
         self.emitter.emit_start(self.step_id)

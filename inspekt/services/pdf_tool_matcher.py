@@ -30,7 +30,7 @@ class ToolMatch:
 
 
 # Cache for loaded tools data
-_TOOLS_CACHE: Optional[dict] = None
+_TOOLS_CACHE: dict | None = None
 _ICONS_CACHE: dict[str, str] = {}
 
 

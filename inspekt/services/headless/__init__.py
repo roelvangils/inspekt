@@ -19,15 +19,15 @@ Example usage:
         html = await ctx.get_html()
 """
 
-from inspekt.services.headless.context import HeadlessContext
-from inspekt.services.headless.state import BrowserState, StateMirror
-from inspekt.services.headless.chrome import HeadlessChrome
 from inspekt.services.headless.cdp import CDPClient, CDPSession
+from inspekt.services.headless.chrome import HeadlessChrome
+from inspekt.services.headless.context import HeadlessContext
 from inspekt.services.headless.pool import (
     HeadlessChromePool,
     PooledHeadlessContext,
     get_pooled_chrome,
 )
+from inspekt.services.headless.state import BrowserState, StateMirror
 
 __all__ = [
     "HeadlessContext",

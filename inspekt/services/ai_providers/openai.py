@@ -145,7 +145,7 @@ class OpenAIProvider(AIProvider):
 
         except openai.APITimeoutError:
             raise AIProviderError(
-                f"API request timed out",
+                "API request timed out",
                 provider=self.name,
             )
         except openai.APIStatusError as e:
@@ -228,7 +228,7 @@ class OpenAIProvider(AIProvider):
 
         except openai.APITimeoutError:
             raise AIProviderError(
-                f"Vision API request timed out",
+                "Vision API request timed out",
                 provider=self.name,
             )
         except openai.APIStatusError as e:

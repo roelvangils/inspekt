@@ -12,39 +12,45 @@ from pathlib import Path
 from typing import Optional
 
 import click
+import requests
 import yaml
 
-from inspekt.app.cli.icons import success, error, get_platform_icon
+from inspekt.app.cli.icons import error, get_platform_icon, success
+from inspekt.app.cli.output import OutputHandler
 from inspekt.client import BridgeClient
 from inspekt.config import get_audio_config, get_video_config
 from inspekt.domain.recording import Recording, RecordingStep
 from inspekt.services.applescript_utils import activate_browser_tab
 from inspekt.services.audio import CLIAudio
 from inspekt.services.formatting_utils import format_filesize
+
 from .formatting import (
     format_assertion_result,
     format_duration,
     format_paused_step_for_display,
     format_skipped_step_for_display,
+    format_status,
     format_step_for_display,
     format_step_header,
-    format_status,
     format_system_message,
     get_recordings_dir,
 )
-from .table import print_warning, print_hint, print_error, wrap_text, _style_with_inline_code, Table
 from .recording_utils import load_external_file_content
-from inspekt.app.cli.output import OutputHandler
-
-import requests
+from .table import Table, _style_with_inline_code, print_error, print_hint, print_warning, wrap_text
 
 # Bridge server constants
 BRIDGE_HTTP_HOST = "127.0.0.1"
 BRIDGE_HTTP_PORT = 8765
 
 # Import shared utilities from recording_utils (moved there to avoid circular imports)
-from .recording_utils import clean_filename, complete_recording_files, find_most_recent_recording, TerminalEchoSuppressor
 from inspekt.shared.dialog_styles import DIALOG_STYLES
+
+from .recording_utils import (
+    TerminalEchoSuppressor,
+    clean_filename,
+    complete_recording_files,
+    find_most_recent_recording,
+)
 
 # Save built-in open before it gets shadowed
 _builtin_open = open
@@ -174,8 +180,8 @@ def _execute_native_keypress(step) -> dict:
     Returns:
         dict with 'ok', 'error', and optionally 'native' keys
     """
-    from inspekt.services.key_parser import KeySpec
     from inspekt.services.applescript_utils import send_native_key_sequence
+    from inspekt.services.key_parser import KeySpec
 
     # Build KeySpec from recorded step
     # modifiers can be a list of strings ['shift', 'ctrl'] or a dict {'shift': True}
@@ -253,8 +259,8 @@ def _execute_native_activate(step) -> dict:
     Returns:
         dict with 'ok', 'error', and optionally 'native' keys
     """
-    from inspekt.services.key_parser import KeySpec
     from inspekt.services.applescript_utils import send_native_key_sequence
+    from inspekt.services.key_parser import KeySpec
 
     # Activate typically uses Enter, but could be Space for buttons
     # Check if step has a hint about which key was used
@@ -786,8 +792,8 @@ class ReplayResult:
         self.failed_steps = 0
         self.skipped_steps = 0
         self.failures: list[dict] = []
-        self.start_time: Optional[datetime] = None
-        self.end_time: Optional[datetime] = None
+        self.start_time: datetime | None = None
+        self.end_time: datetime | None = None
 
     def add_success(self, step_index: int, step: dict):
         self.passed_steps += 1
@@ -1881,7 +1887,7 @@ def run_download_shell_command(command: str, file_path: Path) -> dict:
     help="Hide milliseconds in timestamps (default: show milliseconds)",
 )
 def replay(
-    recording_file: Optional[str],
+    recording_file: str | None,
     speed: float,
     slow: bool,
     very_slow: bool,
@@ -1889,7 +1895,7 @@ def replay(
     step_delay: int,
     dry_run: bool,
     start_step: int,
-    end_step: Optional[int],
+    end_step: int | None,
     skip_hover: bool,
     skip: tuple,
     pause_on_fail: bool,
@@ -1910,12 +1916,12 @@ def replay(
     strict_checksum: bool,
     progress: bool,
     skip_validation: bool,
-    skip_ahead: Optional[bool],
-    skip_threshold: Optional[float],
-    video_output: Optional[str],
+    skip_ahead: bool | None,
+    skip_threshold: float | None,
+    video_output: str | None,
     smooth: bool,
     compact: bool,
-    video_fps: Optional[int],
+    video_fps: int | None,
     open_after: bool,
     reveal_after: bool,
     include_effects: bool,
@@ -2017,7 +2023,12 @@ def replay(
 
     if video_output is not None:
         # Check if ffmpeg is installed
-        from inspekt.services.ffmpeg_utils import ensure_ffmpeg, get_ffmpeg_version, probe_video, merge_audio_video
+        from inspekt.services.ffmpeg_utils import (
+            ensure_ffmpeg,
+            get_ffmpeg_version,
+            merge_audio_video,
+            probe_video,
+        )
 
         if not ensure_ffmpeg(auto_prompt=True):
             click.echo("Error: ffmpeg is required for video recording.", err=True)
@@ -2452,7 +2463,7 @@ def replay(
                         f"but replay is in normal window mode.",
                         fg="blue",
                     )
-                    click.echo(f"   Viewport dimensions may differ. Use --match-viewport to resize.")
+                    click.echo("   Viewport dimensions may differ. Use --match-viewport to resize.")
                 elif current_window_mode in ("fullscreen", "kiosk") and recorded_window_mode == "normal":
                     # Recording was normal, replay is in fullscreen
                     click.echo()
@@ -4308,6 +4319,7 @@ def replay(
 
                 # Retrieve captured video from bridge server
                 import requests
+
                 from inspekt.config import get_bridge_port
 
                 try:
@@ -4347,7 +4359,7 @@ def replay(
                                     target_h = 0
 
                                 click.echo(format_system_message(
-                                    f"Processing video…",
+                                    "Processing video…",
                                     icon="video",
                                     elapsed_ms=save_elapsed
                                 ))
@@ -4479,8 +4491,9 @@ def replay(
                     # Merge audio effects if --include-effects was used
                     if include_effects:
                         try:
-                            import requests
                             import tempfile
+
+                            import requests
 
                             # Stop audio recording in JavaScript
                             client.execute("window.__INSPEKT_REPLAY_VISUAL__.audio.stopRecordingForVideo()", timeout=2.0)

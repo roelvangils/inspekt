@@ -350,7 +350,7 @@ class VisualContentItem:
         return ", ".join(parts) if parts else ""
 
     @classmethod
-    def from_image(cls, img: "ImageAudit") -> "VisualContentItem":
+    def from_image(cls, img: ImageAudit) -> VisualContentItem:
         """Create a VisualContentItem from an ImageAudit."""
         return cls(
             page=img.page,
@@ -375,7 +375,7 @@ class VisualContentItem:
         )
 
     @classmethod
-    def from_vector(cls, vg: "VectorGraphicAudit") -> "VisualContentItem":
+    def from_vector(cls, vg: VectorGraphicAudit) -> VisualContentItem:
         """Create a VisualContentItem from a VectorGraphicAudit."""
         return cls(
             page=vg.page,
@@ -707,7 +707,7 @@ class PDFContentAuditor:
         self._pdf = None
         self._fitz_doc = None
 
-    def __enter__(self) -> "PDFContentAuditor":
+    def __enter__(self) -> PDFContentAuditor:
         """Open PDF files."""
         import pikepdf
         self._pdf = pikepdf.open(self.pdf_path)
@@ -860,8 +860,9 @@ class PDFContentAuditor:
 
         try:
             import base64
-            import fitz
             from io import BytesIO
+
+            import fitz
 
             page = self._fitz_doc[page_num]
             images = page.get_images(full=True)
@@ -927,8 +928,9 @@ class PDFContentAuditor:
 
         try:
             import base64
-            import fitz
             from io import BytesIO
+
+            import fitz
             from PIL import Image
 
             page = self._fitz_doc[page_num]
@@ -1086,7 +1088,7 @@ class PDFContentAuditor:
         Returns:
             Same list with ai_suggested_alt populated for images needing alt text
         """
-        from inspekt.services.image_classifier import generate_alt_text_suggestion, ImageCategory
+        from inspekt.services.image_classifier import ImageCategory, generate_alt_text_suggestion
 
         images_needing_alt = [
             img for img in images
@@ -2362,8 +2364,9 @@ class PDFContentAuditor:
 
         try:
             import base64
-            import fitz
             from io import BytesIO
+
+            import fitz
             from PIL import Image
 
             page = self._fitz_doc[page_num]

@@ -89,8 +89,8 @@ def apply_syntax_highlighting(html_content, theme=None):
     """
     try:
         from pygments import highlight
-        from pygments.lexers import HtmlLexer
         from pygments.formatters import Terminal256Formatter
+        from pygments.lexers import HtmlLexer
         from pygments.styles import get_style_by_name
 
         # Use Terminal256Formatter for better color support

@@ -17,11 +17,10 @@ Usage:
     print(f"Estimated total time: {timing.total_estimated_ms}ms")
 """
 
-from dataclasses import dataclass, field, asdict
+from dataclasses import asdict, dataclass, field
 from typing import Literal
 
 from inspekt.services.pdf_prescan import PDFPrescanResult
-
 
 # =============================================================================
 # Timing Constants (milliseconds) - Calibrated from benchmarks

@@ -6,8 +6,9 @@ Tests for PDFBasicChecker, SimplePDFChecker, and their agreement on common check
 
 from __future__ import annotations
 
-import pytest
 from pathlib import Path
+
+import pytest
 
 # Import fixtures from the PDF fixtures conftest
 pytest_plugins = ["tests.fixtures.pdf.conftest"]
@@ -234,7 +235,7 @@ class TestCheckPdfFunction:
 
     def test_all_engine_without_verapdf(self, accessible_pdf):
         """check_pdf with all engine returns basic and simple, may skip vera if unavailable."""
-        from inspekt.services.pdf_checker import check_pdf, VeraPDFChecker
+        from inspekt.services.pdf_checker import VeraPDFChecker, check_pdf
 
         # Check if veraPDF is available
         vera_checker = VeraPDFChecker()

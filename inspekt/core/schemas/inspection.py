@@ -26,18 +26,18 @@ class GetPageInfoResponse(BaseModel):
 class TakeScreenshotParams(BaseModel):
     """Parameters for take_screenshot command."""
 
-    target: Optional[Literal["viewport", "page", "element"]] = Field(
+    target: Literal["viewport", "page", "element"] | None = Field(
         default="viewport",
         description="Screenshot target: viewport (visible area), page (full page), or element",
     )
-    selector: Optional[str] = Field(
+    selector: str | None = Field(
         default=None,
         description="CSS selector for element screenshot (required if target='element')",
     )
-    format: Optional[Literal["png", "jpeg"]] = Field(
+    format: Literal["png", "jpeg"] | None = Field(
         default="png", description="Image format"
     )
-    quality: Optional[int] = Field(
+    quality: int | None = Field(
         default=90, description="JPEG quality (1-100, ignored for PNG)"
     )
 
@@ -46,8 +46,8 @@ class TakeScreenshotResponse(BaseModel):
     """Response from take_screenshot command."""
 
     success: bool = Field(..., description="Whether screenshot succeeded")
-    data: Optional[str] = Field(default=None, description="Base64-encoded image data")
+    data: str | None = Field(default=None, description="Base64-encoded image data")
     format: str = Field(..., description="Image format (png or jpeg)")
     width: int = Field(..., description="Image width in pixels")
     height: int = Field(..., description="Image height in pixels")
-    message: Optional[str] = Field(default=None, description="Success or error message")
+    message: str | None = Field(default=None, description="Success or error message")

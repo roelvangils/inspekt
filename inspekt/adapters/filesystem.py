@@ -32,7 +32,7 @@ async def read_text_async(path: Path, encoding: str = "utf-8") -> str:
             content = await read_text_async(Path("script.js"))
             return content
     """
-    async with aiofiles.open(path, mode="r", encoding=encoding) as f:
+    async with aiofiles.open(path, encoding=encoding) as f:
         return await f.read()
 
 

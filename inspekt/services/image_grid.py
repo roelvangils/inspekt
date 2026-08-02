@@ -180,7 +180,7 @@ def _get_font(size: int = 13) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
     for font_path in font_candidates:
         try:
             return ImageFont.truetype(font_path, size)
-        except (OSError, IOError):
+        except OSError:
             continue
 
     # Fallback to default bitmap font

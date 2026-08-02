@@ -123,7 +123,7 @@ def _execute_cookie_action(
     try:
         script = loader.load_script_sync("cookies.js")
     except FileNotFoundError as e:
-        raise HTTPException(status_code=500, detail=f"Script not found: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Script not found: {e!s}")
 
     # Replace placeholders
     options_json = json.dumps(options if options else {})

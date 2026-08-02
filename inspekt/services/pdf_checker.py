@@ -110,8 +110,8 @@ class PDFEnhancedMetadata:
     @classmethod
     def from_basic_metadata(
         cls,
-        basic: "PDFMetadata",
-    ) -> "PDFEnhancedMetadata":
+        basic: PDFMetadata,
+    ) -> PDFEnhancedMetadata:
         """
         Create enhanced metadata starting from basic metadata.
 
@@ -430,7 +430,7 @@ def extract_enhanced_metadata(file_path: Path | str) -> PDFEnhancedMetadata | No
             # Extract page dimensions using PyMuPDF if available
             page_dimensions = None
             try:
-                from inspekt.services.pdf_renderer import is_pymupdf_available, PDFRenderer
+                from inspekt.services.pdf_renderer import PDFRenderer, is_pymupdf_available
 
                 if is_pymupdf_available():
                     with PDFRenderer(file_path) as renderer:
@@ -726,7 +726,7 @@ class PDFBasicChecker:
 
         return PDFBasicResult(metadata=metadata, checks=checks)
 
-    def _extract_metadata(self, pdf: "pikepdf.Pdf", file_path: Path) -> PDFMetadata:
+    def _extract_metadata(self, pdf: pikepdf.Pdf, file_path: Path) -> PDFMetadata:
         """Extract basic metadata from the PDF."""
         # Get document info dictionary
         info = pdf.docinfo if hasattr(pdf, "docinfo") else {}
@@ -796,7 +796,7 @@ class PDFBasicChecker:
             details=details or {},
         )
 
-    def _check_tagged(self, pdf: "pikepdf.Pdf") -> PDFCheckResult:
+    def _check_tagged(self, pdf: pikepdf.Pdf) -> PDFCheckResult:
         """
         Check if the PDF is tagged.
 
@@ -839,7 +839,7 @@ class PDFBasicChecker:
                 {"has_mark_info": has_mark_info, "is_marked": is_marked, "has_struct_tree": False},
             )
 
-    def _check_title(self, pdf: "pikepdf.Pdf") -> PDFCheckResult:
+    def _check_title(self, pdf: pikepdf.Pdf) -> PDFCheckResult:
         """
         Check if the document has a title and DisplayDocTitle is enabled.
 
@@ -873,7 +873,7 @@ class PDFBasicChecker:
             return self._make_result(
                 "title",
                 "warn",
-                f"Title is set but DisplayDocTitle is not enabled (viewers will show filename instead)",
+                "Title is set but DisplayDocTitle is not enabled (viewers will show filename instead)",
                 {"title": title, "display_doc_title": False},
             )
         elif not has_title and display_doc_title:
@@ -891,7 +891,7 @@ class PDFBasicChecker:
                 {"title": None, "display_doc_title": False},
             )
 
-    def _check_language(self, pdf: "pikepdf.Pdf") -> PDFCheckResult:
+    def _check_language(self, pdf: pikepdf.Pdf) -> PDFCheckResult:
         """
         Check if the document language is defined.
 
@@ -924,7 +924,7 @@ class PDFBasicChecker:
                 {"language": None},
             )
 
-    def _check_protected(self, pdf: "pikepdf.Pdf") -> PDFCheckResult:
+    def _check_protected(self, pdf: pikepdf.Pdf) -> PDFCheckResult:
         """
         Check if the document blocks assistive technology access.
 
@@ -959,7 +959,7 @@ class PDFBasicChecker:
                 {"encrypted": True, "allows_extraction": False, "allows_accessibility": False},
             )
 
-    def _check_bookmarks(self, pdf: "pikepdf.Pdf", page_count: int) -> PDFCheckResult:
+    def _check_bookmarks(self, pdf: pikepdf.Pdf, page_count: int) -> PDFCheckResult:
         """
         Check if the document has bookmarks (required for 20+ page documents).
 
@@ -1013,7 +1013,7 @@ class PDFBasicChecker:
                     {"has_bookmarks": False, "bookmark_count": 0, "page_count": page_count, "required": True},
                 )
 
-    def _check_scanned(self, pdf: "pikepdf.Pdf") -> PDFCheckResult:
+    def _check_scanned(self, pdf: pikepdf.Pdf) -> PDFCheckResult:
         """
         Check if the PDF is a scanned/image-only document.
 
@@ -1097,7 +1097,7 @@ class PDFBasicChecker:
                 {"image_only_pages": image_only_pages, "pages_checked": pages_checked, "is_scanned": False},
             )
 
-    def _check_figure_alt_text(self, pdf: "pikepdf.Pdf") -> PDFCheckResult:
+    def _check_figure_alt_text(self, pdf: pikepdf.Pdf) -> PDFCheckResult:
         """
         Check if all Figure tags in the structure tree have alt text.
 
@@ -1674,7 +1674,7 @@ class PDFFullResult:
 
     basic: PDFBasicResult
     verapdf: VeraPDFResult | None = None
-    simple: "SimplePDFResult | None" = None  # From SimplePDFChecker
+    simple: SimplePDFResult | None = None  # From SimplePDFChecker
 
 
 # Import SimplePDFResult for type checking

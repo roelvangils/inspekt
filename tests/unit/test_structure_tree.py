@@ -12,9 +12,10 @@ Tests for interactive structure tree features including:
 
 from __future__ import annotations
 
-import pytest
 from pathlib import Path
 from unittest.mock import MagicMock, patch
+
+import pytest
 
 
 class TestStructureNodeFigureIndex:

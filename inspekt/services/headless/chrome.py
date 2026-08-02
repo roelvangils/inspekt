@@ -81,8 +81,8 @@ class HeadlessChrome:
         self,
         process: subprocess.Popen,
         debug_port: int,
-        user_data_dir: Optional[Path] = None,
-        temp_dir: Optional[tempfile.TemporaryDirectory] = None,
+        user_data_dir: Path | None = None,
+        temp_dir: tempfile.TemporaryDirectory | None = None,
     ):
         self.process = process
         self.debug_port = debug_port
@@ -94,8 +94,8 @@ class HeadlessChrome:
     async def launch(
         cls,
         headless: bool = True,
-        user_data_dir: Optional[Path] = None,
-        port: Optional[int] = None,
+        user_data_dir: Path | None = None,
+        port: int | None = None,
         timeout: float = 30.0,
     ) -> "HeadlessChrome":
         """
@@ -293,7 +293,7 @@ class HeadlessChrome:
                         asyncio.get_event_loop().run_in_executor(None, self.process.wait),
                         timeout=5.0,
                     )
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     # Force kill if graceful shutdown fails
                     if platform.system() != "Windows":
                         os.killpg(os.getpgid(self.process.pid), signal.SIGKILL)

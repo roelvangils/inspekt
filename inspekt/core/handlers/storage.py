@@ -181,4 +181,4 @@ async def set_cookie(params: SetCookieParams) -> SetCookieResponse:
 
     except Exception as e:
         logger.error(f"Set cookie error: {e}")
-        return SetCookieResponse(success=False, message=f"Error: {str(e)}")
+        return SetCookieResponse(success=False, message=f"Error: {e!s}")

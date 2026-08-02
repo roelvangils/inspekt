@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 import sys
+from datetime import UTC
 from pathlib import Path
 
 import click
@@ -160,6 +161,7 @@ def reveal_or_download(path: str | Path) -> bool:
     """
     import platform
     import subprocess
+
     from inspekt.config import is_isolated_mode
 
     path = Path(path).resolve()
@@ -473,7 +475,7 @@ def repl():
 
             try:
                 # Get timestamp before execution
-                before_ts = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+                before_ts = datetime.now(UTC).isoformat().replace("+00:00", "Z")
 
                 result = client.execute(code, timeout=10.0)
 

@@ -12,7 +12,6 @@ from typing import Any, Literal, Optional
 
 from pydantic import BaseModel, Field, field_validator
 
-
 # ============================================================================
 # WebSocket Message Models
 # ============================================================================
@@ -40,10 +39,10 @@ class ExecuteResult(BaseModel):
     type: Literal["result"] = "result"
     request_id: str = Field(..., description="UUID matching the execute request")
     ok: bool = Field(..., description="True if execution succeeded")
-    result: Optional[Any] = Field(None, description="Return value from JavaScript")
-    error: Optional[str] = Field(None, description="Error message if ok=False")
-    url: Optional[str] = Field(None, description="Current page URL")
-    title: Optional[str] = Field(None, description="Current page title")
+    result: Any | None = Field(None, description="Return value from JavaScript")
+    error: str | None = Field(None, description="Error message if ok=False")
+    url: str | None = Field(None, description="Current page URL")
+    title: str | None = Field(None, description="Current page title")
 
     model_config = {"extra": "allow"}  # Allow additional fields from browser
 
@@ -108,7 +107,7 @@ class BrowserInfoMessage(BaseModel):
     browserName: str = Field(..., description="Browser name")
     url: str = Field(..., description="Current page URL")
     title: str = Field(..., description="Page title")
-    extensionVersion: Optional[str] = Field(None, description="Extension version")
+    extensionVersion: str | None = Field(None, description="Extension version")
     visible: bool = Field(True, description="Whether the tab is currently visible")
 
     model_config = {"extra": "forbid"}
@@ -161,7 +160,7 @@ class ScreencastAckMessage(BaseModel):
     type: Literal["screencast_ack"] = "screencast_ack"
     requestId: str = Field(..., description="Request ID matching the original command")
     ok: bool = Field(default=True, description="Whether the operation succeeded")
-    error: Optional[str] = Field(default=None, description="Error message if failed")
+    error: str | None = Field(default=None, description="Error message if failed")
 
     model_config = {"extra": "forbid"}
 
@@ -200,8 +199,8 @@ class RunResponse(BaseModel):
     """HTTP POST /run response."""
 
     ok: bool
-    request_id: Optional[str] = None
-    error: Optional[str] = None
+    request_id: str | None = None
+    error: str | None = None
 
     model_config = {"extra": "forbid"}
 
@@ -210,11 +209,11 @@ class ResultResponse(BaseModel):
     """HTTP GET /result response."""
 
     ok: bool
-    status: Optional[Literal["pending"]] = None
-    result: Optional[Any] = None
-    error: Optional[str] = None
-    url: Optional[str] = None
-    title: Optional[str] = None
+    status: Literal["pending"] | None = None
+    result: Any | None = None
+    error: str | None = None
+    url: str | None = None
+    title: str | None = None
 
     model_config = {"extra": "allow"}
 
@@ -224,7 +223,7 @@ class BrowserConnection(BaseModel):
 
     browser_name: str = Field(..., description="Browser name (Chrome, Firefox, etc.)")
     browser_version: str = Field(default="", description="Browser version number")
-    extension_version: Optional[str] = Field(None, description="Extension version")
+    extension_version: str | None = Field(None, description="Extension version")
     url: str = Field(..., description="Current page URL")
     title: str = Field(..., description="Current page title")
     user_agent: str = Field(..., description="Browser user agent string")

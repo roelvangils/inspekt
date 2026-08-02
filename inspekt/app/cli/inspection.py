@@ -17,7 +17,8 @@ from pathlib import Path
 
 import click
 
-from inspekt.app.cli.icons import get_section_icon, warning as warn_icon
+from inspekt.app.cli.icons import get_section_icon
+from inspekt.app.cli.icons import warning as warn_icon
 from inspekt.app.cli.selection import html_output_options
 from inspekt.config import get_screenshot_config
 from inspekt.services.bridge_executor import BridgeExecutor
@@ -186,7 +187,7 @@ def _print_tips_section(tips: list[tuple[str, str, str | None]]) -> None:
         tips: List of (flag, description, example) tuples.
               Example can be None if not applicable.
     """
-    from inspekt.app.cli.table import format_icon_message, _style_with_inline_code
+    from inspekt.app.cli.table import _style_with_inline_code, format_icon_message
 
     # Print header with lightbulb icon
     click.echo(click.style("\uf400 TIPS", fg="bright_black", bold=True))
@@ -621,8 +622,8 @@ def inspected(ctx, output_json):
         display_inspected_info(response, output_json=output_json)
 def _display_text_markdown_metadata(response):
     """Display metadata summary for text and markdown commands."""
-    from inspekt.app.cli.table import Table
     from inspekt.app.cli.output import pluralize
+    from inspekt.app.cli.table import Table
 
     tag = response.get("tag", "unknown")
     selector = response.get("selector", "")
@@ -673,8 +674,8 @@ def text(raw, copy, output_json):
     When stdout is piped or redirected, decorations are automatically suppressed
     (equivalent to --raw flag).
     """
-    from inspekt.app.cli.util import copy_text_to_clipboard
     from inspekt.app.cli.table import print_hint
+    from inspekt.app.cli.util import copy_text_to_clipboard
 
     # Auto-enable raw mode when output is piped/redirected
     auto_raw = raw or not sys.stdout.isatty()
@@ -749,8 +750,8 @@ def markdown(raw, copy, output_json):
     (equivalent to --raw flag).
     """
     from inspekt.app.cli.selection import html_to_markdown
-    from inspekt.app.cli.util import copy_text_to_clipboard
     from inspekt.app.cli.table import print_hint
+    from inspekt.app.cli.util import copy_text_to_clipboard
 
     # Auto-enable raw mode when output is piped/redirected
     auto_raw = raw or not sys.stdout.isatty()
@@ -977,7 +978,7 @@ def html(file_path, open_after, reveal_after, include_css, bundled, all_properti
     # File output mode
     if file_path:
         from inspekt.services.bridge_executor import BridgeExecutor
-        from inspekt.services.css_generator import generate_nested_css, count_properties
+        from inspekt.services.css_generator import count_properties, generate_nested_css
         from inspekt.services.script_loader import ScriptLoader
 
         selector = response.get("selector", "")
@@ -1023,14 +1024,19 @@ def html(file_path, open_after, reveal_after, include_css, bundled, all_properti
                         property_count = count_properties(root)
 
                         # Collect rounded/computed props for comment insertion
-                        from inspekt.services.css_generator import collect_rounded_props, collect_computed_props
+                        from inspekt.services.css_generator import (
+                            collect_computed_props,
+                            collect_rounded_props,
+                        )
                         rounded_props = collect_rounded_props(root) if rounding else None
                         computed_props = collect_computed_props(root) if not rounding else None
 
                         # Optionally optimize CSS and/or convert colors to oklch
                         # Color names are always added when optimizing for convenience
                         if optimize_css or oklch or alphabetize:
-                            from inspekt.services.css_optimizer import optimize_css as do_optimize_css
+                            from inspekt.services.css_optimizer import (
+                                optimize_css as do_optimize_css,
+                            )
                             css_content = do_optimize_css(
                                 css_content,
                                 convert_to_oklch=oklch,
@@ -1140,8 +1146,8 @@ def html(file_path, open_after, reveal_after, include_css, bundled, all_properti
         return
 
     # Formatted display with summary table
-    from inspekt.app.cli.table import Table
     from inspekt.app.cli.output import pluralize
+    from inspekt.app.cli.table import Table
 
     # Extract statistics
     tag = response.get("tag", "element")
@@ -1333,7 +1339,7 @@ def css(file_path, open_after, reveal_after, raw, copy, output_json, all_propert
     """
     from inspekt.app.cli.output import validate_output_options
     from inspekt.services.bridge_executor import BridgeExecutor
-    from inspekt.services.css_generator import generate_nested_css, count_properties
+    from inspekt.services.css_generator import count_properties, generate_nested_css
     from inspekt.services.script_loader import ScriptLoader
 
     # Auto-enable raw mode when output is piped/redirected
@@ -1408,7 +1414,7 @@ def css(file_path, open_after, reveal_after, raw, copy, output_json, all_propert
         property_count = count_properties(root)
 
         # Collect rounded/computed props for comment insertion after optimization
-        from inspekt.services.css_generator import collect_rounded_props, collect_computed_props
+        from inspekt.services.css_generator import collect_computed_props, collect_rounded_props
         rounded_props = collect_rounded_props(root) if rounding else None
         computed_props = collect_computed_props(root) if not rounding else None
 
@@ -1450,7 +1456,7 @@ def css(file_path, open_after, reveal_after, raw, copy, output_json, all_propert
             from inspekt.services.html_processor import compact_css as compact_css_content
             css_content = compact_css_content(css_content, strip_comments=False)
 
-        from inspekt.app.cli.output import OutputHandler, JsonOutput, pluralize
+        from inspekt.app.cli.output import JsonOutput, OutputHandler, pluralize
 
         # File output mode
         if file_path:
@@ -1565,8 +1571,8 @@ def css(file_path, open_after, reveal_after, raw, copy, output_json, all_propert
             if sys.stdout.isatty() and not raw:
                 try:
                     from pygments import highlight
-                    from pygments.lexers import CssLexer
                     from pygments.formatters import Terminal256Formatter
+                    from pygments.lexers import CssLexer
 
                     highlighted = highlight(css_content, CssLexer(), Terminal256Formatter(style="monokai"))
                     print_code_block(highlighted.rstrip())
@@ -1629,9 +1635,10 @@ def inspected_describe(language, output_json, debug):
         inspekt inspected describe --json
     """
     import asyncio
+
+    from inspekt.app.cli.icons import analyze as analyze_icon
     from inspekt.core.handlers.ai import element_describe
     from inspekt.core.schemas.ai import ElementDescribeParams
-    from inspekt.app.cli.icons import analyze as analyze_icon
 
     if not output_json:
         click.echo(analyze_icon("Analyzing element with AI…"), err=True)
@@ -1646,7 +1653,7 @@ def inspected_describe(language, output_json, debug):
             "element_type": result.element_type,
             "accessible_name": result.accessible_name,
             "source": result.source,
-        }, summary=f"inspected element description")
+        }, summary="inspected element description")
     else:
         if result.description.startswith("Error:"):
             click.echo(result.description, err=True)
@@ -1678,9 +1685,10 @@ def inspected_ask(question, language, output_json, debug):
         inspekt inspected ask "What WCAG issues does this have?"
     """
     import asyncio
+
+    from inspekt.app.cli.icons import analyze as analyze_icon
     from inspekt.core.handlers.ai import element_ask
     from inspekt.core.schemas.ai import ElementAskParams
-    from inspekt.app.cli.icons import analyze as analyze_icon
 
     if not output_json:
         click.echo(analyze_icon("Analyzing element with AI…"), err=True)
@@ -1771,8 +1779,8 @@ def text(raw, copy, output_json):
     When stdout is piped or redirected, decorations are automatically suppressed
     (equivalent to --raw flag).
     """
-    from inspekt.app.cli.util import copy_text_to_clipboard
     from inspekt.app.cli.table import print_hint
+    from inspekt.app.cli.util import copy_text_to_clipboard
 
     # Auto-enable raw mode when output is piped/redirected
     auto_raw = raw or not sys.stdout.isatty()
@@ -1847,8 +1855,8 @@ def markdown(raw, copy, output_json):
     (equivalent to --raw flag).
     """
     from inspekt.app.cli.selection import html_to_markdown
-    from inspekt.app.cli.util import copy_text_to_clipboard
     from inspekt.app.cli.table import print_hint
+    from inspekt.app.cli.util import copy_text_to_clipboard
 
     # Auto-enable raw mode when output is piped/redirected
     auto_raw = raw or not sys.stdout.isatty()
@@ -2073,7 +2081,7 @@ def html(file_path, open_after, reveal_after, include_css, bundled, all_properti
     # File output mode
     if file_path:
         from inspekt.services.bridge_executor import BridgeExecutor
-        from inspekt.services.css_generator import generate_nested_css, count_properties
+        from inspekt.services.css_generator import count_properties, generate_nested_css
         from inspekt.services.script_loader import ScriptLoader
 
         selector = response.get("selector", "")
@@ -2117,12 +2125,17 @@ def html(file_path, open_after, reveal_after, include_css, bundled, all_properti
                         css_content = generate_nested_css(root)
                         property_count = count_properties(root)
 
-                        from inspekt.services.css_generator import collect_rounded_props, collect_computed_props
+                        from inspekt.services.css_generator import (
+                            collect_computed_props,
+                            collect_rounded_props,
+                        )
                         rounded_props = collect_rounded_props(root) if rounding else None
                         computed_props = collect_computed_props(root) if not rounding else None
 
                         if optimize_css or oklch or alphabetize:
-                            from inspekt.services.css_optimizer import optimize_css as do_optimize_css
+                            from inspekt.services.css_optimizer import (
+                                optimize_css as do_optimize_css,
+                            )
                             css_content = do_optimize_css(
                                 css_content,
                                 convert_to_oklch=oklch,
@@ -2227,8 +2240,8 @@ def html(file_path, open_after, reveal_after, include_css, bundled, all_properti
         return
 
     # Formatted display with summary table
-    from inspekt.app.cli.table import Table
     from inspekt.app.cli.output import pluralize
+    from inspekt.app.cli.table import Table
 
     # Extract statistics
     tag = response.get("tag", "element")
@@ -2397,7 +2410,7 @@ def css(file_path, open_after, reveal_after, raw, copy, output_json, all_propert
     """
     from inspekt.app.cli.output import validate_output_options
     from inspekt.services.bridge_executor import BridgeExecutor
-    from inspekt.services.css_generator import generate_nested_css, count_properties
+    from inspekt.services.css_generator import count_properties, generate_nested_css
     from inspekt.services.script_loader import ScriptLoader
 
     validate_output_options(file_path, copy, output_json, open_after, reveal_after)
@@ -2465,7 +2478,7 @@ def css(file_path, open_after, reveal_after, raw, copy, output_json, all_propert
         css_content = generate_nested_css(root)
         property_count = count_properties(root)
 
-        from inspekt.services.css_generator import collect_rounded_props, collect_computed_props
+        from inspekt.services.css_generator import collect_computed_props, collect_rounded_props
         rounded_props = collect_rounded_props(root) if rounding else None
         computed_props = collect_computed_props(root) if not rounding else None
 
@@ -2502,7 +2515,7 @@ def css(file_path, open_after, reveal_after, raw, copy, output_json, all_propert
             from inspekt.services.html_processor import compact_css as compact_css_content
             css_content = compact_css_content(css_content, strip_comments=False)
 
-        from inspekt.app.cli.output import OutputHandler, JsonOutput, pluralize
+        from inspekt.app.cli.output import JsonOutput, OutputHandler, pluralize
 
         if file_path:
             selector = root.get("selector", root.get("tag", "unknown"))
@@ -2608,8 +2621,8 @@ def css(file_path, open_after, reveal_after, raw, copy, output_json, all_propert
             if sys.stdout.isatty() and not auto_raw:
                 try:
                     from pygments import highlight
-                    from pygments.lexers import CssLexer
                     from pygments.formatters import Terminal256Formatter
+                    from pygments.lexers import CssLexer
 
                     highlighted = highlight(css_content, CssLexer(), Terminal256Formatter(style="monokai"))
                     print_code_block(highlighted.rstrip())
@@ -2902,6 +2915,7 @@ def screenshot_node(selector, output, margin, margin_color, disable_compression,
             # Get grid dimensions from composed image
             try:
                 import io
+
                 from PIL import Image
                 with Image.open(io.BytesIO(final_image)) as img:
                     grid_width, grid_height = img.size
@@ -3387,6 +3401,7 @@ def screenshot_node(selector, output, margin, margin_color, disable_compression,
                 if max_width and final_width and final_width > max_width:
                     try:
                         import warnings
+
                         from PIL import Image
 
                         # Configure Pillow for large screenshots
@@ -3655,9 +3670,10 @@ def focused_describe(language, output_json, debug):
         inspekt focused describe --json
     """
     import asyncio
+
+    from inspekt.app.cli.icons import analyze as analyze_icon
     from inspekt.core.handlers.ai import element_describe
     from inspekt.core.schemas.ai import ElementDescribeParams
-    from inspekt.app.cli.icons import analyze as analyze_icon
 
     if not output_json:
         click.echo(analyze_icon("Analyzing focused element with AI…"), err=True)
@@ -3672,7 +3688,7 @@ def focused_describe(language, output_json, debug):
             "element_type": result.element_type,
             "accessible_name": result.accessible_name,
             "source": result.source,
-        }, summary=f"focused element description")
+        }, summary="focused element description")
     else:
         if result.description.startswith("Error:"):
             click.echo(result.description, err=True)
@@ -3705,9 +3721,10 @@ def focused_ask(question, language, output_json, debug):
         inspekt focused ask "What WCAG issues does this have?"
     """
     import asyncio
+
+    from inspekt.app.cli.icons import analyze as analyze_icon
     from inspekt.core.handlers.ai import element_ask
     from inspekt.core.schemas.ai import ElementAskParams
-    from inspekt.app.cli.icons import analyze as analyze_icon
 
     if not output_json:
         click.echo(analyze_icon("Analyzing focused element with AI…"), err=True)
@@ -3866,11 +3883,11 @@ def screenshot_viewport(output, margin, margin_color, disable_compression, enabl
     from inspekt.config import get_screenshot_config
     from inspekt.services.screenshot_utils import (
         decode_data_url,
-        validate_screenshot_options,
         display_adjustment_feedback,
         display_capture_feedback,
         display_restoration_feedback,
         get_screenshot_output_path,
+        validate_screenshot_options,
     )
 
     # Load config and apply defaults
@@ -4307,11 +4324,11 @@ def screenshot_page(output, margin, margin_color, disable_compression, enable_co
     from inspekt.config import get_screenshot_config
     from inspekt.services.screenshot_utils import (
         decode_data_url,
-        validate_screenshot_options,
         display_adjustment_feedback,
         display_capture_feedback,
         display_restoration_feedback,
         get_screenshot_output_path,
+        validate_screenshot_options,
     )
 
     # Load config and apply defaults
@@ -4763,7 +4780,11 @@ def screenshot_selection(
     import signal
     import time
 
-    from inspekt.app.cli.icons import crosshair as crosshair_icon, snap as snap_icon, info as info_icon, camera as camera_icon, clipboard as clipboard_icon
+    from inspekt.app.cli.icons import camera as camera_icon
+    from inspekt.app.cli.icons import clipboard as clipboard_icon
+    from inspekt.app.cli.icons import crosshair as crosshair_icon
+    from inspekt.app.cli.icons import info as info_icon
+    from inspekt.app.cli.icons import snap as snap_icon
     from inspekt.config import get_screenshot_config
     from inspekt.services.screenshot_utils import (
         decode_data_url,

@@ -78,7 +78,7 @@ class CachedClassification:
         except (ValueError, TypeError):
             return True  # Invalid timestamp = expired
 
-    def to_classification_result(self) -> "ClassificationResult":
+    def to_classification_result(self) -> ClassificationResult:
         """Convert cached data back to ClassificationResult."""
         from inspekt.services.image_classifier import (
             ClassificationResult,
@@ -177,7 +177,7 @@ class ClassificationCache:
 
         return hasher.hexdigest()[:32]
 
-    def get_by_bytes(self, image_bytes: bytes) -> "ClassificationResult | None":
+    def get_by_bytes(self, image_bytes: bytes) -> ClassificationResult | None:
         """
         Get cached classification result for image bytes.
 
@@ -195,7 +195,7 @@ class ClassificationCache:
                 return None
 
             # Load cached data
-            with open(cache_path, "r", encoding="utf-8") as f:
+            with open(cache_path, encoding="utf-8") as f:
                 data = json.load(f)
 
             cached = CachedClassification(**data)
@@ -228,7 +228,7 @@ class ClassificationCache:
     def set_by_bytes(
         self,
         image_bytes: bytes,
-        result: "ClassificationResult",
+        result: ClassificationResult,
     ) -> bool:
         """
         Store classification result in cache by image bytes.
@@ -276,7 +276,7 @@ class ClassificationCache:
         """Get the cache file path for a given hash."""
         return self.cache_dir / f"{image_hash}.json"
 
-    def get(self, file_path: Path | str) -> "ClassificationResult | None":
+    def get(self, file_path: Path | str) -> ClassificationResult | None:
         """
         Get cached classification result for an image.
 
@@ -299,7 +299,7 @@ class ClassificationCache:
                 return None
 
             # Load cached data
-            with open(cache_path, "r", encoding="utf-8") as f:
+            with open(cache_path, encoding="utf-8") as f:
                 data = json.load(f)
 
             cached = CachedClassification(**data)
@@ -333,7 +333,7 @@ class ClassificationCache:
     def set(
         self,
         file_path: Path | str,
-        result: "ClassificationResult",
+        result: ClassificationResult,
     ) -> bool:
         """
         Store classification result in cache.
@@ -442,7 +442,7 @@ class ClassificationCache:
         count = 0
         for cache_file in self.cache_dir.glob("*.json"):
             try:
-                with open(cache_file, "r", encoding="utf-8") as f:
+                with open(cache_file, encoding="utf-8") as f:
                     data = json.load(f)
 
                 cached = CachedClassification(**data)
@@ -482,7 +482,7 @@ class ClassificationCache:
         expired_count = 0
         for cache_file in files:
             try:
-                with open(cache_file, "r", encoding="utf-8") as f:
+                with open(cache_file, encoding="utf-8") as f:
                     data = json.load(f)
                 cached = CachedClassification(**data)
                 if cached.is_expired(self.ttl_days):
@@ -629,7 +629,7 @@ class AltTextCache:
             if not cache_path.exists():
                 return None
 
-            with open(cache_path, "r", encoding="utf-8") as f:
+            with open(cache_path, encoding="utf-8") as f:
                 data = json.load(f)
 
             cached = CachedAltText(**data)

@@ -46,8 +46,8 @@ class EngineInfo:
     npm_package: str  # e.g., "axe-core", "accessibility-checker-engine"
     description: str
     homepage: str
-    current_version: Optional[str] = None
-    latest_version: Optional[str] = None
+    current_version: str | None = None
+    latest_version: str | None = None
 
 
 @dataclass
@@ -246,7 +246,7 @@ class AccessibilityEngine(ABC):
     # Version Management - Shared implementation
     # =========================================================================
 
-    def get_current_version(self) -> Optional[str]:
+    def get_current_version(self) -> str | None:
         """Get the currently installed version."""
         if not self.version_file.exists():
             return None
@@ -255,10 +255,10 @@ class AccessibilityEngine(ABC):
             with open(self.version_file) as f:
                 metadata = json.load(f)
             return metadata.get("version")
-        except (json.JSONDecodeError, IOError):
+        except (OSError, json.JSONDecodeError):
             return None
 
-    def check_latest_version(self, timeout: float = 5.0) -> Optional[dict[str, Any]]:
+    def check_latest_version(self, timeout: float = 5.0) -> dict[str, Any] | None:
         """
         Check npm registry for the latest version.
 
@@ -276,7 +276,7 @@ class AccessibilityEngine(ABC):
                 if time.time() - cached.get("_timestamp", 0) < _VERSION_CACHE_TTL:
                     # Return cached data (without the timestamp)
                     return {k: v for k, v in cached.items() if not k.startswith("_")}
-            except (json.JSONDecodeError, IOError):
+            except (OSError, json.JSONDecodeError):
                 pass
 
         # Fetch from npm
@@ -311,7 +311,7 @@ class AccessibilityEngine(ABC):
                 cache_data = {**result, "_timestamp": time.time()}
                 with open(cache_file, "w") as f:
                     json.dump(cache_data, f)
-            except IOError:
+            except OSError:
                 pass  # Cache write failure is not critical
 
             return result
@@ -320,7 +320,7 @@ class AccessibilityEngine(ABC):
 
     def is_update_available(
         self,
-    ) -> tuple[bool, Optional[str], Optional[str], Optional[str]]:
+    ) -> tuple[bool, str | None, str | None, str | None]:
         """
         Check if an update is available.
 
@@ -356,7 +356,7 @@ class AccessibilityEngine(ABC):
     # Download and Installation
     # =========================================================================
 
-    def download_version(self, ver: str) -> Optional[Path]:
+    def download_version(self, ver: str) -> Path | None:
         """Download a specific version to a temporary file."""
         url = self.cdn_url_template.format(version=ver)
 
@@ -388,7 +388,7 @@ class AccessibilityEngine(ABC):
         try:
             shutil.copy2(self.lib_path, self.backup_path)
             return True
-        except IOError:
+        except OSError:
             return False
 
     def restore_backup(self) -> bool:
@@ -399,7 +399,7 @@ class AccessibilityEngine(ABC):
         try:
             shutil.copy2(self.backup_path, self.lib_path)
             return True
-        except IOError:
+        except OSError:
             return False
 
     def install_version(self, source_path: Path, ver: str) -> bool:
@@ -421,7 +421,7 @@ class AccessibilityEngine(ABC):
                 json.dump(metadata, f, indent=2)
 
             return True
-        except (IOError, json.JSONDecodeError):
+        except (OSError, json.JSONDecodeError):
             return False
 
     def test_installation(self) -> bool:
@@ -439,11 +439,11 @@ class AccessibilityEngine(ABC):
                 return False
 
             return True
-        except IOError:
+        except OSError:
             return False
 
     def update_to_latest(
-        self, progress_callback: Optional[Callable[[str], None]] = None
+        self, progress_callback: Callable[[str], None] | None = None
     ) -> tuple[bool, str]:
         """
         Update to the latest version.
@@ -496,7 +496,7 @@ class AccessibilityEngine(ABC):
         return True, f"Updated to {self.engine_name} {latest}"
 
     def ensure_installed(
-        self, progress_callback: Optional[Callable[[str], None]] = None
+        self, progress_callback: Callable[[str], None] | None = None
     ) -> tuple[bool, str]:
         """Ensure the library is installed (download if missing)."""
         if self.lib_path.exists() and self.test_installation():

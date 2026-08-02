@@ -8,7 +8,6 @@ from typing import Any, Optional
 
 from pydantic import BaseModel, Field
 
-
 # === Axe Audit Schemas ===
 
 
@@ -19,7 +18,7 @@ class AxeParams(BaseModel):
         "2aa",
         description="WCAG conformance level (2a, 2aa, 2aaa, 21a, 21aa, 22aa)",
     )
-    tags: Optional[str] = Field(
+    tags: str | None = Field(
         None,
         description="Additional comma-separated tags (e.g., 'best-practice,experimental')",
     )
@@ -40,7 +39,7 @@ class AxeNode(BaseModel):
     impact: str = Field(
         ..., description="Impact level: critical, serious, moderate, minor"
     )
-    failure_summary: Optional[str] = Field(
+    failure_summary: str | None = Field(
         default=None, description="Description of the failure"
     )
 
@@ -74,10 +73,10 @@ class AxeSummary(BaseModel):
 class AxeResult(BaseModel):
     """Result from axe accessibility audit."""
 
-    url: Optional[str] = Field(None, description="URL of audited page")
-    title: Optional[str] = Field(None, description="Title of audited page")
-    timestamp: Optional[str] = Field(None, description="Timestamp of audit")
-    axe_version: Optional[str] = Field(None, description="Version of axe-core used")
+    url: str | None = Field(None, description="URL of audited page")
+    title: str | None = Field(None, description="Title of audited page")
+    timestamp: str | None = Field(None, description="Timestamp of audit")
+    axe_version: str | None = Field(None, description="Version of axe-core used")
     config: dict[str, Any] = Field(default_factory=dict, description="Axe configuration used")
     violations: list[AxeViolation] = Field(
         default_factory=list, description="Accessibility violations found"
@@ -95,9 +94,9 @@ class AxeResponse(BaseModel):
     """Response from axe accessibility audit."""
 
     success: bool = Field(..., description="Whether the audit completed successfully")
-    result: Optional[AxeResult] = Field(None, description="Audit results")
-    url: Optional[str] = Field(None, description="URL of audited page")
-    title: Optional[str] = Field(None, description="Title of audited page")
+    result: AxeResult | None = Field(None, description="Audit results")
+    url: str | None = Field(None, description="URL of audited page")
+    title: str | None = Field(None, description="Title of audited page")
     message: str = Field(..., description="Status message")
 
 
@@ -126,12 +125,12 @@ class AutocompleteField(BaseModel):
 
     selector: str = Field(..., description="CSS selector for the field")
     tag_name: str = Field(..., description="HTML tag name")
-    type: Optional[str] = Field(None, description="Input type attribute")
-    label: Optional[str] = Field(None, description="Associated label text")
-    current_autocomplete: Optional[str] = Field(
+    type: str | None = Field(None, description="Input type attribute")
+    label: str | None = Field(None, description="Associated label text")
+    current_autocomplete: str | None = Field(
         None, description="Current autocomplete attribute value"
     )
-    predicted_autocomplete: Optional[str] = Field(
+    predicted_autocomplete: str | None = Field(
         None, description="Predicted appropriate autocomplete value"
     )
     confidence: float = Field(..., description="Confidence score (0-1)")
@@ -172,7 +171,7 @@ class AutocompleteResponse(BaseModel):
     """Response from autocomplete check."""
 
     success: bool = Field(..., description="Whether the check completed successfully")
-    result: Optional[AutocompleteResult] = Field(None, description="Check results")
-    url: Optional[str] = Field(None, description="URL of checked page")
-    title: Optional[str] = Field(None, description="Title of checked page")
+    result: AutocompleteResult | None = Field(None, description="Check results")
+    url: str | None = Field(None, description="URL of checked page")
+    title: str | None = Field(None, description="Title of checked page")
     message: str = Field(..., description="Status message")

@@ -19,7 +19,6 @@ from typing import Any
 import requests
 
 from inspekt.services import http_client
-
 from inspekt.services.ai_providers.base import AIProvider, AIProviderError, AIResponse
 
 logger = logging.getLogger(__name__)

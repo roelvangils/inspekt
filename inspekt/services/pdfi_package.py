@@ -100,7 +100,7 @@ class PDFIPackageBuilder:
         self.report_data: dict[str, Any] | None = None
         self._finalized = False
 
-    def __enter__(self) -> "PDFIPackageBuilder":
+    def __enter__(self) -> PDFIPackageBuilder:
         """Create temporary directory for building the package."""
         self.temp_dir = Path(tempfile.mkdtemp(prefix="pdfi_"))
         # Create directory structure
@@ -141,7 +141,7 @@ class PDFIPackageBuilder:
 
         logger.debug(f"Added source PDF: {pdf_path.name} ({self.manifest.source_pdf_size} bytes)")
 
-    def add_report(self, report: "PDFReportData | dict[str, Any]") -> None:
+    def add_report(self, report: PDFReportData | dict[str, Any]) -> None:
         """
         Add the report data to the package.
 
@@ -396,7 +396,7 @@ class PDFIPackageReader:
         self._manifest: PackageManifest | None = None
         self._report: dict[str, Any] | None = None
 
-    def __enter__(self) -> "PDFIPackageReader":
+    def __enter__(self) -> PDFIPackageReader:
         """Extract package to temporary directory."""
         self.temp_dir = Path(tempfile.mkdtemp(prefix="pdfi_read_"))
 
@@ -535,7 +535,7 @@ class PDFIPackageReader:
 
 def generate_pdfi_package(
     pdf_path: Path | str,
-    report_data: "PDFReportData | dict[str, Any]",
+    report_data: PDFReportData | dict[str, Any],
     output_path: Path | str,
     config: dict | None = None,
     include_preview: bool = True,

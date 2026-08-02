@@ -13,12 +13,12 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from inspekt.core.schemas.accessibility import (
-    AxeParams,
-    AxeResponse,
-    AxeSummary,
     AutocompleteParams,
     AutocompleteResponse,
     AutocompleteSummary,
+    AxeParams,
+    AxeResponse,
+    AxeSummary,
 )
 
 if TYPE_CHECKING:
@@ -193,7 +193,7 @@ async def run_axe_audit(params: AxeParams) -> AxeResponse:
             success=False,
             url=None,
             title=None,
-            message=f"Error: {str(e)}",
+            message=f"Error: {e!s}",
         )
 
 
@@ -269,5 +269,5 @@ async def run_autocomplete_check(params: AutocompleteParams) -> AutocompleteResp
             success=False,
             url=None,
             title=None,
-            message=f"Error: {str(e)}",
+            message=f"Error: {e!s}",
         )

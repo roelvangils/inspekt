@@ -17,11 +17,15 @@ import requests
 
 from inspekt.transport import (
     ConnectionError as TransportConnectionError,
+)
+from inspekt.transport import (
     Request,
     SyncUnixSocketTransport,
-    TimeoutError as TransportTimeoutError,
     get_socket_path,
     is_server_available,
+)
+from inspekt.transport import (
+    TimeoutError as TransportTimeoutError,
 )
 
 
@@ -69,7 +73,7 @@ class SocketClientMixin:
     be used instead of HTTP when available.
     """
 
-    _socket_transport: Optional[SyncUnixSocketTransport] = None
+    _socket_transport: SyncUnixSocketTransport | None = None
     # Once a socket call fails within a client instance, stop retrying it.
     # A CLI invocation is one process, so this effectively means "if the
     # socket path misbehaves once, use HTTP for the rest of this command."
@@ -252,6 +256,7 @@ class BridgeClient(SocketClientMixin):
         Returns True if domain was added and retry succeeded, False otherwise.
         """
         import sys
+
         import click
 
         domain = self._extract_domain(url)
@@ -286,7 +291,7 @@ class BridgeClient(SocketClientMixin):
             )
 
             if response.lower() in ('n', 'no'):
-                click.echo(f"\nDomain not added. You can add it later with:", err=True)
+                click.echo("\nDomain not added. You can add it later with:", err=True)
                 click.echo(f"  inspekt domain add {normalized}", err=True)
                 click.echo("", err=True)
                 click.echo("Or bypass all domain checks for 1 hour with:", err=True)
@@ -337,7 +342,7 @@ class BridgeClient(SocketClientMixin):
             from inspekt.services.domain_service import get_domain_service
             sync_start = time.time()
             domains = get_domain_service().get_domains_for_browser_sync()
-            _verbose_log(f"Domains to sync", len(domains))
+            _verbose_log("Domains to sync", len(domains))
             response = self._session.post(
                 f"{self.base_url}/domains/sync",
                 json={"domains": domains},

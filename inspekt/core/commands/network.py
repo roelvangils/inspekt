@@ -21,7 +21,6 @@ from inspekt.core.schemas.network import (
     GetNetworkRequestsResponse,
 )
 
-
 network = CommandDefinition(
     id="network",
     name="Network",

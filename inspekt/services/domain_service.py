@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import sqlite3
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -335,7 +335,7 @@ class DomainService:
 
         for item in domains_list:
             # Convert Unix timestamp to ISO format
-            dt = datetime.fromtimestamp(item["added_at"], tz=timezone.utc)
+            dt = datetime.fromtimestamp(item["added_at"], tz=UTC)
             iso_timestamp = dt.isoformat().replace("+00:00", "Z")
 
             domains[item["domain"]] = {

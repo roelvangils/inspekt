@@ -207,7 +207,7 @@ def get_cli_command_details(command_path: str) -> dict[str, Any] | None:
 
         Returns None if command not found.
     """
-    from click import Context, Group, Option, Argument
+    from click import Argument, Context, Group, Option
 
     from inspekt.app.cli import cli
 

@@ -8,9 +8,9 @@ used to filter accessibility audit results by WCAG conformance level.
 import pytest
 
 from inspekt.app.cli.accessibility import (
-    _sc_matches_level,
-    WCAG_SC_LEVELS,
     WCAG_SC_DESCRIPTIONS,
+    WCAG_SC_LEVELS,
+    _sc_matches_level,
 )
 
 

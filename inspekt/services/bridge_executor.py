@@ -178,7 +178,7 @@ class BridgeExecutor:
                 _verbose_log(f"Sending code to browser (attempt {attempt + 1}/{retries})")
                 exec_start = time.time()
                 result = self.client.execute(code, timeout=timeout, _fast_poll=fast_poll, instance=instance)
-                _verbose_log(f"Execution completed", f"{time.time() - exec_start:.3f}s")
+                _verbose_log("Execution completed", f"{time.time() - exec_start:.3f}s")
 
                 # Check if this is a domain permission error (fallback for edge cases)
                 if not result.get("ok"):
@@ -317,6 +317,7 @@ class BridgeExecutor:
             True if domain was added, False otherwise
         """
         import requests
+
         from inspekt.services.domain_service import get_domain_service, normalize_domain
 
         try:
@@ -325,22 +326,22 @@ class BridgeExecutor:
 
             # Show helpful message
             click.echo(f"\nDomain '{normalized}' is not in the allowed list.", err=True)
-            click.echo(f"", err=True)
+            click.echo("", err=True)
 
             # Prompt user
             response = click.prompt(
-                f'Would you like to add it now? [Y/n]',
+                'Would you like to add it now? [Y/n]',
                 type=str,
                 default="Y",
                 show_default=False
             )
 
             if response.lower() in ('n', 'no'):
-                click.echo(f"\nDomain not added. You can add it later with:", err=True)
+                click.echo("\nDomain not added. You can add it later with:", err=True)
                 click.echo(f"  inspekt domain add {normalized}", err=True)
-                click.echo(f"", err=True)
-                click.echo(f"Or bypass all domain checks for 1 hour with:", err=True)
-                click.echo(f"  inspekt yolo", err=True)
+                click.echo("", err=True)
+                click.echo("Or bypass all domain checks for 1 hour with:", err=True)
+                click.echo("  inspekt yolo", err=True)
                 return False
 
             # Add to SQLite (automatically normalized)
@@ -348,7 +349,7 @@ class BridgeExecutor:
             result = domain_service.add_domain(normalized)
 
             if not result.get("ok"):
-                click.echo(f"Error: Failed to add domain to database", err=True)
+                click.echo("Error: Failed to add domain to database", err=True)
                 return False
 
             stored_domain = result.get("domain", normalized)
@@ -409,7 +410,7 @@ class BridgeExecutor:
         try:
             with open(filepath, encoding="utf-8") as f:
                 code = f.read()
-        except (FileNotFoundError, IOError) as e:
+        except (OSError, FileNotFoundError) as e:
             click.echo(f"Error reading file {filepath}: {e}", err=True)
             sys.exit(1)
 

@@ -135,7 +135,7 @@ async def summarize(params: SummarizeParams) -> SummarizeResponse:
         logger.error(f"Summarize error: {e}")
         return SummarizeResponse(
             title="",
-            summary=f"Error: {str(e)}",
+            summary=f"Error: {e!s}",
             byline=None,
             cached=False,
         )
@@ -186,7 +186,7 @@ async def describe(params: DescribeParams) -> DescribeResponse:
     except Exception as e:
         logger.error(f"Describe error: {e}")
         return DescribeResponse(
-            description=f"Error: {str(e)}",
+            description=f"Error: {e!s}",
             cached=False,
         )
 
@@ -252,7 +252,7 @@ Please provide a concise, accurate answer based only on the information provided
     except Exception as e:
         logger.error(f"Ask error: {e}")
         return AskResponse(
-            answer=f"Error: {str(e)}",
+            answer=f"Error: {e!s}",
             cached=False,
         )
 
@@ -1342,7 +1342,7 @@ async def element_describe(params: ElementDescribeParams) -> ElementDescribeResp
     except Exception as e:
         logger.error(f"Element describe error: {e}")
         return ElementDescribeResponse(
-            description=f"Error: {str(e)}",
+            description=f"Error: {e!s}",
             element_type="unknown",
             accessible_name=None,
             source=params.source,
@@ -1889,6 +1889,7 @@ async def element_ask(params: ElementAskParams) -> ElementAskResponse:
     generating a rich HTML report.
     """
     import click
+
     from inspekt.services.content_cache import ContentCache
 
     def debug_print(msg: str) -> None:
@@ -2125,7 +2126,7 @@ async def element_ask(params: ElementAskParams) -> ElementAskResponse:
     except Exception as e:
         logger.error(f"Element ask error: {e}")
         return ElementAskResponse(
-            answer=f"Error: {str(e)}",
+            answer=f"Error: {e!s}",
             element_type="unknown",
             source=params.source,
         )

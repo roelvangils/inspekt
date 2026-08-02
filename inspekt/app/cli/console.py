@@ -21,7 +21,7 @@ from datetime import datetime
 
 import click
 
-from inspekt.app.cli.icons import success, get_indicator, get_log_level_icon
+from inspekt.app.cli.icons import get_indicator, get_log_level_icon, success
 from inspekt.app.cli.table import Table
 from inspekt.client import BridgeClient
 
@@ -379,6 +379,7 @@ def log_expression(expression, timeout):
         inspekt log "[1,2,3].map(x => x*2)"
     """
     import requests
+
     from inspekt.services.bridge_executor import BridgeExecutor
 
     executor = BridgeExecutor()
