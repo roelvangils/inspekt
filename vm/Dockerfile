@@ -252,12 +252,14 @@ RUN --mount=type=cache,target=/root/.cache/pip,sharing=locked \
 # --mode regular with Chromium's --proxy-server flag. It requires bpf-linker (eBPF
 # toolchain) which is impractical to build on Alpine.
 #
-# Both mitmproxy-rs AND mitmproxy depend on mitmproxy-linux==0.12.9 on Linux.
+# mitmproxy-rs pins mitmproxy-linux to its own exact version on Linux, so the
+# stub version MUST match the mitmproxy-rs version resolved by the pinned
+# mitmproxy below — keep the two in lockstep when bumping mitmproxy.
 # By installing this stub in a committed layer BEFORE pip resolves those packages,
 # pip sees the dependency as already satisfied and skips the download/build.
 RUN --mount=type=cache,target=/root/.cache/pip,sharing=locked \
     mkdir -p /tmp/mitmproxy-linux-stub/mitmproxy_linux && \
-    printf '[project]\nname = "mitmproxy-linux"\nversion = "0.12.9"\n' \
+    printf '[project]\nname = "mitmproxy-linux"\nversion = "0.12.11"\n' \
         > /tmp/mitmproxy-linux-stub/pyproject.toml && \
     printf '"""Stub: eBPF transparent proxy not needed in regular proxy mode."""\n' \
         > /tmp/mitmproxy-linux-stub/mitmproxy_linux/__init__.py && \
@@ -276,7 +278,7 @@ RUN --mount=type=cache,target=/root/.cache/pip,sharing=locked \
     ln -sf /usr/bin/g++ /usr/local/bin/c++ && \
     curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal && \
     export PATH="/root/.cargo/bin:$PATH" && \
-    /opt/inspekt/.venv/bin/pip install mitmproxy && \
+    /opt/inspekt/.venv/bin/pip install mitmproxy==12.2.3 mitmproxy-rs==0.12.11 && \
     rm -f /usr/local/bin/cc /usr/local/bin/c++ && \
     rustup self uninstall -y && \
     rm -rf /root/.cargo /root/.rustup && \
